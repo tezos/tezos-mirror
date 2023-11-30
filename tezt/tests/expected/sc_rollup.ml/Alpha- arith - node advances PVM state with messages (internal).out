@@ -37,33 +37,33 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000007"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\007"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"0000000a"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\n"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"0000000d"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\r"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000010"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\016"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000013"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\019"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000016"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\022"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000019"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\025"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"0000001c"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\028"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"0000001f"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\031"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000022"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\""
