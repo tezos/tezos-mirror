@@ -1,3 +1,3 @@
 code { LSL } ;
 input { Stack_elt nat 1 ; Stack_elt nat 257 } ;
-output (GeneralOverflow 1 257)
+output Overflow

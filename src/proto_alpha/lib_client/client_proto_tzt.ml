@@ -21,23 +21,9 @@ let convert_error trace =
   | Script_interpreter.Reject (_loc, value, _trace) ->
       let value = Michelson_v1_primitives.strings_of_prims value in
       return (Prim (0, "Failed", [root value], []))
-  | Tez_repr.Addition_overflow (a, b) ->
-      return
-        (Prim
-           ( 0,
-             "MutezOverflow",
-             [
-               Int (0, Z.of_int64 @@ Tez_repr.to_mutez a);
-               Int (0, Z.of_int64 @@ Tez_repr.to_mutez b);
-             ],
-             [] ))
-  | Tez_repr.Multiplication_overflow (a, b) ->
-      return
-        (Prim
-           ( 0,
-             "MutezOverflow",
-             [Int (0, Z.of_int64 @@ Tez_repr.to_mutez a); Int (0, Z.of_int64 b)],
-             [] ))
+  | Tez_repr.Addition_overflow _ | Tez_repr.Multiplication_overflow _
+  | Script_interpreter.Overflow _ ->
+      return (Prim (0, "Overflow", [], []))
   | Tez_repr.Subtraction_underflow (a, b) ->
       return
         (Prim
@@ -48,7 +34,6 @@ let convert_error trace =
                Int (0, Z.of_int64 @@ Tez_repr.to_mutez b);
              ],
              [] ))
-  | Script_interpreter.Overflow _ -> return (Prim (0, "Overflow", [], []))
   | Tez_repr.Negative_multiplicator _ -> return (Prim (0, "NegMul", [], []))
   | Tez_repr.Invalid_divisor _ -> return (Prim (0, "InvalidDivisor", [], []))
   | Raw_context.Operation_quota_exceeded | Raw_context.Block_quota_exceeded ->

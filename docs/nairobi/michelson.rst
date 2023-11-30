@@ -3382,16 +3382,15 @@ raise:
    instruction and the topmost element of the stack at this point was
    ``<value>``;
 
- - ``MutezOverflow``: an addition or multiplication on type ``mutez``
-   produced a result which was too large to be represented as a value
-   of type ``mutez``;
-
  - ``MutezUnderflow``: a mutez subtraction resulted in a negative
    value. This should only happen in the case of the deprecated
    ``mutez`` case of the ``SUB`` instruction;
 
- - ``GeneralOverflow``: the number of bits to shift using the ``LSL``
-   or ``LSR`` instruction was too large;
+ - ``Overflow``: an overflow was detected. This can happen when an
+   addition or multiplication on type ``mutez`` produces a result
+   which is too large to be represented as a value of type ``mutez``,
+   or when the number of bits to shift using the ``LSL`` or ``LSR``
+   instruction is too large.
 
 
 The following example shows how to test a runtime failure; it asserts

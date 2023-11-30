@@ -20,26 +20,6 @@ Got output: { Stack_elt
     0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000003ff002431516be31f3f7bb3c8169f930a024142696af7 }
 Expected: { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }
 
-tzt_reference_test_suite/mul_nat-mutez_01.tzt:
-Got output: Overflow
-Expected: MutezOverflow
-  2000000000000000000000000000000000000000000000000000000000000000000000
-  10
-
-tzt_reference_test_suite/mul_mutez-nat_01.tzt:
-Got output: Overflow
-Expected: MutezOverflow
-  10
-  2000000000000000000000000000000000000000000000000000000000000000000000
-
-tzt_reference_test_suite/lsr_01.tzt:
-Got output: Overflow
-Expected: GeneralOverflow 32 300
-
-tzt_reference_test_suite/lsl_01.tzt:
-Got output: Overflow
-Expected: GeneralOverflow 1 257
-
 tzt_reference_test_suite/createcontract_01.tzt:
 Got output: { Stack_elt
     operation
@@ -74,6 +54,6 @@ Expected: { Stack_elt
        _) ;
   Stack_elt address _ }
 
-Test results: Passed:528 Failed:9 Total:537
+Test results: Passed:532 Failed:5 Total:537
 Fatal error:
   Some tests have failed
