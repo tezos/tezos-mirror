@@ -144,6 +144,12 @@ check-kaitai-struct-files:
 	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
 	@git diff --exit-code contrib/kaitai-struct-files || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
 
+.PHONY: validate-kaitai-struct-files
+validate-kaitai-struct-files:
+	@$(MAKE) check-kaitai-struct-files
+	@./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input 2>/dev/null || \
+	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input\""; exit 1)
+
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
 # the exact list can vary. We just remove all of them.
