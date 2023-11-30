@@ -5196,7 +5196,6 @@ end = struct
             ("test_voting", true);
             ("test_zk_rollup", true);
             ("test_transfer_ticket", N.(number >= 016));
-            ("test_tx_rollup", N.(number <= 016));
           ]
           |> conditional_list
         in
@@ -5297,7 +5296,6 @@ end = struct
             ("test_script_comparison", true);
             ("test_script_roundtrip", N.(number >= 019));
             ("test_tez_repr", true);
-            ("test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
             ("test_bitset", N.(number >= 013));
             ("test_sc_rollup_tick_repr", N.(number >= 016));
             ("test_sc_rollup_encoding", N.(number >= 016));
@@ -5377,8 +5375,6 @@ end = struct
             ("test_sc_rollup_wasm", N.(number >= 016));
             ("test_local_contexts", N.(number >= 016));
             ("test_dal_slot_proof", N.(number >= 016));
-            ("test_tx_rollup_l2_apply", N.(number >= 015 && number <= 016));
-            ("test_tx_rollup_l2", N.(number >= 015 && number <= 016));
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
             ("test_percentage", N.(number >= 019));
@@ -6432,32 +6428,6 @@ let hash = Protocol.hash
         ~inline_tests:ppx_expect
         ~linkall:true
     in
-    let injector =
-      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
-      octez_protocol_lib
-        "injector"
-        ~internal_name:(sf "tezos_injector_%s" name_dash)
-        ~path:(path // "lib_injector")
-        ~synopsis:"Protocol specific library building injectors"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-            |> open_;
-            octez_base_unix;
-            octez_stdlib_unix |> open_;
-            octez_crypto;
-            main |> open_;
-            octez_micheline |> open_;
-            client |> if_some |> open_;
-            octez_client_base |> open_;
-            octez_workers |> open_;
-            octez_shell;
-            layer2_utils |> if_some |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
-    in
     let dal =
       only_if (active && N.(number >= 016)) @@ fun () ->
       octez_protocol_lib
@@ -6707,87 +6677,6 @@ let hash = Protocol.hash
             main |> open_;
             octez_sc_rollup_client |> if_some |> open_;
             octez_version_value;
-          ]
-    in
-    let tx_rollup =
-      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
-      octez_protocol_lib
-        "tx-rollup"
-        ~internal_name:(sf "tezos_tx_rollup_%s" name_dash)
-        ~path:(path // "lib_tx_rollup")
-        ~synopsis:"Protocol specific library for `tezos-tx-rollup`"
-        ~deps:
-          [
-            index;
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-            |> open_;
-            octez_crypto;
-            main |> open_;
-            client |> if_some |> open_;
-            octez_client_commands |> open_;
-            octez_context_encoding;
-            baking_commands |> if_some |> open_;
-            octez_stdlib_unix |> open_;
-            octez_rpc;
-            octez_rpc_http |> open_;
-            octez_rpc_http_client_unix |> open_;
-            octez_rpc_http_server |> open_;
-            octez_micheline |> open_;
-            octez_client_base |> open_;
-            octez_client_base_unix |> open_;
-            octez_shell;
-            octez_store;
-            octez_workers |> open_;
-            plugin |> if_some |> open_;
-            injector |> if_some |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
-    in
-    let _tx_rollup_client =
-      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
-      public_exe
-        (sf "octez-tx-rollup-client-%s" short_hash)
-        ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
-        ~path:(path // "bin_tx_rollup_client")
-        ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
-        ~release_status:executable_release_status
-        ~with_macos_security_framework:true
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_clic;
-            main |> open_ |> open_ ~m:"Protocol";
-            client |> if_some |> open_;
-            client_commands |> if_some |> open_;
-            octez_client_base_unix |> open_;
-            octez_stdlib_unix |> open_;
-            tx_rollup |> if_some |> open_;
-            uri;
-          ]
-    in
-    let _tx_rollup_node =
-      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
-      public_exe
-        (sf "octez-tx-rollup-node-%s" short_hash)
-        ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
-        ~path:(path // "bin_tx_rollup_node")
-        ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
-        ~release_status:executable_release_status
-        ~with_macos_security_framework:true
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-            |> open_;
-            octez_clic;
-            main |> open_;
-            client |> if_some |> open_;
-            octez_client_base |> open_;
-            octez_client_base_unix |> open_;
-            tx_rollup |> if_some |> open_;
           ]
     in
     let benchmark_type_inference =
