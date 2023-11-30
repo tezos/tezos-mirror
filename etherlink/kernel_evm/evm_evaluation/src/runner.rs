@@ -73,6 +73,11 @@ pub enum TestError {
     UnknownPrivateKey { private_key: H256 },
 }
 
+fn read_testsuite(path: &Path) -> Result<TestSuite, TestError> {
+    let json_reader = std::fs::read(path).unwrap();
+    serde_json::from_reader(&*json_reader).map_err(TestError::from)
+}
+
 fn prepare_host() -> EvalHost {
     let execution_buffer = Vec::new();
     let buffer = RefCell::new(execution_buffer);
@@ -137,8 +142,7 @@ pub fn run_test(
     opt: &Opt,
     output_file: &mut File,
 ) -> Result<(), TestError> {
-    let json_reader = std::fs::read(path).unwrap();
-    let suit: TestSuite = serde_json::from_reader(&*json_reader)?;
+    let suit = read_testsuite(path)?;
     let mut host = prepare_host();
 
     let map_caller_keys: HashMap<H256, H160> = MAP_CALLER_KEYS.into();
