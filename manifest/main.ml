@@ -2524,6 +2524,11 @@ let _octez_tooling =
            it is added to tezos/opam-repository. *)
         ocamlformat;
       ]
+    ~npm_deps:
+      [
+        Npm.make "kaitai-struct" (Version (V.exactly "0.10.0"))
+        (* Client-libs project requires Javascript Kaitai runtime. *);
+      ]
 
 let octez_tooling_opam_file_format =
   private_lib
