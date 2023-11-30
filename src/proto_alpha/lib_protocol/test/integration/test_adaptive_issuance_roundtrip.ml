@@ -1722,8 +1722,8 @@ let check_balance_field src_name field amount : (t, t) scenarios =
             let* () = check' rpc_balance.staked_b in
             check' src_balance.staked_b
         | `Unstaked_frozen_total ->
-            let* () = check' rpc_balance.unstaked_frozen_b in
-            check' src_balance.unstaked_frozen_b
+            let* () = check rpc_balance.unstaked_frozen_b in
+            check src_balance.unstaked_frozen_b
         | `Unstaked_finalizable ->
             let* () = check rpc_balance.unstaked_finalizable_b in
             check src_balance.unstaked_finalizable_b
@@ -2237,7 +2237,8 @@ module Autostaking = struct
             Q.of_int64 @@ Tez.to_mutez new_balance.liquid_b )
       | `staked -> (old_balance.staked_b, new_balance.staked_b)
       | `unstaked_frozen ->
-          (old_balance.unstaked_frozen_b, new_balance.unstaked_frozen_b)
+          ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_frozen_b,
+            Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_frozen_b )
       | `unstaked_finalizable ->
           ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_finalizable_b,
             Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_finalizable_b )
@@ -2741,15 +2742,15 @@ module Slashing = struct
          ("Test slashed is forbidden", test_delegate_forbidden);
          ("Test slash with unstake", test_slash_unstake);
          ("Test slashes with simple varying stake", test_slash_monotonous_stake);
-         (* ( "Test multiple slashes with multiple stakes/unstakes",
-            test_many_slashes ); *)
+         ( "Test multiple slashes with multiple stakes/unstakes",
+           test_many_slashes );
          ("Test slash timing", test_slash_timing);
          ( "Test stake from unstake deactivated when slashed",
            test_no_shortcut_for_cheaters );
          ( "Test stake from unstake reduce initial amount",
            test_slash_correct_amount_after_stake_from_unstake );
-         (* ("Test unstake 1 mutez then slash", test_mini_slash);
-            ("Test slash rounding", test_slash_rounding); *)
+         ("Test unstake 1 mutez then slash", test_mini_slash);
+         ("Test slash rounding", test_slash_rounding);
        ]
 end
 
