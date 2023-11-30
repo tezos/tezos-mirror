@@ -21,6 +21,8 @@ val voting_weight : t -> Int64.t tzresult
 
 val apply_slashing : percentage:Int_percentage.t -> t -> t
 
+val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
+
 val remove_delegated : amount:Tez_repr.t -> t -> t tzresult
 
 val remove_own_frozen : amount:Tez_repr.t -> t -> t tzresult

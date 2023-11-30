@@ -42,6 +42,10 @@ let apply_slashing ~percentage {own_frozen; staked_frozen; delegated} =
   in
   {own_frozen; staked_frozen; delegated}
 
+let has_minimal_frozen_stake ~minimal_frozen_stake
+    {own_frozen; staked_frozen = _; delegated = _} =
+  Tez_repr.(own_frozen >= minimal_frozen_stake)
+
 let remove_delegated ~amount {own_frozen; staked_frozen; delegated} =
   let open Result_syntax in
   let+ delegated = Tez_repr.(delegated -? amount) in
