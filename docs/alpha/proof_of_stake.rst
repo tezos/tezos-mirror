@@ -46,6 +46,8 @@ of all the accounts that delegate to it, including the balance of the delegate i
 participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
 ``MINIMAL_STAKE`` :ref:`protocol constant
+<protocol_constants_alpha>` and a minimal frozen stake given by the
+``MINIMAL_FROZEN_STAKE`` :ref:`protocol constant
 <protocol_constants_alpha>`.
 
 Delegates place security deposits that may be forfeited in case they do not
@@ -115,7 +117,8 @@ At the end of cycle ``n-1-PRESERVED_CYCLES``, the snapshot for cycle
 PRNG having as seed the :ref:`random seed<random_seed_alpha>` for
 cycle ``n``.
 
-Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE`` is snapshot.
+Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE``
+and frozen deposits greater than ``MINIMAL_FROZEN_STAKE`` is snapshotted.
 
 .. _rights_alpha:
 
@@ -166,6 +169,8 @@ Proof-of-stake parameters
      - 5 cycles
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
+   * - ``MINIMAL_FROZEN_STAKE``
+     - 600 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
      - 1024 blocks
 
