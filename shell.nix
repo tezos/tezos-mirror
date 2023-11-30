@@ -89,12 +89,8 @@ let
         '';
       })
     else pkgs.clang;
-
-  mkShell = pkgs.mkShell.override {
-    stdenv = pkgs.clang16Stdenv;
-  };
 in
-  mkShell {
+  pkgs.mkShell {
     name = "tezos-shell";
 
     hardeningDisable = ["stackprotector"];
