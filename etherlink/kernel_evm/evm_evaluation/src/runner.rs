@@ -135,6 +135,34 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
     write_host!(host, "\n[END] Accounts initialisation\n");
 }
 
+fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
+    let map_caller_keys: HashMap<H256, H160> = MAP_CALLER_KEYS.into();
+
+    let mut env = Env::default();
+
+    // BlockEnv
+    env.block.number = unit.env.current_number;
+    env.block.coinbase = unit.env.current_coinbase;
+    env.block.timestamp = unit.env.current_timestamp;
+    env.block.gas_limit = unit.env.current_gas_limit;
+    env.block.basefee = unit.env.current_base_fee.unwrap_or_default();
+
+    // TxEnv
+    env.tx.caller = if let Some(caller) =
+        map_caller_keys.get(&unit.transaction.secret_key.unwrap())
+    {
+        *caller
+    } else {
+        let private_key = unit.transaction.secret_key.unwrap();
+        return Err(TestError::UnknownPrivateKey { private_key });
+    };
+    env.tx.gas_price = unit
+        .transaction
+        .gas_price
+        .unwrap_or_else(|| unit.transaction.max_fee_per_gas.unwrap_or_default());
+    Ok(env)
+}
+
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
@@ -145,39 +173,17 @@ pub fn run_test(
     let suit = read_testsuite(path)?;
     let mut host = prepare_host();
 
-    let map_caller_keys: HashMap<H256, H160> = MAP_CALLER_KEYS.into();
-
     for (name, unit) in suit.0.into_iter() {
+        writeln!(output_file, "Running unit test: {}", name).unwrap();
+
         let precompiles = precompile_set::<EvalHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
 
-        writeln!(output_file, "Running unit test: {}", name).unwrap();
         let filler_source = prepare_filler_source(&host, &unit, opt)?;
 
         initialize_accounts(&mut host, &unit);
 
-        let mut env = Env::default();
-
-        // BlockEnv
-        env.block.number = unit.env.current_number;
-        env.block.coinbase = unit.env.current_coinbase;
-        env.block.timestamp = unit.env.current_timestamp;
-        env.block.gas_limit = unit.env.current_gas_limit;
-        env.block.basefee = unit.env.current_base_fee.unwrap_or_default();
-
-        // TxEnv
-        env.tx.caller = if let Some(caller) =
-            map_caller_keys.get(&unit.transaction.secret_key.unwrap())
-        {
-            *caller
-        } else {
-            let private_key = unit.transaction.secret_key.unwrap();
-            return Err(TestError::UnknownPrivateKey { private_key });
-        };
-        env.tx.gas_price = unit
-            .transaction
-            .gas_price
-            .unwrap_or_else(|| unit.transaction.max_fee_per_gas.unwrap_or_default());
+        let mut env = initialize_env(&unit)?;
 
         // post and execution
         for (spec_name, tests) in unit.post {
