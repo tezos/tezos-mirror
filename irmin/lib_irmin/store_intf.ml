@@ -802,7 +802,8 @@ module type S_generic_key = sig
     test:tree option ->
     set:tree option ->
     (commit option, write_error) result Lwt.t
-  (** [test_set_and_get_tree] is like {!test_set_and_get} but for a {!tree} *)
+  (** [test_set_and_get_tree] is like {!test_set_and_get} but for a
+      {!type-tree} *)
 
   val test_set_and_get_tree_exn :
     ?clear:bool ->
@@ -935,7 +936,7 @@ module type S_generic_key = sig
 
   val clone : src:t -> dst:branch -> t Lwt.t
   (** [clone ~src ~dst] makes [dst] points to [Head.get src]. [dst] is created
-      if needed. Remove the current contents en [dst] if [src] is {!empty}. *)
+      if needed. Remove the current contents en [dst] if [src] is {!val-empty}. *)
 
   (** {1 Watches} *)
 
@@ -1127,7 +1128,7 @@ module type S_generic_key = sig
       When [clear] is set (the default), the tree cache is emptied upon the
       function's completion, mirroring the effect of invoking {!Tree.clear}. *)
 
-  (** {Deprecated} *)
+  (** {2 Deprecated} *)
 
   val master : repo -> t Lwt.t
     [@@ocaml.deprecated "Use `main` instead."]

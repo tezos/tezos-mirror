@@ -47,7 +47,7 @@ module type S = sig
 
   val watch_key :
     t -> key -> ?init:value -> (value Diff.t -> unit Lwt.t) -> watch Lwt.t
-  (** Watch a given key for changes. More efficient than {!watch}. *)
+  (** Watch a given key for changes. More efficient than {!val-watch}. *)
 
   val watch :
     t ->

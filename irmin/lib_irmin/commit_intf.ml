@@ -200,7 +200,7 @@ module type History = sig
     min:commit_key list ->
     max:commit_key list ->
     commit_key list Lwt.t
-  (** Same as {{!Node.Graph.closure} Node.Graph.closure} but for the history
+  (** Same as {{!Node.module-type-Graph.closure} Node.Graph.closure} but for the history
       graph. *)
 
   val iter :
@@ -213,7 +213,7 @@ module type History = sig
     ?rev:bool ->
     unit ->
     unit Lwt.t
-  (** Same as {{!Node.Graph.iter} Node.Graph.iter} but for traversing the
+  (** Same as {{!Node.module-type-Graph.iter} Node.Graph.iter} but for traversing the
       history graph. *)
 end
 

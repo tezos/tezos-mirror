@@ -85,7 +85,7 @@ module Metadata = Metadata
 module Path = Path
 (** Store paths.
 
-    An Irmin {{!Irmin.S} store} binds {{!Path.S.t} paths} to user-defined
+    An Irmin {{!Irmin.S} store} binds {{!Path.S.type-t} paths} to user-defined
     {{!Contents.S} contents}. Paths are composed by basic elements, that we call
     {{!Path.S.step} steps}. The following [Path] module provides functions to
     manipulate steps and paths. *)
@@ -122,15 +122,15 @@ module Json_tree : Store.Json_tree
 (** {2 Creating Stores} *)
 
 (** [Maker] is the signature exposed by any backend providing {!S}
-    implementations. {!Maker.Make} is parameterised by {!Schema.S}. It does not
+    implementations. {!module-type-Maker.Make} is parameterised by {!Schema.S}. It does not
     use any native synchronization primitives. *)
 module type Maker = sig
   include Store.Maker
   (** @inline *)
 end
 
-(** [KV_maker] is like {!Maker} but where everything except the contents is
-    replaced by sensible default implementations. {!KV_maker.Make} is
+(** [KV_maker] is like {!module-type-Maker} but where everything except the contents is
+    replaced by sensible default implementations. {!module-type-KV_maker.Make} is
     parameterised by {!Contents.S} *)
 module type KV_maker = sig
   include Store.KV_maker

@@ -38,7 +38,7 @@ module type Store = sig
       key. The merge function will: {e (i)} read the values associated with the
       given keys, {e (ii)} use the merge function defined on values and
       {e (iii)} write the resulting values into the store to get the resulting
-      key. See {!val-S.merge}.
+      key. See {!module-type-S.val-merge}.
 
       If any of these operations fail, return [`Conflict]. *)
 
@@ -93,7 +93,7 @@ module type Sigs = sig
        and type hash = H.t
        and type value = C.t
 
-  (** [Store_indexable] is like {!Store} but uses an indexable store as a
+  (** [Store_indexable] is like {!module-Store} but uses an indexable store as a
       backend (rather than a content-addressable one). *)
   module Store_indexable
       (S : Indexable.S)

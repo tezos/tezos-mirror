@@ -176,7 +176,7 @@ module type Internal = sig
 
       type 'a pointer = { index : int; pointer : hash; tree : 'a }
       [@@deriving irmin]
-      (** The type for internal pointers between concrete {!tree}s. *)
+      (** The type for internal pointers between concrete {!type-tree}s. *)
 
       type 'a tree = { depth : int; length : int; pointers : 'a pointer list }
       [@@deriving irmin]

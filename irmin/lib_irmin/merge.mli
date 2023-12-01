@@ -199,7 +199,7 @@ end) : sig
   val merge : 'a Type.t -> (K.t -> 'a option t) -> 'a Map.Make(K).t t
 end
 
-(** Infix operators for manipulating merge results and {!promise}s.
+(** Infix operators for manipulating merge results and {!type-promise}s.
 
     [open Irmin.Merge.Infix] at the top of your file to use them. *)
 module Infix : sig

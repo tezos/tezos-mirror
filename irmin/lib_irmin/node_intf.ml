@@ -65,7 +65,7 @@ module type Core = sig
   (** [empty ()] is the empty node. *)
 
   val is_empty : t -> bool
-  (** [is_empty t] is true iff [t] is {!empty}. *)
+  (** [is_empty t] is true iff [t] is {!val-empty}. *)
 
   val length : t -> int
   (** [length t] is the number of entries in [t]. *)

@@ -24,7 +24,7 @@ module type Subcommand = sig
   val run : run
 
   val term_internal : (unit -> unit) Cmdliner.Term.t
-  (** A pre-packaged [Cmdliner] term for executing {!run}. *)
+  (** A pre-packaged [Cmdliner] term for executing {!val-run}. *)
 
   val term : (unit Cmdliner.Term.t * Cmdliner.Term.info[@alert "-deprecated"])
   (** [term] is {!term_internal} plus documentation and logs initialisation *)
