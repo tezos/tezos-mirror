@@ -191,7 +191,7 @@ let unparse_invalid expanded =
     |> Micheline_printer.printable (fun n -> n)
     |> Format.asprintf "%a" Micheline_printer.print_expr_unwrapped
   in
-  fst (Michelson_v1_parser.parse_toplevel source)
+  fst (Michelson_v1_parser.expand_toplevel source)
 
 let ocaml_constructor_of_prim prim =
   (* Assuming all the prim constructor prefixes match the

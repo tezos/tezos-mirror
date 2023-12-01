@@ -91,6 +91,12 @@ type error +=
   | Wrong_extra_big_maps_item of localized_node
   | Wrong_extra_big_maps of localized_node
   | Invalid_address_for_smart_contract of string
+  | Duplicated_tzt_top_prim of string * localized_node
+  | Wrong_tzt_top_prim_arity of string * localized_node * int
+  | Unknown_tzt_top_prim of string * localized_node
+  | Missing_mandatory_tzt_top_prim of string
+  | Invalid_format_for_tzt_top_prim of string * localized_node
+  | Invalid_tzt_toplevel of localized_node
 
 let () =
   Protocol_client_context.register_error_kind
@@ -212,7 +218,116 @@ let () =
          in base58 checked notation starting with 'KT1', but given '%s'"
         literal)
     (function Invalid_address_for_smart_contract str -> Some str | _ -> None)
-    (fun str -> Invalid_address_for_smart_contract str)
+    (fun str -> Invalid_address_for_smart_contract str) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.wrong_toplevel_arity"
+    ~title:"Wrong arity for a TZT toplevel primitive"
+    ~description:"A known toplevel TZT primitive was used with a bad arity."
+    ~pp:(fun ppf (prim, node, arity) ->
+      Format.fprintf
+        ppf
+        "%a,@ Wrong arity for TZT toplevel primitive %s, expected %d \
+         arguments, got %a"
+        print_localized_node_location
+        node
+        prim
+        arity
+        print_localized_node
+        node)
+    Data_encoding.(
+      obj3
+        (req "prim" string)
+        (req "node" localized_node_encoding)
+        (req "arity" int16))
+    (function
+      | Wrong_tzt_top_prim_arity (prim, node, arity) -> Some (prim, node, arity)
+      | _ -> None)
+    (fun (prim, node, arity) -> Wrong_tzt_top_prim_arity (prim, node, arity)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.duplicated_toplevel"
+    ~title:"Duplicated TZT toplevel primitive"
+    ~description:"A toplevel TZT primitive was used several times."
+    ~pp:(fun ppf (prim, node) ->
+      Format.fprintf
+        ppf
+        "%a,@ The TZT toplevel primitive %s, cannot be used because it has \
+         already been used. A TZT toplevel primitive can only be used once per \
+         unit test."
+        print_localized_node_location
+        node
+        prim)
+    Data_encoding.(
+      obj2 (req "prim" string) (req "node" localized_node_encoding))
+    (function
+      | Duplicated_tzt_top_prim (prim, node) -> Some (prim, node) | _ -> None)
+    (fun (prim, node) -> Duplicated_tzt_top_prim (prim, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.unknown_toplevel"
+    ~title:"Unknown TZT toplevel primitive"
+    ~description:"A toplevel TZT primitive was unknown."
+    ~pp:(fun ppf (prim, node) ->
+      Format.fprintf
+        ppf
+        "%a,@ The TZT toplevel primitive %s is unknown."
+        print_localized_node_location
+        node
+        prim)
+    Data_encoding.(
+      obj2 (req "prim" string) (req "node" localized_node_encoding))
+    (function
+      | Unknown_tzt_top_prim (prim, node) -> Some (prim, node) | _ -> None)
+    (fun (prim, node) -> Unknown_tzt_top_prim (prim, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.missing_mandatory"
+    ~title:"Missing TZT mandatory toplevel primitive"
+    ~description:"A mandatory toplevel TZT primitive was missing."
+    ~pp:(fun ppf prim ->
+      Format.fprintf
+        ppf
+        "The mandatory TZT toplevel primitive %s is missing."
+        prim)
+    Data_encoding.(obj1 (req "prim" string))
+    (function Missing_mandatory_tzt_top_prim prim -> Some prim | _ -> None)
+    (fun prim -> Missing_mandatory_tzt_top_prim prim) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.invalid_format"
+    ~title:"Invalid format for a TZT toplevel primitive"
+    ~description:"Invalid format for a TZT toplevel primitive"
+    ~pp:(fun ppf (prim, node) ->
+      Format.fprintf
+        ppf
+        "%a,@ Invalid format for TZT toplevel primitive %s."
+        print_localized_node_location
+        node
+        prim)
+    Data_encoding.(
+      obj2 (req "prim" string) (req "node" localized_node_encoding))
+    (function
+      | Invalid_format_for_tzt_top_prim (prim, node) -> Some (prim, node)
+      | _ -> None)
+    (fun (prim, node) -> Invalid_format_for_tzt_top_prim (prim, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"tzt.invalid_toplevel"
+    ~title:"Invalid format for TZT toplevel entry"
+    ~description:"Invalid format for a TZT toplevel entry"
+    ~pp:(fun ppf node ->
+      Format.fprintf
+        ppf
+        "%a,@ Invalid format for TZT toplevel entry, expected a sequence of \
+         primitive applications, got %a."
+        print_localized_node_location
+        node
+        print_localized_node
+        node)
+    localized_node_encoding
+    (function Invalid_tzt_toplevel node -> Some node | _ -> None)
+    (fun node -> Invalid_tzt_toplevel node)
 
 let parse_expression (node : (_, string) Micheline.node) =
   Environment.wrap_tzresult
@@ -289,3 +404,69 @@ let parse_extra_big_maps ?node parsed =
     ~parsed
     ~error:(fun node -> Wrong_extra_big_maps node)
     parse_extra_big_map_item
+
+type unit_test = {
+  input : (Script.expr * Script.expr) list;
+  code : Script.expr;
+  output : (Script.expr * Script.expr) list;
+}
+
+(* Same as unit_test but all fields are optional. Used only during
+   parsing. *)
+type temp_unit_test = {
+  temp_input : (Script.expr * Script.expr) list option;
+  temp_code : Script.expr option;
+  temp_output : (Script.expr * Script.expr) list option;
+}
+
+let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
+  let open Result_syntax in
+  let open Micheline in
+  let rec parse ut = function
+    | [] -> return ut
+    | (Prim (_loc, prim, [arg], _annots) as e) :: l -> (
+        let check_duplicated = function
+          | None -> return_unit
+          | Some _ ->
+              tzfail (Duplicated_tzt_top_prim (prim, localize_node ~parsed e))
+        in
+        let invalid_format () =
+          Invalid_format_for_tzt_top_prim (prim, localize_node ~parsed e)
+        in
+        let trace_invalid_format res = record_trace_eval invalid_format res in
+        match prim with
+        | "input" ->
+            let* () = check_duplicated ut.temp_input in
+            let* items = trace_invalid_format @@ parse_stack ~node:arg parsed in
+            parse {ut with temp_input = Some items} l
+        | "output" ->
+            let* () = check_duplicated ut.temp_output in
+            let* items = trace_invalid_format @@ parse_stack ~node:arg parsed in
+            parse {ut with temp_output = Some items} l
+        | "code" ->
+            let* () = check_duplicated ut.temp_code in
+            let* c = trace_invalid_format @@ parse_expression arg in
+            parse {ut with temp_code = Some c} l
+        | _ -> tzfail @@ Unknown_tzt_top_prim (prim, localize_node ~parsed e))
+    | (Prim (_loc, prim, ([] | _ :: _ :: _), _annots) as e) :: _ ->
+        tzfail @@ Wrong_tzt_top_prim_arity (prim, localize_node ~parsed e, 1)
+    | ((Seq _ | Int _ | String _ | Bytes _) as e) :: _ ->
+        tzfail @@ Invalid_tzt_toplevel (localize_node ~parsed e)
+  in
+  let nodes =
+    match Micheline.root parsed.expanded with
+    | Seq (_, nodes) -> nodes
+    | node -> [node]
+  in
+  let* ut =
+    parse {temp_input = None; temp_code = None; temp_output = None} nodes
+  in
+  let check_mandatory opt prim =
+    Option.value_e
+      opt
+      ~error:(TzTrace.make @@ Missing_mandatory_tzt_top_prim prim)
+  in
+  let* input = check_mandatory ut.temp_input "input" in
+  let* code = check_mandatory ut.temp_code "code" in
+  let* output = check_mandatory ut.temp_output "output" in
+  return {input; code; output}

@@ -125,3 +125,9 @@ let expand_expression = parse Expression String
 
 let expand_all_and_recognize_prims ~source ~original =
   expand_all_and_recognize_prims source original []
+
+let unrecognize_prims parsed =
+  {
+    parsed with
+    expanded = Michelson_v1_primitives.strings_of_prims parsed.expanded;
+  }

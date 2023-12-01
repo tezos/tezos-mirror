@@ -59,7 +59,8 @@ val unparse_expression : Script.expr -> Michelson_v1_parser.parsed
 (** Unexpand the macros and produce the result of parsing an
     intermediate pretty printed source. Works on generic trees,for
     programs that fail to be converted to a specific script version. *)
-val unparse_invalid : string Micheline.canonical -> Michelson_v1_parser.parsed
+val unparse_invalid :
+  string Micheline.canonical -> string Michelson_v1_parser.parser_result
 
 val ocaml_constructor_of_prim : Michelson_v1_primitives.prim -> string
 

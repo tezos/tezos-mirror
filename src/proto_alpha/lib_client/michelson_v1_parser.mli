@@ -65,3 +65,5 @@ val expand_all_and_recognize_prims :
   source:string ->
   original:Micheline_parser.node ->
   parsed Micheline_parser.parsing_result
+
+val unrecognize_prims : parsed -> string parser_result
