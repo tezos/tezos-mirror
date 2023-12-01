@@ -7,6 +7,7 @@ publish_kernel_sdk:
   extends:
     - .default_settings_template
     - .image_template__rust_toolchain
+    - .tags_template__no_gcp
   stage: manual
   rules:
   - when: manual
