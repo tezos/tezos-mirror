@@ -49,8 +49,21 @@ mod bare_metal {
     }
 }
 
+#[cfg(target_os = "hermit")]
+mod hermit {
+    extern crate std;
+
+    /// Exit the kernel with a status code.
+    pub fn exit(code: i32) -> ! {
+        std::process::exit(code)
+    }
+}
+
 #[cfg(target_os = "none")]
 pub use bare_metal::*;
+
+#[cfg(target_os = "hermit")]
+pub use hermit::*;
 
 /// Available file descriptor for output
 #[repr(i64)]
