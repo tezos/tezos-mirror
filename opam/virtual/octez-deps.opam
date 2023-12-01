@@ -21,7 +21,7 @@ depends: [
   "camlzip" { >= "1.11" & < "1.12" }
   "caqti"
   "caqti-dynload"
-  "caqti-lwt"
+  "caqti-lwt" { >= "2.0.1" }
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
   "cohttp-lwt-unix" { >= "5.2.0" }

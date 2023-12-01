@@ -88,7 +88,9 @@ let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
 
-let caqti_lwt = external_lib "caqti-lwt" V.True
+let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
+
+let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
 let caqti_dynload = external_lib "caqti-dynload" V.True
 
@@ -7490,7 +7492,7 @@ let _get_teztale_data =
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
-        caqti_lwt;
+        caqti_lwt_unix;
         caqti_dynload;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
@@ -7897,7 +7899,7 @@ let _octez_tps_evaluation =
         octez_base |> open_ ~m:"TzPervasives";
         caqti;
         caqti_dynload;
-        caqti_lwt;
+        caqti_lwt_unix;
         data_encoding;
         lwt;
         Protocol.(baking_exn alpha);

@@ -172,7 +172,7 @@ let find_key_by_value map v =
 let get_head_id db_pool =
   let open Lwt_result_syntax in
   let*! head_id_ref =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.fold get_canonical_chain_head_id_query add_head_id () (ref None))
       db_pool
@@ -189,7 +189,7 @@ let get_head_id db_pool =
 let create_table ~db_pool ~query ~query_error =
   let open Lwt_result_syntax in
   let*! query_result =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query ())
       db_pool
   in
@@ -207,7 +207,7 @@ let create_table ~db_pool ~query ~query_error =
 let get_entries ~db_pool ~query ~add_to_map ~arg ~query_error =
   let open Lwt_result_syntax in
   let*! query_result =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.fold query add_to_map arg Query_map.empty)
       db_pool
@@ -222,7 +222,7 @@ let get_entries ~db_pool ~query ~add_to_map ~arg ~query_error =
 let insert_entry ~db_pool ~query ~entry ~query_error =
   let open Lwt_result_syntax in
   let*! query_result =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query entry)
       db_pool
   in
@@ -275,7 +275,7 @@ let print_baker_nodes map =
 let connect_db db_path =
   let open Lwt_result_syntax in
   let db_uri = Uri.of_string ("sqlite3:" ^ db_path) in
-  match Caqti_lwt.connect_pool db_uri with
+  match Caqti_lwt_unix.connect_pool db_uri with
   | Error e -> tzfail (Caqti_db_connection (Caqti_error.show e))
   | Ok db_pool -> return db_pool
 

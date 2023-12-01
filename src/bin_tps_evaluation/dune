@@ -10,7 +10,7 @@
   octez-libs.base
   caqti
   caqti-dynload
-  caqti-lwt
+  caqti-lwt.unix
   data-encoding
   lwt
   octez-protocol-alpha-libs.baking
