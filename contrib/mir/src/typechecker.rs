@@ -5172,4 +5172,37 @@ mod typecheck_tests {
 
         assert_eq!(stk, &tc_stk![Type::Mutez]);
     }
+
+    #[test]
+    fn contract() {
+        let stk = &mut tc_stk![Type::Address];
+        assert_eq!(
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            Ok(Contract(Type::Int, Entrypoint::default()))
+        );
+        assert_eq!(
+            stk,
+            &tc_stk![Type::new_option(Type::new_contract(Type::Int))]
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CONTRACT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CONTRACT,
+                stack: stk![Type::Unit],
+                reason: None
+            })
+        );
+    }
 }
