@@ -40,7 +40,7 @@ proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
 
 # Get version number.
-version=$(dune exec tezos-version)
+version=$(dune exec octez-version)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
@@ -50,7 +50,7 @@ $tezos_node config init --data-dir $data_dir \
     --no-bootstrap-peer \
     --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
-$tezos_node run --data-dir $data_dir &
+$tezos_node run --data-dir $data_dir --connections 0 &
 node_pid="$!"
 
 # Wait for the node to be ready (sorry for the hackish way...)
