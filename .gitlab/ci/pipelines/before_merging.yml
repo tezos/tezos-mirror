@@ -48,3 +48,5 @@ include:
   - .gitlab/ci/jobs/publish/kernel_sdk.yml
   - .gitlab/ci/jobs/publish/gitlab:publish.yml
   - .gitlab/ci/jobs/publish/gitlab:release.yml
+
+  - .gitlab/ci/jobs/build/static_arm64_experimental.yml
