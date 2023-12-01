@@ -3,7 +3,7 @@
 #
 ### BEGIN INIT INFO
 # Provides:          octez-smartrollup
-# Required-Start:    octez-node
+# Required-Start:    
 # Required-Stop:     
 # Should-Start:      $network $named 
 # Should-Stop:       $network $named 
@@ -34,11 +34,14 @@ clientdir=~tezos/.tezos-client
 logdir=/var/log/tezos
 rotateonstart=yes
 waitfornode=yes
+nodeaddr=127.0.0.1
 rpcport=8732
 othercliopts_smartrollup=""
 
 [ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
 [ -r /etc/octez/smartrollup.conf ] && . /etc/octez/smartrollup.conf
+
+[ -z "$nodeurl" ] && nodeurl="http://$nodeaddr:$rpcport"
 
 logfile="${logdir}/smartrollup.log"
 sr="/usr/bin/octez-smart-rollup-node"
@@ -70,7 +73,7 @@ wait_for_bootstrap()
 	echo "Waiting for node to be bootstrapped" >&2
 		
 	while [ 1 = 1 ]; do
-		/usr/bin/octez-client -E http://127.0.0.1:$rpcport bootstrapped >/dev/null 2>&1
+		/usr/bin/octez-client -E $nodeurl bootstrapped >/dev/null 2>&1
 		[ "$?" = "0" ] && break
 		echo "Node not ready - sleeping for 30 seconds" >&2
 		sleep 30
@@ -91,14 +94,10 @@ case "$1" in
 start)	initial_checks
 	rotate_logs
 	[ "$waitfornode" = "yes" ] && wait_for_bootstrap
-	su $user -c "${sr} -d "$clientdir" run --data-dir "$rollupdatadir" ${othercliopts_smartrollup} >> ${logfile} 2>&1 &"
+	su $user -c "${sr} -d "$clientdir" -E $nodeurl run --data-dir "$rollupdatadir" ${othercliopts_smartrollup} >> ${logfile} 2>&1 &"
 	;;
 stop)	
-       	pkill octez-smart
-#	pkill refuses to match octez-smart-rollup XXX
-#	for p in ${protocols}; do
-#		[ ! -x "${sr}-$p" ] && continue
-#	done
+       	pkill octez-smart-rollup-node
         ;;
 restart) 
         $0 stop
@@ -107,10 +106,7 @@ restart)
 reload|force-reload) 
         ;;
 status)
-	for p in ${protocols}; do
-		[ ! -x "${sr}-$p" ] && continue
-        	status_of_proc ${sr}-$p $NAME || exit $?
-	done
+	status_of_proc ${sr} $NAME || exit $?
 	exit 0
         ;;
 *)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
