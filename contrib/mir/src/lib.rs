@@ -247,6 +247,7 @@ mod tests {
 
     use crate::stack::{FailingTypeStack, Stack, TypeStack};
     use crate::typechecker::typecheck_instruction;
+    use std::collections::HashMap;
 
     #[track_caller]
     fn run_e2e_test<'a>(
@@ -397,6 +398,170 @@ mod tests {
             {
                 let mut c = Ctx::default();
                 c.balance = 45;
+                c
+            },
+        )
+    }
+
+    #[test]
+    fn contract() {
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        // When contract for the address does not exist.
+        run_e2e_test(
+            "CONTRACT int",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Int))],
+            stk![TypedValue::Address(addr)],
+            stk![TypedValue::new_option(None),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts(HashMap::new());
+                c
+            },
+        );
+
+        let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        // When contract is implicit
+        run_e2e_test(
+            "CONTRACT unit",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Unit))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts(HashMap::new());
+                c
+            },
+        );
+
+        let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        // When contract is implicit and contract type is Ticket
+        run_e2e_test(
+            "CONTRACT (ticket unit)",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::new_ticket(
+                Type::Unit
+            )))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(None),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts(HashMap::new());
+                c
+            },
+        );
+
+        let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        // When contract is implicit and contract type is some other type
+        run_e2e_test(
+            "CONTRACT int",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Int))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(None),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts(HashMap::new());
+                c
+            },
+        );
+
+        // When contract for the address does exist and is of expected type.
+        run_e2e_test(
+            "CONTRACT unit",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Unit))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(TypedValue::Contract(
+                addr.clone()
+            ))),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts({
+                    let mut x = HashMap::new();
+                    x.insert(
+                        addr.hash,
+                        HashMap::from([(Entrypoint::default(), Type::Unit)]),
+                    );
+                    x
+                });
+                c
+            },
+        );
+
+        // When the address has an entrypoint.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo").unwrap();
+        run_e2e_test(
+            "CONTRACT unit",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Unit))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(TypedValue::Contract(
+                addr.clone()
+            ))),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts({
+                    let mut x = HashMap::new();
+                    x.insert(
+                        addr.hash,
+                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                    );
+                    x
+                });
+                c
+            },
+        );
+
+        // When the instruction has an entrypoint.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_e2e_test(
+            "CONTRACT %foo unit",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Unit))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(TypedValue::Contract(
+                Address {
+                    entrypoint: Entrypoint::try_from("foo").unwrap(),
+                    ..addr.clone()
+                }
+            ))),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts({
+                    let mut x = HashMap::new();
+                    x.insert(
+                        addr.hash,
+                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                    );
+                    x
+                });
+                c
+            },
+        );
+
+        // When the instruction has an entrypoint and address has an entrypoint.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar").unwrap();
+        run_e2e_test(
+            "CONTRACT %foo unit",
+            stk![Type::Address],
+            stk![Type::new_option(Type::new_contract(Type::Unit))],
+            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::new_option(None),],
+            {
+                let mut c = Ctx::default();
+                c.set_known_contracts({
+                    let mut x = HashMap::new();
+                    x.insert(
+                        addr.hash,
+                        HashMap::from([
+                            (Entrypoint::try_from("bar").unwrap(), Type::Unit),
+                            (Entrypoint::try_from("foo").unwrap(), Type::Unit),
+                        ]),
+                    );
+                    x
+                });
                 c
             },
         );
