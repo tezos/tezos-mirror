@@ -1440,9 +1440,8 @@ let mk_tools chain_db : Tools.tools =
     set_mempool;
   }
 
-let make limits chain_db chain_id mk_tools (module Proto : Protocol_plugin.T) =
+let make limits chain_db chain_id tools (module Proto : Protocol_plugin.T) =
   let module Prevalidation_t = Prevalidation.Make (Proto) in
-  let tools = mk_tools chain_db in
   let module Prevalidator =
     Make
       (Proto)
@@ -1483,7 +1482,7 @@ let create limits (module Proto : Protocol_plugin.T) chain_db =
   with
   | None ->
       let prevalidator =
-        make limits chain_db chain_id mk_tools (module Proto)
+        make limits chain_db chain_id (mk_tools chain_db) (module Proto)
       in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
@@ -1605,3 +1604,27 @@ let rpc_directory : t option Tezos_rpc.Directory.t =
           let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
           Lwt.return
             (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+
+module Internal_for_tests = struct
+  module Tools = Tools
+
+  let mk_chain_tools = mk_chain_tools
+
+  let create tools limits (module Proto : Protocol_plugin.T) chain_db =
+    let open Lwt_result_syntax in
+    let chain_store = Distributed_db.chain_store chain_db in
+    let chain_id = Store.Chain.chain_id chain_store in
+    match
+      ChainProto_registry.find (chain_id, Proto.hash) !chain_proto_registry
+    with
+    | None ->
+        let prevalidator = make limits chain_db chain_id tools (module Proto) in
+        let (module Prevalidator : T) = prevalidator in
+        chain_proto_registry :=
+          ChainProto_registry.add
+            Prevalidator.name
+            prevalidator
+            !chain_proto_registry ;
+        return prevalidator
+    | Some p -> return p
+end
