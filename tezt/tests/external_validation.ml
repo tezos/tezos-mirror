@@ -39,16 +39,21 @@ let wait_for_external_validator_pid node =
 (* Typical signals that could be sent. This could be enriched but the
    effects are expected to be similar.
    Note that the behaviour of SIGSTOP is undefined here, as the node
-   will hang forever. *)
-type signal = SIGABRT | SIGINT | SIGKILL | SIGQUIT | SIGTERM
+   will hang forever.
 
-let all_signals = [SIGABRT; SIGINT; SIGKILL; SIGQUIT; SIGTERM]
+   TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/6675
+   It was reported that the SIGQUIT signal makes the "external
+   validator kill" test particularly flaky. Thus, we choose to
+   deactivate it.
+*)
+type signal = SIGABRT | SIGINT | SIGKILL | SIGTERM
+
+let all_signals = [SIGABRT; SIGINT; SIGKILL; SIGTERM]
 
 let signal_to_int = function
   | SIGABRT -> Sys.sigabrt
   | SIGINT -> Sys.sigint
   | SIGKILL -> Sys.sigkill
-  | SIGQUIT -> Sys.sigquit
   | SIGTERM -> Sys.sigterm
 
 let pp_signal ppf signal =
@@ -57,7 +62,6 @@ let pp_signal ppf signal =
     | SIGABRT -> "sigabrt"
     | SIGINT -> "sigint"
     | SIGKILL -> "sigkill"
-    | SIGQUIT -> "sigquit"
     | SIGTERM -> "sigterm"
   in
   Format.fprintf ppf "%s" str
