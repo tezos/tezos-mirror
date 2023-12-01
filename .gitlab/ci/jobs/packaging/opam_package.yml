@@ -530,7 +530,7 @@ opam:octez-injector:
 opam:octez-l2-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: octez-l2-libs
 
@@ -572,14 +572,14 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
 opam:octez-protocol-001-PtCJ7pwo-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-protocol-001-PtCJ7pwo-libs
 
 opam:octez-protocol-002-PsYLVpVv-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-protocol-002-PsYLVpVv-libs
 
@@ -663,14 +663,14 @@ opam:octez-protocol-013-PtJakart-libs:
 opam:octez-protocol-014-PtKathma-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-014-PtKathma-libs
 
 opam:octez-protocol-015-PtLimaPt-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-015-PtLimaPt-libs
 
@@ -744,19 +744,9 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
-opam:octez-smart-rollup-client-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
-  variables:
-    package: octez-smart-rollup-client-Proxford
+# Ignoring unreleased package octez-smart-rollup-client-Proxford.
 
-opam:octez-smart-rollup-client-PtNairob:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_2
-  variables:
-    package: octez-smart-rollup-client-PtNairob
+# Ignoring unreleased package octez-smart-rollup-client-PtNairob.
 
 # Ignoring unreleased package octez-smart-rollup-client-alpha.
 
@@ -770,7 +760,7 @@ opam:octez-smart-rollup-node:
 opam:octez-smart-rollup-node-Proxford:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_1
   variables:
     package: octez-smart-rollup-node-Proxford
 
@@ -825,7 +815,7 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
 opam:octez-version:
   extends:
     - .opam_template
-    - .rules_template__trigger_exec_opam_batch_7
+    - .rules_template__trigger_exec_opam_batch_6
   variables:
     package: octez-version
 
@@ -942,14 +932,14 @@ opam:tezos-protocol-001-PtCJ7pwo:
 opam:tezos-protocol-002-PsYLVpVv:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-protocol-002-PsYLVpVv
 
 opam:tezos-protocol-003-PsddFKi3:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-protocol-003-PsddFKi3
 
@@ -1033,14 +1023,14 @@ opam:tezos-protocol-012-Psithaca:
 opam:tezos-protocol-013-PtJakart:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-013-PtJakart
 
 opam:tezos-protocol-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-014-PtKathma
 
