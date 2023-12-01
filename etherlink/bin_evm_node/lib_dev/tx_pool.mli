@@ -10,13 +10,14 @@
    the configuration. *)
 type mode = Proxy | Sequencer of {time_between_blocks : float}
 
-(** [start config] starts the tx-pool. The [config] represents:
-    - the backend rpc module,
-    - the address of the smart rollup,
-    - the mode of the node.
-*)
-val start :
-  (module Services_backend_sig.S) * string * mode -> unit tzresult Lwt.t
+type parameters = {
+  rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
+  smart_rollup_address : string;  (** The address of the smart rollup. *)
+  mode : mode;  (** The mode of the node. *)
+}
+
+(** [start parameters] starts the tx-pool *)
+val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)

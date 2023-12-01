@@ -106,6 +106,12 @@ end
 
 type mode = Proxy | Sequencer of {time_between_blocks : float}
 
+type parameters = {
+  rollup_node : (module Services_backend_sig.S);
+  smart_rollup_address : string;
+  mode : mode;
+}
+
 module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
@@ -115,7 +121,7 @@ module Types = struct
     mode : mode;
   }
 
-  type parameters = (module Services_backend_sig.S) * string * mode
+  type nonrec parameters = parameters
 end
 
 module Name = struct
@@ -307,7 +313,8 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () (rollup_node, smart_rollup_address, mode) =
+  let on_launch _w ()
+      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
     let state =
       Types.
         {
@@ -363,7 +370,9 @@ let rec subscribe_l2_block worker =
   let open Lwt_syntax in
   let* () = Lwt_unix.sleep 5.0 in
   let state = Worker.state worker in
-  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
+  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
+    state
+  in
   (* Get the current eth level.*)
   let* res = Rollup_node_rpc.current_block_number () in
   match res with
@@ -384,7 +393,9 @@ let rec sequencer_produce_block ~time_between_blocks worker =
   let open Lwt_syntax in
   let* () = Lwt_unix.sleep time_between_blocks in
   let state = Worker.state worker in
-  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
+  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
+    state
+  in
   let* _pushed =
     Worker.Queue.push_request
       worker
@@ -395,7 +406,7 @@ let rec sequencer_produce_block ~time_between_blocks worker =
   in
   sequencer_produce_block ~time_between_blocks worker
 
-let start ((_, _, mode) as parameters) =
+let start ({mode; _} as parameters) =
   let open Lwt_result_syntax in
   let+ worker = Worker.launch table () parameters (module Handlers) in
   let () =

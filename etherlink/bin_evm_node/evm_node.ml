@@ -310,7 +310,7 @@ let proxy_command =
           in
           let* () =
             Evm_node_lib_dev.Tx_pool.start
-              (backend_rpc, smart_rollup_address, Proxy)
+              {rollup_node = backend_rpc; smart_rollup_address; mode = Proxy}
           in
           let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
@@ -380,7 +380,11 @@ let sequencer_command =
       (* Ignore the smart rollup address for now. *)
       let* () =
         Tx_pool.start
-          ((module Sequencer), "", Sequencer {time_between_blocks = 5.})
+          {
+            rollup_node = (module Sequencer);
+            smart_rollup_address = "";
+            mode = Sequencer {time_between_blocks = 5.};
+          }
       in
       let* directory = dev_directory config ((module Sequencer), "") in
       let* server = start config ~directory in
