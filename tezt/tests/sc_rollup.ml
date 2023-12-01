@@ -188,8 +188,9 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) {variant; tags; description} scenario =
-  let tags = kind :: tags in
+    ?(uses = fun _protocol -> []) ?rpc_local {variant; tags; description}
+    scenario =
+  let tags = kind :: "rollup_node" :: tags in
   register_test
     ?supports
     ?regression
@@ -200,6 +201,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   @@ fun protocol ->
   let* tezos_node, tezos_client =
     setup_l1
+      ?rpc_local
       ?commitment_period
       ?challenge_window
       ?timeout
