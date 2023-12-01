@@ -51,3 +51,4 @@ include:
 
   - .gitlab/ci/jobs/build/static_arm64_experimental.yml
   - .gitlab/ci/jobs/build/bin_packages.yml
+  - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_release.yml
