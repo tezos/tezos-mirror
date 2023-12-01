@@ -134,6 +134,30 @@ let wait_for_current_level node ?timeout sc_rollup_node =
   let* current_level = Node.get_level node in
   Sc_rollup_node.wait_for_level ?timeout sc_rollup_node current_level
 
+let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
+    ?(amount = Tez.of_int 1_000) client n =
+  let* keys, multiple_transfers_json_batch =
+    let str_amount = Tez.to_string amount in
+    fold n ([], []) (fun _i (keys, json_batch_dest) ->
+        let* key = Client.gen_and_show_keys client in
+        let json_batch_dest =
+          `O
+            [("destination", `String key.alias); ("amount", `String str_amount)]
+          :: json_batch_dest
+        in
+        let keys = key :: keys in
+        return (keys, json_batch_dest))
+  in
+  let*! () =
+    Client.multiple_transfers
+      ~giver
+      ~json_batch:(JSON.encode_u (`A multiple_transfers_json_batch))
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let* _ = Client.bake_for_and_wait client in
+  return keys
+
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
     ?(src = Constant.bootstrap1.alias) ?rpc_local ?uses
@@ -164,8 +188,9 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) {variant; tags; description} scenario =
-  let tags = kind :: tags in
+    ?(uses = fun _protocol -> []) ?rpc_local {variant; tags; description}
+    scenario =
+  let tags = kind :: "rollup_node" :: tags in
   register_test
     ?supports
     ?regression
@@ -176,6 +201,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   @@ fun protocol ->
   let* tezos_node, tezos_client =
     setup_l1
+      ?rpc_local
       ?commitment_period
       ?challenge_window
       ?timeout
@@ -422,6 +448,12 @@ let wait_for_included_successful_operation node ~operation_kind =
     "smart_rollup_node_daemon_included_successful_operation.v0"
   @@ fun json ->
   if JSON.(json |-> "kind" |> as_string) = operation_kind then Some () else None
+
+let wait_until_n_batches_are_injected rollup_node ~nb_batches =
+  let nb_injected = ref 0 in
+  Sc_rollup_node.wait_for rollup_node "injected_ops.v0" @@ fun _json ->
+  nb_injected := !nb_injected + 1 ;
+  if !nb_injected >= nb_batches then Some () else None
 
 let send_message_batcher_aux ?hooks client sc_node sc_client msgs =
   let batched =
@@ -700,8 +732,36 @@ let send_messages_then_bake_until_rollup_node_execute_output_message
          rollup_node
          ~operation_kind:"execute_outbox_message"
   and* res = wait_for_publish_execute_whitelist_update rollup_node in
-
   return res
+
+let map_manager_op_from_block node ~block ~find_map_op_content =
+  let* block_ops_json =
+    Node.RPC.call node @@ RPC.get_chain_block_operations ~block ()
+  in
+  let manager_ops = JSON.(block_ops_json |=> 3 |> as_list) in
+  let map_op_contents op_json =
+    JSON.(op_json |-> "contents" |> as_list)
+    |> List.filter_map find_map_op_content
+  in
+  List.map map_op_contents manager_ops |> List.flatten |> return
+
+let wait_for_included_and_map_ops_content rollup_node node ~find_map_op_content
+    =
+  let* block =
+    Sc_rollup_node.wait_for rollup_node "included.v0" @@ fun json ->
+    Some JSON.(json |-> "block" |> as_string)
+  in
+  map_manager_op_from_block node ~block ~find_map_op_content
+
+let wait_for_get_messages_and_map_ops_content rollup_node node
+    ~find_map_op_content =
+  let* block =
+    Sc_rollup_node.wait_for
+      rollup_node
+      "smart_rollup_node_layer_1_get_messages.v0"
+    @@ fun json -> Some JSON.(json |-> "hash" |> as_string)
+  in
+  map_manager_op_from_block node ~block ~find_map_op_content
 
 let check_batcher_message_status response status =
   Check.((response = status) string)
@@ -5124,26 +5184,12 @@ let test_multiple_batcher_key ~kind =
   let nb_of_batcher = 16 in
   let msg_per_batch = 32 in
   let msg_size = 1000 in
-  let* operators, multiple_transfers_json_batch =
-    let str_amount = Tez.to_string (Tez.of_int 1000) in
-    fold nb_of_batcher ([], []) (fun _i (keys, json_batch_dest) ->
-        let* key = Client.gen_and_show_keys client in
-        let json_batch_dest =
-          `O
-            [("destination", `String key.alias); ("amount", `String str_amount)]
-          :: json_batch_dest
-        in
-        let keys = (Sc_rollup_node.Batching, key.public_key_hash) :: keys in
-        return (keys, json_batch_dest))
+  let* keys = gen_keys_then_transfer_tez client nb_of_batcher in
+  let operators =
+    List.map
+      (fun k -> (Sc_rollup_node.Batching, k.Account.public_key_hash))
+      keys
   in
-  let*! () =
-    Client.multiple_transfers
-      ~giver:Constant.bootstrap1.alias
-      ~json_batch:(JSON.encode_u (`A multiple_transfers_json_batch))
-      ~burn_cap:(Tez.of_int 2)
-      client
-  in
-  let* _ = Client.bake_for_and_wait client in
   let* sc_rollup_node, sc_rollup_client, _sc_rollup =
     setup_rollup
       ~protocol
@@ -5164,7 +5210,7 @@ let test_multiple_batcher_key ~kind =
        differents messages. *)
     List.init msg_per_batch (fun _ ->
         msg_cpt := !msg_cpt + 1 ;
-        String.make msg_size @@ Char.chr (97 + !msg_cpt))
+        String.make msg_size @@ Char.chr (96 + !msg_cpt))
   in
   let inject_n_msgs_batches nb_of_batches =
     let* _hashes =
@@ -5174,44 +5220,24 @@ let test_multiple_batcher_key ~kind =
     in
     unit
   in
-  let wait_until_all_batches_injected nb_batches =
-    let nb_injected = ref 0 in
-    Sc_rollup_node.wait_for sc_rollup_node "injected_ops.v0" @@ fun _json ->
-    nb_injected := !nb_injected + 1 ;
-    if !nb_injected >= nb_batches then Some () else None
-  in
-  let bake_until_included_checks_batches_and_returns_pkhs () =
-    let* block =
-      let event_name = "included.v0" in
-      bake_until_event ~event_name ~timeout:30. client
-      @@ Sc_rollup_node.wait_for sc_rollup_node event_name
-      @@ fun json -> Some JSON.(json |-> "block" |> as_string)
+  let wait_for_included_check_batches_and_returns_pkhs () =
+    let find_map_op_content op_content_json =
+      let kind = JSON.(op_content_json |-> "kind" |> as_string) in
+      if kind = "smart_rollup_add_messages" then (
+        let nb_msgs =
+          JSON.(op_content_json |-> "message" |> as_list |> List.length)
+        in
+        Check.(nb_msgs = msg_per_batch)
+          Check.int
+          ~error_msg:"%L found where %R was expected" ;
+        let src = JSON.(op_content_json |-> "source" |> as_string) in
+        Some src)
+      else None
     in
-    let* block_operations_json =
-      Node.RPC.call tezos_node @@ RPC.get_chain_block_operations ~block ()
-    in
-    let check_msgs_nb_and_return_pkhs pkhs op_json =
-      let contents_list = JSON.(op_json |-> "contents" |> as_list) in
-      let src =
-        List.find_map
-          (fun contents ->
-            let kind = JSON.(contents |-> "kind" |> as_string) in
-            if kind = "smart_rollup_add_messages" then (
-              let nb_msgs =
-                JSON.(contents |-> "message" |> as_list |> List.length)
-              in
-              Check.(nb_msgs = msg_per_batch)
-                Check.int
-                ~error_msg:"%L found where %R was expected" ;
-              let src = JSON.(contents |-> "source" |> as_string) in
-              Some src)
-            else None)
-          contents_list
-      in
-      match src with Some src -> src :: pkhs | None -> pkhs
-    in
-    let manager_ops = JSON.(block_operations_json |=> 3 |> as_list) in
-    return @@ List.fold_left check_msgs_nb_and_return_pkhs [] manager_ops
+    wait_for_included_and_map_ops_content
+      sc_rollup_node
+      tezos_node
+      ~find_map_op_content
   in
   let check_against_operators_pkhs =
     let operators_pkhs = List.map snd operators |> List.sort String.compare in
@@ -5224,17 +5250,178 @@ let test_multiple_batcher_key ~kind =
   Log.info "Waiting until all batchers key have injected a batch" ;
   let* () =
     let* () = Client.bake_for_and_wait client
-    and* () = wait_until_all_batches_injected nb_of_batcher in
+    and* () =
+      wait_until_n_batches_are_injected sc_rollup_node ~nb_batches:nb_of_batcher
+    in
     unit
   in
   Log.info "Baking to include all previous batches and the new injection salvo" ;
-  let* pkhs_first_salve = bake_until_included_checks_batches_and_returns_pkhs ()
-  and* () = wait_until_all_batches_injected nb_of_batcher in
-  let () = check_against_operators_pkhs pkhs_first_salve in
-  let* pkhs_snd_salve =
-    bake_until_included_checks_batches_and_returns_pkhs ()
+  let* _lvl = Client.bake_for_and_wait client
+  and* pkhs_first_salvo = wait_for_included_check_batches_and_returns_pkhs ()
+  and* () =
+    wait_until_n_batches_are_injected sc_rollup_node ~nb_batches:nb_of_batcher
   in
-  let () = check_against_operators_pkhs pkhs_snd_salve in
+  let () = check_against_operators_pkhs pkhs_first_salvo in
+  let* _lvl = Client.bake_for_and_wait client
+  and* pkhs_snd_salvo = wait_for_included_check_batches_and_returns_pkhs () in
+  let () = check_against_operators_pkhs pkhs_snd_salvo in
+  unit
+
+(** Injector only uses key that have no operation in the mempool
+   currently.
+   1. Batcher setup:
+   - 5 signers in the batcher.
+   - 10 batches to inject.
+   2. First Block:
+   - Mempool:
+     - Contains enough batches to fill the block from users with high fees.
+     - Includes 5 batches injected by the batcher.
+   - Block contents:
+     - Only contains batches with high fees.
+   3. Second Block:
+   - Mempool:
+     - Has 5 batches injected by the batcher.
+   - Block contents:
+     - Contains batches.
+   - Processing:
+     - Node re-injects 5 batches during block processing.
+   4.Third Block:
+   - Mempool:
+     - Still has 5 batches injected by the batcher.
+   - Block contents:
+     - Contains batches.
+*)
+let test_injector_uses_available_keys ~kind =
+  let operators =
+    List.map
+      (fun k -> (Sc_rollup_node.Batching, k.Account.public_key_hash))
+      Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+  in
+  let operators_pkh = List.map snd operators in
+  let nb_operators = List.length operators in
+  test_full_scenario
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
+
+     cf multiple_batcher_test comment. *)
+    ~rpc_local:true
+    ~kind
+    ~operators
+    ~mode:Batcher
+    {
+      variant = None;
+      tags = ["injector"; "keys"];
+      description = "injector uses only available signers";
+    }
+  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
+  Log.info "Batcher setup" ;
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let batch ~msg_per_batch ~msg_size =
+    let msg_cpt = ref 0 in
+    (* create batch with different payloads so the logs show
+       differents messages. *)
+    List.init msg_per_batch (fun _ ->
+        msg_cpt := !msg_cpt + 1 ;
+        String.make msg_size @@ Char.chr (96 + !msg_cpt))
+  in
+  let batch_str ~msg_per_batch ~msg_size =
+    let batch = batch ~msg_per_batch ~msg_size in
+    let json = `A (List.map (fun s -> `String s) batch) in
+    "text:" ^ Ezjsonm.to_string json
+  in
+  let reveal_key keys =
+    Lwt_list.iter_p
+      (fun key -> Runnable.run @@ Client.reveal ~src:key.Account.alias client)
+      keys
+  in
+  let inject_with_keys keys ~msg_per_batch ~msg_size =
+    Lwt_list.iter_p
+      (fun key ->
+        Client.Sc_rollup.send_message
+          ~src:key.Account.alias
+          ~fee:(Tez.of_int 10)
+          ~fee_cap:(Tez.of_int 10)
+          ~msg:(batch_str ~msg_per_batch ~msg_size)
+          client)
+      keys
+  in
+  let inject_n_msgs_batches_in_rollup_node ~nb_of_batches ~msg_per_batch
+      ~msg_size =
+    let* _hashes =
+      Lwt.all @@ List.init nb_of_batches
+      @@ fun _ ->
+      Runnable.run
+      @@ Sc_rollup_client.inject rollup_client (batch ~msg_per_batch ~msg_size)
+    in
+    unit
+  in
+  let find_map_op_content op_content_json =
+    let kind = JSON.(op_content_json |-> "kind" |> as_string) in
+    if kind = "smart_rollup_add_messages" then
+      let src = JSON.(op_content_json |-> "source" |> as_string) in
+      Some src
+    else None
+  in
+  let wait_for_get_messages_and_get_batches_pkhs () =
+    wait_for_get_messages_and_map_ops_content
+      rollup_node
+      node
+      ~find_map_op_content
+  in
+  let wait_for_included_and_get_batches_pkhs () =
+    wait_for_included_and_map_ops_content rollup_node node ~find_map_op_content
+  in
+  Log.info "Checking that the batcher keys received are correct." ;
+  let check_keys ~received ~expected =
+    let sorted_expected = List.sort String.compare expected in
+    let sorted_received = List.sort String.compare received in
+    Check.(
+      (sorted_received = sorted_expected)
+        (list string)
+        ~error_msg:"%L found where %R was expected)")
+  in
+  (* nb_of_keys * msg_per_batch * msg_size = expected_block_size
+     16 * 8 * 4000 = 512_000 = maximum size of Tezos L1 block *)
+  let nb_of_keys = 16 and msg_per_batch = 8 and msg_size = 4000 in
+  let* keys = gen_keys_then_transfer_tez client nb_of_keys in
+  let keys_pkh = List.map (fun k -> k.Account.public_key_hash) keys in
+  let* () = reveal_key keys in
+
+  (* test start here *)
+  let* _lvl = Client.bake_for_and_wait client in
+  let* () =
+    inject_n_msgs_batches_in_rollup_node
+    (* we inject 2 times the number of operators so the rollup node
+       must inject in two salvos all the batches. *)
+      ~nb_of_batches:(2 * nb_operators)
+      ~msg_per_batch
+      ~msg_size
+  in
+  let* _lvl = Client.bake_for_and_wait client
+  and* () =
+    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
+  in
+  Log.info "Inject enough batches to fill the block." ;
+  let* () = inject_with_keys keys ~msg_per_batch ~msg_size in
+  Log.info "First block's batches are the one injected directly to the L1." ;
+  let* _lvl = Client.bake_for_and_wait client
+  and* used_pkhs = wait_for_get_messages_and_get_batches_pkhs () in
+  Log.info "Got pkhs." ;
+  check_keys ~received:used_pkhs ~expected:keys_pkh ;
+  Log.info
+    "Second block's batches found are those injected by the rollup node \
+     simultaneously with direct injection. Additionally, await the  injection \
+     of N batches." ;
+  let* _lvl = Client.bake_for_and_wait client
+  and* () =
+    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
+  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
+  check_keys ~received:used_pkhs ~expected:operators_pkh ;
+  Log.info
+    "Last block's batches found are those injected by the rollup node using \
+     keys that have been utilized in block up to this point." ;
+  let* _lvl = Client.bake_for_and_wait client
+  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
+  check_keys ~received:used_pkhs ~expected:operators_pkh ;
   unit
 
 let start_rollup_node_with_encrypted_key ~kind =
@@ -5454,7 +5641,6 @@ let register ~kind ~protocols =
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
-  test_multiple_batcher_key ~kind protocols ;
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
@@ -5512,6 +5698,9 @@ let register ~protocols =
   test_accuser protocols ;
   test_bailout_refutation protocols ;
   test_injector_auto_discard protocols ;
+  test_multiple_batcher_key ~kind:"wasm_2_0_0" protocols ;
+  test_injector_uses_available_keys protocols ~kind:"wasm_2_0_0" ;
+
   (* Specific riscv PVM tezt *)
   register_riscv () ;
   (* Shared tezts - will be executed for each PVMs. *)

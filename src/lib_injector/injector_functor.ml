@@ -97,7 +97,16 @@ module Make (Parameters : PARAMETERS) = struct
     l1_level : int32;
   }
 
-  type l1_op_content = {level : int32; inj_ops : Inj_operation.Hash.t list}
+  type injected_l1_op_content = {
+    level : int32;
+    inj_ops : Inj_operation.Hash.t list;
+    signer_pkh : Signature.public_key_hash;
+  }
+
+  type included_l1_op_content = {
+    level : int32;
+    inj_ops : Inj_operation.Hash.t list;
+  }
 
   type status =
     | Pending of POperation.t
@@ -121,7 +130,7 @@ module Make (Parameters : PARAMETERS) = struct
     injected_operations : injected_info Injected_operations.t;
         (** A table mapping L1 manager operation hashes to the injection info for that
           operation.  *)
-    injected_ophs : l1_op_content Injected_ophs.t;
+    injected_ophs : injected_l1_op_content Injected_ophs.t;
         (** A mapping of all L1 manager operations contained in a L1 batch (i.e. an L1
           operation). *)
   }
@@ -133,7 +142,7 @@ module Make (Parameters : PARAMETERS) = struct
     operations which are included in the L1 chain (but not confirmed). *)
   type included_state = {
     included_operations : included_info Included_operations.t;
-    included_in_blocks : l1_op_content Included_in_blocks.t;
+    included_in_blocks : included_l1_op_content Included_in_blocks.t;
   }
 
   type protocols = Tezos_shell_services.Chain_services.Blocks.protocols = {
@@ -149,7 +158,6 @@ module Make (Parameters : PARAMETERS) = struct
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
     signers : signer list;  (** The signers for this worker. *)
-    number_of_signers : int;
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -290,13 +298,11 @@ module Make (Parameters : PARAMETERS) = struct
     let proto_client =
       Inj_proto.proto_client_for_protocol head_protocols.next_protocol
     in
-    let number_of_signers = List.length signers in
     return
       {
         cctxt = injector_context (cctxt :> #Client_context.full);
         l1_ctxt;
         signers;
-        number_of_signers;
         tags;
         strategy;
         save_dir = data_dir;
@@ -346,7 +352,8 @@ module Make (Parameters : PARAMETERS) = struct
       Op_queue.replace state.queue op.hash op
 
   (** Mark operations as injected (in [oph]). *)
-  let add_injected_operations state oph ~injection_level operations =
+  let add_injected_operations state {pkh = signer_pkh; _} oph ~injection_level
+      operations =
     let infos =
       List.map
         (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
@@ -358,7 +365,7 @@ module Make (Parameters : PARAMETERS) = struct
     Injected_ophs.replace
       state.injected.injected_ophs
       oph
-      {level = injection_level; inj_ops = List.map fst infos}
+      {level = injection_level; inj_ops = List.map fst infos; signer_pkh}
 
   (** [add_included_operations state oph l1_block l1_level operations] marks the
     [operations] as included (in the L1 batch [oph]) in the Tezos block
@@ -465,6 +472,18 @@ module Make (Parameters : PARAMETERS) = struct
   let keep_half ops =
     let total = List.length ops in
     if total <= 1 then None else Some (List.take_n (total / 2) ops)
+
+  let available_signers state =
+    let used_signers =
+      Injected_ophs.fold
+        (fun _ {signer_pkh; _} signers_pkh ->
+          Signature.Public_key_hash.Set.add signer_pkh signers_pkh)
+        state.injected.injected_ophs
+        Signature.Public_key_hash.Set.empty
+    in
+    List.filter
+      (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
+      state.signers
 
   (** [simulate_operations ~must_succeed state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
@@ -781,6 +800,7 @@ module Make (Parameters : PARAMETERS) = struct
             let () =
               add_injected_operations
                 state
+                signer
                 oph
                 ~injection_level
                 injected_operations
@@ -808,10 +828,11 @@ module Make (Parameters : PARAMETERS) = struct
         let module Proto_client = (val state.proto_client) in
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
+    let signers = available_signers state in
     let ops_batch =
-      get_n_ops_batch_from_queue ~size_limit state state.number_of_signers
+      get_n_ops_batch_from_queue ~size_limit state (List.length signers)
     in
-    let signers_and_ops = List.combine_drop state.signers ops_batch in
+    let signers_and_ops = List.combine_drop signers ops_batch in
     let*! res_list =
       List.map_p
         (fun (signer, operations_to_inject) ->
@@ -978,7 +999,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 confirmed_level) state confirmed_level in
     Included_in_blocks.iter_es
-      (fun block ({level = inclusion_level; _} : l1_op_content) ->
+      (fun block ({level = inclusion_level; _} : included_l1_op_content) ->
         if
           inclusion_level
           <= Int32.sub confirmed_level (Int32.of_int state.retention_period)
@@ -994,7 +1015,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let expired =
       Injected_ophs.fold
-        (fun oph ({level = injection_level; _} : l1_op_content) acc ->
+        (fun oph ({level = injection_level; _} : injected_l1_op_content) acc ->
           if
             head_level
             > Int32.add injection_level (Int32.of_int state.injection_ttl)

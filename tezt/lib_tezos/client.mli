@@ -1887,6 +1887,8 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    ?fee:Tez.t ->
+    ?fee_cap:Tez.t ->
     msg:string ->
     src:string ->
     t ->
@@ -1897,6 +1899,8 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    ?fee:Tez.t ->
+    ?fee_cap:Tez.t ->
     msg:string ->
     src:string ->
     t ->

@@ -2506,16 +2506,21 @@ module Sc_rollup = struct
     let parse process = Process.check_and_read_stdout process in
     {value = process; run = parse}
 
-  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src client =
+  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ?fee ?fee_cap ~msg
+      ~src client =
     spawn_command
       ?hooks
       client
       (["--wait"; wait]
       @ ["send"; "smart"; "rollup"; "message"; msg; "from"; src]
+      @ optional_arg "fee" Tez.to_string fee
+      @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
-  let send_message ?hooks ?wait ?burn_cap ~msg ~src client =
-    let process = spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src client in
+  let send_message ?hooks ?wait ?burn_cap ?fee ?fee_cap ~msg ~src client =
+    let process =
+      spawn_send_message ?hooks ?wait ?burn_cap ?fee ?fee_cap ~msg ~src client
+    in
     Process.check process
 
   let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
