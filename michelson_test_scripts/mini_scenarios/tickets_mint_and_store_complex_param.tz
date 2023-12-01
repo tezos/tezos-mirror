@@ -1,0 +1,28 @@
+# Contract for sending ticket transfer from implicit to originated.
+# Has two entrypoints:
+# - mint_and_send content:
+#   Mints a string ticket with the given content and amount
+#   then sends the ticket to the given contract address.
+# - store:
+#   Stores the given tickets to storage. The parameter of this
+#   entrypoint is deliberately made complex by including garbage values
+#   for testing purpose.
+{ parameter
+    (or (pair %mint_and_send string nat (contract (ticket string)))
+        (pair %store int (list (pair string (ticket string))))) ;
+  storage (list (ticket string)) ;
+  code { UNPAIR ;
+         IF_LEFT
+           { UNPAIR 3 ;
+             TICKET ;
+             IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+             SWAP ;
+             PUSH mutez 0 ;
+             DIG 2 ;
+             TRANSFER_TOKENS ;
+             SWAP ;
+             NIL operation ;
+             DIG 2 ;
+             CONS }
+           { CDR ; ITER { CDR ; CONS } ; NIL operation } ;
+         PAIR } }

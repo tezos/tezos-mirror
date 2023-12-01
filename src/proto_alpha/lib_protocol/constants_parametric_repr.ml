@@ -207,6 +207,7 @@ type t = {
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
+  direct_ticket_spending_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -515,8 +516,10 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_issuance)) ) )
-          ) ) ))
+                ( c.dal,
+                  ( (c.sc_rollup, c.zk_rollup),
+                    (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
+              ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -551,7 +554,10 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) ) ) ->
+                   ( dal,
+                     ( (sc_rollup, zk_rollup),
+                       (adaptive_issuance, direct_ticket_spending_enable) ) ) )
+               ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -591,6 +597,7 @@ let encoding =
         sc_rollup;
         zk_rollup;
         adaptive_issuance;
+        direct_ticket_spending_enable;
       })
     (merge_objs
        (obj10
@@ -648,4 +655,6 @@ let encoding =
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
-                         adaptive_issuance_encoding)))))))
+                         (merge_objs
+                            adaptive_issuance_encoding
+                            (obj1 (req "direct_ticket_spending_enable" bool))))))))))

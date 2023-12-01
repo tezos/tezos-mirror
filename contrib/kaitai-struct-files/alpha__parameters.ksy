@@ -576,3 +576,6 @@ seq:
 - id: autostaking_enable
   type: u1
   enum: bool
+- id: direct_ticket_spending_enable
+  type: u1
+  enum: bool

@@ -278,6 +278,11 @@ let constants_mainnet =
         activation_vote_enable = false;
         autostaking_enable = true;
       };
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
+       Enable once at least the following is done:
+       - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
+       - Introduce a new Ticket constructor in Michelson: #6643 *)
+    direct_ticket_spending_enable = false;
   }
 
 (* Sandbox and test networks's Dal cryptobox are computed by this function:
