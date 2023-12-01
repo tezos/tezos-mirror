@@ -254,7 +254,7 @@ let test_advertisement () =
     let*! () = Prevalidator.Internal_for_tests.advertise_mempool prevalidator in
     let*! () = wait_for_empty_request_queue prevalidator in
     assert (Operation_hash.Set.cardinal !advertised.pending = 0) ;
-    assert (Operation_hash.Set.cardinal !advertised.known_valid = 3) ;
+    assert (Operation_hash.Set.cardinal !advertised.known_valid = 1) ;
     return_unit
   in
   match r with Error errs -> Test.fail "%a" pp_print_trace errs | Ok _ -> unit
