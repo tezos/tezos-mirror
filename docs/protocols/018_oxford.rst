@@ -66,41 +66,42 @@ Smart Rollups
 
 - Add private rollups: smart rollup with an updatable whitelist stakers. Only stakers on the whitelist can publish commitment and participate in a refutation game. (MRs :gl:`!9823`, :gl:`!10104`, :gl:`!9823`, :gl:`!9572`, :gl:`!9427`, :gl:`!9472`, :gl:`!9439`, :gl:`!9401`)
 
-Zero Knowledge Rollups (ongoing)
---------------------------------
+Adaptive Issuance (experimental)
+----------------------------------
 
-Data Availability Layer (ongoing)
----------------------------------
 
-Adaptive Issuance (ongoing)
-----------------------------
-
+- This protocol expands the voting system for bakers to include
+  Adaptive Issuance alongside Liquidity Baking. This vote is ignored
+  on Mainnet (as explained below), but active on testnets for
+  testing purposes. Bakers may use the per-block votes
+  file, or CLI option ``--adaptive-issuance-vote``. If they do
+  not vote for the Adaptive Issuance feature, the vote defaults to
+  "pass" (unlike the case of Liquidity Baking, whose vote remains mandatory).
 
 - Adaptive Issuance is locked behind a feature flag and cannot be activated for
   this proposal. The voting mechanism for Adaptive Issuance remains accessible,
   but is ignored and can never activate the feature. Moreover, the vote EMA will
   be reset before reactivating the feature flag. (MR :gl:`!10371`)
 
-- This protocol asks the bakers to set their votes for the adoption of
-  the adaptive issuance feature. They may use the per-block votes
-  file, or CLI option ``--adaptive-issuance-vote``. If they do
-  not vote for the adaptive issuance feature, the vote defaults to
-  "pass" (unlike for the liquidity baking vote, which is mandatory).
+- The new ``stake`` and ``unstake`` operations are currently deactivated on Mainnet, calls to
+  these operations will fail. Staking and unstaking transfers are still used
+  internally, and may appear in balance receipts. (MR :gl:`!10849`)
 
-- Introduce feature flag for Adaptive Issuance. (MR :gl:`!8566`)
-
-- Add parameter ``limit_of_staking_over_baking`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
-
-When the feature flag is enabled (testnets only), the following extra changes happen:
+- The new staking mechanism is used internally to freeze deposits automatically
+  at cycle ends, and mimic Nairobi's behavior. (MR :gl:`!10562`)
 
 - Most rewards (baking rewards, baking bonuses, attestation rewards, revelation
-  rewards) are paid on the frozen deposits balance rather than the spendable
+  rewards) are partially paid on the frozen deposits balance in addition to the spendable
   balance. Manager operations fees and denunciation rewards are still paid on
   the spendable balance. (MR :gl:`!8091`)
 
-- Multiplicative coefficient (with a dynamic part) applied to reward values. (MRs :gl:`!8860`, :gl:`!8861`)
-
 - Denunciation rewards computation updated to depend on ``limit_of_staking_over_baking``. (MR :gl:`!8939`)
+
+When the feature flag is enabled (testnets only), the following extra changes happen:
+
+- Add parameter ``limit_of_staking_over_baking`` as the limit of the ratio of tez staked by other delegators over the baker's own, for a given baker. (MR :gl:`!8744`)
+
+- Multiplicative coefficient (with a dynamic part) applied to reward values. (MRs :gl:`!8860`, :gl:`!8861`)
 
 - EMA and launch cycle. (MRs :gl:`!8967`, :gl:`!9002`, :gl:`!9025`, :gl:`!9058`)
 
@@ -111,40 +112,28 @@ When the feature flag is enabled (testnets only), the following extra changes ha
 - New RPCs introduced: total supply, total frozen stake, launch cycle.
   (MRs :gl:`!8982`, :gl:`!8995`, :gl:`!8997`, :gl:`!9057`)
 
-- The ``stake`` and ``unstake`` operations are currently deactivated, calls to
-  these operations will fail. Staking and unstaking transfers are still used
-  internally, and may appear in balance receipts. (MR :gl:`!10849`)
-
 - The ``unstake`` client command uses the ``amount`` field instead of an extra parameter. (MRs :gl:`!10377`, :gl:`!10429`)
-
-- The ``set deposits limit`` operation has been brought back. (MR :gl:`!10449`)
 
 - Balance updates now include more information related to staking in general,
   including slashing and rewards. (MRs :gl:`!10485`, :gl:`!10486`, :gl:`!10487`,
   :gl:`!10488`, :gl:`!10496`, :gl:`!10526`, :gl:`!10766`, :gl:`!10853`)
-
-- The new staking mechanism is used internally to freeze deposits automatically
-  at cycle ends, and mimic Nairobi's behavior. (MR :gl:`!10562`)
 
 - Unstaked frozen deposits, i.e recently unstaked funds, can be used by bakers
   to be staked again (unless the baker has been slashed). They are used in
   addition to liquid funds for staking, prioritizing the most recent unstake
   requests. (MR :gl:`!10781`)
 
-Gas improvements
-----------------
-
 Breaking Changes
 ----------------
 
 - Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement``
-  is converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
+  is converted from the ratio ``1/2`` into the percentage ``50%`` and renamed to
   ``percentage_of_frozen_deposits_slashed_per_double_attestation``. (MRs
   :gl:`!8753`, :gl:`!9440`)
 
 - Protocol parameter ``double_baking_punishment`` is converted from a fixed
-  value of ``640tz`` into the percentage ``11%`` and renamed to
-  ``percentage_of_frozen_deposits_slashed_per_double_baking``. (MR :gl:`!8753`)
+  value of ``640tz`` into the percentage ``5%`` and renamed to
+  ``percentage_of_frozen_deposits_slashed_per_double_baking``. (MR :gl:`!8753`, :gl:`!10431`)
 
 - Since protocol Ithaca, the ratio of delegated tez over the delegate's frozen deposit
   must be at most 9. Until now, this was ensured by a protocol parameter named
@@ -253,8 +242,6 @@ Minor Changes
 
 - Remove zero tickets from a big map of a mainnet contract during migration. (MR :gl:`!8111`)
 
-- Add a ``Stake`` operation, implemented as an entrypoint of external operations to implicit accounts, for delegates only. (MR :gl:`!8120`)
-
 - Add a Total supply counter in the storage. (MRs :gl:`!8732`, :gl:`!8739`)
 
 - Allow to choose the bootstrapped contracts hashes. (MR :gl:`!9176`)
@@ -266,7 +253,9 @@ Minor Changes
 
 - Slashing penalties for double-signing are now applied at the end of the cycle where denunciations were included, rather than immediately. The same applies for rewards allocated from denunciations. (MR :gl:`!10389`)
 
-- Double baking penalty is now 5% of the offending baker's stake -- instead of 10%. (MR :gl:`!10431`)
+- The semantics of forbidden delegates has been adjusted: a delegate becomes
+  forbidden if it has been slashed for more than 51% of its frozen stake over
+  the last 2 cycles. (MRs :gl:`!10382`, :gl:`!10844`)
 
 Internal
 --------
@@ -351,6 +340,3 @@ Internal
 - Register an error's encoding: ``WASM_proof_verification_failed``. It was
   previously not registered, making the error message a bit obscure. (MR :gl:`!9603`)
 
-- The semantics of forbidden delegates has been adjusted: a delegate becomes
-  forbidden if it has been slashed for more than 51% of its frozen stake over
-  the last 2 cycles. (MRs :gl:`!10382`, :gl:`!10844`)
