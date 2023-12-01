@@ -248,6 +248,7 @@ mod tests {
     use crate::stack::{FailingTypeStack, Stack, TypeStack};
     use crate::typechecker::typecheck_instruction;
 
+    #[track_caller]
     fn run_e2e_test<'a>(
         instr: &'a str,
         input_type_stack: TypeStack,
