@@ -342,6 +342,20 @@ module System = struct
   end)
 end
 
+module Monotonic = struct
+  module Span = struct
+    type t = Mtime.Span.t
+
+    let to_ms x =
+      Int64.to_int
+        Mtime.Span.(Int64.unsigned_div (to_uint64_ns x) (to_uint64_ns ms))
+
+    let to_float_us x = Mtime.Span.(to_float_ns x /. to_float_ns us)
+
+    let to_float_s x = Mtime.Span.(to_float_ns x /. to_float_ns s)
+  end
+end
+
 let () =
   Data_encoding.Registration.register ~pp:Protocol.pp_hum Protocol.encoding ;
   Data_encoding.Registration.register ~pp:System.pp_hum System.encoding ;
