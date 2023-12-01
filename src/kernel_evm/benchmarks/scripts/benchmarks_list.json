@@ -42,6 +42,7 @@
     "benchmarks/bench_creates_erc20.js",
     "benchmarks/bench_creates_erc1155.js",
     "benchmarks/bench_precompile.js",
+    "benchmarks/bench_ecdsa.js",
     "benchmarks/bench_linear_transfers.js 0",
     "benchmarks/bench_linear_transfers.js 5",
     "benchmarks/bench_linear_transfers.js 10",

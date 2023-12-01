@@ -26,6 +26,7 @@
 - Change the L1 type of the rollup into an entrypoint style: `or (or (pair bytes
   (ticket (pair nat (option bytes)))) bytes) bytes`. (!10735)
 - The L1 type now expects FA2.1-compatible tickets. (!10738)
+- Add support for precompiled contract 0x01 (ecRecover) (!10926)
 
 ### EVM Node
 
