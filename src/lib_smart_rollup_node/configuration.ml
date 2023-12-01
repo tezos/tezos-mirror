@@ -599,7 +599,7 @@ let refutation_player_buffer_levels = 5
 
 let default_index_buffer_size = 10_000
 
-let default_irmin_cache_size = 100_000
+let default_irmin_cache_size = 300_000
 
 let loser_warning_message config =
   if config.loser_mode <> Loser_mode.no_failures then

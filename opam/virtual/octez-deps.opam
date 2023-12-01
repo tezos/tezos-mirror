@@ -44,8 +44,8 @@ depends: [
   "integers"
   "integers_stubs_js"
   "ipaddr" { >= "5.3.0" & < "6.0.0" }
-  "irmin" { >= "3.7.2" & < "3.8.0" }
-  "irmin-pack" { >= "3.7.2" & < "3.8.0" }
+  "irmin" { >= "3.8.0" & < "3.9.0" }
+  "irmin-pack" { >= "3.8.0" & < "3.9.0" }
   "jingoo"
   "json-data-encoding" { >= "0.12" & < "0.13" }
   "lambda-term" { >= "3.3.1" }
