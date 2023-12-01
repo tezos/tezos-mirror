@@ -142,7 +142,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | New_l2_head : Ethereum_types.block_height -> (unit, tztrace) t
+    | Inject_transactions : Ethereum_types.block_height -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -163,12 +163,12 @@ module Request = struct
           (fun ((), messages) -> View (Add_transaction messages));
         case
           (Tag 1)
-          ~title:"New_l2_head"
+          ~title:"Inject_transactions"
           (obj2
              (req "request" (constant "new_l2_head"))
              (req "block_height" Ethereum_types.block_height_encoding))
-          (function View (New_l2_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_l2_head b));
+          (function View (Inject_transactions b) -> Some ((), b) | _ -> None)
+          (fun ((), b) -> View (Inject_transactions b));
       ]
 
   let pp ppf (View r) =
@@ -178,7 +178,7 @@ module Request = struct
           ppf
           "Add [%s] tx to tx-pool"
           (Hex.of_string transaction |> Hex.show)
-    | New_l2_head block_height ->
+    | Inject_transactions block_height ->
         let (Ethereum_types.Block_height block_height) = block_height in
         Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
 end
@@ -308,7 +308,7 @@ module Handlers = struct
     match request with
     | Request.Add_transaction raw_tx ->
         protect @@ fun () -> on_transaction state raw_tx
-    | Request.New_l2_head block_height ->
+    | Request.Inject_transactions block_height ->
         protect @@ fun () -> on_head state block_height
 
   type launch_error = error trace
@@ -384,7 +384,9 @@ let rec subscribe_l2_block worker =
   | Ok block_number ->
       if state.level != block_number then
         let* _pushed =
-          Worker.Queue.push_request worker (Request.New_l2_head block_number)
+          Worker.Queue.push_request
+            worker
+            (Request.Inject_transactions block_number)
         in
         subscribe_l2_block worker
       else subscribe_l2_block worker
@@ -402,7 +404,7 @@ let rec sequencer_produce_block ~time_between_blocks worker =
       (* The sequencer mode does not rely on the state.level, therefore we do not
          care about the value we push. Also, note that this is state.level will
          be completely removed when we stream L2 blocks. *)
-      (Request.New_l2_head (Ethereum_types.Block_height Z.zero))
+      (Request.Inject_transactions (Ethereum_types.Block_height Z.zero))
   in
   sequencer_produce_block ~time_between_blocks worker
 
