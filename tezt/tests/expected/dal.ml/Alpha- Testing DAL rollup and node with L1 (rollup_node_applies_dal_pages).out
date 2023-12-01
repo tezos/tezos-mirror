@@ -91,6 +91,6 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 172.912
 
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"000001f6"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\001\246"

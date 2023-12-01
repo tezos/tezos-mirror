@@ -58,15 +58,6 @@ val rpc_get_rich :
   (string * string) list ->
   JSON.t Runnable.process
 
-(** [state_value ?block client key] gets the corresponding PVM state value
-    mapped to [key] for the [block] (default ["head"]). *)
-val state_value :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  t ->
-  key:string ->
-  bytes Runnable.process
-
 type 'output_type durable_state_operation =
   | Value : string option durable_state_operation
   | Length : int64 option durable_state_operation

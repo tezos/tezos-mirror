@@ -148,3 +148,8 @@ type gc_info = {last_gc_level : int; first_available_level : int}
 
 (** RPC: [GET local/gc_info] returns garbage collection information. *)
 val get_local_gc_info : unit -> gc_info RPC_core.t
+
+(** RPC: [GET global/block/<block>/state] gets the corresponding PVM state value
+    mapped to [key] for the [block] (default ["head"]). *)
+val get_global_block_state :
+  ?block:string -> key:string -> unit -> bytes RPC_core.t

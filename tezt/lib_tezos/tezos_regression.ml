@@ -49,6 +49,7 @@ let replace_variables string =
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)
       ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
+      ("/127.0.0.1:\\d{4,5}/", "/127.0.0.1:[PORT]/");
     ]
   in
   List.fold_left

@@ -74,14 +74,6 @@ let spawn_command ?hooks ?log_output sc_client command =
   in
   Runnable.{value = process; run = Process.check_and_read_stdout}
 
-let state_value ?hooks ?(block = "head") sc_client ~key =
-  spawn_command
-    ?hooks
-    sc_client
-    ["get"; "state"; "value"; "for"; key; "--block"; block]
-  |> Runnable.map @@ fun out ->
-     Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes
-
 type transaction = {
   destination : string;
   entrypoint : string option;

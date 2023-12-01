@@ -136,17 +136,14 @@ let with_fresh_rollup ?(kind = "arith") ~boot_sector f tezos_node tezos_client
 
 let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
-  let go ~protocol ~internal client sc_rollup sc_rollup_node =
+  let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
     let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
-
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
     in
@@ -207,11 +204,9 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       let* () =
         match kind with
         | "arith" ->
-            let*! encoded_value =
-              Sc_rollup_client.state_value
-                ~hooks
-                sc_rollup_client
-                ~key:"vars/value"
+            let* encoded_value =
+              Sc_rollup_node.RPC.call sc_rollup_node
+              @@ Sc_rollup_rpc.get_global_block_state ~key:"vars/value" ()
             in
             let value =
               match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
@@ -275,7 +270,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~protocol ~internal:false client sc_rollup_address sc_rollup_node)
+            go ~internal:false client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols
@@ -291,7 +286,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~protocol ~internal:true client sc_rollup_address sc_rollup_node)
+            go ~internal:true client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols
