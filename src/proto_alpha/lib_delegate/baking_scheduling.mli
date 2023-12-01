@@ -85,6 +85,7 @@ val create_initial_state :
   Baking_configuration.t ->
   Operation_worker.t ->
   current_proposal:proposal ->
+  ?constants:Constants.t ->
   consensus_key list ->
   state tzresult Lwt.t
 
@@ -104,6 +105,7 @@ val run :
   ?canceler:Lwt_canceler.t ->
   ?stop_on_event:(event -> bool) ->
   ?on_error:(tztrace -> unit tzresult Lwt.t) ->
+  ?constants:Constants.t ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
   consensus_key list ->

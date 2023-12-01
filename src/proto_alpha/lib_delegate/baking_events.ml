@@ -506,6 +506,35 @@ module Scheduling = struct
       ~msg:"process proposal received in the future with hash {block_hash}"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
+
+  let waiting_to_forge_block =
+    declare_2
+      ~section
+      ~name:"waiting_to_forge_block"
+      ~level:Info
+      ~msg:"waiting {timespan} until it's time to forge block at {timestamp}"
+      ~pp1:Ptime.Span.pp
+      ("timespan", Time.System.Span.encoding)
+      ~pp2:Timestamp.pp
+      ("timestamp", Timestamp.encoding)
+
+  let no_need_to_wait_to_forge_block =
+    declare_0
+      ~section
+      ~name:"no_need_to_wait_to_forge_block"
+      ~level:Info
+      ~msg:"no need to wait to forge a block"
+      ()
+
+  let first_baker_of_next_level =
+    declare_0
+      ~section
+      ~name:"first_baker_of_next_level"
+      ~level:Info
+      ~msg:
+        "first baker of next level found among delegates. pre-emptively \
+         forging block."
+      ()
 end
 
 module Lib = struct
