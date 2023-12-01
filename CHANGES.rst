@@ -112,6 +112,14 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Now smart rollup node allows multiple batcher keys. Setting multiple
+  keys for the batching purpose allows to inject multiple operations
+  of the same kind per block by the rollup node. ( MR :gl:`!10512`, MR
+  :gl:`!10529`, MR :gl:`!10533`, MR :gl:`!10567`, MR :gl:`!10582`, MR
+  :gl:`!10584`, MR :gl:`!10588`, MR :gl:`!10597`, MR :gl:`!10601`, MR
+  :gl:`!10622`, MR :gl:`!10642`, MR :gl:`!10643`, MR :gl:`!10839`, MR
+  :gl:`!10842`, MR :gl:`!10861`, MR :gl:`!11008` )
+
 - A new bailout mode that solely cements and defends existing
   commitments without publishing new ones. Recovers bonds when
   possible, after which the node exits gracefully. (MR :gl:`!9721`, MR
