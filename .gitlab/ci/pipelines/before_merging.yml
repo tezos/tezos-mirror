@@ -50,3 +50,4 @@ include:
   - .gitlab/ci/jobs/publish/gitlab:release.yml
 
   - .gitlab/ci/jobs/build/static_arm64_experimental.yml
+  - .gitlab/ci/jobs/build/bin_packages.yml
