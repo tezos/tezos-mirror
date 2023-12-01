@@ -229,8 +229,6 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
     let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
     return (inbox_hash, inbox, witness, [])
 
-let start () = Inbox_event.starting ()
-
 let payloads_history_of_messages ~is_first_block ~predecessor
     ~predecessor_timestamp messages =
   let open Result_syntax in
