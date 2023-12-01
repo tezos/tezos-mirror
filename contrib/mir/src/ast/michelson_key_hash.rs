@@ -13,7 +13,7 @@ use super::{ByteReprError, ByteReprTrait};
 
 macro_rules! key_hash_type_and_impls {
     ($($con:ident($ty:ident)),* $(,)*) => {
-        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
         pub enum KeyHash {
             $($con($ty)),*
         }

@@ -5,10 +5,11 @@
 /*                                                                            */
 /******************************************************************************/
 
+use crate::ast::michelson_address::entrypoint::Entrypoints;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -135,8 +136,6 @@ pub enum StacksNotEqualReason {
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
-
-pub type Entrypoints = HashMap<Entrypoint, Type>;
 
 impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).

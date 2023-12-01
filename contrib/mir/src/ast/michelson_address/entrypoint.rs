@@ -5,12 +5,17 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::collections::HashMap;
+
 use crate::ast::annotations::FieldAnnotation;
+use crate::ast::Type;
 
 use super::ByteReprError;
 
 #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
 pub struct Entrypoint(String);
+
+pub type Entrypoints = HashMap<Entrypoint, Type>;
 
 impl std::fmt::Display for Entrypoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

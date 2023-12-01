@@ -21,6 +21,7 @@ use crate::parser::Parser;
 use crate::stack::*;
 use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
+use crate::tzt::entrypoint::Entrypoints;
 use crate::tzt::expectation::*;
 
 pub type TestStack<'a> = Vec<(Type, TypedValue<'a>)>;

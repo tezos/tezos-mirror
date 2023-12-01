@@ -16,7 +16,7 @@ use tezos_crypto_rs::hash::{
 
 macro_rules! address_hash_type_and_impls {
     ($($con:ident($ty:ident)),* $(,)*) => {
-        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
         pub enum AddressHash {
             $($con($ty)),*
         }
