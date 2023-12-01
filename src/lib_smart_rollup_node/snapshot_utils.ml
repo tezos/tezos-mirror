@@ -151,12 +151,31 @@ let list_files dir ~include_file f =
   let dir_handle = Unix.opendir dir in
   list_files_in_dir Stream.sempty (dir, "", dir_handle)
 
+let total_bytes_to_export dir ~include_file =
+  let file_stream =
+    list_files dir ~include_file @@ fun ~full_path ~relative_path:_ ->
+    let {Unix.st_size; _} = Unix.lstat full_path in
+    st_size
+  in
+  let total = ref 0 in
+  Stream.iter (fun size -> total := !total + size) file_stream ;
+  !total
+
 let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
     ~include_file ~dest =
   let module Archive_writer = Tar.Make (struct
     include Reader
     include Writer
   end) in
+  let total = total_bytes_to_export dir ~include_file in
+  let progress_bar =
+    Progress_bar.progress_bar
+      ~counter:`Bytes
+      ~message:"Exporting snapshot  "
+      ~color:(Terminal.Color.rgb 3 132 252)
+      total
+  in
+  Progress_bar.with_reporter progress_bar @@ fun count_progress ->
   let write_file file (out_chan : Writer.out_channel) =
     let in_chan = Reader.open_in file in
     try
@@ -165,6 +184,7 @@ let create (module Reader : READER) (module Writer : WRITER) metadata ~dir
       let rec copy () =
         let read_bytes = Reader.input in_chan buf 0 buffer_size in
         Writer.output out_chan buf 0 read_bytes ;
+        count_progress read_bytes ;
         if read_bytes > 0 then copy ()
       in
       copy () ;
@@ -246,6 +266,15 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     raise e
 
 let compress ~snapshot_file =
+  let Unix.{st_size = total; _} = Unix.stat snapshot_file in
+  let progress_bar =
+    Progress_bar.progress_bar
+      ~counter:`Bytes
+      ~message:"Compressing snapshot"
+      ~color:(Terminal.Color.rgb 3 198 252)
+      total
+  in
+  Progress_bar.with_reporter progress_bar @@ fun count_progress ->
   let snapshot_file_gz = Filename.chop_suffix snapshot_file ".uncompressed" in
   let in_chan = open_in snapshot_file in
   let out_chan = Gzip.open_out snapshot_file_gz in
@@ -255,6 +284,7 @@ let compress ~snapshot_file =
     let rec copy () =
       let read_bytes = input in_chan buf 0 buffer_size in
       Gzip.output out_chan buf 0 read_bytes ;
+      count_progress read_bytes ;
       if read_bytes > 0 then copy ()
     in
     copy () ;

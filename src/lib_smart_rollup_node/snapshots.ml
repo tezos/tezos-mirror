@@ -94,10 +94,21 @@ let check_some hash what = function
   | None ->
       error_with "Could not read %s at %a after export." what Block_hash.pp hash
 
-let check_l2_chain ~data_dir (store : _ Store.t) context
+let check_l2_chain ~message ~data_dir (store : _ Store.t) context
     (head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
   let* first_available_level = first_available_level ~data_dir store in
+  let blocks_to_check =
+    Int32.sub head.header.level first_available_level |> Int32.to_int |> succ
+  in
+  let progress_bar =
+    Progress_bar.progress_bar
+      ~counter:`Int
+      ~message
+      ~color:(Terminal.Color.rgb 3 252 132)
+      blocks_to_check
+  in
+  Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
   let rec check_block hash =
     let* b = Store.L2_blocks.read store.l2_blocks hash in
     let*? _b, header = check_some hash "L2 block" b in
@@ -118,12 +129,13 @@ let check_l2_chain ~data_dir (store : _ Store.t) context
     (* Ensure head context is available. *)
     let*! head_ctxt = Context.checkout context header.context in
     let*? _head_ctxt = check_some hash "context" head_ctxt in
+    let*! () = count_progress 1 in
     if header.level <= first_available_level then return_unit
     else check_block header.predecessor
   in
   check_block head.header.block_hash
 
-let post_import_checks ~dest =
+let post_import_checks ~message ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
   let context_dir = Configuration.default_context_dir dest in
@@ -138,7 +150,7 @@ let post_import_checks ~dest =
       store_dir
   in
   let* head = check_head store context in
-  let* () = check_l2_chain ~data_dir:dest store context head in
+  let* () = check_l2_chain ~message ~data_dir:dest store context head in
   let*! () = Context.close context in
   let* () = Store.close store in
   return_unit
@@ -146,7 +158,7 @@ let post_import_checks ~dest =
 let post_export_checks ~snapshot_file =
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
   extract gzip_reader stdlib_writer (fun _ -> ()) ~snapshot_file ~dest ;
-  post_import_checks ~dest
+  post_import_checks ~message:"Checking snapshot   " ~dest
 
 let operator_local_file_regexp =
   Re.Str.regexp "^storage/\\(commitments_published_at_level.*\\|lpc$\\)"
