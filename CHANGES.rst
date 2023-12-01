@@ -153,6 +153,8 @@ Smart Rollup node
   history, no GC happens. In ``full`` the rollup node retains data for possible
   refutations. (MRs :gl:`!10475`, :gl:`!10695`)
 
+- Snapshot export with integrity checks. (MR :gl:`!10704`)
+
 Smart Rollup client
 -------------------
 
