@@ -138,4 +138,6 @@ module Internal_for_tests : sig
     (module Protocol_plugin.T) ->
     Distributed_db.chain_db ->
     t tzresult Lwt.t
+
+  val advertise_mempool : t -> unit Lwt.t
 end

@@ -1627,4 +1627,13 @@ module Internal_for_tests = struct
             !chain_proto_registry ;
         return prevalidator
     | Some p -> return p
+
+  let advertise_mempool (t : t) =
+    let module Prevalidator : T = (val t) in
+    let w = Lazy.force Prevalidator.worker in
+    let open Lwt_result_syntax in
+    let*! (_was_pushed : bool) =
+      Prevalidator.Worker.Queue.push_request w Request.Advertise
+    in
+    Lwt.return_unit
 end
