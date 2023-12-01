@@ -85,6 +85,7 @@ let register () =
     ~__FILE__
     ~title:"Run the dummy kernel"
     ~tags:["riscv"; "sandbox"]
+    ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
     test_dummy_kernel ;
   List.iter
     (fun test_unit ->
@@ -92,10 +93,12 @@ let register () =
         ~__FILE__
         ~title:(sf "Run risc-v unit tests (%s)" test_unit)
         ~tags:["riscv"; "sandbox"; "unit"; test_unit]
+        ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
         (test_user_level_risc_v_unit_tests test_unit))
     riscv_test_units ;
   Test.register
     ~__FILE__
     ~title:"Run inline asm tests"
     ~tags:["riscv"; "sandbox"; "inline_asm"]
+    ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
     test_inline_asm
