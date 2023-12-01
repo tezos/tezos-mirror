@@ -85,6 +85,8 @@ pub enum TcError {
     AnnotationError(#[from] AnnotationError),
     #[error("duplicate entrypoint: {0}")]
     DuplicateEntrypoint(Entrypoint),
+    #[error("explicit default entrypoint is forbidden in: {0}")]
+    ExplicitDefaultEntrypointError(Prim),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -1361,6 +1363,31 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(BALANCE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(CONTRACT, [t], anns), [.., T::Address]) => {
+            pop!();
+            let entrypoint = match anns.get_single_field_ann()? {
+                Option::None => Option::None,
+                Option::Some(field_annot) => match Entrypoint::try_from(field_annot) {
+                    Ok(ep) => Option::Some(ep),
+                    Err(err) => return Err(TcError::EntrypointError(err)),
+                },
+            };
+            // explicit default entrypoint is forbidden
+            if let Option::Some(ep) = &entrypoint {
+                if ep.is_default() {
+                    return Err(TcError::ExplicitDefaultEntrypointError(CONTRACT));
+                }
+            }
+            // if no entrypoint is specified, default is assumed
+            let entrypoint = entrypoint.unwrap_or_default();
+            let t = parse_ty(ctx, t)?;
+            stack.push(T::new_option(T::new_contract(t.clone())));
+            I::Contract(t, entrypoint)
+        }
+        (App(CONTRACT, [_], _), [.., _]) => no_overload!(CONTRACT),
+        (App(CONTRACT, [_], _), []) => no_overload!(CONTRACT, len 1),
+        (App(CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -1711,7 +1738,7 @@ fn unify_stacks(
     Ok(())
 }
 
-fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
+pub(crate) fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
     ctx.gas
         .consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
