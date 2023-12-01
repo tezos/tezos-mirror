@@ -106,20 +106,13 @@ module Tools = struct
   (** Functions provided by {!Distributed_db} and {!Store.chain_store}
       that are used in various places of the mempool. Gathered here so that we can test
       the mempool without requiring a full-fledged [Distributed_db]/[Store.Chain_store]. *)
-  type 'prevalidation_t tools = {
+  type tools = {
     advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
         (** [advertise_current_head mempool head] sends a
             [Current_head (chain_id, head_header, mempool)] message to all known
             active peers for the chain being considered. *)
     chain_tools : Store.Block.t Classification.chain_tools;
         (** Lower-level tools provided by {!Prevalidator_classification} *)
-    flush :
-      head:Store.Block.t ->
-      timestamp:Time.Protocol.t ->
-      'prevalidation_t ->
-      'prevalidation_t tzresult Lwt.t;
-        (** Create a new empty prevalidation state, recycling some elements
-            of the provided previous prevalidation state. *)
     fetch :
       ?peer:P2p_peer.Id.t ->
       ?timeout:Time.System.Span.t ->
@@ -156,9 +149,16 @@ module Tools = struct
   }
 end
 
-type 'a parameters = {
+type 'prevalidation_t parameters = {
   limits : Shell_limits.prevalidator_limits;
-  tools : 'a Tools.tools;
+  tools : Tools.tools;
+  flush :
+    head:Store.Block.t ->
+    timestamp:Time.Protocol.t ->
+    'prevalidation_t ->
+    'prevalidation_t tzresult Lwt.t;
+      (** Create a new empty prevalidation state, recycling some elements
+            of the provided previous prevalidation state. *)
 }
 
 (** The type needed for the implementation of [Make] below, but
@@ -771,7 +771,7 @@ module Make_s
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
       let* validation_state =
-        pv.shell.parameters.tools.flush
+        pv.shell.parameters.flush
           ~head:new_predecessor
           ~timestamp
           pv.validation_state
@@ -878,6 +878,8 @@ module type ARG = sig
   val chain_db : Distributed_db.chain_db
 
   val chain_id : Chain_id.t
+
+  val tools : Tools.tools
 end
 
 module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
@@ -1273,39 +1275,6 @@ module Make
         pv.shell.fetching ;
       Lwt.return_unit
 
-    let mk_tools (chain_db : Distributed_db.chain_db) : _ Tools.tools =
-      let advertise_current_head ~mempool bh =
-        Distributed_db.Advertise.current_head chain_db ~mempool bh
-      in
-      let chain_tools = mk_chain_tools chain_db in
-      let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
-      let fetch ?peer ?timeout oph =
-        Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
-      in
-      let read_block bh =
-        let chain_store = Distributed_db.chain_store chain_db in
-        Store.Block.read_block chain_store bh
-      in
-      let send_get_current_head ?peer () =
-        match peer with
-        | None -> Distributed_db.Request.current_head_from_all chain_db
-        | Some peer ->
-            Distributed_db.Request.current_head_from_peer chain_db peer
-      in
-      let set_mempool ~head mempool =
-        let chain_store = Distributed_db.chain_store chain_db in
-        Store.Chain.set_mempool chain_store ~head mempool
-      in
-      {
-        advertise_current_head;
-        chain_tools;
-        flush;
-        fetch;
-        read_block;
-        send_get_current_head;
-        set_mempool;
-      }
-
     let mk_worker_tools w : Tools.worker_tools =
       let push_request r = Worker.Queue.push_request w r in
       let push_request_now r = Worker.Queue.push_request_now w r in
@@ -1316,6 +1285,7 @@ module Make
     let on_launch w _ (limits, chain_db) : (state, launch_error) result Lwt.t =
       let open Lwt_result_syntax in
       let chain_store = Distributed_db.chain_store chain_db in
+      let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
       let*! head = Store.Chain.current_head chain_store in
       let*! mempool = Store.Chain.mempool chain_store in
       let*! live_blocks, live_operations =
@@ -1336,7 +1306,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; tools = mk_tools chain_db} in
+      let parameters = {limits; tools = Arg.tools; flush} in
       let shell =
         {
           classification;
@@ -1440,8 +1410,39 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Proto : Protocol_plugin.T) =
+let mk_tools chain_db : Tools.tools =
+  let advertise_current_head ~mempool bh =
+    Distributed_db.Advertise.current_head chain_db ~mempool bh
+  in
+  let chain_tools = mk_chain_tools chain_db in
+  let fetch ?peer ?timeout oph =
+    Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
+  in
+  let read_block bh =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Block.read_block chain_store bh
+  in
+  let send_get_current_head ?peer () =
+    match peer with
+    | None -> Distributed_db.Request.current_head_from_all chain_db
+    | Some peer -> Distributed_db.Request.current_head_from_peer chain_db peer
+  in
+  let set_mempool ~head mempool =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Chain.set_mempool chain_store ~head mempool
+  in
+  {
+    advertise_current_head;
+    chain_tools;
+    fetch;
+    read_block;
+    send_get_current_head;
+    set_mempool;
+  }
+
+let make limits chain_db chain_id mk_tools (module Proto : Protocol_plugin.T) =
   let module Prevalidation_t = Prevalidation.Make (Proto) in
+  let tools = mk_tools chain_db in
   let module Prevalidator =
     Make
       (Proto)
@@ -1451,6 +1452,8 @@ let make limits chain_db chain_id (module Proto : Protocol_plugin.T) =
         let chain_db = chain_db
 
         let chain_id = chain_id
+
+        let tools = tools
       end)
       (Prevalidation_t)
   in
@@ -1479,7 +1482,9 @@ let create limits (module Proto : Protocol_plugin.T) chain_db =
     ChainProto_registry.find (chain_id, Proto.hash) !chain_proto_registry
   with
   | None ->
-      let prevalidator = make limits chain_db chain_id (module Proto) in
+      let prevalidator =
+        make limits chain_db chain_id mk_tools (module Proto)
+      in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
         ChainProto_registry.add
