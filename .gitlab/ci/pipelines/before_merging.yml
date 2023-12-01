@@ -43,3 +43,8 @@ include:
   # Stage: doc
   - .gitlab/ci/jobs/doc/linkcheck.yml
   - .gitlab/ci/jobs/doc/test_install_python.yml
+
+  # Debug
+  - .gitlab/ci/jobs/publish/kernel_sdk.yml
+  - .gitlab/ci/jobs/publish/gitlab:publish.yml
+  - ./.gitlab/ci/jobs/publish/gitlab:release.yml
