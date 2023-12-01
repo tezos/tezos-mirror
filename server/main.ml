@@ -344,28 +344,26 @@ let maybe_alter_tables db_pool =
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Lwt.map
         (fun () -> Ok ())
-        ( Teztale_lib.Metrics.sql "alter_tables" @@ fun () ->
-          Lwt_list.iter_s
-            (fun reqs ->
-              Lwt.bind
-                (Db.with_transaction (fun () ->
-                     Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                       (fun req ->
-                         Db.exec
-                           (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                              req)
-                           ())
-                       reqs))
-                (function
-                  | Ok () -> Lwt.return_unit
-                  | Error e ->
-                      Lwt_io.eprintlf
-                        "\"ALTER TABLE ADD COLUMN IF NOT EXISTS\" expression \
-                         is not supported by sqlite, if the following error is \
-                         because the column already exists ignore it:\n\
-                         %s"
-                        (Caqti_error.show e)))
-            Sql_requests.alter_tables ))
+        (Lwt_list.iter_s
+           (fun reqs ->
+             Lwt.bind
+               (Db.with_transaction (fun () ->
+                    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                      (fun req ->
+                        Db.exec
+                          (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
+                          ())
+                      reqs))
+               (function
+                 | Ok () -> Lwt.return_unit
+                 | Error e ->
+                     Lwt_io.eprintlf
+                       "\"ALTER TABLE ADD COLUMN IF NOT EXISTS\" expression is \
+                        not supported by sqlite, if the following error is \
+                        because the column already exists ignore it:\n\
+                        %s"
+                       (Caqti_error.show e)))
+           Sql_requests.alter_tables))
     db_pool
 
 let maybe_alter_and_create_tables db_pool =
@@ -462,6 +460,8 @@ let endorsing_rights_callback =
            return_unit
          else
            let* () =
+             Teztale_lib.Metrics.sql "maybe_insert_endorsing_right__list"
+             @@ fun () ->
              Caqti_lwt.Pool.use
                (fun (module Db : Caqti_lwt.CONNECTION) ->
                  let* () =
@@ -567,6 +567,7 @@ let block_callback =
                else
                  let* () = may_insert_delegates (module Db) conf [delegate] in
                  let* () =
+                   Teztale_lib.Metrics.sql "maybe_insert_block" @@ fun () ->
                    without_cache
                      Sql_requests.Mutex.blocks
                      Sql_requests.maybe_insert_block
@@ -580,6 +581,7 @@ let block_callback =
                    match cycle_info with
                    | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
                      ->
+                       Teztale_lib.Metrics.sql "maybe_insert_cycle" @@ fun () ->
                        without_cache
                          Sql_requests.Mutex.cycles
                          Sql_requests.maybe_insert_cycle
@@ -633,6 +635,7 @@ let block_callback =
                  return_unit)
           in
           let* () =
+            Teztale_lib.Metrics.sql "insert_received_block__list" @@ fun () ->
             (* This data is non-redondant: we always treat it. *)
             maybe_with_transaction conf (module Db) @@ fun () ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -697,6 +700,7 @@ let operations_callback ~logger conf db_pool g source operations =
         Teztale_lib.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations" level) ;
         let* () =
+          Teztale_lib.Metrics.sql "insert_received_operation__list" @@ fun () ->
           maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
