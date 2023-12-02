@@ -9,20 +9,12 @@ all: build test check
 build:
 	@cargo build --release
 
-.PHONY: build-deps
-build-deps:
-
-.PHONY: build-dev-deps
-build-dev-deps: build-deps
-	@rustup component add rustfmt clippy
-
 .PHONY: test
 test:
 	@cargo test
 
 .PHONY: check
 check:
-	@cargo fmt --check
 	@cargo clippy --all-targets -- --deny warnings
 
 .PHONY: clean

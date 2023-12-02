@@ -3,15 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 .PHONY: all
-all: build-deps check
+all: check
 
 .PHONY: build
 build:
 	@make -C inline_asm build
-
-.PHONY: build-deps
-build-deps:
-	@make -C inline_asm build-deps
 
 .PHONY: check
 check:

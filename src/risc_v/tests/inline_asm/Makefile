@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 .PHONY: all
-all: build-deps check
+all: check
 
 TARGET=rv64-inline-asm-tests
 
@@ -12,13 +12,8 @@ build:
 	@cargo build --release
 	@cp target/riscv64gc-unknown-none-elf/release/$(TARGET) $(TARGET)
 
-.PHONY: build-deps
-build-deps:
-	@rustup target add riscv64gc-unknown-none-elf
-
 .PHONY: check
 check:
-	@cargo fmt --check
 
 .PHONY: clean
 clean:
