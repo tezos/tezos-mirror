@@ -10,6 +10,7 @@ pub struct Ctx {
     pub amount: i64,
     pub balance: i64,
     pub level: BigUint,
+    pub min_block_time: BigUint,
     pub chain_id: tezos_crypto_rs::hash::ChainId,
     pub self_address: AddressHash,
     pub lookup_contract: Box<dyn FnMut(&AddressHash) -> Option<Entrypoints>>,
@@ -39,6 +40,7 @@ impl Default for Ctx {
             balance: 0,
             amount: 0,
             level: 0u32.into(),
+            min_block_time: 1u32.into(),
             // the default chain id is NetXynUjJNZm7wi, which is also the default chain id of octez-client in mockup mode
             chain_id: tezos_crypto_rs::hash::ChainId(vec![0xf3, 0xd4, 0x85, 0x54]),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),

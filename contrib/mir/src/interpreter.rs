@@ -920,6 +920,10 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::LEVEL)?;
             stack.push(TypedValue::Nat(ctx.level.clone()));
         }
+        I::MinBlockTime => {
+            ctx.gas.consume(interpret_cost::MIN_BLOCK_TIME)?;
+            stack.push(TypedValue::Nat(ctx.min_block_time.clone()));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3495,6 +3499,20 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::LEVEL + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn min_block_time() {
+        let mut ctx = Ctx::default();
+        ctx.min_block_time = 70u32.into();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[MinBlockTime], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::nat(70),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::MIN_BLOCK_TIME + interpret_cost::INTERPRET_RET
         );
     }
 }
