@@ -608,6 +608,27 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   let process = spawn_command sc_rollup_node cmd in
   Process.check process
 
+let export_snapshot sc_rollup_node dir =
+  let process =
+    spawn_command
+      sc_rollup_node
+      [
+        "snapshot";
+        "export";
+        "--dest";
+        dir;
+        "--data-dir";
+        data_dir sc_rollup_node;
+      ]
+  in
+  let parse process =
+    let* output = Process.check_and_read_stdout process in
+    match output =~* rex "Snapshot exported to ([^\n]*)" with
+    | None -> Test.fail "Snapshot export failed"
+    | Some filename -> return filename
+  in
+  Runnable.{value = process; run = parse}
+
 let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in

@@ -397,6 +397,15 @@ let wasm_dump_file_param next =
     string_parameter
     next
 
+let snapshot_dir_arg =
+  Tezos_clic.arg
+    ~long:"dest"
+    ~placeholder:"path"
+    ~doc:
+      "Directory in which to export the snapshot (defaults to current \
+       directory)"
+    string_parameter
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
