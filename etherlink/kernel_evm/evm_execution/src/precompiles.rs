@@ -842,7 +842,7 @@ mod tests {
         // address: 0xf0affc80a5f69f4a9a3ee01a640873b6ba53e539
         // privateKey: 0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
         // publicKey: 0x08a4681ba8c520aaab2308957d401ffded69155b358246596846f87c0728e76f618f9772f16687ed5a2854234b037b71e4c3bc92cad78e575fb12c8df8b8dae5
-        // node src/kernel_evm/benchmarks/scripts/sign_tx.js $(pwd)/src/kernel_evm/benchmarks/scripts/transactions_example/tx_legacy.json 0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
+        // node etherlink/kernel_evm/benchmarks/scripts/sign_tx.js $(pwd)/src/kernel_evm/benchmarks/scripts/transactions_example/tx_legacy.json 0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
         let hash = "3c74ed8cf6d9695ac4de8e5dda38ac3719b3f42e913e0109344a5fcbd1ff8562";
         let r = "b17daf010e907d83f0235467faac96f346c4cc46600477d1b5f543ced8c986b7";
         let s = "70221fd3c40e0cbaef013e9bb62cf8adc70c77a5c313954c03897f3f08f90726";

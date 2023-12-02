@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_bin_evm_node_test_tezt_lib)
+ (name etherlink_bin_evm_node_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -29,7 +29,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_bin_evm_node_test_tezt_lib
+  etherlink_bin_evm_node_test_tezt_lib
   tezt)
  (link_flags
   (:standard)

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 // usage: node benchmarks/bench_erc20tok.js
-// The source code of the ERC-20 Token contract can be found in src/kernel_evm/solidy_examples/erc20tok.sol
+// The source code of the ERC-20 Token contract can be found in etherlink/kernel_evm/solidy_examples/erc20tok.sol
 
 const utils = require('./utils');
 const { contracts_directory, compile_contract_file } = require("../lib/contract");

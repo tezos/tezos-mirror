@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec src/bin_evm_node/test/main.exe -- --file test_ethbloom.ml
+    Invocation:   dune exec etherlink/bin_evm_node/test/main.exe -- --file test_ethbloom.ml
     Subject:      Tests for implementation of Ethereum bloom filters
 *)
 
