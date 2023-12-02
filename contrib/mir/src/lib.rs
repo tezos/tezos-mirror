@@ -599,6 +599,57 @@ mod tests {
         );
     }
 
+    #[test]
+    fn self_address() {
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_e2e_test(
+            "SELF_ADDRESS",
+            stk![],
+            stk![Type::Address],
+            stk![],
+            stk![TypedValue::Address(addr.clone())],
+            {
+                let mut c = Ctx::default();
+                c.self_address = addr.hash;
+                c
+            },
+        );
+    }
+
+    #[test]
+    fn sender() {
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_e2e_test(
+            "SENDER",
+            stk![],
+            stk![Type::Address],
+            stk![],
+            stk![TypedValue::Address(addr.clone())],
+            {
+                let mut c = Ctx::default();
+                c.sender = addr.hash;
+                c
+            },
+        );
+    }
+
+    #[test]
+    fn source() {
+        let addr = Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        run_e2e_test(
+            "SOURCE",
+            stk![],
+            stk![Type::Address],
+            stk![],
+            stk![TypedValue::Address(addr.clone())],
+            {
+                let mut c = Ctx::default();
+                c.source = addr.hash;
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
