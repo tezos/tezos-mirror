@@ -102,6 +102,7 @@ mod tests {
     #[test]
     fn types() {
         assert_eq!(parse("ticket").unwrap(), app!(ticket));
+        assert_eq!(parse("timestamp").unwrap(), app!(timestamp));
     }
 
     #[test]

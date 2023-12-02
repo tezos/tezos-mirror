@@ -42,7 +42,7 @@ impl Type {
         let invalid_type_prop = || Err(TcError::InvalidTypeProperty(prop, self.clone()));
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Never | Address | ChainId | Bytes | Key
-            | Signature | KeyHash => (),
+            | Signature | KeyHash | Timestamp => (),
             Ticket(_) => match prop {
                 TypeProperty::Comparable
                 | TypeProperty::Pushable

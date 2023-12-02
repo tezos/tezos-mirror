@@ -333,6 +333,9 @@ fn parse_ty_with_entrypoints(
         }
         App(ticket, ..) => unexpected()?,
 
+        App(timestamp, [], _) => Type::Timestamp,
+        App(timestamp, ..) => unexpected()?,
+
         App(pair, [ty1, ty2, rest @ ..], _) => make_pair(ctx, (ty1, ty2, rest))?,
         App(pair, ..) => unexpected()?,
 
