@@ -949,6 +949,14 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::NOW)?;
             stack.push(TypedValue::Timestamp(ctx.now.clone()));
         }
+        I::ImplicitAccount => {
+            ctx.gas.consume(interpret_cost::IMPLICIT_ACCOUNT)?;
+            let keyhash = pop!(V::KeyHash);
+            stack.push(TypedValue::Contract(Address {
+                hash: AddressHash::Implicit(keyhash),
+                entrypoint: Entrypoint::default(),
+            }));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3594,6 +3602,25 @@ mod interpreter_tests {
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&[Now], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::timestamp(7000),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::NOW + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn implicit_account() {
+        let mut ctx = Ctx::default();
+        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let mut stack = stk![V::KeyHash(key_hash)];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[ImplicitAccount], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::Contract(
+                super::Address::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap()
+            ),]
+        );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
