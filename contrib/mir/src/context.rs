@@ -2,12 +2,14 @@
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::gas::Gas;
+use num_bigint::BigUint;
 use std::collections::HashMap;
 
 pub struct Ctx {
     pub gas: Gas,
     pub amount: i64,
     pub balance: i64,
+    pub level: BigUint,
     pub chain_id: tezos_crypto_rs::hash::ChainId,
     pub self_address: AddressHash,
     pub lookup_contract: Box<dyn FnMut(&AddressHash) -> Option<Entrypoints>>,
@@ -36,6 +38,7 @@ impl Default for Ctx {
             gas: Gas::default(),
             balance: 0,
             amount: 0,
+            level: 0u32.into(),
             // the default chain id is NetXynUjJNZm7wi, which is also the default chain id of octez-client in mockup mode
             chain_id: tezos_crypto_rs::hash::ChainId(vec![0xf3, 0xd4, 0x85, 0x54]),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),

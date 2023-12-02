@@ -440,6 +440,7 @@ pub enum Instruction<'a> {
     Sha3,
     Sha512,
     Balance,
+    Level,
     /// Here entrypoint is not an optional value because explicit default entrypoints are forbidden
     /// in concrete syntax, so we can assume that if the entrypoint is the default entrypoint, then
     /// no explicit entrypoint was specified in the instruction.
