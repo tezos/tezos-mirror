@@ -271,6 +271,7 @@ pub mod interpret_cost {
     pub const SELF_ADDRESS: u32 = 10;
     pub const SENDER: u32 = 10;
     pub const SOURCE: u32 = 10;
+    pub const NOW: u32 = 10;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol

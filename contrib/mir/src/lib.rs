@@ -670,6 +670,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn now() {
+        run_e2e_test(
+            "NOW",
+            stk![],
+            stk![Type::Timestamp],
+            stk![],
+            stk![TypedValue::timestamp(4500),],
+            {
+                let mut c = Ctx::default();
+                c.now = 4500i32.into();
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;

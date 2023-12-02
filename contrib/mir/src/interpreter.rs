@@ -945,6 +945,10 @@ fn interpret_one<'a>(
                 entrypoint: Entrypoint::default(),
             }));
         }
+        I::Now => {
+            ctx.gas.consume(interpret_cost::NOW)?;
+            stack.push(TypedValue::Timestamp(ctx.now.clone()));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3579,6 +3583,20 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::SOURCE + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn now() {
+        let mut ctx = Ctx::default();
+        ctx.now = 7000i32.into();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[Now], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::timestamp(7000),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::NOW + interpret_cost::INTERPRET_RET
         );
     }
 }

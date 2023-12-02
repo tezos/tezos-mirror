@@ -1426,6 +1426,12 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(SOURCE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NOW, [], _), ..) => {
+            stack.push(T::Timestamp);
+            I::Now
+        }
+        (App(NOW, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5402,5 +5408,16 @@ mod typecheck_tests {
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
         );
+    }
+
+    #[test]
+    fn now() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("NOW").unwrap(), &mut Ctx::default(), stk),
+            Ok(Now)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Timestamp]);
     }
 }
