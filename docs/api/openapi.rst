@@ -71,6 +71,19 @@ and specific to the Nairobi protocol can be found at:
 
 - `nairobi-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi-rc.json>`_
 
+Oxford RPCs
+-----------
+
+The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
+protocol can be found at:
+
+- `oxford-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Oxford protocol can be found at:
+
+- `oxford-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
+
 .. _openapi_generate:
 
 How to Generate
