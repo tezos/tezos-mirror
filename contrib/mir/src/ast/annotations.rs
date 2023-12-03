@@ -30,6 +30,7 @@ impl std::fmt::Debug for Annotations<'_> {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldAnnotation<'a>(&'a str);
 
 impl FieldAnnotation<'_> {

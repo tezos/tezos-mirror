@@ -43,7 +43,7 @@ pub use michelson_list::MichelsonList;
 pub use michelson_signature::Signature;
 pub use or::Or;
 
-use self::big_map::BigMap;
+use self::{annotations::FieldAnnotation, big_map::BigMap};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TransferTokens<'a> {
@@ -56,9 +56,24 @@ pub struct TransferTokens<'a> {
 pub struct SetDelegate(pub Option<KeyHash>);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Emit<'a> {
+    pub tag: Option<FieldAnnotation<'a>>,
+    pub value: TypedValue<'a>,
+
+    // Here an `Or` type is used, (instead of a single `Type` or `Micheline` field), because of two
+    // reasons.
+    // 1. We need to carry annotations for this type, so at least for now, that requires carrying Micheline.
+    // 2. If the type is implicit, and comes from the stack, then we cannot make an equalent
+    //    Micheline<'a> from it since it requires an Arena (at least for now), which is not
+    //    available in the typechecker.
+    pub arg_ty: Or<Type, Micheline<'a>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Operation<'a> {
     TransferTokens(TransferTokens<'a>),
     SetDelegate(SetDelegate),
+    Emit(Emit<'a>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -381,6 +396,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         None => V::prim0(Prim::None),
                     },
                 ),
+                Operation::Emit(_) => todo!(),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
         }
