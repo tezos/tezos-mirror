@@ -62,10 +62,14 @@ protocol can be found at:
 
 - `nairobi-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
 
+- `nairobi-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi-rc.json>`_
+
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Nairobi protocol can be found at:
 
 - `nairobi-mempool-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
+
+- `nairobi-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi-rc.json>`_
 
 .. _openapi_generate:
 
