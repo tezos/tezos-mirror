@@ -45,7 +45,6 @@
 unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64_coverage
-  - .tags_template__no_gcp
   # The [lib_benchmark] unit tests require Python
   - .image_template__runtime_build_test_dependencies
   variables:
@@ -82,7 +81,6 @@ unit:non-proto-arm64:
     - .unit_test_template_arm64
     # The [lib_benchmark] unit tests require Python
     - .image_template__runtime_build_test_dependencies
-    - .tags_template__no_gcp_arm64
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
 

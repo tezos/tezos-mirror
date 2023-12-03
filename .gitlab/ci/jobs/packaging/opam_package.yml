@@ -731,7 +731,6 @@ opam:octez-shell-libs:
   extends:
     - .opam_template
     - .rules_template__trigger_all_opam_batch_6
-    - .tags_template__no_gcp
   variables:
     package: octez-shell-libs
 
