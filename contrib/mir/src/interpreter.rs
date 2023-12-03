@@ -957,6 +957,15 @@ fn interpret_one<'a>(
                 entrypoint: Entrypoint::default(),
             }));
         }
+        I::VotingPower => {
+            ctx.gas.consume(interpret_cost::VOTING_POWER)?;
+            let keyhash = pop!(V::KeyHash);
+            stack.push(TypedValue::Nat((ctx.voting_powers)(&keyhash)))
+        }
+        I::TotalVotingPower => {
+            ctx.gas.consume(interpret_cost::TOTAL_VOTING_POWER)?;
+            stack.push(TypedValue::Nat(ctx.total_voting_power.clone()))
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3624,6 +3633,55 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn voting_power() {
+        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+
+        let mut ctx = Ctx::default();
+        ctx.set_voting_powers([
+            (key_hash_1.clone(), 30u32.into()),
+            (key_hash_2.clone(), 50u32.into()),
+        ]);
+        let mut stack = stk![TypedValue::KeyHash(key_hash_2.clone())];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::nat(50)]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
+        );
+
+        // When key_hash is not in context.
+        let mut ctx = Ctx::default();
+        ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+        let mut stack = stk![TypedValue::KeyHash(key_hash_3)];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::nat(0)]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn total_voting_power() {
+        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let mut ctx = Ctx::default();
+        ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[TotalVotingPower], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::nat(80)]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::TOTAL_VOTING_POWER + interpret_cost::INTERPRET_RET
         );
     }
 }

@@ -1440,6 +1440,20 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IMPLICIT_ACCOUNT, len 1),
         (App(IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(TOTAL_VOTING_POWER, [], _), ..) => {
+            stack.push(T::Nat);
+            I::TotalVotingPower
+        }
+        (App(TOTAL_VOTING_POWER, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(VOTING_POWER, [], _), [.., T::KeyHash]) => {
+            stack[0] = T::Nat;
+            I::VotingPower
+        }
+        (App(VOTING_POWER, [], _), [.., _]) => no_overload!(VOTING_POWER),
+        (App(VOTING_POWER, [], _), []) => no_overload!(VOTING_POWER, len 1),
+        (App(VOTING_POWER, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5469,5 +5483,51 @@ mod typecheck_tests {
         );
 
         assert_eq!(stk, &tc_stk![Type::Timestamp]);
+    }
+
+    #[test]
+    fn voting_power() {
+        let stk = &mut tc_stk![Type::KeyHash];
+        assert_eq!(
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            Ok(VotingPower)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Nat]);
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::VOTING_POWER,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::VOTING_POWER,
+                stack: stk![Type::Unit],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn total_voting_power() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("TOTAL_VOTING_POWER").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(TotalVotingPower)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Nat]);
     }
 }

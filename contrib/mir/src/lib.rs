@@ -701,6 +701,59 @@ mod tests {
         );
     }
 
+    #[test]
+    fn voting_power() {
+        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        run_e2e_test(
+            "VOTING_POWER",
+            stk![Type::KeyHash],
+            stk![Type::Nat],
+            stk![TypedValue::KeyHash(key_hash_2.clone())],
+            stk![TypedValue::nat(50)],
+            {
+                let mut c = Ctx::default();
+                c.set_voting_powers([
+                    (key_hash_1.clone(), 30u32.into()),
+                    (key_hash_2.clone(), 50u32.into()),
+                ]);
+                c
+            },
+        );
+
+        run_e2e_test(
+            "VOTING_POWER",
+            stk![Type::KeyHash],
+            stk![Type::Nat],
+            stk![TypedValue::KeyHash(key_hash_3)],
+            stk![TypedValue::nat(0)],
+            {
+                let mut c = Ctx::default();
+                c.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+                c
+            },
+        );
+    }
+
+    #[test]
+    fn total_voting_power() {
+        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        run_e2e_test(
+            "TOTAL_VOTING_POWER",
+            stk![],
+            stk![Type::Nat],
+            stk![],
+            stk![TypedValue::nat(80)],
+            {
+                let mut c = Ctx::default();
+                c.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
