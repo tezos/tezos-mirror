@@ -17,7 +17,36 @@ shift
 
 mkdir -p test_results
 
-echo "Running test \"dune build ${COVERAGE_OPTIONS:-} $*\" ..."
+all_targets="$*"
+
+# In some cases and especially to reduce the duration of the tests or when we
+# find that one global test job introduce hangs or stuck jobs randomly
+# we use the parallel capability of Gitlab CI to launch tests in parallel. In
+# such a case, the block below calculates the targets to be executed in
+# parallel.
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6808
+if [ -n "${CI_NODE_INDEX:-}" ] &&
+  [ -n "${CI_NODE_TOTAL:-}" ] &&
+  [ "${DISTRIBUTE_TESTS_TO_PARALLELS:-}" = "true" ]; then
+
+  targets=0
+  for target in $all_targets; do
+    node=$((targets % CI_NODE_TOTAL))
+    # Disable SC1083 as we truly intend the outermost set of braces on
+    # the right-hand side to be literal.
+    # shellcheck disable=SC1083
+    eval group_target_$node=\"\${group_target_${node}-} "$target"\"
+    targets=$((targets + 1))
+  done
+  if [ "$targets" -lt "$CI_NODE_TOTAL" ]; then
+    echo "The number of targets is larger than CI_NODE_TOTAL -- consider decreasing 'parallel:'."
+    exit 1
+  fi
+  eval "group_target=\"\$group_target_$((CI_NODE_INDEX - 1))"\"
+
+fi
+
+echo "Running test \"dune build ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets}\" ..."
 
 START=$(date +%s.%N)
 
@@ -26,8 +55,10 @@ exitcode_file=$(mktemp)
   echo "0" > "$exitcode_file"
   # If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
   # We need this to be word split for the arguments to be properly parsed by dune.
+  # The same holds for ${group_target:-$all_targets} which may contain multiple targets
+  # and must be word split.
   # shellcheck disable=SC2086
-  dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} "$@" 2>&1 ||
+  dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets} 2>&1 ||
     echo "$?" > "$exitcode_file"
 } | tee "test_results/$name.log"
 EXITCODE=$(cat "$exitcode_file")

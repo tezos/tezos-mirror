@@ -35,14 +35,14 @@
       - test_results
 
 .oc.unit_test_template_arm64:
-  extends: .oc.unit_test_template
+  extends:
+    - .oc.unit_test_template
+    - .tags_template__build_arm64
   needs:
     - "oc.build_arm64-released"
     - "oc.build_arm64-exp-dev-extra"
   variables:
     ARCH: "arm64"
-  tags:
-    - arm64
   rules:
     # These rules must be imply the rules for the [oc.build_arm64-*]
     # jobs, such the build jobs always run if the test jobs are
@@ -97,9 +97,10 @@ oc.unit:non-proto-arm64:
     - .oc.unit_test_template_arm64
     # The [lib_benchmark] unit tests require Python
     - .image_template__runtime_build_test_dependencies
-    - .tags_template__no_gcp_arm64
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
+    DISTRIBUTE_TESTS_TO_PARALLELS: "true"
+  parallel: 2
 
 oc.unit:js_components:
   extends:
