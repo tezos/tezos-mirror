@@ -5,7 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
-use crate::ast::michelson_address::entrypoint::Entrypoints;
+use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Entrypoints};
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
@@ -1737,6 +1737,43 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(VOTING_POWER, [], _), []) => no_overload!(VOTING_POWER, len 1),
         (App(VOTING_POWER, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(EMIT, [t], anns), [.., _]) => {
+            let emit_val_type = pop!();
+            let emit_type_arg = parse_ty(ctx, t)?;
+            ensure_ty_eq(&mut ctx.gas, &emit_type_arg, &emit_val_type)?;
+            // NB: the docs for the EMIT instruction
+            // https://tezos.gitlab.io/michelson-reference/#instr-EMIT claim
+            // the type needs to be packable, but that's not quite correct, as
+            // `contract _` is forbidden. The correct constraint is seemingly
+            // "pushable", as "pushable" is just "packable" without `contract _`
+            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            let opt_tag = anns.get_single_field_ann()?;
+            if let Option::Some(t) = &opt_tag {
+                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+            }
+            stack.push(Type::Operation);
+            I::Emit {
+                tag: opt_tag,
+                arg_ty: Or::Right(t.clone()),
+            }
+        }
+        (App(EMIT, [], anns), [.., _]) => {
+            let emit_val_type = pop!();
+            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            let opt_tag = anns.get_single_field_ann()?;
+            if let Option::Some(t) = &opt_tag {
+                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+            }
+            stack.push(Type::Operation);
+            I::Emit {
+                tag: opt_tag,
+                arg_ty: Or::Left(emit_val_type),
+            }
+        }
+        (App(EMIT, [], _), []) => no_overload!(EMIT, len 1),
+        (App(EMIT, [_], _), []) => no_overload!(EMIT, len 1),
+        (App(EMIT, [_, _, ..], _), _) => unexpected_micheline!(),
+
         (App(PAIRING_CHECK, [], _), [.., T::List(ty)])
             if match ty.as_ref() {
                 T::Pair(p) => matches!(p.as_ref(), (T::Bls12381G1, T::Bls12381G2)),
@@ -2250,6 +2287,7 @@ mod typecheck_tests {
     use super::{Lambda, Or};
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::michelson_address as addr;
+    use crate::ast::or::Or::{Left, Right};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -5549,7 +5587,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::Int];
         assert_eq!(
             typecheck_instruction(&parse("LEFT nat").unwrap(), &mut Ctx::default(), &mut stack),
-            Ok(Left)
+            Ok(Instruction::Left)
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Nat)]);
     }
@@ -5568,7 +5606,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Right)
+            Ok(Instruction::Right)
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Nat, Type::Int)]);
     }
@@ -6870,5 +6908,128 @@ mod typecheck_tests {
     #[test]
     fn unpack_short_stack() {
         too_short_test(&app!(UNPACK[app!(unit)]), Prim::UNPACK, 1)
+    }
+
+    #[test]
+    fn emit() {
+        use crate::ast::annotations::FieldAnnotation;
+
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Emit {
+                tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                arg_ty: Right(parse("nat").unwrap())
+            })
+        );
+        assert_eq!(stk, &tc_stk![Type::Operation]);
+
+        // Instruction with tag only
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT %mytag").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Emit {
+                tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                arg_ty: Left(Type::Nat)
+            })
+        );
+
+        // Only pushable types can be emitted.
+        let stk = &mut tc_stk![Type::Operation];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::Operation
+            ))
+        );
+
+        // Only pushable types can be emitted with type explicitly provided.
+        let stk = &mut tc_stk![Type::Operation];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT operation").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::Operation
+            ))
+        );
+
+        // Instruction with type arg only
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT nat").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Emit {
+                tag: None,
+                arg_ty: Right(parse("nat").unwrap())
+            })
+        );
+
+        // Instruction with type no args
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::Emit {
+                tag: None,
+                arg_ty: Left(Type::Nat)
+            })
+        );
+
+        // Type from stack and from argument should be same.
+        let stk = &mut tc_stk![Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Nat, Type::Int)))
+        );
+
+        // too short stack
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::EMIT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        // Unexpected argument count
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMIT %mytag nat nat").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::UnexpectedMicheline(
+                "App(EMIT, [App(nat, [], []), App(nat, [], [])], [Field(\"mytag\")])".to_string()
+            ))
+        );
+
+        // Too long tag
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMIT %mytagmytagmytagmytagmytagmytagmytag").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::EntrypointError(ByteReprError::WrongFormat(
+                "entrypoint name must be at most 31 characters long, but it is 35 characters long"
+                    .into()
+            )))
+        );
+
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMIT %mytagmytagmytagmytagmytagmytagmytag nat").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::EntrypointError(ByteReprError::WrongFormat(
+                "entrypoint name must be at most 31 characters long, but it is 35 characters long"
+                    .into()
+            )))
+        );
     }
 }

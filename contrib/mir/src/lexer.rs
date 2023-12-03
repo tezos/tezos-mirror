@@ -104,7 +104,7 @@ defprim! {
     EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
     NAT,
     // Unstable primitives (they are not part of a released protocol)
-    Transfer_tokens, Set_delegate
+    Transfer_tokens, Set_delegate, Emit
     // If you add anything here, see the note about the order above.
 }
 

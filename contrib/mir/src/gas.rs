@@ -327,6 +327,7 @@ pub mod interpret_cost {
     pub const IMPLICIT_ACCOUNT: u32 = 10;
     pub const VOTING_POWER: u32 = 640;
     pub const TOTAL_VOTING_POWER: u32 = 450;
+    pub const EMIT: u32 = 30;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol

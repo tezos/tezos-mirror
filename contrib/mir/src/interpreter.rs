@@ -1264,6 +1264,19 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::TOTAL_VOTING_POWER)?;
             stack.push(TypedValue::Nat(ctx.total_voting_power.clone()))
         }
+        I::Emit { tag, arg_ty } => {
+            let counter: u128 = ctx.operation_counter();
+            let emit_val = pop!();
+            ctx.gas.consume(interpret_cost::EMIT)?;
+            stack.push(TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag: tag.clone(),
+                    value: emit_val,
+                    arg_ty: arg_ty.clone(),
+                }),
+                counter,
+            ))
+        }
         I::PairingCheck => {
             let list = pop!(V::List);
             ctx.gas
@@ -1291,6 +1304,7 @@ mod interpreter_tests {
     use super::{Lambda, Or};
     use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
+    use crate::ast::or::Or::Left;
     use crate::bls;
     use crate::gas::Gas;
     use num_bigint::BigUint;
@@ -4468,6 +4482,78 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::TOTAL_VOTING_POWER + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn emit() {
+        use crate::ast::annotations::FieldAnnotation;
+
+        let mut ctx = Ctx::default();
+        ctx.set_operation_counter(100);
+
+        let mut stack = stk![TypedValue::nat(20)];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(
+            interpret(
+                &[Instruction::Emit {
+                    tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                    arg_ty: Left(Type::Nat)
+                }],
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::new_operation(
+                Operation::Emit(super::Emit {
+                    tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                    value: TypedValue::nat(20),
+                    arg_ty: Left(Type::Nat)
+                }),
+                101
+            )]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::EMIT + interpret_cost::INTERPRET_RET
+        );
+
+        // When type contain annotations
+        let mut ctx = Ctx::default();
+        ctx.set_operation_counter(100);
+        use crate::parser::test_helpers::parse;
+
+        let mut stack = stk![TypedValue::nat(20)];
+        let start_milligas = ctx.gas.milligas();
+        let emit_type_mich = parse("pair (int %f1) (int %f2)").unwrap();
+        assert_eq!(
+            interpret(
+                &[Instruction::Emit {
+                    tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                    arg_ty: Or::Right(emit_type_mich.clone())
+                }],
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::new_operation(
+                Operation::Emit(super::Emit {
+                    tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                    value: TypedValue::nat(20),
+                    arg_ty: Or::Right(emit_type_mich)
+                }),
+                101
+            )]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::EMIT + interpret_cost::INTERPRET_RET
         );
     }
 
