@@ -262,7 +262,7 @@ let read t buf pos len =
       (read_write_error_handler ~rw:Read t)
   in
   t.nread <- t.nread + nread ;
-  let*! () = Events.(emit read_fd) (t.id, nread, t.nread) in
+  let*! () = Events.(emit read_fd) (t.id, nread, Int64.of_int t.nread) in
   if nread = 0 then Lwt.return_error `Connection_closed_by_peer
   else return nread
 
