@@ -1987,4 +1987,44 @@ mod test {
         }));
         assert_eq!(result, expected_result);
     }
+
+    #[test]
+    fn evm_should_fail_gracefully_when_balance_overflow_occurs() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let caller = H160::from_low_u64_be(523);
+        let target = H160::from_low_u64_be(210);
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            U256::from(200)
+        );
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &target, U256::max_value()
+        );
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(target),
+            caller,
+            vec![],
+            None,
+            Some(U256::from(100)),
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let expected_result = Err(EthereumError::EthereumAccountError(AccountStorageError::BalanceOverflow));
+        assert_eq!(expected_result, result);
+    }
 }
