@@ -22,7 +22,11 @@
       "^src/lib_requester",
       "^src/proto_.*/lib_protocol",
       "^src/proto_.*/lib_delegate",
-      "^devtools/yes_wallet"
+      "^devtools/yes_wallet",
+      "^tezt/tests/bootstrap.ml$",
+      "^tezt/tests/double_bake.ml$",
+      "^tezt/tests/precheck.ml$",
+      "^tezt/tests/replace_by_fees.ml$"
     ]
   },
   "tezos2": {
@@ -33,7 +37,8 @@
     ],
     "path_patterns": [
       "^src/lib_aplonk",
-      "^src/lib_distributed_plonk"
+      "^src/lib_distributed_plonk",
+      "^tezt/tests/injector_test.ml$"
     ]
   },
   "etherlink": {
@@ -44,6 +49,8 @@
       "refutation",
       "commitment"
     ],
-    "path_patterns": []
+    "path_patterns": [
+      "^tezt/tests/evm_rollup.ml$"
+    ]
   }
 }
