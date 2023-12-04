@@ -1,10 +1,10 @@
 
 curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
 []
-[{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.018-Proxford.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
-[{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.018-Proxford.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
-[{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.018-Proxford.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.018-Proxford.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
 
 ./octez-client rpc get '/chains/main/mempool/pending_operations?version=2&validated=true&refused=true&outdated=true&branch_delayed=true&branch_refused=true'
 { "validated":
@@ -20,7 +20,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
           "[SIGNATURE]" } ],
   "refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -36,7 +36,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
   "outdated": [],
   "branch_refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -53,7 +53,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
               "expected": "2", "found": "1" } ] } ],
   "branch_delayed":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -87,7 +87,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
           "[SIGNATURE]" } ],
   "refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -103,7 +103,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
   "outdated": [],
   "branch_refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -120,7 +120,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
               "expected": "2", "found": "1" } ] } ],
   "branch_delayed":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -150,7 +150,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
           "[SIGNATURE]" } ],
   "refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -166,7 +166,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
   "outdated": [],
   "branch_refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -183,7 +183,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
               "expected": "2", "found": "1" } ] } ],
   "branch_delayed":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -222,7 +222,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
 { "validated": [],
   "refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -242,7 +242,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
 { "validated": [], "refused": [], "outdated": [], "branch_refused": [],
   "branch_delayed":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -262,7 +262,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
 { "validated": [], "refused": [], "outdated": [],
   "branch_refused":
     [ { "hash": "[OPERATION_HASH]",
-        "protocol": "ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4",
+        "protocol": "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
@@ -284,7 +284,7 @@ curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=
   "branch_delayed": [], "unprocessed": [] }
 
 curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.018-Proxford.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.018-Proxford.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.018-Proxford.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.018-Proxford.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.018-Proxford.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.018-Proxford.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
 
 ./octez-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
