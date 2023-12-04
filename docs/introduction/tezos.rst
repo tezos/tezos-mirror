@@ -43,7 +43,7 @@ The Community
 
     - https://tezos.com/ecosystem (resources classified by their kind: organisations, block explorers, wallets, etc.)
     - https://tezoscommons.org/ (featured resources classified by approach: technology, developing, contributing, etc.)
-    - https://tezos.com/developer-portal/ (resources for developers of applications built on Tezos)
+    - https://tezos.com/developers/ (resources for developers of applications built on Tezos)
 
 - More resources can be found in the :doc:`support` page.
 
