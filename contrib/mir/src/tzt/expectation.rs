@@ -70,18 +70,12 @@ pub fn check_expectation(
     use TestExpectation::*;
     use TztTestError::*;
     match (expected, real) {
-        (ExpectSuccess(stk_exp), Ok((res_type_stack, i_stack))) => {
-            let (exp_stk_types, exp_stk_values): (Vec<Type>, Vec<Value>) =
+        (ExpectSuccess(stk_exp), Ok((res_type_stack, result_stack))) => {
+            let (exp_stk_types, exp_stk_values): (Vec<Type>, Vec<TypedValue>) =
                 stk_exp.into_iter().unzip();
 
-            let expected_type_stack = FailingTypeStack::Ok(TopIsFirst::from_iter(exp_stk_types).0);
-            let expected_stack = TopIsFirst::from_iter(exp_stk_values).0;
-            let result_stack: Stack<Value> = TopIsFirst::from_iter(
-                i_stack
-                    .iter()
-                    .map(|x| typed_value_to_value_optimized(x.clone())),
-            )
-            .0;
+            let expected_type_stack = FailingTypeStack::Ok(TopIsFirst::from(exp_stk_types).0);
+            let expected_stack = TopIsFirst::from(exp_stk_values).0;
             // If the run was success, and the expectation is also of success check the expected
             // stack. Stack types and values should match.
             if res_type_stack == expected_type_stack && result_stack == expected_stack {
