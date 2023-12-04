@@ -509,7 +509,7 @@ let test_evm_node_connection =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"EVM node server connection"
   @@ fun protocol ->
   let* tezos_node, tezos_client = setup_l1 protocol in
@@ -543,7 +543,7 @@ let test_originate_evm_kernel =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Originate EVM kernel with installer"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; sc_rollup_client; _} =
@@ -583,7 +583,7 @@ let test_rpc_getBalance =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_balance"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -604,7 +604,7 @@ let test_rpc_getBlockByNumber =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_block_by_number"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -630,7 +630,7 @@ let test_rpc_getBlockByHash =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_block_by_hash"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getBlockByHash"
   @@ fun protocol ->
   let* ({evm_node; _} as evm_setup) = setup_past_genesis ~admin:None protocol in
@@ -646,7 +646,7 @@ let test_l2_block_size_non_zero =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "block"; "size"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Block size is greater than zero"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -673,7 +673,7 @@ let test_rpc_getTransactionCount =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_transaction_count"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -688,7 +688,7 @@ let test_rpc_getTransactionCountBatch =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_transaction_count_as_batch"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -714,7 +714,7 @@ let test_rpc_batch =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "rpc"; "batch"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC batch requests"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -745,7 +745,7 @@ let test_l2_blocks_progression =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_blocks_progression"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 blocks progression"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; endpoint; _} =
@@ -773,7 +773,7 @@ let test_consistent_block_hashes =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_blocks"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 blocks consistency of hashes"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; endpoint; _} =
@@ -904,7 +904,7 @@ let test_l2_deploy_simple_storage =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 contract deployment"
   @@ fun protocol ->
   deploy_with_base_checks
@@ -936,7 +936,7 @@ let test_l2_call_simple_storage =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"; "l2_call"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 contract call"
   @@ fun protocol ->
   (* setup *)
@@ -992,7 +992,7 @@ let test_l2_deploy_erc20 =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"; "erc20"; "l2_call"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 erc20 contract deployment"
   @@ fun protocol ->
   (* setup *)
@@ -1117,7 +1117,7 @@ let test_deploy_contract_for_shanghai =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "deploy"; "shanghai"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Check that a contract containing PUSH0 can successfully be deployed."
   @@ deploy_with_base_checks
@@ -1374,7 +1374,7 @@ let test_l2_transfer =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_transfer"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 transfers are applied"
     transfer
 
@@ -1382,7 +1382,7 @@ let test_chunked_transaction =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_transfer"; "chunked"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 chunked transfers are applied"
   @@ transfer ~data:("0x" ^ String.make 12_000 'a')
 
@@ -1390,7 +1390,7 @@ let test_rpc_txpool_content =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "txpool_content"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check RPC txpool_content is available"
   @@ fun protocol ->
   let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
@@ -1405,7 +1405,7 @@ let test_rpc_web3_clientVersion =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "client_version"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check RPC web3_clientVersion"
   @@ fun protocol ->
   let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
@@ -1425,7 +1425,7 @@ let test_rpc_web3_sha3 =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "sha3"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check RPC web3_sha3"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -1449,7 +1449,7 @@ let test_simulate =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "simulate"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"A block can be simulated in the rollup node"
     (fun protocol ->
       let* {evm_node; sc_rollup_node; _} =
@@ -1491,7 +1491,7 @@ let test_full_blocks =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "full_blocks"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
        informations"
@@ -1551,7 +1551,7 @@ let test_latest_block =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "blocks"; "latest"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Check `evm_getBlockByNumber` works correctly when asking for the \
        `latest`"
@@ -1578,7 +1578,7 @@ let test_eth_call_nullable_recipient =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_call"; "null"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check `eth_call.to` input can be null"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -1599,7 +1599,7 @@ let test_inject_100_transactions =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "bigger_blocks"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check blocks can contain more than 64 transactions"
   @@ fun protocol ->
   let config =
@@ -1656,7 +1656,7 @@ let test_eth_call_large =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_call"; "simulate"; "large"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"eth_estimateGas with a large amount of data"
     (fun protocol ->
       (* setup *)
@@ -1693,7 +1693,7 @@ let test_estimate_gas =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_estimategas"; "simulate"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"eth_estimateGas for contract creation"
     (fun protocol ->
       (* setup *)
@@ -1725,7 +1725,7 @@ let test_estimate_gas_additionnal_field =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_estimategas"; "simulate"; "remix"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"eth_estimateGas allows additional fields"
     (fun protocol ->
       (* setup *)
@@ -1767,7 +1767,7 @@ let test_eth_call_storage_contract_rollup_node =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_call"; "simulate"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Try to call a view (directly through proxy)"
     (fun protocol ->
       (* setup *)
@@ -1838,7 +1838,7 @@ let test_eth_call_storage_contract_proxy =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "simulate"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Try to call a view (directly through rollup node)"
     (fun protocol ->
       let* ({sc_rollup_node; evm_node; _} as evm_setup) =
@@ -1887,7 +1887,7 @@ let test_eth_call_storage_contract_eth_cli =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_call"; "simulate"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Try to call a view through an ethereum client"
     (fun protocol ->
       (* setup *)
@@ -1936,7 +1936,7 @@ let test_preinitialized_evm_kernel =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "administrator"; "config"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Creates a kernel with an initialized administrator key"
   @@ fun protocol ->
   let administrator_key_path = Durable_storage_path.admin in
@@ -2092,7 +2092,7 @@ let test_deposit_and_withdraw =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "deposit"; "withdraw"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
@@ -2266,7 +2266,7 @@ let test_kernel_upgrade_to_debug =
   Protocol.register_test
     ~__FILE__
     ~tags:["debug"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
@@ -2278,7 +2278,7 @@ let test_kernel_upgrade_evm_to_evm =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade integrity to itself"
   @@ fun protocol ->
   let base_installee = "./" in
@@ -2300,7 +2300,7 @@ let test_kernel_upgrade_wrong_key =
   Protocol.register_test
     ~__FILE__
     ~tags:["administrator"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
@@ -2321,7 +2321,7 @@ let test_kernel_upgrade_wrong_rollup_address =
   Protocol.register_test
     ~__FILE__
     ~tags:["address"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
@@ -2341,7 +2341,7 @@ let test_kernel_upgrade_no_administrator =
   Protocol.register_test
     ~__FILE__
     ~tags:["administrator"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
@@ -2360,7 +2360,7 @@ let test_kernel_upgrade_failing_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["migration"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
@@ -2424,7 +2424,7 @@ let test_rpc_sendRawTransaction =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "tx_hash"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
   @@ fun protocol ->
@@ -2515,7 +2515,7 @@ let test_rpc_getTransactionByBlockHashAndIndex =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_transaction_by"; "block_hash_and_index"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
   @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
@@ -2523,7 +2523,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_transaction_by"; "block_number_and_index"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
   @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
@@ -2531,7 +2531,7 @@ let test_validation_result =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "simulate"; "tmp"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Ensure validation returns appropriate address for a given transaction."
   @@ fun protocol ->
@@ -2633,7 +2633,7 @@ let test_kernel_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "upgrade"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
   @@ fun protocol ->
   let sender, receiver =
@@ -2672,7 +2672,7 @@ let test_deposit_dailynet =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "deposit"; "dailynet"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"deposit on dailynet"
   @@ fun protocol ->
   let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
@@ -2780,7 +2780,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "nonce"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Returns an error if the nonce is too low"
   @@ fun protocol ->
   let* {evm_node; sc_rollup_node; node; client; _} =
@@ -2811,7 +2811,7 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "nonce"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Accepts transactions with nonce too high."
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -2828,7 +2828,7 @@ let test_deposit_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "deposit"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
@@ -2895,7 +2895,7 @@ let test_block_storage_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "block"; "storage"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
   let block_id = "1" in
@@ -2918,7 +2918,7 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "chain_id"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Returns an error if the chainId is not correct."
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -2945,7 +2945,7 @@ let test_kernel_upgrade_version_change =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "upgrade"; "version"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
   let scenario_prior ~evm_setup = tez_kernelVersion evm_setup.evm_node in
@@ -2961,7 +2961,7 @@ let test_transaction_storage_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "transaction"; "storage"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
   let config =
@@ -2999,7 +2999,7 @@ let test_reboot =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "reboot"; "loop"; Tag.flaky]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
   let* {evm_node; sc_rollup_node; node; client; _} =
@@ -3072,7 +3072,7 @@ let test_rpc_getBlockTransactionCountBy =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_block_transaction_count_by"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
@@ -3132,7 +3132,7 @@ let test_rpc_getUncleCountByBlock =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_uncle_count_by_block"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "RPC methods eth_getUncleCountByBlockHash and \
        eth_getUncleCountByBlockNumber"
@@ -3179,7 +3179,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_uncle_by_block_arg_and_index"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "RPC methods eth_getUncleByBlockHashAndIndex and \
        eth_getUncleByBlockNumberAndIndex"
@@ -3210,7 +3210,7 @@ let test_simulation_eip2200 =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "loop"; "simulation"; "eip2200"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Simulation is EIP2200 resilient"
   @@ fun protocol ->
   let* ({sc_rollup_node; node; client; endpoint; _} as full_evm_setup) =
@@ -3236,7 +3236,7 @@ let test_cover_fees =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "validity"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Transaction is invalid if sender cannot cover the fees"
   @@ fun protocol ->
   (* No bootstrap accounts, so no one has funds. *)
@@ -3273,7 +3273,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "tx_nonce"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Can submit many transactions."
   @@ fun protocol ->
   let* {evm_node; node; client; sc_rollup_node; _} =
@@ -3315,7 +3315,7 @@ let test_rpc_sendRawTransaction_not_included =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "tx_nonce"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:
       "Tx with nonce too high are not included without previous transactions."
   @@ fun protocol ->
@@ -3348,7 +3348,7 @@ let test_rpc_gasPrice =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "gas_price"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC methods eth_gasPrice"
   @@ fun protocol ->
   let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
@@ -3380,7 +3380,7 @@ let test_rpc_getStorageAt =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "get_storage_at"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"RPC methods eth_getStorageAt"
   @@ fun protocol ->
   (* setup *)
@@ -3434,7 +3434,7 @@ let test_accounts_double_indexing =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "accounts"; "index"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Accounts have a unique index"
   @@ fun protocol ->
   let* ({sc_rollup_client; _} as full_evm_setup) =
@@ -3468,7 +3468,7 @@ let test_originate_evm_kernel_and_dump_pvm_state =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Originate EVM kernel with installer and dump PVM state"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; sc_rollup_client; _} =
@@ -3513,7 +3513,7 @@ let test_l2_call_inter_contract =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"; "l2_call"; "inter_contract"]
-    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
+    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check L2 inter contract call"
   @@ fun protocol ->
   (* setup *)

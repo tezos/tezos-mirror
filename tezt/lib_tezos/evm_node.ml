@@ -102,7 +102,7 @@ let create ?runner ?data_dir ~devmode ?rpc_addr ?rpc_port rollup_node =
   in
   let evm_node =
     create
-      ~path:Constant.octez_evm_node
+      ~path:(Uses.path Constant.octez_evm_node)
       ~name
       {
         arguments;
@@ -140,7 +140,9 @@ let run evm_node =
   unit
 
 let spawn_command evm_node args =
-  Process.spawn ?runner:evm_node.persistent_state.runner Constant.octez_evm_node
+  Process.spawn
+    ?runner:evm_node.persistent_state.runner
+    (Uses.path Constant.octez_evm_node)
   @@ args
 
 let spawn_run evm_node =
