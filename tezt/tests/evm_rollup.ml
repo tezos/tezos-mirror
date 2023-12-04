@@ -265,12 +265,14 @@ let setup_l1_contracts ~admin client =
 
 type kernel_installee = {base_installee : string; installee : string}
 
+type setup_mode = Setup_sequencer | Setup_proxy of {devmode : bool}
+
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(with_administrator = true) ~admin ?commitment_period ?challenge_window
-    ?timestamp protocol =
+    ?timestamp ?(setup_mode = Setup_proxy {devmode = true}) protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -289,7 +291,15 @@ let setup_evm_kernel ?config ?kernel_installee
         Option.map (fun {admin; _} -> admin) l1_contracts
       else None
     in
-    Configuration.make_config ~bootstrap_accounts ?ticketer ?administrator ()
+    let sequencer =
+      match setup_mode with Setup_proxy _ -> false | Setup_sequencer -> true
+    in
+    Configuration.make_config
+      ~bootstrap_accounts
+      ?ticketer
+      ?administrator
+      ~sequencer
+      ()
   in
   let config =
     match (config, base_config) with
@@ -337,10 +347,23 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
+  let* mode =
+    match setup_mode with
+    | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
+    | Setup_sequencer ->
+        let preimages_dir = Temp.dir "preimages" in
+        let* {output; _} =
+          prepare_installer_kernel
+            ~base_installee:"./"
+            ~preimages_dir
+            ?config
+            "evm_kernel"
+        in
+        return
+          (Evm_node.Sequencer {kernel = output; preimage_dir = preimages_dir})
+  in
   let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   return
@@ -357,6 +380,32 @@ let setup_evm_kernel ?config ?kernel_installee
       l1_contracts;
       config;
     }
+
+let register_test ~title ~tags ?(admin = None) ~setup_mode f =
+  let extra_tag =
+    match setup_mode with
+    | Setup_proxy _ -> "proxy"
+    | Setup_sequencer -> "sequencer"
+  in
+  Protocol.register_test
+    ~__FILE__
+    ~tags:(extra_tag :: tags)
+    ~uses:(fun protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
+      ])
+    ~title:(sf "%s (%s)" title extra_tag)
+    (fun protocol ->
+      let* evm_setup = setup_evm_kernel ~admin ~setup_mode protocol in
+      f ~protocol ~evm_setup)
+
+let register_both ~title ~tags ?admin f protocols =
+  let register = register_test ~title ~tags ?admin f protocols in
+  register ~setup_mode:(Setup_proxy {devmode = true}) ;
+  register ~setup_mode:Setup_sequencer
 
 let setup_past_genesis
     ?(config :
