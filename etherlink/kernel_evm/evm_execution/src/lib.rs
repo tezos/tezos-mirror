@@ -2446,4 +2446,133 @@ mod test {
         let result = unwrap_outcome!(&result);
         assert_eq!(ExitReason::Succeed(ExitSucceed::Returned), result.reason);
     }
+
+    // Test case from https://eips.ethereum.org/EIPS/eip-684
+    #[test]
+    fn test_create_to_address_with_code_returns_error() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller =
+            H160::from_str("0xd0bBEc6D2c628b7e2E6D5556daA14a5181b604C5").unwrap();
+
+        let target_address =
+            H160::from_str("0x7658771dc6Af74a3d2F8499D349FF9c1a0DF8826").unwrap();
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            10000000.into(),
+        );
+
+        set_account_code(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &target_address,
+            hex::decode("B0B0FACE")
+                .expect("Failed to decode contract code")
+                .as_slice(),
+        );
+
+        // call_data is the input to deploy the following contract.
+        // The content of the contract does not matter since address of created contract depends on address and nonce of caller
+        // contract Empty {
+        //     function run() public{
+        //     }
+        // }
+        let call_data = hex::decode(
+            "6080604052348015600e575f80fd5b50606a80601a5f395ff3fe6080604052348015600e575f80fd5b50600436106026575f3560e01c8063c040622614602a575b5f80fd5b60306032565b005b56fea264697066735822122033200c2933dd0930ac60a7727e0a3e56f8967f6f76afb4ecf2459651419983ab64736f6c63430008170033",
+        )
+        .expect("Failed to decode call data");
+
+        let gas_limit = 300_000;
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            call_data,
+            Some(gas_limit),
+            None,
+            true,
+            10_000_000_000,
+        );
+
+        let result = unwrap_outcome!(&result, false);
+        match &result.reason {
+            ExitReason::Error(ExitError::CreateCollision) => (),
+            exit_error => panic!(
+                "ExitReason: {:?}. Expect ExitReason::Error(ExitError::CreateCollision)",
+                exit_error
+            ),
+        }
+    }
+
+    // Test case from https://eips.ethereum.org/EIPS/eip-684 with modification
+    #[test]
+    fn test_create_to_address_with_non_zero_nonce_returns_error() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller =
+            H160::from_str("0xd0bBEc6D2c628b7e2E6D5556daA14a5181b604C5").unwrap();
+
+        let target_address =
+            H160::from_str("0x7658771dc6Af74a3d2F8499D349FF9c1a0DF8826").unwrap();
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            10000000.into(),
+        );
+
+        bump_nonce(&mut mock_runtime, &mut evm_account_storage, &target_address);
+
+        // call_data is the input to deploy the following contract.
+        // The content of the contract does not matter since address of created contract depends on address and nonce of caller
+        // contract Empty {
+        //     function run() public{
+        //     }
+        // }
+        let call_data = hex::decode(
+            "6080604052348015600e575f80fd5b50606a80601a5f395ff3fe6080604052348015600e575f80fd5b50600436106026575f3560e01c8063c040622614602a575b5f80fd5b60306032565b005b56fea264697066735822122033200c2933dd0930ac60a7727e0a3e56f8967f6f76afb4ecf2459651419983ab64736f6c63430008170033",
+        )
+        .expect("Failed to decode call data");
+
+        let gas_limit = 300_000;
+
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            call_data,
+            Some(gas_limit),
+            None,
+            true,
+            10_000_000_000,
+        );
+
+        let result = unwrap_outcome!(&result, false);
+        match &result.reason {
+            ExitReason::Error(ExitError::CreateCollision) => (),
+            exit_error => panic!(
+                "ExitReason: {:?}. Expect ExitReason::Error(ExitError::CreateCollision)",
+                exit_error
+            ),
+        }
+    }
 }

@@ -375,6 +375,22 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             })
     }
 
+    /// Check if an address has either a nonzero nonce, or a nonzero code length, i.e., if the address exists.
+    fn exists(&mut self, address: H160) -> Result<bool, EthereumError> {
+        let Some(account) = self.get_account(address) else {
+            return Ok(false);
+        };
+
+        let has_code = account
+            .code_size(self.borrow_host())
+            .map(|s| s != U256::zero())?;
+        let non_zero_nonce = account
+            .nonce(self.borrow_host())
+            .map(|s| s != U256::zero())?;
+
+        Ok(has_code || non_zero_nonce)
+    }
+
     /// Returns true if there is a static transaction in progress, otherwise
     /// return false.
     fn is_static(&self) -> bool {
@@ -660,9 +676,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             apparent_value: value,
         };
 
-        // TODO: check that target address isn't already in use (must contain no code and a zero
-        // nonce)
-        // issue: https://gitlab.com/tezos/tezos/-/issues/4865
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6716
+        // Create collision and failed transfers should use up all the gas
+        if self.exists(address)? {
+            log!(
+                self.host,
+                Debug,
+                "Failed to create contract at {:?}. Address is non-empty",
+                address
+            );
+            return Ok((ExitReason::Error(ExitError::CreateCollision), None, vec![]));
+        }
 
         if let Err(error) = self.execute_transfer(caller, address, value) {
             log!(
