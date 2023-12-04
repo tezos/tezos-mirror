@@ -50,7 +50,7 @@ include: .gitlab/ci/jobs/test/common.yml
     # because if the CI timeout is reached, there are no artefacts,
     # and thus no logs to investigate.
     # See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
-    - timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/exit_code.sh _build/default/tezt/tests/main.exe
         ${TESTS}
         --color
         --log-buffer-size 5000
@@ -89,11 +89,12 @@ include: .gitlab/ci/jobs/test/common.yml
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60
+  tags:
+    - gcp_tezt
 
 tezt:
   extends:
     - .tezt_tests
-    - .tags_template__no_gcp
   variables:
     # Exclude tests with tags 'ci_disabled', 'flaky' and `memory_{3,4}k`.
     # See tezt/lib_tezos/tag.mli for more information.
