@@ -13,6 +13,10 @@ if ! [ -f "$testowners" ]; then
     echo "Expected to find TESTOWNERS.json in ${tezt_dir}."
     exit 1
 fi
+if ! jq "empty" "$testowners" 2> /dev/null; then
+    echo "$testowners is not valid JSON."
+    exit 1
+fi
 
 products() {
     jq -r 'keys|join(", ")' < "$testowners"
