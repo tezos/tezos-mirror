@@ -6,12 +6,13 @@
 (*****************************************************************************)
 
 (** [execute ?commit ctxt messages] executes [messages] on the local
-    EVM state of [ctxt], commits to disk if [commit] is true. *)
+    EVM state of [ctxt], commits to disk if [commit] is true. Returns
+    the modified EVM state even if it's not commited. *)
 val execute :
   ?commit:bool ->
   Sequencer_context.t ->
   string list ->
-  Sequencer_context.t tzresult Lwt.t
+  (Sequencer_context.t * Sequencer_context.evm_state) tzresult Lwt.t
 
 (** [init ~smart_rollup_address ctxt] initializes the local state in
     [ctxt], bakes the genesis block. *)
