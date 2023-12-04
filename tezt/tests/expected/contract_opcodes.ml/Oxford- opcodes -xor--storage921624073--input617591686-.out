@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/xor.tz on storage None and input 'Left (Pair False True)' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/xor.tz on storage None and input 'Left (Pair False True)' --level 1 --trace-stack
 storage
   (Some (Left True))
 emitted operations

@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/none.tz on storage 'Some 10' and input Unit --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/none.tz on storage 'Some 10' and input Unit --level 1 --trace-stack
 storage
   None
 emitted operations

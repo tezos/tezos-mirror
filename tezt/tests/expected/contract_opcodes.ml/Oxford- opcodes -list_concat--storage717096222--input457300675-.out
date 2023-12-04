@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordXomTQ2AyWMVdAzJvbhGm2nGzBuDvovb4Rn6UGmgZ5s4 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/list_concat.tz on storage '"abc"' and input '{}' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/list_concat.tz on storage '"abc"' and input '{}' --level 1 --trace-stack
 storage
   "abc"
 emitted operations
