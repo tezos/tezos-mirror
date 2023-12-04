@@ -1962,7 +1962,7 @@ let test_eth_call_storage_contract_rollup_node =
         Protocol.sc_rollup_client protocol;
         Constant.smart_rollup_installer;
       ])
-    ~title:"Try to call a view (directly through proxy)"
+    ~title:"Call a view (directly through proxy)"
     (fun protocol ->
       (* setup *)
       let* ({evm_node; endpoint; _} as evm_setup) =
@@ -2039,7 +2039,7 @@ let test_eth_call_storage_contract_proxy =
         Protocol.sc_rollup_client protocol;
         Constant.smart_rollup_installer;
       ])
-    ~title:"Try to call a view (directly through rollup node)"
+    ~title:"Call a view (directly through rollup node)"
     (fun protocol ->
       let* ({sc_rollup_node; evm_node; _} as evm_setup) =
         setup_past_genesis ~admin:None protocol
@@ -2094,7 +2094,7 @@ let test_eth_call_storage_contract_eth_cli =
         Protocol.sc_rollup_client protocol;
         Constant.smart_rollup_installer;
       ])
-    ~title:"Try to call a view through an ethereum client"
+    ~title:"Call a view through an ethereum client"
     (fun protocol ->
       (* setup *)
       let* ({evm_node; endpoint; sc_rollup_node; client; node; _} as evm_setup)
