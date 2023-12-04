@@ -71,6 +71,7 @@ include: .gitlab/ci/jobs/test/common.yml
     - .image_template__runtime_e2etest_dependencies
     - .template__coverage_files
     - .tezt_template
+    - .tags_template__no_gcp
   variables:
     # Certain tests can be blacklisted by modifying the TESTS variable.
     # Do not tests with the tag 'ci_disabled' and 'flaky'.
@@ -89,8 +90,6 @@ include: .gitlab/ci/jobs/test/common.yml
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60
-  tags:
-    - gcp_tezt
 
 tezt:
   extends:
@@ -112,7 +111,9 @@ tezt-greedy-4k:
   parallel: 4
 
 tezt-greedy-3k:
-  extends: [.tezt_tests]
+  extends:
+    - .tezt_tests
+    - .tags_template__no_gcp
   variables:
     TESTS: "memory_3k"
     TEZT_PARALLEL: 1
@@ -126,6 +127,7 @@ tezt:static-binaries:
     - .default_settings_template
     - .image_template__runtime_e2etest_dependencies
     - .tezt_template
+    - .tags_template__no_gcp
   dependencies:
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
     # build_x86_64-exp-dev-extra

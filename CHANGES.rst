@@ -44,13 +44,6 @@ Node
   nodes. Also, improved the consistency of ``snapshot`` import errors
   messages (MR :gl:`!10138`)
 
-- Introduced a new process, forked by the node, that is responsible of
-  managing the RPC server: the RPC-process. It is used by default by
-  the node.
-
-- Introduced a new ``--local-rpc-addr`` that starts the RPC server
-  locally, not using the dedicated RPC-process.
-
 - Add logs at ``Info`` level about the disconnection reasons in the p2p section.
 
 - Removed a spurious "missing validation plugin" warning message that

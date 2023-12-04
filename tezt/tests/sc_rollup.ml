@@ -5199,15 +5199,7 @@ let custom_mode_empty_operation_kinds ~kind =
    block. *)
 let test_multiple_batcher_key ~kind =
   test_l1_scenario
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
-
-     also might be related to https://gitlab.com/tezos/tezos/-/issues/3014
-
-     Test is flaky without rpc_local:true and it seems to be related to this issue. When
-     investigating it seems that the sink used by the octez node has a
-     race condition between process, it seems it due to the rpc server
-     being run in a separate process. *)
-    ~rpc_local:true
+    ~rpc_local:false
     ~kind
     {
       variant = None;
@@ -5336,10 +5328,7 @@ let test_injector_uses_available_keys ~kind =
   let operators_pkh = List.map snd operators in
   let nb_operators = List.length operators in
   test_full_scenario
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
-
-     cf multiple_batcher_test comment. *)
-    ~rpc_local:true
+    ~rpc_local:false
     ~kind
     ~operators
     ~mode:Batcher
