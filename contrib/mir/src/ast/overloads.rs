@@ -5,19 +5,27 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::{Instruction, Stage, Type, Value};
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ParsedStage {}
-
-impl Stage for ParsedStage {
-    type AddMeta = ();
-    type PushValue = (Type, Value);
-    type NilType = Type;
-    type GetOverload = ();
-    type UpdateOverload = ();
-    type FailwithType = ();
-    type IterOverload = ();
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Add {
+    IntInt,
+    NatNat,
+    IntNat,
+    NatInt,
+    MutezMutez,
 }
 
-pub type ParsedInstruction = Instruction<ParsedStage>;
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Get {
+    Map,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Update {
+    Map,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Iter {
+    List,
+    Map,
+}

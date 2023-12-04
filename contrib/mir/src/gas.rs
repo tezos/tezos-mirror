@@ -93,7 +93,7 @@ pub mod tc_cost {
     pub const VALUE_STEP: u32 = 100;
 
     // Corresponds to cost_PARSE_TYPE1 in the Tezos protocol.
-    pub const VERIFY_TYPE_STEP: u32 = 60;
+    pub const PARSE_TYPE_STEP: u32 = 60;
     // Taken to be the same as VERIFY_TYPE_STEP, but that's a guess
     pub const TYPE_PROP_STEP: u32 = 60;
 

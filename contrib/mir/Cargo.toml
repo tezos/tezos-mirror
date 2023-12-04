@@ -13,6 +13,7 @@ thiserror = "1.0"
 logos = "0.13"
 hex = "0.4"
 tezos_crypto_rs = "0.5"
+typed-arena = "2"
 
 [[bin]]
 name = "tzt_runner"

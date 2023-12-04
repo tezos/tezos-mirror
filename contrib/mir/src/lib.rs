@@ -19,12 +19,12 @@ pub mod tzt;
 
 #[cfg(test)]
 mod tests {
+    use crate::ast::micheline::test_helpers::*;
     use crate::ast::*;
     use crate::context::Ctx;
     use crate::gas::Gas;
     use crate::interpreter;
-    use crate::parser;
-    use crate::parser::parse_contract_script;
+    use crate::parser::test_helpers::{parse, parse_contract_script};
     use crate::stack::{stk, tc_stk};
     use crate::typechecker;
 
@@ -38,9 +38,9 @@ mod tests {
 
     #[test]
     fn interpret_test_expect_success() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &mut tc_stk![Type::Nat])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(10)];
         assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
@@ -49,9 +49,9 @@ mod tests {
 
     #[test]
     fn interpret_mutez_push_add() {
-        let ast = parser::parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
+        let ast = parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
         let mut ctx = Ctx::default();
-        let ast = ast.typecheck(&mut ctx, None, &mut tc_stk![]).unwrap();
+        let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
         let mut istack = stk![];
         assert!(ast.interpret(&mut ctx, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
@@ -59,23 +59,23 @@ mod tests {
 
     #[test]
     fn interpret_test_gas_consumption() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &mut tc_stk![Type::Nat])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
         let mut ctx = Ctx::default();
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &mut istack).is_ok());
         });
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 1359);
+        assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1359);
     }
 
     #[test]
     fn interpret_test_gas_out_of_gas() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck(&mut Ctx::default(), None, &mut tc_stk![Type::Nat])
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::Nat(5)];
         let mut ctx = Ctx {
@@ -90,34 +90,34 @@ mod tests {
 
     #[test]
     fn typecheck_test_expect_success() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
-        assert!(ast.typecheck(&mut Ctx::default(), None, &mut stack).is_ok());
+        assert!(
+            typechecker::typecheck_instruction(&ast, &mut Ctx::default(), None, &mut stack).is_ok()
+        );
         assert_eq!(stack, tc_stk![Type::Int])
     }
 
     #[test]
     fn typecheck_gas() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
-        let mut stack = tc_stk![Type::Nat];
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let mut ctx = Ctx::default();
         let start_milligas = ctx.gas.milligas();
         report_gas(&mut ctx, |ctx| {
-            assert!(ast.typecheck(ctx, None, &mut stack).is_ok());
+            assert!(ast.typecheck_instruction(ctx, None, &[app!(nat)]).is_ok());
         });
         assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
     }
 
     #[test]
     fn typecheck_out_of_gas() {
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
-        let mut stack = tc_stk![Type::Nat];
+        let ast = parse(FIBONACCI_SRC).unwrap();
         let mut ctx = Ctx {
             gas: Gas::new(1000),
             ..Ctx::default()
         };
         assert_eq!(
-            ast.typecheck(&mut ctx, None, &mut stack),
+            ast.typecheck_instruction(&mut ctx, None, &[app!(nat)]),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -125,10 +125,9 @@ mod tests {
     #[test]
     fn typecheck_test_expect_fail() {
         use typechecker::{NoMatchingOverloadReason, TcError};
-        let ast = parser::parse(FIBONACCI_ILLTYPED_SRC).unwrap();
-        let mut stack = tc_stk![Type::Nat];
+        let ast = parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         assert_eq!(
-            ast.typecheck(&mut Ctx::default(), None, &mut stack),
+            ast.typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
             Err(TcError::NoMatchingOverload {
                 instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
@@ -139,96 +138,82 @@ mod tests {
 
     #[test]
     fn parser_test_expect_success() {
-        use Instruction::*;
-        use Value::*;
+        use crate::ast::micheline::test_helpers::*;
 
-        let ast = parser::parse(FIBONACCI_SRC).unwrap();
+        let ast = parse(FIBONACCI_SRC).unwrap();
         // use built in pretty printer to validate the expected AST.
         assert_eq!(
             ast,
-            Instruction::Seq(vec![
-                Int,
-                Push((Type::Int, Number(0))),
-                Dup(Some(2)),
-                Gt,
-                If(
-                    vec![
-                        Dip(None, vec![Push((Type::Int, Number(-1))), Add(())]),
-                        Push((Type::Int, Number(1))),
-                        Dup(Some(3)),
-                        Gt,
-                        Loop(vec![
-                            Swap,
-                            Dup(Some(2)),
-                            Add(()),
-                            Dip(Some(2), vec![Push((Type::Int, Number(-1))), Add(())]),
-                            Dup(Some(3)),
-                            Gt,
-                        ]),
-                        Dip(None, vec![Drop(Some(2))]),
-                    ],
-                    vec![Dip(None, vec![Drop(None)])],
-                ),
-            ])
+            seq! {
+                app!(INT);
+                app!(PUSH[app!(int), 0]);
+                app!(DUP[2]);
+                app!(GT);
+                app!(IF[
+                    seq!{
+                        app!(DIP[seq!{app!(PUSH[app!(int), -1]); app!(ADD) }]);
+                        app!(PUSH[app!(int), 1]);
+                        app!(DUP[3]);
+                        app!(GT);
+                        app!(LOOP[seq!{
+                            app!(SWAP);
+                            app!(DUP[2]);
+                            app!(ADD);
+                            app!(DIP[2, seq!{
+                                app!(PUSH[app!(int), -1]);
+                                app!(ADD)
+                            }]);
+                            app!(DUP[3]);
+                            app!(GT);
+                        }]);
+                        app!(DIP[seq!{app!(DROP[2])}]);
+                    },
+                    seq!{
+                        app!(DIP[seq!{ app!(DROP) }])
+                    },
+                ]);
+            }
         );
     }
 
     #[test]
     fn parser_test_expect_fail() {
+        use crate::ast::micheline::test_helpers::app;
         assert_eq!(
-            &parser::parse(FIBONACCI_MALFORMED_SRC)
-                .unwrap_err()
-                .to_string(),
-            "Unrecognized token `GT` found at 133:135\nExpected one of \";\" or \"}\""
+            parse(FIBONACCI_MALFORMED_SRC)
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
+            Err(typechecker::TcError::UnexpectedMicheline(format!(
+                "{:?}",
+                app!(DUP[4, app!(GT)])
+            )))
         );
     }
 
     #[test]
     fn parser_test_dip_dup_drop_args() {
-        use Instruction::{Dip, Drop, Dup};
+        use crate::ast::micheline::test_helpers::*;
 
-        assert_eq!(parser::parse("DROP 1023"), Ok(Drop(Some(1023))));
-        assert_eq!(parser::parse("DIP 1023 {}"), Ok(Dip(Some(1023), vec![])));
-        assert_eq!(parser::parse("DUP 1023"), Ok(Dup(Some(1023))));
-
-        // failures
-        assert_eq!(
-            parser::parse("{ DROP 1025 }")
-                .unwrap_err()
-                .to_string()
-                .as_str(),
-            "expected a natural from 0 to 1023 inclusive, but got 1025"
-        );
-        assert_eq!(
-            parser::parse("{ DIP 1024 {} }")
-                .unwrap_err()
-                .to_string()
-                .as_str(),
-            "expected a natural from 0 to 1023 inclusive, but got 1024"
-        );
-        assert_eq!(
-            parser::parse("{ DUP 65536 }")
-                .unwrap_err()
-                .to_string()
-                .as_str(),
-            "expected a natural from 0 to 1023 inclusive, but got 65536"
-        );
+        assert_eq!(parse("DROP 1023"), Ok(app!(DROP[1023])));
+        assert_eq!(parse("DIP 1023 {}"), Ok(app!(DIP[1023, seq!{}])));
+        assert_eq!(parse("DUP 1023"), Ok(app!(DUP[1023])));
     }
 
     #[test]
     fn vote_contract() {
+        use crate::ast::micheline::test_helpers::*;
         let mut ctx = Ctx {
             amount: 5_000_000,
             ..Ctx::default()
         };
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck(&mut ctx)
+            .typecheck_script(&mut ctx)
             .unwrap()
             .interpret(
                 &mut ctx,
                 "foo".into(),
-                vec![Elt("bar", 0), Elt("baz", 0), Elt("foo", 0)].into(),
+                seq! {app!(Elt["bar", 0]); app!(Elt["baz", 0]); app!(Elt["foo", 0])},
             );
         use TypedValue as TV;
         match interp_res.unwrap() {

@@ -15,6 +15,7 @@ use crate::context::*;
 use crate::interpreter::*;
 use crate::irrefutable_match::irrefutable_match;
 use crate::parser::spanned_lexer;
+use crate::parser::Parser;
 use crate::stack::*;
 use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
@@ -23,14 +24,14 @@ use crate::tzt::expectation::*;
 pub type TestStack = Vec<(Type, TypedValue)>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum TztTestError {
+pub enum TztTestError<'a> {
     StackMismatch((FailingTypeStack, IStack), (FailingTypeStack, IStack)),
     UnexpectedError(TestError),
-    UnexpectedSuccess(ErrorExpectation, IStack),
-    ExpectedDifferentError(ErrorExpectation, TestError),
+    UnexpectedSuccess(ErrorExpectation<'a>, IStack),
+    ExpectedDifferentError(ErrorExpectation<'a>, TestError),
 }
 
-impl fmt::Display for TztTestError {
+impl fmt::Display for TztTestError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use TztTestError::*;
         match self {
@@ -60,29 +61,32 @@ impl fmt::Display for TztTestError {
 
 /// Represent one Tzt test.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TztTest {
-    pub code: ParsedInstruction,
+pub struct TztTest<'a> {
+    pub code: Micheline<'a>,
     pub input: TestStack,
-    pub output: TestExpectation,
+    pub output: TestExpectation<'a>,
     pub amount: Option<i64>,
     pub chain_id: Option<ChainId>,
     pub parameter: Option<Type>,
     pub self_addr: Option<AddressHash>,
 }
 
-fn typecheck_stack(stk: Vec<(Type, Value)>) -> Result<Vec<(Type, TypedValue)>, TcError> {
+fn typecheck_stack(stk: Vec<(Micheline, Micheline)>) -> Result<Vec<(Type, TypedValue)>, TcError> {
     stk.into_iter()
         .map(|(t, v)| {
-            let tc_val = v.typecheck(&mut Default::default(), &t)?;
+            let t = parse_ty(&mut Ctx::default(), &t)?;
+            let tc_val = typecheck_value(&v, &mut Default::default(), &t)?;
             Ok((t, tc_val))
         })
         .collect()
 }
 
-pub fn parse_tzt_test(src: &str) -> Result<TztTest, Box<dyn Error + '_>> {
-    tztTestEntitiesParser::new()
-        .parse(spanned_lexer(src))?
-        .try_into()
+impl<'a> Parser<'a> {
+    pub fn parse_tzt_test(&'a self, src: &str) -> Result<TztTest, Box<dyn Error + '_>> {
+        tztTestEntitiesParser::new()
+            .parse(&self.arena, spanned_lexer(src))?
+            .try_into()
+    }
 }
 
 // Check if the option argument value is none, and raise an error if it is not.
@@ -98,19 +102,19 @@ fn set_tzt_field<T>(field_name: &str, t: &mut Option<T>, v: T) -> Result<(), Str
 }
 
 use std::error::Error;
-impl TryFrom<Vec<TztEntity>> for TztTest {
+impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
     type Error = Box<dyn Error>;
-    fn try_from(tzt: Vec<TztEntity>) -> Result<Self, Self::Error> {
+    fn try_from(tzt: Vec<TztEntity<'a>>) -> Result<Self, Self::Error> {
         use TestExpectation::*;
         use TztEntity::*;
         use TztOutput::*;
-        let mut m_code: Option<ParsedInstruction> = None;
+        let mut m_code: Option<Micheline> = None;
         let mut m_input: Option<TestStack> = None;
         let mut m_output: Option<TestExpectation> = None;
         let mut m_amount: Option<i64> = None;
-        let mut m_chain_id: Option<Value> = None;
-        let mut m_parameter: Option<Type> = None;
-        let mut m_self: Option<Value> = None;
+        let mut m_chain_id: Option<Micheline> = None;
+        let mut m_parameter: Option<Micheline> = None;
+        let mut m_self: Option<Micheline> = None;
 
         for e in tzt {
             match e {
@@ -139,17 +143,19 @@ impl TryFrom<Vec<TztEntity>> for TztTest {
             chain_id: m_chain_id
                 .map(|v| {
                     Ok::<_, TcError>(irrefutable_match!(
-                        v.typecheck(&mut Ctx::default(), &Type::ChainId)?;
+                        typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
                         TypedValue::ChainId
                     ))
                 })
                 .transpose()?,
-            parameter: m_parameter,
+            parameter: m_parameter
+                .map(|v| parse_ty(&mut Ctx::default(), &v))
+                .transpose()?,
             self_addr: m_self
                 .map(|v| {
                     Ok::<_, TcError>(
                         irrefutable_match!(
-                            v.typecheck(&mut Ctx::default(), &Type::Address)?;
+                            typecheck_value(&v, &mut Ctx::default(), &Type::Address)?;
                             TypedValue::Address
                         )
                         .hash,
@@ -173,18 +179,18 @@ pub enum TestError {
 /// This represents the outcome that we expect from interpreting
 /// the code in a test.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum TestExpectation {
+pub enum TestExpectation<'a> {
     ExpectSuccess(Vec<(Type, TypedValue)>),
-    ExpectError(ErrorExpectation),
+    ExpectError(ErrorExpectation<'a>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ErrorExpectation {
+pub enum ErrorExpectation<'a> {
     TypecheckerError(Option<String>),
-    InterpreterError(InterpreterErrorExpectation),
+    InterpreterError(InterpreterErrorExpectation<'a>),
 }
 
-impl fmt::Display for ErrorExpectation {
+impl fmt::Display for ErrorExpectation<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ErrorExpectation::*;
         match self {
@@ -196,13 +202,13 @@ impl fmt::Display for ErrorExpectation {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum InterpreterErrorExpectation {
+pub enum InterpreterErrorExpectation<'a> {
     GeneralOverflow(i128, i128),
     MutezOverflow(i64, i64),
-    FailedWith(Value),
+    FailedWith(Micheline<'a>),
 }
 
-impl fmt::Display for InterpreterErrorExpectation {
+impl fmt::Display for InterpreterErrorExpectation<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use InterpreterErrorExpectation::*;
         match self {
@@ -215,24 +221,24 @@ impl fmt::Display for InterpreterErrorExpectation {
 
 /// Helper type for use during parsing, represent a single
 /// line from the test file.
-pub enum TztEntity {
-    Code(ParsedInstruction),
-    Input(Vec<(Type, Value)>),
-    Output(TztOutput),
+pub enum TztEntity<'a> {
+    Code(Micheline<'a>),
+    Input(Vec<(Micheline<'a>, Micheline<'a>)>),
+    Output(TztOutput<'a>),
     Amount(i64),
-    ChainId(Value),
-    Parameter(Type),
-    SelfAddr(Value),
+    ChainId(Micheline<'a>),
+    Parameter(Micheline<'a>),
+    SelfAddr(Micheline<'a>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test
-pub enum TztOutput {
-    TztSuccess(Vec<(Type, Value)>),
-    TztError(ErrorExpectation),
+pub enum TztOutput<'a> {
+    TztSuccess(Vec<(Micheline<'a>, Micheline<'a>)>),
+    TztError(ErrorExpectation<'a>),
 }
 
 fn execute_tzt_test_code(
-    code: ParsedInstruction,
+    code: Micheline,
     ctx: &mut Ctx,
     parameter: &Type,
     input: Vec<(Type, TypedValue)>,
@@ -249,7 +255,7 @@ fn execute_tzt_test_code(
     // This value along with the test expectation
     // from the test file will be used to decide if
     // the test was a success or a fail.
-    let typechecked_code = code.typecheck(ctx, Some(parameter), &mut t_stack)?;
+    let typechecked_code = typecheck_instruction(&code, ctx, Some(parameter), &mut t_stack)?;
     let mut i_stack: IStack = TopIsFirst::from(vals).0;
     typechecked_code.interpret(ctx, &mut i_stack)?;
     Ok((t_stack, i_stack))

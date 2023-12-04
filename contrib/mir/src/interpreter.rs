@@ -9,7 +9,9 @@ use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::stack::*;
+use crate::typechecker::typecheck_value;
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError {
@@ -29,19 +31,20 @@ pub enum ContractInterpretError {
     InterpretError(#[from] crate::interpreter::InterpretError),
 }
 
-impl ContractScript<TypecheckedStage> {
+impl ContractScript {
     /// Interpret a typechecked contract script using the provided parameter and
-    /// storage. Parameter and storage are given as untyped `Value`s, as this
+    /// storage. Parameter and storage are given as `Micheline`, as this
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
         ctx: &mut crate::context::Ctx,
-        parameter: Value,
-        storage: Value,
+        parameter: Micheline,
+        storage: Micheline,
     ) -> Result<(Vec<TypedValue>, TypedValue), ContractInterpretError> {
         let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
-        let in_val = Value::new_pair(parameter, storage);
-        let tc_val = in_val.typecheck(ctx, &in_ty)?;
+        let in_val = &[parameter, storage];
+        let in_val = Micheline::App(Prim::Pair, in_val, vec![]);
+        let tc_val = typecheck_value(&in_val, ctx, &in_ty)?;
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, &mut stack)?;
         use TypedValue as V;
@@ -55,7 +58,7 @@ impl ContractScript<TypecheckedStage> {
     }
 }
 
-impl TypecheckedInstruction {
+impl Instruction {
     /// Interpret the instruction with the given `Ctx` and input stack. Note the
     /// interpreter assumes the instruction can execute on the provided stack,
     /// otherwise this function will panic.
@@ -69,7 +72,7 @@ impl TypecheckedInstruction {
 }
 
 fn interpret(
-    ast: &TypecheckedAST,
+    ast: &Vec<Instruction>,
     ctx: &mut Ctx,
     stack: &mut IStack,
 ) -> Result<(), InterpretError> {
@@ -87,11 +90,7 @@ fn unreachable_state() -> ! {
     panic!("Unreachable state reached during interpreting, possibly broken typechecking!")
 }
 
-fn interpret_one(
-    i: &TypecheckedInstruction,
-    ctx: &mut Ctx,
-    stack: &mut IStack,
-) -> Result<(), InterpretError> {
+fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
     use Instruction as I;
     use TypedValue as V;
 
@@ -320,7 +319,7 @@ fn interpret_one(
             ctx.gas.consume(interpret_cost::AMOUNT)?;
             stack.push(V::Mutez(ctx.amount));
         }
-        I::Nil(..) => {
+        I::Nil => {
             ctx.gas.consume(interpret_cost::NIL)?;
             stack.push(V::List(MichelsonList::new()));
         }
@@ -1037,7 +1036,7 @@ mod interpreter_tests {
     fn nil() {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
-        assert_eq!(interpret(&vec![Nil(())], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(interpret(&vec![Nil], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::List(vec![].into())]);
         assert_eq!(
             ctx.gas.milligas(),
