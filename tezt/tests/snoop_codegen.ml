@@ -36,6 +36,7 @@ let generate_code_using_solution_test () =
     ~tags:["codegen"]
     ~uses:[Constant.octez_snoop]
     ~uses_client:false
+    ~uses_admin_client:false
     ~__FILE__
   @@ fun () ->
   let open Lwt.Syntax in

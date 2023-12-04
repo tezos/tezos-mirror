@@ -87,6 +87,7 @@ let register () =
     ~tags:["riscv"; "sandbox"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
     ~uses_client:false
+    ~uses_admin_client:false
     test_dummy_kernel ;
   List.iter
     (fun test_unit ->
@@ -96,6 +97,7 @@ let register () =
         ~tags:["riscv"; "sandbox"; "unit"; test_unit]
         ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
         ~uses_client:false
+        ~uses_admin_client:false
         (test_user_level_risc_v_unit_tests test_unit))
     riscv_test_units ;
   Test.register
@@ -104,4 +106,5 @@ let register () =
     ~tags:["riscv"; "sandbox"; "inline_asm"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
     ~uses_client:false
+    ~uses_admin_client:false
     test_inline_asm

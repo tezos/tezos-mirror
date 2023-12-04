@@ -28,6 +28,7 @@ let node_tls () =
     ~title:"Test TLS"
     ~tags:["node"; "tls"]
     ~uses_client:false
+    ~uses_admin_client:false
     ~__FILE__
   @@ fun () ->
   let certificate_path = "tezt/tests/tls/tezos.crt" in

@@ -31,6 +31,7 @@ let check_connections_below_cap () =
     ~title:"CLI under connections cap"
     ~tags:["cli"; "connections"]
     ~uses_client:false
+    ~uses_admin_client:false
   @@ fun () ->
   let* _node = Node.init [Connections cap] in
   unit
@@ -65,6 +66,7 @@ let check_connections_above_cap () =
     ~title:"CLI above connections cap"
     ~tags:["cli"; "connections"; "bad"]
     ~uses_client:false
+    ~uses_admin_client:false
   @@ fun () ->
   let has_failed, on_failure = Lwt.task () in
   let node = Node.create [] in
@@ -85,6 +87,7 @@ let check_node_net_addr_colision_message () =
     ~title:"CLI --net-addr collision message"
     ~tags:["cli"; "address"]
     ~uses_client:false
+    ~uses_admin_client:false
   @@ fun () ->
   let net_port = Port.fresh () in
   let* _node1 = Node.init ~net_port [] in
