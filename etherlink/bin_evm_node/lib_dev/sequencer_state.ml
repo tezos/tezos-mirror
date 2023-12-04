@@ -30,7 +30,6 @@ let init ctxt =
     Wasm.start
       ~tree:ctxt.Sequencer_context.evm_state
       Tezos_scoru_wasm.Wasm_pvm_state.V3
-      true
       ctxt.kernel
   in
   let ctxt = {ctxt with evm_state} in
