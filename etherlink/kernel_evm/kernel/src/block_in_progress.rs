@@ -196,31 +196,23 @@ impl BlockInProgress {
         )
     }
 
-    pub fn from_queue_element(
-        proposal: crate::blueprint::QueueElement,
+    pub fn from_blueprint(
+        blueprint: crate::blueprint::Blueprint,
         current_block_number: U256,
         parent_hash: H256,
         constants: &BlockConstants,
         tick_counter: u64,
     ) -> BlockInProgress {
-        match proposal {
-            crate::blueprint::QueueElement::Blueprint(proposal) => {
-                // proposal is turn into a ring to allow poping from the front
-                let ring = proposal.transactions.into();
-                BlockInProgress::new_with_ticks(
-                    current_block_number,
-                    parent_hash,
-                    constants.gas_price,
-                    ring,
-                    tick_counter,
-                    proposal.timestamp,
-                )
-            }
-            crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
-                bip.estimated_ticks = tick_counter;
-                *bip
-            }
-        }
+        // blueprint is turn into a ring to allow popping from the front
+        let ring = blueprint.transactions.into();
+        BlockInProgress::new_with_ticks(
+            current_block_number,
+            parent_hash,
+            constants.gas_price,
+            ring,
+            tick_counter,
+            blueprint.timestamp,
+        )
     }
 
     fn add_gas(&mut self, gas: U256) -> Result<(), Error> {

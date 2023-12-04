@@ -5,8 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_in_progress::BlockInProgress;
-use crate::inbox::{KernelUpgrade, Transaction};
+use crate::inbox::Transaction;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
 
@@ -48,107 +47,16 @@ impl Decodable for Blueprint {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub enum QueueElement {
-    Blueprint(Blueprint),
-    BlockInProgress(Box<BlockInProgress>),
-}
-
-const BIP_QUEUEELT_TAG: u8 = 1;
-const BLUEPRINT_QUEUEELT_TAG: u8 = 2;
-
-impl Decodable for QueueElement {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-        let tag: u8 = decoder.at(0)?.as_val()?;
-        let elt = decoder.at(1)?;
-        match tag {
-            BIP_QUEUEELT_TAG => {
-                // block in progress
-                let bip = BlockInProgress::decode(&elt)?;
-                Ok(Self::BlockInProgress(Box::new(bip)))
-            }
-            BLUEPRINT_QUEUEELT_TAG => {
-                // blueprint
-                let bpt = Blueprint::decode(&elt)?;
-                Ok(Self::Blueprint(bpt))
-            }
-            _ => Err(DecoderError::Custom("Unknown queue element tag.")),
-        }
-    }
-}
-
-impl Encodable for QueueElement {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        match self {
-            QueueElement::Blueprint(bpt) => {
-                stream.append(&BLUEPRINT_QUEUEELT_TAG);
-                bpt.rlp_append(stream)
-            }
-            QueueElement::BlockInProgress(bip) => {
-                stream.append(&BIP_QUEUEELT_TAG);
-                bip.rlp_append(stream)
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct Queue {
-    // In our case, to make it simple and straightforward it will be
-    // an array of pendings transactions even though it'll be only a
-    // singleton for our needs.
-    pub proposals: Vec<QueueElement>,
-    pub kernel_upgrade: Option<KernelUpgrade>,
-}
-
-impl Decodable for Queue {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-
-        let mut it = decoder.iter();
-        let proposals: Vec<QueueElement> =
-            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "proposals")?;
-        let kernel_upgrade: Option<KernelUpgrade> =
-            rlp_helpers::decode_option(&rlp_helpers::next(&mut it)?, "kernel_upgrade")?;
-        Ok(Queue {
-            proposals,
-            kernel_upgrade,
-        })
-    }
-}
-
-impl Encodable for Queue {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        stream.append_list(&self.proposals);
-        rlp_helpers::append_option(stream, &self.kernel_upgrade);
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
 
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
-    use primitive_types::{H160, H256, U256};
+    use primitive_types::{H160, U256};
     use rlp::Rlp;
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
-    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
@@ -178,51 +86,14 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_queue_elt() {
-        let proposal = QueueElement::Blueprint(Blueprint {
+    fn test_encode_blueprint() {
+        let proposal = Blueprint {
             transactions: vec![dummy_transaction(0), dummy_transaction(1)],
             timestamp: Timestamp::from(0i64),
-        });
-
+        };
         let encoded = proposal.rlp_bytes();
         let decoder = Rlp::new(&encoded);
-        let decoded = QueueElement::decode(&decoder).expect("Should be decodable");
+        let decoded = Blueprint::decode(&decoder).expect("Should be decodable");
         assert_eq!(decoded, proposal);
-    }
-
-    fn dummy_bip(i: usize) -> BlockInProgress {
-        BlockInProgress::new_with_ticks(
-            U256::from(i),
-            H256::zero(),
-            U256::zero(),
-            VecDeque::new(),
-            0,
-            Timestamp::from(0i64),
-        )
-    }
-
-    #[test]
-    fn test_encode_queue() {
-        let proposal = QueueElement::Blueprint(Blueprint {
-            transactions: vec![dummy_transaction(0), dummy_transaction(1)],
-            timestamp: Timestamp::from(0i64),
-        });
-
-        let proposals = vec![
-            QueueElement::BlockInProgress(Box::new(dummy_bip(2))),
-            proposal,
-        ];
-        let kernel_upgrade = Some(KernelUpgrade {
-            preimage_hash: [3; PREIMAGE_HASH_SIZE],
-        });
-        let queue = Queue {
-            proposals,
-            kernel_upgrade,
-        };
-
-        let encoded = queue.rlp_bytes();
-        let decoder = Rlp::new(&encoded);
-        let decoded = Queue::decode(&decoder).expect("Should be decodable");
-        assert_eq!(decoded, queue);
     }
 }

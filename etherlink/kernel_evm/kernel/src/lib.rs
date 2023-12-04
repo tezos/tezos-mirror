@@ -5,11 +5,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::blueprint::Queue;
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::inbox::KernelUpgrade;
 use crate::migration::storage_migration;
+use crate::reboot_context::RebootContext;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::fetch;
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
@@ -94,7 +94,7 @@ pub fn stage_one<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
     is_sequencer: bool,
-) -> Result<Queue, anyhow::Error> {
+) -> Result<Option<KernelUpgrade>, anyhow::Error> {
     log!(host, Info, "Entering stage one.");
     log!(
         host,
@@ -106,33 +106,14 @@ pub fn stage_one<Host: Runtime>(
 
     // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
     // if rebooted, don't fetch inbox
-    let queue = fetch(host, smart_rollup_address, ticketer, admin, is_sequencer)?;
-
-    for (i, queue_elt) in queue.proposals.iter().enumerate() {
-        match queue_elt {
-            blueprint::QueueElement::Blueprint(b) => log!(
-                host,
-                Info,
-                "Blueprint {} contains {} transactions.",
-                i,
-                b.transactions.len()
-            ),
-            blueprint::QueueElement::BlockInProgress(bip) => log!(
-                host,
-                Info,
-                "Block in progress {} has {} transactions left.",
-                i,
-                bip.queue_length()
-            ),
-        }
-    }
-
-    Ok(queue)
+    let kernel_upgrade =
+        fetch(host, smart_rollup_address, ticketer, admin, is_sequencer)?;
+    Ok(kernel_upgrade)
 }
 
 fn produce_and_upgrade<Host: KernelRuntime>(
     host: &mut Host,
-    queue: Queue,
+    reboot_context: RebootContext,
     kernel_upgrade: KernelUpgrade,
     chain_id: U256,
     base_fee_per_gas: U256,
@@ -141,7 +122,7 @@ fn produce_and_upgrade<Host: KernelRuntime>(
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
     // In case of a reboot request, the upgrade is delayed.
-    match block::produce(host, queue, chain_id, base_fee_per_gas) {
+    match block::produce(host, reboot_context, chain_id, base_fee_per_gas) {
         Ok(ComputationResult::RebootNeeded) => Ok(()),
         Err(e) => {
             log!(
@@ -166,16 +147,22 @@ fn upgrade<Host: Runtime>(
 
 pub fn stage_two<Host: KernelRuntime>(
     host: &mut Host,
-    queue: Queue,
+    reboot_context: RebootContext,
     chain_id: U256,
     base_fee_per_gas: U256,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage two.");
-    let kernel_upgrade = queue.kernel_upgrade.clone();
+    let kernel_upgrade = reboot_context.kernel_upgrade.clone();
     if let Some(kernel_upgrade) = kernel_upgrade {
-        produce_and_upgrade(host, queue, kernel_upgrade, chain_id, base_fee_per_gas)
+        produce_and_upgrade(
+            host,
+            reboot_context,
+            kernel_upgrade,
+            chain_id,
+            base_fee_per_gas,
+        )
     } else {
-        block::produce(host, queue, chain_id, base_fee_per_gas).map(|_| ())
+        block::produce(host, reboot_context, chain_id, base_fee_per_gas).map(|_| ())
     }
 }
 
@@ -235,7 +222,7 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
 
 pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-    let queue = if storage::was_rebooted(host)? {
+    let reboot_context = if storage::was_rebooted(host)? {
         // kernel was rebooted
         log!(
             host,
@@ -244,8 +231,8 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
             host.reboot_left()?
         );
         storage::delete_reboot_flag(host)?;
-        log!(host, Info, "Read queue.");
-        storage::read_queue(host)?
+        log!(host, Info, "Read reboot context.");
+        storage::read_reboot_context(host)?
     } else {
         // first kernel run of the level
         match stage_zero(host)? {
@@ -256,15 +243,21 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
                 let ticketer = read_ticketer(host);
                 let admin = read_admin(host);
                 let is_sequencer = is_sequencer(host)?;
-                stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
-                    .context("Failed during stage 1")?
+                let kernel_upgrade =
+                    stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
+                        .context("Failed during stage 1")?;
+                RebootContext {
+                    kernel_upgrade,
+                    bip: None,
+                }
             }
             MigrationStatus::InProgress => return Ok(()),
         }
     };
 
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
-    stage_two(host, queue, chain_id, base_fee_per_gas).context("Failed during stage 2")
+    stage_two(host, reboot_context, chain_id, base_fee_per_gas)
+        .context("Failed during stage 2")
 }
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
@@ -347,10 +340,12 @@ kernel_entry!(kernel_loop);
 mod tests {
     use std::{ops::Rem, str::FromStr};
 
+    use crate::blueprint_storage::store_inbox_blueprint;
     use crate::mock_internal::MockInternal;
+    use crate::reboot_context::RebootContext;
     use crate::safe_storage::{KernelRuntime, SafeStorage};
     use crate::{
-        blueprint::{Blueprint, Queue, QueueElement},
+        blueprint::Blueprint,
         inbox::{KernelUpgrade, Transaction, TransactionContent},
         stage_two, storage,
     };
@@ -436,11 +431,11 @@ mod tests {
         }
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
-        QueueElement::Blueprint(Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+        Blueprint {
             transactions,
             timestamp: Timestamp::from(0i64),
-        })
+        }
     }
 
     #[test]
@@ -479,19 +474,24 @@ mod tests {
                 transactions = vec![];
             }
         }
+        // Store blueprints
+        for blueprint in proposals {
+            store_inbox_blueprint(&mut host, blueprint)
+                .expect("Should have stored blueprint");
+        }
         // the upgrade mechanism should not start otherwise it will fail
         let broken_kernel_upgrade = KernelUpgrade {
             preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
         };
-        let queue = Queue {
-            proposals,
+        let reboot_context = RebootContext {
+            bip: None,
             kernel_upgrade: Some(broken_kernel_upgrade),
         };
 
         // If the upgrade is started, it should raise an error
         stage_two(
             &mut host,
-            queue,
+            reboot_context,
             DUMMY_CHAIN_ID,
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
