@@ -132,17 +132,17 @@ $(ALL_EXECUTABLES):
 
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
-	@dune build contrib/bin_codec_kaitai/codec.exe
-	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
 	@$(MAKE) -C contrib/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
 check-kaitai-struct-files:
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
 	@dune build contrib/bin_codec_kaitai/codec.exe
-	@git diff --exit-code contrib/kaitai-struct-files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
 	@rm contrib/kaitai-struct-files/*.ksy
 	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
-	@git diff --exit-code contrib/kaitai-struct-files || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+	@git add contrib/kaitai-struct-files/*.ksy
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
