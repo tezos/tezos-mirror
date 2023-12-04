@@ -1822,211 +1822,153 @@ let test_inject_100_transactions =
        hasn't changed" ;
   unit
 
+let check_estimate_gas {evm_node; _} eth_call expected_gas =
+  (* Make the call to the EVM node. *)
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {
+          method_ = "eth_estimateGas";
+          parameters = `A [`O eth_call; `String "latest"];
+        })
+  in
+  (* Check the RPC result. *)
+  let r = call_result |> Evm_node.extract_result |> JSON.as_int in
+  Check.((r >= expected_gas) int)
+    ~error_msg:"Expected result greater than %R, but got %L" ;
+  unit
+
+let check_eth_call {evm_node; _} eth_call expected_result =
+  (* Make the call to the EVM node. *)
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {method_ = "eth_call"; parameters = `A [`O eth_call; `String "latest"]})
+  in
+  (* Check the RPC result. *)
+  let r = call_result |> Evm_node.extract_result in
+  Check.((JSON.as_string r = expected_result) string)
+    ~error_msg:"Expected result %R, but got %L" ;
+  unit
+
 let test_eth_call_large =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "eth_call"; "simulate"; "large"]
-    ~uses:(fun protocol ->
+  let test_f ~protocol:_ ~evm_setup =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    (* large request *)
+    let eth_call =
       [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"eth_call with a large amount of data"
-    (fun protocol ->
-      (* setup *)
-      let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
-      let sender = Eth_account.bootstrap_accounts.(0) in
+        ("to", Ezjsonm.encode_string sender.address);
+        ("data", Ezjsonm.encode_string ("0x" ^ String.make 12_000 'a'));
+      ]
+    in
 
-      (* large request *)
-      let eth_call =
-        [
-          ("to", Ezjsonm.encode_string sender.address);
-          ("data", Ezjsonm.encode_string ("0x" ^ String.make 12_000 'a'));
-        ]
-      in
-
-      (* make call to proxy *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_call";
-              parameters = `A [`O eth_call; `String "latest"];
-            })
-      in
-
-      (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_node.extract_result in
-      Check.((JSON.as_string r = "0x") string)
-        ~error_msg:"Expected result %R, but got %L" ;
-
-      unit)
+    check_eth_call evm_setup eth_call "0x"
+  in
+  let title = "eth_call with a large amount of data" in
+  let tags = ["evm"; "eth_call"; "simulate"; "large"] in
+  register_both ~title ~tags test_f
 
 let test_estimate_gas =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "eth_estimategas"; "simulate"; "create"]
-    ~uses:(fun protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"eth_estimateGas for contract creation"
-    (fun protocol ->
-      (* setup *)
-      let* {evm_node; _} = setup_past_genesis protocol ~admin:None in
+  let test_f ~protocol:_ ~evm_setup =
+    (* large request *)
+    let data = read_file simple_storage.bin in
+    let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
 
-      (* large request *)
-      let data = read_file simple_storage.bin in
-      let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
+    check_estimate_gas evm_setup eth_call 23423
+  in
 
-      (* make call to proxy *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_estimateGas";
-              parameters = `A [`O eth_call; `String "latest"];
-            })
-      in
-
-      (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_node.extract_result in
-      Check.((JSON.as_int r >= 23423) int)
-        ~error_msg:"Expected result greater than %R, but got %L" ;
-
-      unit)
+  let title = "eth_estimateGas for contract creation" in
+  let tags = ["evm"; "eth_estimategas"; "simulate"] in
+  register_both ~title ~tags test_f
 
 let test_estimate_gas_additionnal_field =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "eth_estimategas"; "simulate"; "remix"]
-    ~uses:(fun protocol ->
+  let test_f ~protocol:_ ~evm_setup =
+    (* large request *)
+    let data = read_file simple_storage.bin in
+    let eth_call =
       [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"eth_estimateGas allows additional fields"
-    (fun protocol ->
-      (* setup *)
-      let* {evm_node; _} = setup_past_genesis protocol ~admin:None in
+        ( "from",
+          Ezjsonm.encode_string @@ "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+        );
+        ("data", Ezjsonm.encode_string @@ "0x" ^ data);
+        ("value", Ezjsonm.encode_string @@ "0x0");
+        (* for some reason remix adds the "type" field *)
+        ("type", Ezjsonm.encode_string @@ "0x1");
+      ]
+    in
 
-      (* large request *)
-      let data = read_file simple_storage.bin in
-      let eth_call =
-        [
-          ( "from",
-            Ezjsonm.encode_string
-            @@ "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c" );
-          ("data", Ezjsonm.encode_string @@ "0x" ^ data);
-          ("value", Ezjsonm.encode_string @@ "0x0");
-          (* for some reason remix adds the "type" field *)
-          ("type", Ezjsonm.encode_string @@ "0x1");
-        ]
-      in
+    check_estimate_gas evm_setup eth_call 23423
+  in
+  let title = "eth_estimateGas allows additional fields" in
+  let tags = ["evm"; "eth_estimategas"; "simulate"; "remix"] in
+  register_both ~title ~tags test_f
 
-      (* make call to proxy *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_estimateGas";
-              parameters = `A [`O eth_call; `String "latest"];
-            })
-      in
+let test_eth_call_storage_contract =
+  let test_f ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) =
+    let sender = Eth_account.bootstrap_accounts.(0) in
 
-      (* Check the RPC returns a `result`. *)
-      let r = call_result |> Evm_node.extract_result in
-      Check.((JSON.as_int r >= 23423) int)
-        ~error_msg:"Expected result greater than %R, but got %L" ;
+    (* deploy contract *)
+    let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
+    let* () = check_tx_succeeded ~endpoint ~tx in
+    Check.(
+      (String.lowercase_ascii address
+      = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+        string
+        ~error_msg:"Expected address to be %R but was %L.") ;
 
-      unit)
-
-let test_eth_call_storage_contract_rollup_node =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "eth_call"; "simulate"]
-    ~uses:(fun protocol ->
+    (* craft request *)
+    let data = "0x4e70b1dc" in
+    let eth_call =
       [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"Call a view (directly through proxy)"
-    (fun protocol ->
-      (* setup *)
-      let* ({evm_node; endpoint; _} as evm_setup) =
-        setup_past_genesis ~admin:None protocol
-      in
+        ("to", Ezjsonm.encode_string address);
+        ("data", Ezjsonm.encode_string data);
+      ]
+    in
 
-      let sender = Eth_account.bootstrap_accounts.(0) in
+    (* make call to proxy *)
+    let* call_result =
+      Evm_node.(
+        call_evm_rpc
+          evm_node
+          {
+            method_ = "eth_call";
+            parameters = `A [`O eth_call; `String "latest"];
+          })
+    in
 
-      (* deploy contract *)
-      let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
-      let* () = check_tx_succeeded ~endpoint ~tx in
-      Check.(
-        (String.lowercase_ascii address
-        = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
-          string
-          ~error_msg:"Expected address to be %R but was %L.") ;
+    let r = call_result |> Evm_node.extract_result in
+    Check.(
+      (JSON.as_string r
+     = "0x0000000000000000000000000000000000000000000000000000000000000000")
+        string)
+      ~error_msg:"Expected result %R, but got %L" ;
 
-      (* craft request *)
-      let data = "0x4e70b1dc" in
-      let eth_call =
-        [
-          ("to", Ezjsonm.encode_string address);
-          ("data", Ezjsonm.encode_string data);
-        ]
-      in
+    let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+    let* () = check_tx_succeeded ~endpoint ~tx in
 
-      (* make call to proxy *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_call";
-              parameters = `A [`O eth_call; `String "latest"];
-            })
-      in
-
-      let r = call_result |> Evm_node.extract_result in
-      Check.(
-        (JSON.as_string r
-       = "0x0000000000000000000000000000000000000000000000000000000000000000")
-          string)
-        ~error_msg:"Expected result %R, but got %L" ;
-
-      let* tx = send_call_set_storage_simple address sender 42 evm_setup in
-      let* () = check_tx_succeeded ~endpoint ~tx in
-
-      (* make call to proxy *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_call";
-              parameters = `A [`O eth_call; `String "latest"];
-            })
-      in
-      let r = call_result |> Evm_node.extract_result in
-      Check.(
-        (JSON.as_string r
-       = "0x000000000000000000000000000000000000000000000000000000000000002a")
-          string)
-        ~error_msg:"Expected result %R, but got %L" ;
-      unit)
+    (* make call to proxy *)
+    let* call_result =
+      Evm_node.(
+        call_evm_rpc
+          evm_node
+          {
+            method_ = "eth_call";
+            parameters = `A [`O eth_call; `String "latest"];
+          })
+    in
+    let r = call_result |> Evm_node.extract_result in
+    Check.(
+      (JSON.as_string r
+     = "0x000000000000000000000000000000000000000000000000000000000000002a")
+        string)
+      ~error_msg:"Expected result %R, but got %L" ;
+    unit
+  in
+  let title = "Call a view" in
+  let tags = ["evm"; "eth_call"; "simulate"] in
+  register_both ~title ~tags test_f
 
 let test_eth_call_storage_contract_proxy =
   Protocol.register_test
@@ -2084,59 +2026,49 @@ let test_eth_call_storage_contract_proxy =
       unit)
 
 let test_eth_call_storage_contract_eth_cli =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "eth_call"; "simulate"]
-    ~uses:(fun protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"Call a view through an ethereum client"
-    (fun protocol ->
-      (* setup *)
-      let* ({evm_node; endpoint; sc_rollup_node; client; node; _} as evm_setup)
-          =
-        setup_past_genesis ~admin:None protocol
-      in
+  let test_f ~protocol:_
+      ~evm_setup:
+        ({evm_node; endpoint; sc_rollup_node; node; client; _} as evm_setup) =
+    (* sanity *)
+    let* call_result =
+      Evm_node.(
+        call_evm_rpc
+          evm_node
+          {
+            method_ = "eth_call";
+            parameters = `A [`O [("to", `Null)]; `String "latest"];
+          })
+    in
+    (* Check the RPC returns a `result`. *)
+    let _result = call_result |> Evm_node.extract_result in
 
-      (* sanity *)
-      let* call_result =
-        Evm_node.(
-          call_evm_rpc
-            evm_node
-            {
-              method_ = "eth_call";
-              parameters = `A [`O [("to", `Null)]; `String "latest"];
-            })
-      in
-      (* Check the RPC returns a `result`. *)
-      let _result = call_result |> Evm_node.extract_result in
+    let sender = Eth_account.bootstrap_accounts.(0) in
 
-      let sender = Eth_account.bootstrap_accounts.(0) in
+    (* deploy contract send send 42 *)
+    let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
+    let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+    let* () = check_tx_succeeded ~endpoint ~tx in
 
-      (* deploy contract send send 42 *)
-      let* address, _tx = deploy ~contract:simple_storage ~sender evm_setup in
-      let* tx = send_call_set_storage_simple address sender 42 evm_setup in
-      let* () = check_tx_succeeded ~endpoint ~tx in
+    (* make a call to proxy through eth-cli *)
+    let call_num =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:simple_storage.label
+        ~address
+        ~method_call:"num()"
+    in
+    let* res =
+      wait_for_application ~evm_node ~sc_rollup_node ~node ~client call_num ()
+    in
 
-      (* make a call to proxy through eth-cli *)
-      let call_num =
-        Eth_cli.contract_call
-          ~endpoint
-          ~abi_label:simple_storage.label
-          ~address
-          ~method_call:"num()"
-      in
-      let* res =
-        wait_for_application ~evm_node ~sc_rollup_node ~node ~client call_num ()
-      in
+    Check.((String.trim res = "42") string)
+      ~error_msg:"Expected result %R, but got %L" ;
+    unit
+  in
+  let title = "Call a view through an ethereum client" in
+  let tags = ["evm"; "eth_call"; "simulate"] in
 
-      Check.((String.trim res = "42") string)
-        ~error_msg:"Expected result %R, but got %L" ;
-      unit)
+  register_both ~title ~tags test_f
 
 let test_preinitialized_evm_kernel =
   Protocol.register_test
@@ -2797,7 +2729,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
 let test_validation_result =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "simulate"; "tmp"]
+    ~tags:["evm"; "simulate"]
     ~uses:(fun protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -4365,7 +4297,7 @@ let register_evm_node ~protocols =
   test_l2_deploy_erc20 protocols ;
   test_deploy_contract_for_shanghai protocols ;
   test_inject_100_transactions protocols ;
-  test_eth_call_storage_contract_rollup_node protocols ;
+  test_eth_call_storage_contract protocols ;
   test_eth_call_storage_contract_proxy protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
