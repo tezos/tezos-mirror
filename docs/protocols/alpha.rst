@@ -99,6 +99,10 @@ Minor Changes
 - Arithmetic errors on Michelson ``mutez`` type have been exported so
   they can now be caught outside of the protocol. (MR :gl:`!9934`)
 
+- Michelson error traces for elaboration of invalid data was made more
+  consistent by adding errors in some cases (BLS12-381 values, Sapling
+  transactions, and timelocks). (MR :gl:`!10227`)
+
 Internal
 --------
 

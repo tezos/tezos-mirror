@@ -1718,6 +1718,141 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
 let parse_never expr : (never * context) tzresult =
   Result_syntax.tzfail @@ Invalid_never_expr (location expr)
 
+let parse_bls12_381_g1 ctxt :
+    Script.node -> (Script_bls.G1.t * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bs) as expr -> (
+      let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g1 in
+      match Script_bls.G1.of_bytes_opt bs with
+      | Some pt -> return (pt, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid BLS12-381 G1 element")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_bls12_381_g2 ctxt :
+    Script.node -> (Script_bls.G2.t * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bs) as expr -> (
+      let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g2 in
+      match Script_bls.G2.of_bytes_opt bs with
+      | Some pt -> return (pt, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid BLS12-381 G2 element")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_bls12_381_fr ctxt :
+    Script.node -> (Script_bls.Fr.t * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bs) as expr -> (
+      let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_fr in
+      match Script_bls.Fr.of_bytes_opt bs with
+      | Some pt -> return (pt, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid BLS12-381 field element")))
+  | Int (_, v) ->
+      let* ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_fr in
+      return (Script_bls.Fr.of_z v, ctxt)
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_sapling_transaction ctxt ~memo_size :
+    Script.node -> (Sapling.transaction * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      match
+        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
+      with
+      | Some transaction -> (
+          match Sapling.transaction_get_memo_size transaction with
+          | None -> return (transaction, ctxt)
+          | Some transac_memo_size ->
+              let* () =
+                memo_size_eq
+                  ~error_details:(Informative ())
+                  memo_size
+                  transac_memo_size
+              in
+              return (transaction, ctxt))
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid Sapling transaction")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_sapling_transaction_deprecated ctxt ~memo_size :
+    Script.node -> (Sapling.Legacy.transaction * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      match
+        Data_encoding.Binary.of_bytes_opt
+          Sapling.Legacy.transaction_encoding
+          bytes
+      with
+      | Some transaction -> (
+          match Sapling.Legacy.transaction_get_memo_size transaction with
+          | None -> return (transaction, ctxt)
+          | Some transac_memo_size ->
+              let* () =
+                memo_size_eq
+                  ~error_details:(Informative ())
+                  memo_size
+                  transac_memo_size
+              in
+              return (transaction, ctxt))
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               ( loc,
+                 strip_locations expr,
+                 "a valid Sapling transaction (deprecated format)" )))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_chest_key ctxt :
+    Script.node -> (Script_timelock.chest_key * context) tzresult =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      let* ctxt = Gas.consume ctxt Typecheck_costs.chest_key in
+      match
+        Data_encoding.Binary.of_bytes_opt
+          Script_timelock.chest_key_encoding
+          bytes
+      with
+      | Some chest_key -> return (chest_key, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid time-lock chest key")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+let parse_chest ctxt : Script.node -> (Script_timelock.chest * context) tzresult
+    =
+  let open Result_syntax in
+  function
+  | Bytes (loc, bytes) as expr -> (
+      let* ctxt =
+        Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
+      in
+      match
+        Data_encoding.Binary.of_bytes_opt Script_timelock.chest_encoding bytes
+      with
+      | Some chest -> return (chest, ctxt)
+      | None ->
+          tzfail
+            (Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid time-lock chest")))
+  | expr -> tzfail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
 (* -- parse data of complex types -- *)
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
@@ -2322,73 +2457,23 @@ let rec parse_data :
       (Big_map {id; diff; key_type = tk; value_type = tv}, ctxt)
   | Never_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_never expr
   (* Bls12_381 types *)
-  | Bls12_381_g1_t, Bytes (_, bs) -> (
-      let*? ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g1 in
-      match Script_bls.G1.of_bytes_opt bs with
-      | Some pt -> return (pt, ctxt)
-      | None -> fail_parse_data ())
   | Bls12_381_g1_t, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  | Bls12_381_g2_t, Bytes (_, bs) -> (
-      let*? ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_g2 in
-      match Script_bls.G2.of_bytes_opt bs with
-      | Some pt -> return (pt, ctxt)
-      | None -> fail_parse_data ())
+      Lwt.return @@ traced_no_lwt @@ parse_bls12_381_g1 ctxt expr
   | Bls12_381_g2_t, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  | Bls12_381_fr_t, Bytes (_, bs) -> (
-      let*? ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_fr in
-      match Script_bls.Fr.of_bytes_opt bs with
-      | Some pt -> return (pt, ctxt)
-      | None -> fail_parse_data ())
-  | Bls12_381_fr_t, Int (_, v) ->
-      let*? ctxt = Gas.consume ctxt Typecheck_costs.bls12_381_fr in
-      return (Script_bls.Fr.of_z v, ctxt)
+      Lwt.return @@ traced_no_lwt @@ parse_bls12_381_g2 ctxt expr
   | Bls12_381_fr_t, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+      Lwt.return @@ traced_no_lwt @@ parse_bls12_381_fr ctxt expr
   (*
                    /!\ When adding new lazy storage kinds, you may want to guard the parsing
                    of identifiers with [allow_forged].
                *)
   (* Sapling *)
-  | Sapling_transaction_t memo_size, Bytes (_, bytes) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
-      with
-      | Some transaction -> (
-          match Sapling.transaction_get_memo_size transaction with
-          | None -> return (transaction, ctxt)
-          | Some transac_memo_size ->
-              let*? () =
-                memo_size_eq
-                  ~error_details:(Informative ())
-                  memo_size
-                  transac_memo_size
-              in
-              return (transaction, ctxt))
-      | None -> fail_parse_data ())
-  | Sapling_transaction_t _, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  | Sapling_transaction_deprecated_t memo_size, Bytes (_, bytes) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Sapling.Legacy.transaction_encoding
-          bytes
-      with
-      | Some transaction -> (
-          match Sapling.Legacy.transaction_get_memo_size transaction with
-          | None -> return (transaction, ctxt)
-          | Some transac_memo_size ->
-              let*? () =
-                memo_size_eq
-                  ~error_details:(Informative ())
-                  memo_size
-                  transac_memo_size
-              in
-              return (transaction, ctxt))
-      | None -> fail_parse_data ())
-  | Sapling_transaction_deprecated_t _, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+  | Sapling_transaction_t memo_size, expr ->
+      Lwt.return @@ traced_no_lwt
+      @@ parse_sapling_transaction ctxt ~memo_size expr
+  | Sapling_transaction_deprecated_t memo_size, expr ->
+      Lwt.return @@ traced_no_lwt
+      @@ parse_sapling_transaction_deprecated ctxt ~memo_size expr
   | Sapling_state_t memo_size, Int (loc, id) ->
       if allow_forged then
         let id = Sapling.Id.parse_z id in
@@ -2410,28 +2495,9 @@ let rec parse_data :
       traced_fail
         (Invalid_kind (location expr, [Int_kind; Seq_kind], kind expr))
   (* Time lock*)
-  | Chest_key_t, Bytes (_, bytes) -> (
-      let*? ctxt = Gas.consume ctxt Typecheck_costs.chest_key in
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Script_timelock.chest_key_encoding
-          bytes
-      with
-      | Some chest_key -> return (chest_key, ctxt)
-      | None -> fail_parse_data ())
   | Chest_key_t, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
-  | Chest_t, Bytes (_, bytes) -> (
-      let*? ctxt =
-        Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
-      in
-      match
-        Data_encoding.Binary.of_bytes_opt Script_timelock.chest_encoding bytes
-      with
-      | Some chest -> return (chest, ctxt)
-      | None -> fail_parse_data ())
-  | Chest_t, expr ->
-      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+      Lwt.return @@ traced_no_lwt @@ parse_chest_key ctxt expr
+  | Chest_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chest ctxt expr
 
 and parse_view :
     type storage storagec.
