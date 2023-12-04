@@ -152,7 +152,7 @@ pub mod interpret_cost {
     use checked::Checked;
 
     use super::{AsGasCost, OutOfGas};
-    use crate::ast::TypedValue;
+    use crate::ast::{Or, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -246,20 +246,39 @@ pub mod interpret_cost {
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
+        let cmp_or = Checked::from(10u32);
+        #[track_caller]
+        fn incomparable() -> ! {
+            unreachable!("Comparison of incomparable values")
+        }
         Ok(match (v1, v2) {
             (V::Nat(l), V::Nat(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
                 cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
             }
+            (V::Nat(_), _) => incomparable(),
+
             (V::Int(l), V::Int(r)) => {
                 // NB: eventually when using BigInts, use BigInt::bits() &c
                 cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
             }
+            (V::Int(_), _) => incomparable(),
+
             (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
+            (V::Bool(_), _) => incomparable(),
+
             (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
+            (V::Mutez(_), _) => incomparable(),
+
             (V::String(l), V::String(r)) => cmp_bytes(l.len(), r.len())?,
+            (V::String(_), _) => incomparable(),
+
             (V::Unit, V::Unit) => 10,
+            (V::Unit, _) => incomparable(),
+
             (V::Pair(l), V::Pair(r)) => cmp_pair(l.as_ref(), r.as_ref())?,
+            (V::Pair(_), _) => incomparable(),
+
             (V::Option(l), V::Option(r)) => match (l, r) {
                 (None, None) => cmp_option,
                 (None, Some(_)) => cmp_option,
@@ -267,9 +286,24 @@ pub mod interpret_cost {
                 (Some(l), Some(r)) => cmp_option + compare(l, r)?,
             }
             .as_gas_cost()?,
+            (V::Option(_), _) => incomparable(),
+
             (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
+            (V::Address(_), _) => incomparable(),
+
             (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
-            _ => unreachable!("Comparison of incomparable values"),
+            (V::ChainId(_), _) => incomparable(),
+
+            (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
+                (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,
+                (Or::Right(x), Or::Right(y)) => cmp_or + compare(x, y)?,
+                (Or::Left(_), Or::Right(_)) => cmp_or,
+                (Or::Right(_), Or::Left(_)) => cmp_or,
+            }
+            .as_gas_cost()?,
+            (V::Or(..), _) => incomparable(),
+
+            (V::List(..) | V::Map(..) | V::Contract(_), _) => incomparable(),
         })
     }
 
