@@ -4,6 +4,8 @@
 
 ### Features
 
+- Fix contract code storage cost (!10356)
+
 ### Bug fixes
 
 ### Breaking changes
