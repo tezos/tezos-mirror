@@ -223,3 +223,7 @@ Miscellaneous
 - Beta Debian and Redhat packages are now linked in gitlab releases.
 
 - Renamed package registries for releases from ``tezos-x.y`` to ``octez-x.y``.
+
+- **Breaking change** Switch encoding of ``nread_total`` field of
+  ``P2p_events.read_fd`` in Octez-p2p library to ``Data_encoding.int64`` to fix an
+  overflow.
