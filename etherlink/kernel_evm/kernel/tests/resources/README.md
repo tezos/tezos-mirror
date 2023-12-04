@@ -50,3 +50,15 @@ This triggers a fallback mechanism to the kernel before the upgrade.
 
 Because the `STORAGE_VERSION` is hardcoded in `failed_migration.wasm`, this blob
 needs to be updated everytime we bump the `STORAGE_VERSION` to trigger the migration.
+
+## ghostnet_evm_kernel.wasm
+
+The kernel `ghostnet_evm_kernel.wasm` is a compiled version of the latest
+released kernel described in [CHANGES_KERNEL.md](../../../../CHANGES_KERNEL.md).
+It is used for migration tests with the current kernel.
+
+It can be reproduced easily with (from the root of the repository):
+```
+make -f kernels.ml evm_kernel.wasm
+cp evm_kernel.wasm etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm
+```
