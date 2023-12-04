@@ -5,8 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~smart_rollup_address ~transactions] creates a sequencer
-    blueprint containing [transactions]. Returns the inputs to put in
-    the inbox. *)
-val create :
-  smart_rollup_address:string -> transactions:string list -> string list
+(** Default balance given to bootstrap account. *)
+val default_bootstrap_account_balance : Wei.t
+
+(** [make_config ?bootstrap_accounts ?ticketer ?administrator
+    ?sequencer ()] creates an installer configuration compatible with
+    the EVM kernel. *)
+val make_config :
+  ?bootstrap_accounts:Eth_account.t array ->
+  ?ticketer:string ->
+  ?administrator:string ->
+  ?sequencer:bool ->
+  unit ->
+  [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option

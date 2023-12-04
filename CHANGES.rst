@@ -204,6 +204,9 @@ Smart Rollup WASM Debugger
   the debugger via the option ``--installer-config`` and will initialize the
   storage with this configuration. (MR :gl:`!9641`)
 
+- The argument ``--kernel`` accepts hexadecimal files (suffixed by ``.hex``), it
+  is consired as an hexadecimal ``.wasm`` file. (MR :gl:`!11094`)
+
 Data Availability Committee (DAC)
 ---------------------------------
 

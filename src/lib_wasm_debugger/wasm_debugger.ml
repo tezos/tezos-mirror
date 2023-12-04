@@ -106,10 +106,27 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let*! tree = Wasm.eval_until_input_requested tree in
     return tree
 
-  let start ?installer_config ?tree version binary file =
+  let start ?installer_config ?tree version file =
     let open Lwt_result_syntax in
     let module_name = Filename.(file |> basename |> chop_extension) in
-    let*! buffer = Repl_helpers.read_file file in
+    let* buffer, binary =
+      if Filename.(check_suffix file ".hex") then
+        let*! content = Repl_helpers.read_file file in
+        let*? content =
+          match Hex.to_string (`Hex content) with
+          | Some content -> Ok content
+          | None -> error_with "%S is not a valid hexadecimal file" file
+        in
+        return (content, true)
+      else
+        let*! content = Repl_helpers.read_file file in
+        let*? binary =
+          if Filename.check_suffix file ".wasm" then Ok true
+          else if Filename.check_suffix file ".wast" then Ok false
+          else error_with "Kernels should have .wasm or .wast file extension"
+        in
+        return (content, binary)
+    in
     handle_module ?installer_config ?tree version binary module_name buffer
 
   (* REPL main loop: reads an input, does something out of it, then loops. *)
@@ -338,11 +355,6 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       | Some wasm_file -> Ok wasm_file
       | None -> error_with "A kernel file must be provided"
     in
-    let*? binary =
-      if Filename.check_suffix wasm_file ".wasm" then Ok true
-      else if Filename.check_suffix wasm_file ".wast" then Ok false
-      else error_with "Kernels should have .wasm or .wast file extension"
-    in
     let parse_json_config content =
       match Data_encoding.Json.from_string content with
       | Ok json -> (
@@ -366,7 +378,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
           | `Json, content -> parse_json_config content)
         installer_config
     in
-    let* tree = start ?installer_config version binary wasm_file in
+    let* tree = start ?installer_config version wasm_file in
     let* inboxes =
       match inputs with
       | Some inputs -> Messages.parse_inboxes inputs config

@@ -132,7 +132,9 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
   (* EVM Kernel installation level. *)
   let* current_level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level rollup_node current_level in
-  let* evm_node = Evm_node.init ~devmode:true ?runner rollup_node in
+  let* evm_node =
+    Evm_node.init ~devmode:true ?runner (Sc_rollup_node.endpoint rollup_node)
+  in
   Log.info "Node API is available at %s." (Evm_node.endpoint evm_node) ;
   return (rollup_address, rollup_node, evm_node)
 

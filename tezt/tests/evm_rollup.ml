@@ -263,47 +263,6 @@ let setup_l1_contracts ~admin client =
 
   return {exchanger; bridge; admin}
 
-let default_bootstrap_account_balance = Wei.of_eth_int 9999
-
-let make_config ?bootstrap_accounts ?ticketer ?administrator () =
-  let open Sc_rollup_helpers.Installer_kernel_config in
-  let ticketer =
-    Option.fold
-      ~some:(fun ticketer ->
-        let value = Hex.(of_string ticketer |> show) in
-        let to_ = Durable_storage_path.ticketer in
-        [Set {value; to_}])
-      ~none:[]
-      ticketer
-  in
-  let bootstrap_accounts =
-    Option.fold
-      ~some:
-        (Array.fold_left
-           (fun acc Eth_account.{address; _} ->
-             let value =
-               Wei.(to_le_bytes default_bootstrap_account_balance)
-               |> Hex.of_bytes |> Hex.show
-             in
-             let to_ = Durable_storage_path.balance address in
-             Set {value; to_} :: acc)
-           [])
-      ~none:[]
-      bootstrap_accounts
-  in
-  let administrator =
-    Option.fold
-      ~some:(fun administrator ->
-        let to_ = Durable_storage_path.admin in
-        let value = Hex.(of_string administrator |> show) in
-        [Set {value; to_}])
-      ~none:[]
-      administrator
-  in
-  match ticketer @ bootstrap_accounts @ administrator with
-  | [] -> None
-  | res -> Some (`Config res)
-
 type kernel_installee = {base_installee : string; installee : string}
 
 let setup_evm_kernel ?config ?kernel_installee
@@ -330,7 +289,7 @@ let setup_evm_kernel ?config ?kernel_installee
         Option.map (fun {admin; _} -> admin) l1_contracts
       else None
     in
-    make_config ~bootstrap_accounts ?ticketer ?administrator ()
+    Configuration.make_config ~bootstrap_accounts ?ticketer ?administrator ()
   in
   let config =
     match (config, base_config) with
@@ -378,7 +337,9 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-  let* evm_node = Evm_node.init ~devmode:true sc_rollup_node in
+  let* evm_node =
+    Evm_node.init ~devmode:true (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
   return
     {
@@ -527,7 +488,7 @@ let test_evm_node_connection =
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:Constant.bootstrap1.alias
   in
-  let evm_node = Evm_node.create sc_rollup_node in
+  let evm_node = Evm_node.create (Sc_rollup_node.endpoint sc_rollup_node) in
   (* Tries to start the EVM node server without a listening rollup node. *)
   let process = Evm_node.spawn_run evm_node in
   let* () = Process.check ~expect_failure:true process in
@@ -593,7 +554,7 @@ let test_rpc_getBalance =
       ~account:Eth_account.bootstrap_accounts.(0).address
       ~endpoint:evm_node_endpoint
   in
-  Check.((balance = default_bootstrap_account_balance) Wei.typ)
+  Check.((balance = Configuration.default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -1336,7 +1297,7 @@ let transfer ?data protocol =
        } =
     make_transfer
       ?data
-      ~value:Wei.(default_bootstrap_account_balance - one)
+      ~value:Wei.(Configuration.default_bootstrap_account_balance - one)
       ~sender
       ~receiver
       full_evm_setup
@@ -1455,14 +1416,7 @@ let test_simulate =
       let* {evm_node; sc_rollup_node; _} =
         setup_past_genesis ~admin:None protocol
       in
-      let* json =
-        Evm_node.call_evm_rpc
-          evm_node
-          {method_ = "eth_blockNumber"; parameters = `A []}
-      in
-      let block_number =
-        JSON.(json |-> "result" |> as_string |> int_of_string)
-      in
+      let* block_number = Rpc.block_number evm_node in
       let* simulation_result =
         Sc_rollup_node.RPC.call sc_rollup_node
         @@ Sc_rollup_rpc.post_global_block_simulate
@@ -1475,7 +1429,9 @@ let test_simulate =
         | [insight] -> Option.map Helpers.hex_string_to_int insight
         | _ -> None
       in
-      Check.((simulated_block_number = Some (block_number + 1)) (option int))
+      Check.(
+        (simulated_block_number = Some (Int32.to_int block_number + 1))
+          (option int))
         ~error_msg:"The simulation should advance one L2 block" ;
       unit)
 
@@ -1636,13 +1592,7 @@ let test_inject_100_transactions =
         ~error_msg:"Expected %R transactions in the latest block, got %L") ;
 
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-  let* latest_evm_level =
-    Evm_node.(
-      call_evm_rpc evm_node {method_ = "eth_blockNumber"; parameters = `A []})
-  in
-  let latest_evm_level =
-    latest_evm_level |> Evm_node.extract_result |> JSON.as_int32
-  in
+  let* latest_evm_level = Rpc.block_number evm_node in
   (* At each loop, the kernel reads the previous block. Until the patch, the
      kernel failed to read the previous block if there was more than 64 hash,
      this test ensures it works by assessing new blocks are produced. *)
@@ -2603,7 +2553,11 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
-  let* evm_node = Evm_node.init ~devmode:false evm_setup.sc_rollup_node in
+  let* evm_node =
+    Evm_node.init
+      ~devmode:false
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
     scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}
@@ -2642,7 +2596,7 @@ let test_kernel_migration =
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
-        ~value:Wei.(default_bootstrap_account_balance - one)
+        ~value:Wei.(Configuration.default_bootstrap_account_balance - one)
         ~sender
         ~receiver
         evm_setup
@@ -2754,7 +2708,7 @@ let test_deposit_dailynet =
       smart_rollup_node_extra_args
   in
 
-  let* evm_node = Evm_node.init sc_rollup_node in
+  let* evm_node = Evm_node.init (Sc_rollup_node.endpoint sc_rollup_node) in
   let endpoint = Evm_node.endpoint evm_node in
 
   (* Deposit tokens to the EVM rollup. *)

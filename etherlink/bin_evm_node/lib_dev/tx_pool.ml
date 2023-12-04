@@ -104,15 +104,24 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
+type mode = Proxy | Sequencer of {time_between_blocks : float}
+
+type parameters = {
+  rollup_node : (module Services_backend_sig.S);
+  smart_rollup_address : string;
+  mode : mode;
+}
+
 module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
     mutable pool : Pool.t;
+    mode : mode;
   }
 
-  type parameters = (module Services_backend_sig.S) * string
+  type nonrec parameters = parameters
 end
 
 module Name = struct
@@ -133,7 +142,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | New_l2_head : Ethereum_types.block_height -> (unit, tztrace) t
+    | Inject_transactions : Ethereum_types.block_height -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -154,12 +163,12 @@ module Request = struct
           (fun ((), messages) -> View (Add_transaction messages));
         case
           (Tag 1)
-          ~title:"New_l2_head"
+          ~title:"Inject_transactions"
           (obj2
              (req "request" (constant "new_l2_head"))
              (req "block_height" Ethereum_types.block_height_encoding))
-          (function View (New_l2_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_l2_head b));
+          (function View (Inject_transactions b) -> Some ((), b) | _ -> None)
+          (fun ((), b) -> View (Inject_transactions b));
       ]
 
   let pp ppf (View r) =
@@ -169,7 +178,7 @@ module Request = struct
           ppf
           "Add [%s] tx to tx-pool"
           (Hex.of_string transaction |> Hex.show)
-    | New_l2_head block_height ->
+    | Inject_transactions block_height ->
         let (Ethereum_types.Block_height block_height) = block_height in
         Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
 end
@@ -205,12 +214,9 @@ let on_transaction state tx_raw =
       state.pool <- pool ;
       return (Ok hash)
 
-let on_head state block_height =
+let inject_transactions ~smart_rollup_address rollup_node pool =
   let open Lwt_result_syntax in
-  let open Types in
-  let {rollup_node = (module Rollup_node); smart_rollup_address; pool; _} =
-    state
-  in
+  let (module Rollup_node : Services_backend_sig.S) = rollup_node in
   (* Get all the addresses in the tx-pool. *)
   let addresses = Pool.addresses pool in
   (* Get the nonce related to each address. *)
@@ -278,6 +284,13 @@ let on_head state block_height =
             "[tx-pool] Transaction %s sent to the rollup.\n%!"
             (Ethereum_types.hash_to_string hash))
         hashes) ;
+  return pool
+
+let on_head state block_height =
+  let open Lwt_result_syntax in
+  let open Types in
+  let {rollup_node; smart_rollup_address; pool; _} = state in
+  let* pool = inject_transactions ~smart_rollup_address rollup_node pool in
   (* update the pool *)
   state.level <- block_height ;
   state.pool <- pool ;
@@ -295,12 +308,13 @@ module Handlers = struct
     match request with
     | Request.Add_transaction raw_tx ->
         protect @@ fun () -> on_transaction state raw_tx
-    | Request.New_l2_head block_height ->
+    | Request.Inject_transactions block_height ->
         protect @@ fun () -> on_head state block_height
 
   type launch_error = error trace
 
-  let on_launch _w () (rollup_node, smart_rollup_address) =
+  let on_launch _w ()
+      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
     let state =
       Types.
         {
@@ -308,6 +322,7 @@ module Handlers = struct
           smart_rollup_address;
           level = Block_height Z.zero;
           pool = Pool.empty;
+          mode;
         }
     in
     Lwt_result_syntax.return state
@@ -352,12 +367,14 @@ TODO: https://gitlab.com/tezos/tezos/-/issues/6079
 listen to the node instead of pulling the level each 5s
 *)
 let rec subscribe_l2_block worker =
-  let open Lwt_result_syntax in
-  let*! () = Lwt_unix.sleep 5.0 in
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep 5.0 in
   let state = Worker.state worker in
-  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
+  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
+    state
+  in
   (* Get the current eth level.*)
-  let*! res = Rollup_node_rpc.current_block_number () in
+  let* res = Rollup_node_rpc.current_block_number () in
   match res with
   | Error _ ->
       (* Kind of retry strategy *)
@@ -366,25 +383,41 @@ let rec subscribe_l2_block worker =
       subscribe_l2_block worker
   | Ok block_number ->
       if state.level != block_number then
-        let*! _pushed =
-          Worker.Queue.push_request worker (Request.New_l2_head block_number)
+        let* _pushed =
+          Worker.Queue.push_request
+            worker
+            (Request.Inject_transactions block_number)
         in
         subscribe_l2_block worker
       else subscribe_l2_block worker
 
-let start
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  let open Lwt_result_syntax in
-  let+ worker =
-    Worker.launch
-      table
-      ()
-      ((module Rollup_node_rpc), smart_rollup_address)
-      (module Handlers)
+let rec sequencer_produce_block ~time_between_blocks worker =
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep time_between_blocks in
+  let state = Worker.state worker in
+  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
+    state
   in
+  let* _pushed =
+    Worker.Queue.push_request
+      worker
+      (* The sequencer mode does not rely on the state.level, therefore we do not
+         care about the value we push. Also, note that this is state.level will
+         be completely removed when we stream L2 blocks. *)
+      (Request.Inject_transactions (Ethereum_types.Block_height Z.zero))
+  in
+  sequencer_produce_block ~time_between_blocks worker
+
+let start ({mode; _} as parameters) =
+  let open Lwt_result_syntax in
+  let+ worker = Worker.launch table () parameters (module Handlers) in
   let () =
     Lwt.dont_wait
-      (fun () -> subscribe_l2_block worker)
+      (fun () ->
+        match mode with
+        | Proxy -> subscribe_l2_block worker
+        | Sequencer {time_between_blocks} ->
+            sequencer_produce_block ~time_between_blocks worker)
       (fun _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
         Format.printf "[tx-pool] Pool has been stopped.\n%!")

@@ -7,9 +7,11 @@
  (libraries
   tezt
   tezt-tezos.tezt-performance-regression
-  octez-libs.crypto)
+  octez-libs.crypto
+  tezt-tezos)
  (flags
   (:standard)
   -open Tezt
   -open Tezt.Base
-  -open Tezt_tezos_tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression
+  -open Tezt_tezos))

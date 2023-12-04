@@ -50,5 +50,8 @@ val admin : path
 (** [ticketer] is the path to the ticketer contract. *)
 val ticketer : path
 
+(** [sequencer] is the path to the sequencer flag. *)
+val sequencer : path
+
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path

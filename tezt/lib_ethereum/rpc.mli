@@ -5,8 +5,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~smart_rollup_address ~transactions] creates a sequencer
-    blueprint containing [transactions]. Returns the inputs to put in
-    the inbox. *)
-val create :
-  smart_rollup_address:string -> transactions:string list -> string list
+(** [block_number evm_node] calls [eth_blockNumber]. *)
+val block_number : Evm_node.t -> int32 Lwt.t

@@ -5,8 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~smart_rollup_address ~transactions] creates a sequencer
-    blueprint containing [transactions]. Returns the inputs to put in
-    the inbox. *)
-val create :
-  smart_rollup_address:string -> transactions:string list -> string list
+(* Testing
+   -------
+   Component:    Etherlink: sequencer
+   Requirement:  make -f kernels.mk build
+                 npm install eth-cli
+   Invocation:   dune exec tezt/tests/main.exe -- --file evm_sequencer.ml
+*)
+
+val register : protocols:Protocol.t list -> unit

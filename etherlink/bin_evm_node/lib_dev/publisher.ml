@@ -15,7 +15,8 @@ module type TxEncoder = sig
 end
 
 module type Publisher = sig
-  val publish_messages : messages:string list -> unit tzresult Lwt.t
+  val publish_messages :
+    smart_rollup_address:string -> messages:string list -> unit tzresult Lwt.t
 end
 
 module Make (TxEncoder : TxEncoder) (Publisher : Publisher) = struct
@@ -33,6 +34,8 @@ module Make (TxEncoder : TxEncoder) (Publisher : Publisher) = struct
         ([], [])
         transactions
     in
-    let* () = Publisher.publish_messages ~messages:to_publish in
+    let* () =
+      Publisher.publish_messages ~smart_rollup_address ~messages:to_publish
+    in
     return (List.rev rev_tx_hashes)
 end

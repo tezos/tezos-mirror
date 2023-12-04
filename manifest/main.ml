@@ -2680,6 +2680,7 @@ let tezt_ethereum =
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         octez_crypto;
+        tezt_tezos |> open_;
       ]
     ~release_status:Unreleased
 
