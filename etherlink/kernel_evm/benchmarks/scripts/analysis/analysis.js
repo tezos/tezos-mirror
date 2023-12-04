@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
-// const { ChartConfiguration } = require('chart')
 const fs = require('fs')
 const fetch = require('./fetch')
 const block_finalization = require('./block_finalization')
