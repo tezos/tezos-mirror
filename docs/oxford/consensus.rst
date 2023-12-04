@@ -184,14 +184,12 @@ Delegates can set an upper limit to their frozen deposits with the
 command ``octez-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
-using a new manager operation ``Set_deposits_limit``. When emitting such a
-command in cycle ``c``, it affects the active stake for cycles starting
-with ``c + PRESERVED_CYCLES + 1``; the new active stake is
-taken into account when computing the frozen deposit for cycle ``c+1``
-already, however the user may see an update to its frozen deposit at
-cycle ``c + PRESERVED_CYCLES + MAX_SLASHING_PERIOD`` at the
-latest (because up to that cycle the frozen deposit also depends on the
-active stake at cycles before cycle ``c+1``).
+using a new manager operation ``Set_deposits_limit``.
+When emitting such a command in cycle ``c``, it affects the automatic deposit at
+the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
+PRESERVED_CYCLES + 1``.
+Since the deposit will be adjusted at the end of cycle ``c``, unstaked tokens
+will be available at cycle  ``c + 1 + PRESERVED_CYCLES + MAX_SLASHING_PERIOD``.
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
 the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
