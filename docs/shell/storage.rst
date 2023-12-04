@@ -45,17 +45,14 @@ Both operations are explained next.
 Trimming
 ********
 
-.. _lafl:
-
-To notice when a cycle has completed, the store uses the
-latest head's metadata that contains the **last allowed fork
-level**. This specifies the point under which the local chain cannot be
-reorganized. When a protocol validation operation returns a changed
-value for this point, it means that a cycle has completed. Then, the store
-retrieves all the blocks from ``(head-1).last_allowed_fork_level + 1``
-to ``head.last_allowed_fork_level``, which contain all the blocks of the
-completed cycle, that cannot be reorganized anymore, and trims the
-potential branches to yield a linear history.
+The protocol indicates to the shell, through some metadata present in
+the block application result, how much history is relevant to keep in
+order to preserve useful informations. If too much history is present,
+the storage layer triggers a clean-up mechanism which trims the
+chain's outdated history. Only the linear history that is part of the
+finalized chain will remain, discarding all the unreachable forks in
+the process. The resulting sequential interval of blocks that is
+returned represents a *cycle*.
 
 Pruning
 *******
@@ -103,15 +100,17 @@ history mode:
 - The *savepoint* which indicates the lowest block known by the store
   that possesses metadata and context.
 
-The *checkpoint* is another variable maintained by the store, that indicates one block that
-must be part of the chain. This special block may be in the future.
-Setting a future checkpoint on a fresh node before bootstrapping adds
-protection in case of eclipse attacks where a set of malicious peers
-will advertise a wrong chain. When the store reaches the level of a
-manually defined checkpoint, it will make sure that this is indeed the
-expected block or will stop the bootstrap. When the checkpoint is
-unspecified by the user, the store sets it to the :ref:`last allowed fork level <lafl>`, each time this latter is updated. In any case, the store will maintain the following invariant:
-``checkpoint ≥ head.last_allowed_fork_level``.
+.. _checkpoint:
+
+The *checkpoint* is another variable maintained by the store, that
+indicates one block that must be part of the chain. This special block
+may be in the future. Setting a future checkpoint on a fresh node
+before bootstrapping adds protection in case of eclipse attacks where
+a set of malicious peers will advertise a wrong chain. When the store
+reaches the level of a manually defined checkpoint, it will make sure
+that this is indeed the expected block or it will stop the
+bootstrap. When the checkpoint is unspecified by the user, the store
+sets it to the value provided by the protocol consensus.
 
 While the node is running, it is possible to
 call the following RPCs to access the values of all these variables:

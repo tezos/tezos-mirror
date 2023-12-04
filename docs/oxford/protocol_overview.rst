@@ -78,12 +78,12 @@ protocol and the shell interact in order to ensure that the blocks
 being appended to the blockchain are valid. There are mainly two rules
 that the shell uses when receiving a new block:
 
-- The shell does not accept a branch whose fork point is in a cycle
-  more than ``PRESERVED_CYCLES`` in the past. More precisely, if ``n``
-  is the current cycle, :ref:`the last allowed fork point<lafl>` is
-  the first level of cycle ``n-PRESERVED_CYCLES``. The parameter
-  ``PRESERVED_CYCLES`` therefore plays a central role in Tezos: any
-  block before the last allowed fork level is immutable.
+- The shell does not accept a block whose level is below the current
+  :ref:`checkpoint<checkpoint>`. The checkpoint itself is updated based on
+  information resulting from successful block applications by the
+  protocol which depends on the protocol consensus algorithm. Previously
+  accepted blocks with lower levels than the current checkpoint are
+  considered finalized and immutable.
 - The shell changes the head of the chain to this new block only if
   the block is :doc:`valid<../shell/validation>`, and it has a higher
   fitness than the current head; a block is

@@ -450,9 +450,9 @@ let lowest_head_predecessor_in_floating block_store ~head =
   let highest_cemented_block =
     Cemented_block_store.get_highest_cemented_level cemented_block_store
   in
-  let* head_lafl =
+  let* head_lpbl =
     match Block_repr.metadata head with
-    | Some m -> return m.last_allowed_fork_level
+    | Some m -> return m.last_preserved_block_level
     | None ->
         (*Assumption: head must have metadata *)
         tzfail
@@ -461,8 +461,8 @@ let lowest_head_predecessor_in_floating block_store ~head =
   in
   let start =
     match highest_cemented_block with
-    | Some hcb -> max Int32.(succ hcb) head_lafl
-    | None -> head_lafl
+    | Some hcb -> max Int32.(succ hcb) head_lpbl
+    | None -> head_lpbl
   in
   let head_descr = Block_repr.descriptor head in
   let head_level = Block_repr.level head in
@@ -663,9 +663,10 @@ let fix_savepoint_and_caboose ?history_mode chain_dir block_store head genesis =
       in
       return (savepoint, caboose)
 
-(* [fix_checkpoint chain_dir block_store ~head ~savepoint] fixes the checkpoint by
-   setting it to the last allowed fork level of the current head. If
-   the metadata of this block is not available, the savepoint is used.
+(* [fix_checkpoint chain_dir block_store ~head ~savepoint] fixes the
+   checkpoint by setting it to the last preserved block level of the
+   current head. If the metadata of this block is not available, the
+   savepoint is used.
    Assumptions:
    - head is valid,
    - savepoint is valid,
@@ -683,13 +684,13 @@ let fix_checkpoint chain_dir block_store ~head ~savepoint =
     match head_metadata with
     | None -> return savepoint
     | Some head_metadata -> (
-        let lafl = Block_repr.last_allowed_fork_level head_metadata in
+        let lpbl = Block_repr.last_preserved_block_level head_metadata in
         let* block =
           read_block_at_level
             ~read_metadata:false
             block_store
             ~head:(Block_repr.descriptor head)
-            lafl
+            lpbl
         in
         match block with
         | None -> return savepoint

@@ -43,7 +43,7 @@ type t =
 
 (* The default_offset value defines a window of stored cycles which is
    suitable for baking services. It currently corresponds to 6 as we
-   store 1 cycle below the last allowed fork level of the current
+   store 1 cycle below the last preserved block level of the current
    head, which is set to [preserved_cycles] cycles in the past.
    TODO: https://gitlab.com/tezos/tezos/-/issues/1406
    As this value is potentially both network and protocol specific, it

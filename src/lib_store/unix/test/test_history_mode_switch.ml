@@ -50,7 +50,9 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
   let* current_head_metadata =
     Store.Block.get_block_metadata chain_store current_head
   in
-  let head_lafl = Store.Block.last_allowed_fork_level current_head_metadata in
+  let head_lpbl =
+    Store.Block.last_preserved_block_level current_head_metadata
+  in
   let max_op_ttl = Store.Block.max_operations_ttl current_head_metadata in
   match target_mode with
   | Archive when previous_mode <> Archive ->
@@ -66,7 +68,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
           (* We can comply to every mode *)
           (* The preserved_level is the level to be kept to be able to
              export snapshots.*)
-          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let preserved_level = Int32.(sub head_lpbl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
           in
@@ -74,7 +76,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
              offset. We take the succ to be on a block of the end of a
              cycle. *)
           let expected_savepoint =
-            Int32.(succ (sub head_lafl target_offset_window))
+            Int32.(succ (sub head_lpbl target_offset_window))
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           return (max 0l preserved_savepoint)
@@ -86,7 +88,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
               .offset
           in
           (* We are limited by the previous savepoint available *)
-          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let preserved_level = Int32.(sub head_lpbl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
           in
@@ -94,7 +96,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
             Int32.(mul blocks_per_cycle (of_int previous_offset))
           in
           let expected_savepoint =
-            Int32.(succ (sub head_lafl target_offset_window))
+            Int32.(succ (sub head_lpbl target_offset_window))
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           (* The available savepoint is the savepoint available in the
@@ -106,7 +108,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
                 0l
                 (min
                    preserved_level
-                   (succ (sub head_lafl previous_offset_window))))
+                   (succ (sub head_lpbl previous_offset_window))))
           in
           return (max available_savepoint preserved_savepoint)
       | Rolling _ -> invalid_history_mode_switch ~previous_mode ~target_mode)
@@ -118,12 +120,12 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
       match previous_mode with
       | Archive ->
           (* We can comply to every mode *)
-          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let preserved_level = Int32.(sub head_lpbl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
           in
           let expected_savepoint =
-            Int32.(succ (sub head_lafl target_offset_window))
+            Int32.(succ (sub head_lpbl target_offset_window))
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           return (max 0l preserved_savepoint)
@@ -135,7 +137,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
               .offset
           in
           (* We are limited by the previous savepoint available *)
-          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let preserved_level = Int32.(sub head_lpbl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
           in
@@ -143,7 +145,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
             Int32.(mul blocks_per_cycle (of_int previous_offset))
           in
           let expected_savepoint =
-            Int32.(succ (sub head_lafl target_offset_window))
+            Int32.(succ (sub head_lpbl target_offset_window))
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           let available_savepoint =
@@ -152,7 +154,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
                 0l
                 (min
                    preserved_level
-                   (succ (sub head_lafl previous_offset_window))))
+                   (succ (sub head_lpbl previous_offset_window))))
           in
           return (max available_savepoint preserved_savepoint)
       | Rolling offset ->
@@ -163,7 +165,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
               .offset
           in
           (* We are limited by the previous savepoint available *)
-          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let preserved_level = Int32.(sub head_lpbl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
           in
@@ -171,7 +173,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
             Int32.(mul blocks_per_cycle (of_int previous_offset))
           in
           let expected_savepoint =
-            Int32.(succ (sub head_lafl target_offset_window))
+            Int32.(succ (sub head_lpbl target_offset_window))
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           let available_savepoint =
@@ -180,7 +182,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
                 0l
                 (min
                    preserved_level
-                   (succ (sub head_lafl previous_offset_window))))
+                   (succ (sub head_lpbl previous_offset_window))))
           in
           return (max available_savepoint preserved_savepoint))
 
@@ -202,11 +204,11 @@ let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
           let* current_head_metadata =
             Store.Block.get_block_metadata chain_store current_head
           in
-          let head_lafl =
-            Store.Block.last_allowed_fork_level current_head_metadata
+          let head_lpbl =
+            Store.Block.last_preserved_block_level current_head_metadata
           in
           let offset_window =
-            Int32.(sub head_lafl (mul blocks_per_cycle (of_int target_offset)))
+            Int32.(sub head_lpbl (mul blocks_per_cycle (of_int target_offset)))
           in
           let expected_caboose =
             (* When the offset window exceeds the savepoint, we take the

@@ -2400,10 +2400,10 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return (pred_block, minimum_level_needed)
 
   (* Retrieves the block to export based on given block "as hint". As
-     the checkpoint is provided as a default value, we must ensure that
-     it is valid. It may be not the case when the checkpoint was set in
-     the future. In this particular case, the last allowed fork level of
-     the current head is chosen. *)
+     the checkpoint is provided as a default value, we must ensure
+     that it is valid. It may be not the case when the checkpoint was
+     set in the future. In this particular case, the last preserved
+     block level of the current head is chosen. *)
   let retrieve_export_block chain_store block =
     let open Lwt_result_syntax in
     let* export_block =
@@ -4389,7 +4389,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ({
            message = validation_store.message;
            max_operations_ttl = validation_store.max_operations_ttl;
-           last_allowed_fork_level = validation_store.last_allowed_fork_level;
+           last_preserved_block_level =
+             validation_store.last_preserved_block_level;
            block_metadata = fst block_metadata;
            operations_metadata =
              (match ops_metadata with

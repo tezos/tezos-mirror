@@ -75,7 +75,8 @@ type validation_store = {
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_finalized_block_level : Int32.t;
+  last_preserved_block_level : Int32.t;
 }
 
 let validation_store_encoding =
@@ -86,31 +87,36 @@ let validation_store_encoding =
            timestamp;
            message;
            max_operations_ttl;
-           last_allowed_fork_level;
+           last_finalized_block_level;
+           last_preserved_block_level;
          } ->
       ( resulting_context_hash,
         timestamp,
         message,
         max_operations_ttl,
-        last_allowed_fork_level ))
+        last_finalized_block_level,
+        last_preserved_block_level ))
     (fun ( resulting_context_hash,
            timestamp,
            message,
            max_operations_ttl,
-           last_allowed_fork_level ) ->
+           last_finalized_block_level,
+           last_preserved_block_level ) ->
       {
         resulting_context_hash;
         timestamp;
         message;
         max_operations_ttl;
-        last_allowed_fork_level;
+        last_finalized_block_level;
+        last_preserved_block_level;
       })
-    (obj5
+    (obj6
        (req "resulting_context_hash" Context_hash.encoding)
        (req "timestamp" Time.Protocol.encoding)
        (req "message" (option string))
        (req "max_operations_ttl" int31)
-       (req "last_allowed_fork_level" int32))
+       (req "last_finalized_block_level" int32)
+       (req "last_preserved_block_level" int32))
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
@@ -827,7 +833,10 @@ module Make (Proto : Protocol_plugin.T) = struct
             timestamp = block_header.shell.timestamp;
             message = validation_result.message;
             max_operations_ttl = validation_result.max_operations_ttl;
-            last_allowed_fork_level = validation_result.last_allowed_fork_level;
+            last_finalized_block_level =
+              validation_result.last_finalized_block_level;
+            last_preserved_block_level =
+              validation_result.last_preserved_block_level;
           }
         in
         return
@@ -1233,7 +1242,10 @@ module Make (Proto : Protocol_plugin.T) = struct
           timestamp;
           message = validation_result.message;
           max_operations_ttl;
-          last_allowed_fork_level = validation_result.last_allowed_fork_level;
+          last_finalized_block_level =
+            validation_result.last_finalized_block_level;
+          last_preserved_block_level =
+            validation_result.last_preserved_block_level;
         }
       in
       let result =

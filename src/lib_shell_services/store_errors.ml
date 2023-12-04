@@ -284,8 +284,8 @@ type store_block_error =
       operations_lengths : string;
       operations_data_lengths : string;
     }
-  | Invalid_last_allowed_fork_level of {
-      last_allowed_fork_level : int32;
+  | Invalid_last_preserved_block_level of {
+      last_preserved_block_level : int32;
       genesis_level : int32;
     }
 
@@ -347,7 +347,7 @@ type error +=
   | Temporary_cemented_file_exists of string
   | Inconsistent_cemented_file of string * string
   | Inconsistent_cemented_store of cemented_store_inconsistency
-  | Missing_last_allowed_fork_level_block
+  | Missing_last_preserved_block
   | Inconsistent_block_hash of {
       level : Int32.t;
       expected_hash : Block_hash.t;
@@ -632,19 +632,19 @@ let () =
     (fun csi -> Inconsistent_cemented_store csi) ;
   Error_monad.register_error_kind
     `Temporary
-    ~id:"store.missing_last_allowed_fork_level_block"
-    ~title:"Missing last allowed fork level block"
+    ~id:"store.missing_last_preserved_block"
+    ~title:"Missing last preserved block"
     ~description:
-      "Current head's last allowed fork level block (or its associated \
-       metadata) cannot be found in the store."
+      "Current head's last preserved block (or its associated metadata) cannot \
+       be found in the store."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Current head's last allowed fork level block or (its associated \
-         metadata) cannot be found in the store.")
+        "Current head's last preserved block or (its associated metadata) \
+         cannot be found in the store.")
     Data_encoding.empty
-    (function Missing_last_allowed_fork_level_block -> Some () | _ -> None)
-    (fun () -> Missing_last_allowed_fork_level_block) ;
+    (function Missing_last_preserved_block -> Some () | _ -> None)
+    (fun () -> Missing_last_preserved_block) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"store.inconsistent_block_hash"
@@ -745,12 +745,12 @@ let () =
               "inconsistent operations (%s) and operations_data (%s) lengths"
               operations_lengths
               operations_data_lengths
-        | Invalid_last_allowed_fork_level
-            {last_allowed_fork_level; genesis_level} ->
+        | Invalid_last_preserved_block_level
+            {last_preserved_block_level; genesis_level} ->
             Format.sprintf
-              "block's last allowed fork level (%ld) is below the genesis \
-               level (%ld)"
-              last_allowed_fork_level
+              "block's last preserved level (%ld) is below the genesis level \
+               (%ld)"
+              last_preserved_block_level
               genesis_level))
     Data_encoding.(
       obj2

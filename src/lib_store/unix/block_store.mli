@@ -359,7 +359,7 @@ val register_gc_callback :
 val register_split_callback :
   block_store -> (unit -> unit tzresult Lwt.t) option -> unit
 
-(** [split_context block_store new_head_lafl] calls the callback
+(** [split_context block_store new_head_lpbl] calls the callback
     registered by [register_split_callback] if any. *)
 val split_context : t -> Int32.t -> unit tzresult Lwt.t
 

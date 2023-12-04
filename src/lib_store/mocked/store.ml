@@ -187,7 +187,7 @@ module Block = struct
   type metadata = Block_repr.metadata = {
     message : string option;
     max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
+    last_preserved_block_level : Int32.t;
     block_metadata : Bytes.t;
     operations_metadata : Block_validation.operation_metadata list list;
   }
@@ -398,7 +398,8 @@ module Block = struct
           timestamp = _;
           message;
           max_operations_ttl;
-          last_allowed_fork_level;
+          last_preserved_block_level;
+          _;
         };
       block_metadata;
       ops_metadata;
@@ -448,22 +449,22 @@ module Block = struct
           .chain_id
     in
     let genesis_level = Block_repr.level genesis_block in
-    let* last_allowed_fork_level =
+    let* last_preserved_block_level =
       if is_main_chain then
         let* () =
           fail_unless
-            Compare.Int32.(last_allowed_fork_level >= genesis_level)
+            Compare.Int32.(last_preserved_block_level >= genesis_level)
             (Cannot_store_block
                ( hash,
-                 Invalid_last_allowed_fork_level
-                   {last_allowed_fork_level; genesis_level} ))
+                 Invalid_last_preserved_block_level
+                   {last_preserved_block_level; genesis_level} ))
         in
-        return last_allowed_fork_level
-      else if Compare.Int32.(last_allowed_fork_level < genesis_level) then
-        (* Hack: on the testchain, the block's lafl depends on the
-           lafl and is not max(genesis_level, expected_lafl) *)
+        return last_preserved_block_level
+      else if Compare.Int32.(last_preserved_block_level < genesis_level) then
+        (* Hack: on the testchain, the block's lpbl depends on the
+           lpbl and is not max(genesis_level, expected_lpbl) *)
         return genesis_level
-      else return last_allowed_fork_level
+      else return last_preserved_block_level
     in
     let*! b = is_known_valid chain_store hash in
     match b with
@@ -508,7 +509,7 @@ module Block = struct
             {
               message;
               max_operations_ttl;
-              last_allowed_fork_level;
+              last_preserved_block_level;
               block_metadata = fst block_metadata;
               operations_metadata =
                 (match ops_metadata with
@@ -739,8 +740,8 @@ module Block = struct
 
   let max_operations_ttl metadata = Block_repr.max_operations_ttl metadata
 
-  let last_allowed_fork_level metadata =
-    Block_repr.last_allowed_fork_level metadata
+  let last_preserved_block_level metadata =
+    Block_repr.last_preserved_block_level metadata
 
   let block_metadata metadata = Block_repr.block_metadata metadata
 
@@ -1161,11 +1162,11 @@ module Chain = struct
         in
         Lwt.return_some l
 
-  let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lafl
+  let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lpbl
       ~checkpoint ~target =
     let open Lwt_result_syntax in
     let new_checkpoint =
-      if Compare.Int32.(snd new_head_lafl > snd checkpoint) then new_head_lafl
+      if Compare.Int32.(snd new_head_lpbl > snd checkpoint) then new_head_lpbl
       else checkpoint
     in
     match target with
@@ -1218,28 +1219,30 @@ module Chain = struct
              Block.get_block_metadata chain_store new_head)
         in
         let*! target = Stored_data.get chain_state.target_data in
-        let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
+        let new_head_lpbl =
+          Block.last_preserved_block_level new_head_metadata
+        in
         (* This write call will initialize the cementing
            highwatermark when it is not yet set or do nothing
            otherwise. *)
-        let*! lafl_block_opt =
+        let*! lpbl_block_opt =
           Block.locked_read_block_by_level_opt
             chain_store
             new_head
-            new_head_lafl
+            new_head_lpbl
         in
         let* new_checkpoint, new_target =
-          match lafl_block_opt with
+          match lpbl_block_opt with
           | None ->
-              (* This case may occur when importing a rolling
-                 snapshot where the lafl block is not known.
-                 We may use the checkpoint instead. *)
+              (* This case may occur when importing a rolling snapshot
+                 where the lpbl block is not known. We may use the
+                 checkpoint instead. *)
               return (checkpoint, target)
-          | Some lafl_block ->
+          | Some lpbl_block ->
               may_update_checkpoint_and_target
                 chain_store
                 ~new_head:new_head_descr
-                ~new_head_lafl:(Block.descriptor lafl_block)
+                ~new_head_lpbl:(Block.descriptor lpbl_block)
                 ~checkpoint
                 ~target
         in
@@ -1366,7 +1369,7 @@ module Chain = struct
     let cementing_highwatermark =
       Option.fold
         ~none:0l
-        ~some:(fun metadata -> Block.last_allowed_fork_level metadata)
+        ~some:(fun metadata -> Block.last_preserved_block_level metadata)
         (Block_repr.metadata genesis_block)
     in
     let expect_predecessor_context =
@@ -2004,10 +2007,10 @@ let rec make_pp_chain_store (chain_store : chain_store) =
           in
           Format.fprintf
             fmt
-            "%a (lafl: %ld) (max_op_ttl: %d)"
+            "%a (lpbl: %ld) (max_op_ttl: %d)"
             pp_block_descriptor
             (Block.descriptor block)
-            (Block.last_allowed_fork_level metadata)
+            (Block.last_preserved_block_level metadata)
             (Block.max_operations_ttl metadata))
         current_head
         pp_block_descriptor

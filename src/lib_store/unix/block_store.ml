@@ -557,10 +557,10 @@ let available_savepoint block_store current_head savepoint_candidate =
   in
   return (descriptor block)
 
-(* [preserved_block block_store current_head] returns the
-   preserved block candidate level. The preserved block aims to be the
-   one needed and maintained available to export snapshot. That is to
-   say, the block: lafl(head) - max_op_ttl(lafl). *)
+(* [preserved_block block_store current_head] returns the preserved
+   block candidate level. The preserved block aims to be the one
+   needed and maintained available to export snapshot. That is to say,
+   the block: lpbl(head) - max_op_ttl(lpbl). *)
 let preserved_block block_store current_head =
   let open Lwt_result_syntax in
   let head_hash = Block_repr.hash current_head in
@@ -570,11 +570,11 @@ let preserved_block block_store current_head =
   let current_head_metadata =
     WithExceptions.Option.get ~loc:__LOC__ current_head_metadata_o
   in
-  let head_lafl = Block_repr.last_allowed_fork_level current_head_metadata in
+  let head_lpbl = Block_repr.last_preserved_block_level current_head_metadata in
   let head_max_op_ttl =
     Int32.of_int (Block_repr.max_operations_ttl current_head_metadata)
   in
-  return Int32.(max 0l (sub head_lafl head_max_op_ttl))
+  return Int32.(max 0l (sub head_lpbl head_max_op_ttl))
 
 (* [infer_savepoint block_store current_head ~target_offset] returns
    the savepoint candidate for an history mode switch. *)
@@ -879,28 +879,28 @@ let compute_new_caboose block_store history_mode ~new_savepoint
         return (Block_repr.descriptor min_block_to_preserve)
       else return new_savepoint
 
-module BlocksLAFL = Set.Make (Int32)
+module BlocksLPBL = Set.Make (Int32)
 
 (* FIXME: update doc *)
 (* [update_floating_stores block_store ~history_mode ~ro_store
-   ~rw_store ~new_store ~new_head ~new_head_lafl
+   ~rw_store ~new_store ~new_head ~new_head_lpbl
    ~lowest_bound_to_preserve_in_floating ~cementing_highwatermark]
    updates the [new_store] by storing the predecessors of the
-   [new_head_lafl] and preserving the
+   [new_head_lpbl] and preserving the
    [lowest_bound_to_preserve_in_floating]. It returns the cycles to
    cement from [new_head] to [cementing_highwatermark] and the
    savepoint and caboose candidates. *)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
-    ~new_store ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
+    ~new_store ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
-  let* lafl_block =
-    read_predecessor_block_by_level block_store ~head:new_head new_head_lafl
+  let* lpbl_block =
+    read_predecessor_block_by_level block_store ~head:new_head new_head_lpbl
   in
-  let final_hash, final_level = Block_repr.descriptor lafl_block in
+  let final_hash, final_level = Block_repr.descriptor lpbl_block in
   (* 1. Append to the new RO [new_store] blocks between
-     [lowest_bound_to_preserve_in_floating] and [lafl_block]. *)
+     [lowest_bound_to_preserve_in_floating] and [lpbl_block]. *)
   let max_nb_blocks_to_retrieve =
     Compare.Int.(
       max
@@ -914,7 +914,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     (* Iterate over the store with RO first for the lookup. *)
     [ro_store; rw_store]
   in
-  let*! lafl_predecessors =
+  let*! lpbl_predecessors =
     try_retrieve_n_predecessors
       floating_stores
       final_hash
@@ -923,8 +923,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   (* [min_level_to_preserve] is the lowest block that we want to keep
      in the floating stores. *)
   let*! min_level_to_preserve =
-    match lafl_predecessors with
-    | [] -> Lwt.return new_head_lafl
+    match lpbl_predecessors with
+    | [] -> Lwt.return new_head_lpbl
     | oldest_predecessor :: _ -> (
         let*! o =
           List.find_map_s
@@ -933,29 +933,29 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
             floating_stores
         in
         match o with
-        | None -> Lwt.return new_head_lafl
+        | None -> Lwt.return new_head_lpbl
         | Some x -> Lwt.return (Block_repr.level x))
   in
-  (* As blocks from [lafl_predecessors] contains older blocks first,
+  (* As blocks from [lpbl_predecessors] contains older blocks first,
      the resulting [new_store] will be correct and will contain older
      blocks before more recent ones. *)
   let* () =
     Floating_block_store.raw_copy_all
       ~src_floating_stores:floating_stores
-      ~block_hashes:lafl_predecessors
+      ~block_hashes:lpbl_predecessors
       ~dst_floating_store:new_store
   in
   (* 2. Retrieve ALL cycles (potentially more than one) *)
   (* 2.1. We write back to the new store all the blocks from
-     [lafl_block] to the end of the file(s).
+     [lpbl_block] to the end of the file(s).
 
      2.2 At the same time, retrieve the list of cycle bounds: i.e. the
      interval of blocks s.t. \forall b \in
-     {stores}. cementing_highwatermark < b.lafl <= new_head_lafl
+     {stores}. cementing_highwatermark < b.lpbl <= new_head_lpbl
 
-     HYPOTHESIS: all blocks at a given level have the same lafl. *)
-  let visited = ref (Block_hash.Set.singleton (Block_repr.hash lafl_block)) in
-  let blocks_lafl = ref BlocksLAFL.empty in
+     HYPOTHESIS: all blocks at a given level have the same lpbl. *)
+  let visited = ref (Block_hash.Set.singleton (Block_repr.hash lpbl_block)) in
+  let blocks_lpbl = ref BlocksLPBL.empty in
   let*! () = Store_events.(emit start_retreiving_cycles) () in
   let* () =
     List.iter_es
@@ -967,20 +967,20 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
             if Compare.Int32.(block_level <= cementing_highwatermark) then
               return_unit
             else
-              let block_lafl_opt =
-                Block_repr_unix.raw_get_last_allowed_fork_level
+              let block_lpbl_opt =
+                Block_repr_unix.raw_get_last_preserved_block_level
                   block_bytes
                   total_block_length
               in
               (* Start by updating the set of cycles *)
               Option.iter
-                (fun block_lafl ->
+                (fun block_lpbl ->
                   if
                     Compare.Int32.(
-                      cementing_highwatermark < block_lafl
-                      && block_lafl <= new_head_lafl)
-                  then blocks_lafl := BlocksLAFL.add block_lafl !blocks_lafl)
-                block_lafl_opt ;
+                      cementing_highwatermark < block_lpbl
+                      && block_lpbl <= new_head_lpbl)
+                  then blocks_lpbl := BlocksLPBL.add block_lpbl !blocks_lpbl)
+                block_lpbl_opt ;
               (* Append block if its predecessor was visited and update
                  the visited set. *)
               let block_predecessor =
@@ -1014,24 +1014,24 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let rec loop acc pred = function
     | [] -> tzfail (Cannot_cement_blocks `Empty)
     | [h] ->
-        assert (Compare.Int32.(h = new_head_lafl)) ;
+        assert (Compare.Int32.(h = new_head_lpbl)) ;
         return (List.rev ((Int32.succ pred, h) :: acc))
     | h :: (h' :: _ as t) ->
-        (* lafls are monotonous and strictly increasing *)
+        (* lpbls are monotonous and strictly increasing *)
         assert (Compare.Int32.(h < h')) ;
         loop ((Int32.succ pred, h) :: acc) h t
   in
   let initial_pred =
     (* Hack to include genesis in the first cycle when the initial
-       cementing highwatermark is genesis's lafl *)
+       cementing highwatermark is genesis's lpbl *)
     if is_cementing_highwatermark_genesis then
       Int32.pred cementing_highwatermark
     else cementing_highwatermark
   in
-  let sorted_lafl =
-    List.sort Compare.Int32.compare (BlocksLAFL.elements !blocks_lafl)
+  let sorted_lpbl =
+    List.sort Compare.Int32.compare (BlocksLPBL.elements !blocks_lpbl)
   in
-  let* cycles_to_cement = loop [] initial_pred sorted_lafl in
+  let* cycles_to_cement = loop [] initial_pred sorted_lpbl in
   let* new_savepoint =
     compute_new_savepoint
       block_store
@@ -1138,29 +1138,30 @@ let check_store_consistency block_store ~cementing_highwatermark =
               {highest_cemented_level; cementing_highwatermark}))
 
 (* We want to keep in the floating store, at least, the blocks above
-   (new_head.lafl - (new_head.lafl).max_op_ttl)). Important: we might
+   (new_head.lpbl - (new_head.lpbl).max_op_ttl)). Important: we might
    not have this block so it should be treated as a potential lower
    bound. Furethermore, we consider the current caboose as a potential
-   lower bound.*)
+   lower bound. *)
 let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
     ~new_head_metadata =
   let open Lwt_result_syntax in
-  (* Safety check: is the highwatermark consistent with our highest cemented block *)
-  let lafl = Block_repr.last_allowed_fork_level new_head_metadata in
-  let* lafl_block =
+  (* Safety check: is the highwatermark consistent with our highest
+     cemented block *)
+  let lpbl = Block_repr.last_preserved_block_level new_head_metadata in
+  let* lpbl_block =
     trace
-      Missing_last_allowed_fork_level_block
+      Missing_last_preserved_block
       (read_predecessor_block_by_level
          block_store
          ~read_metadata:true
          ~head:new_head
-         lafl)
+         lpbl)
   in
   return
     (Int32.sub
-       lafl
+       lpbl
        (Int32.of_int
-          (match Block_repr.metadata lafl_block with
+          (match Block_repr.metadata lpbl_block with
           | None ->
               (* FIXME: this is not valid but it is a good
                  approximation of the max_op_ttl of a block where the
@@ -1202,7 +1203,7 @@ let instanciate_temporary_floating_store block_store =
          return (ro_store, rw_store, new_rw_store)))
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
-    ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
+    ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
@@ -1220,7 +1221,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             ~rw_store:old_rw_store
             ~new_store:new_ro_store
             ~new_head
-            ~new_head_lafl
+            ~new_head_lpbl
             ~lowest_bound_to_preserve_in_floating
             ~cementing_highwatermark
         in
@@ -1336,12 +1337,12 @@ let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
         let*! () = Store_events.(emit start_context_gc new_savepoint) in
         gc savepoint_hash
 
-let split_context block_store new_head_lafl =
+let split_context block_store new_head_lpbl =
   let open Lwt_result_syntax in
   match block_store.split_callback with
   | None -> return_unit
   | Some split ->
-      let*! () = Store_events.(emit start_context_split new_head_lafl) in
+      let*! () = Store_events.(emit start_context_split new_head_lpbl) in
       split ()
 
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
@@ -1365,10 +1366,10 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       in
       (* Mark the store's status as Merging *)
       let* () = write_status block_store Merging in
-      let new_head_lafl =
-        Block_repr.last_allowed_fork_level new_head_metadata
+      let new_head_lpbl =
+        Block_repr.last_preserved_block_level new_head_metadata
       in
-      let*! () = Store_events.(emit start_merging_stores) new_head_lafl in
+      let*! () = Store_events.(emit start_merging_stores) new_head_lpbl in
       let* () = check_store_consistency block_store ~cementing_highwatermark in
       let*! previous_savepoint = Stored_data.get block_store.savepoint in
       let* lowest_bound_to_preserve_in_floating =
@@ -1399,7 +1400,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         let msg = Format.asprintf "%a" pp_print_trace err in
                         let*! () =
                           Store_events.(emit merge_error)
-                            (cementing_highwatermark, new_head_lafl, msg)
+                            (cementing_highwatermark, new_head_lpbl, msg)
                         in
                         on_error (Merge_error :: err))
                       (fun () ->
@@ -1410,7 +1411,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                             ~old_ro_store
                             ~old_rw_store
                             ~new_head
-                            ~new_head_lafl
+                            ~new_head_lpbl
                             ~lowest_bound_to_preserve_in_floating
                             ~cementing_highwatermark
                         in
@@ -1433,7 +1434,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         (* Don't call the finalizer in the critical
                            section, in case it needs to access the block
                            store. *)
-                        let* () = finalizer new_head_lafl in
+                        let* () = finalizer new_head_lpbl in
                         (* We can now trigger the context GC: if the
                            GC is performed, this call will block until
                            its end. *)
@@ -1460,7 +1461,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                 (Ptime.Span.to_float_s merging_time) ;
               return_unit
             in
-            block_store.merging_thread <- Some (new_head_lafl, merging_thread) ;
+            block_store.merging_thread <- Some (new_head_lpbl, merging_thread) ;
             (* Temporary stores in place and the merging thread was
                 started: we can now release the hard-lock. *)
             return_unit)
