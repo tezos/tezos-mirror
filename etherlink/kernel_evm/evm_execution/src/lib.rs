@@ -2084,6 +2084,27 @@ mod test {
         assert_eq!(result, expected_result);
     }
 
+    /// [unwrap_outcome!(result, expect_success)] tries to unwrap a value of type
+    /// `Result<Option<ExecutionOutome>, ...>` and check the outcome status
+    /// according to optional argument [expect_success] (default value true)
+    macro_rules! unwrap_outcome {
+        ($result:expr, $expect_success:expr) => {{
+            assert!($result.is_ok(), "Couldn't unwrap, Result was Err");
+            let tmp = $result.as_ref().unwrap();
+            assert!(tmp.is_some(), "Couldn't unwrap, Option was None");
+            let tmp = tmp.as_ref().unwrap();
+            assert_eq!(
+                tmp.is_success, $expect_success,
+                "outcome field 'is_success' should be {}",
+                $expect_success
+            );
+            tmp
+        }};
+        ($result:expr) => {{
+            unwrap_outcome!($result, true)
+        }};
+    }
+
     #[test]
     fn evm_should_fail_gracefully_when_balance_overflow_occurs() {
         let mut mock_runtime = MockHost::default();
@@ -2168,11 +2189,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(result.is_some());
-        let result = result.unwrap();
-        assert!(result.is_success);
+        let result = unwrap_outcome!(result);
 
         // gas calculation
         let expected_gas = 21000 // base cost
@@ -2224,17 +2241,127 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
         );
 
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(result.is_some());
-        let result = result.unwrap();
-        assert!(!result.is_success);
+        let result = unwrap_outcome!(&result, false);
 
         // gas calculation
         let expected_gas = 21000 // base cost
         + 32000 // create cost
         + 32 * CONFIG.gas_transaction_non_zero_data // transaction data cost
         + 3; // init cost
+
+        assert_eq!(expected_gas, result.gas_used);
+    }
+
+    #[test]
+    fn test_transaction_data_cost() {
+        // Arrange
+        let mut mock_runtime = MockHost::default();
+        let base_fee_per_gas = U256::from(23000);
+        let mut base_fee_per_gas_bytes = [0u8; 32];
+        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
+        let block =
+            BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas);
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let target = H160::from_low_u64_be(117u64);
+        let caller = H160::from_low_u64_be(118u64);
+
+        // zero byte data
+        let data = [0u8; 32];
+
+        // zero cost contract
+        let code = vec![Opcode::STOP.as_u8()];
+
+        // value not relevant to test, just needs to be big enough
+        let all_the_gas = 25_000_u64;
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            all_the_gas.into(),
+        );
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
+
+        // Act
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        // Assert
+        let result = unwrap_outcome!(&result);
+
+        let expected_gas = 21000 // base cost
+        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+
+        assert_eq!(expected_gas, result.gas_used);
+    }
+
+    #[test]
+    fn test_transaction_data_cost_non_zero() {
+        // Arrange
+        let mut mock_runtime = MockHost::default();
+        let base_fee_per_gas = U256::from(23000);
+        let mut base_fee_per_gas_bytes = [0u8; 32];
+        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
+        let block =
+            BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas);
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let target = H160::from_low_u64_be(117u64);
+        let caller = H160::from_low_u64_be(118u64);
+
+        // no zero byte data
+        let data = [127u8; 32];
+
+        // zero cost contract
+        let code = vec![Opcode::STOP.as_u8()];
+
+        // value not relevant to test, just needs to be big enough
+        let all_the_gas = 25_000_u64;
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            all_the_gas.into(),
+        );
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
+
+        // Act
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        // Assert
+        let result = unwrap_outcome!(&result);
+
+        let expected_gas = 21000 // base cost
+        + 32 * CONFIG.gas_transaction_non_zero_data; // transaction data cost: should be zero_byte cost * size
 
         assert_eq!(expected_gas, result.gas_used);
     }
