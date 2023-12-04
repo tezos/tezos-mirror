@@ -45,6 +45,7 @@ mod linked_list;
 mod migration;
 mod mock_internal;
 mod parsing;
+mod reboot_context;
 mod safe_storage;
 mod sequencer_blueprint;
 mod simulation;
