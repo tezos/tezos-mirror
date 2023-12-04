@@ -1833,7 +1833,7 @@ let test_eth_call_large =
         Protocol.sc_rollup_client protocol;
         Constant.smart_rollup_installer;
       ])
-    ~title:"eth_estimateGas with a large amount of data"
+    ~title:"eth_call with a large amount of data"
     (fun protocol ->
       (* setup *)
       let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
