@@ -17,6 +17,7 @@ let execute ?(commit = false) ctxt inbox =
     Config.config
       ~preimage_directory:ctxt.Sequencer_context.preimages
       ~kernel_debug:true
+      ~destination:ctxt.Sequencer_context.smart_rollup_address
       ()
   in
   let* pvm_state, _, _, _ =
@@ -24,7 +25,7 @@ let execute ?(commit = false) ctxt inbox =
   in
   if commit then Sequencer_context.commit ctxt pvm_state else return ctxt
 
-let init ctxt =
+let init ~smart_rollup_address ctxt =
   let open Lwt_result_syntax in
   let* evm_state =
     Wasm.start
@@ -34,7 +35,9 @@ let init ctxt =
   in
   let ctxt = {ctxt with evm_state} in
   (* Create the first empty block. *)
-  let inputs = Sequencer_blueprint.create ~transactions:[] in
+  let inputs =
+    Sequencer_blueprint.create ~smart_rollup_address ~transactions:[]
+  in
   execute ~commit:true ctxt inputs
 
 let inspect evm_state key =

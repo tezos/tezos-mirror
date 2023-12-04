@@ -13,8 +13,12 @@ val execute :
   string list ->
   Sequencer_context.t tzresult Lwt.t
 
-(** [init ctxt] initializes the local state in [ctxt], bakes the genesis block. *)
-val init : Sequencer_context.t -> Sequencer_context.t tzresult Lwt.t
+(** [init ~smart_rollup_address ctxt] initializes the local state in
+    [ctxt], bakes the genesis block. *)
+val init :
+  smart_rollup_address:string ->
+  Sequencer_context.t ->
+  Sequencer_context.t tzresult Lwt.t
 
 (** [inspect evm_state key] inspects [key] in [evm_state]. *)
 val inspect : Sequencer_context.evm_state -> string -> bytes option Lwt.t

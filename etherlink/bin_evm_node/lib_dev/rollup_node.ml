@@ -43,7 +43,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module Publisher = struct
-    let publish_messages ~messages =
+    let publish_messages ~smart_rollup_address:_ ~messages =
       let open Lwt_result_syntax in
       (* The injection's service returns a notion of L2 message hash (defined
          by the rollup node) used to track the message's injection in the batcher.

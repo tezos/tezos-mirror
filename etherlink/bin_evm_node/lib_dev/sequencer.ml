@@ -29,10 +29,12 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module Publisher = struct
-    let publish_messages ~messages =
+    let publish_messages ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
       (* Create the blueprint with the messages. *)
-      let inputs = Sequencer_blueprint.create ~transactions:messages in
+      let inputs =
+        Sequencer_blueprint.create ~smart_rollup_address ~transactions:messages
+      in
       (* Execute the blueprint. *)
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
       let* _ctxt = Sequencer_state.execute ~commit:true ctxt inputs in

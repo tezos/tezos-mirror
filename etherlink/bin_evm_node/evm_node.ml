@@ -367,13 +367,20 @@ let sequencer_command =
       in
       let* () = Configuration.save_sequencer ~force:true ~data_dir config in
       let open Evm_node_lib_dev in
+      let* smart_rollup_address =
+        Rollup_node_services.smart_rollup_address rollup_node_endpoint
+      in
       let* ctxt, loaded =
         Sequencer_context.init
           ~data_dir
           ~kernel:config.mode.kernel
           ~preimages:config.mode.preimages
+          ~smart_rollup_address
       in
-      let* ctxt = if loaded then return ctxt else Sequencer_state.init ctxt in
+      let* ctxt =
+        if loaded then return ctxt
+        else Sequencer_state.init ~smart_rollup_address ctxt
+      in
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
       end) in
@@ -382,11 +389,13 @@ let sequencer_command =
         Tx_pool.start
           {
             rollup_node = (module Sequencer);
-            smart_rollup_address = "";
+            smart_rollup_address;
             mode = Sequencer {time_between_blocks = 5.};
           }
       in
-      let* directory = dev_directory config ((module Sequencer), "") in
+      let* directory =
+        dev_directory config ((module Sequencer), smart_rollup_address)
+      in
       let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in
       let wait, _resolve = Lwt.wait () in

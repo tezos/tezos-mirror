@@ -7,8 +7,13 @@
 
 open Sc_rollup_helpers
 
-let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts) () =
-  let preimages_dir = Temp.dir "preimages" in
+let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
+    protocol =
+  let* node, client = setup_l1 protocol in
+  let sc_rollup_node =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let config =
     Configuration.make_config ~bootstrap_accounts ~sequencer:true ()
   in
@@ -19,18 +24,28 @@ let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts) () =
       ?config
       "evm_kernel"
   in
+  let* sc_rollup_address =
+    originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~boot_sector:("file:" ^ output)
+      ~parameters_ty:"unit"
+      client
+  in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+  in
   let mode =
     Evm_node.Sequencer {kernel = output; preimage_dir = preimages_dir}
   in
-  Evm_node.init ~mode ~devmode:false "0.0.0.0:0"
+  Evm_node.init ~mode ~devmode:false (Sc_rollup_node.endpoint sc_rollup_node)
 
 let test_persistent_state =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
-  @@ fun _protocol ->
-  let* evm_node = setup_sequencer () in
+  @@ fun protocol ->
+  let* evm_node = setup_sequencer protocol in
   (* Sleep to let the sequencer produce some blocks. *)
   let* () = Lwt_unix.sleep 20. in
   (* Ask for the current block. *)

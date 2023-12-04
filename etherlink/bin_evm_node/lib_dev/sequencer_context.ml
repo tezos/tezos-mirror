@@ -20,6 +20,7 @@ type t = {
   evm_state : evm_state;
   kernel : string;
   preimages : string;
+  smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
 }
 
 (** The EVM/PVM local state used by the sequencer. *)
@@ -65,11 +66,24 @@ let load_checkpoint ~data_dir index =
     let evm_state = Context.Tree.empty store in
     return (store, evm_state, false)
 
-let init ~data_dir ~kernel ~preimages =
+let init ~data_dir ~kernel ~preimages ~smart_rollup_address =
   let open Lwt_result_syntax in
   let*! index = Context.init (store_path ~data_dir) in
   let* store, evm_state, loaded = load_checkpoint ~data_dir index in
-  return ({index; store; data_dir; evm_state; kernel; preimages}, loaded)
+  let smart_rollup_address =
+    Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
+  in
+  return
+    ( {
+        index;
+        store;
+        data_dir;
+        evm_state;
+        kernel;
+        preimages;
+        smart_rollup_address;
+      },
+      loaded )
 
 let commit ctxt evm_state =
   let open Lwt_result_syntax in

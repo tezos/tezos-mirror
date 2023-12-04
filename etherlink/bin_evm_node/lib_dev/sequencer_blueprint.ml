@@ -12,7 +12,7 @@ let now_bytes () =
   Time.Protocol.to_seconds timestamp
   |> Z.of_int64 |> Z.to_bits |> Bytes.of_string
 
-let create ~transactions =
+let create ~smart_rollup_address ~transactions =
   let timestamp = Rlp.Value (now_bytes ()) in
   let messages =
     Rlp.List
@@ -23,5 +23,11 @@ let create ~transactions =
   let rlp_blueprint =
     Rlp.List [messages; timestamp] |> Rlp.encode |> Bytes.to_string
   in
-  (* External message tag. *)
-  ["\001" ^ rlp_blueprint]
+
+  [
+    "\001" (* External message *) ^ "\000"
+    (* Framed protocol *) ^ smart_rollup_address
+    ^ "\003"
+    ^ (* Blueprint *)
+    rlp_blueprint;
+  ]

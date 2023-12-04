@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create transactions] creates a sequencer blueprint containing
-    [transactions]. Returns the inputs to put in the inbox. *)
-val create : transactions:string list -> string list
+(** [create ~smart_rollup_address ~transactions] creates a sequencer
+    blueprint containing [transactions]. Returns the inputs to put in
+    the inbox. *)
+val create :
+  smart_rollup_address:string -> transactions:string list -> string list

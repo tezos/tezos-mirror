@@ -20,11 +20,12 @@ type t = {
   evm_state : evm_state;  (** EVM local state of the sequencer. *)
   kernel : string;  (** Path to the kernel to execute. *)
   preimages : string;  (** Path to the preimages directory. *)
+  smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
 }
 
-(** [init ~data_dir ~kernel ~preimages] creates a context where it
-    initializes the {!type-index}, and use a checkpoint mechanism to load
-    the latest {!type-store} if any.
+(** [init ~data_dir ~kernel ~preimages ~smart_rollup_address] creates
+    a context where it initializes the {!type-index}, and use a
+    checkpoint mechanism to load the latest {!type-store} if any.
 
     Also returns a boolean denoting whether the context was initialized or not.
 *)
@@ -32,6 +33,7 @@ val init :
   data_dir:string ->
   kernel:string ->
   preimages:string ->
+  smart_rollup_address:string ->
   (t * bool) tzresult Lwt.t
 
 (** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
