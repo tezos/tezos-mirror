@@ -1,23 +1,8 @@
 # Changelog
 
-## Version Next
-
-### EVM Kernel
-
-- Fix the memory limit of the runtime, which is now of the maximum size
-  addressable considering the limits of the WASM PVM (32bits, which means `2^32`
-  bytes addressable).
-
-### EVM Node
-
-### Bug fixes
-
-### Breaking changes
-
-### Internal
-
-- Add a debug feature flag to the log crate for optional debug traces. (!10692)
-- Blueprints include timestamp, instead of retrieving it at block finalization. (!10822)
+Note that the release for the kernel and the node are now separated, and both
+have their respective changelogs (see [CHANGES_KERNEL.md](CHANGES_KERNEL.md) and
+[CHANGES_NODE.md](CHANGES_NODE.md)).
 
 ## Version 43bbcea48eca22511d9bda0a739302985fab9d24
 
