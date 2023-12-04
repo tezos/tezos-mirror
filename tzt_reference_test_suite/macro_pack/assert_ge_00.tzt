@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda int unit) { ASSERT_GE; UNIT } } ;
+output { Stack_elt bytes 0x05020000001e02000000170328072c020000000002000000090200000004034f0327034f } ;
