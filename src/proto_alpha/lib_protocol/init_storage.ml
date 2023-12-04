@@ -344,9 +344,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           Forbidden_delegates_storage.init_for_genesis_and_oxford ctxt
         in
         let* ctxt = migrate_staking_balance_for_o ctxt in
-        let*! ctxt =
-          Storage.Contract.Frozen_deposits_up_to_Nairobi.clear ctxt
-        in
         let* ctxt = clear_staking_balance_snapshots_for_o ctxt in
         let* ctxt = migrate_stake_distribution_for_o ctxt in
         let*! ctxt = initialize_total_supply_for_o chain_id ctxt in
