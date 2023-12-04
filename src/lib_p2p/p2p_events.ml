@@ -506,7 +506,7 @@ module P2p_fd = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
       ("nread", Data_encoding.int31)
-      ("nread_total", Data_encoding.int31)
+      ("nread_total", Data_encoding.int64)
 
   let written_fd =
     declare_3
