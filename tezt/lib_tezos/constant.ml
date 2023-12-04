@@ -40,7 +40,7 @@ let octez_snoop = Uses.make ~tag:"snoop" ~path:"./octez-snoop"
 let octez_protocol_compiler =
   Uses.make ~tag:"protocol_compiler" ~path:"./octez-protocol-compiler"
 
-let octez_dal_node = "./octez-dal-node"
+let octez_dal_node = Uses.make ~tag:"dal_node" ~path:"./octez-dal-node"
 
 let octez_dac_node = Uses.make ~tag:"dac_node" ~path:"./octez-dac-node"
 
