@@ -190,7 +190,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
     ?(uses = fun _protocol -> []) ?rpc_local {variant; tags; description}
     scenario =
-  let tags = kind :: "rollup_node" :: tags in
+  let tags = kind :: tags in
   register_test
     ?supports
     ?regression
