@@ -130,6 +130,28 @@ fn compute<Host: Runtime>(
     Ok(ComputationResult::Finished)
 }
 
+fn next_bip_from_blueprints<Host: Runtime>(
+    host: &mut Host,
+    current_block_number: U256,
+    current_block_parent_hash: H256,
+    constants: &BlockConstants,
+    tick_counter: &TickCounter,
+) -> Result<Option<BlockInProgress>, anyhow::Error> {
+    match read_next_blueprint(host)? {
+        Some(blueprint) => {
+            let bip = block_in_progress::BlockInProgress::from_blueprint(
+                blueprint,
+                current_block_number,
+                current_block_parent_hash,
+                constants,
+                tick_counter.c,
+            );
+            Ok(Some(bip))
+        }
+        None => Ok(None),
+    }
+}
+
 fn next_bip<Host: Runtime>(
     host: &mut Host,
     reboot_context: &RebootContext,
@@ -139,8 +161,27 @@ fn next_bip<Host: Runtime>(
     tick_counter: &TickCounter,
     first_bip_of_run: &mut bool,
 ) -> Result<Option<BlockInProgress>, anyhow::Error> {
-    // Implemented in the next commit.
-    todo!()
+    if *first_bip_of_run {
+        *first_bip_of_run = false;
+        match &reboot_context.bip {
+            Some(bip) => Ok(Some(bip.clone())),
+            None => next_bip_from_blueprints(
+                host,
+                current_block_number,
+                current_block_parent_hash,
+                current_constants,
+                tick_counter,
+            ),
+        }
+    } else {
+        next_bip_from_blueprints(
+            host,
+            current_block_number,
+            current_block_parent_hash,
+            current_constants,
+            tick_counter,
+        )
+    }
 }
 
 pub fn produce<Host: KernelRuntime>(

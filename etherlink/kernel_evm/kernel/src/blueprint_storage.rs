@@ -151,7 +151,6 @@ fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     }
 }
 
-#[allow(dead_code)]
 pub fn read_next_blueprint<Host: Runtime>(
     host: &Host,
 ) -> Result<Option<Blueprint>, Error> {
