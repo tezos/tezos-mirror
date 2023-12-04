@@ -52,6 +52,7 @@ let check_dump_encodings () =
     ~title:"octez-codec dump encodings"
     ~tags:["dump"]
     ~uses:[Constant.octez_codec]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->
@@ -87,6 +88,7 @@ let check_protocol_sample_encoding ?supports sample =
     ~title:(sf "protocol encoding regression test: %s" sample)
     ~tags:(["encoding"; "protocol"] @ sample_as_tags sample)
     ~uses:(fun _protocol -> [Constant.octez_codec])
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
     ?supports
@@ -105,6 +107,7 @@ let check_shell_sample_encoding sample =
     ~title:(sf "shell encoding regression test: %s" sample)
     ~tags:(["encoding"; "shell"] @ sample_as_tags sample)
     ~uses:[Constant.octez_codec]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->

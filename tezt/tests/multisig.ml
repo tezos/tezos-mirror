@@ -190,6 +190,7 @@ let test_multisig ~sig_algs ~supports protocols =
         (if by_address then "by_address" else "by_alias");
         show_msig_version version;
       ]
+    ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in
       let bootstrap1 = Constant.bootstrap1.alias in
@@ -736,6 +737,7 @@ let test_unsupported_multisig =
     ~__FILE__
     ~title:"Unsupported multisig"
     ~tags:["unsupported"; "multisig"]
+    ~uses_node:false
   @@ fun protocol ->
   Log.info "Deploy nonmultisig" ;
   let* client = Client.init_mockup ~protocol () in

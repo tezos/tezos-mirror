@@ -56,6 +56,7 @@ let register_opcode_tests ?supports parameterization protocols =
            (Hashtbl.hash storage)
            (Hashtbl.hash input))
       ~tags:["michelson"]
+      ~uses_node:false
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
     let script_path =
@@ -1501,6 +1502,7 @@ let register ~protocols =
         ~__FILE__
         ~title:("test Michelson opcodes: " ^ test_opcode_name)
         ~tags:["michelson"]
+        ~uses_node:false
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in
           test_function protocol client)

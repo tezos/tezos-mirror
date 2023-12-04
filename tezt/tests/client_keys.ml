@@ -61,6 +61,7 @@ module BLS_aggregate_wallet = struct
       ~__FILE__
       ~tags:["aggregate"; "client"; "keys"]
       ~title:"Import BLS secret key in aggregate wallet"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* () =
@@ -81,6 +82,7 @@ module BLS_aggregate_wallet = struct
       ~__FILE__
       ~tags:["aggregate"; "client"; "keys"]
       ~title:"Shows the address of a registered BLS account in aggregate wallet"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* () =
@@ -101,6 +103,7 @@ module BLS_aggregate_wallet = struct
       ~__FILE__
       ~tags:["aggregate"; "client"; "keys"]
       ~title:"Generates new tz4 keys in aggregate wallet"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* alias = Client.bls_gen_keys client in
@@ -112,6 +115,7 @@ module BLS_aggregate_wallet = struct
       ~__FILE__
       ~tags:["aggregate"; "client"; "keys"]
       ~title:"Lists known BLS aliases in the client's aggregate wallet"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let Account.{aggregate_alias; aggregate_public_key_hash; _} =
@@ -176,6 +180,7 @@ module BLS_normal_wallet = struct
       ~__FILE__
       ~tags:["bls"; "client"; "keys"]
       ~title:"Import BLS secret key"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* () =
@@ -192,6 +197,7 @@ module BLS_normal_wallet = struct
       ~__FILE__
       ~tags:["bls"; "client"; "keys"]
       ~title:"Shows the address of a registered BLS account"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* () =
@@ -208,6 +214,7 @@ module BLS_normal_wallet = struct
       ~__FILE__
       ~tags:["bls"; "client"; "keys"]
       ~title:"Generates new tz4 keys"
+      ~uses_node:false
       (fun () ->
         let* client = Client.init () in
         let* alias = Client.gen_keys ~sig_alg:"bls" client in
@@ -226,6 +233,7 @@ module Wallet = struct
       ~__FILE__
       ~tags:["client"; "keys"; "duplicate"]
       ~title:"Add a duplicate address"
+      ~uses_node:false
     @@ fun () ->
     let* client = Client.init () in
     let* (_ : string) = Client.gen_keys client ~alias:"foo" in
@@ -271,6 +279,7 @@ module Wallet = struct
       ~__FILE__
       ~tags:["client"; "contract"; "remember"]
       ~title:"Test remember contract"
+      ~uses_node:false
     @@ fun protocol ->
     let* client = Client.init_mockup ~protocol () in
     [
@@ -293,6 +302,7 @@ module Wallet = struct
       ~__FILE__
       ~title:"Wallet: Import key mnemonic"
       ~tags:["client"; "keys"; "import"; "mnemonic"]
+      ~uses_node:false
     @@ fun () ->
     let mnemonic =
       [

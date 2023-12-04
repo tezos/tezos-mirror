@@ -50,6 +50,7 @@ let register =
     ~__FILE__
     ~title:"Tests of Michelson annotations"
     ~tags:["client"; "michelson"; "annotations"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   (* annotation length limit positive case *)

@@ -39,6 +39,7 @@ let test_rpc_list =
     ~__FILE__
     ~title:"(Mockup) RPC list"
     ~tags:["mockup"; "client"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
@@ -52,6 +53,7 @@ let test_rpc_header_shell =
     ~__FILE__
     ~title:"(Mockup) RPC header/shell"
     ~tags:["mockup"; "client"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.shell_header client in
@@ -89,6 +91,7 @@ let test_transfer =
     ~__FILE__
     ~title:"(Mockup) Transfer"
     ~tags:["mockup"; "client"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -117,6 +120,7 @@ let test_calling_contract_with_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -142,6 +146,7 @@ let test_calling_contract_with_global_constant_failure =
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let storage = "0" in
@@ -164,6 +169,7 @@ let test_register_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Register Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -178,6 +184,7 @@ let test_register_global_constant_failure =
     ~__FILE__
     ~title:"(Mockup) Register Global Constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -196,6 +203,7 @@ let test_originate_contract_with_global_constant_success =
     ~__FILE__
     ~title:"(Mockup) Originate Contract with Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -220,6 +228,7 @@ let test_typechecking_and_normalization_work_with_constants =
     ~__FILE__
     ~title:"(Mockup) Typechecking and normalization work with constants"
     ~tags:["mockup"; "client"; "global_constant"]
+    ~uses_node:false
   @@ fun protocol ->
   let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -242,6 +251,7 @@ let test_simple_baking_event =
     ~__FILE__
     ~title:"(Mockup) Transfer (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -265,6 +275,7 @@ let test_same_transfer_twice =
     ~__FILE__
     ~title:"(Mockup) Same transfer twice (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -290,6 +301,7 @@ let test_transfer_same_participants =
     ~__FILE__
     ~title:"(Mockup) Transfer same participants (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, amount, receiver = transfer_data in
   let* client =
@@ -323,6 +335,7 @@ let test_multiple_baking =
     ~__FILE__
     ~title:"(Mockup) Multi transfer/multi baking (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   (* For the equality test below to hold, alice, bob and baker must be
      different accounts. Here, alice is bootstrap1, bob is bootstrap2 and
@@ -398,6 +411,7 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
     ~__FILE__
     ~title:(sf "(Mockup) Migration (%s)" info)
     ~tags:["mockup"; "migration"]
+    ~uses_node:false
     (fun () ->
       match migration_spec with
       | None -> (
@@ -487,6 +501,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
     ~tags:["mockup"; "migration"]
+    ~uses_node:false
     (fun () ->
       let constants_path =
         ["chains"; "main"; "blocks"; "head"; "context"; "constants"]
@@ -525,6 +540,7 @@ let test_origination_from_unrevealed_fees =
     ~__FILE__
     ~title:"(Mockup) origination fees from unrevealed"
     ~tags:["mockup"; "client"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
@@ -562,6 +578,7 @@ let test_multiple_transfers =
     ~__FILE__
     ~title:"(Mockup) multiple transfer simulation"
     ~tags:["mockup"; "client"; "multiple"; "transfer"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let batch_line =
@@ -589,6 +606,7 @@ let test_empty_block_baking =
     ~__FILE__
     ~title:"(Mockup) Transfer (empty, asynchronous)"
     ~tags:["mockup"; "client"; "empty"; "bake_for"; "asynchronous"]
+    ~uses_node:false
   @@ fun protocol ->
   let giver, _amount, _receiver = transfer_data in
   let* client =
@@ -603,6 +621,7 @@ let test_storage_from_file =
     ~__FILE__
     ~title:"(Mockup) Load storage and input from file."
     ~tags:["mockup"; "client"; "run_script"]
+    ~uses_node:false
   @@ fun protocol ->
   Format.printf "%s" @@ Unix.getcwd () ;
   let* client = Client.init_mockup ~protocol () in
@@ -625,6 +644,7 @@ let test_list_mockup_protocols () =
     ~__FILE__
     ~title:"(Mockup) List mockup protocols."
     ~tags:["mockup"; "client"; "protocols"]
+    ~uses_node:false
   @@ fun () ->
   let client = Client.create_with_mode Client.Mockup in
   let* protocols = Client.list_protocols `Mockup client in
@@ -639,6 +659,7 @@ let test_create_mockup_dir_exists_nonempty =
     ~__FILE__
     ~title:"(Mockup) Create mockup in existing base dir"
     ~tags:["mockup"; "client"; "base_dir"]
+    ~uses_node:false
   @@ fun protocol ->
   let base_dir = Temp.dir "mockup_dir" in
   write_file ~contents:"" (base_dir // "whatever") ;
@@ -655,6 +676,7 @@ let test_retrieve_addresses =
     ~__FILE__
     ~title:"(Mockup) Retrieve addresses"
     ~tags:["mockup"; "client"; "wallet"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* addresses = Client.list_known_addresses client in
@@ -677,6 +699,7 @@ let test_create_mockup_already_initialized =
     ~__FILE__
     ~title:"(Mockup) Create mockup when already initialized."
     ~tags:["mockup"; "client"; "base_dir"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
@@ -693,6 +716,7 @@ let test_create_mockup_custom_constants =
     ~__FILE__
     ~title:"(Mockup) Create mockup with mockup-custom protocol constants."
     ~tags:["mockup"; "client"; "mockup_protocol_constants"]
+    ~uses_node:false
   @@ fun protocol ->
   let iter = Fun.flip Lwt_list.iter_s in
   (* [chain_id] is the string to pass for field [chain_id]. It's
@@ -783,6 +807,7 @@ let test_create_mockup_custom_bootstrap_accounts =
     ~__FILE__
     ~title:"(Mockup) Create mockup with mockup-custom bootstrap accounts."
     ~tags:["mockup"; "client"; "mockup_bootstrap_accounts"]
+    ~uses_node:false
   @@ fun protocol ->
   let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
   JSON.encode_to_file_u
@@ -813,6 +838,7 @@ let test_transfer_bad_base_dir =
     ~__FILE__
     ~title:"(Mockup) Transfer bad base dir."
     ~tags:["mockup"; "client"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   Log.info "First create mockup with an empty base dir" ;
   let base_dir = Temp.dir "mockup-dir" in
@@ -848,6 +874,7 @@ let test_config_show_mockup =
     ~__FILE__
     ~title:"(Mockup) Show config."
     ~tags:["mockup"; "client"; "config"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.config_show ~protocol client in
@@ -861,6 +888,7 @@ let test_config_show_mockup_fail =
     ~__FILE__
     ~title:"(Mockup) Show config failure."
     ~tags:["mockup"; "client"; "config"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () = rmdir (Client.base_dir client) in
@@ -874,6 +902,7 @@ let test_config_init_mockup =
     ~__FILE__
     ~title:"(Mockup) Mockup config initialization."
     ~tags:["mockup"; "client"; "config"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   let protocol_constants = Temp.file "protocol-constants.json" in
   let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
@@ -893,6 +922,7 @@ let test_config_init_mockup_fail =
     ~__FILE__
     ~title:"(Mockup) Mockup config initialization failure."
     ~tags:["mockup"; "client"; "config"; "initialization"]
+    ~uses_node:false
   @@ fun protocol ->
   let protocol_constants = Temp.file "protocol-constants.json" in
   let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
@@ -917,6 +947,7 @@ let test_transfer_rpc =
     ~__FILE__
     ~title:"(Mockup) Mockup transfer RPC."
     ~tags:["mockup"; "client"; "transfer"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let get_balance (key : Account.key) =
@@ -948,6 +979,7 @@ let test_proto_mix =
     ~__FILE__
     ~title:"(Mockup) Mockup mixed protocols."
     ~tags:["mockup"; "client"; "transfer"; "rpc"]
+    ~uses_node:false
   @@ fun protocol ->
   let protos1, protos2 =
     match Protocol.previous_protocol protocol with
@@ -1352,6 +1384,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
        ("(Mockup) Create mockup config show / init roundtrip "
       ^ parametrization_suffix)
      ~tags:(["mockup"; "client"; "base_dir"; "roundtrip"] @ tags)
+     ~uses_node:false
    @@ fun protocol ->
    let* protocol_constants_opt, parameter_file_opt =
      match param_value param_protocol_constants with

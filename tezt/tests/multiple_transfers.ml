@@ -64,6 +64,7 @@ let test_empty =
     ~__FILE__
     ~title:"Test Empty"
     ~tags:["client"; "michelson"; "multiple"; "transfers"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let giver = Constant.bootstrap1.alias in
@@ -79,6 +80,7 @@ let test_transfer_json_to_entrypoint_with_args =
     ~__FILE__
     ~title:"Test transfer JSON to entrypoint with args"
     ~tags:["client"; "michelson"; "multiple"; "transfers"; "args"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* big_map_entrypoints = big_map_entrypoints client ~protocol in
@@ -129,6 +131,7 @@ let test_multiple_transfer =
     ~__FILE__
     ~title:"Test multiple transfers"
     ~tags:["client"; "michelson"; "multiple"; "transfers"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* manager = manager client ~protocol in

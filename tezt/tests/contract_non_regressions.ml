@@ -41,6 +41,7 @@ let register262 =
     ~__FILE__
     ~title:"Contract-related non-regressions, Issue 262"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract =
@@ -66,6 +67,7 @@ let register843 =
     ~__FILE__
     ~title:"Contract-related non-regressions, Issue 843"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 015)
   @@ fun protocol ->
   (* https://gitlab.com/tezos/tezos/-/issues/843

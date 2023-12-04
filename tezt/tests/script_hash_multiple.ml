@@ -37,6 +37,7 @@ let test_script_hash_multiple =
     ~__FILE__
     ~title:"Script hash multiple"
     ~tags:["script"; "hash"; "multiple"]
+    ~uses_node:false
   @@ fun protocol ->
   let id_script_path =
     Michelson_script.(find ["attic"; "empty"] protocol |> path)

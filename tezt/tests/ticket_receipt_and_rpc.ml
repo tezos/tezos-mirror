@@ -99,6 +99,7 @@ let test_ticket_receipt_and_rpc =
     ~__FILE__
     ~title:"Ticket updates in receipt"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, kt_a =

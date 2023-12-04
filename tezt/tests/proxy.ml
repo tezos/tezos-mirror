@@ -659,6 +659,7 @@ let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
          "%s supported protocols are the same as the mockup protocols"
          mode_str)
     ~tags:["client"; mode_str; "list"; "protocols"]
+    ~uses_node:false
   @@ fun () ->
   let client = Client.create () in
   let* mockup_protocols =

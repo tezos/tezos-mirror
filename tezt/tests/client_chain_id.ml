@@ -31,7 +31,12 @@
 *)
 
 let test_chain_id () =
-  Test.register ~__FILE__ ~title:"Chain id" ~tags:["chain"; "id"] @@ fun () ->
+  Test.register
+    ~__FILE__
+    ~title:"Chain id"
+    ~tags:["chain"; "id"]
+    ~uses_node:false
+  @@ fun () ->
   Log.info "Chain id block hash" ;
   let* client = Client.init () in
   let block_hash = "BKyFui5WPY1n3e9aKF3qd2kGBKBtHu3rtm5miYFnUagJC1BdHTF" in

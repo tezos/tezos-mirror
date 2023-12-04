@@ -362,17 +362,18 @@ let test_contract_error_opening ~protocol () =
 
 let register ~protocols =
   List.iter
-    (fun (title, test_function) ->
+    (fun (title, test_function, uses_node) ->
       Protocol.register_test
         ~supports:Protocol.(From_protocol (number Nairobi + 1))
         ~__FILE__
         ~title
         ~tags:["client"; "michelson"; "timelock"]
+        ~uses_node
         (fun protocol -> test_function ~protocol ())
         protocols)
     [
-      ("Correct guess test on timelock", test_contract_correct_guess);
-      ("Incorrect guess test on timelock", test_contract_incorrect_guess);
-      ("Guess too late test on timelock", test_contract_guess_too_late);
-      ("Error opening test on timelock", test_contract_error_opening);
+      ("Correct guess test on timelock", test_contract_correct_guess, false);
+      ("Incorrect guess test on timelock", test_contract_incorrect_guess, false);
+      ("Guess too late test on timelock", test_contract_guess_too_late, true);
+      ("Error opening test on timelock", test_contract_error_opening, false);
     ]
