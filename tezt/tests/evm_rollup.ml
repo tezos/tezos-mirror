@@ -338,7 +338,9 @@ let setup_evm_kernel ?config ?kernel_installee
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   let* evm_node =
-    Evm_node.init ~devmode:true (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   return
@@ -2798,9 +2800,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   in
   (* Load the EVM rollup's storage and sanity check results. *)
   let* evm_node =
-    Evm_node.init
-      ~devmode:false
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =

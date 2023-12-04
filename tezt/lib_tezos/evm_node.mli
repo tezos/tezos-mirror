@@ -35,17 +35,17 @@ type mode =
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
     }
-  | Proxy
+  | Proxy of {devmode : bool  (** --devmode flag. *)}
 
-(** [create ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port
+(** Returns the mode of the EVM node. *)
+val mode : t -> mode
+
+(** [create ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
     chosen if [rpc_port] is not set.
-
-    To use the node on development set [devmode] to [true]. Otherwise to
-    set it to the one on production set [devmode] to [false] (or omit the parameter).
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -56,7 +56,6 @@ val create :
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
-  ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   string ->
@@ -66,14 +65,13 @@ val create :
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?mode ?data_dir ?devmode ?rpc_addr ?rpc_port
+(** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
     and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
-  ?devmode:bool ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   string ->
