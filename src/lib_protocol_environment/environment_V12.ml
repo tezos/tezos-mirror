@@ -1070,7 +1070,8 @@ struct
       fitness : Fitness.t;
       message : string option;
       max_operations_ttl : int;
-      last_allowed_fork_level : Int32.t;
+      last_finalized_block_level : Int32.t;
+      last_preserved_block_level : Int32.t;
     }
 
     type nonrec quota = quota = {max_size : int; max_op : int option}

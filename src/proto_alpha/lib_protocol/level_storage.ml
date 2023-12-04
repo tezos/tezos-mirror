@@ -109,6 +109,11 @@ let last_preserved_block_level c =
   | None -> Raw_level_repr.root
   | Some cycle -> (first_level_in_cycle c cycle).level
 
+let last_finalized_block_level c =
+  (* Not implemented yet. We use the last_preserved_block_level by
+     default.*)
+  last_preserved_block_level c
+
 let last_of_a_cycle ctxt level =
   let cycle_eras = Raw_context.cycle_eras ctxt in
   Level_repr.last_of_cycle ~cycle_eras level

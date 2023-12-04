@@ -808,7 +808,7 @@ struct
   module Logging = Legacy_logging
 
   module Updater = struct
-    type nonrec validation_result = validation_result = {
+    type nonrec validation_result = legacy_validation_result = {
       context : Context.t;
       fitness : Fitness.t;
       message : string option;
@@ -832,7 +832,7 @@ struct
       Environment_protocol_T_V0.T
         with type context := Context.t
          and type quota := quota
-         and type validation_result := validation_result
+         and type validation_result := legacy_validation_result
          and type rpc_context := rpc_context
          and type tztrace := Error_monad.tztrace
          and type 'a tzresult := 'a Error_monad.tzresult
@@ -948,13 +948,18 @@ struct
 
     let finalize_block c =
       let open Lwt_syntax in
-      let+ r = finalize_block c in
-      wrap_error r
+      let* r = finalize_block c in
+      match r with
+      | Ok (vr, metadata) ->
+          Lwt.return_ok (lift_legacy_validation_result vr, metadata)
+      | Error e -> Lwt.return (wrap_error (Error e))
 
     let init c bh =
       let open Lwt_syntax in
-      let+ r = init c bh in
-      wrap_error r
+      let* r = init c bh in
+      match r with
+      | Ok vr -> Lwt.return_ok (lift_legacy_validation_result vr)
+      | Error e -> Lwt.return (wrap_error (Error e))
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
