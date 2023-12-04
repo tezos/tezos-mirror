@@ -5,6 +5,7 @@
 ### Features
 
 - Fix contract code storage cost (!10356)
+- Fix contract creation gas cost and transaction data cost. (!10349)
 
 ### Bug fixes
 
