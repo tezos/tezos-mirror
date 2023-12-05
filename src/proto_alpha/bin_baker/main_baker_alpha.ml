@@ -30,6 +30,7 @@ let () =
   @@ Baking_commands.baker_commands ()
 
 let select_commands _ _ =
+  let open Lwt_result_syntax in
   return
     (List.map
        (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
