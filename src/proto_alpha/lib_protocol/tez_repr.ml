@@ -167,7 +167,6 @@ let mul_ratio_z ~rounding tez ~num ~den =
   let (Tez_tag t) = tez in
   if Z.(lt num zero) then tzfail (Negative_multiplicator (tez, num))
   else if Z.(leq den zero) then tzfail (Invalid_divisor (tez, den))
-  else if Z.(equal num zero) then return zero
   else
     let numerator = Z.(mul (of_int64 t) num) in
     let z =
