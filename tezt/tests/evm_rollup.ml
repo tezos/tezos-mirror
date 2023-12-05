@@ -1452,8 +1452,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
       receiver_balance_after;
     }
 
-let transfer ?data protocol =
-  let* full_evm_setup = setup_past_genesis ~admin:None protocol in
+let transfer ?data ~evm_setup () =
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
@@ -1473,10 +1472,10 @@ let transfer ?data protocol =
       ~value:Wei.(Configuration.default_bootstrap_account_balance - one)
       ~sender
       ~receiver
-      full_evm_setup
+      evm_setup
   in
   let* receipt =
-    Eth_cli.get_receipt ~endpoint:full_evm_setup.endpoint ~tx:tx_object.hash
+    Eth_cli.get_receipt ~endpoint:evm_setup.endpoint ~tx:tx_object.hash
   in
   let fees =
     match receipt with
@@ -1505,32 +1504,20 @@ let transfer ?data protocol =
   unit
 
 let test_l2_transfer =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "l2_transfer"]
-    ~uses:(fun protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"Check L2 transfers are applied"
-    transfer
+  let test_f ~protocol:_ ~evm_setup = transfer ~evm_setup () in
+  let title = "Check L2 transfers are applied" in
+  let tags = ["evm"; "l2_transfer"] in
+  register_both ~title ~tags test_f
 
 let test_chunked_transaction =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "l2_transfer"; "chunked"]
-    ~uses:(fun protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Protocol.sc_rollup_client protocol;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:"Check L2 chunked transfers are applied"
-  @@ transfer ~data:("0x" ^ String.make 12_000 'a')
+  let test_f ~protocol:_ ~evm_setup =
+    transfer ~data:("0x" ^ String.make 12_000 'a') ~evm_setup ()
+  in
+  let title = "Check L2 chunked transfers are applied" in
+  let tags = ["evm"; "l2_transfer"; "chunked"] in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6692
+     Large chunked transaction doesn't work without large blueprints. *)
+  register_test ~setup_mode:(Setup_proxy {devmode = true}) ~title ~tags test_f
 
 let test_rpc_txpool_content =
   Protocol.register_test
