@@ -258,6 +258,7 @@ pub enum TypedValue<'a> {
     KeyHash(KeyHash),
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
+    Timestamp(BigInt),
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -298,6 +299,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
             TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Timestamp(s) => V::Int(s),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
                 Operation::TransferTokens(tt) => Micheline::App(
@@ -364,6 +366,12 @@ impl<'a> TypedValue<'a> {
     /// useful in tests.
     pub fn nat(n: u32) -> Self {
         Self::Nat(n.into())
+    }
+
+    /// Helper for more easily constructing `Timestamp` variant with literals. Mostly
+    /// useful in tests.
+    pub fn timestamp(n: impl Into<BigInt>) -> Self {
+        Self::Timestamp(n.into())
     }
 
     pub fn new_ticket(t: Ticket<'a>) -> Self {

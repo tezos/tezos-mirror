@@ -49,6 +49,9 @@ impl PartialOrd for TypedValue<'_> {
             (KeyHash(l), KeyHash(r)) => l.partial_cmp(r),
             (KeyHash(..), _) => None,
 
+            (Timestamp(a), Timestamp(b)) => a.partial_cmp(b),
+            (Timestamp(..), _) => None,
+
             // non-comparable types
             (
                 List(..) | Set(..) | Map(..) | Contract(..) | Operation(_) | Ticket(_) | Lambda(..),
