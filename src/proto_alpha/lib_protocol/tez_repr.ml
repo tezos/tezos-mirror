@@ -162,22 +162,31 @@ let mul_exn t m =
 let div_exn t d =
   match t /? Int64.of_int d with Ok v -> v | Error _ -> invalid_arg "div_exn"
 
-let mul_ratio ~rounding tez ~num ~den =
+let mul_ratio_z ~rounding tez ~num ~den =
   let open Result_syntax in
+  let z_to_int64_for_error z =
+    if Z.fits_int64 z then Z.to_int64 z else Int64.max_int
+  in
   let (Tez_tag t) = tez in
-  if num < 0L then tzfail (Negative_multiplicator (tez, num))
-  else if den <= 0L then tzfail (Invalid_divisor (tez, den))
-  else if num = 0L then return zero
+  if Z.(lt num zero) then
+    tzfail (Negative_multiplicator (tez, z_to_int64_for_error num))
+  else if Z.(leq den zero) then
+    tzfail (Invalid_divisor (tez, z_to_int64_for_error den))
+  else if Z.(equal num zero) then return zero
   else
-    let numerator = Z.(mul (of_int64 t) (of_int64 num)) in
-    let denominator = Z.of_int64 den in
+    let numerator = Z.(mul (of_int64 t) num) in
     let z =
       match rounding with
-      | `Down -> Z.div numerator denominator
-      | `Up -> Z.cdiv numerator denominator
+      | `Down -> Z.div numerator den
+      | `Up -> Z.cdiv numerator den
     in
     if Z.fits_int64 z then return (Tez_tag (Z.to_int64 z))
-    else tzfail (Multiplication_overflow (tez, num))
+    else tzfail (Multiplication_overflow (tez, z_to_int64_for_error num))
+
+let mul_ratio ~rounding tez ~num ~den =
+  mul_ratio_z ~rounding tez ~num:(Z.of_int64 num) ~den:(Z.of_int64 den)
+
+let mul_q ~rounding tez {Q.num; den} = mul_ratio_z ~rounding tez ~num ~den
 
 let mul_percentage ~rounding =
   let z100 = Z.of_int 100 in

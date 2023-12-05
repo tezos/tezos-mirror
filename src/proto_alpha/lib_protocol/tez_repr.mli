@@ -76,6 +76,13 @@ val div2 : t -> t
 val mul_ratio :
   rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
 
+(** [mul_ratio_z] is the same as [mul_ratio], but takes [Z.t] as arguments *)
+val mul_ratio_z :
+  rounding:[`Down | `Up] -> t -> num:Z.t -> den:Z.t -> t tzresult
+
+(** [mul_q] is the same as [mul_ratio_z], but takes a [Q.t] as an argument *)
+val mul_q : rounding:[`Down | `Up] -> t -> Q.t -> t tzresult
+
 (** [mul_percentage tez percentage] returns [tez * percentage / 100].
     No errors can happen. *)
 val mul_percentage : rounding:[`Down | `Up] -> t -> Int_percentage.t -> t
