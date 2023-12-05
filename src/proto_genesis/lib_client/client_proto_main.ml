@@ -50,6 +50,7 @@ let bake cctxt ?timestamp block command sk =
   Shell_services.Injection.block cctxt signed_blk []
 
 let int32_parameter =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter (fun _ p ->
       match Int32.of_string p with
       | i32 ->
@@ -59,6 +60,7 @@ let int32_parameter =
       | exception _ -> failwith "Cannot read int32")
 
 let file_parameter =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
@@ -97,6 +99,7 @@ let fitness_from_uint32 fitness =
   ]
 
 let timestamp_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"timestamp"
     ~placeholder:"date"
@@ -108,6 +111,7 @@ let timestamp_arg =
          | Some t -> return t))
 
 let test_delay_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"delay"
     ~placeholder:"time"
