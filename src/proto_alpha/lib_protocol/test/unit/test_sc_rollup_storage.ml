@@ -218,7 +218,7 @@ let originate_rollup_and_deposit_with_three_stakers () =
     By convention, context is passed linearly as [ctxt].  This takes a context
     argument to allow this.
 *)
-let assert_true _ctxt = return_unit
+let assert_true _ctxt = Lwt_result_syntax.return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~loc k expected_err =

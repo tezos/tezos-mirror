@@ -120,6 +120,7 @@ let pre_boot boot_sector f =
   | Some boot_sector -> setup boot_sector @@ f
 
 let test_preboot () =
+  let open Lwt_result_syntax in
   [""; "1"; "1 2 +"]
   |> List.iter_es (fun boot_sector ->
          pre_boot boot_sector @@ fun _ctxt _state -> return_unit)

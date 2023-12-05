@@ -44,6 +44,7 @@ let new_context ~limit =
   Gas.set_limit (Incremental.alpha_ctxt inc) limit
 
 let assert_gas_exhaustion ~loc ctxt gas_monad =
+  let open Lwt_result_syntax in
   match GM.run ctxt gas_monad with
   | Error _ -> return_unit
   | _ -> failwith "%s: expected gas-exhaustion error" loc
@@ -109,7 +110,7 @@ let test_gas_exhaustion_before_error () =
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
-    let* () = GM.of_result (error "Oh no") in
+    let* () = GM.of_result (Result_syntax.tzfail "Oh no") in
     let* y = GM.return 2 in
     GM.return (x + y)
   in
@@ -149,7 +150,7 @@ let test_inner_error () =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
-    let* () = GM.of_result (error "Oh no") in
+    let* () = GM.of_result (Result_syntax.tzfail "Oh no") in
     let* y = GM.return 2 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
     GM.return (x + y)
@@ -183,6 +184,7 @@ let test_unlimited () =
     ~remaining_gas:10
 
 let test_syntax_module () =
+  let open Lwt_result_syntax in
   with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
     let open Gas_monad.Syntax in

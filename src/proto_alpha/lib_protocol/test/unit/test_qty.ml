@@ -87,6 +87,7 @@ let default_printer _ = ""
 
 (** Literals which are supposed to be parsed correctly. *)
 let test_known_tez_literals () =
+  let open Lwt_result_syntax in
   List.iter
     (fun (v, s) ->
       let vv = Tez_repr.of_mutez v in
@@ -119,6 +120,7 @@ let test_known_tez_literals () =
 (** Randomly generated tez value which is printed into a string then
     parsed again for their equality. *)
 let test_random_tez_literals () =
+  let open Lwt_result_syntax in
   for _ = 0 to 100_000 do
     let v = Random.int64 12L in
     let vv = Tez_repr.of_mutez v in
