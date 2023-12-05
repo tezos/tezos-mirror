@@ -5,8 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~smart_rollup_address ~transactions] creates a sequencer
-    blueprint containing [transactions]. Returns the inputs to put in
-    the inbox. *)
+(** [create  ~smart_rollup_address ~number ~transactions] creates a
+    sequencer blueprint with a given [number] containing [transactions].
+    Returns the inputs to put in the inbox. *)
 val create :
-  smart_rollup_address:string -> transactions:string list -> string list
+  smart_rollup_address:string ->
+  number:Ethereum_types.quantity ->
+  transactions:string list ->
+  string list

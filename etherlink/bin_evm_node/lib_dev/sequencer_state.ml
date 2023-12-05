@@ -33,10 +33,15 @@ let init ~smart_rollup_address ctxt =
       Tezos_scoru_wasm.Wasm_pvm_state.V3
       ctxt.kernel
   in
-  let ctxt = {ctxt with evm_state} in
+  let ctxt =
+    {ctxt with evm_state; next_blueprint_number = Ethereum_types.(Qty Z.one)}
+  in
   (* Create the first empty block. *)
   let inputs =
-    Sequencer_blueprint.create ~smart_rollup_address ~transactions:[]
+    Sequencer_blueprint.create
+      ~smart_rollup_address
+      ~transactions:[]
+      ~number:Ethereum_types.(Qty Z.zero)
   in
   execute ~commit:true ctxt inputs
 

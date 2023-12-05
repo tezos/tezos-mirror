@@ -161,6 +161,18 @@ let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
+let pad_to_n_bytes_le bytes length =
+  let current_length = Bytes.length bytes in
+  if current_length >= length then bytes
+  else
+    let padding_length = length - current_length in
+    let padding = Bytes.make padding_length '\x00' in
+    Bytes.cat bytes padding
+
+let encode_u256_le (Qty n) =
+  let bits = Z.to_bits n |> Bytes.of_string in
+  pad_to_n_bytes_le bits 32
+
 type transaction_log = {
   address : address;
   topics : hash list;
