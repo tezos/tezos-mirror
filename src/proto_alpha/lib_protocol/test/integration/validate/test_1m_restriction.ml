@@ -113,6 +113,7 @@ let positive_tests =
     pool should contain two operations with the same manager. It
     raises a Manager_restriction error. *)
 let two_op_from_same_manager_tests =
+  let open Lwt_result_syntax in
   let gen =
     QCheck2.Gen.quad
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -140,7 +141,6 @@ let two_op_from_same_manager_tests =
     ~name:"check conflicts between managers."
     ~gen
     (fun (ctxt_req, operation_req, operation_req2, mode) ->
-      let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op operation_req infos in
       let* op2 = select_op operation_req2 infos in
@@ -150,6 +150,7 @@ let two_op_from_same_manager_tests =
 (** Under 1M restriction, a batch of two operations cannot be replaced
    by two single operations. *)
 let batch_is_not_singles_tests =
+  let open Lwt_result_syntax in
   let gen =
     QCheck2.Gen.triple
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -165,7 +166,6 @@ let batch_is_not_singles_tests =
     ~name:"batch is not sequence of Single"
     ~gen
     (fun (ctxt_req, operation_req, mode) ->
-      let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op (fst operation_req) infos in
       let* op2 = select_op (snd operation_req) infos in
