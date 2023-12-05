@@ -10,11 +10,19 @@
 *)
 
 module Util = struct
+  let clear msg =
+    let len = String.length msg in
+    Format.eprintf "%s\r%!" (String.make len '\b')
+
   let progress =
-    let c = ref 0 in
+    let c = ref (-1) in
+    let msg = ref "" in
     fun () ->
       incr c ;
-      if !c mod 10_000 = 0 then Format.printf "progress... % 10d@." !c
+      if !c mod 1_000 = 0 then (
+        clear !msg ;
+        msg := Format.asprintf "progress... % 10dk" (!c / 1000) ;
+        Format.eprintf "%s%!" !msg)
 
   let list_assoc_rev_map_p f l =
     (* Actually doing it sequentially to avoid a stack overflow in Lwt. *)
@@ -231,7 +239,9 @@ module TreeAbstraction (KeySet : KeySet) (AConf : AbstractionConfig) = struct
 
   let print_tree tree =
     let open Lwt_syntax in
+    let () = Util.progress () in
     let+ atree = abstract_tree tree in
+    let () = Format.printf "@." in
     let (_total_size : int) = print_atree ~prefix:"" atree in
     match KeySet.size (all_keys_in_atree atree) with
     | None -> ()
