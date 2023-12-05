@@ -39,9 +39,9 @@ let wrap t = Tez_tag t [@@ocaml.inline always]
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
-  | Multiplication_overflow of t * int64 (* `Temporary *)
-  | Negative_multiplicator of t * int64 (* `Temporary *)
-  | Invalid_divisor of t * int64
+  | Multiplication_overflow of t * Z.t (* `Temporary *)
+  | Negative_multiplicator of t * Z.t (* `Temporary *)
+  | Invalid_divisor of t * Z.t
 
 (* `Temporary *)
 
@@ -142,16 +142,16 @@ let ( +? ) tez1 tez2 =
 let ( *? ) tez m =
   let open Result_syntax in
   let (Tez_tag t) = tez in
-  if m < 0L then tzfail (Negative_multiplicator (tez, m))
+  if m < 0L then tzfail (Negative_multiplicator (tez, Z.of_int64 m))
   else if m = 0L then return (Tez_tag 0L)
   else if t > Int64.(div max_int m) then
-    tzfail (Multiplication_overflow (tez, m))
+    tzfail (Multiplication_overflow (tez, Z.of_int64 m))
   else return (Tez_tag (Int64.mul t m))
 
 let ( /? ) tez d =
   let open Result_syntax in
   let (Tez_tag t) = tez in
-  if d <= 0L then tzfail (Invalid_divisor (tez, d))
+  if d <= 0L then tzfail (Invalid_divisor (tez, Z.of_int64 d))
   else return (Tez_tag (Int64.div t d))
 
 let div2 (Tez_tag t) = Tez_tag (Int64.div t 2L)
@@ -164,14 +164,9 @@ let div_exn t d =
 
 let mul_ratio_z ~rounding tez ~num ~den =
   let open Result_syntax in
-  let z_to_int64_for_error z =
-    if Z.fits_int64 z then Z.to_int64 z else Int64.max_int
-  in
   let (Tez_tag t) = tez in
-  if Z.(lt num zero) then
-    tzfail (Negative_multiplicator (tez, z_to_int64_for_error num))
-  else if Z.(leq den zero) then
-    tzfail (Invalid_divisor (tez, z_to_int64_for_error den))
+  if Z.(lt num zero) then tzfail (Negative_multiplicator (tez, num))
+  else if Z.(leq den zero) then tzfail (Invalid_divisor (tez, den))
   else if Z.(equal num zero) then return zero
   else
     let numerator = Z.(mul (of_int64 t) num) in
@@ -181,7 +176,7 @@ let mul_ratio_z ~rounding tez ~num ~den =
       | `Up -> Z.cdiv numerator den
     in
     if Z.fits_int64 z then return (Tez_tag (Z.to_int64 z))
-    else tzfail (Multiplication_overflow (tez, z_to_int64_for_error num))
+    else tzfail (Multiplication_overflow (tez, num))
 
 let mul_ratio ~rounding tez ~num ~den =
   mul_ratio_z ~rounding tez ~num:(Z.of_int64 num) ~den:(Z.of_int64 den)
@@ -266,14 +261,15 @@ let () =
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
-        "Overflowing multiplication of %a %s and %Ld"
+        "Overflowing multiplication of %a %s and %a"
         pp
         opa
         id
+        Z.pp_print
         opb)
     ~description:
       ("A multiplication of a " ^ id ^ " amount by an integer overflowed")
-    (obj2 (req "amount" encoding) (req "multiplicator" int64))
+    (obj2 (req "amount" encoding) (req "multiplicator" z))
     (function Multiplication_overflow (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Multiplication_overflow (a, b)) ;
   register_error_kind
@@ -283,13 +279,14 @@ let () =
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
-        "Multiplication of %a %s by negative integer %Ld"
+        "Multiplication of %a %s by negative integer %a"
         pp
         opa
         id
+        Z.pp_print
         opb)
     ~description:("Multiplication of a " ^ id ^ " amount by a negative integer")
-    (obj2 (req "amount" encoding) (req "multiplicator" int64))
+    (obj2 (req "amount" encoding) (req "multiplicator" z))
     (function Negative_multiplicator (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Negative_multiplicator (a, b)) ;
   register_error_kind
@@ -299,14 +296,15 @@ let () =
     ~pp:(fun ppf (opa, opb) ->
       Format.fprintf
         ppf
-        "Division of %a %s by non positive integer %Ld"
+        "Division of %a %s by non positive integer %a"
         pp
         opa
         id
+        Z.pp_print
         opb)
     ~description:
       ("Multiplication of a " ^ id ^ " amount by a non positive integer")
-    (obj2 (req "amount" encoding) (req "divisor" int64))
+    (obj2 (req "amount" encoding) (req "divisor" z))
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
 

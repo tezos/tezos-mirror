@@ -41,9 +41,9 @@ type t = Tez_tag of repr [@@ocaml.unboxed]
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
-  | Multiplication_overflow of t * int64 (* `Temporary *)
-  | Negative_multiplicator of t * int64 (* `Temporary *)
-  | Invalid_divisor of t * int64 (* `Temporary *)
+  | Multiplication_overflow of t * Z.t (* `Temporary *)
+  | Negative_multiplicator of t * Z.t (* `Temporary *)
+  | Invalid_divisor of t * Z.t (* `Temporary *)
 
 val zero : t
 
