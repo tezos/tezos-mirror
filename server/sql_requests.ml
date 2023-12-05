@@ -124,6 +124,26 @@ let create_cycles =
   \   size INTEGER NOT NULL,\n\
   \   UNIQUE (level))"
 
+module Mutex = struct
+  let delegates = Lwt_mutex.create ()
+
+  let nodes = Lwt_mutex.create ()
+
+  let blocks = Lwt_mutex.create ()
+
+  let blocks_reception = Lwt_mutex.create ()
+
+  let operations = Lwt_mutex.create ()
+
+  let operations_reception = Lwt_mutex.create ()
+
+  let operations_inclusion = Lwt_mutex.create ()
+
+  let endorsing_rights = Lwt_mutex.create ()
+
+  let cycles = Lwt_mutex.create ()
+end
+
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"

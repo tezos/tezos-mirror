@@ -23,8 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let maybe_with_transaction (c : Config.t) (module D : Caqti_lwt.CONNECTION) f =
-  if c.with_transaction then D.with_transaction f else f ()
+let maybe_with_transaction (c : Config.t) (m : Lwt_mutex.t)
+    (module D : Caqti_lwt.CONNECTION) f =
+  if c.with_transaction then
+    Lwt_mutex.with_lock m (fun () -> D.with_transaction f)
+  else f ()
 
 let method_not_allowed_respond meths =
   let headers =
@@ -284,21 +287,18 @@ let get_levels_at_timestamp db_pool timestamp =
     (get_levels_at_timestamp0 db_pool timestamp)
 
 (** Fetch the list of allowed logins from db and update the list ref given as parameter. *)
-let refresh_users =
-  let mutex = Lwt_mutex.create () in
-  fun db_pool users ->
-    Lwt_mutex.with_lock mutex (fun () ->
-        let query =
-          Caqti_request.Infix.(
-            Caqti_type.(unit ->* tup2 string Sql_requests.Type.bcrypt_hash))
-            "SELECT name, password FROM nodes WHERE password IS NOT NULL"
-        in
-        Lwt_result.map
-          (fun users_from_db -> users := users_from_db)
-          (Caqti_lwt.Pool.use
-             (fun (module Db : Caqti_lwt.CONNECTION) ->
-               Db.collect_list query ())
-             db_pool))
+let refresh_users db_pool users =
+  Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
+      let query =
+        Caqti_request.Infix.(
+          Caqti_type.(unit ->* tup2 string Sql_requests.Type.bcrypt_hash))
+          "SELECT name, password FROM nodes WHERE password IS NOT NULL"
+      in
+      Lwt_result.map
+        (fun users_from_db -> users := users_from_db)
+        (Caqti_lwt.Pool.use
+           (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
+           db_pool))
 
 (** Insert a new user (i.e. a teztale archiver) into the database.
     If the user already exists, password is updated.
@@ -311,7 +311,9 @@ let upsert_user db_pool login password =
        UPDATE SET password = $2"
   in
   Caqti_lwt.Pool.use
-    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query (login, password))
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
+          Db.exec query (login, password)))
     db_pool
 
 (** Delete a user from db (i.e. removes feeder permissions) *)
@@ -365,39 +367,83 @@ let maybe_alter_and_create_tables db_pool =
       | Error e -> Lwt.return_error e
       | Ok () -> maybe_create_tables db_pool)
 
-let may_insert_delegate =
-  let open
+let with_cache mutex request mem add (module Db : Caqti_lwt.CONNECTION) conf
+    list =
+  (* Note: even if data is already in cache,
+     we add it again at the end in order to mark it as recent. *)
+  if conf.Config.with_transaction then
+    Lwt_mutex.with_lock mutex @@ fun () ->
+    Db.with_transaction @@ fun () ->
+    Lwt_result.map (fun () -> List.iter add list)
+    @@ Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+         (fun x ->
+           if mem x then
+             Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+             .return_unit
+           else Db.exec request x)
+         list
+  else
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+      (fun x ->
+        Lwt_result.map
+          (fun () -> add x)
+          (if mem x then
+             Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+             .return_unit
+           else Db.exec request x))
+      list
+
+let may_insert_delegates =
+  let module Cache =
     Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-      (Tezos_base.TzPervasives.Signature.Public_key_hash) in
-  let delegate_cache = create 1_000 in
-  fun (module Db : Caqti_lwt.CONNECTION) address ->
-    (* Note: even if data is already in cache,
-       we add it again in order to mark it as recent. *)
-    Lwt_result.map
-      (fun () -> add delegate_cache address)
-      (if mem delegate_cache address then
-         Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
-         .return_unit
-       else Db.exec Sql_requests.maybe_insert_delegate address)
+      (Tezos_crypto.Signature.Public_key_hash)
+  in
+  let cache = Cache.create 1_000 in
+  with_cache
+    Sql_requests.Mutex.delegates
+    Sql_requests.maybe_insert_delegate
+    (Cache.mem cache)
+    (Cache.add cache)
+
+let may_insert_operations =
+  let module Cache =
+    Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
+      (Tezos_base.TzPervasives.Operation_hash)
+  in
+  let cache = Cache.create 10_000 in
+  let hash ((_, h, _, _), _) = h in
+  with_cache
+    Sql_requests.Mutex.operations
+    Sql_requests.maybe_insert_operation
+    (fun x -> Cache.mem cache @@ hash x)
+    (fun x -> Cache.add cache @@ hash x)
+
+let with_external_cache mutex request =
+  (* We don't use the cache feature here, only the SQL transaction option. *)
+  with_cache mutex request (fun _ -> false) (fun _ -> ())
+
+let format_block_op level delegate (op : Teztale_lib.Consensus_ops.operation) =
+  ((level, op.hash, op.kind = Endorsement, op.round), delegate)
 
 let endorsing_rights_callback =
-  let open
+  let module Cache =
     Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
       (struct
         include Int32
 
         let hash = Int32.to_int
-      end) in
-  let level_cache = create 100 in
-  fun ~logger db_pool g rights ->
+      end)
+  in
+  let cache = Cache.create 100 in
+  fun ~logger conf db_pool g rights ->
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
       let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
       (* Note: even if data is already in cache,
          we add it again in order to mark it as recent. *)
       Lwt_result.map
-        (fun () -> add level_cache level)
-        (if mem level_cache level then
+        (fun () -> Cache.add cache level)
+        (if Cache.mem cache level then
            let () =
              Teztale_lib.Log.debug logger (fun () ->
                  Format.asprintf "(%ld) CACHE.mem Level rights" level)
@@ -408,18 +454,24 @@ let endorsing_rights_callback =
              Caqti_lwt.Pool.use
                (fun (module Db : Caqti_lwt.CONNECTION) ->
                  let* () =
-                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                     (fun right ->
-                       may_insert_delegate
-                         (module Db)
-                         right.Teztale_lib.Consensus_ops.address)
+                   let delegates =
+                     List.map
+                       (fun {Teztale_lib.Consensus_ops.address; _} -> address)
+                       rights
+                   in
+                   may_insert_delegates (module Db) conf delegates
+                 in
+                 let rights =
+                   List.map
+                     (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
+                       (level, first_slot, power, address))
                      rights
                  in
-                 Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                   (fun Teztale_lib.Consensus_ops.{address; first_slot; power} ->
-                     Db.exec
-                       Sql_requests.maybe_insert_endorsing_right
-                       (level, first_slot, power, address))
+                 with_external_cache
+                   Sql_requests.Mutex.endorsing_rights
+                   Sql_requests.maybe_insert_endorsing_right
+                   (module Db)
+                   conf
                    rights)
                db_pool
            in
@@ -429,7 +481,6 @@ let endorsing_rights_callback =
            in
            return_unit)
     in
-
     with_caqti_error ~logger out (fun () ->
         Cohttp_lwt_unix.Server.respond_string
           ~headers:
@@ -438,42 +489,32 @@ let endorsing_rights_callback =
           ~body:"Endorsing rights"
           ())
 
-let may_insert_operation =
-  let open
-    Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-      (Tezos_base.TzPervasives.Operation_hash) in
-  let operation_cache = create 10_000 in
-  fun (module Db : Caqti_lwt.CONNECTION) hash op ->
-    (* Note: even if data is already in cache,
-       we add it again in order to mark it as recent. *)
-    Lwt_result.map
-      (fun () -> add operation_cache hash)
-      (if mem operation_cache hash then
-         Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
-         .return_unit
-       else Db.exec Sql_requests.maybe_insert_operation op)
-
-let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
+let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
   let* () =
-    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-      (fun (op : Teztale_lib.Consensus_ops.block_op) ->
-        may_insert_operation
-          (module Db)
-          op.op.hash
-          ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
-            op.delegate ))
-      operations
+    let operations =
+      List.map
+        (fun {Teztale_lib.Consensus_ops.delegate; op; _} ->
+          format_block_op level delegate op)
+        operations
+    in
+    may_insert_operations (module Db) conf operations
   in
-  Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-    (fun op ->
-      Db.exec
-        Sql_requests.insert_included_operation
+  let operation_inclusion =
+    List.map
+      (fun op ->
         ( Teztale_lib.Consensus_ops.
             (op.delegate, op.op.kind = Endorsement, op.op.round),
           (block_hash, level) ))
-    operations
+      operations
+  in
+  with_external_cache
+    Sql_requests.Mutex.operations_inclusion
+    Sql_requests.insert_included_operation
+    (module Db)
+    conf
+    operation_inclusion
 
 module Block_lru_cache =
   Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
@@ -512,19 +553,27 @@ let block_callback =
                  in
                  return_unit
                else
-                 let* () = may_insert_delegate (module Db) delegate in
+                 let* () = may_insert_delegates (module Db) conf [delegate] in
                  let* () =
-                   Db.exec
+                   with_external_cache
+                     Sql_requests.Mutex.blocks
                      Sql_requests.maybe_insert_block
-                     ((level, timestamp, hash, round), (predecessor, delegate))
+                     (module Db)
+                     conf
+                     [
+                       ((level, timestamp, hash, round), (predecessor, delegate));
+                     ]
                  in
                  let* () =
                    match cycle_info with
                    | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
                      ->
-                       Db.exec
+                       with_external_cache
+                         Sql_requests.Mutex.cycles
                          Sql_requests.maybe_insert_cycle
-                         (cycle, Int32.sub level cycle_position, cycle_size)
+                         (module Db)
+                         conf
+                         [(cycle, Int32.sub level cycle_position, cycle_size)]
                    | _ -> Lwt.return_ok ()
                  in
                  Teztale_lib.Log.debug logger (fun () ->
@@ -550,6 +599,7 @@ let block_callback =
                  let* () =
                    insert_operations_from_block
                      (module Db)
+                     conf
                      (Int32.pred level)
                      hash
                      endorsements
@@ -557,6 +607,7 @@ let block_callback =
                  let* () =
                    insert_operations_from_block
                      (module Db)
+                     conf
                      level
                      hash
                      preendorsements
@@ -571,7 +622,7 @@ let block_callback =
           in
           let* () =
             (* This data is non-redondant: we always treat it. *)
-            maybe_with_transaction conf (module Db) @@ fun () ->
+            Db.with_transaction @@ fun () ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
               (fun r ->
                 let open Teztale_lib.Data.Block in
@@ -608,32 +659,33 @@ let operations_callback ~logger conf db_pool g source operations =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun (right, _) ->
-              may_insert_delegate
-                (module Db)
-                right.Teztale_lib.Consensus_ops.address)
-            operations
+          let delegates =
+            List.map
+              (fun ({Teztale_lib.Consensus_ops.address; _}, _) -> address)
+              operations
+          in
+          may_insert_delegates (module Db) conf delegates
         in
         Teztale_lib.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Delegates" level) ;
         let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun (right, ops) ->
-              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
-                  may_insert_operation
-                    (module Db)
-                    op.op.hash
-                    ( (level, op.op.hash, op.op.kind = Endorsement, op.op.round),
-                      right.Teztale_lib.Consensus_ops.address ))
-                ops)
-            operations
+          let operations =
+            List.flatten
+            @@ List.map
+                 (fun (rights, operations) ->
+                   let delegate = rights.Teztale_lib.Consensus_ops.address in
+                   List.map
+                     (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
+                       format_block_op level delegate op.op)
+                     operations)
+                 operations
+          in
+          may_insert_operations (module Db) conf operations
         in
         Teztale_lib.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations" level) ;
         let* () =
-          maybe_with_transaction conf (module Db) @@ fun () ->
+          Db.with_transaction @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -662,7 +714,7 @@ let operations_callback ~logger conf db_pool g source operations =
         ~body:"Operations reception times"
         ())
 
-let import_callback ~logger db_pool g data =
+let import_callback ~logger conf db_pool g data =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -670,20 +722,21 @@ let import_callback ~logger db_pool g data =
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         (* delegates *)
         let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun slot ->
-              may_insert_delegate
-                (module Db)
-                slot.Teztale_lib.Data.Delegate_operations.delegate)
-            data.Teztale_lib.Data.delegate_operations
-        in
-        let* () =
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun block ->
-              may_insert_delegate
-                (module Db)
-                block.Teztale_lib.Data.Block.delegate)
-            data.Teztale_lib.Data.blocks
+          let delegates =
+            List.rev_map
+              (fun {Teztale_lib.Data.Delegate_operations.delegate; _} ->
+                delegate)
+              data.Teztale_lib.Data.delegate_operations
+          in
+          let delegates' =
+            List.rev_map
+              (fun {Teztale_lib.Data.Block.delegate; _} -> delegate)
+              data.Teztale_lib.Data.blocks
+          in
+          may_insert_delegates
+            (module Db)
+            conf
+            (List.rev_append delegates delegates')
         in
         (* sources *)
         let* () =
@@ -828,12 +881,12 @@ let routes :
     list =
   [
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
-      fun g ~logger ~conf:_ ~admins:_ ~users db_pool header meth body ->
+      fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun _source ->
             with_data
               Teztale_lib.Consensus_ops.rights_encoding
               body
-              (endorsing_rights_callback ~logger db_pool g)) );
+              (endorsing_rights_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
@@ -849,12 +902,12 @@ let routes :
               body
               (operations_callback ~logger conf db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
-      fun g ~logger ~conf:_ ~admins ~users:_ db_pool header meth body ->
+      fun g ~logger ~conf ~admins ~users:_ db_pool header meth body ->
         post_only_endpoint admins header meth (fun _source ->
             with_data
               Teztale_lib.Data.encoding
               body
-              (import_callback ~logger db_pool g)) );
+              (import_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/timestamp/"; Re.group (Re.rep1 Re.digit)],
       fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->

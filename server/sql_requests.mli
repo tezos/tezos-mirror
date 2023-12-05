@@ -39,6 +39,26 @@ end
 
 val env : Caqti_driver_info.t -> string -> Caqti_query.t
 
+module Mutex : sig
+  val delegates : Lwt_mutex.t
+
+  val nodes : Lwt_mutex.t
+
+  val blocks : Lwt_mutex.t
+
+  val blocks_reception : Lwt_mutex.t
+
+  val operations : Lwt_mutex.t
+
+  val operations_reception : Lwt_mutex.t
+
+  val operations_inclusion : Lwt_mutex.t
+
+  val endorsing_rights : Lwt_mutex.t
+
+  val cycles : Lwt_mutex.t
+end
+
 val create_tables : string list
 
 val alter_tables : string list list
