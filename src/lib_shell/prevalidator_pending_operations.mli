@@ -29,6 +29,11 @@ open Shell_operation
 (* A priority is attached to each pending operation. *)
 type priority = High | Medium | Low of Q.t list
 
+(** The status of a pending operation. *)
+type status = Fresh | Reclassified
+
+type status_and_priority = {priority : priority; status : status}
+
 (**
    This type is used for data representing pending operations of the
    prevalidator. Any iterator on this structure will process operations with
@@ -58,8 +63,8 @@ val is_empty : 'protocol_data t -> bool
 *)
 val mem : Operation_hash.t -> 'protocol_data t -> bool
 
-(** [add oph op p prio] records the operation [op] whose hash is [oph] and whose
-    priority is [prio] in [p].
+(** [add oph op p status_and_priority] records the operation [op] whose hash is
+    [oph] and whose status and priority is [status_and_priority] in [p].
 
     Complexity is O(log(n)), where n is the number of operations (hashes) in the
     structure.
@@ -69,7 +74,10 @@ val mem : Operation_hash.t -> 'protocol_data t -> bool
     as the caller of the function to ensure this.
 *)
 val add :
-  'protocol_data operation -> priority -> 'protocol_data t -> 'protocol_data t
+  'protocol_data operation ->
+  status_and_priority ->
+  'protocol_data t ->
+  'protocol_data t
 
 (** [remove oph op p] removes the binding [oph] from [p].
 
@@ -86,23 +94,34 @@ val remove : Operation_hash.t -> 'protocol_data t -> 'protocol_data t
 val cardinal : 'protocol_data t -> int
 
 (** [fold f p acc] applies the function [f] on every binding [oph] |-> [op] of
-    priority [prio] in [p]. The [acc] is passed to and (possibly) updated by
-    every call to [f].
+    status and priority [status_and_priority] in [p]. The [acc] is passed to and
+    (possibly) updated by every call to [f].
 
-    We iterate on operations with `High priority first, then on those with `Low
-    priority. For operations with the same priority, the iteration order is
+    We iterate on operations with the following order:
+    - Fresh status and High priority
+    - Fresh status and Medium priority
+    - Fresh status and Low priority
+    - Reclassified status and High priority
+    - Reclassified status and Medium priority
+    - Reclassified status and Low priority
+
+    For operations with the same priority, the iteration order is
     defined [Operation_hash.compare] function (operations with small hashes are
     processed first).
 *)
 val fold :
-  (priority -> Operation_hash.t -> 'protocol_data operation -> 'a -> 'a) ->
+  (status_and_priority ->
+  Operation_hash.t ->
+  'protocol_data operation ->
+  'a ->
+  'a) ->
   'protocol_data t ->
   'a ->
   'a
 
 (** [iter f p] is similar to [fold] where [acc] is unit *)
 val iter :
-  (priority -> Operation_hash.t -> 'protocol_data operation -> unit) ->
+  (status_and_priority -> Operation_hash.t -> 'protocol_data operation -> unit) ->
   'protocol_data t ->
   unit
 
@@ -110,7 +129,7 @@ val iter :
     returns wihtout iterating over all the elements of the list as soon as a
     value [Error e] is returned by [f] *)
 val fold_es :
-  (priority ->
+  (status_and_priority ->
   Operation_hash.t ->
   'protocol_data operation ->
   'a ->

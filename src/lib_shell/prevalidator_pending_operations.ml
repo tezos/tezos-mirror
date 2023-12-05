@@ -29,26 +29,41 @@ open Shell_operation
 (* Ordering is important, as it is used below in map keys comparison *)
 type priority = High | Medium | Low of Q.t list
 
-module Priority_map : Map.S with type key = priority = Map.Make (struct
-  type t = priority
+(* This type is used to know if the operation has already been classified in the
+   past *)
+type status = Fresh | Reclassified
+
+type status_and_priority = {priority : priority; status : status}
+
+module Priority_map : Map.S with type key = status_and_priority =
+Map.Make (struct
+  type t = status_and_priority
 
   module CompareListQ = Compare.List (Q)
 
-  let compare_low_prio p1 p2 =
+  let compare_low_priority p1 p2 =
     (* A higher priority operation should appear before in the map. So we use
        the pointwise comparison of p2 and p1 *)
     CompareListQ.compare p2 p1
 
-  let compare p1 p2 =
+  let compare_priority p1 p2 =
     (* - Explicit comparison, High is smaller,
        - Avoid fragile patterns in case the type is extended in the future *)
     match (p1, p2) with
     | High, High | Medium, Medium -> 0
-    | Low p1, Low p2 -> compare_low_prio p1 p2
+    | Low p1, Low p2 -> compare_low_priority p1 p2
     | High, (Low _ | Medium) -> -1
     | (Low _ | Medium), High -> 1
     | Low _, Medium -> 1
     | Medium, Low _ -> -1
+
+  let compare p1 p2 =
+    (* - Explicit comparison, Fresh is smaller *)
+    match (p1.status, p2.status) with
+    | Fresh, Fresh -> compare_priority p1.priority p2.priority
+    | Fresh, Reclassified -> -1
+    | Reclassified, Fresh -> 1
+    | Reclassified, Reclassified -> compare_priority p1.priority p2.priority
 end)
 
 module Map = Operation_hash.Map
@@ -68,23 +83,25 @@ type 'a t = {
   pending : 'a operation Map.t Priority_map.t;
   (* Used for advertising *)
   hashes : Sized_set.t;
-  (* We need to remember the priority of each hash, to be used when removing
-     without providing the priority *)
-  priority_of : priority Map.t;
+  (* We need to remember the status and priority of each hash, to be used when
+     removing without providing the status and priority *)
+  status_and_priority_of : status_and_priority Map.t;
 }
 
 let empty =
   {
     pending = Priority_map.empty;
     hashes = Sized_set.empty;
-    priority_of = Map.empty;
+    status_and_priority_of = Map.empty;
   }
 
-let is_empty {pending = _; priority_of = _; hashes} = Sized_set.is_empty hashes
+let is_empty {pending = _; status_and_priority_of = _; hashes} =
+  Sized_set.is_empty hashes
 
-let hashes {pending = _; priority_of = _; hashes} = Sized_set.to_set hashes
+let hashes {pending = _; status_and_priority_of = _; hashes} =
+  Sized_set.to_set hashes
 
-let operations {pending; priority_of = _; hashes = _} =
+let operations {pending; status_and_priority_of = _; hashes = _} =
   (* Build a flag map [oph -> op] from pending. Needed when re-cycling
      operations *)
   Priority_map.fold
@@ -92,43 +109,49 @@ let operations {pending; priority_of = _; hashes = _} =
     pending
     Map.empty
 
-let mem oph {hashes; priority_of = _; pending = _} = Sized_set.mem oph hashes
+let mem oph {hashes; status_and_priority_of = _; pending = _} =
+  Sized_set.mem oph hashes
 
-let get_priority_map prio pending =
-  match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
+let get_priority_map status_and_priority pending =
+  match Priority_map.find status_and_priority pending with
+  | None -> Map.empty
+  | Some mp -> mp
 
-let add op prio {pending; hashes; priority_of} =
+let add op status_and_priority {pending; hashes; status_and_priority_of} =
   let oph = op.hash in
-  let mp = get_priority_map prio pending |> Map.add oph op in
+  let mp = get_priority_map status_and_priority pending |> Map.add oph op in
   {
-    pending = Priority_map.add prio mp pending;
+    pending = Priority_map.add status_and_priority mp pending;
     hashes = Sized_set.add oph hashes;
-    priority_of = Map.add oph prio priority_of;
+    status_and_priority_of =
+      Map.add oph status_and_priority status_and_priority_of;
   }
 
-let remove oph ({pending; hashes; priority_of} as t) =
-  match Map.find oph priority_of with
+let remove oph ({pending; hashes; status_and_priority_of} as t) =
+  match Map.find oph status_and_priority_of with
   | None -> t
-  | Some prio ->
-      let mp = get_priority_map prio pending |> Map.remove oph in
+  | Some status_and_priority ->
+      let mp = get_priority_map status_and_priority pending |> Map.remove oph in
       {
         pending =
-          (if Map.is_empty mp then Priority_map.remove prio pending
-          else Priority_map.add prio mp pending);
+          (if Map.is_empty mp then
+           Priority_map.remove status_and_priority pending
+          else Priority_map.add status_and_priority mp pending);
         hashes = Sized_set.remove oph hashes;
-        priority_of = Map.remove oph priority_of;
+        status_and_priority_of = Map.remove oph status_and_priority_of;
       }
 
-let cardinal {pending = _; hashes; priority_of = _} = Sized_set.cardinal hashes
+let cardinal {pending = _; hashes; status_and_priority_of = _} =
+  Sized_set.cardinal hashes
 
-let fold_es f {pending; hashes = _; priority_of = _} acc =
+let fold_es f {pending; hashes = _; status_and_priority_of = _} acc =
   Priority_map.fold_es
     (fun prio mp acc -> Map.fold_es (f prio) mp acc)
     pending
     acc
 
-let fold f {pending; hashes = _; priority_of = _} acc =
+let fold f {pending; hashes = _; status_and_priority_of = _} acc =
   Priority_map.fold (fun prio mp acc -> Map.fold (f prio) mp acc) pending acc
 
-let iter f {pending; hashes = _; priority_of = _} =
+let iter f {pending; hashes = _; status_and_priority_of = _} =
   Priority_map.iter (fun prio mp -> Map.iter (f prio) mp) pending

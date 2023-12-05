@@ -641,8 +641,12 @@ module Make_s
                 else (
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                      Should this have an influence on the peer's score ? *)
+                  (* The operation has never been handled by the prevalidator,
+                     we add it with a Fresh status in the pending
+                     data-strutcure to be handled with higher priority *)
                   pv.shell.pending <-
-                    Pending_ops.add parsed_op priority pv.shell.pending ;
+                    Pending_ops.(
+                      add parsed_op {status = Fresh; priority} pv.shell.pending) ;
                   return_ok_unit))
 
     let on_inject (pv : types_state) ~force op =
@@ -653,7 +657,7 @@ module Make_s
          - We don't want to call prefilter to get the priority.
          But, this may change in the future
       *)
-      let priority = Pending_ops.High in
+      let status_and_priority = Pending_ops.{status = Fresh; priority = High} in
       if already_handled ~origin:Events.Injected pv.shell oph then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
@@ -673,7 +677,7 @@ module Make_s
                 pv.shell.parameters.tools.chain_tools.inject_operation oph op
               in
               pv.shell.pending <-
-                Pending_ops.add parsed_op priority pv.shell.pending ;
+                Pending_ops.add parsed_op status_and_priority pv.shell.pending ;
               let*! () = Events.(emit operation_injected) oph in
               return_unit)
             else if
@@ -795,7 +799,7 @@ module Make_s
          does not exist for the moment. *)
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
-          (fun _oph op (pending, nb_pending) ->
+          (fun oph op (pending, nb_pending) ->
             let*! v =
               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
             in
@@ -804,7 +808,14 @@ module Make_s
             | Priority ((High | Medium | Low _) as priority) ->
                 (* Here, an operation injected in this node with High priority will
                    now get its approriate priority. *)
-                Lwt.return (Pending_ops.add op priority pending, nb_pending + 1))
+                let status =
+                  (* If the operation has not yet been classified we set its
+                     status to Fresh *)
+                  if Pending_ops.mem oph pv.shell.pending then Pending_ops.Fresh
+                  else Reclassified
+                in
+                Lwt.return
+                  (Pending_ops.add op {status; priority} pending, nb_pending + 1))
           new_pending_operations
           (Pending_ops.empty, 0)
       in
