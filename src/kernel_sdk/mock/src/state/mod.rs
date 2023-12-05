@@ -166,7 +166,7 @@ impl HostState {
             return Err(Error::StoreNotAValue);
         }
 
-        let bytes: Vec<u8> = self.store.get_value(&path);
+        let bytes = self.store.get_value(&path);
         if offset > bytes.len() {
             return Err(Error::StoreInvalidAccess);
         }
@@ -193,8 +193,8 @@ impl HostState {
 
         let path = validate_path(path)?;
 
-        let mut value: Vec<u8> = match self.store.maybe_get_value(&path) {
-            Some(value) => value,
+        let mut value = match self.store.maybe_get_value(&path) {
+            Some(value) => value.as_ref().clone(),
             // No value, so only valid offset is zero (ie writing a new value).
             None => Vec::with_capacity(bytes.len()),
         };
@@ -284,9 +284,7 @@ impl HostState {
         if !self.store.has_entry(&path) {
             return Err(Error::StoreNotAValue);
         }
-        let value: Vec<u8> = self.store.get_value(&path);
-
-        Ok(value.len() as i32)
+        Ok(self.store.get_value(&path).len() as i32)
     }
 }
 
