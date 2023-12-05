@@ -52,6 +52,7 @@ let init_env () =
   return {block; baker; contract}
 
 let collect_token_amounts ctxt tickets =
+  let open Lwt_result_syntax in
   let accum (tokens, ctxt) ticket =
     let token, amount =
       Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
