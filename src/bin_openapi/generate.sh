@@ -16,7 +16,7 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef
+protocol_hash=ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
 protocol_parameters=src/proto_018_Proxford/parameters/sandbox-parameters.json
 protocol_name=oxford
 
@@ -35,12 +35,12 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-dev.json
-proto_openapi_json=docs/api/$protocol_name-openapi-dev.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-dev.json
+openapi_json=docs/api/rpc-openapi-rc.json
+proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
 
 # Get version number.
-version=$(dune exec tezos-version)
+version=$(dune exec octez-version)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
@@ -50,7 +50,7 @@ $tezos_node config init --data-dir $data_dir \
     --no-bootstrap-peer \
     --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
-$tezos_node run --data-dir $data_dir &
+$tezos_node run --data-dir $data_dir --connections 0 &
 node_pid="$!"
 
 # Wait for the node to be ready (sorry for the hackish way...)

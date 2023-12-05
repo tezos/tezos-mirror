@@ -191,6 +191,8 @@ In addition, a rollup node can run under different modes:
    rollup node will accept transactions in its queue and batch them on
    the Layer 1.
 
+.. _rollup_batcher:
+
 #. ``batcher`` means that the rollup node will accept transactions in
    its queue and batch them on the Layer 1. In this mode, the rollup
    node follows the Layer 1 chain, but it does not update its state
@@ -300,6 +302,7 @@ Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-i
 
 A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
 
+.. _rollup_history_mode:
 
 History modes
 -------------

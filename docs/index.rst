@@ -249,6 +249,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
    releases/releases
    releases/version-18
+   releases/version-19
    releases/history
 
 .. toctree::
