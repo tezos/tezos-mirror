@@ -52,6 +52,8 @@ mod storage;
 mod tick_model;
 mod upgrade;
 
+extern crate alloc;
+
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;

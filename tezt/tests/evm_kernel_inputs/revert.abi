@@ -1,0 +1,9 @@
+[
+	{
+		"inputs": [],
+		"name": "run",
+		"outputs": [],
+		"stateMutability": "pure",
+		"type": "function"
+	}
+]

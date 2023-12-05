@@ -11,6 +11,7 @@ use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use evm::executor::stack::PrecompileFailure;
+use evm::ExitReason;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -134,6 +135,13 @@ pub fn run_transaction<'a, Host>(
 where
     Host: Runtime,
 {
+    fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
+        match outcome.reason {
+            ExitReason::Revert(_) => pay_for_gas,
+            _ => pay_for_gas && outcome.is_success,
+        }
+    }
+
     log!(host, Info, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
 
     let mut handler = handler::EvmHandler::<'_, Host>::new(
@@ -168,7 +176,7 @@ where
 
         handler.increment_nonce(caller)?;
 
-        if result.is_success {
+        if do_refund(&result, pay_for_gas) {
             let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
             handler.repay_gas(caller, unused_gas)?;
         }
@@ -191,7 +199,7 @@ mod test {
         EthereumAccountStorage,
     };
     use evm::executor::stack::Log;
-    use evm::Opcode;
+    use evm::{ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed, Opcode};
     use handler::ExecutionOutcome;
     use host::runtime::Runtime;
     use primitive_types::{H160, H256};
@@ -318,6 +326,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfFund)),
             new_address: None,
             logs: vec![],
             result: None,
@@ -380,6 +389,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -436,9 +446,10 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 55427,
         }));
@@ -668,6 +679,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -720,6 +732,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21000,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -862,6 +875,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21006,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -909,24 +923,33 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(6),
+            Some(22000),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas_used = 21000 + 3 + 3; // Base Cost + PUHS1 + PUSH1, remaining gas is refunded
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 6,
+            gas_used: expected_gas_used,
             is_success: false,
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 65039,
         }));
 
         assert_eq!(expected_result, result);
+
+        // Some gas is returned to the send after the transaction is reverted
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
+            block.gas_price.saturating_mul(994.into())
+        )
     }
 
     #[test]
@@ -970,6 +993,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1024,6 +1048,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
+            reason: ExitReason::Error(ExitError::DesignatedInvalid),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1080,6 +1105,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21018,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(vec![1u8; 32]),
@@ -1135,6 +1161,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 24000,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(hex::decode(expected_address).unwrap()),
@@ -1320,6 +1347,9 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 86653,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                ExitError::InvalidCode(Opcode::SSTORE),
+            )),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1406,6 +1436,9 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 86653,
             is_success: false,
+            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                ExitError::InvalidCode(Opcode::LOG0),
+            )),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1523,6 +1556,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 22348,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
@@ -1624,6 +1658,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21911,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![log_record1],
             result: Some(vec![]),
@@ -1714,6 +1749,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 51124,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -1829,6 +1865,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: all_the_gas,
             is_success: false,
+            reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1914,6 +1951,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21017,
             is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
             logs: vec![],
             result: Some(chain_id_bytes.into()),
@@ -1978,6 +2016,7 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 21017,
+            reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
             logs: vec![],
