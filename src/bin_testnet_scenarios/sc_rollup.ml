@@ -41,7 +41,7 @@ let originate_new_rollup ?(alias = "rollup")
   return rollup
 
 let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
-    ?loser_mode ~operator client node rollup =
+    ?loser_mode ?(log_kernel_debug = false) ~operator client node rollup =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
@@ -64,7 +64,10 @@ let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
   in
   let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup in
   Log.info "Starting a smart rollup node to track %s" rollup ;
-  let* () = Sc_rollup_node.run rollup_node rollup [] in
+  let* () =
+    Sc_rollup_node.run rollup_node rollup
+    @@ Cli_arg.optional_switch "log-kernel-debug" log_kernel_debug
+  in
   let* () = Sc_rollup_node.wait_for_ready rollup_node in
   Log.info "Smart rollup node started." ;
   return rollup_node
