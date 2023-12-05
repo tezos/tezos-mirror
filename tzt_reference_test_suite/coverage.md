@@ -253,6 +253,7 @@ to some extent. Not all pushable types are tested with `PUSH`, however.
 - [compare_nat_03.tzt](compare_nat_03.tzt)
 - [compare_nat_04.tzt](compare_nat_04.tzt)
 - [compare_nat_05.tzt](compare_nat_05.tzt)
+- [compare_never_00.tzt](compare_never_00.tzt)
 - [compare_pairintint_00.tzt](compare_pairintint_00.tzt)
 - [compare_pairintint_01.tzt](compare_pairintint_01.tzt)
 - [compare_pairintint_02.tzt](compare_pairintint_02.tzt)
@@ -287,7 +288,6 @@ Types `COMPARE` isn't tested for:
 - `address`
 - `chain_id`
 - `key`
-- `never`
 - `signature`
 - `timestamp`
 - `unit`
@@ -924,7 +924,7 @@ Files do not follow naming convention.
 
 ### `NEVER`
 
-***None***
+- [never_00.tzt](never_00.tzt)
 
 ### `NIL`
 
@@ -1305,7 +1305,6 @@ Instructions with no tests:
 - `COMPARE: address : address`
 - `COMPARE: chain_id : chain_id`
 - `COMPARE: key : key`
-- `COMPARE: never : never`
 - `COMPARE: option _ : option _`
 - `COMPARE: or _ _ : or _ _`
 - `COMPARE: signature : signature`
@@ -1343,7 +1342,6 @@ Instructions with no tests:
 - `NEG: bls12_381_fr`
 - `NEG: bls12_381_g1`
 - `NEG: bls12_381_g2`
-- `NEVER`
 - `NOT: bytes`
 - `OR bytes`
 - `PAIR n`

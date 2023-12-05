@@ -1,0 +1,3 @@
+code { LAMBDA never unit { NEVER }; DROP } ;
+input { } ;
+output { } ;
