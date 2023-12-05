@@ -50,7 +50,7 @@ let sum_weights
    for each of them. It also gives the (maximum) amount of rewards per minute
    expected on the chain
    [weight] is one of those reward weights as described in [rewards]
-   [minimal_block_delay] is the minimum amouht of time between two blocks. *)
+   [minimal_block_delay] is the minimum amount of time between two blocks. *)
 let tez_from_weights
     ~(issuance_weights : Constants_parametric_repr.issuance_weights)
     ~(weight : int) ~(minimal_block_delay : Period_repr.t) =
