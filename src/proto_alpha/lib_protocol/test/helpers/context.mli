@@ -271,7 +271,7 @@ module Delegate : sig
     t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
 
   val participation :
-    t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
+    t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 
   (** This function might begin constructing a block. Use [policy] to
       specify a valid baker for the new block (default [By_round 0]) *)

@@ -153,91 +153,93 @@ let check_and_reset_delegate_participation ctxt delegate =
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
 
-type participation_info = {
-  expected_cycle_activity : int;
-  minimal_cycle_activity : int;
-  missed_slots : int;
-  missed_levels : int;
-  remaining_allowed_missed_slots : int;
-  expected_attesting_rewards : Tez_repr.t;
-}
+module For_RPC = struct
+  type participation_info = {
+    expected_cycle_activity : int;
+    minimal_cycle_activity : int;
+    missed_slots : int;
+    missed_levels : int;
+    remaining_allowed_missed_slots : int;
+    expected_attesting_rewards : Tez_repr.t;
+  }
 
-(* Inefficient, only for RPC *)
-let participation_info ctxt delegate =
-  let open Lwt_result_syntax in
-  let level = Level_storage.current ctxt in
-  let* stake_distribution =
-    Stake_storage.get_selected_distribution ctxt level.cycle
-  in
-  match
-    List.assoc_opt
-      ~equal:Signature.Public_key_hash.equal
-      delegate
-      stake_distribution
-  with
-  | None ->
-      (* delegate does not have an active stake at the current cycle *)
-      return
-        {
-          expected_cycle_activity = 0;
-          minimal_cycle_activity = 0;
-          missed_slots = 0;
-          missed_levels = 0;
-          remaining_allowed_missed_slots = 0;
-          expected_attesting_rewards = Tez_repr.zero;
-        }
-  | Some active_stake ->
-      let* total_active_stake =
-        Stake_storage.get_total_active_stake ctxt level.cycle
-      in
-      let expected_cycle_activity =
-        let active_stake_weight = Stake_repr.staking_weight active_stake in
-        let total_active_stake_weight =
-          Stake_repr.staking_weight total_active_stake
+  (* Inefficient, only for RPC *)
+  let participation_info ctxt delegate =
+    let open Lwt_result_syntax in
+    let level = Level_storage.current ctxt in
+    let* stake_distribution =
+      Stake_storage.get_selected_distribution ctxt level.cycle
+    in
+    match
+      List.assoc_opt
+        ~equal:Signature.Public_key_hash.equal
+        delegate
+        stake_distribution
+    with
+    | None ->
+        (* delegate does not have an active stake at the current cycle *)
+        return
+          {
+            expected_cycle_activity = 0;
+            minimal_cycle_activity = 0;
+            missed_slots = 0;
+            missed_levels = 0;
+            remaining_allowed_missed_slots = 0;
+            expected_attesting_rewards = Tez_repr.zero;
+          }
+    | Some active_stake ->
+        let* total_active_stake =
+          Stake_storage.get_total_active_stake ctxt level.cycle
         in
-        expected_slots_for_given_active_stake
-          ctxt
-          ~total_active_stake_weight
-          ~active_stake_weight
-      in
-      let Ratio_repr.{numerator; denominator} =
-        Constants_storage.minimal_participation_ratio ctxt
-      in
-      let attesting_reward_per_slot =
-        Delegate_rewards.attesting_reward_per_slot ctxt
-      in
-      let minimal_cycle_activity =
-        expected_cycle_activity * numerator / denominator
-      in
-      let maximal_cycle_inactivity =
-        expected_cycle_activity - minimal_cycle_activity
-      in
-      let expected_attesting_rewards =
-        Tez_repr.mul_exn attesting_reward_per_slot expected_cycle_activity
-      in
-      let contract = Contract_repr.Implicit delegate in
-      let* missed_attestations =
-        Storage.Contract.Missed_attestations.find ctxt contract
-      in
-      let missed_slots, missed_levels, remaining_allowed_missed_slots =
-        match missed_attestations with
-        | None -> (0, 0, maximal_cycle_inactivity)
-        | Some {remaining_slots; missed_levels} ->
-            ( maximal_cycle_inactivity - remaining_slots,
-              missed_levels,
-              Compare.Int.max 0 remaining_slots )
-      in
-      let expected_attesting_rewards =
-        match missed_attestations with
-        | Some r when Compare.Int.(r.remaining_slots < 0) -> Tez_repr.zero
-        | _ -> expected_attesting_rewards
-      in
-      return
-        {
-          expected_cycle_activity;
-          minimal_cycle_activity;
-          missed_slots;
-          missed_levels;
-          remaining_allowed_missed_slots;
-          expected_attesting_rewards;
-        }
+        let expected_cycle_activity =
+          let active_stake_weight = Stake_repr.staking_weight active_stake in
+          let total_active_stake_weight =
+            Stake_repr.staking_weight total_active_stake
+          in
+          expected_slots_for_given_active_stake
+            ctxt
+            ~total_active_stake_weight
+            ~active_stake_weight
+        in
+        let Ratio_repr.{numerator; denominator} =
+          Constants_storage.minimal_participation_ratio ctxt
+        in
+        let attesting_reward_per_slot =
+          Delegate_rewards.attesting_reward_per_slot ctxt
+        in
+        let minimal_cycle_activity =
+          expected_cycle_activity * numerator / denominator
+        in
+        let maximal_cycle_inactivity =
+          expected_cycle_activity - minimal_cycle_activity
+        in
+        let expected_attesting_rewards =
+          Tez_repr.mul_exn attesting_reward_per_slot expected_cycle_activity
+        in
+        let contract = Contract_repr.Implicit delegate in
+        let* missed_attestations =
+          Storage.Contract.Missed_attestations.find ctxt contract
+        in
+        let missed_slots, missed_levels, remaining_allowed_missed_slots =
+          match missed_attestations with
+          | None -> (0, 0, maximal_cycle_inactivity)
+          | Some {remaining_slots; missed_levels} ->
+              ( maximal_cycle_inactivity - remaining_slots,
+                missed_levels,
+                Compare.Int.max 0 remaining_slots )
+        in
+        let expected_attesting_rewards =
+          match missed_attestations with
+          | Some r when Compare.Int.(r.remaining_slots < 0) -> Tez_repr.zero
+          | _ -> expected_attesting_rewards
+        in
+        return
+          {
+            expected_cycle_activity;
+            minimal_cycle_activity;
+            missed_slots;
+            missed_levels;
+            remaining_allowed_missed_slots;
+            expected_attesting_rewards;
+          }
+end

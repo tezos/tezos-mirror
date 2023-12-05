@@ -557,6 +557,8 @@ module Delegate = struct
 
   module For_RPC = struct
     include For_RPC
+    include Delegate_storage.For_RPC
+    include Delegate_missed_attestations_storage.For_RPC
 
     let current_cycle_denunciations_list ctxt =
       let open Lwt_syntax in

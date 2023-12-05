@@ -65,35 +65,37 @@ val check_and_reset_delegate_participation :
   Signature.Public_key_hash.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** Participation information. We denote by:
-    - "static" information that does not change during the cycle
-    - "dynamic" information that may change during the cycle *)
-type participation_info = {
-  expected_cycle_activity : int;
-      (** The total expected slots to be attested in the cycle. (static) *)
-  minimal_cycle_activity : int;
-      (** The minimal attesting slots in the cycle to get attesting rewards.
+module For_RPC : sig
+  (** Participation information. We denote by:
+      - "static" information that does not change during the cycle
+      - "dynamic" information that may change during the cycle *)
+  type participation_info = {
+    expected_cycle_activity : int;
+        (** The total expected slots to be attested in the cycle. (static) *)
+    minimal_cycle_activity : int;
+        (** The minimal attesting slots in the cycle to get attesting rewards.
           (static) *)
-  missed_slots : int;
-      (** The number of missed attesting slots in the cycle. (dynamic) *)
-  missed_levels : int;
-      (** The number of missed attesting levels in the cycle. (dynamic) *)
-  remaining_allowed_missed_slots : int;
-      (** Remaining amount of attesting slots that can be missed in the
+    missed_slots : int;
+        (** The number of missed attesting slots in the cycle. (dynamic) *)
+    missed_levels : int;
+        (** The number of missed attesting levels in the cycle. (dynamic) *)
+    remaining_allowed_missed_slots : int;
+        (** Remaining amount of attesting slots that can be missed in the
       cycle before forfeiting the rewards. (dynamic) *)
-  expected_attesting_rewards : Tez_repr.t;
-      (** Attesting rewards that will be distributed at the end of the
+    expected_attesting_rewards : Tez_repr.t;
+        (** Attesting rewards that will be distributed at the end of the
      cycle if activity at that point will be greater than the minimal
      required. If the activity is already known to be below the
      required minimum, then the rewards are zero. (dynamic) *)
-}
+  }
 
-(** Only use this function for RPC: this is expensive.
+  (** Only use this function for RPC: this is expensive.
 
-   [delegate_participation_info] and [!val:check_delegate] forms the
-   implementation of RPC call "/context/delegates/<pkh>/participation".
+      [delegate_participation_info] and [!val:check_delegate] forms the
+      implementation of RPC call "/context/delegates/<pkh>/participation".
  *)
-val participation_info :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  participation_info tzresult Lwt.t
+  val participation_info :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    participation_info tzresult Lwt.t
+end

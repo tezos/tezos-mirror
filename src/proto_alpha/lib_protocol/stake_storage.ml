@@ -238,11 +238,6 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   in
   Storage.Stake.Last_snapshot.update ctxt 0
 
-let clear_cycle ctxt cycle =
-  let open Lwt_result_syntax in
-  let* ctxt = Storage.Stake.Total_active_stake.remove_existing ctxt cycle in
-  Selected_distribution_for_cycle.remove_existing ctxt cycle
-
 let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
   let open Lwt_result_syntax in
   Storage.Stake.Active_delegates_with_minimal_stake.fold
@@ -267,10 +262,15 @@ let fold_snapshot ctxt ~index ~f ~init =
       f (delegate, stake) acc)
 
 let clear_at_cycle_end ctxt ~new_cycle =
+  let open Lwt_result_syntax in
   let max_slashing_period = Constants_repr.max_slashing_period in
   match Cycle_repr.sub new_cycle max_slashing_period with
   | None -> return ctxt
-  | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear
+  | Some cycle_to_clear ->
+      let* ctxt =
+        Storage.Stake.Total_active_stake.remove_existing ctxt cycle_to_clear
+      in
+      Selected_distribution_for_cycle.remove_existing ctxt cycle_to_clear
 
 let fold_on_active_delegates_with_minimal_stake_s =
   Storage.Stake.Active_delegates_with_minimal_stake.fold
