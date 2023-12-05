@@ -1138,40 +1138,53 @@ pub(crate) fn typecheck_value(
                 .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
-        (T::Set(ty), V::Seq(vs)) => {
-            let vs = vs
-                .iter()
-                .map(|v| typecheck_value(v, ctx, ty))
-                .collect::<Result<Vec<TypedValue>, TcError>>()?;
-            validate_ordered_by(ctx, t, &vs, |x| x)?;
+        (set_ty @ T::Set(ty), V::Seq(vs)) => {
             ctx.gas
                 .consume(gas::tc_cost::construct_set(ty.size_for_gas(), vs.len())?)?;
+            let ctx_cell = std::cell::RefCell::new(ctx);
             // See the same concern about constructing from ordered sequence as in Map
-            let set: BTreeSet<TypedValue> = vs.into_iter().collect();
+            let set: BTreeSet<TypedValue> = OrderValidatingIterator {
+                it: vs
+                    .iter()
+                    .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), ty))
+                    .peekable(),
+                container_ty: set_ty,
+                to_key: |x| x,
+                ctx: &ctx_cell,
+            }
+            .collect::<Result<_, TcError>>()?;
             TV::Set(set)
         }
-        (T::Map(m), V::Seq(vs)) => {
+        (map_ty @ T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            let tc_elt = |v: &Micheline| -> Result<(TypedValue, TypedValue), TcError> {
-                match v {
-                    Micheline::App(Prim::Elt, [k, v], _) => {
-                        let k = typecheck_value(k, ctx, tk)?;
-                        let v = typecheck_value(v, ctx, tv)?;
-                        Ok((k, v))
-                    }
-                    _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
-                }
-            };
-            let elts: Vec<(TypedValue, TypedValue)> =
-                vs.iter().map(tc_elt).collect::<Result<_, TcError>>()?;
-            validate_ordered_by(ctx, t, &elts, |(k, _)| k)?;
             ctx.gas
-                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), elts.len())?)?;
+                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
+            let ctx_cell = std::cell::RefCell::new(ctx);
+            let tc_elt =
+                |v: &Micheline, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
+                    match v {
+                        Micheline::App(Prim::Elt, [k, v], _) => {
+                            let k = typecheck_value(k, ctx, tk)?;
+                            let v = typecheck_value(v, ctx, tv)?;
+                            Ok((k, v))
+                        }
+                        _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
+                    }
+                };
             // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
             // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
             // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
             // too much overhead.
-            let map: BTreeMap<TypedValue, TypedValue> = elts.into_iter().collect();
+            let map: BTreeMap<TypedValue, TypedValue> = OrderValidatingIterator {
+                it: vs
+                    .iter()
+                    .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
+                    .peekable(),
+                container_ty: map_ty,
+                to_key: |(k, _)| k,
+                ctx: &ctx_cell,
+            }
+            .collect::<Result<_, TcError>>()?;
             TV::Map(map)
         }
         (T::Address, V::String(str)) => {
@@ -1263,34 +1276,48 @@ fn validate_u10(n: i128) -> Result<u16, TcError> {
     Ok(res)
 }
 
-/// Ensures given elements have their keys in strictly ascending order
+/// An iterator that ensures the keys to be in strictly ascending order.
 /// (where you specify a getter to obtain the key from an element).
 ///
 /// Also charges gas for this check.
-fn validate_ordered_by<T>(
-    ctx: &mut Ctx,
-    container_t: &Type,
-    vs: &[T],
-    to_key: impl Fn(&T) -> &TypedValue,
-) -> Result<(), TcError> {
-    if vs.len() > 1 {
-        let mut prev = to_key(&vs[0]);
-        for i in &vs[1..] {
-            ctx.gas
-                .consume(gas::interpret_cost::compare(prev, to_key(i))?)?;
-            match prev.cmp(to_key(i)) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(container_t.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(container_t.clone()))
+struct OrderValidatingIterator<'a, T: Iterator<Item = Result<I, TcError>>, I> {
+    it: std::iter::Peekable<T>,
+    to_key: fn(&I) -> &TypedValue,
+    container_ty: &'a Type,
+    ctx: &'a std::cell::RefCell<&'a mut Ctx>,
+}
+
+impl<T, I> Iterator for OrderValidatingIterator<'_, T, I>
+where
+    T: Iterator<Item = Result<I, TcError>>,
+{
+    type Item = Result<I, TcError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.next().map(|cur| {
+            let cur = cur?;
+            if let Some(Ok(next)) = self.it.peek() {
+                let mut ctx = self.ctx.borrow_mut();
+                let cur_key = (self.to_key)(&cur);
+                let next_key = (self.to_key)(next);
+                ctx.gas
+                    .consume(gas::interpret_cost::compare(cur_key, next_key)?)?;
+                match cur_key.cmp(next_key) {
+                    std::cmp::Ordering::Less => (),
+                    std::cmp::Ordering::Equal => {
+                        Err(TcError::DuplicateElements(self.container_ty.clone()))?
+                    }
+                    std::cmp::Ordering::Greater => {
+                        Err(TcError::ElementsNotSorted(self.container_ty.clone()))?
+                    }
                 }
             }
-            prev = to_key(i);
-        }
+            Ok(cur)
+        })
     }
-    Ok(())
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
