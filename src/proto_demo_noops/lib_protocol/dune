@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"demo-noops\" end\ninclude Tezos_protocol_environment.V11.Make(Name)()\n")))
+   "module Name = struct let name = \"demo-noops\" end\ninclude Tezos_protocol_environment.V12.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_demo_noops)
