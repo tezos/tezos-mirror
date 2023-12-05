@@ -24,13 +24,23 @@
 (*****************************************************************************)
 
 (* Sum weights for normalizing *)
-let sum_weights (rewards : Constants_parametric_repr.issuance_weights) =
-  let r = rewards.baking_reward_fixed_portion_weight in
-  let r = rewards.baking_reward_bonus_weight + r in
-  let r = rewards.attesting_reward_weight + r in
-  let r = rewards.liquidity_baking_subsidy_weight + r in
-  let r = rewards.seed_nonce_revelation_tip_weight + r in
-  let r = rewards.vdf_revelation_tip_weight + r in
+let sum_weights
+    ({
+       base_total_issued_per_minute = _;
+       baking_reward_fixed_portion_weight;
+       baking_reward_bonus_weight;
+       attesting_reward_weight;
+       liquidity_baking_subsidy_weight;
+       seed_nonce_revelation_tip_weight;
+       vdf_revelation_tip_weight;
+     } :
+      Constants_parametric_repr.issuance_weights) =
+  let r = baking_reward_fixed_portion_weight in
+  let r = baking_reward_bonus_weight + r in
+  let r = attesting_reward_weight + r in
+  let r = liquidity_baking_subsidy_weight + r in
+  let r = seed_nonce_revelation_tip_weight + r in
+  let r = vdf_revelation_tip_weight + r in
   assert (Compare.Int.(r > 0)) ;
   r
 
