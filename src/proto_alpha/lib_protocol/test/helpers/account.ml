@@ -63,6 +63,7 @@ let activator_account =
   new_account ~seed ()
 
 let find pkh =
+  let open Lwt_result_syntax in
   match Signature.Public_key_hash.Table.find known_accounts pkh with
   | Some k -> return k
   | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh

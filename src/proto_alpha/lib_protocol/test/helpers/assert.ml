@@ -27,6 +27,7 @@
 open Protocol
 
 let error ~loc v f =
+  let open Lwt_result_syntax in
   match v with
   | Error err when List.exists f err -> return_unit
   | Ok _ -> failwith "Unexpected successful result (%s)" loc
@@ -64,11 +65,13 @@ let proto_error_with_info ?(error_info_field = `Title) ~loc v
       String.equal info expected_error_info)
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
+  let open Lwt_result_syntax in
   if not (cmp a b) then
     failwith "@[@[[%s]@] - @[%s : %a is not equal to %a@]@]" loc msg pp a pp b
   else return_unit
 
 let leq ~loc (cmp : 'a -> 'a -> int) msg pp a b =
+  let open Lwt_result_syntax in
   if cmp a b > 0 then
     failwith
       "@[@[[%s]@] - @[%s : %a is not less or equal to %a@]@]"
@@ -81,11 +84,13 @@ let leq ~loc (cmp : 'a -> 'a -> int) msg pp a b =
   else return_unit
 
 let lt ~loc (cmp : 'a -> 'a -> int) msg pp a b =
+  let open Lwt_result_syntax in
   if cmp a b >= 0 then
     failwith "@[@[[%s]@] - @[%s : %a is not less than %a@]@]" loc msg pp a pp b
   else return_unit
 
 let not_equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
+  let open Lwt_result_syntax in
   if cmp a b then
     failwith "@[@[[%s]@] - @[%s : %a is equal to %a@]@]" loc msg pp a pp b
   else return_unit
@@ -195,11 +200,13 @@ let not_equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
     a
     b
 
-let get_some ~loc = function
-  | Some x -> return x
-  | None -> failwith "Unexpected None (%s)" loc
+let get_some ~loc =
+  let open Lwt_result_syntax in
+  function Some x -> return x | None -> failwith "Unexpected None (%s)" loc
 
-let is_none ~loc ~pp = function
+let is_none ~loc ~pp =
+  let open Lwt_result_syntax in
+  function
   | Some x -> failwith "Unexpected (Some %a) (%s)" pp x loc
   | None -> return_unit
 
@@ -212,11 +219,14 @@ let equal_result ~loc ~pp_ok ~pp_error eq_ok eq_error a b =
     a
     b
 
-let is_error ~loc ~pp = function
-  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc
-  | Error _ -> return_unit
+let is_error ~loc ~pp =
+  let open Lwt_result_syntax in
+  function
+  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc | Error _ -> return_unit
 
-let get_ok ~__LOC__ = function
+let get_ok ~__LOC__ =
+  let open Lwt_result_syntax in
+  function
   | Ok r -> return r
   | Error err ->
       failwith "@[Unexpected error (%s): %a@]" __LOC__ pp_print_trace err

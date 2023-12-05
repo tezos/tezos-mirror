@@ -175,6 +175,7 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let rec naive_pow_miner ~proof_of_work_threshold shell header =
+    let open Lwt_result_syntax in
     match
       Hacl_star.Hacl.RandomBuffer.randombytes
         ~size:Constants.proof_of_work_nonce_size
@@ -998,7 +999,8 @@ let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote
 
 let rec bake_while_with_metadata ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
-    ?(invariant = fun _ -> return_unit) ?previous_metadata predicate b =
+    ?(invariant = fun _ -> Lwt_result_syntax.return_unit) ?previous_metadata
+    predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
   let* new_block, (metadata, _) =
