@@ -32,6 +32,7 @@ module Sapling_gen_cmd = struct
 
   (* Generic max-%s argument *)
   let max name =
+    let open Lwt_result_syntax in
     Tezos_clic.arg
       ~doc:(Printf.sprintf "Maximum number of %s" name)
       ~long:(Printf.sprintf "max-%s" name)
@@ -52,6 +53,7 @@ module Sapling_gen_cmd = struct
 
   (* Integer argument --seed *)
   let seed_arg =
+    let open Lwt_result_syntax in
     let seed =
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
@@ -62,6 +64,7 @@ module Sapling_gen_cmd = struct
     Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
   let positive_param =
+    let open Lwt_result_syntax in
     Tezos_clic.parameter (fun _ s ->
         match int_of_string_opt s with
         | Some i when i > 0 -> return i
@@ -84,6 +87,7 @@ module Sapling_gen_cmd = struct
   let sapling_handler
       (max_inputs, max_outputs, max_nullifiers, max_additional_commitments, seed)
       tx_count save_to () =
+    let open Lwt_result_syntax in
     let sapling_gen_options =
       default_sapling_gen_options
       |> lift_opt set_max_inputs max_inputs
