@@ -40,32 +40,35 @@ let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
     exprs
 
 let typecheck_by_tezos =
+  let open Lwt_result_wrap_syntax in
   let context_init_memory ~rng_state =
-    Context.init_n
-      ~rng_state
-      ~bootstrap_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-      ()
-    >>=? fun (block, _accounts) ->
-    Context.get_constants (B block) >>=? fun csts ->
+    let* block, _accounts =
+      Context.init_n
+        ~rng_state
+        ~bootstrap_balances:
+          [
+            4_000_000_000_000L;
+            4_000_000_000_000L;
+            4_000_000_000_000L;
+            4_000_000_000_000L;
+            4_000_000_000_000L;
+          ]
+        5
+        ()
+    in
+    let* csts = Context.get_constants (B block) in
     let minimal_block_delay =
       Protocol.Alpha_context.Period.to_seconds
         csts.parametric.minimal_block_delay
     in
-    Incremental.begin_construction
-      ~timestamp:
-        (Tezos_base.Time.Protocol.add
-           block.header.shell.timestamp
-           minimal_block_delay)
-      block
-    >>=? fun vs ->
+    let* vs =
+      Incremental.begin_construction
+        ~timestamp:
+          (Tezos_base.Time.Protocol.add
+             block.header.shell.timestamp
+             minimal_block_delay)
+        block
+    in
     let ctxt = Incremental.alpha_ctxt vs in
     (* Required for eg Create_contract *)
     return
@@ -76,16 +79,19 @@ let typecheck_by_tezos =
   fun bef node ->
     Stdlib.Result.get_ok
       (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_tc_context.data
-             ctxt
-             ~elab_conf:
-               (Protocol.Script_ir_translator_config.make ~legacy:false ())
-             (Micheline.root node)
-             bef
-           >|= Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+         (let* ctxt = context_init_memory ~rng_state in
+          let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
+            Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
+          in
+          let*@ (_ :
+                  _ Protocol.Script_ir_translator.judgement
+                  * Protocol.Alpha_context.t) =
+            Protocol.Script_ir_translator.parse_instr
+              Protocol.Script_tc_context.data
+              ctxt
+              ~elab_conf:
+                (Protocol.Script_ir_translator_config.make ~legacy:false ())
+              (Micheline.root node)
+              bef
+          in
+          return_unit))
