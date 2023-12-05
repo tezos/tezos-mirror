@@ -241,19 +241,21 @@ let get_issuance_per_minute ctxt =
   Adaptive_issuance_services.current_issuance_per_minute rpc_ctxt ctxt
 
 let get_baking_reward_fixed_portion ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  return
-    (Delegate.Rewards.For_RPC.reward_from_constants
-       csts
-       ~reward_kind:Baking_reward_fixed_portion)
+  let*?@ reward =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Baking_reward_fixed_portion
+  in
+  return reward
 
 let get_bonus_reward ctxt ~attesting_power =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = {consensus_threshold; _} as csts; _} =
     get_constants ctxt
   in
-  let baking_reward_bonus_per_slot =
+  let*?@ baking_reward_bonus_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
       ~reward_kind:Baking_reward_bonus_per_slot
@@ -264,7 +266,7 @@ let get_bonus_reward ctxt ~attesting_power =
 let get_attesting_reward ctxt ~expected_attesting_power =
   let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  let attesting_reward_per_slot =
+  let*?@ attesting_reward_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
       ~reward_kind:Attesting_reward_per_slot
@@ -275,12 +277,14 @@ let get_attesting_reward ctxt ~expected_attesting_power =
   return t
 
 let get_liquidity_baking_subsidy ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  return
-    (Delegate.Rewards.For_RPC.reward_from_constants
-       csts
-       ~reward_kind:Liquidity_baking_subsidy)
+  let*?@ reward =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Liquidity_baking_subsidy
+  in
+  return reward
 
 let get_liquidity_baking_cpmm_address ctxt =
   Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
@@ -295,20 +299,24 @@ let get_total_supply ctxt =
   Adaptive_issuance_services.total_supply rpc_ctxt ctxt
 
 let get_seed_nonce_revelation_tip ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  return
-    (Delegate.Rewards.For_RPC.reward_from_constants
-       csts
-       ~reward_kind:Seed_nonce_revelation_tip)
+  let*?@ reward =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Seed_nonce_revelation_tip
+  in
+  return reward
 
 let get_vdf_revelation_tip ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  return
-    (Delegate.Rewards.For_RPC.reward_from_constants
-       csts
-       ~reward_kind:Vdf_revelation_tip)
+  let*?@ reward =
+    Delegate.Rewards.For_RPC.reward_from_constants
+      csts
+      ~reward_kind:Vdf_revelation_tip
+  in
+  return reward
 
 let get_ai_current_yearly_rate ctxt =
   Adaptive_issuance_services.current_yearly_rate rpc_ctxt ctxt

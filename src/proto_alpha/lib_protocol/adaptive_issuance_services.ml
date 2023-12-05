@@ -202,15 +202,21 @@ let collect_expected_rewards ~ctxt =
   let csts = (Constants.all ctxt).parametric in
   let reward_of_cycle cycle =
     if Cycle.(cycle = ctxt_cycle) then
+      let*? baking_reward_fixed_portion = baking_reward_fixed_portion ctxt in
+      let*? baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt in
+      let*? attesting_reward_per_slot = attesting_reward_per_slot ctxt in
+      let*? liquidity_baking_subsidy = liquidity_baking_subsidy ctxt in
+      let*? seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt in
+      let*? vdf_revelation_tip = vdf_revelation_tip ctxt in
       return
         {
           cycle;
-          baking_reward_fixed_portion = baking_reward_fixed_portion ctxt;
-          baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt;
-          attesting_reward_per_slot = attesting_reward_per_slot ctxt;
-          liquidity_baking_subsidy = liquidity_baking_subsidy ctxt;
-          seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt;
-          vdf_revelation_tip = vdf_revelation_tip ctxt;
+          baking_reward_fixed_portion;
+          baking_reward_bonus_per_slot;
+          attesting_reward_per_slot;
+          liquidity_baking_subsidy;
+          seed_nonce_revelation_tip;
+          vdf_revelation_tip;
         }
     else
       (* This coeff is correct only when applied to Cycle lesser than
@@ -218,36 +224,40 @@ let collect_expected_rewards ~ctxt =
          not be set and thus we get the default values. *)
       let open Delegate.Rewards.For_RPC in
       let* coeff = get_reward_coeff ctxt ~cycle in
+
+      let*? baking_reward_fixed_portion =
+        reward_from_constants
+          ~coeff
+          csts
+          ~reward_kind:Baking_reward_fixed_portion
+      in
+      let*? baking_reward_bonus_per_slot =
+        reward_from_constants
+          ~coeff
+          csts
+          ~reward_kind:Baking_reward_bonus_per_slot
+      in
+      let*? attesting_reward_per_slot =
+        reward_from_constants ~coeff csts ~reward_kind:Attesting_reward_per_slot
+      in
+      let*? liquidity_baking_subsidy =
+        reward_from_constants ~coeff csts ~reward_kind:Liquidity_baking_subsidy
+      in
+      let*? seed_nonce_revelation_tip =
+        reward_from_constants ~coeff csts ~reward_kind:Seed_nonce_revelation_tip
+      in
+      let*? vdf_revelation_tip =
+        reward_from_constants ~coeff csts ~reward_kind:Vdf_revelation_tip
+      in
       return
         {
           cycle;
-          baking_reward_fixed_portion =
-            reward_from_constants
-              ~coeff
-              csts
-              ~reward_kind:Baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot =
-            reward_from_constants
-              ~coeff
-              csts
-              ~reward_kind:Baking_reward_bonus_per_slot;
-          attesting_reward_per_slot =
-            reward_from_constants
-              ~coeff
-              csts
-              ~reward_kind:Attesting_reward_per_slot;
-          liquidity_baking_subsidy =
-            reward_from_constants
-              ~coeff
-              csts
-              ~reward_kind:Liquidity_baking_subsidy;
-          seed_nonce_revelation_tip =
-            reward_from_constants
-              ~coeff
-              csts
-              ~reward_kind:Seed_nonce_revelation_tip;
-          vdf_revelation_tip =
-            reward_from_constants ~coeff csts ~reward_kind:Vdf_revelation_tip;
+          baking_reward_fixed_portion;
+          baking_reward_bonus_per_slot;
+          attesting_reward_per_slot;
+          liquidity_baking_subsidy;
+          seed_nonce_revelation_tip;
+          vdf_revelation_tip;
         }
   in
   let queried_cycles =
