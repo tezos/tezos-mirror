@@ -216,6 +216,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
            return x.shell)
 
   let chain chain_id =
+    let open Lwt_result_syntax in
     Directory.prefix
       Chain_services.path
       (Directory.register

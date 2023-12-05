@@ -161,6 +161,7 @@ end
 let locate_blocks (state : state)
     (block : Tezos_shell_services.Block_services.block) :
     block list tzresult Lwt.t =
+  let open Lwt_result_syntax in
   match block with
   | `Hash (hash, rel) -> (
       match Block_hash.Table.find state.chain_table hash with
@@ -201,6 +202,7 @@ let live_blocks (state : state) block =
 
 (** Extract the round number from raw fitness. *)
 let round_from_raw_fitness raw_fitness =
+  let open Lwt_result_syntax in
   match Protocol.Alpha_context.Fitness.from_raw raw_fitness with
   | Ok fitness ->
       return
@@ -210,6 +212,7 @@ let round_from_raw_fitness raw_fitness =
 
 (** Extract level from a block header. *)
 let get_block_level (block_header : Block_header.t) =
+  let open Lwt_result_syntax in
   return block_header.shell.level
 
 (** Extract round from a block header. *)
@@ -218,6 +221,7 @@ let get_block_round (block_header : Block_header.t) =
 
 (** Parse protocol data. *)
 let parse_protocol_data (protocol_data : Bytes.t) =
+  let open Lwt_result_syntax in
   match
     Data_encoding.Binary.of_bytes_opt
       Protocol.Alpha_context.Block_header.protocol_data_encoding
@@ -558,6 +562,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
 
 (** Return the current head. *)
 let head {chain; _} =
+  let open Lwt_result_syntax in
   match List.hd chain with
   | None -> failwith "mockup_simulator.ml: empty chain"
   | Some hd -> return hd
@@ -1200,9 +1205,11 @@ let default_propagation_vector = List.repeat 5 Pass
 module Default_hooks : Hooks = struct
   let on_inject_block ~level:_ ~round:_ ~block_hash ~block_header ~operations
       ~protocol_data:_ =
+    let open Lwt_result_syntax in
     return (block_hash, block_header, operations, default_propagation_vector)
 
   let on_inject_operation ~op_hash ~op =
+    let open Lwt_result_syntax in
     return (op_hash, op, default_propagation_vector)
 
   let on_new_validated_block ~block_hash ~block_header ~operations =
@@ -1215,17 +1222,18 @@ module Default_hooks : Hooks = struct
 
   let check_block_before_processing ~level:_ ~round:_ ~block_hash:_
       ~block_header:_ ~protocol_data:_ =
-    return_unit
+    Lwt_result_syntax.return_unit
 
-  let check_chain_after_processing ~level:_ ~round:_ ~chain:_ = return_unit
+  let check_chain_after_processing ~level:_ ~round:_ ~chain:_ =
+    Lwt_result_syntax.return_unit
 
-  let check_mempool_after_processing ~mempool:_ = return_unit
+  let check_mempool_after_processing ~mempool:_ = Lwt_result_syntax.return_unit
 
   let stop_on_event _ = false
 
   let on_start_baker ~baker_position:_ ~delegates:_ ~cctxt:_ = Lwt.return_unit
 
-  let check_chain_on_success ~chain:_ = return_unit
+  let check_chain_on_success ~chain:_ = Lwt_result_syntax.return_unit
 end
 
 type config = {
@@ -1363,6 +1371,7 @@ let bootstrap5 = get_account_pk 4
 
 let check_block_signature ~block_hash ~(block_header : Block_header.t)
     ~public_key =
+  let open Lwt_result_syntax in
   let (protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
     Data_encoding.Binary.of_bytes_exn
       Protocol.Alpha_context.Block_header.protocol_data_encoding
@@ -1452,6 +1461,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
 
 let op_is_preattestation ?level ?round (op_hash : Operation_hash.t)
     (op : Alpha_context.packed_operation) =
+  let open Lwt_result_syntax in
   match op.protocol_data with
   | Operation_data d -> (
       match d.contents with
@@ -1480,6 +1490,7 @@ let op_is_preattestation ?level ?round (op_hash : Operation_hash.t)
 
 let op_is_attestation ?level ?round (op_hash : Operation_hash.t)
     (op : Alpha_context.packed_operation) =
+  let open Lwt_result_syntax in
   match op.protocol_data with
   | Operation_data d -> (
       match d.contents with
@@ -1513,6 +1524,7 @@ let op_is_both f g op_hash op =
 
 let save_proposal_payload
     ~(protocol_data : Alpha_context.Block_header.protocol_data) ~var =
+  let open Lwt_result_syntax in
   var :=
     Some
       (protocol_data.contents.payload_hash, protocol_data.contents.payload_round) ;
@@ -1521,6 +1533,7 @@ let save_proposal_payload
 let verify_payload_hash
     ~(protocol_data : Alpha_context.Block_header.protocol_data)
     ~original_proposal ~message =
+  let open Lwt_result_syntax in
   match !original_proposal with
   | None ->
       failwith

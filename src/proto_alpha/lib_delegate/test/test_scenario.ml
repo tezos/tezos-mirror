@@ -64,6 +64,7 @@ let test_level_5 () =
   run ~config [(3, (module Hooks)); (2, (module Hooks))]
 
 let test_preattest_on_valid () =
+  let open Lwt_result_syntax in
   let level_to_reach = 2l in
   let round_to_reach = 1l in
   let module Hooks : Hooks = struct
@@ -811,6 +812,7 @@ Scenario F2
 *)
 
 let test_scenario_f2 () =
+  let open Lwt_result_syntax in
   let proposal_2_4_observed = ref false in
   let module Hooks : Hooks = struct
     include Default_hooks
@@ -874,6 +876,7 @@ Scenario M1
 *)
 
 let test_scenario_m1 () =
+  let open Lwt_result_syntax in
   let observed_level2_timestamp = ref None in
   let network_down_sec = 5. in
   let module Hooks : Hooks = struct
@@ -999,6 +1002,7 @@ Scenario M3
 *)
 
 let test_scenario_m3 () =
+  let open Lwt_result_syntax in
   let stop_on_event0 = function
     | Baking_state.New_head_proposal {block; _} ->
         block.shell.level = 1l
