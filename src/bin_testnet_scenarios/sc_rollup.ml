@@ -40,14 +40,15 @@ let originate_new_rollup ?(alias = "rollup")
   Log.info "Rollup %s originated" rollup ;
   return rollup
 
-let setup_l2_node ?runner ?name ?loser_mode ~operator client node rollup =
+let setup_l2_node ?(mode = Sc_rollup_node.Operator) ?runner ?name ?loser_mode
+    ~operator client node rollup =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
       ?name
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator
-      Operator
+      mode
       node
   in
 
