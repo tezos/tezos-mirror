@@ -62,17 +62,17 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner () =
            `lib_node_config/config_file.ml`). *)
         let node = Node.create ?runner l1_node_args in
         let* () = Node.config_init node [] in
-        let* () =
-          match testnet.snapshot with
-          | Some snapshot ->
-              Log.info "Import snapshot" ;
-              let* snapshot = download ?runner snapshot "snapshot" in
-              let* () = Node.snapshot_import node snapshot in
-              Log.info "Snapshot imported" ;
-              unit
-          | None -> unit
-        in
         return node
+  in
+  let* () =
+    match testnet.snapshot with
+    | Some snapshot ->
+        Log.info "Import snapshot" ;
+        let* snapshot = download ?runner snapshot "snapshot" in
+        let* () = Node.snapshot_import node snapshot in
+        Log.info "Snapshot imported" ;
+        unit
+    | None -> unit
   in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
