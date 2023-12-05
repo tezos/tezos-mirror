@@ -26,10 +26,8 @@
 
 open Shell_operation
 
-(** The priority of a pending operation.
-
-    A priority is attached to each pending operation. *)
-type priority = [`High | `Medium | `Low of Q.t list]
+(* A priority is attached to each pending operation. *)
+type priority = High | Medium | Low of Q.t list
 
 (**
    This type is used for data representing pending operations of the

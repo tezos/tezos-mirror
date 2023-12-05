@@ -370,7 +370,9 @@ module Make_s
        on an "harmless" field of [types_state_shell]: [operation_stream] *)
     Lwt_watcher.notify operation_stream (classification, op)
 
-  let pre_filter pv ~notifier parsed_op : [Pending_ops.priority | `Drop] Lwt.t =
+  type pre_filter_result = Drop | Priority of Pending_ops.priority
+
+  let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
     let open Lwt_syntax in
     let+ v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
@@ -379,8 +381,8 @@ module Make_s
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        `Drop
-    | `Passed_prefilter priority -> (priority :> [Pending_ops.priority | `Drop])
+        Drop
+    | `Passed_prefilter priority -> Priority priority
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -626,8 +628,8 @@ module Make_s
                 parsed_op
             in
             match v with
-            | `Drop -> return_ok_unit
-            | (`High | `Medium | `Low _) as prio ->
+            | Drop -> return_ok_unit
+            | Priority ((High | Medium | Low _) as priority) ->
                 if
                   not
                     (Block_hash.Set.mem
@@ -640,7 +642,7 @@ module Make_s
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                      Should this have an influence on the peer's score ? *)
                   pv.shell.pending <-
-                    Pending_ops.add parsed_op prio pv.shell.pending ;
+                    Pending_ops.add parsed_op priority pv.shell.pending ;
                   return_ok_unit))
 
     let on_inject (pv : types_state) ~force op =
@@ -651,7 +653,7 @@ module Make_s
          - We don't want to call prefilter to get the priority.
          But, this may change in the future
       *)
-      let prio = `High in
+      let priority = Pending_ops.High in
       if already_handled ~origin:Events.Injected pv.shell oph then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
@@ -671,7 +673,7 @@ module Make_s
                 pv.shell.parameters.tools.chain_tools.inject_operation oph op
               in
               pv.shell.pending <-
-                Pending_ops.add parsed_op prio pv.shell.pending ;
+                Pending_ops.add parsed_op priority pv.shell.pending ;
               let*! () = Events.(emit operation_injected) oph in
               return_unit)
             else if
@@ -798,11 +800,11 @@ module Make_s
               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
             in
             match v with
-            | `Drop -> Lwt.return (pending, nb_pending)
-            | (`High | `Medium | `Low _) as prio ->
-                (* Here, an operation injected in this node with `High priority will
+            | Drop -> Lwt.return (pending, nb_pending)
+            | Priority ((High | Medium | Low _) as priority) ->
+                (* Here, an operation injected in this node with High priority will
                    now get its approriate priority. *)
-                Lwt.return (Pending_ops.add op prio pending, nb_pending + 1))
+                Lwt.return (Pending_ops.add op priority pending, nb_pending + 1))
           new_pending_operations
           (Pending_ops.empty, 0)
       in

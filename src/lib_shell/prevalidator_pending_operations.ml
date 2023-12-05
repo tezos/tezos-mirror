@@ -27,7 +27,7 @@
 open Shell_operation
 
 (* Ordering is important, as it is used below in map keys comparison *)
-type priority = [`High | `Medium | `Low of Q.t list]
+type priority = High | Medium | Low of Q.t list
 
 module Priority_map : Map.S with type key = priority = Map.Make (struct
   type t = priority
@@ -40,15 +40,15 @@ module Priority_map : Map.S with type key = priority = Map.Make (struct
     CompareListQ.compare p2 p1
 
   let compare p1 p2 =
-    (* - Explicit comparison, `High is smaller,
+    (* - Explicit comparison, High is smaller,
        - Avoid fragile patterns in case the type is extended in the future *)
     match (p1, p2) with
-    | `High, `High | `Medium, `Medium -> 0
-    | `Low p1, `Low p2 -> compare_low_prio p1 p2
-    | `High, (`Low _ | `Medium) -> -1
-    | (`Low _ | `Medium), `High -> 1
-    | `Low _, `Medium -> 1
-    | `Medium, `Low _ -> -1
+    | High, High | Medium, Medium -> 0
+    | Low p1, Low p2 -> compare_low_prio p1 p2
+    | High, (Low _ | Medium) -> -1
+    | (Low _ | Medium), High -> 1
+    | Low _, Medium -> 1
+    | Medium, Low _ -> -1
 end)
 
 module Map = Operation_hash.Map
