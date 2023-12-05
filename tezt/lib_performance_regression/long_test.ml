@@ -900,8 +900,8 @@ let wrap_body title filename team timeout body argument =
       current_test := None ;
       unit)
 
-let register ~__FILE__ ~title ~tags ?uses ?uses_client ?uses_admin_client ?team
-    ~executors ~timeout body =
+let register ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
+    ?uses_admin_client ?team ~executors ~timeout body =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
@@ -911,6 +911,7 @@ let register ~__FILE__ ~title ~tags ?uses ?uses_client ?uses_admin_client ?team
     ~title
     ~tags
     ?uses
+    ?uses_node
     ?uses_client
     ?uses_admin_client
     (wrap_body title __FILE__ team timeout body)

@@ -21,15 +21,18 @@ module Uses = struct
 
   let tag uses = uses.tag
 
+  let octez_node = make ~tag:"node" ~path:"./octez-node"
+
   let octez_client = make ~tag:"client" ~path:"./octez-client"
 
   let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
 end
 
 (* Prepare parameters of a [Test.register]-like function. *)
-let wrap ~file ~title ~tags ?(uses = []) ?(uses_client = true)
-    ?(uses_admin_client = true) ~run_test () =
+let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
+    ?(uses_client = true) ?(uses_admin_client = true) ~run_test () =
   (* Add default uses. *)
+  let uses = if uses_node then Uses.octez_node :: uses else uses in
   let uses = if uses_client then Uses.octez_client :: uses else uses in
   let uses =
     if uses_admin_client then Uses.octez_admin_client :: uses else uses
@@ -79,10 +82,19 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_client = true)
 module Test = struct
   include Test
 
-  let register ~__FILE__:file ~title ~tags ?uses ?uses_client ?uses_admin_client
-      ?seed run_test =
+  let register ~__FILE__:file ~title ~tags ?uses ?uses_node ?uses_client
+      ?uses_admin_client ?seed run_test =
     let tags, run_test =
-      wrap ~file ~title ~tags ?uses ?uses_client ?uses_admin_client ~run_test ()
+      wrap
+        ~file
+        ~title
+        ~tags
+        ?uses
+        ?uses_node
+        ?uses_client
+        ?uses_admin_client
+        ~run_test
+        ()
     in
     Test.register ~__FILE__:file ~title ~tags ?seed run_test
 end
@@ -90,10 +102,19 @@ end
 module Regression = struct
   include Regression
 
-  let register ~__FILE__:file ~title ~tags ?uses ?uses_client ?uses_admin_client
-      ?file:output_file run_test =
+  let register ~__FILE__:file ~title ~tags ?uses ?uses_node ?uses_client
+      ?uses_admin_client ?file:output_file run_test =
     let tags, run_test =
-      wrap ~file ~title ~tags ?uses ?uses_client ?uses_admin_client ~run_test ()
+      wrap
+        ~file
+        ~title
+        ~tags
+        ?uses
+        ?uses_node
+        ?uses_client
+        ?uses_admin_client
+        ~run_test
+        ()
     in
     Regression.register ~__FILE__:file ~title ~tags ?file:output_file run_test
 end
