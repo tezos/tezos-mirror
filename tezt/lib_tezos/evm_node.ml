@@ -51,6 +51,8 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
+let mode t = t.persistent_state.mode
+
 let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =

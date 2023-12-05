@@ -175,13 +175,19 @@ let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
   in
   loop count
 
-let wait_for_application ~sc_rollup_node ~node ~client apply () =
+let wait_for_application ~evm_node ~sc_rollup_node ~node ~client apply () =
   let* start_level = Client.level client in
   let max_iteration = 10 in
   let application_result = apply () in
   let rec loop () =
     let* () = Lwt_unix.sleep 5. in
-    let* new_level = next_evm_level ~sc_rollup_node ~node ~client in
+    let* new_level =
+      match Evm_node.mode evm_node with
+      | Proxy _ -> next_evm_level ~sc_rollup_node ~node ~client
+      | Sequencer _ ->
+          let* head = Rpc.block_number evm_node in
+          return (Int32.to_int head)
+    in
     if start_level + max_iteration < new_level then
       Test.fail
         "Baked more than %d blocks and the operation's application is still \
@@ -213,6 +219,7 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs =
       test this block contains the `n` transactions as expected. *)
   let* receipt =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -441,7 +448,7 @@ let deploy ~contract ~sender full_evm_setup =
       ~abi:contract.label
       ~bin:contract.bin
   in
-  wait_for_application ~sc_rollup_node ~node ~client send_deploy ()
+  wait_for_application ~evm_node ~sc_rollup_node ~node ~client send_deploy ()
 
 type deploy_checks = {
   contract : contract;
@@ -507,7 +514,7 @@ let send ~sender ~receiver ~value ?data full_evm_setup =
       ~endpoint:evm_node_endpoint
       ?data
   in
-  wait_for_application ~sc_rollup_node ~node ~client send ()
+  wait_for_application ~evm_node ~sc_rollup_node ~node ~client send ()
 
 let check_block_progression ~sc_rollup_node ~node ~client ~endpoint
     ~expected_block_level =
@@ -1004,7 +1011,7 @@ let test_l2_deploy_simple_storage =
     protocol
 
 let send_call_set_storage_simple contract_address sender n
-    {sc_rollup_node; node; client; endpoint; _} =
+    {sc_rollup_node; node; client; endpoint; evm_node; _} =
   let call_set (sender : Eth_account.t) n =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
@@ -1013,7 +1020,13 @@ let send_call_set_storage_simple contract_address sender n
       ~address:contract_address
       ~method_call:(Printf.sprintf "set(%d)" n)
   in
-  wait_for_application ~sc_rollup_node ~node ~client (call_set sender n) ()
+  wait_for_application
+    ~evm_node
+    ~sc_rollup_node
+    ~node
+    ~client
+    (call_set sender n)
+    ()
 
 (** Test that a contract can be called,
     and that the call can modify the storage.  *)
@@ -1169,7 +1182,13 @@ let test_l2_deploy_erc20 =
   in
   (* sender mints 42 *)
   let* tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_mint sender 42) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_mint sender 42)
+      ()
   in
   let* () =
     check_status_n_logs ~endpoint ~status:true ~logs:(mint_logs sender 42) ~tx
@@ -1180,7 +1199,13 @@ let test_l2_deploy_erc20 =
 
   (* player mints 100 *)
   let* tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_mint player 100) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_mint player 100)
+      ()
   in
   let* () =
     check_status_n_logs ~endpoint ~status:true ~logs:(mint_logs player 100) ~tx
@@ -1191,6 +1216,7 @@ let test_l2_deploy_erc20 =
   (* sender tries to burn 100, should fail *)
   let* _tx =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -1201,7 +1227,13 @@ let test_l2_deploy_erc20 =
 
   (* sender tries to burn 42, should succeed *)
   let* tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_burn sender 42) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_burn sender 42)
+      ()
   in
   let* () =
     check_status_n_logs ~endpoint ~status:true ~logs:(burn_logs sender 42) ~tx
@@ -2112,7 +2144,7 @@ let test_eth_call_storage_contract_eth_cli =
           ~method_call:"num()"
       in
       let* res =
-        wait_for_application ~sc_rollup_node ~node ~client call_num ()
+        wait_for_application ~evm_node ~sc_rollup_node ~node ~client call_num ()
       in
 
       Check.((String.trim res = "42") string)
@@ -2182,8 +2214,8 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~sc_rollup_node
   unit
 
 let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
-    ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address ~node ~client ~endpoint
-    =
+    ~evm_node ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address ~node ~client
+    ~endpoint =
   let* withdrawal_level = Client.level client in
 
   (* Call the withdrawal precompiled contract. *)
@@ -2200,7 +2232,13 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       ~value:amount_wei
   in
   let* _tx =
-    wait_for_application ~sc_rollup_node ~node ~client call_withdraw ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      call_withdraw
+      ()
   in
 
   (* Bake enough levels to have a commitment. *)
@@ -2305,6 +2343,7 @@ let test_deposit_and_withdraw =
          sc_rollup_client;
          node;
          endpoint;
+         evm_node;
          _;
        } =
     setup_evm_kernel
@@ -2356,6 +2395,7 @@ let test_deposit_and_withdraw =
   let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
   let* _tx =
     withdraw
+      ~evm_node
       ~sc_rollup_address
       ~sc_rollup_client
       ~commitment_period
@@ -2713,6 +2753,7 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
     (fun transaction_hash ->
       let* receipt =
         wait_for_application
+          ~evm_node
           ~sc_rollup_node
           ~node
           ~client
@@ -3054,6 +3095,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
   let transaction_hash = Result.get_ok result in
   let* _ =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -3533,7 +3575,8 @@ let test_simulation_eip2200 =
       ])
     ~title:"Simulation is EIP2200 resilient"
   @@ fun protocol ->
-  let* ({sc_rollup_node; node; client; endpoint; _} as full_evm_setup) =
+  let* ({sc_rollup_node; node; client; endpoint; evm_node; _} as full_evm_setup)
+      =
     setup_past_genesis ~admin:None protocol
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3549,7 +3592,9 @@ let test_simulation_eip2200 =
       ~address:loop_address
       ~method_call:"loop(5)"
   in
-  let* _tx = wait_for_application ~sc_rollup_node ~node ~client call () in
+  let* _tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~node ~client call ()
+  in
   unit
 
 let test_cover_fees =
@@ -3627,6 +3672,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
   let hash_2 = Result.get_ok result in
   let* _ =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -3635,6 +3681,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
   in
   let* _ =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -3667,6 +3714,7 @@ let test_rpc_sendRawTransaction_not_included =
   in
   let* result =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -3709,7 +3757,7 @@ let test_rpc_gasPrice =
   unit
 
 let send_foo_mapping_storage contract_address sender
-    {sc_rollup_node; node; client; endpoint; _} =
+    {sc_rollup_node; node; client; endpoint; evm_node; _} =
   let call_foo (sender : Eth_account.t) =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
@@ -3718,7 +3766,13 @@ let send_foo_mapping_storage contract_address sender
       ~address:contract_address
       ~method_call:"foo()"
   in
-  wait_for_application ~sc_rollup_node ~node ~client (call_foo sender) ()
+  wait_for_application
+    ~evm_node
+    ~sc_rollup_node
+    ~node
+    ~client
+    (call_foo sender)
+    ()
 
 let test_rpc_getStorageAt =
   Protocol.register_test
@@ -3907,6 +3961,7 @@ let test_l2_call_inter_contract =
         ~method_call:(Printf.sprintf "setX(%d)" n)
     in
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -3934,6 +3989,7 @@ let test_l2_call_inter_contract =
         ~method_call:(Printf.sprintf "setX(\"%s\", %d)" callee_address n)
     in
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -4042,15 +4098,33 @@ let test_rpc_getLogs =
   in
   (* sender mints 42 *)
   let* tx1 =
-    wait_for_application ~sc_rollup_node ~node ~client (call_mint sender 42) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_mint sender 42)
+      ()
   in
   (* player mints 100 *)
   let* _tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_mint player 100) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_mint player 100)
+      ()
   in
   (* sender burns 42 *)
   let* _tx =
-    wait_for_application ~sc_rollup_node ~node ~client (call_burn sender 42) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_burn sender 42)
+      ()
   in
   (* Check that there have been 3 logs in total *)
   let* all_logs = get_logs ~from_block:"0" evm_node in
@@ -4139,6 +4213,7 @@ let test_tx_pool_replacing_transactions =
   let tx_b_hash = Result.get_ok result in
   let* receipt =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -4175,7 +4250,13 @@ let test_l2_nested_create =
         ~address:nested_create_address
         ~method_call:(Printf.sprintf "create(%d)" n)
     in
-    wait_for_application ~sc_rollup_node ~node ~client (call_create sender 1) ()
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_create sender 1)
+      ()
   in
   let* tx2 =
     let call_create (sender : Eth_account.t) n salt =
@@ -4187,6 +4268,7 @@ let test_l2_nested_create =
         ~method_call:(Printf.sprintf "create2(%d, \"%s\")" n salt)
     in
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
@@ -4248,6 +4330,7 @@ let test_l2_revert_returns_unused_gas =
   let transaction_hash = Result.get_ok result in
   let* transaction_receipt =
     wait_for_application
+      ~evm_node
       ~sc_rollup_node
       ~node
       ~client
