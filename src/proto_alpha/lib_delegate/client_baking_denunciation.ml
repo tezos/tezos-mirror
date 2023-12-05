@@ -328,6 +328,7 @@ let process_consensus_op (type kind) state cctxt
 
 let process_operations (cctxt : #Protocol_client_context.full) state
     (attestations : 'a list) ~packed_op chain_id =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun op ->
       let {shell; protocol_data; _} = packed_op op in

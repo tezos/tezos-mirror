@@ -26,6 +26,7 @@
 open Client_proto_args
 
 let pidfile_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.arg
     ~doc:"write process id in file"
     ~short:'P'
@@ -148,6 +149,7 @@ let keep_alive_arg =
     ()
 
 let per_block_vote_parameter =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Per_block_votes in
@@ -183,6 +185,7 @@ let adaptive_issuance_vote_arg =
     per_block_vote_parameter
 
 let state_recorder_switch_arg =
+  let open Lwt_result_syntax in
   let open Baking_configuration in
   Tezos_clic.map_arg
     ~f:(fun _cctxt flag -> if flag then return Filesystem else return Memory)
@@ -243,6 +246,7 @@ let sources_param =
           the consensus key signing on the delegate's behalf")
 
 let endpoint_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"dal-node"
     ~placeholder:"uri"
