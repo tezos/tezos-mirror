@@ -83,7 +83,7 @@ let check_tx_succeeded ~endpoint ~tx =
   Check.(is_true status) ~error_msg:"Expected transaction to succeed." ;
   unit
 
-let _check_tx_failed ~endpoint ~tx =
+let check_tx_failed ~endpoint ~tx =
   let* status = get_transaction_status ~endpoint ~tx in
   Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
   unit
@@ -908,6 +908,13 @@ let nested_create =
     label = "nested_create";
     abi = kernel_inputs_path ^ "/nested_create.abi";
     bin = kernel_inputs_path ^ "/nested_create.bin";
+  }
+
+let revert =
+  {
+    label = "revert";
+    abi = kernel_inputs_path ^ "/revert.abi";
+    bin = kernel_inputs_path ^ "/revert.bin";
   }
 
 (** Test that the contract creation works.  *)
@@ -4118,6 +4125,51 @@ let test_block_hash_regression =
   Regression.capture @@ sf "Block hash: %s" receipt.blockHash ;
   unit
 
+let test_l2_revert_returns_unused_gas =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"]
+    ~title:"Check L2 revert returns unused gas"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
+       evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* _revert_address, _tx = deploy ~contract:revert ~sender evm_setup in
+  (* Tx data is constructed by:
+     cd src/kernel_evm/benchmarks/scripts
+     node sign_tx.js ../../../../tezt/tests/evm_kernel_inputs/call_revert.json "9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0"
+  *)
+  let tx =
+    "0xf8690183010000830186a094d77420f73b4612a7a99dba8c2afd30a1886b03448084c0406226820a96a0869b3a97d2c87d41c22eaeafba2644c276e74267998dff3504d1d2b35fae0e2ba058f0661adcff7d2abd3c6eb4d663e4731c838f6ef15ebb797b88db87c4fee39b"
+  in
+  let* balance_before = Eth_cli.balance ~account:sender.address ~endpoint in
+  let* result = send_raw_transaction evm_node tx in
+  let transaction_hash = Result.get_ok result in
+  let* transaction_receipt =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash)
+      ()
+  in
+  let gas_used = transaction_receipt.gasUsed in
+  let* () = check_tx_failed ~endpoint ~tx:transaction_hash in
+  Check.((gas_used < 100000l) int32)
+    ~error_msg:"Expected gas usage less than %R logs, got %L" ;
+  let* balance_after = Eth_cli.balance ~account:sender.address ~endpoint in
+  let gas_fee_paid = Wei.(balance_before - balance_after) in
+  let gas_price = transaction_receipt.effectiveGasPrice in
+  let expected_gas_fee_paid =
+    Wei.to_wei_z @@ Z.of_int32 @@ Int32.mul gas_price gas_used
+  in
+  Check.((expected_gas_fee_paid = gas_fee_paid) Wei.typ)
+    ~error_msg:"Expected gas fee paid to be %L, got %R" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4184,7 +4236,8 @@ let register_evm_node ~protocols =
   test_log_index protocols ;
   test_tx_pool_replacing_transactions protocols ;
   test_l2_nested_create protocols ;
-  test_block_hash_regression protocols
+  test_block_hash_regression protocols ;
+  test_l2_revert_returns_unused_gas protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
