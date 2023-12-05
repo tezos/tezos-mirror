@@ -94,8 +94,8 @@ let liquidity_baking_votefile ?path vote =
       ]) ;
   votefile
 
-let create_from_uris ~protocol ?(path = Protocol.baker protocol) ?name ?color
-    ?event_pipe ?runner ?(delegates = []) ?votefile
+let create_from_uris ~protocol ?(path = Uses.path (Protocol.baker protocol))
+    ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
     ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
     ?minimal_nanotez_per_gas_unit ?(state_recorder = false) ~base_dir

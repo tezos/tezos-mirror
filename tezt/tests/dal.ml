@@ -275,16 +275,16 @@ let scenario_with_layer1_node ?(tags = ["layer1"])
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
-    ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
-    ?attestation_threshold ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile variant
-    scenario =
+let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"])
+    ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
+    ?delay_increment_per_round ?attestation_lag ?attestation_threshold
+    ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?activation_timestamp ?bootstrap_profile variant scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
     ~tags
-    ~uses:(fun _protocol -> [Constant.octez_dal_node])
+    ~uses:(fun protocol -> Constant.octez_dal_node :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
@@ -304,14 +304,16 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
     ?page_size ?number_of_shards ?attestation_lag ?(tags = [])
-    ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
-    ?challenge_window ?minimal_block_delay ?delay_increment_per_round
-    ?activation_timestamp variant scenario =
+    ?(uses = fun _ -> []) ?(pvm_name = "arith") ?(dal_enable = true)
+    ?commitment_period ?challenge_window ?minimal_block_delay
+    ?delay_increment_per_round ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
     ~tags
-    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_dal_node])
+    ~uses:(fun protocol ->
+      Constant.octez_smart_rollup_node :: Constant.octez_dal_node
+      :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
@@ -2786,6 +2788,7 @@ let register_end_to_end_tests ~protocols =
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
+        ~uses:(fun protocol -> [Protocol.baker protocol])
         title
         (e2e_test_script
            ~number_of_dal_slots
@@ -4143,6 +4146,7 @@ let register ~protocols =
     test_attester_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~uses:(fun protocol -> [Protocol.baker protocol])
     ~attestation_threshold:100
     ~attestation_lag:8
     ~activation_timestamp:Now
@@ -4182,6 +4186,7 @@ let register ~protocols =
   *)
   scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"
+    ~uses:(fun protocol -> [Protocol.baker protocol])
     ~activation_timestamp:Now
     test_baker_registers_profiles
     protocols ;

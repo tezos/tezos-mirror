@@ -452,6 +452,7 @@ let baker_test ~network =
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
     ~tags:["dal"; "baker"; network]
+    ~uses:[Protocol.baker Alpha]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
   let dal_bootstrap_peers =

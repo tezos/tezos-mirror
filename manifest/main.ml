@@ -8483,7 +8483,9 @@ let _tezt_manual_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
-        tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_; yes_wallet_lib;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_;
+        yes_wallet_lib;
       ]
 
 let _tezt_remote_tests =

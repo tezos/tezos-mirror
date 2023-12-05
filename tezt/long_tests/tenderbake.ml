@@ -311,6 +311,7 @@ module Rounds = struct
       ~__FILE__
       ~title:test
       ~tags:["tenderbake"; "basic"]
+      ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->
@@ -461,6 +462,7 @@ module Long_dynamic_bake = struct
       ~__FILE__
       ~title:(test topology)
       ~tags:["tenderbake"; "dynamic"; string_of_topology topology]
+      ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->

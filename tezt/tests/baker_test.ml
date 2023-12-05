@@ -58,7 +58,11 @@ let baker_test ?force_apply protocol ~keys =
   Lwt.return client
 
 let baker_simple_test =
-  Protocol.register_test ~__FILE__ ~title:"baker test" ~tags:["node"; "baker"]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker test"
+    ~tags:["node"; "baker"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* _ =
     baker_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
@@ -70,6 +74,7 @@ let baker_stresstest =
     ~__FILE__
     ~title:"baker stresstest"
     ~tags:["node"; "baker"; "stresstest"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
@@ -86,6 +91,7 @@ let baker_stresstest_apply =
     ~__FILE__
     ~title:"baker stresstest with forced application"
     ~tags:["node"; "baker"; "stresstest"; "apply"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
@@ -139,6 +145,7 @@ let baker_remote_test =
     ~__FILE__
     ~title:"Baker in RPC-only mode"
     ~tags:["baker"; "remote"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
