@@ -5,6 +5,10 @@
 .PHONY: all
 all: build test check
 
+.PHONY: build-dev-deps
+build-dev-deps:
+	@exec ./install-rust-std-hermit.sh
+
 .PHONY: build
 build:
 	@cargo build --release --target=riscv64gc-unknown-none-elf

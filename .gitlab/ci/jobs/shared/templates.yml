@@ -50,7 +50,7 @@
   stage: build
   needs: [trigger]
   before_script:
-    - make -f kernels.mk build-dev-deps
+    - make -f kernels.mk build-deps
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo
