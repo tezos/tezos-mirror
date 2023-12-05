@@ -165,7 +165,9 @@ let test_multiple_origination_and_delegation () =
       Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
     new_contracts
 
-let expect_apply_failure = function
+let expect_apply_failure =
+  let open Lwt_result_syntax in
+  function
   | Environment.Ecoproto_error err :: _ ->
       Assert.test_error_encodings err ;
       let error_info =
@@ -321,6 +323,7 @@ let test_wrong_signature_in_the_middle () =
   return_unit
 
 let expect_inconsistent_counters list =
+  let open Lwt_result_syntax in
   if
     List.exists
       (function

@@ -108,6 +108,7 @@ let test_block_with_a_single_transfer_with_fee () =
 
 (** Single transfer without fee. *)
 let test_transfer_zero_tez () =
+  let open Lwt_result_syntax in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Apply.Empty_transaction _ as err) :: _ ->
         Assert.test_error_encodings err ;

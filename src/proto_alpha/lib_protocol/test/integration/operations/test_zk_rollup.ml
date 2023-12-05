@@ -63,6 +63,7 @@ let false_op l1_dst rollup_id =
 (** [check_proto_error_f f t] checks that the first error of [t]
     satisfies the boolean function [f]. *)
 let check_proto_error_f f t =
+  let open Lwt_result_syntax in
   match t with
   | Environment.Ecoproto_error e :: _ when f e ->
       Assert.test_error_encodings e ;

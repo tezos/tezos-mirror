@@ -104,6 +104,7 @@ let get_game_status_result incr =
       | Some x -> x)
 
 let assert_equal_game_status ?game_status actual_game_status =
+  let open Lwt_result_syntax in
   match game_status with
   | None -> return_unit
   | Some game_status ->
