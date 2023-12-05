@@ -1,0 +1,3 @@
+code { EMPTY_SET operation } ;
+input { } ;
+output (StaticError _)
