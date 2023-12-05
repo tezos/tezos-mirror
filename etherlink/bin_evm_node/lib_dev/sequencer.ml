@@ -25,7 +25,7 @@ end) : Services_backend_sig.Backend = struct
         Ethereum_types.(
           Hash Hex.(of_string tx_hash_str |> show |> hex_of_string))
       in
-      Result_syntax.return (tx_hash, [tx_hash_str ^ transaction])
+      Result_syntax.return (tx_hash, [transaction])
   end
 
   module Publisher = struct
