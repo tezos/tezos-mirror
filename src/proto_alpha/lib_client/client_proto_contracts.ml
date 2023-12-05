@@ -34,7 +34,9 @@ module Contract_entity = struct
     |> record_trace_eval (fun () -> error_of_fmt "bad contract notation")
     |> Lwt.return
 
-  let to_source s = return (Contract.to_b58check s)
+  let to_source s =
+    let open Lwt_result_syntax in
+    return (Contract.to_b58check s)
 
   let name = "contract"
 end
