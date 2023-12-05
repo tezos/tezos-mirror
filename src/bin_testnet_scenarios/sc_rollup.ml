@@ -40,8 +40,8 @@ let originate_new_rollup ?(alias = "rollup")
   Log.info "Rollup %s originated" rollup ;
   return rollup
 
-let setup_l2_node ?(mode = Sc_rollup_node.Operator) ?runner ?name ?loser_mode
-    ~operator client node rollup =
+let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
+    ?loser_mode ~operator client node rollup =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
@@ -51,7 +51,17 @@ let setup_l2_node ?(mode = Sc_rollup_node.Operator) ?runner ?name ?loser_mode
       mode
       node
   in
-
+  let* () =
+    match preimages_dir with
+    | None -> unit
+    | Some dir ->
+        let* _ =
+          Lwt_unix.system
+            ("cp -r " ^ dir ^ " "
+            ^ (Sc_rollup_node.data_dir rollup_node // "wasm_2_0_0"))
+        in
+        unit
+  in
   let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup in
   Log.info "Starting a smart rollup node to track %s" rollup ;
   let* () = Sc_rollup_node.run rollup_node rollup [] in
