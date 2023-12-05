@@ -116,12 +116,33 @@ let start_updating_floating_stores =
     ~msg:"updating floating stores"
     ()
 
+let cementing_block_ranges =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"cementing_block_ranges"
+    ~msg:"cementing block ranges: {ranges}."
+    ~pp1:
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.pp_print_string ppf "; ")
+         (fun ppf (s, e) -> Format.fprintf ppf "[ %ld, %ld ]" s e))
+    ("ranges", Data_encoding.(list (tup2 int32 int32)))
+
 let start_cementing_blocks =
-  declare_0
+  declare_2
     ~section
     ~level:Info
     ~name:"start_cementing_blocks"
-    ~msg:"cementing blocks"
+    ~msg:"cementing blocks between level {start} and {stop}"
+    ("start", Data_encoding.int32)
+    ("stop", Data_encoding.int32)
+
+let end_cementing_blocks =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"end_cementing_blocks"
+    ~msg:"successful cementing"
     ()
 
 let start_cementing_blocks_metadata =

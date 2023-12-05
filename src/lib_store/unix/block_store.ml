@@ -415,16 +415,22 @@ let store_block block_store block resulting_context_hash =
             block))
 
 let cement_blocks ?(check_consistency = true) ~write_metadata block_store
-    chunk_iterator =
+    chunk_iterator ~cycle_range:(cycle_start, cycle_stop) =
   (* No need to lock *)
   let open Lwt_result_syntax in
-  let*! () = Store_events.(emit start_cementing_blocks) () in
+  let*! () =
+    Store_events.(emit start_cementing_blocks) (cycle_start, cycle_stop)
+  in
   let {cemented_store; _} = block_store in
-  Cemented_block_store.cement_blocks
-    ~check_consistency
-    cemented_store
-    ~write_metadata
-    chunk_iterator
+  let* () =
+    Cemented_block_store.cement_blocks
+      ~check_consistency
+      cemented_store
+      ~write_metadata
+      chunk_iterator
+  in
+  let*! () = Store_events.(emit end_cementing_blocks) () in
+  return_unit
 
 (* [try_retrieve_n_predecessors stores block_hash n] retrieves, at
    most, the [n] [block_hash]'s predecessors (including [block_hash])
@@ -1218,6 +1224,9 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             ~lowest_bound_to_preserve_in_floating
             ~cementing_highwatermark
         in
+        let*! () =
+          Store_events.(emit cementing_block_ranges) cycles_interval_to_cement
+        in
         let cycle_reader =
           read_iterator_block_range_in_floating_stores
             block_store
@@ -1232,7 +1241,11 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 (fun cycle_range ->
                   let* chunk_iterator = cycle_reader cycle_range in
                   (* In archive, we store the metadatas *)
-                  cement_blocks ~write_metadata:true block_store chunk_iterator)
+                  cement_blocks
+                    ~write_metadata:true
+                    block_store
+                    chunk_iterator
+                    ~cycle_range)
                 cycles_interval_to_cement
           | Rolling offset ->
               let offset =
@@ -1249,7 +1262,8 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                       cement_blocks
                         ~write_metadata:true
                         block_store
-                        chunk_iterator)
+                        chunk_iterator
+                        ~cycle_range)
                     cycles_interval_to_cement
                 in
                 (* Clean-up the files that are below the offset *)
@@ -1278,7 +1292,8 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                       cement_blocks
                         ~write_metadata:true
                         block_store
-                        chunk_iterator)
+                        chunk_iterator
+                        ~cycle_range)
                     cycles_interval_to_cement
                 in
                 (* Clean-up the files that are below the offset *)
@@ -1296,7 +1311,8 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                     cement_blocks
                       ~write_metadata:false
                       block_store
-                      chunk_iterator)
+                      chunk_iterator
+                      ~cycle_range)
                   cycles_interval_to_cement
         in
         return (new_savepoint, new_caboose))

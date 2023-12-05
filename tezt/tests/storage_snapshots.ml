@@ -161,7 +161,7 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
     match history_mode with
     | Node.Full_history ->
         iter_block_range_s 1 (savepoint - 1) @@ expect_no_metadata
-    | _ ->
+    | Node.Rolling_history ->
         if caboose <> 0 then
           iter_block_range_s 1 (caboose - 1) @@ expect_no_block
         else unit
@@ -309,6 +309,20 @@ let test_export_import_snapshots =
   in
   unit
 
+let wait_for_complete_merge node target =
+  let wait_for_starting_merge target =
+    let filter json =
+      let level = JSON.(json |-> "stop" |> as_int) in
+      if level = target then Some () else None
+    in
+    Node.wait_for node "start_cementing_blocks.v0" filter
+  in
+  let wait_for_ending_merge () =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
+  in
+  let* () = wait_for_starting_merge target in
+  wait_for_ending_merge ()
+
 (* This test aims to export and import a rolling snapshot, bake some
    blocks and make sure that the checkpoint, savepoint and caboose are
    well dragged. *)
@@ -369,6 +383,7 @@ let test_drag_after_rolling_import =
       ~name:fresh_node_name
       ~snapshot:(snapshot_dir // filename, false)
       node_arguments
+      ~event_sections_levels:[("node.store", `Info)]
   in
   (* Baking a few blocks so that the caboose is not the genesis
      anymore. *)
@@ -395,9 +410,18 @@ let test_drag_after_rolling_import =
       ~caboose:expected_caboose
   in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let* () = Client.Admin.connect_address ~peer:fresh_node client in
   let* expected_head = Node.get_level archive_node in
+  let wait_for_merge_at_checkpoint =
+    (* Waiting for the last cycle to be cemented before checking
+       store's invariants. *)
+    let expected_checkpoint =
+      expected_head - (preserved_cycles * blocks_per_cycle)
+    in
+    wait_for_complete_merge fresh_node expected_checkpoint
+  in
+  let* () = Client.Admin.connect_address ~peer:fresh_node client in
   let* (_ : int) = Node.wait_for_level fresh_node expected_head in
+  let* () = wait_for_merge_at_checkpoint in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     match history_mode with
     | Node.Full_history -> Test.fail "testing only rolling mode"
@@ -409,7 +433,7 @@ let test_drag_after_rolling_import =
           expected_head
           - ((preserved_cycles + additional_cycles) * blocks_per_cycle)
         in
-        (checkpoint, savepoint, savepoint - max_op_ttl)
+        (checkpoint, savepoint, min savepoint (checkpoint - max_op_ttl))
   in
   let* () =
     check_consistency_after_import
@@ -419,6 +443,11 @@ let test_drag_after_rolling_import =
       ~expected_savepoint
       ~expected_caboose
   in
+  (* Restart the node to invalidate the cache and avoid false
+     positives. *)
+  let* () = Node.terminate fresh_node in
+  let* () = Node.run fresh_node node_arguments in
+  let* () = Node.wait_for_ready fresh_node in
   let* () =
     check_blocks_availability
       fresh_node
