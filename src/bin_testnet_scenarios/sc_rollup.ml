@@ -29,7 +29,7 @@ let originate_new_rollup ?(alias = "rollup")
   let* rollup =
     Client.Sc_rollup.originate
       client
-      ~wait:"0"
+      ~wait:"2"
       ~alias
       ~src
       ~kind:"wasm_2_0_0"
