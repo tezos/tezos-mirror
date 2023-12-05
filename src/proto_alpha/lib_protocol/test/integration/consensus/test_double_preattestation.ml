@@ -216,8 +216,9 @@ end = struct
   (** Helper function for denunciations inclusion *)
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
       ~nb_blocks_before_denunciation
-      ?(test_expected_ok = fun _loc _baker _pred _bbad _d1 _d2 -> return_unit)
-      ?(test_expected_ko = fun _loc _res -> return_unit)
+      ?(test_expected_ok =
+        fun _loc _baker _pred _bbad _d1 _d2 -> Lwt_result_syntax.return_unit)
+      ?(test_expected_ko = fun _loc _res -> Lwt_result_syntax.return_unit)
       ?(pick_attesters =
         let open Lwt_result_syntax in
         fun ctxt ->

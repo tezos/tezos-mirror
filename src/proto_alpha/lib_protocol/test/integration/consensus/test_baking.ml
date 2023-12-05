@@ -175,6 +175,7 @@ let test_basic_baking_reward () =
     Account.default_initial_balance
 
 let get_contract_for_pkh contracts pkh =
+  let open Lwt_result_syntax in
   let rec find_contract = function
     | [] -> assert false
     | c :: t ->
