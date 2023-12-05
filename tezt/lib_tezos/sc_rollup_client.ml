@@ -45,7 +45,7 @@ let create ~protocol ?runner ?name ?base_dir ?color sc_node =
     | Some name -> name
     | None -> Sc_rollup_node.name sc_node ^ "_client"
   in
-  let path = Protocol.sc_rollup_client protocol in
+  let path = Uses.path (Protocol.sc_rollup_client protocol) in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
