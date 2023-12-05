@@ -250,6 +250,7 @@ module Contract_state = struct
   let find_account vk contract_state = Accounts.find vk contract_state.accounts
 
   let init ~force vk state =
+    let open Lwt_result_syntax in
     Accounts.find vk state.accounts |> function
     | None ->
         let accounts = Accounts.add (Account.create vk) state.accounts in
@@ -349,6 +350,7 @@ module Client_state = struct
   let write (cctxt : #Client_context.wallet) t = cctxt#write filename t encoding
 
   let get_or_init ~default_memo_size contract client_state =
+    let open Lwt_result_syntax in
     Map.find contract client_state |> function
     | None -> (
         match default_memo_size with
@@ -374,6 +376,7 @@ module Client_state = struct
     write cctxt client_state
 
   let find (cctxt : #Client_context.full) contract state =
+    let open Lwt_result_syntax in
     Map.find contract state |> function
     | None ->
         cctxt#error

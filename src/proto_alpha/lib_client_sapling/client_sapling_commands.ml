@@ -120,6 +120,7 @@ let do_sapling_transfer cctxt ?message contract src_name amount dst =
     anti_replay
 
 let message_arg =
+  let open Lwt_result_syntax in
   let open Tezos_clic in
   arg
     ~long:"message"
@@ -128,6 +129,7 @@ let message_arg =
     (parameter (fun _ x -> return @@ Bytes.of_string x))
 
 let memo_size_arg =
+  let open Lwt_result_syntax in
   let open Tezos_clic in
   arg
     ~long:"memo-size"
@@ -330,6 +332,7 @@ let unshield_cmd =
 let sapling_transaction_file = "sapling_transaction"
 
 let file_arg default_filename =
+  let open Lwt_result_syntax in
   let open Tezos_clic in
   arg
     ~long:"file"
