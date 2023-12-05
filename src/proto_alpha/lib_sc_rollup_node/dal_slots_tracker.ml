@@ -271,8 +271,8 @@ module Confirmed_slots_history = struct
       ~default:read_slots_history_from_l1
 
   let slots_history_cache_of_hash node_ctxt block =
+    let open Lwt_result_syntax in
     let find node_ctxt block =
-      let open Lwt_result_syntax in
       let+ hist = Node_context.find_confirmed_slots_histories node_ctxt block in
       Option.map Sc_rollup_proto_types.Dal.Slot_history_cache.of_octez hist
     in

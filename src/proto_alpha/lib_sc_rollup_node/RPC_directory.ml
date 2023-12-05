@@ -85,6 +85,7 @@ module Common = struct
     Z.of_int num_messages
 
   let () =
+    let open Lwt_result_syntax in
     Block_directory.register0 Sc_rollup_services.Block.hash
     @@ fun (_node_ctxt, block) () () -> return block
 
