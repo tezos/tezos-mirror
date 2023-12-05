@@ -59,6 +59,7 @@ let max_z_len =
 let zeros = String.make max_z_len '\000'
 
 let mine ~proof_of_work_threshold shell builder =
+  let open Lwt_result_syntax in
   match
     Option.bind
       (Data_encoding.Binary.fixed_length Block_payload_hash.encoding)
