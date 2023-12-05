@@ -102,7 +102,7 @@ type rpc_hooks = {
   on_request : string -> unit;
       (** A hook is invoked for every request line,
       and the string parameter represents the request message. *)
-  on_response : string -> unit;
+  on_response : Cohttp.Code.status_code -> string -> unit;
       (** A hook is invoked for every response line,
           receiving the body of an HTTP response as a string parameter. *)
 }

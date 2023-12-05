@@ -87,5 +87,8 @@ let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
 
 let rpc_hooks : RPC_core.rpc_hooks =
   let on_request input = replace_variables input |> Regression.capture in
-  let on_response output = replace_variables output |> Regression.capture in
+  let on_response status body =
+    Regression.capture (Cohttp.Code.string_of_status status) ;
+    Regression.capture (replace_variables body)
+  in
   {on_request; on_response}

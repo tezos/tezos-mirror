@@ -78,7 +78,10 @@ let make_uri endpoint rpc =
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
 
-type rpc_hooks = {on_request : string -> unit; on_response : string -> unit}
+type rpc_hooks = {
+  on_request : string -> unit;
+  on_response : Cohttp.Code.status_code -> string -> unit;
+}
 
 module type CALLERS = sig
   type uri_provider
@@ -150,7 +153,11 @@ let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
       "RPC response: %s"
       (Cohttp.Code.string_of_status response.status) ;
   let* body = Cohttp_lwt.Body.to_string response_body in
-  let () = Option.iter (fun {on_response; _} -> on_response body) rpc_hooks in
+  let () =
+    Option.iter
+      (fun {on_response; _} -> on_response response.status body)
+      rpc_hooks
+  in
   if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
   return {body; code = Cohttp.Code.code_of_status response.status}
 
