@@ -11,6 +11,7 @@ use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use evm::executor::stack::PrecompileFailure;
+use evm::ExitReason;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -134,6 +135,13 @@ pub fn run_transaction<'a, Host>(
 where
     Host: Runtime,
 {
+    fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
+        match outcome.reason {
+            ExitReason::Revert(_) => pay_for_gas,
+            _ => pay_for_gas && outcome.is_success,
+        }
+    }
+
     log!(host, Info, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
 
     let mut handler = handler::EvmHandler::<'_, Host>::new(
@@ -168,7 +176,7 @@ where
 
         handler.increment_nonce(caller)?;
 
-        if result.is_success {
+        if do_refund(&result, pay_for_gas) {
             let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
             handler.repay_gas(caller, unused_gas)?;
         }
@@ -915,25 +923,33 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(6),
+            Some(22000),
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
         );
 
+        let expected_gas_used = 21000 + 3 + 3; // Base Cost + PUHS1 + PUSH1, remaining gas is refunded
+
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 6,
+            gas_used: expected_gas_used,
             is_success: false,
-            reason: ExitReason::Error(ExitError::OutOfGas),
+            reason: ExitReason::Revert(ExitRevert::Reverted),
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 65039,
         }));
 
         assert_eq!(expected_result, result);
+
+        // Some gas is returned to the send after the transaction is reverted
+        assert_eq!(
+            get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
+            block.gas_price.saturating_mul(994.into())
+        )
     }
 
     #[test]
