@@ -281,7 +281,7 @@ let write t buf =
       (read_write_error_handler ~rw:Write t)
   in
   t.nwrit <- t.nwrit + len ;
-  let*! () = Events.(emit written_fd) (t.id, len, t.nwrit) in
+  let*! () = Events.(emit written_fd) (t.id, len, Int64.of_int t.nwrit) in
   return_unit
 
 let connect t saddr =
