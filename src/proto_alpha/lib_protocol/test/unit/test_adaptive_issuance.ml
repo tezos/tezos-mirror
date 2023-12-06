@@ -109,7 +109,8 @@ let test_compute_bonus () =
   in
   (* For simplicity, one cycle = one day *)
   let seconds_per_cycle = 86_400L in
-  let compute_bonus stake_ratio previous =
+  let compute_bonus ?(seconds_per_cycle = seconds_per_cycle) stake_ratio
+      previous =
     assert (Q.(stake_ratio <= one)) ;
     Lwt_main.run
       (let*?@ previous_bonus =
@@ -191,6 +192,25 @@ let test_compute_bonus () =
       ~f:Q.leq
       (compute_bonus Q.(40 // 100) max_bonus)
       max_bonus
+  in
+  (* Test linearity wrt seconds_per_cycle *)
+  let compute_growth seconds_per_cycle =
+    Q.(
+      sub
+        (compute_bonus ~seconds_per_cycle Q.(47 // 100) small_bonus)
+        small_bonus)
+  in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_growth (Int64.div seconds_per_cycle 2L))
+      Q.(mul (1 // 2) (compute_growth seconds_per_cycle))
+  in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_growth (Int64.mul seconds_per_cycle 2L))
+      Q.(mul (2 // 1) (compute_growth seconds_per_cycle))
   in
   return_unit
 
