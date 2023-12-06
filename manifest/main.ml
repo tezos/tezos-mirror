@@ -6326,7 +6326,7 @@ let hash = Protocol.hash
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_protocol_environment |> if_ N.(number <= 011);
-            octez_test_helpers |> if_ N.(number <= 011);
+            octez_test_helpers |> open_;
             octez_micheline |> open_;
             client |> if_some |> open_;
             main |> open_;
@@ -6337,7 +6337,6 @@ let hash = Protocol.hash
             baking |> open_;
             parameters |> if_some |> if_ N.(number >= 012);
             octez_crypto |> if_ N.(number >= 012);
-            alcotezt;
             uri;
           ]
     in

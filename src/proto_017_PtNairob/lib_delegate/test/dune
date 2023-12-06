@@ -7,6 +7,7 @@
  (libraries
   tezt.core
   octez-libs.base
+  octez-libs.test-helpers
   octez-libs.micheline
   octez-protocol-017-PtNairob-libs.client
   tezos-protocol-017-PtNairob.protocol
@@ -15,7 +16,6 @@
   octez-protocol-017-PtNairob-libs.baking
   tezos-protocol-017-PtNairob.parameters
   octez-libs.crypto
-  octez-alcotezt
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -24,13 +24,13 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_test_helpers
   -open Tezos_micheline
   -open Tezos_client_017_PtNairob
   -open Tezos_protocol_017_PtNairob
   -open Tezos_base_test_helpers
   -open Tezos_017_PtNairob_mockup_simulator
-  -open Tezos_baking_017_PtNairob
-  -open Octez_alcotezt)
+  -open Tezos_baking_017_PtNairob)
  (modules test_scenario))
 
 (executable

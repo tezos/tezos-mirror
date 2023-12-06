@@ -7,6 +7,7 @@
  (libraries
   tezt.core
   octez-libs.base
+  octez-libs.test-helpers
   octez-libs.micheline
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol
@@ -15,7 +16,6 @@
   octez-protocol-alpha-libs.baking
   tezos-protocol-alpha.parameters
   octez-libs.crypto
-  octez-alcotezt
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -24,13 +24,13 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_test_helpers
   -open Tezos_micheline
   -open Tezos_client_alpha
   -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
   -open Tezos_alpha_mockup_simulator
-  -open Tezos_baking_alpha
-  -open Octez_alcotezt)
+  -open Tezos_baking_alpha)
  (modules test_scenario))
 
 (executable
