@@ -63,7 +63,7 @@ impl Transaction {
     // For more details see the first paragraph here https://eips.ethereum.org/EIPS/eip-1559#specification
     fn gas_price(&self, block_base_fee_per_gas: U256) -> Result<U256, anyhow::Error> {
         match &self.content {
-            TransactionContent::Deposit(Deposit { gas_price, .. }) => Ok(*gas_price),
+            TransactionContent::Deposit(_) => Ok(U256::zero()),
             TransactionContent::Ethereum(transaction) => {
                 let priority_fee_per_gas = U256::min(
                     transaction.max_priority_fee_per_gas,
@@ -361,14 +361,7 @@ fn apply_deposit<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
 ) -> Result<Option<TransactionResult>, Error> {
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/5939
-    // The maximum gas price is ignored for now as the rollup's gas price
-    // never change.
-    let Deposit {
-        amount,
-        gas_price: _,
-        receiver,
-    } = deposit;
+    let Deposit { amount, receiver } = deposit;
 
     let mut do_deposit = |()| -> Option<()> {
         let mut to_account = evm_account_storage

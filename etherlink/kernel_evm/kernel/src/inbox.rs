@@ -29,15 +29,13 @@ use tezos_smart_rollup_host::runtime::Runtime;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Deposit {
     pub amount: U256,
-    pub gas_price: U256,
     pub receiver: H160,
 }
 
 impl Encodable for Deposit {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(3);
+        stream.begin_list(2);
         stream.append(&self.amount);
-        stream.append(&self.gas_price);
         stream.append(&self.receiver);
     }
 }
@@ -47,19 +45,14 @@ impl Decodable for Deposit {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 3 {
+        if decoder.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         let mut it = decoder.iter();
         let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
-        let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
         let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
-        Ok(Deposit {
-            amount,
-            gas_price,
-            receiver,
-        })
+        Ok(Deposit { amount, receiver })
     }
 }
 
@@ -269,12 +262,9 @@ fn handle_deposit<Host: Runtime>(
 
     let mut buffer_amount = [0; 32];
     deposit.amount.to_little_endian(&mut buffer_amount);
-    let mut buffer_gas_price = [0; 32];
-    deposit.gas_price.to_little_endian(&mut buffer_gas_price);
 
     let mut to_hash = vec![];
     to_hash.extend_from_slice(&buffer_amount);
-    to_hash.extend_from_slice(&buffer_gas_price);
     to_hash.extend_from_slice(&deposit.receiver.to_fixed_bytes());
     to_hash.extend_from_slice(&deposit_nonce.to_le_bytes());
 

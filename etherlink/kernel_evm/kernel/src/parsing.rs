@@ -25,9 +25,7 @@ use tezos_smart_rollup_encoding::{
     inbox::{
         ExternalMessageFrame, InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer,
     },
-    michelson::{
-        ticket::FA2_1Ticket, MichelsonBytes, MichelsonInt, MichelsonOr, MichelsonPair,
-    },
+    michelson::{ticket::FA2_1Ticket, MichelsonBytes, MichelsonOr, MichelsonPair},
 };
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -244,7 +242,6 @@ impl InputResult {
         host: &mut Host,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
-        gas_price: MichelsonInt,
         ticketer: &Option<ContractKt1Hash>,
     ) -> Self {
         match &ticket.creator().0 {
@@ -264,10 +261,6 @@ impl InputResult {
         let amount: u64 = U256::from_little_endian(&amount_bytes).as_u64();
         let amount: U256 = eth_from_mutez(amount);
 
-        // Amount for gas
-        let (_sign, gas_price_bytes) = gas_price.0 .0.to_bytes_le();
-        let gas_price: U256 = U256::from_little_endian(&gas_price_bytes);
-
         // EVM address
         let receiver_bytes = receiver.0;
         if receiver_bytes.len() != std::mem::size_of::<H160>() {
@@ -280,19 +273,8 @@ impl InputResult {
         }
         let receiver = H160::from_slice(&receiver_bytes);
 
-        let content = Deposit {
-            amount,
-            gas_price,
-            receiver,
-        };
-        log!(
-            host,
-            Info,
-            "Deposit of {} to {} with gas price {}",
-            amount,
-            receiver,
-            gas_price
-        );
+        let content = Deposit { amount, receiver };
+        log!(host, Info, "Deposit of {} to {}.", amount, receiver);
         Self::Input(Input::Deposit(content))
     }
 
@@ -317,13 +299,7 @@ impl InputResult {
         match transfer.payload {
             MichelsonOr::Left(left) => match left {
                 MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
-                    Self::parse_deposit(
-                        host,
-                        ticket,
-                        receiver,
-                        MichelsonInt::from(0),
-                        ticketer,
-                    )
+                    Self::parse_deposit(host, ticket, receiver, ticketer)
                 }
                 MichelsonOr::Right(_extra) => Self::Unparsable,
             },
