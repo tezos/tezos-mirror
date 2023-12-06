@@ -17,6 +17,8 @@ tezos_crypto_rs = "0.5"
 typed-arena = "2"
 base58="0.2"
 cryptoxide="0.4"
+num-bigint="0.3"
+num-traits="0.2"
 
 [[bin]]
 name = "tzt_runner"

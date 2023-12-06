@@ -162,7 +162,7 @@ fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
     use Micheline::*;
     match mich {
         Int(n) => {
-            let z = Zarith((*n).into());
+            let z = Zarith(n.clone());
             out.push(NUMBER_TAG);
             z.bin_write(out)
                 .unwrap_or_else(|err| panic!("Encoding zarith number unexpectedly failed: {err}"))

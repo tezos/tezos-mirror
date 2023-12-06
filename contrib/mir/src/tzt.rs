@@ -9,6 +9,8 @@ mod expectation;
 
 use std::fmt;
 
+use num_bigint::BigInt;
+
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::*;
@@ -201,7 +203,7 @@ impl fmt::Display for ErrorExpectation<'_> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InterpreterErrorExpectation<'a> {
-    GeneralOverflow(i128, i128),
+    GeneralOverflow(BigInt, BigInt),
     MutezOverflow(i64, i64),
     FailedWith(Micheline<'a>),
 }

@@ -11,6 +11,7 @@ pub mod macros;
 
 pub use errors::*;
 use macros::*;
+use num_bigint::BigInt;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -161,7 +162,7 @@ pub enum Tok<'a> {
     Noun(Noun),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
-    Number(i128),
+    Number(BigInt),
 
     #[regex(r#""(\\.|[^\\"])*""#, lex_string)]
     String(String),
@@ -234,7 +235,7 @@ fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
         .map_err(LexerError::PrimError)
 }
 
-fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
+fn lex_number(lex: &mut Lexer) -> Result<BigInt, LexerError> {
     lex.slice()
         .parse()
         .map_err(|_| LexerError::NumericLiteral(lex.slice().to_owned()))

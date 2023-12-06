@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use num_bigint::{BigInt, BigUint};
+use num_traits::{Signed, Zero};
 use typed_arena::Arena;
 
 use crate::ast::annotations::NO_ANNS;
@@ -55,7 +57,7 @@ impl ContractScript {
             V::Pair(p) => match *p {
                 (V::List(vec), storage) => Ok((
                     vec.into_iter()
-                        .map(|x| (*irrefutable_match!(x; TypedValue::Operation))),
+                        .map(|x| (*irrefutable_match!(x; V::Operation))),
                     storage,
                 )),
                 (v, _) => panic!("expected `list operation`, got {:?}", v),
@@ -128,33 +130,29 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             overloads::Add::IntInt => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
+                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Nat(sum));
             }
             overloads::Add::IntNat => {
                 let o1 = pop!(V::Int);
-                // this potentially overflows on i128, but can't overflow on
-                // bigints, unwrap for now
-                let o2 = pop!(V::Nat).try_into().unwrap();
-                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
-                let sum = o1 + o2;
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                let sum = o1 + BigInt::from(o2);
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatInt => {
-                // this potentially overflows on i128, but can't overflow on
-                // bigints, unwrap for now
-                let o1 = pop!(V::Nat).try_into().unwrap();
+                let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_int(o1, o2)?)?;
-                let sum = o1 + o2;
+                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                let sum = BigInt::from(o1) + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::MutezMutez => {
@@ -186,17 +184,17 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
         I::Gt => {
             ctx.gas.consume(interpret_cost::GT)?;
             let i = pop!(V::Int);
-            stack.push(V::Bool(i > 0));
+            stack.push(V::Bool(i.is_positive()));
         }
         I::Eq => {
             ctx.gas.consume(interpret_cost::EQ)?;
             let i = pop!(V::Int);
-            stack.push(V::Bool(i == 0));
+            stack.push(V::Bool(i.is_zero()));
         }
         I::Le => {
             ctx.gas.consume(interpret_cost::LE)?;
             let i = pop!(V::Int);
-            stack.push(V::Bool(i <= 0));
+            stack.push(V::Bool(!i.is_positive()));
         }
         I::If(nested_t, nested_f) => {
             ctx.gas.consume(interpret_cost::IF)?;
@@ -247,7 +245,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
         I::Int => {
             let i = pop!(V::Nat);
             ctx.gas.consume(interpret_cost::INT_NAT)?;
-            stack.push(V::Int(i.try_into().unwrap()));
+            stack.push(V::Int(i.into()));
         }
         I::Loop(nested) => {
             ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
@@ -454,7 +452,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let contract_address = pop!(V::Contract);
             let counter = ctx.operation_counter();
             ctx.gas.consume(interpret_cost::TRANSFER_TOKENS)?;
-            stack.push(TypedValue::new_operation(
+            stack.push(V::new_operation(
                 Operation::TransferTokens(TransferTokens {
                     param,
                     amount: mutez_amount,
@@ -467,7 +465,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let opt_keyhash = pop!(V::Option).map(|kh| irrefutable_match!(*kh; V::KeyHash));
             let counter: u128 = ctx.operation_counter();
             ctx.gas.consume(interpret_cost::SET_DELEGATE)?;
-            stack.push(TypedValue::new_operation(
+            stack.push(V::new_operation(
                 Operation::SetDelegate(SetDelegate(opt_keyhash)),
                 counter,
             ))
@@ -479,8 +477,8 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
         }
         I::Slice(overload) => {
             fn validate_bounds(
-                offset: u128,
-                length: u128,
+                offset: BigUint,
+                length: BigUint,
                 actual_length: usize,
             ) -> Option<std::ops::Range<usize>> {
                 // If `offset` or `offset + length` are greater than `usize::MAX`, `SLICE` will return `None`.
@@ -550,8 +548,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_add() {
-        let mut stack = stk![V::Nat(10), V::Nat(20)];
-        let expected_stack = stk![V::Nat(30)];
+        let mut stack = stk![V::nat(10), V::nat(20)];
+        let expected_stack = stk![V::nat(30)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -598,8 +596,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_dip() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(25), V::Nat(10)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(25), V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Dip(None, vec![Add(overloads::Add::NatNat)]),
@@ -612,8 +610,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_dip2() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(5), V::Nat(10)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(5), V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dip(Some(2), vec![Drop(None)]), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -621,8 +619,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_drop() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20), V::Nat(5)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(20), V::nat(5)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Drop(None), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -630,8 +628,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_drop2() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(20)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Drop(Some(2)), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -639,8 +637,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_dup() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20), V::Nat(5), V::Nat(10), V::Nat(10)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(20), V::nat(5), V::nat(10), V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dup(None), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -648,8 +646,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_dup2() {
-        let mut stack = stk![V::Nat(20), V::Nat(5), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20), V::Nat(5), V::Nat(10), V::Nat(5)];
+        let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
+        let expected_stack = stk![V::nat(20), V::nat(5), V::nat(10), V::nat(5)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dup(Some(2)), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -657,8 +655,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_gt() {
-        let mut stack = stk![V::Int(20), V::Int(10)];
-        let expected_stack = stk![V::Int(20), V::Bool(true)];
+        let mut stack = stk![V::int(20), V::int(10)];
+        let expected_stack = stk![V::int(20), V::Bool(true)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -666,8 +664,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_gt_false() {
-        let mut stack = stk![V::Int(20), V::Int(-10)];
-        let expected_stack = stk![V::Int(20), V::Bool(false)];
+        let mut stack = stk![V::int(20), V::int(-10)];
+        let expected_stack = stk![V::int(20), V::Bool(false)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -675,8 +673,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_eq() {
-        let mut stack = stk![V::Int(20), V::Int(0)];
-        let expected_stack = stk![V::Int(20), V::Bool(true)];
+        let mut stack = stk![V::int(20), V::int(0)];
+        let expected_stack = stk![V::int(20), V::Bool(true)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -684,8 +682,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_eq_false() {
-        let mut stack = stk![V::Int(20), V::Int(1)];
-        let expected_stack = stk![V::Int(20), V::Bool(false)];
+        let mut stack = stk![V::int(20), V::int(1)];
+        let expected_stack = stk![V::int(20), V::Bool(false)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -693,8 +691,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_le() {
-        let mut stack = stk![V::Int(20), V::Int(-1)];
-        let expected_stack = stk![V::Int(20), V::Bool(true)];
+        let mut stack = stk![V::int(20), V::int(-1)];
+        let expected_stack = stk![V::int(20), V::Bool(true)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -702,8 +700,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_le_false() {
-        let mut stack = stk![V::Int(20), V::Int(1)];
-        let expected_stack = stk![V::Int(20), V::Bool(false)];
+        let mut stack = stk![V::int(20), V::int(1)];
+        let expected_stack = stk![V::int(20), V::Bool(false)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -711,8 +709,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_if_t() {
-        let mut stack = stk![V::Int(20), V::Int(5), V::Bool(true)];
-        let expected_stack = stk![V::Int(20)];
+        let mut stack = stk![V::int(20), V::int(5), V::Bool(true)];
+        let expected_stack = stk![V::int(20)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
@@ -725,8 +723,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_if_f() {
-        let mut stack = stk![V::Int(20), V::Int(5), V::Bool(false)];
-        let expected_stack = stk![V::Int(25)];
+        let mut stack = stk![V::int(20), V::int(5), V::Bool(false)];
+        let expected_stack = stk![V::int(25)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
@@ -739,8 +737,8 @@ mod interpreter_tests {
 
     #[test]
     fn test_int() {
-        let mut stack = stk![V::Nat(20), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20), V::Int(10)];
+        let mut stack = stk![V::nat(20), V::nat(10)];
+        let expected_stack = stk![V::nat(20), V::int(10)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Int, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -748,21 +746,21 @@ mod interpreter_tests {
 
     #[test]
     fn test_push() {
-        let mut stack = stk![V::Nat(20), V::Nat(10)];
-        let expected_stack = stk![V::Nat(20), V::Nat(10), V::Nat(0)];
+        let mut stack = stk![V::nat(20), V::nat(10)];
+        let expected_stack = stk![V::nat(20), V::nat(10), V::nat(0)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Push(V::Nat(0)), &mut ctx, &mut stack).is_ok());
+        assert!(interpret_one(&Push(V::nat(0)), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_loop_0() {
-        let mut stack = stk![V::Nat(20), V::Nat(10), V::Bool(false)];
-        let expected_stack = stk![V::Nat(20), V::Nat(10)];
+        let mut stack = stk![V::nat(20), V::nat(10), V::Bool(false)];
+        let expected_stack = stk![V::nat(20), V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::Nat(1)),
+                Push(V::nat(1)),
                 Add(overloads::Add::NatNat),
                 Push(V::Bool(false))
             ]),
@@ -775,12 +773,12 @@ mod interpreter_tests {
 
     #[test]
     fn test_loop_1() {
-        let mut stack = stk![V::Nat(20), V::Nat(10), V::Bool(true)];
-        let expected_stack = stk![V::Nat(20), V::Nat(11)];
+        let mut stack = stk![V::nat(20), V::nat(10), V::Bool(true)];
+        let expected_stack = stk![V::nat(20), V::nat(11)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::Nat(1)),
+                Push(V::nat(1)),
                 Add(overloads::Add::NatNat),
                 Push(V::Bool(false))
             ]),
@@ -793,12 +791,12 @@ mod interpreter_tests {
 
     #[test]
     fn test_loop_many() {
-        let mut stack = stk![V::Nat(20), V::Int(10), V::Bool(true)];
-        let expected_stack = stk![V::Nat(20), V::Int(0)];
+        let mut stack = stk![V::nat(20), V::int(10), V::Bool(true)];
+        let expected_stack = stk![V::nat(20), V::int(0)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::Int(-1)),
+                Push(V::int(-1)),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
@@ -814,7 +812,7 @@ mod interpreter_tests {
     fn test_iter_list_many() {
         let mut stack = stk![
             V::List(vec![].into()),
-            V::List((1..5).map(V::Int).collect())
+            V::List((1..5).map(V::int).collect())
         ];
         assert!(interpret_one(
             &Iter(overloads::Iter::List, vec![Cons]),
@@ -824,7 +822,7 @@ mod interpreter_tests {
         .is_ok());
         // NB: walking a list start-to-end and CONSing each element effectively
         // reverses the list.
-        assert_eq!(stack, stk![V::List((1..5).rev().map(V::Int).collect())]);
+        assert_eq!(stack, stk![V::List((1..5).rev().map(V::int).collect())]);
     }
 
     #[test]
@@ -844,7 +842,7 @@ mod interpreter_tests {
         let mut stack = stk![
             V::List(vec![].into()),
             V::Set(
-                vec![(V::Int(1)), (V::Int(2)), (V::Int(3)),]
+                vec![(V::int(1)), (V::int(2)), (V::int(3)),]
                     .into_iter()
                     .collect()
             )
@@ -861,21 +859,21 @@ mod interpreter_tests {
                 // NB: traversing the set start-to-end, we're CONSing to a
                 // list, thus the first element of the map is the last element
                 // of the list.
-                vec![V::Int(3), V::Int(2), V::Int(1),].into()
+                vec![V::int(3), V::int(2), V::int(1),].into()
             )]
         );
     }
 
     #[test]
     fn test_iter_set_zero() {
-        let mut stack = stk![V::Int(0), V::Set(BTreeSet::new())];
+        let mut stack = stk![V::int(0), V::Set(BTreeSet::new())];
         assert!(interpret_one(
             &Iter(overloads::Iter::Set, vec![Add(overloads::Add::IntInt)]),
             &mut Ctx::default(),
             &mut stack,
         )
         .is_ok());
-        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(stack, stk![V::int(0)]);
     }
 
     #[test]
@@ -884,9 +882,9 @@ mod interpreter_tests {
             V::List(vec![].into()),
             V::Map(
                 vec![
-                    (V::Int(1), V::Nat(1)),
-                    (V::Int(2), V::Nat(2)),
-                    (V::Int(3), V::Nat(3)),
+                    (V::int(1), V::nat(1)),
+                    (V::int(2), V::nat(2)),
+                    (V::int(3), V::nat(3)),
                 ]
                 .into_iter()
                 .collect()
@@ -905,9 +903,9 @@ mod interpreter_tests {
                 // list, thus the first element of the map is the last element
                 // of the list.
                 vec![
-                    V::new_pair(V::Int(3), V::Nat(3)),
-                    V::new_pair(V::Int(2), V::Nat(2)),
-                    V::new_pair(V::Int(1), V::Nat(1)),
+                    V::new_pair(V::int(3), V::nat(3)),
+                    V::new_pair(V::int(2), V::nat(2)),
+                    V::new_pair(V::int(1), V::nat(1)),
                 ]
                 .into()
             )]
@@ -916,20 +914,20 @@ mod interpreter_tests {
 
     #[test]
     fn test_iter_map_zero() {
-        let mut stack = stk![V::Int(0), V::Map(BTreeMap::new())];
+        let mut stack = stk![V::int(0), V::Map(BTreeMap::new())];
         assert!(interpret_one(
             &Iter(overloads::Iter::Map, vec![Car, Add(overloads::Add::IntInt)]),
             &mut Ctx::default(),
             &mut stack,
         )
         .is_ok());
-        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(stack, stk![V::int(0)]);
     }
 
     #[test]
     fn test_swap() {
-        let mut stack = stk![V::Nat(20), V::Int(10)];
-        let expected_stack = stk![V::Int(10), V::Nat(20)];
+        let mut stack = stk![V::nat(20), V::int(10)];
+        let expected_stack = stk![V::int(10), V::nat(20)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Swap, &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -941,9 +939,9 @@ mod interpreter_tests {
             interpret_one(
                 &Failwith(Type::Nat),
                 &mut Ctx::default(),
-                &mut stk![V::Nat(20)]
+                &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(Type::Nat, V::Nat(20)))
+            Err(InterpretError::FailedWith(Type::Nat, V::nat(20)))
         );
     }
 
@@ -989,8 +987,8 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &vec![Push(V::new_pair(
-                V::Int(-5),
-                V::new_pair(V::Nat(3), V::Bool(false))
+                V::int(-5),
+                V::new_pair(V::nat(3), V::Bool(false))
             ))],
             &mut ctx,
             &mut stack
@@ -999,8 +997,8 @@ mod interpreter_tests {
         assert_eq!(
             stack,
             stk![V::new_pair(
-                V::Int(-5),
-                V::new_pair(V::Nat(3), V::Bool(false))
+                V::int(-5),
+                V::new_pair(V::nat(3), V::Bool(false))
             )]
         );
         assert_eq!(
@@ -1014,12 +1012,12 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &vec![Push(V::new_option(Some(V::Int(-5))))],
+            &vec![Push(V::new_option(Some(V::int(-5))))],
             &mut ctx,
             &mut stack
         )
         .is_ok());
-        assert_eq!(stack, stk![V::new_option(Some(V::Int(-5)))]);
+        assert_eq!(stack, stk![V::new_option(Some(V::int(-5)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
@@ -1033,8 +1031,8 @@ mod interpreter_tests {
         assert!(interpret(
             &vec![
                 Push(V::new_pair(
-                    V::Int(-5),
-                    V::new_pair(V::Nat(3), V::Bool(false))
+                    V::int(-5),
+                    V::new_pair(V::nat(3), V::Bool(false))
                 )),
                 Car
             ],
@@ -1042,7 +1040,7 @@ mod interpreter_tests {
             &mut stack
         )
         .is_ok());
-        assert_eq!(stack, stk![V::Int(-5)]);
+        assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1059,8 +1057,8 @@ mod interpreter_tests {
         assert!(interpret(
             &vec![
                 Push(V::new_pair(
-                    V::new_pair(V::Nat(3), V::Bool(false)),
-                    V::Int(-5),
+                    V::new_pair(V::nat(3), V::Bool(false)),
+                    V::int(-5),
                 )),
                 Cdr
             ],
@@ -1068,7 +1066,7 @@ mod interpreter_tests {
             &mut stack
         )
         .is_ok());
-        assert_eq!(stack, stk![V::Int(-5)]);
+        assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1080,40 +1078,40 @@ mod interpreter_tests {
 
     #[test]
     fn pair() {
-        let mut stack = stk![V::Nat(42), V::Bool(false)]; // NB: bool is top
+        let mut stack = stk![V::nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair], &mut Ctx::default(), &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_pair(V::Bool(false), V::Nat(42))]);
+        assert_eq!(stack, stk![V::new_pair(V::Bool(false), V::nat(42))]);
     }
 
     #[test]
     fn unpair() {
-        let mut stack = stk![V::new_pair(V::Bool(false), V::Nat(42))];
+        let mut stack = stk![V::new_pair(V::Bool(false), V::nat(42))];
         assert!(interpret(&vec![Unpair], &mut Ctx::default(), &mut stack).is_ok());
-        assert_eq!(stack, stk![V::Nat(42), V::Bool(false)]);
+        assert_eq!(stack, stk![V::nat(42), V::Bool(false)]);
     }
 
     #[test]
     fn pair_car() {
-        let mut stack = stk![V::Nat(42), V::Bool(false)]; // NB: bool is top
+        let mut stack = stk![V::nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair, Car], &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::Bool(false)]);
     }
 
     #[test]
     fn pair_cdr() {
-        let mut stack = stk![V::Nat(42), V::Bool(false)]; // NB: bool is top
+        let mut stack = stk![V::nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&vec![Pair, Cdr], &mut Ctx::default(), &mut stack).is_ok());
-        assert_eq!(stack, stk![V::Nat(42)]);
+        assert_eq!(stack, stk![V::nat(42)]);
     }
 
     #[test]
     fn if_none_1() {
-        let code = vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])];
+        let code = vec![IfNone(vec![Push(V::int(5))], vec![])];
         // with Some
-        let mut stack = stk![V::new_option(Some(V::Int(42)))];
+        let mut stack = stk![V::new_option(Some(V::int(42)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(42)]);
+        assert_eq!(stack, stk![V::int(42)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::IF_NONE - interpret_cost::INTERPRET_RET * 2
@@ -1122,12 +1120,12 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_2() {
-        let code = vec![IfNone(vec![Push(TypedValue::Int(5))], vec![])];
+        let code = vec![IfNone(vec![Push(V::int(5))], vec![])];
         // with None
         let mut stack = stk![V::new_option(None)];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(5)]);
+        assert_eq!(stack, stk![V::int(5)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1139,11 +1137,11 @@ mod interpreter_tests {
 
     #[test]
     fn if_cons_cons() {
-        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::Int(0))])];
-        let mut stack = stk![V::List(vec![V::Int(1), V::Int(2)].into())];
+        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::int(0))])];
+        let mut stack = stk![V::List(vec![V::int(1), V::int(2)].into())];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(1)]);
+        assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1156,11 +1154,11 @@ mod interpreter_tests {
 
     #[test]
     fn if_cons_nil() {
-        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::Int(0))])];
+        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::int(0))])];
         let mut stack = stk![V::List(vec![].into())];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1172,11 +1170,11 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_left() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::Int(0))])];
-        let mut stack = stk![V::new_or(Or::Left(V::Int(1)))];
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
+        let mut stack = stk![V::new_or(Or::Left(V::int(1)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(1)]);
+        assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::IF_LEFT - interpret_cost::INTERPRET_RET * 2
@@ -1185,11 +1183,11 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_right() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::Int(0))])];
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
         let mut stack = stk![V::new_or(Or::Right(V::Unit))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Int(0)]);
+        assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
@@ -1202,10 +1200,10 @@ mod interpreter_tests {
 
     #[test]
     fn some() {
-        let mut stack = stk![V::Int(5)];
+        let mut stack = stk![V::int(5)];
         let mut ctx = Ctx::default();
         assert!(interpret(&vec![ISome], &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_option(Some(V::Int(5)))]);
+        assert_eq!(stack, stk![V::new_option(Some(V::int(5)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
@@ -1237,21 +1235,21 @@ mod interpreter_tests {
                 assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - expected_cost);
             };
         }
-        test!([V::Int(5), V::Int(6)], [V::Int(1)]);
-        test!([V::Int(5), V::Int(5)], [V::Int(0)]);
-        test!([V::Int(6), V::Int(5)], [V::Int(-1)]);
-        test!([V::Bool(true), V::Bool(false)], [V::Int(-1)]);
-        test!([V::Bool(true), V::Bool(true)], [V::Int(0)]);
-        test!([V::Bool(false), V::Bool(true)], [V::Int(1)]);
-        test!([V::Bool(false), V::Bool(false)], [V::Int(0)]);
+        test!([V::int(5), V::int(6)], [V::int(1)]);
+        test!([V::int(5), V::int(5)], [V::int(0)]);
+        test!([V::int(6), V::int(5)], [V::int(-1)]);
+        test!([V::Bool(true), V::Bool(false)], [V::int(-1)]);
+        test!([V::Bool(true), V::Bool(true)], [V::int(0)]);
+        test!([V::Bool(false), V::Bool(true)], [V::int(1)]);
+        test!([V::Bool(false), V::Bool(false)], [V::int(0)]);
         test!(
             [V::String("foo".to_owned()), V::String("bar".to_owned())],
-            [V::Int(-1)]
+            [V::int(-1)]
         );
-        test!([V::Unit, V::Unit], [V::Int(0)]);
+        test!([V::Unit, V::Unit], [V::int(0)]);
         test!(
-            [V::new_option(Some(V::Int(5))), V::Option(None)],
-            [V::Int(-1)]
+            [V::new_option(Some(V::int(5))), V::Option(None)],
+            [V::int(-1)]
         );
     }
 
@@ -1261,7 +1259,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.amount = 100500;
         assert_eq!(interpret(&vec![Amount], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![TypedValue::Mutez(100500)]);
+        assert_eq!(stack, stk![V::Mutez(100500)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::INTERPRET_RET - interpret_cost::AMOUNT,
@@ -1274,9 +1272,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
-                &vec![Push(TypedValue::List(
-                    vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
-                ))],
+                &vec![Push(V::List(vec![V::int(1), V::int(2), V::int(3),].into()))],
                 &mut ctx,
                 &mut stack
             ),
@@ -1284,9 +1280,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::List(
-                vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
-            )]
+            stk![V::List(vec![V::int(1), V::int(2), V::int(3),].into())]
         );
         assert_eq!(
             ctx.gas.milligas(),
@@ -1299,7 +1293,7 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&vec![Nil], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![TypedValue::List(vec![].into())]);
+        assert_eq!(stack, stk![V::List(vec![].into())]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
@@ -1308,13 +1302,10 @@ mod interpreter_tests {
 
     #[test]
     fn cons() {
-        let mut stack = stk![V::List(vec![V::Int(321)].into()), V::Int(123)];
+        let mut stack = stk![V::List(vec![V::int(321)].into()), V::int(123)];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&vec![Cons], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(
-            stack,
-            stk![TypedValue::List(vec![V::Int(123), V::Int(321)].into())]
-        );
+        assert_eq!(stack, stk![V::List(vec![V::int(123), V::int(321)].into())]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::CONS - interpret_cost::INTERPRET_RET,
@@ -1326,18 +1317,14 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
-            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+            (V::int(1), V::String("foo".to_owned())),
+            (V::int(2), V::String("bar".to_owned())),
         ]);
         assert_eq!(
-            interpret(
-                &vec![Push(TypedValue::Map(map.clone()))],
-                &mut ctx,
-                &mut stack
-            ),
+            interpret(&vec![Push(V::Map(map.clone()))], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Map(map)]);
+        assert_eq!(stack, stk![V::Map(map)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
@@ -1348,24 +1335,22 @@ mod interpreter_tests {
     fn get_map() {
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
-            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+            (V::int(1), V::String("foo".to_owned())),
+            (V::int(2), V::String("bar".to_owned())),
         ]);
-        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(1)];
+        let mut stack = stk![V::Map(map), V::int(1)];
         assert_eq!(
             interpret(&vec![Get(overloads::Get::Map)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(
             stack,
-            stk![TypedValue::new_option(Some(TypedValue::String(
-                "foo".to_owned()
-            )))]
+            stk![V::new_option(Some(V::String("foo".to_owned())))]
         );
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_get(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::map_get(&V::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1374,19 +1359,19 @@ mod interpreter_tests {
     fn get_map_none() {
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
-            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+            (V::int(1), V::String("foo".to_owned())),
+            (V::int(2), V::String("bar".to_owned())),
         ]);
-        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(100500)];
+        let mut stack = stk![V::Map(map), V::int(100500)];
         assert_eq!(
             interpret(&vec![Get(overloads::Get::Map)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Option(None)]);
+        assert_eq!(stack, stk![V::Option(None)]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
+                - interpret_cost::map_get(&V::int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1395,10 +1380,10 @@ mod interpreter_tests {
     fn mem_map() {
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
-            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+            (TypedValue::int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::int(2), TypedValue::String("bar".to_owned())),
         ]);
-        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(1)];
+        let mut stack = stk![TypedValue::Map(map), TypedValue::int(1)];
         assert_eq!(
             interpret(&vec![Mem(overloads::Mem::Map)], &mut ctx, &mut stack),
             Ok(())
@@ -1407,7 +1392,7 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_mem(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::map_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1416,10 +1401,10 @@ mod interpreter_tests {
     fn mem_map_absent() {
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
-            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+            (TypedValue::int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::int(2), TypedValue::String("bar".to_owned())),
         ]);
-        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(100500)];
+        let mut stack = stk![TypedValue::Map(map), TypedValue::int(100500)];
         assert_eq!(
             interpret(&vec![Mem(overloads::Mem::Map)], &mut ctx, &mut stack),
             Ok(())
@@ -1430,8 +1415,8 @@ mod interpreter_tests {
     #[test]
     fn mem_set() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::Int(1), TypedValue::Int(2)]);
-        let mut stack = stk![TypedValue::Set(set), TypedValue::Int(1)];
+        let set = BTreeSet::from([TypedValue::int(1), TypedValue::int(2)]);
+        let mut stack = stk![TypedValue::Set(set), TypedValue::int(1)];
         assert_eq!(
             interpret(&vec![Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
             Ok(())
@@ -1440,7 +1425,7 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::set_mem(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::set_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1448,8 +1433,8 @@ mod interpreter_tests {
     #[test]
     fn mem_set_absent() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::Int(1), TypedValue::Int(2)]);
-        let mut stack = stk![TypedValue::Set(set), TypedValue::Int(100500)];
+        let set = BTreeSet::from([TypedValue::int(1), TypedValue::int(2)]);
+        let mut stack = stk![TypedValue::Set(set), TypedValue::int(100500)];
         assert_eq!(
             interpret(&vec![Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
             Ok(())
@@ -1476,7 +1461,7 @@ mod interpreter_tests {
         let mut stack = stk![
             TypedValue::Set(set),
             TypedValue::Bool(true),
-            TypedValue::Int(1)
+            TypedValue::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
@@ -1484,12 +1469,12 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::Set(BTreeSet::from([TypedValue::Int(1)])),]
+            stk![TypedValue::Set(BTreeSet::from([TypedValue::int(1)])),]
         );
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::set_update(&TypedValue::Int(1), 0).unwrap()
+                - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1497,11 +1482,11 @@ mod interpreter_tests {
     #[test]
     fn update_set_remove() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::Int(1)]);
+        let set = BTreeSet::from([TypedValue::int(1)]);
         let mut stack = stk![
             TypedValue::Set(set),
             TypedValue::Bool(false),
-            TypedValue::Int(1)
+            TypedValue::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
@@ -1511,7 +1496,7 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::set_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1519,11 +1504,11 @@ mod interpreter_tests {
     #[test]
     fn update_set_insert_when_exists() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::Int(1)]);
+        let set = BTreeSet::from([TypedValue::int(1)]);
         let mut stack = stk![
             TypedValue::Set(set.clone()),
             TypedValue::Bool(true),
-            TypedValue::Int(1)
+            TypedValue::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
@@ -1533,7 +1518,7 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::set_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1544,7 +1529,7 @@ mod interpreter_tests {
         let mut stack = stk![
             TypedValue::Set(BTreeSet::new()),
             TypedValue::Bool(false),
-            TypedValue::Int(1)
+            TypedValue::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Set)], &mut ctx, &mut stack),
@@ -1554,7 +1539,7 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::set_update(&TypedValue::Int(1), 0).unwrap()
+                - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1564,9 +1549,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let map = BTreeMap::new();
         let mut stack = stk![
-            TypedValue::Map(map),
-            TypedValue::new_option(Some(TypedValue::String("foo".to_owned()))),
-            TypedValue::Int(1)
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
@@ -1574,15 +1559,15 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::Map(BTreeMap::from([(
-                TypedValue::Int(1),
-                TypedValue::String("foo".to_owned())
+            stk![V::Map(BTreeMap::from([(
+                V::int(1),
+                V::String("foo".to_owned())
             )])),]
         );
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_update(&TypedValue::Int(1), 0).unwrap()
+                - interpret_cost::map_update(&V::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1590,11 +1575,11 @@ mod interpreter_tests {
     #[test]
     fn update_map_update() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(TypedValue::Int(1), TypedValue::String("bar".to_owned()))]);
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
         let mut stack = stk![
-            TypedValue::Map(map),
-            TypedValue::new_option(Some(TypedValue::String("foo".to_owned()))),
-            TypedValue::Int(1)
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
         ];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
@@ -1602,15 +1587,15 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::Map(BTreeMap::from([(
-                TypedValue::Int(1),
-                TypedValue::String("foo".to_owned())
+            stk![V::Map(BTreeMap::from([(
+                V::int(1),
+                V::String("foo".to_owned())
             )])),]
         );
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
@@ -1618,28 +1603,24 @@ mod interpreter_tests {
     #[test]
     fn update_map_remove() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(TypedValue::Int(1), TypedValue::String("bar".to_owned()))]);
-        let mut stack = stk![
-            TypedValue::Map(map),
-            TypedValue::new_option(None),
-            TypedValue::Int(1)
-        ];
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let mut stack = stk![V::Map(map), V::new_option(None), V::int(1)];
         assert_eq!(
             interpret(&vec![Update(overloads::Update::Map)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
+        assert_eq!(stack, stk![V::Map(BTreeMap::new())]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas()
-                - interpret_cost::map_update(&TypedValue::Int(1), 1).unwrap()
+                - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
     }
 
     #[test]
     fn seq() {
-        let mut stack = stk![TypedValue::Int(1), TypedValue::Nat(2)];
+        let mut stack = stk![V::int(1), V::nat(2)];
         assert_eq!(
             interpret(
                 &vec![
@@ -1653,12 +1634,12 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Nat(2)]);
+        assert_eq!(stack, stk![V::nat(2)]);
     }
 
     #[test]
     fn add_int_nat() {
-        let mut stack = stk![TypedValue::Nat(123), TypedValue::Int(456)];
+        let mut stack = stk![V::nat(123), V::int(456)];
         assert_eq!(
             interpret(
                 &vec![Add(overloads::Add::IntNat)],
@@ -1667,12 +1648,12 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Int(579)]);
+        assert_eq!(stack, stk![V::int(579)]);
     }
 
     #[test]
     fn add_int_nat_2() {
-        let mut stack = stk![TypedValue::Nat(123), TypedValue::Int(-456)];
+        let mut stack = stk![V::nat(123), V::int(-456)];
         assert_eq!(
             interpret(
                 &vec![Add(overloads::Add::IntNat)],
@@ -1681,12 +1662,12 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Int(-333)]);
+        assert_eq!(stack, stk![V::int(-333)]);
     }
 
     #[test]
     fn add_nat_int() {
-        let mut stack = stk![TypedValue::Int(789), TypedValue::Nat(42)];
+        let mut stack = stk![V::int(789), V::nat(42)];
         assert_eq!(
             interpret(
                 &vec![Add(overloads::Add::NatInt)],
@@ -1695,12 +1676,12 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Int(831)]);
+        assert_eq!(stack, stk![V::int(831)]);
     }
 
     #[test]
     fn add_nat_int_2() {
-        let mut stack = stk![TypedValue::Int(-789), TypedValue::Nat(42)];
+        let mut stack = stk![V::int(-789), V::nat(42)];
         assert_eq!(
             interpret(
                 &vec![Add(overloads::Add::NatInt)],
@@ -1709,7 +1690,7 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Int(-747)]);
+        assert_eq!(stack, stk![V::int(-747)]);
     }
 
     #[test]
@@ -1734,7 +1715,7 @@ mod interpreter_tests {
         let start_milligas = ctx.gas.milligas();
         let stk = &mut stk![];
         assert_eq!(interpret(&vec![Instruction::ChainId], ctx, stk), Ok(()));
-        assert_eq!(stk, &stk![TypedValue::ChainId(chain_id)]);
+        assert_eq!(stk, &stk![V::ChainId(chain_id)]);
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
@@ -1743,11 +1724,11 @@ mod interpreter_tests {
 
     #[test]
     fn pack_instr() {
-        let stack = &mut stk![TypedValue::new_pair(TypedValue::Int(12), TypedValue::Unit)];
+        let stack = &mut stk![TypedValue::new_pair(TypedValue::int(12), TypedValue::Unit)];
         assert_eq!(interpret(&vec![Pack], &mut Ctx::default(), stack), Ok(()));
         assert_eq!(
             stack,
-            &stk![TypedValue::Bytes(hex::decode("050707000c030b").unwrap())]
+            &stk![V::Bytes(hex::decode("050707000c030b").unwrap())]
         );
     }
 
@@ -1762,7 +1743,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stk,
-            &stk![TypedValue::Contract(
+            &stk![V::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap()
             )]
         );
@@ -1771,13 +1752,14 @@ mod interpreter_tests {
     #[test]
     fn transfer_tokens() {
         let tt = super::TransferTokens {
-            param: TypedValue::Nat(42),
-            destination_address: addr::Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap(),
+            param: TypedValue::nat(42),
+            destination_address: addr::Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")
+                .unwrap(),
             amount: 0,
         };
         let stk = &mut stk![
-            TypedValue::Contract(tt.destination_address.clone()),
-            TypedValue::Mutez(tt.amount),
+            V::Contract(tt.destination_address.clone()),
+            V::Mutez(tt.amount),
             tt.param.clone()
         ];
         let ctx = &mut Ctx::default();
@@ -1786,10 +1768,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&vec![TransferTokens], ctx, stk), Ok(()));
         assert_eq!(
             stk,
-            &stk![TypedValue::new_operation(
-                Operation::TransferTokens(tt),
-                101
-            )]
+            &stk![V::new_operation(Operation::TransferTokens(tt), 101)]
         );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
@@ -1803,16 +1782,14 @@ mod interpreter_tests {
         let sd = super::SetDelegate(Some(
             KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
-        let stk = &mut stk![TypedValue::new_option(Some(TypedValue::KeyHash(
-            sd.0.clone().unwrap()
-        )))];
+        let stk = &mut stk![V::new_option(Some(V::KeyHash(sd.0.clone().unwrap())))];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&vec![I::SetDelegate], ctx, stk), Ok(()));
         assert_eq!(
             stk,
-            &stk![TypedValue::new_operation(Operation::SetDelegate(sd), 101)]
+            &stk![V::new_operation(Operation::SetDelegate(sd), 101)]
         );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
@@ -1830,8 +1807,8 @@ mod interpreter_tests {
             KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
         let stk = &mut stk![
-            TypedValue::new_option(Some(TypedValue::KeyHash(sd.0.clone().unwrap()))),
-            TypedValue::new_option(Some(TypedValue::KeyHash(sd.0.clone().unwrap())))
+            V::new_option(Some(V::KeyHash(sd.0.clone().unwrap()))),
+            V::new_option(Some(V::KeyHash(sd.0.clone().unwrap())))
         ];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
@@ -1842,8 +1819,8 @@ mod interpreter_tests {
         assert_eq!(
             stk,
             &stk![
-                TypedValue::new_operation(Operation::SetDelegate(sd.clone()), 101),
-                TypedValue::new_operation(Operation::SetDelegate(sd), 102)
+                V::new_operation(Operation::SetDelegate(sd.clone()), 101),
+                V::new_operation(Operation::SetDelegate(sd), 102)
             ]
         );
     }
@@ -1859,7 +1836,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stk,
-            &stk![TypedValue::Contract(
+            &stk![V::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%foo"
                     .try_into()
                     .unwrap()
@@ -1897,8 +1874,8 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_string() {
-        fn test(str: &str, offset: u128, length: u128, expected: Option<&str>) {
-            let stk = &mut stk![V::String(str.to_string()), V::Nat(length), V::Nat(offset)];
+        fn test(str: &str, offset: u32, length: u32, expected: Option<&str>) {
+            let stk = &mut stk![V::String(str.to_string()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|str| V::String(str.to_string()));
             assert_eq!(
@@ -1919,8 +1896,8 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_bytes() {
-        fn test(bytes: &[u8], offset: u128, length: u128, expected: Option<&[u8]>) {
-            let stk = &mut stk![V::Bytes(bytes.to_vec()), V::Nat(length), V::Nat(offset)];
+        fn test(bytes: &[u8], offset: u32, length: u32, expected: Option<&[u8]>) {
+            let stk = &mut stk![V::Bytes(bytes.to_vec()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|bytes| V::Bytes(bytes.to_vec()));
             assert_eq!(
@@ -1941,10 +1918,10 @@ mod interpreter_tests {
 
     #[test]
     fn left() {
-        let mut stack = stk![V::Nat(10)];
+        let mut stack = stk![V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret(&vec![Instruction::Left], &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_or(Or::Left(V::Nat(10)))]);
+        assert_eq!(stack, stk![V::new_or(Or::Left(V::nat(10)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::LEFT - interpret_cost::INTERPRET_RET
@@ -1953,10 +1930,10 @@ mod interpreter_tests {
 
     #[test]
     fn right() {
-        let mut stack = stk![V::Nat(10)];
+        let mut stack = stk![V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret(&vec![Instruction::Right], &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_or(Or::Right(V::Nat(10)))]);
+        assert_eq!(stack, stk![V::new_or(Or::Right(V::nat(10)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET

@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use num_bigint::{BigInt, BigUint};
+
 #[derive(Debug)]
 pub struct Gas {
     milligas_amount: Option<u32>,
@@ -59,6 +61,12 @@ impl AsGasCost for checked::Checked<u32> {
 }
 
 impl AsGasCost for checked::Checked<usize> {
+    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
+        self.ok_or(OutOfGas)?.try_into().map_err(|_| OutOfGas)
+    }
+}
+
+impl AsGasCost for checked::Checked<u64> {
     fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
         self.ok_or(OutOfGas)?.try_into().map_err(|_| OutOfGas)
     }
@@ -166,10 +174,32 @@ pub mod tc_cost {
     }
 }
 
+pub trait BigIntByteSize {
+    /// Minimal size in bytes a given bigint is representable in.
+    fn byte_size(&self) -> u64;
+}
+
+/// Bit size divided by 8, rounded up
+fn bits_to_bytes(bits: u64) -> u64 {
+    (bits + 7) >> 3
+}
+
+impl BigIntByteSize for BigInt {
+    fn byte_size(&self) -> u64 {
+        bits_to_bytes(self.bits())
+    }
+}
+
+impl BigIntByteSize for BigUint {
+    fn byte_size(&self) -> u64 {
+        bits_to_bytes(self.bits())
+    }
+}
+
 pub mod interpret_cost {
     use checked::Checked;
 
-    use super::{AsGasCost, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, OutOfGas};
     use crate::ast::{Key, KeyHash, Micheline, Or, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -253,18 +283,16 @@ pub mod interpret_cost {
         mb_n.map_or(Ok(DUP), dupn)
     }
 
-    pub fn add_int<T>(i1: T, i2: T) -> Result<u32, OutOfGas> {
-        // NB: eventually when using BigInts, use BigInt::bits() &c
-        use std::mem::size_of_val;
+    pub fn add_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
-        let sz = Checked::from(std::cmp::max(size_of_val(&i1), size_of_val(&i2)));
+        let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
         use TypedValue as V;
-        let cmp_bytes = |s1: usize, s2: usize| {
+        let cmp_bytes = |s1: u64, s2: u64| {
             // Approximating 35 + 0.024413 x term
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
@@ -274,7 +302,7 @@ pub mod interpret_cost {
             (c + compare(&l.0, &r.0)? + compare(&l.1, &r.1)?).as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
-        const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
+        const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
         const CMP_KEY: u32 = 92; // hard-coded in the protocol
         const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
@@ -284,16 +312,10 @@ pub mod interpret_cost {
             unreachable!("Comparison of incomparable values")
         }
         Ok(match (v1, v2) {
-            (V::Nat(l), V::Nat(r)) => {
-                // NB: eventually when using BigInts, use BigInt::bits() &c
-                cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
-            }
+            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
             (V::Nat(_), _) => incomparable(),
 
-            (V::Int(l), V::Int(r)) => {
-                // NB: eventually when using BigInts, use BigInt::bits() &c
-                cmp_bytes(std::mem::size_of_val(l), std::mem::size_of_val(r))?
-            }
+            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
             (V::Int(_), _) => incomparable(),
 
             (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
@@ -302,7 +324,7 @@ pub mod interpret_cost {
             (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
             (V::Mutez(_), _) => incomparable(),
 
-            (V::String(l), V::String(r)) => cmp_bytes(l.len(), r.len())?,
+            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
             (V::String(_), _) => incomparable(),
 
             (V::Unit, V::Unit) => 10,
@@ -326,7 +348,7 @@ pub mod interpret_cost {
             (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
             (V::ChainId(_), _) => incomparable(),
 
-            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len(), r.len())?,
+            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
             (V::Bytes(_), _) => incomparable(),
 
             (V::Key(_), V::Key(_)) => CMP_KEY,
@@ -335,7 +357,9 @@ pub mod interpret_cost {
             (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
             (V::Signature(_), _) => incomparable(),
 
-            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(KeyHash::BYTE_SIZE, KeyHash::BYTE_SIZE)?,
+            (V::KeyHash(_), V::KeyHash(_)) => {
+                cmp_bytes(KeyHash::BYTE_SIZE as u64, KeyHash::BYTE_SIZE as u64)?
+            }
             (V::KeyHash(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
@@ -406,13 +430,13 @@ pub mod interpret_cost {
     /// Measures size of Michelson using several metrics.
     pub struct MichelineSize {
         /// Total number of nodes (including leaves).
-        nodes_num: Checked<usize>,
+        nodes_num: Checked<u64>,
 
         /// Total size of string and bytes literals.
-        str_byte: Checked<usize>,
+        str_byte: Checked<u64>,
 
         /// Total size of zarith numbers, in bytes.
-        zariths: Checked<usize>,
+        zariths: Checked<u64>,
     }
 
     impl Default for MichelineSize {
@@ -438,14 +462,9 @@ pub mod interpret_cost {
     fn collect_micheline_size<'a>(mich: &'a Micheline<'a>, size: &mut MichelineSize) {
         size.nodes_num += 1;
         match mich {
-            Micheline::String(s) => size.str_byte += s.len(),
-            Micheline::Bytes(bs) => size.str_byte += bs.len(),
-            Micheline::Int(i) => {
-                // NB: eventually when using BigInts, use BigInt::bits() &c
-                let bits = std::mem::size_of_val(i);
-                let bytes = (bits + 7) / 8;
-                size.zariths += bytes;
-            }
+            Micheline::String(s) => size.str_byte += s.len() as u64,
+            Micheline::Bytes(bs) => size.str_byte += bs.len() as u64,
+            Micheline::Int(i) => size.zariths += i.byte_size(),
             Micheline::Seq(ms) => {
                 for m in *ms {
                     collect_micheline_size(m, size)
@@ -464,7 +483,7 @@ pub mod interpret_cost {
                         Ann::Variable(a) => a.len() + 1,
                         Ann::Type(a) => a.len() + 1,
                         Ann::Special(a) => a.len(),
-                    }
+                    } as u64
                 }
             }
         }

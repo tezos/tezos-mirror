@@ -44,9 +44,9 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
-        let mut istack = stk![TypedValue::Nat(10)];
+        let mut istack = stk![TypedValue::nat(10)];
         assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
-        assert!(istack.len() == 1 && istack[0] == TypedValue::Int(55));
+        assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
     }
 
     #[test]
@@ -65,12 +65,12 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
-        let mut istack = stk![TypedValue::Nat(5)];
+        let mut istack = stk![TypedValue::nat(5)];
         let mut ctx = Ctx::default();
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &mut istack).is_ok());
         });
-        assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1359);
+        assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1287);
     }
 
     #[test]
@@ -79,7 +79,7 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
-        let mut istack = stk![TypedValue::Nat(5)];
+        let mut istack = stk![TypedValue::nat(5)];
         let mut ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1);
         assert_eq!(
@@ -94,9 +94,9 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(option[app!(nat)])])
             .unwrap();
-        let mut istack = stk![TypedValue::new_option(Some(TypedValue::Nat(5)))];
+        let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
-        assert_eq!(istack, stk![TypedValue::Nat(6)]);
+        assert_eq!(istack, stk![TypedValue::nat(6)]);
     }
 
     #[test]
@@ -230,7 +230,7 @@ mod tests {
         use TypedValue as TV;
         match interp_res.unwrap() {
             (_, TV::Map(m)) => {
-                assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::Int(1))
+                assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::int(1))
             }
             _ => panic!("unexpected contract output"),
         }
@@ -291,6 +291,7 @@ mod multisig_tests {
     use crate::context::Ctx;
     use crate::interpreter::{ContractInterpretError, InterpretError};
     use crate::parser::test_helpers::parse_contract_script;
+    use num_bigint::BigUint;
     use Type as T;
     use TypedValue as TV;
 
@@ -321,12 +322,15 @@ mod multisig_tests {
         ctx.chain_id = tezos_crypto_rs::hash::ChainId(hex::decode("f3d48554").unwrap());
         ctx
     }
-    static ANTI_REPLAY_COUNTER: i128 = 111;
+
+    fn anti_replay_counter() -> BigUint {
+        BigUint::from(111u32)
+    }
 
     #[test]
     fn multisig_transfer() {
         let mut ctx = make_ctx();
-        let threshold = 1;
+        let threshold = BigUint::from(1u32);
 
         /*
             # Pack the parameter we will be sending to the multisig contract.
@@ -354,7 +358,7 @@ mod multisig_tests {
                 app!(Pair[
                     // :payload
                     app!(Pair[
-                        ANTI_REPLAY_COUNTER,
+                        anti_replay_counter(),
                         app!(Left[
                             // :transfer
                             app!(Pair[transfer_amount as i128,transfer_destination])
@@ -364,7 +368,7 @@ mod multisig_tests {
                     seq!{ app!(Some[signature]) }
                 ]),
                 // make_initial_storage(),
-                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+                app!(Pair[anti_replay_counter(), threshold.clone(), seq!{ PUBLIC_KEY }]),
             );
 
         assert_eq!(
@@ -379,9 +383,9 @@ mod multisig_tests {
                     counter: 1
                 }],
                 TV::new_pair(
-                    TV::Nat(ANTI_REPLAY_COUNTER as u128 + 1),
+                    TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                     TV::new_pair(
-                        TV::Nat(threshold as u128),
+                        TV::Nat(threshold),
                         TV::List(MichelsonList::from(vec![TV::Key(
                             PUBLIC_KEY.try_into().unwrap()
                         )]))
@@ -394,7 +398,7 @@ mod multisig_tests {
     #[test]
     fn multisig_set_delegate() {
         let mut ctx = make_ctx();
-        let threshold = 1;
+        let threshold = BigUint::from(1u32);
 
         /*
             # Pack the parameter we will be sending to the multisig contract.
@@ -421,7 +425,7 @@ mod multisig_tests {
                 app!(Pair[
                     // :payload
                     app!(Pair[
-                        ANTI_REPLAY_COUNTER,
+                        anti_replay_counter(),
                         app!(Right[ app!(Left[
                             // %delegate
                             app!(Some[new_delegate])
@@ -430,7 +434,7 @@ mod multisig_tests {
                     // %sigs
                     seq!{ app!(Some[signature]) }
                 ]),
-                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+                app!(Pair[anti_replay_counter(), threshold.clone(), seq!{ PUBLIC_KEY }]),
             );
 
         assert_eq!(
@@ -443,9 +447,9 @@ mod multisig_tests {
                     counter: 1
                 }],
                 TV::new_pair(
-                    TV::Nat(ANTI_REPLAY_COUNTER as u128 + 1),
+                    TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                     TV::new_pair(
-                        TV::Nat(threshold as u128),
+                        TV::Nat(threshold),
                         TV::List(MichelsonList::from(vec![TV::Key(
                             PUBLIC_KEY.try_into().unwrap()
                         )]))
@@ -471,7 +475,7 @@ mod multisig_tests {
                 app!(Pair[
                     // :payload
                     app!(Pair[
-                        ANTI_REPLAY_COUNTER,
+                        anti_replay_counter(),
                         app!(Right[ app!(Left[
                             // %delegate
                             app!(Some[new_delegate])
@@ -480,7 +484,7 @@ mod multisig_tests {
                     // %sigs
                     seq!{ app!(Some[invalid_signature]) }
                 ]),
-                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+                app!(Pair[anti_replay_counter(), threshold, seq!{ PUBLIC_KEY }]),
             );
 
         assert_eq!(

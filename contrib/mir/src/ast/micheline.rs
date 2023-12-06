@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+use num_bigint::{BigInt, BigUint};
 use typed_arena::Arena;
 
 use super::annotations::{Annotations, NO_ANNS};
@@ -12,7 +13,7 @@ use crate::lexer::Prim;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Micheline<'a> {
-    Int(i128),
+    Int(BigInt),
     String(String),
     Bytes(Vec<u8>),
     /// Application of a Micheline primitive to some arguments with optional
@@ -43,7 +44,19 @@ impl<'a> Micheline<'a> {
 
 impl<'a> From<i128> for Micheline<'a> {
     fn from(x: i128) -> Self {
+        Micheline::Int(x.into())
+    }
+}
+
+impl<'a> From<BigInt> for Micheline<'a> {
+    fn from(x: BigInt) -> Self {
         Micheline::Int(x)
+    }
+}
+
+impl<'a> From<BigUint> for Micheline<'a> {
+    fn from(x: BigUint) -> Self {
+        Micheline::Int(x.into())
     }
 }
 
@@ -312,14 +325,14 @@ pub mod test_helpers {
         assert_eq!(app!(True), Micheline::App(Prim::True, &[], NO_ANNS));
         assert_eq!(
             app!(DUP[3]),
-            Micheline::App(Prim::DUP, &[Micheline::Int(3)], NO_ANNS)
+            Micheline::App(Prim::DUP, &[Micheline::Int(3.into())], NO_ANNS)
         );
         assert_eq!(
             app!(DIP[3, seq!{ app!(DROP) }]),
             Micheline::App(
                 Prim::DIP,
                 &[
-                    Micheline::Int(3),
+                    Micheline::Int(3.into()),
                     Micheline::Seq(&[Micheline::App(Prim::DROP, &[], NO_ANNS)])
                 ],
                 NO_ANNS

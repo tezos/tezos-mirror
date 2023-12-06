@@ -18,6 +18,7 @@ pub mod or;
 pub mod overloads;
 
 pub use micheline::Micheline;
+use num_bigint::{BigInt, BigUint};
 use std::collections::{BTreeMap, BTreeSet};
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
@@ -85,8 +86,8 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId | Bytes
-            | Key | Signature | KeyHash => 1,
+            Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
+            | Bytes | Key | Signature | KeyHash => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Set(x) | Contract(x) => 1 + x.size_for_gas(),
         }
@@ -123,8 +124,8 @@ impl Type {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypedValue {
-    Int(i128),
-    Nat(u128),
+    Int(BigInt),
+    Nat(BigUint),
     Mutez(i64),
     Bool(bool),
     String(String),
@@ -230,6 +231,18 @@ impl TypedValue {
             operation: o,
             counter: c,
         }))
+    }
+
+    /// Helper for more easily constructing `Int` variant with literals. Mostly
+    /// useful in tests.
+    pub fn int(n: impl Into<BigInt>) -> Self {
+        Self::Int(n.into())
+    }
+
+    /// Helper for more easily constructing `Nat` variant with literals. Mostly
+    /// useful in tests.
+    pub fn nat(n: u32) -> Self {
+        Self::Nat(n.into())
     }
 }
 
