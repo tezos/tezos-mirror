@@ -56,9 +56,8 @@ let test_reward_coeff_ratio () =
   let assert_eq ~loc a b = Assert.equal ~loc Q.equal "" Q.pp_print a b in
   (* Curve tests *)
   let curve stake_ratio =
-    compute_reward_coeff_ratio
+    compute_reward_coeff_ratio_without_bonus
       ~stake_ratio
-      ~bonus:Issuance_bonus_repr.zero
       ~issuance_ratio_max:(Q.of_int 1_000_000)
       ~issuance_ratio_min:(Q.of_int (-1_000_000))
   in
@@ -76,53 +75,26 @@ let test_reward_coeff_ratio () =
   let* () =
     assert_eq ~loc:__LOC__ (curve one_m_e) Q.(1 // 1600 / (one_m_e * one_m_e))
   in
-  (* Test bonus *)
-  let max_bonus = Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.one in
-  let*?@ bonus = Issuance_bonus_repr.of_Q ~max_bonus Q.(1 // 5) in
-  (* If bounds are not reached, the bonus is an additive component of the curve *)
-  let* () =
-    assert_eq
-      ~loc:__LOC__
-      (Q.add Q.(1 // 5) (curve Q.(1 // 10)))
-      (compute_reward_coeff_ratio
-         ~stake_ratio:Q.(1 // 10)
-         ~bonus
-         ~issuance_ratio_max:(Q.of_int 100)
-         ~issuance_ratio_min:(Q.of_int (-100)))
-  in
   (* Test min max *)
   let bound = Q.(1 // 30) in
-  (* curve(1/10) = 1/16 > 1/30. Expected result: 1/30 *)
+  (* curve(1/10) = 1/16 > 1/30 (max). Expected result: 1/30 *)
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_reward_coeff_ratio
+      (compute_reward_coeff_ratio_without_bonus
          ~stake_ratio:Q.(1 // 10)
-         ~bonus:Issuance_bonus_repr.zero
          ~issuance_ratio_max:bound
          ~issuance_ratio_min:(Q.of_int (-100)))
       bound
   in
-  (* curve(1) = 1/1600 < 1/30. Expected result: 1/30 *)
+  (* curve(1) = 1/1600 < 1/30 (min). Expected result: 1/30 *)
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_reward_coeff_ratio
+      (compute_reward_coeff_ratio_without_bonus
          ~stake_ratio:Q.one
-         ~bonus:Issuance_bonus_repr.zero
          ~issuance_ratio_max:(Q.of_int 100)
          ~issuance_ratio_min:bound)
-      bound
-  in
-  (* curve(1) + 1/5 = 1/5 + 1/1600 > 1/30. Expected result: 1/30 *)
-  let* () =
-    assert_eq
-      ~loc:__LOC__
-      (compute_reward_coeff_ratio
-         ~stake_ratio:Q.one
-         ~bonus
-         ~issuance_ratio_max:bound
-         ~issuance_ratio_min:(Q.of_int (-100)))
       bound
   in
   return_unit
@@ -137,19 +109,23 @@ let test_compute_bonus () =
   in
   (* For simplicity, one cycle = one day *)
   let seconds_per_cycle = 86_400L in
-  let compute_bonus frozen total previous =
-    assert (frozen <= total) ;
+  let compute_bonus stake_ratio previous =
+    assert (Q.(stake_ratio <= one)) ;
     Lwt_main.run
-      (let total_supply = Tez_repr.of_mutez_exn total in
-       let total_frozen_stake = Tez_repr.of_mutez_exn frozen in
-       let*?@ previous_bonus =
+      (let*?@ previous_bonus =
          Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus previous
+       in
+       let base_reward_coeff_ratio =
+         compute_reward_coeff_ratio_without_bonus
+           ~stake_ratio
+           ~issuance_ratio_max:reward_params.issuance_ratio_max
+           ~issuance_ratio_min:reward_params.issuance_ratio_min
        in
        let*?@ bonus =
          compute_bonus
            ~seconds_per_cycle
-           ~total_supply
-           ~total_frozen_stake
+           ~stake_ratio
+           ~base_reward_coeff_ratio
            ~previous_bonus
            ~reward_params
        in
@@ -159,23 +135,23 @@ let test_compute_bonus () =
   let small_bonus = Q.(1 // 200) (* 0.5% *) in
   (* Test deadzone *)
   let* () =
-    assert_eq ~loc:__LOC__ (compute_bonus 48L 100L small_bonus) small_bonus
+    assert_eq ~loc:__LOC__ (compute_bonus Q.(48 // 100) small_bonus) small_bonus
   in
   let* () =
-    assert_eq ~loc:__LOC__ (compute_bonus 52L 100L small_bonus) small_bonus
+    assert_eq ~loc:__LOC__ (compute_bonus Q.(52 // 100) small_bonus) small_bonus
   in
   let* () =
     assert_fun
       ~loc:__LOC__
       ~f:Q.gt
-      (compute_bonus 47_9999L 100_0000L small_bonus)
+      (compute_bonus Q.(47_9999 // 100_0000) small_bonus)
       small_bonus
   in
   let* () =
     assert_fun
       ~loc:__LOC__
       ~f:Q.lt
-      (compute_bonus 52_0001L 100_0000L small_bonus)
+      (compute_bonus Q.(52_0001 // 100_0000) small_bonus)
       small_bonus
   in
   (* Test variation amplitude *)
@@ -183,35 +159,37 @@ let test_compute_bonus () =
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_bonus 47L 100L small_bonus)
+      (compute_bonus Q.(47 // 100) small_bonus)
       (Q.add small_bonus variation)
   in
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_bonus 40L 100L small_bonus)
+      (compute_bonus Q.(40 // 100) small_bonus)
       (Q.add small_bonus (Q.mul variation (Q.of_int 8)))
   in
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_bonus 53L 100L small_bonus)
+      (compute_bonus Q.(53 // 100) small_bonus)
       (Q.sub small_bonus variation)
   in
   let* () =
     assert_eq
       ~loc:__LOC__
-      (compute_bonus 60L 100L small_bonus)
+      (compute_bonus Q.(60 // 100) small_bonus)
       (Q.sub small_bonus (Q.mul variation (Q.of_int 8)))
   in
   (* Test bounds *)
   let max_bonus = (reward_params.max_bonus :> Q.t) in
-  let* () = assert_eq ~loc:__LOC__ (compute_bonus 60L 100L Q.zero) Q.zero in
+  let* () =
+    assert_eq ~loc:__LOC__ (compute_bonus Q.(60 // 100) Q.zero) Q.zero
+  in
   let* () =
     assert_fun
       ~loc:__LOC__
       ~f:Q.leq
-      (compute_bonus 40L 100L max_bonus)
+      (compute_bonus Q.(40 // 100) max_bonus)
       max_bonus
   in
   return_unit

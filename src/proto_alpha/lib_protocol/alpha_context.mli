@@ -2341,17 +2341,16 @@ module Delegate : sig
 
     module Internal_for_tests : sig
       (** Reward computation functions *)
-      val compute_reward_coeff_ratio :
+      val compute_reward_coeff_ratio_without_bonus :
         stake_ratio:Q.t ->
-        bonus:Issuance_bonus_repr.t ->
         issuance_ratio_max:Q.t ->
         issuance_ratio_min:Q.t ->
         Q.t
 
       val compute_bonus :
         seconds_per_cycle:int64 ->
-        total_supply:Tez_repr.t ->
-        total_frozen_stake:Tez_repr.t ->
+        stake_ratio:Q.t ->
+        base_reward_coeff_ratio:Q.t ->
         previous_bonus:Issuance_bonus_repr.t ->
         reward_params:Constants.Parametric.adaptive_rewards_params ->
         Issuance_bonus_repr.t tzresult

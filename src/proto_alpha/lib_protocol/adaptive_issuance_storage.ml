@@ -321,39 +321,8 @@ module For_RPC = struct
 end
 
 module Internal_for_tests = struct
-  let compute_reward_coeff_ratio ~stake_ratio ~(bonus : Issuance_bonus_repr.t)
-      ~issuance_ratio_max ~issuance_ratio_min =
-    let f =
-      compute_reward_coeff_ratio_without_bonus
-        ~stake_ratio
-        ~issuance_ratio_max
-        ~issuance_ratio_min
-    in
-    (* f is truncated twice, it's OK because the bonus is non-negative. *)
-    let f = Q.add f (bonus :> Q.t) in
-    (* f is truncated so that 0.05% <= f <= 5% *)
-    truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
+  let compute_reward_coeff_ratio_without_bonus =
+    compute_reward_coeff_ratio_without_bonus
 
-  let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
-      ~previous_bonus ~reward_params =
-    let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _} =
-      reward_params
-    in
-    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-    let q_total_frozen_stake =
-      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-    in
-    let stake_ratio = Q.div q_total_frozen_stake q_total_supply in
-    let base_reward_coeff_ratio =
-      compute_reward_coeff_ratio_without_bonus
-        ~stake_ratio
-        ~issuance_ratio_max
-        ~issuance_ratio_min
-    in
-    compute_bonus
-      ~seconds_per_cycle
-      ~stake_ratio
-      ~base_reward_coeff_ratio
-      ~previous_bonus
-      ~reward_params
+  let compute_bonus = compute_bonus
 end
