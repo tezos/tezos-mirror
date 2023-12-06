@@ -1090,6 +1090,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         in
 
         let direct_ticket_spending_enable = false in
+        let sponsored_operations_enable = false in
         let Constants_repr.Generated.{max_slashing_threshold; _} =
           Constants_repr.Generated.generate
             ~consensus_committee_size:c.consensus_committee_size
@@ -1148,6 +1149,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               zk_rollup;
               adaptive_issuance;
               direct_ticket_spending_enable;
+              sponsored_operations_enable;
             }
         in
         let*! ctxt = add_constants ctxt constants in

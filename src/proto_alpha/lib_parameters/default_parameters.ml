@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -312,6 +313,7 @@ let constants_mainnet : Constants.Parametric.t =
        - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
+    sponsored_operations_enable = false;
   }
 
 let constants_sandbox =
