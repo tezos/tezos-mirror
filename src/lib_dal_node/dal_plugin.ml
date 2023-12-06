@@ -71,6 +71,10 @@ module type T = sig
 
   val attested_slot_headers :
     block_info -> number_of_slots:int -> slot_index list tzresult
+
+  val get_round : Fitness.t -> int32 tzresult
+
+  val block_shell_header : block_info -> Block_header.shell_header
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5

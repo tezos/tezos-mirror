@@ -97,6 +97,13 @@ module type T = sig
       stripped.  *)
   val attested_slot_headers :
     block_info -> number_of_slots:int -> slot_index list tzresult
+
+  (** [get_round fitness] returns the block round contained in [fitness]. *)
+  val get_round : Fitness.t -> int32 tzresult
+
+  (** [block_shell_header block_info] returns the shell header of the block
+      whose information are given . *)
+  val block_shell_header : block_info -> Block_header.shell_header
 end
 
 val register : (module T) -> unit
