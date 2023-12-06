@@ -1853,6 +1853,7 @@ let _octez_distributed_plonk_test_main =
         octez_plonk_distribution;
         octez_aplonk;
         octez_plonk_test_helpers;
+        octez_test_helpers |> open_;
       ]
 
 let _octez_distributed_plonk_worker_runner =

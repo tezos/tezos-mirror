@@ -11,12 +11,14 @@
   octez-libs.plonk.aggregation
   octez-libs.plonk.distribution
   octez-libs.aplonk
-  octez-libs.plonk.plonk-test)
+  octez-libs.plonk.plonk-test
+  octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
-  -open Tezt_core.Base)
+  -open Tezt_core.Base
+  -open Tezos_test_helpers)
  (modules test_distribution))
 
 (executable

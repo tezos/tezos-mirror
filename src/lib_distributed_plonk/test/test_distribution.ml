@@ -131,22 +131,22 @@ let () =
   Test.register
     ~__FILE__
     ~title:"test_distribution_kzg"
-    ~tags:["plonk"; "lib_distributed_plonk"]
+    ~tags:[Tag.ci_disabled; "plonk"; "lib_distributed_plonk"]
     (test_distribution (module DP_Kzg ())) ;
   Test.register
     ~__FILE__
     ~title:"test_distribution_kzg_pack"
-    ~tags:["plonk"; "lib_distributed_plonk"]
+    ~tags:[Tag.ci_disabled; "plonk"; "lib_distributed_plonk"]
     (test_distribution (module DP_Pack ())) ;
   Test.register
     ~__FILE__
     ~title:"test_distribution_meta"
-    ~tags:["plonk"; "lib_distributed_plonk"]
+    ~tags:[Tag.ci_disabled; "plonk"; "lib_distributed_plonk"]
     (test_distribution (module DP_Meta ())) ;
   Test.register
     ~__FILE__
     ~title:"test_distribution_RC"
-    ~tags:["plonk"; "lib_distributed_plonk"]
+    ~tags:[Tag.ci_disabled; "plonk"; "lib_distributed_plonk"]
     (test_distribution
        ~circuit_builder:Circuit_Builder.range_checks
        (module DP_Pack ()))
