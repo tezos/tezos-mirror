@@ -45,25 +45,27 @@ let () =
       | Missing_stored_kvs_data (path, index) -> Some (path, index) | _ -> None)
     (fun (path, index) -> Missing_stored_kvs_data (path, index))
 
-type ('file, 'value) directory_spec = {
+type ('key, 'value) layout = {
   encoding : 'value Data_encoding.t;
   eq : 'value -> 'value -> bool;
-  index_of : 'file -> int;
-  path : string;
+  index_of : 'key -> int;
+  filepath : string;
   value_size : int;
 }
 
-(** [Directories] handle writing and reading virtual files to virtual directories.
-    A virtual directory is backed by a physical file and a virtual file is an offset
-    in a virtual directory.
+(** The module [Files] handles writing and reading into memory-mapped
+    files. A virtual file is backed by a physical file and a key is
+    an offset in this file.
 
-    Besides implementing a key-value store, the module [Directories] must properly
+    Besides implementing a key-value store, this module must properly
     handle resource utilization, especially file descriptors.
 
-    The structure [Directories.t] guarantees that no more than the specified
+    The structure [File.t] guarantees that no more than the specified
     [lru_size] file descriptors can be open at the same time.
+
+    This modules also enables each file to come with its own layout.
 *)
-module Directories : sig
+module Files : sig
   type 'value t
 
   val init : lru_size:int -> 'value t
@@ -73,15 +75,14 @@ module Directories : sig
   val write :
     ?override:bool ->
     'value t ->
-    ('b, 'value) directory_spec ->
-    'b ->
+    ('key, 'value) layout ->
+    'key ->
     'value ->
     unit tzresult Lwt.t
 
-  val read :
-    'value t -> ('b, 'value) directory_spec -> 'b -> 'value tzresult Lwt.t
+  val read : 'value t -> ('key, 'value) layout -> 'key -> 'value tzresult Lwt.t
 
-  val value_exists : 'value t -> ('b, 'value) directory_spec -> 'b -> bool Lwt.t
+  val value_exists : 'value t -> ('key, 'value) layout -> 'key -> bool Lwt.t
 end = struct
   module LRU = Ringo.LRU_Collection
 
@@ -108,11 +109,11 @@ end = struct
 
   type handle = {fd : Lwt_unix.file_descr; bitset : Lwt_bytes.t}
 
-  let file_exists handle index = handle.bitset.{index} <> '\000'
+  let key_exists handle index = handle.bitset.{index} <> '\000'
 
-  let set_file_exists handle index = handle.bitset.{index} <- '\001'
+  let set_key_exists handle index = handle.bitset.{index} <- '\001'
 
-  let initialize_virtual_directory path value_size =
+  let initialize_file path value_size =
     (* We perform the initialization synchronously to avoid spurious Lwt
        premption slowing down writing shards. The execution time of the
        code below should be on the order of a few tenth of a millisecond
@@ -128,7 +129,7 @@ end = struct
       Unix.unlink path ;
       raise e
 
-  let load_virtual_directory path =
+  let load_file path =
     let open Lwt_syntax in
     let* fd = Lwt_unix.openfile path [O_RDWR; O_CLOEXEC] 0o660 in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
@@ -142,7 +143,7 @@ end = struct
     in
     return {fd; bitset}
 
-  let close_virtual_directory handle = Lwt_unix.close handle.fd
+  let close_file handle = Lwt_unix.close handle.fd
 
   type 'value handle_and_pending_callbacks =
     | Entry of {
@@ -162,10 +163,9 @@ end = struct
         match Lwt.state p with Return () | Fail _ -> false | Sleep -> true)
       l
 
-  (* The type of directories.
-     The domains of [handles] and [lru] should be the same, before and after
-     calling the functions [write] and [read] in this module.
-  *)
+  (* The type of files. The domains of [handles] and [lru] should be
+     the same, before and after calling the functions [write] and
+     [read] in this module. *)
   type 'value t = {
     handles : 'value handle_and_pending_callbacks Table.t;
     lru : string LRU.t;
@@ -192,17 +192,22 @@ end = struct
             Lwt_unix.close handle.fd)
       handles
 
-  let resolve_pending_and_close dirs removed =
+  (* This function is called anytime the file "removed" must be
+     removed from the cache. The value has already been removed from
+     the LRU. *)
+  let resolve_pending_and_close files removed =
     let open Lwt_syntax in
     let await_close, resolve_close = Lwt.task () in
-    match Table.find dirs.handles removed with
+    (* Invariant: The value removed must be in the cache, i.e. the
+       domain of the LRU and the one of the Table is the same. *)
+    match Table.find files.handles removed with
     | None -> assert false
     | Some (Being_evicted _) -> assert false
     | Some (Entry {handle; accessed = _; cached = _; pending_callbacks}) ->
-        Table.replace dirs.handles removed (Being_evicted await_close) ;
+        Table.replace files.handles removed (Being_evicted await_close) ;
         let* handle and* () = Lwt.join pending_callbacks in
-        let+ () = close_virtual_directory handle in
-        Table.remove dirs.handles removed ;
+        let+ () = close_file handle in
+        Table.remove files.handles removed ;
         Lwt.wakeup resolve_close () ;
         ()
 
@@ -214,22 +219,23 @@ end = struct
         Lwt_mutex.with_lock mutex f
     | Some mutex -> Lwt_mutex.with_lock mutex f
 
-  let rec bind_dir_and_lock_file dirs spec index f =
+  let rec bind_and_lock_file files layout index f =
     (* Precondition: the LRU and the table are in sync *)
     let open Lwt_syntax in
     let load_or_initialize () =
-      let* b = Lwt_unix.file_exists spec.path in
-      if b then load_virtual_directory spec.path
-      else initialize_virtual_directory spec.path spec.value_size
+      let* b = Lwt_unix.file_exists layout.filepath in
+      if b then load_file layout.filepath
+      else initialize_file layout.filepath layout.value_size
     in
-
     let put_then_bind () =
-      (* Precondition: [spec.path] not in [dirs.handle] *)
-      let _node, erased_opt = LRU.add_and_return_erased dirs.lru spec.path in
-      (* Here, [spec.path] is in the LRU but not in the table yet.
+      (* Precondition: [layout.filepath] not in [files.handle] *)
+      let _node, erased_opt =
+        LRU.add_and_return_erased files.lru layout.filepath
+      in
+      (* Here, [layout.filepath] is in the LRU but not in the table yet.
          But:
          - all executions from this point are cooperation-point-free
-           until the insertion of [spec.path] in the table
+           until the insertion of [layout.filepath] in the table
          It follows that this temporary discrepancy is not observable.
 
          Same observation holds in the other direction if [erased_opt = Some erased].
@@ -238,7 +244,7 @@ end = struct
         match erased_opt with
         | None -> load_or_initialize ()
         | Some removed ->
-            let* () = resolve_pending_and_close dirs removed in
+            let* () = resolve_pending_and_close files removed in
             load_or_initialize ()
       in
       let accessed = File_table.create 3 in
@@ -247,8 +253,8 @@ end = struct
         with_mutex accessed index (fun () -> Lwt.bind handle (f cached))
       in
       Table.replace
-        dirs.handles
-        spec.path
+        files.handles
+        layout.filepath
         (Entry
            {
              handle;
@@ -258,8 +264,7 @@ end = struct
            }) ;
       callback
     in
-
-    match Table.find dirs.handles spec.path with
+    match Table.find files.handles layout.filepath with
     | Some (Entry p) ->
         let promise =
           with_mutex p.accessed index (fun () -> Lwt.bind p.handle (f p.cached))
@@ -271,33 +276,33 @@ end = struct
         let* () = await_eviction in
         (* We can't directly [put_and_bind] because several threads may be
            waiting here. *)
-        bind_dir_and_lock_file dirs spec index f
+        bind_and_lock_file files layout index f
     | None -> put_then_bind ()
 
-  let write ?(override = false) dirs spec file data =
+  let write ?(override = false) files layout key data =
     let open Lwt_result_syntax in
-    let index = spec.index_of file in
-    bind_dir_and_lock_file dirs spec index @@ fun cached handle ->
+    let index = layout.index_of key in
+    bind_and_lock_file files layout index @@ fun cached handle ->
     let perform_write () =
-      let pos = Int64.of_int (bitset_size + (index * spec.value_size)) in
+      let pos = Int64.of_int (bitset_size + (index * layout.value_size)) in
       let mmap =
         Lwt_bytes.map_file
           ~fd:(Lwt_unix.unix_file_descr handle.fd)
           ~pos
-          ~size:spec.value_size
+          ~size:layout.value_size
           ~shared:true
           ()
       in
-      let bytes = Data_encoding.Binary.to_bytes_exn spec.encoding data in
-      if Bytes.length bytes <> spec.value_size then
+      let bytes = Data_encoding.Binary.to_bytes_exn layout.encoding data in
+      if Bytes.length bytes <> layout.value_size then
         failwith
           "Key_value_store.write: encoded value does not respect specified size"
       else (
         Lwt_bytes.blit_from_bytes bytes 0 mmap 0 (Bytes.length bytes) ;
-        set_file_exists handle index ;
+        set_key_exists handle index ;
         return_unit)
     in
-    if not (file_exists handle index) then (
+    if not (key_exists handle index) then (
       assert (not (File_table.mem cached index)) ;
       perform_write ())
     else if override then
@@ -306,57 +311,61 @@ end = struct
           File_table.add cached index data ;
           perform_write ()
       | Some cached ->
-          if spec.eq cached data then return_unit else perform_write ()
+          if layout.eq cached data then return_unit else perform_write ()
     else return_unit
 
-  let read dirs spec file =
+  let read files layout key =
     let open Lwt_result_syntax in
-    let index = spec.index_of file in
-    bind_dir_and_lock_file dirs spec index @@ fun cached handle ->
-    if file_exists handle index then
+    let index = layout.index_of key in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6691
+
+       If the file does not exist, one will be created.
+    *)
+    bind_and_lock_file files layout index @@ fun cached handle ->
+    if key_exists handle index then
       match File_table.find cached index with
       | None ->
           (* Note that the following code executes atomically Lwt-wise. *)
-          let pos = Int64.of_int (bitset_size + (index * spec.value_size)) in
+          let pos = Int64.of_int (bitset_size + (index * layout.value_size)) in
           let mmap =
             Lwt_bytes.map_file
               ~fd:(Lwt_unix.unix_file_descr handle.fd)
               ~pos
-              ~size:spec.value_size
+              ~size:layout.value_size
               ~shared:true
               ()
           in
-          let bytes = Bytes.make spec.value_size '\000' in
-          Lwt_bytes.blit_to_bytes mmap 0 bytes 0 spec.value_size ;
-          let data = Data_encoding.Binary.of_bytes_exn spec.encoding bytes in
+          let bytes = Bytes.make layout.value_size '\000' in
+          Lwt_bytes.blit_to_bytes mmap 0 bytes 0 layout.value_size ;
+          let data = Data_encoding.Binary.of_bytes_exn layout.encoding bytes in
           File_table.add cached index data ;
           return data
       | Some v -> return v
-    else tzfail (Missing_stored_kvs_data (spec.path, index))
+    else tzfail (Missing_stored_kvs_data (layout.filepath, index))
 
-  let value_exists dirs spec file =
+  let value_exists files layout key =
     let open Lwt_syntax in
-    let index = spec.index_of file in
-    bind_dir_and_lock_file dirs spec index @@ fun _cached handle ->
-    return @@ file_exists handle index
+    let index = layout.index_of key in
+    bind_and_lock_file files layout index @@ fun _cached handle ->
+    return @@ key_exists handle index
 end
 
-type ('dir, 'file, 'value) t =
+type ('file, 'key, 'value) t =
   | E : {
-      directory_of : 'dir -> ('file, 'value) directory_spec;
-      directories : 'value Directories.t;
+      layout_of : 'file -> ('key, 'value) layout;
+      files : 'value Files.t;
     }
-      -> ('dir, 'file, 'value) t
+      -> ('file, 'key, 'value) t
 
-let directory ?encoded_value_size encoding path eq index_of =
+let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of () =
   match encoded_value_size with
-  | Some value_size -> {path; eq; encoding; index_of; value_size}
+  | Some value_size -> {filepath; eq; encoding; index_of; value_size}
   | None -> (
       match Data_encoding.classify encoding with
-      | `Fixed value_size -> {path; eq; encoding; index_of; value_size}
+      | `Fixed value_size -> {filepath; eq; encoding; index_of; value_size}
       | `Dynamic | `Variable ->
           invalid_arg
-            "Key_value_store.directory: encoding does not have fixed size")
+            "Key_value_store.layout: encoding does not have fixed size")
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/4643
 
@@ -371,52 +380,52 @@ let directory ?encoded_value_size encoding path eq index_of =
    In practice, there should not be a duplication in memory of the
    values read since values are shared. *)
 
-let init ~lru_size directory_of =
-  let directories = Directories.init ~lru_size in
-  E {directory_of; directories}
+let init ~lru_size layout_of =
+  let files = Files.init ~lru_size in
+  E {layout_of; files}
 
-let close (E {directories; _}) = Directories.close directories
+let close (E {files; _}) = Files.close files
 
 let write_value :
-    type dir file value.
+    type file key value.
     ?override:bool ->
-    (dir, file, value) t ->
-    dir ->
+    (file, key, value) t ->
     file ->
+    key ->
     value ->
     unit tzresult Lwt.t =
- fun ?override (E {directories; directory_of}) dir file value ->
-  let dir = directory_of dir in
-  Directories.write ?override directories dir file value
+ fun ?override (E {files; layout_of}) file key value ->
+  let layout = layout_of file in
+  Files.write ?override files layout key value
 
 let read_value :
-    type dir file value.
-    (dir, file, value) t -> dir -> file -> value tzresult Lwt.t =
- fun (E {directories; directory_of}) dir file ->
-  let dir = directory_of dir in
-  Directories.read directories dir file
+    type file key value.
+    (file, key, value) t -> file -> key -> value tzresult Lwt.t =
+ fun (E {files; layout_of}) file key ->
+  let layout = layout_of file in
+  Files.read files layout key
 
 let value_exists :
-    type dir file value. (dir, file, value) t -> dir -> file -> bool Lwt.t =
- fun (E {directories; directory_of}) dir file ->
-  let dir = directory_of dir in
-  Directories.value_exists directories dir file
+    type file key value. (file, key, value) t -> file -> key -> bool Lwt.t =
+ fun (E {files; layout_of}) file key ->
+  let layout = layout_of file in
+  Files.value_exists files layout key
 
 let write_values ?override t seq =
   Seq.ES.iter
-    (fun (dir, file, value) -> write_value ?override t dir file value)
+    (fun (file, key, value) -> write_value ?override t file key value)
     seq
 
 let read_values t seq =
   let open Lwt_syntax in
   Seq_s.of_seq seq
-  |> Seq_s.S.map (fun (dir, file) ->
-         let* maybe_value = read_value t dir file in
-         return (dir, file, maybe_value))
+  |> Seq_s.S.map (fun (file, key) ->
+         let* maybe_value = read_value t file key in
+         return (file, key, maybe_value))
 
 let values_exist t seq =
   let open Lwt_syntax in
   Seq_s.of_seq seq
-  |> Seq_s.S.map (fun (dir, file) ->
-         let* maybe_value = value_exists t dir file in
-         return (dir, file, maybe_value))
+  |> Seq_s.S.map (fun (file, key) ->
+         let* maybe_value = value_exists t file key in
+         return (file, key, maybe_value))
