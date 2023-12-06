@@ -8,6 +8,7 @@
  (libraries
   octez-libs.clic
   octez-libs.base
+  octez-node-config
   octez-shell-libs.store
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
