@@ -228,6 +228,31 @@ let protocol_of_hash protocol_hash =
     (fun (module P : Sigs.PROTOCOL) -> Protocol_hash.equal P.hash protocol_hash)
     (Known_protocols.get_all ())
 
+(** load mainnet store from [base_dir]
+*)
+let genesis ~network =
+  match network with
+  | `Mainnet ->
+      {
+        Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+      }
+  | `Ghostnet ->
+      {
+        Genesis.time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+      }
+
 (** [load_mainnet_bakers_public_keys base_dir active_backers_only
     alias_phk_pk_list] checkouts the head context at the given
     [base_dir] and computes a list of triples [(alias, pkh, pk)]
@@ -237,28 +262,18 @@ let protocol_of_hash protocol_hash =
     if [active_bakers_only] then the deactivated delegates are filtered out of
     the list.
 *)
-let load_mainnet_bakers_public_keys ?(staking_share_opt = None) base_dir
-    ~active_bakers_only alias_pkh_pk_list =
+let load_bakers_public_keys ?(staking_share_opt = None)
+    ?(network_opt = `Mainnet) base_dir ~active_bakers_only alias_pkh_pk_list =
   let open Lwt_result_syntax in
   let open Tezos_store in
-  let mainnet_genesis =
-    {
-      Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-  in
+  let genesis = genesis ~network:network_opt in
   let* store =
     Tezos_store.Store.init
       ~store_dir:(Filename.concat base_dir "store")
       ~context_dir:(Filename.concat base_dir "context")
       ~allow_testchains:true
       ~readonly:true
-      mainnet_genesis
+      genesis
   in
   let main_chain_store = Store.main_chain_store store in
   let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
@@ -276,16 +291,31 @@ let load_mainnet_bakers_public_keys ?(staking_share_opt = None) base_dir
   let* delegates =
     match protocol_of_hash protocol_hash with
     | None ->
-        Error_monad.failwith
-          "Unknown protocol hash: %a.@;Known protocols are: %a"
-          Protocol_hash.pp
+        if
           protocol_hash
-          Format.(
-            pp_print_list
-              ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-              Protocol_hash.pp)
-          (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-          @@ Known_protocols.get_all ())
+          = Protocol_hash.of_b58check_exn
+              "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+        then
+          Error_monad.failwith
+            "Context was probably ill loaded, found Genesis protocol.@;\
+             Known protocols are: %a"
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+                Protocol_hash.pp)
+            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+            @@ Known_protocols.get_all ())
+        else
+          Error_monad.failwith
+            "Unknown protocol hash: %a.@;Known protocols are: %a"
+            Protocol_hash.pp
+            protocol_hash
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+                Protocol_hash.pp)
+            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+            @@ Known_protocols.get_all ())
     | Some protocol ->
         Format.printf
           "@[<h>Detected protocol:@;<10 0>%a@]@."
@@ -317,11 +347,13 @@ let load_mainnet_bakers_public_keys ?(staking_share_opt = None) base_dir
          (alias, pkh, pk, stake))
        delegates
 
-let build_yes_wallet ?staking_share_opt base_dir ~active_bakers_only ~aliases =
+let build_yes_wallet ?staking_share_opt ?network_opt base_dir
+    ~active_bakers_only ~aliases =
   let open Lwt_result_syntax in
   let+ mainnet_bakers =
-    load_mainnet_bakers_public_keys
+    load_bakers_public_keys
       ?staking_share_opt
+      ?network_opt
       base_dir
       ~active_bakers_only
       aliases
