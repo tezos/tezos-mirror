@@ -1518,6 +1518,45 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
        %L, got = %R)" ;
   unit
 
+let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
+    dal_node =
+  let* commitment, proof =
+    Helpers.(
+      store_slot dal_node ~with_proof:true
+      @@ make_slot
+           ~slot_size:parameters.Dal_common.Parameters.cryptobox.slot_size
+           "content1")
+  in
+  let* _oph =
+    publish_slot_header
+      ~source:Constant.bootstrap1
+      ~index:0
+      ~commitment
+      ~proof
+      client
+  in
+  let* level = Node.get_level node in
+  let* () = Client.bake_for_and_wait client in
+  let* export_level = Node.wait_for_level node (level + 1) in
+  let file = Temp.file "snapshot" in
+  let* () = Node.snapshot_export ~export_level node file in
+  let node2 = Node.create [] in
+  let* () = Node.config_init node2 [] in
+  (* We update the configuration because by default on sandbox mode,
+     DAL is not activated. *)
+  let config : Cryptobox.Config.t =
+    {
+      activated = true;
+      use_mock_srs_for_testing = Some parameters.cryptobox;
+      bootstrap_peers = [];
+    }
+  in
+  Node.Config_file.update
+    node2
+    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
+  let* () = Node.snapshot_import node2 file in
+  unit
+
 let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
@@ -4153,6 +4192,11 @@ let register ~protocols =
     ~activation_timestamp:Now
     "dal attester with baker daemon"
     test_attester_with_daemon
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["snapshot"; "import"]
+    "dal node import snapshot"
+    test_dal_node_import_snapshot
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
