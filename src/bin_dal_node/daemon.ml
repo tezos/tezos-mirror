@@ -299,11 +299,6 @@ module Handler = struct
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready ready_ctxt ->
-          let head_level = header.shell.level in
-          Dal_metrics.new_layer1_head ~head_level ;
-          let*! () =
-            Event.(emit layer1_node_new_head (head_hash, head_level))
-          in
           let Node_context.
                 {
                   plugin = (module Plugin);
@@ -314,6 +309,13 @@ module Handler = struct
                   last_seen_head;
                 } =
             ready_ctxt
+          in
+          let head_level = header.shell.level in
+          let*? head_round = Plugin.get_round header.shell.fitness in
+          Dal_metrics.new_layer1_head ~head_level ;
+          let*! () =
+            Event.(
+              emit layer1_node_new_head (head_hash, head_level, head_round))
           in
           Gossipsub.Worker.Validate_message_hook.set
             (gossipsub_app_messages_validation
@@ -326,6 +328,10 @@ module Handler = struct
             let block = `Level block_level in
             let* block_info =
               Plugin.block_info cctxt ~block ~metadata:`Always
+            in
+            let*? block_round =
+              let shell_header = Plugin.block_shell_header block_info in
+              Plugin.get_round shell_header.fitness
             in
             let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
@@ -386,7 +392,9 @@ module Handler = struct
                 committee
             in
             Dal_metrics.layer1_block_finalized ~block_level ;
-            let*! () = Event.(emit layer1_node_final_block block_level) in
+            let*! () =
+              Event.(emit layer1_node_final_block (block_level, block_round))
+            in
             may_update_plugin
               cctxt
               ctxt
