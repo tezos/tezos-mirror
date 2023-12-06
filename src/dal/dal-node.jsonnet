@@ -52,11 +52,15 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ).addTargets([
       prometheus.target(
         namespace + '_new_layer1_head' + node_instance,
-        legendFormat=head
+        legendFormat=head,
+        intervalFactor=1,
+        interval='3s',
       ),
       prometheus.target(
         namespace + '_layer1_block_finalized' + node_instance,
-        legendFormat=finalized
+        legendFormat=finalized,
+        intervalFactor=1,
+        interval='3s',
       ),
     ]),
 
@@ -77,11 +81,15 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ).addTargets([
       prometheus.target(
         namespace + '_new_layer1_head_round' + node_instance,
-        legendFormat=head
+        legendFormat=head,
+        intervalFactor=1,
+        interval='3s',
       ),
       prometheus.target(
         namespace + '_layer1_block_finalized_round' + node_instance,
-        legendFormat=finalized
+        legendFormat=finalized,
+        intervalFactor=1,
+        interval='3s',
       ),
     ]),
 
@@ -100,13 +108,14 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ).addTargets([
       prometheus.target(
         'deriv(' + namespace + '_number_of_stored_shards' + node_instance + '[1m])',
-        legendFormat=shards
+        legendFormat=shards,
+        interval='3s',
       ),
     ]),
 
   slotsAttesatationSummary:
-    local attested = "Number of attested slots";
-    local waiting = "Number of slots waiting for attestation";
+    local attested = 'Number of attested slots';
+    local waiting = 'Number of slots waiting for attestation';
     graphPanel.new(
       title='Number of slots waiting for attesatation and of attested slots',
       datasource='Prometheus',
@@ -121,7 +130,8 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ).addTargets([
       prometheus.target(
         'sum(' + namespace + '_slots_waiting_for_attestaion' + node_instance + ')',
-        legendFormat=waiting
+        legendFormat=waiting,
+        interval='3s',
       ),
       prometheus.target(
         'sum(' + namespace + '_slots_attested' + node_instance + ')',
@@ -141,6 +151,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_slots_waiting_for_attestaion' + node_instance,
         legendFormat='{{ slot_waiting_for_attestaion }}',
+        interval='3s',
       ),
     ]),
 
@@ -156,6 +167,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_slots_attested' + node_instance,
         legendFormat='{{ slot_attested }}',
+        interval='3s',
       ),
     ]),
 

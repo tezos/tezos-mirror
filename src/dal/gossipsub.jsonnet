@@ -98,15 +98,18 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     ).addTargets([
       prometheus.target(
         namespace + '_input_events_stream_length' + node_instance,
-        legendFormat=input
+        legendFormat=input,
+        interval='3s',
       ),
       prometheus.target(
         namespace + '_p2p_output_stream_length' + node_instance,
-        legendFormat=p2p
+        legendFormat=p2p,
+        interval='3s',
       ),
       prometheus.target(
         namespace + '_app_output_stream_length' + node_instance,
-        legendFormat=app
+        legendFormat=app,
+        interval='3s',
       ),
     ]),
 
@@ -132,18 +135,22 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         'deriv(' + namespace + '_count_received_valid_messages' + node_instance + '[1m])',
         legendFormat=received_valid,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_received_invalid_messages' + node_instance + '[1m])',
         legendFormat=received_invalid,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_received_unknown_validity_messages' + node_instance + '[1m])',
         legendFormat=received_unknown,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_sent_messages' + node_instance + '[1m])',
         legendFormat=sent,
+        interval='3s',
       ),
     ]),
 
@@ -169,18 +176,22 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         'deriv(' + namespace + '_count_sent_grafts' + node_instance + '[1m])',
         legendFormat=grafts,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_sent_prunes' + node_instance + '[1m])',
         legendFormat=prunes,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_sent_ihaves' + node_instance + '[1m])',
         legendFormat=ihaves,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_sent_iwants' + node_instance + '[1m])',
         legendFormat=iwants,
+        interval='3s',
       ),
     ]),
 
@@ -206,18 +217,22 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         'deriv(' + namespace + '_count_received_grafts' + node_instance + '[1m])',
         legendFormat=grafts,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_received_prunes' + node_instance + '[1m])',
         legendFormat=prunes,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_received_ihaves' + node_instance + '[1m])',
         legendFormat=ihaves,
+        interval='3s',
       ),
       prometheus.target(
         'deriv(' + namespace + '_count_received_iwants' + node_instance + '[1m])',
         legendFormat=iwants,
+        interval='3s',
       ),
     ]),
 
@@ -233,6 +248,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_scores_of_peers' + node_instance,
         legendFormat='{{ scores_of_peers }}',
+        interval='3s',
       ),
     ]),
 
@@ -248,6 +264,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_count_peers_per_topic' + node_instance,
         legendFormat='{{ count_peers_per_topic }}',
+        interval='3s',
       ),
     ]),
 
