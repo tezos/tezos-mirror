@@ -38,8 +38,6 @@ type simulation_kind =
       payload_hash : Block_payload_hash.t;
     }
 
-type simulation_mode = Local of Context.index | Node
-
 val forge :
   #Protocol_client_context.full ->
   chain_id:Chain_id.t ->
