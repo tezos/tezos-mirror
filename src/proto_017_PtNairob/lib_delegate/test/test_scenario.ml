@@ -1863,6 +1863,8 @@ let () =
 
 let () =
   let open Lwt_result_syntax in
+  (* Activate a sink to record baker's events *)
+  let t = lazy (Tezt_sink.activate ()) in
   let proto_name =
     String.lowercase_ascii Protocol.name
     |> String.map (function '-' -> '_' | x -> x)
@@ -1873,6 +1875,7 @@ let () =
       ~title
       ~tags:[proto_name; "baker"; "mockup"; Tag.time_sensitive]
     @@ fun () ->
+    let*! () = Lazy.force t in
     let*! r = test () in
     match r with
     | Ok () -> unit

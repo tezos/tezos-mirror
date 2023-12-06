@@ -16,6 +16,7 @@
   octez-protocol-017-PtNairob-libs.baking
   tezos-protocol-017-PtNairob.parameters
   octez-libs.crypto
+  octez-libs.event-logging-test-helpers
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -30,7 +31,8 @@
   -open Tezos_protocol_017_PtNairob
   -open Tezos_base_test_helpers
   -open Tezos_017_PtNairob_mockup_simulator
-  -open Tezos_baking_017_PtNairob)
+  -open Tezos_baking_017_PtNairob
+  -open Tezos_event_logging_test_helpers)
  (modules test_scenario))
 
 (executable

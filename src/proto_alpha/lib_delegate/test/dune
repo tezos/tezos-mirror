@@ -16,6 +16,7 @@
   octez-protocol-alpha-libs.baking
   tezos-protocol-alpha.parameters
   octez-libs.crypto
+  octez-libs.event-logging-test-helpers
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -30,7 +31,8 @@
   -open Tezos_protocol_alpha
   -open Tezos_base_test_helpers
   -open Tezos_alpha_mockup_simulator
-  -open Tezos_baking_alpha)
+  -open Tezos_baking_alpha
+  -open Tezos_event_logging_test_helpers)
  (modules test_scenario))
 
 (executable
