@@ -70,10 +70,19 @@ pub struct Emit<'a> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct CreateContract<'a> {
+    pub delegate: Option<KeyHash>,
+    pub amount: i64,
+    pub storage: TypedValue<'a>,
+    pub code: Rc<ContractScript<'a>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Operation<'a> {
     TransferTokens(TransferTokens<'a>),
     SetDelegate(SetDelegate),
     Emit(Emit<'a>),
+    CreateContract(CreateContract<'a>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -413,6 +422,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         None => annotations::NO_ANNS,
                     },
                 ),
+                Operation::CreateContract(_) => todo!(),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
         }
