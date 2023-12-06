@@ -325,4 +325,6 @@ module Internal_for_tests = struct
     compute_reward_coeff_ratio_without_bonus
 
   let compute_bonus = compute_bonus
+
+  let compute_coeff = compute_coeff
 end

@@ -2354,6 +2354,14 @@ module Delegate : sig
         previous_bonus:Issuance_bonus_repr.t ->
         reward_params:Constants.Parametric.adaptive_rewards_params ->
         Issuance_bonus_repr.t tzresult
+
+      val compute_coeff :
+        base_total_issued_per_minute:Tez_repr.t ->
+        base_reward_coeff_ratio:Q.t ->
+        q_total_supply:Q.t ->
+        bonus:Issuance_bonus_repr.t ->
+        reward_params:Constants.Parametric.adaptive_rewards_params ->
+        Q.t
     end
   end
 
