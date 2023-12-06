@@ -8,7 +8,7 @@ KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm 
 SDK_DIR=src/kernel_sdk
 RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
-RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
+RISC_V_DUMMY_BM_DIR=src/risc_v/dummy_kernel_bm
 RISC_V_TESTS_DIR=src/risc_v/tests
 EVM_DIR=etherlink/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
@@ -114,8 +114,8 @@ dal_echo_kernel.wasm:
 
 .PHONY: risc-v-dummy.elf
 risc-v-dummy.elf:
-	@make -C ${RISC_V_DUMMY_DIR} build
-	@ln -f ${RISC_V_DUMMY_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy $@
+	@make -C ${RISC_V_DUMMY_BM_DIR} build
+	@ln -f ${RISC_V_DUMMY_BM_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy-bm $@
 
 .PHONY: risc-v-tests
 risc-v-tests:
@@ -148,7 +148,7 @@ test:
 	@make -C ${SDK_DIR} test
 	@make -C ${RISC_V_SANDBOX_DIR} test
 	@make -C ${RISC_V_INTERPRETER_DIR} test
-	@make -C ${RISC_V_DUMMY_DIR} test
+	@make -C ${RISC_V_DUMMY_BM_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
@@ -158,7 +158,7 @@ check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${RISC_V_INTERPRETER_DIR} check
-	@make -C ${RISC_V_DUMMY_DIR} check
+	@make -C ${RISC_V_DUMMY_BM_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
@@ -181,7 +181,7 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${RISC_V_SANDBOX_DIR} clean
 	@make -C ${RISC_V_INTERPRETER_DIR} clean
-	@make -C ${RISC_V_DUMMY_DIR} clean
+	@make -C ${RISC_V_DUMMY_BM_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean
