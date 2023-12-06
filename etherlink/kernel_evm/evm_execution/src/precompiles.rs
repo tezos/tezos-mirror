@@ -13,6 +13,7 @@
 
 use std::{cmp::min, str::FromStr, vec};
 
+use crate::eip152;
 use crate::handler::EvmHandler;
 use crate::zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 use crate::EthereumError;
@@ -357,6 +358,113 @@ fn ripemd160_precompile<Host: Runtime>(
     })
 }
 
+fn blake2f_output_for_wrong_input() -> PrecompileOutcome {
+    PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output: vec![],
+        withdrawals: vec![],
+        estimated_ticks: 0,
+    }
+}
+
+trait Decodable {
+    fn decode_from_le_slice(&mut self, source: &[u8]);
+}
+
+impl<const N: usize> Decodable for [u64; N] {
+    fn decode_from_le_slice(&mut self, src: &[u8]) {
+        let mut word_buf = [0_u8; 8];
+        for (i, word) in self.iter_mut().enumerate() {
+            word_buf.copy_from_slice(&src[i * 8..(i + 1) * 8]);
+            *word = u64::from_le_bytes(word_buf);
+        }
+    }
+}
+
+fn blake2f_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    log!(handler.borrow_host(), Info, "Calling blake2f precompile");
+
+    // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
+    if input.len() != 213 {
+        return Ok(blake2f_output_for_wrong_input());
+    }
+
+    // the number of rounds - 32-bit unsigned big-endian word
+    let mut rounds_buf = [0_u8; 4];
+    rounds_buf.copy_from_slice(&input[0..4]);
+    let rounds: u32 = u32::from_be_bytes(rounds_buf);
+
+    // check that enough ressources to execute (gas / ticks) are available
+    let estimated_ticks =
+        fail_if_too_much!(tick_model::ticks_of_blake2f(rounds), handler);
+    let cost = rounds as u64; // static_gas + dynamic_gas
+    if let Err(err) = handler.record_cost(cost) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Couldn't record the cost of blake2f {:?}",
+            err
+        );
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Input is {:?}",
+        hex::encode(input)
+    );
+
+    // parse inputs
+    // the state vector - 8 unsigned 64-bit little-endian words
+    let mut h = [0_u64; 8];
+    h.decode_from_le_slice(&input[4..68]);
+
+    // the message block vector - 16 unsigned 64-bit little-endian words
+    let mut m = [0_u64; 16];
+    m.decode_from_le_slice(&input[68..196]);
+
+    // offset counters - 2 unsigned 64-bit little-endian words
+    let mut t = [0_u64; 2];
+    t.decode_from_le_slice(&input[196..212]);
+
+    // the final block indicator flag - 8-bit word (true if 1 or false if 0)
+    let f = match input[212] {
+        1 => true,
+        0 => false,
+        _ => return Ok(blake2f_output_for_wrong_input()),
+    };
+
+    eip152::compress(&mut h, m, t, f, rounds as usize);
+
+    let mut output = [0_u8; 64];
+    for (i, state_word) in h.iter().enumerate() {
+        output[i * 8..(i + 1) * 8].copy_from_slice(&state_word.to_le_bytes());
+    }
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Output is {:?}",
+        hex::encode(output)
+    );
+    Ok(PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output: output.to_vec(),
+        withdrawals: vec![],
+        estimated_ticks,
+    })
+}
+
 /// Implementation of Etherelink specific withdrawals precompiled contract.
 fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
@@ -475,6 +583,10 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             ecpairing_precompile as PrecompileFn<Host>,
         ),
         (
+            H160::from_low_u64_be(9u64),
+            blake2f_precompile as PrecompileFn<Host>,
+        ),
+        (
             // Prefixed by 'ff' to make sure we will not conflict with any
             // upcoming Ethereum upgrades.
             // NB: The `unwrap()` here is safe.
@@ -505,6 +617,10 @@ mod tick_model {
 
     pub fn ticks_of_ecrecover() -> u64 {
         30_000_000
+    }
+
+    pub fn ticks_of_blake2f(rounds: u32) -> u64 {
+        1_000_000 * rounds as u64 // TODO: determine the number of ticks
     }
 }
 
