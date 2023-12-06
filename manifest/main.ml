@@ -1983,11 +1983,12 @@ let octez_event_logging_test_helpers =
     ~deps:
       [
         octez_stdlib;
-        octez_lwt_result_stdlib;
+        octez_lwt_result_stdlib |> open_;
         data_encoding;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_event_logging |> open_;
         octez_test_helpers |> open_;
+        tezt_core_lib |> open_;
         alcotezt;
       ]
     ~js_compatible:true
@@ -6976,7 +6977,6 @@ let octez_store_tests =
       "test_store";
       "test_testchain";
       "test_utils";
-      "tezt_sink";
       "assert_lib";
     ]
     ~path:"src/lib_store/unix/test"
@@ -7004,6 +7004,7 @@ let octez_store_tests =
         alcotezt;
         tezt_lib;
         octez_test_helpers |> open_;
+        octez_event_logging_test_helpers |> open_;
       ]
 
 (* [_octez_bench_store_lib_tests_exe] is a bench for the store locator,

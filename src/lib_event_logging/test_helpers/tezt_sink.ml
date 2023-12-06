@@ -5,13 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+open Lwt_result_syntax
+
 (** [Sink] is an {!Internal_event.SINK} implementation logging through Tezt's {!Log}. *)
 module Sink : Internal_event.SINK = struct
   type t = unit
 
   let uri_scheme = "tezt-log"
 
-  let configure _ = Lwt_result_syntax.return_unit
+  let configure _ = return_unit
 
   let should_handle ?section:_ (_ : t) _m = true
 
@@ -26,9 +29,9 @@ module Sink : Internal_event.SINK = struct
       | Internal_event.Fatal | Internal_event.Error -> Cli.Logs.Error
     in
     Log.log ~level "%a" (M.pp ~all_fields:true ~block:true) ev ;
-    Lwt_result_syntax.return_unit
+    return_unit
 
-  let close (_ : t) : unit tzresult Lwt.t = Lwt_result_syntax.return_unit
+  let close (_ : t) : unit tzresult Lwt.t = return_unit
 end
 
 let sink : Sink.t Internal_event.sink_definition =
@@ -37,13 +40,10 @@ let sink : Sink.t Internal_event.sink_definition =
 (** Activate the Tezt {!Sink} *)
 let activate () =
   Internal_event.All_sinks.register sink ;
-  let* r =
+  let*! r =
     Internal_event.All_sinks.activate (Uri.of_string (Sink.uri_scheme ^ "://"))
   in
   match r with
-  | Ok () -> unit
+  | Ok () -> Lwt.return_unit
   | Error errors ->
-      Tezt.Test.fail
-        "Could not initialize Tezt sink:\n   %a\n"
-        pp_print_trace
-        errors
+      Test.fail "Could not initialize Tezt sink:\n   %a\n" pp_print_trace errors

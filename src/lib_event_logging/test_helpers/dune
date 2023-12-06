@@ -11,13 +11,16 @@
   octez-libs.error-monad
   octez-libs.event-logging
   octez-libs.test-helpers
+  tezt.core
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezos_lwt_result_stdlib
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_event_logging
   -open Tezos_test_helpers
+  -open Tezt_core
   -open Octez_alcotezt))
