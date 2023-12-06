@@ -101,7 +101,7 @@ pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(),
 }
 
 const TAG_IMPLICIT: u8 = 0;
-const TAG_KT1: u8 = 1;
+pub(crate) const TAG_KT1: u8 = 1;
 const TAG_SR1: u8 = 3;
 const PADDING_ORIGINATED: &[u8] = &[0];
 

@@ -10,6 +10,7 @@ use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{Signed, Zero};
 use std::rc::Rc;
+use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
 
 use crate::ast::big_map::{BigMap, LazyStorageError};
@@ -1295,6 +1296,21 @@ fn interpret_one<'a>(
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
     }
     Ok(())
+}
+
+#[allow(dead_code)]
+fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Address {
+    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+    let mut input: [u8; 36] = [0; 36];
+    input[..32].copy_from_slice(operation_group_hash);
+    // append bytes representing o_index
+    input[32..36].copy_from_slice(&o_index.to_le_bytes());
+    let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
+
+    Address {
+        hash: AddressHash::Kt1(HashTrait::try_from_bytes(digest.as_slice()).unwrap()),
+        entrypoint: Entrypoint::default(),
+    }
 }
 
 #[cfg(test)]
