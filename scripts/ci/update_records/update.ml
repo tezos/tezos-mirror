@@ -61,41 +61,21 @@ let fetch_pipeline_records_from_jobs pipeline =
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let name = JSON.(job |-> "name" |> as_string) in
-    match name =~* rex "^tezt (\\d+)/\\d+$" with
-    | None -> (
-        match name =~* rex "^tezt-greedy-4k (\\d+)/\\d+$" with
-        | None -> (
-            match name =~* rex "^tezt-greedy-3k (\\d+)/\\d+$" with
-            | None -> None
-            | Some index ->
-                Some
-                  ( Gitlab.project_job_artifact
-                      ~project
-                      ~job_id
-                      ~artifact_path:
-                        ("tezt-results-" ^ index ^ "-memory_3k" ^ ".json")
-                      (),
-                    index,
-                    "memory_3k" ))
-        | Some index ->
-            Some
-              ( Gitlab.project_job_artifact
-                  ~project
-                  ~job_id
-                  ~artifact_path:
-                    ("tezt-results-" ^ index ^ "-memory_4k" ^ ".json")
-                  (),
-                index,
-                "memory_4k" ))
-    | Some index ->
+    match name =~** rex "^tezt-?([^ ]*) (\\d+)/\\d+$" with
+    | None -> None
+    | Some (variant, index) ->
+        let artifact_path =
+          sf
+            "tezt-results-%s%s.json"
+            index
+            (if variant = "" then ""
+            else "-" ^ String.map (function '-' -> '_' | c -> c) variant)
+        in
+        Log.info "Will fetch %s from job #%d (%s)" artifact_path job_id name ;
         Some
-          ( Gitlab.project_job_artifact
-              ~project
-              ~job_id
-              ~artifact_path:("tezt-results-" ^ index ^ ".json")
-              (),
+          ( Gitlab.project_job_artifact ~project ~job_id ~artifact_path (),
             index,
-            "" )
+            variant )
   in
   let records = List.filter_map get_record jobs in
   Log.info "Found %d Tezt jobs." (List.length records) ;
