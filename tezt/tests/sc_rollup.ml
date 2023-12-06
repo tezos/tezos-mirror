@@ -4864,10 +4864,15 @@ let test_rollup_whitelist_update ~kind =
     ~commitment_period
     ~challenge_window
     ~operator:Constant.bootstrap1.public_key_hash
-  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
+  @@ fun _protocol rollup_node _rollup_client rollup_addr node client ->
   let encode_whitelist_msg whitelist =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O [("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist))]
+    Codec.encode
+      ~name:"alpha.smart_rollup.outbox.message"
+      (`O
+        [
+          ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
+          ("kind", `String "whitelist_update");
+        ])
   in
   let send_whitelist_then_bake_until_exec encoded_whitelist_msgs =
     let* _res =
@@ -4918,7 +4923,7 @@ let test_rollup_whitelist_update ~kind =
     unit
   in
   let* () =
-    let*! encoded_whitelist_update =
+    let* encoded_whitelist_update =
       encode_whitelist_msg
         [
           Constant.bootstrap1.public_key_hash;
@@ -4944,12 +4949,13 @@ let test_rollup_whitelist_update ~kind =
     "submits two whitelist update in one inbox level. Only the second update \
      is executed by the rollup node." ;
   let* () =
-    let*! encoded_whitelist_update1 =
+    let* encoded_whitelist_update1 =
       encode_whitelist_msg [Constant.bootstrap3.public_key_hash]
     in
-    let*! encoded_whitelist_update2 =
-      Sc_rollup_client.encode_json_outbox_msg rollup_client
-      @@ `O [("whitelist", `Null)]
+    let* encoded_whitelist_update2 =
+      Codec.encode
+        ~name:"alpha.smart_rollup.outbox.message"
+        (`O [("kind", `String "whitelist_update")])
     in
     send_whitelist_then_bake_until_exec
       [encoded_whitelist_update1; encoded_whitelist_update2]
@@ -4998,21 +5004,28 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~challenge_window
   @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
   let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
-  let*! payload =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O [("whitelist", `A [`String Constant.bootstrap1.public_key_hash])]
+  let* payload =
+    Codec.encode
+      ~name:"alpha.smart_rollup.outbox.message"
+      (`O
+        [
+          ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
+          ("kind", `String "whitelist_update");
+        ])
   in
-  let*! payload2 =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O
-         [
-           ( "whitelist",
-             `A
-               [
-                 `String Constant.bootstrap1.public_key_hash;
-                 `String Constant.bootstrap2.public_key_hash;
-               ] );
-         ]
+  let* payload2 =
+    Codec.encode
+      ~name:"alpha.smart_rollup.outbox.message"
+      (`O
+        [
+          ( "whitelist",
+            `A
+              [
+                `String Constant.bootstrap1.public_key_hash;
+                `String Constant.bootstrap2.public_key_hash;
+              ] );
+          ("kind", `String "whitelist_update");
+        ])
   in
   (* Execute whitelist update with outdated message index. *)
   let* _hash, outbox_level, message_index =

@@ -91,13 +91,3 @@ val outbox_proof :
   message_index:int ->
   outbox_level:int ->
   outbox_proof option Lwt.t
-
-(** [encode_json_outbox_msg outbox_msg_json] returns the encoding of
-    an outbox message. *)
-val encode_json_outbox_msg :
-  ?hooks:Process.hooks -> t -> JSON.u -> string Runnable.process
-
-(** [inject client messages] injects the [messages] in the queue the rollup
-    node's batcher and returns the list of message hashes injected. *)
-val inject :
-  ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process
