@@ -67,6 +67,13 @@ module Plugin = struct
       ~metadata
       ()
 
+  let block_shell_header (block_info : block_info) = block_info.header.shell
+
+  let get_round fitness =
+    let open Result_syntax in
+    let* round = Fitness.round_from_raw fitness |> Environment.wrap_tzresult in
+    return @@ Round.to_int32 round
+
   (* Turn the given value of type {!Protocol.Apply_operation_result.operation_result}
      into a value of type {!Dal_plugin.operation_application_result}. *)
   let status_of_result = function
