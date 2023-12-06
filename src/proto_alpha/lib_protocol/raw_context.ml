@@ -1118,6 +1118,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           Constants_parametric_repr.
             {
               preserved_cycles = c.preserved_cycles;
+              consensus_rights_delay = c.preserved_cycles;
               blocks_per_cycle = c.blocks_per_cycle;
               blocks_per_commitment = c.blocks_per_commitment;
               nonce_revelation_threshold = c.nonce_revelation_threshold;

@@ -154,6 +154,8 @@ type issuance_weights = {
 
 type t = {
   preserved_cycles : int;
+  (* Number of cycles after which computed consensus rights are used to actually participate in the consensus *)
+  consensus_rights_delay : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;

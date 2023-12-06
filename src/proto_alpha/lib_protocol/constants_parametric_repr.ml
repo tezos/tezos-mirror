@@ -167,6 +167,7 @@ type issuance_weights = {
 
 type t = {
   preserved_cycles : int;
+  consensus_rights_delay : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -482,16 +483,16 @@ let encoding =
   let open Data_encoding in
   conv
     (fun c ->
-      ( ( c.preserved_cycles,
-          c.blocks_per_cycle,
-          c.blocks_per_commitment,
-          c.nonce_revelation_threshold,
-          c.blocks_per_stake_snapshot,
-          c.cycles_per_voting_period,
-          c.hard_gas_limit_per_operation,
-          c.hard_gas_limit_per_block,
-          c.proof_of_work_threshold,
-          c.minimal_stake ),
+      ( ( (c.preserved_cycles, c.consensus_rights_delay),
+          ( c.blocks_per_cycle,
+            c.blocks_per_commitment,
+            c.nonce_revelation_threshold,
+            c.blocks_per_stake_snapshot,
+            c.cycles_per_voting_period,
+            c.hard_gas_limit_per_operation,
+            c.hard_gas_limit_per_block,
+            c.proof_of_work_threshold,
+            c.minimal_stake ) ),
         ( ( c.minimal_frozen_stake,
             c.vdf_difficulty,
             c.origination_size,
@@ -520,16 +521,16 @@ let encoding =
                   ( (c.sc_rollup, c.zk_rollup),
                     (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
               ) ) ) ) ))
-    (fun ( ( preserved_cycles,
-             blocks_per_cycle,
-             blocks_per_commitment,
-             nonce_revelation_threshold,
-             blocks_per_stake_snapshot,
-             cycles_per_voting_period,
-             hard_gas_limit_per_operation,
-             hard_gas_limit_per_block,
-             proof_of_work_threshold,
-             minimal_stake ),
+    (fun ( ( (preserved_cycles, consensus_rights_delay),
+             ( blocks_per_cycle,
+               blocks_per_commitment,
+               nonce_revelation_threshold,
+               blocks_per_stake_snapshot,
+               cycles_per_voting_period,
+               hard_gas_limit_per_operation,
+               hard_gas_limit_per_block,
+               proof_of_work_threshold,
+               minimal_stake ) ),
            ( ( minimal_frozen_stake,
                vdf_difficulty,
                origination_size,
@@ -560,6 +561,7 @@ let encoding =
                ) ) ) ) ->
       {
         preserved_cycles;
+        consensus_rights_delay;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
@@ -600,21 +602,24 @@ let encoding =
         direct_ticket_spending_enable;
       })
     (merge_objs
-       (obj10
-          (req "preserved_cycles" uint8)
-          (req "blocks_per_cycle" int32)
-          (req "blocks_per_commitment" int32)
-          (req "nonce_revelation_threshold" int32)
-          (req "blocks_per_stake_snapshot" int32)
-          (req "cycles_per_voting_period" int32)
-          (req
-             "hard_gas_limit_per_operation"
-             Gas_limit_repr.Arith.z_integral_encoding)
-          (req
-             "hard_gas_limit_per_block"
-             Gas_limit_repr.Arith.z_integral_encoding)
-          (req "proof_of_work_threshold" int64)
-          (req "minimal_stake" Tez_repr.encoding))
+       (merge_objs
+          (obj2
+             (req "preserved_cycles" uint8)
+             (req "consensus_rights_delay" uint8))
+          (obj9
+             (req "blocks_per_cycle" int32)
+             (req "blocks_per_commitment" int32)
+             (req "nonce_revelation_threshold" int32)
+             (req "blocks_per_stake_snapshot" int32)
+             (req "cycles_per_voting_period" int32)
+             (req
+                "hard_gas_limit_per_operation"
+                Gas_limit_repr.Arith.z_integral_encoding)
+             (req
+                "hard_gas_limit_per_block"
+                Gas_limit_repr.Arith.z_integral_encoding)
+             (req "proof_of_work_threshold" int64)
+             (req "minimal_stake" Tez_repr.encoding)))
        (merge_objs
           (obj7
              (req "minimal_frozen_stake" Tez_repr.encoding)

@@ -31,6 +31,8 @@
 
 val preserved_cycles : Raw_context.t -> int
 
+val consensus_rights_delay : Raw_context.t -> int
+
 val blocks_per_cycle : Raw_context.t -> int32
 
 val blocks_per_commitment : Raw_context.t -> int32
