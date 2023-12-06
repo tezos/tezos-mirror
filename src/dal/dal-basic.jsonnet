@@ -71,8 +71,9 @@ dashboard.new(
     ) + { gridPos: { h: 0, w: 24, x: 0, y: node_y } },
 
     // ## First line of pannels
-    dal_node.layer1Monitor { gridPos: { h: 8, w: 12, x: 0, y: node_y } },
-    dal_node.storedShards { gridPos: { h: 8, w: 12, x: 12, y: node_y } },
+    dal_node.layer1MonitorLevels { gridPos: { h: 8, w: 8, x: 0, y: node_y } },
+    dal_node.layer1MonitorRounds { gridPos: { h: 8, w: 8, x: 8, y: node_y } },
+    dal_node.storedShards { gridPos:        { h: 8, w: 8, x: 16, y: node_y } },
 
     // ## Second line of pannels
     dal_node.slotsAttesatationSummary { gridPos: { h: 8, w: 8, x: 0, y: node_y + 8 } },

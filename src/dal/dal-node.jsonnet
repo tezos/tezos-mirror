@@ -35,7 +35,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
 
 {
 
-  layer1Monitor:
+  layer1MonitorLevels:
     local head = 'Seen L1 heads';
     local finalized = 'Finalized L1 blocks';
     graphPanel.new(
@@ -56,6 +56,31 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       ),
       prometheus.target(
         namespace + '_layer1_block_finalized' + node_instance,
+        legendFormat=finalized
+      ),
+    ]),
+
+  layer1MonitorRounds:
+    local head = "Seen L1 heads' rounds";
+    local finalized = "Finalized L1 blocks' rounds";
+    graphPanel.new(
+      title='Rounds of layer 1 heads & finalized blocks seen by the DAL node',
+      datasource='Prometheus',
+      legend_rightSide=false,
+      linewidth=1,
+      format='none',
+      legend_show=true,
+      aliasColors={
+        [head]: 'blue',
+        [finalized]: 'green',
+      },
+    ).addTargets([
+      prometheus.target(
+        namespace + '_new_layer1_head_round' + node_instance,
+        legendFormat=head
+      ),
+      prometheus.target(
+        namespace + '_layer1_block_finalized_round' + node_instance,
         legendFormat=finalized
       ),
     ]),
