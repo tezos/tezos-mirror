@@ -38,12 +38,21 @@ let sink : Sink.t Internal_event.sink_definition =
   (module Sink : Internal_event.SINK with type t = Sink.t)
 
 (** Activate the Tezt {!Sink} *)
-let activate () =
-  Internal_event.All_sinks.register sink ;
-  let*! r =
-    Internal_event.All_sinks.activate (Uri.of_string (Sink.uri_scheme ^ "://"))
-  in
-  match r with
-  | Ok () -> Lwt.return_unit
-  | Error errors ->
-      Test.fail "Could not initialize Tezt sink:\n   %a\n" pp_print_trace errors
+let activate =
+  let is_active = ref false in
+  fun () ->
+    if !is_active then Lwt.return_unit
+    else (
+      is_active := true ;
+      Internal_event.All_sinks.register sink ;
+      let*! r =
+        Internal_event.All_sinks.activate
+          (Uri.of_string (Sink.uri_scheme ^ "://"))
+      in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error errors ->
+          Test.fail
+            "Could not initialize Tezt sink:\n   %a\n"
+            pp_print_trace
+            errors)
