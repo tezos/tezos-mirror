@@ -107,11 +107,12 @@ module Assert = struct
 end
 
 let rec add_cycles ctxt n =
+  let open Lwt_result_syntax in
   if n <= 0 then return ctxt
   else
     let current_level = Raw_context.current_level ctxt in
     let new_cycle = Cycle_repr.succ current_level.cycle in
-    let* ctxt = Consensus_key.activate ctxt ~new_cycle in
+    let*! ctxt = Consensus_key.activate ctxt ~new_cycle in
     let ctxt = Raw_context.Internal_for_tests.add_cycles ctxt 1 in
     add_cycles ctxt (n - 1)
 

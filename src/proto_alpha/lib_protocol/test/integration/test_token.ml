@@ -562,11 +562,13 @@ let build_test_cases () =
   return (ctxt, List.product giver_list receiver_list)
 
 let check_giver_balances ctxt ctxt' giver amount =
+  let open Lwt_result_syntax in
   match cast_to_container_type giver with
   | None -> return_unit
   | Some giver -> check_giver_balances ctxt ctxt' giver amount
 
 let check_receiver_balances ctxt ctxt' receiver amount =
+  let open Lwt_result_syntax in
   match cast_to_container_type receiver with
   | None -> return_unit
   | Some receiver -> check_receiver_balances ctxt ctxt' receiver amount

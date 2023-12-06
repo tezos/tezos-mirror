@@ -54,8 +54,8 @@ end = struct
       ?(preattested_block = fun _predpred _pred curr -> curr)
       ?(mk_ops = fun op -> [op])
       ?(get_delegate_and_slot =
-        fun _predpred _pred _curr -> return (None, None))
-      ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
+        fun _predpred _pred _curr -> Lwt_result_syntax.return (None, None))
+      ?(post_process = Ok (fun _ -> Lwt_result_syntax.return_unit)) ~loc () =
     let open Lwt_result_syntax in
     let* genesis, _contracts = Context.init_n ~consensus_threshold:1 5 () in
     let* b1 = bake genesis in
@@ -129,6 +129,7 @@ end = struct
        given locked_round is not used / checked. Moreover, the test succeed in
        this case.
     *)
+    let open Lwt_result_syntax in
     let post_process =
       if Mode.baking_mode == Block.Application then
         Error (function Fitness_repr.Wrong_fitness -> true | _ -> false)
@@ -219,6 +220,7 @@ end = struct
        given locked_round is not used / checked. Moreover, the test succeed in
        this case.
     *)
+    let open Lwt_result_syntax in
     let post_process =
       if Mode.baking_mode == Application then
         Error

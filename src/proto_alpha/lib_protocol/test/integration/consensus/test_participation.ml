@@ -50,7 +50,7 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
   | None -> assert false
   | Some (delegate, _slots) ->
       let*?@ round = Block.get_round b_cur in
-      Op.attestation ~round ~delegate b_cur >>=? fun attestation ->
+      let* attestation = Op.attestation ~round ~delegate b_cur in
       Block.bake_with_metadata
         ~policy:(By_account baker)
         ~operation:attestation

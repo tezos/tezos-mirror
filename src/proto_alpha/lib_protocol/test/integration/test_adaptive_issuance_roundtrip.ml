@@ -577,11 +577,11 @@ module State = struct
     let state = apply_all_slashes_at_cycle_end current_cycle state in
     (* Apply autostaking *)
     let*?@ state =
-      if not state.constants.adaptive_issuance.autostaking_enable then ok state
+      if not state.constants.adaptive_issuance.autostaking_enable then Ok state
       else
         match launch_cycle_opt with
         | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) ->
-            ok state
+            Ok state
         | None | Some _ ->
             String.Map.fold_e
               (fun name account state ->
@@ -672,10 +672,13 @@ let rec unfold_scenarios :
 let rec run_scenario :
     type input output.
     (input, output) single_scenario -> input -> output tzresult Lwt.t =
- fun scenario input ->
-  match scenario with
-  | End_scenario -> return input
-  | Cons (action, next) -> action input >>=? run_scenario next
+  let open Lwt_result_syntax in
+  fun scenario input ->
+    match scenario with
+    | End_scenario -> return input
+    | Cons (action, next) ->
+        let* result = action input in
+        run_scenario next result
 
 let unfolded_to_test :
     (unit, unit) single_scenario * string list * bool ->
@@ -720,6 +723,7 @@ let ( |+ ) a b = branch a b
 
 (** Ends the test. Dump the state, returns [unit] *)
 let end_test : ('a, unit) scenarios =
+  let open Lwt_result_syntax in
   Action
     (fun _ ->
       Log.info ~color:begin_end_color "-- End test --" ;
@@ -936,12 +940,14 @@ let bake_until_next_cycle : t -> t tzresult Lwt.t =
 
 (** Sets the de facto baker for all future blocks *)
 let set_baker baker : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       let {pkh; _} = State.find_account baker state in
       return {state with State.baking_policy = Some (Block.By_account pkh)})
 
 (** Exclude a list of delegates from baking *)
 let exclude_bakers bakers : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       let bakers_pkh =
         List.map (fun baker -> (State.find_account baker state).pkh) bakers
@@ -951,6 +957,7 @@ let exclude_bakers bakers : (t, t) scenarios =
 
 (** Unsets the baking policy, it returns to default ([By_round 0]) *)
 let unset_baking_policy : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       return {state with State.baking_policy = None})
 
@@ -959,6 +966,7 @@ let unset_baking_policy : (t, t) scenarios =
     are the same (either nothing happened, or a succession of actions resulted in
     getting the same values as before *)
 let snapshot_balances snap_name names_list : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
@@ -1179,6 +1187,7 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
 
 (** Add a new account with the given name *)
 let add_account name : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       Log.info ~color:action_color "[Add account \"%s\"]" name ;
       let new_account = Account.new_account () in
@@ -1643,30 +1652,31 @@ let make_denunciations ?filter () = exec_op (make_denunciations_ ?filter)
 
 let check_failure_aux ?expected_error :
     ('a -> 'b tzresult Lwt.t) -> 'a -> 'a tzresult Lwt.t =
- fun f input ->
-  Log.info ~color:assert_block_color "Entering failing scenario..." ;
-  let* output = f input in
-  match output with
-  | Ok _ -> failwith "Unexpected success"
-  | Error e -> (
-      match expected_error with
-      | None ->
-          Log.info ~color:assert_block_color "Rollback" ;
-          return input
-      | Some exp_e ->
-          let exp_e = exp_e input in
-          if e = exp_e then (
+  let open Lwt_result_syntax in
+  fun f input ->
+    Log.info ~color:assert_block_color "Entering failing scenario..." ;
+    let*! output = f input in
+    match output with
+    | Ok _ -> failwith "Unexpected success"
+    | Error e -> (
+        match expected_error with
+        | None ->
             Log.info ~color:assert_block_color "Rollback" ;
-            return input)
-          else (
-            Log.info
-              ~color:Log.Color.FG.red
-              "Unexpected error:@.%a@.Expected:@.%a@."
-              (Format.pp_print_list pp)
-              e
-              (Format.pp_print_list pp)
-              exp_e ;
-            fail Unexpected_error))
+            return input
+        | Some exp_e ->
+            let exp_e = exp_e input in
+            if e = exp_e then (
+              Log.info ~color:assert_block_color "Rollback" ;
+              return input)
+            else (
+              Log.info
+                ~color:Log.Color.FG.red
+                "Unexpected error:@.%a@.Expected:@.%a@."
+                (Format.pp_print_list pp)
+                e
+                (Format.pp_print_list pp)
+                exp_e ;
+              tzfail Unexpected_error))
 
 let check_fail_and_rollback ?expected_error :
     ('a, 'b) single_scenario -> 'a -> 'a tzresult Lwt.t =
@@ -1970,6 +1980,7 @@ module Roundtrip = struct
 
   (* TODO: there's probably more... *)
   let scenario_forbidden_operations =
+    let open Lwt_result_syntax in
     let fail_if_staker_is_self_delegate staker =
       exec (fun ((_, state) as input) ->
           if State.(is_self_delegate staker state) then
@@ -2230,6 +2241,7 @@ end
 module Autostaking = struct
   let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
       ~new_balance compare =
+    let open Lwt_result_syntax in
     let old_b, new_b =
       match part with
       | `liquid ->
@@ -2455,9 +2467,10 @@ module Slashing = struct
   let check_is_forbidden baker = assert_failure (next_block_with_baker baker)
 
   let check_is_not_forbidden baker =
+    let open Lwt_result_syntax in
     exec (fun ((block, state) as input) ->
         let baker = State.find_account baker state in
-        let* _ = Block.bake ~policy:(By_account baker.pkh) block in
+        let*! _ = Block.bake ~policy:(By_account baker.pkh) block in
         return input)
 
   let test_delegate_forbidden =
@@ -2755,6 +2768,7 @@ module Slashing = struct
 end
 
 let tests =
+  let open Lwt_result_syntax in
   (tests_of_scenarios
   @@ [
        ("Test expected error in assert failure", test_expected_error);

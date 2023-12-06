@@ -219,6 +219,7 @@ let get_first_different_bakers ctxt =
       (baker_1, get_first_different_baker baker_1 other_bakers)
 
 let get_seed_nonce_hash ctxt =
+  let open Lwt_result_syntax in
   let header =
     match ctxt with B {header; _} -> header | I i -> Incremental.header i
   in

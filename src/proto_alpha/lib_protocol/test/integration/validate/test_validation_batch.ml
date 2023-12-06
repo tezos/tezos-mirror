@@ -40,6 +40,7 @@ open Manager_operation_helpers
 (** Revelation should not occur elsewhere than in first position
    in a batch.*)
 let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [
@@ -103,6 +104,7 @@ let batch_in_the_middle infos kind1 kind2 =
 
 (** A batch of manager operation contains at most one Revelation.*)
 let batch_two_reveals_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expected_failure errs =
     match errs with
     | [
@@ -166,6 +168,7 @@ let batch_two_reveals infos kind =
 
 (** Every manager operation in a batch concerns the same source.*)
 let batch_two_sources_diagnostic (infos : infos) op =
+  let open Lwt_result_syntax in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_sources]

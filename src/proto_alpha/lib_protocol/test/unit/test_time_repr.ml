@@ -27,6 +27,7 @@ let test_nominal_add () =
   | Error _ -> failwith "Addition has overflowed"
 
 let test_overflow_add () =
+  let open Lwt_result_syntax in
   let t = Time_repr.of_seconds Int64.max_int in
   match Period_repr.of_seconds Int64.one with
   | Error _ -> failwith "period_repr conversion"

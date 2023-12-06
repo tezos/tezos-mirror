@@ -137,6 +137,7 @@ let encoding_roundtrip lazy_storage_diff =
 (** Iterator and test definitions *)
 
 let on_diffs f () =
+  let open Lwt_result_syntax in
   List.iter f diffs_list ;
   return_unit
 

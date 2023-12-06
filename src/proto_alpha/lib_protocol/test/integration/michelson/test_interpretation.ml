@@ -204,6 +204,7 @@ let test_stack_overflow_in_lwt () =
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 let test_json_roundtrip name testable enc v =
+  let open Lwt_result_syntax in
   let v' =
     Data_encoding.Json.destruct enc (Data_encoding.Json.construct enc v)
   in
@@ -346,6 +347,7 @@ let fail_with_trace trace =
 
 let test_contract_success path storage param expected_storage_str
     ?entrypoint_str () =
+  let open Lwt_result_syntax in
   let expected_storage = Expr.from_string expected_storage_str in
   test_contract
     path
@@ -358,6 +360,7 @@ let test_contract_success path storage param expected_storage_str
     ~entrypoint_str
 
 let test_contract_fail path storage param ?entrypoint_str () =
+  let open Lwt_result_syntax in
   test_contract
     path
     storage

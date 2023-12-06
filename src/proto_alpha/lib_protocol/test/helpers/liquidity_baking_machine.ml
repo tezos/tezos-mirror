@@ -742,7 +742,7 @@ module ConcreteBaseMachine :
 
   let fold_m = Environment.List.fold_left_es
 
-  let pure = return
+  let pure = Lwt_result_syntax.return
 
   let get_xtz_balance contract blk =
     let* x = Context.Contract.balance (B blk) contract in
@@ -781,6 +781,7 @@ module ConcreteBaseMachine :
     pure {xtz; tzbtc; liquidity}
 
   let bake ~invariant ~baker ops env blk =
+    let open Lwt_result_syntax in
     let* incr =
       Incremental.begin_construction
         ~policy:(Block.By_account (Context.Contract.pkh baker))
@@ -1377,7 +1378,7 @@ module ValidationBaseMachine :
   let init ~invariant ?subsidy balances =
     let* blk, env =
       ConcreteBaseMachine.init
-        ~invariant:(fun _ _ -> return_true)
+        ~invariant:(fun _ _ -> Lwt_result_syntax.return_true)
         ?subsidy
         balances
     in
