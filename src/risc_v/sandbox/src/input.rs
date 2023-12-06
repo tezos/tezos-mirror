@@ -14,7 +14,7 @@ pub fn configure_emulator(contents: &[u8], emu: &mut Emulator) -> Result<u64, Er
     let LoadResult {
         entry,
         last_written,
-    } = kernel_loader::load_elf(&mut emu.cpu.bus, contents)?;
+    } = kernel_loader::load_elf(&mut emu.cpu.bus, rvemu::bus::DRAM_BASE, contents)?;
 
     // Setting the program counter (PC) tells the emulator where to start executing.
     emu.initialize_pc(entry);
