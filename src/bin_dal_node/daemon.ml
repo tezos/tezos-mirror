@@ -313,6 +313,7 @@ module Handler = struct
           let head_level = header.shell.level in
           let*? head_round = Plugin.get_round header.shell.fitness in
           Dal_metrics.new_layer1_head ~head_level ;
+          Dal_metrics.new_layer1_head_round ~head_round ;
           let*! () =
             Event.(
               emit layer1_node_new_head (head_hash, head_level, head_round))
@@ -392,6 +393,7 @@ module Handler = struct
                 committee
             in
             Dal_metrics.layer1_block_finalized ~block_level ;
+            Dal_metrics.layer1_block_finalized_round ~block_round ;
             let*! () =
               Event.(emit layer1_node_final_block (block_level, block_round))
             in
