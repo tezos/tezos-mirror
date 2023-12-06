@@ -59,12 +59,47 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
-      ?extra_operations ?dal_node_endpoint ?force_apply ?context_path
-      ?state_recorder ~chain ~keep_alive delegates =
+      ?extra_operations ?dal_node_endpoint ?pre_emptive_forge_time ?force_apply
+      ?context_path ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
         Config_services.user_activated_upgrades cctxt
+      in
+      let* constants =
+        let* chain_id =
+          Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
+        in
+        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+      in
+      let block_time_s =
+        Int64.to_float
+          (Protocol.Alpha_context.Period.to_seconds
+             constants.parametric.minimal_block_delay)
+      in
+      let* pre_emptive_forge_time =
+        match Option.map Q.to_float pre_emptive_forge_time with
+        | Some t ->
+            if t >= block_time_s then
+              failwith
+                "pre-emptive-forge-time must be less than current block time \
+                 (<= %f seconds)"
+                block_time_s
+            else return t
+        | None -> return (Float.mul 0.15 block_time_s)
+      in
+      let*! () =
+        if pre_emptive_forge_time <> 0. then
+          cctxt#message
+            "pre-emptive-forge-time optimization set to %fs. Operation \
+             inclusion window is ~%fs. Caution: Setting this too high may \
+             result in reduced block proposal rewards."
+            pre_emptive_forge_time
+            (Float.sub block_time_s pre_emptive_forge_time)
+        else Lwt.return_unit
+      in
+      let pre_emptive_forge_time =
+        Time.System.Span.of_seconds_exn pre_emptive_forge_time
       in
       let config =
         Baking_configuration.make
@@ -74,6 +109,7 @@ module Baker = struct
           ?votes
           ?extra_operations
           ?dal_node_endpoint
+          ~pre_emptive_forge_time
           ?force_apply
           ?context_path
           ~user_activated_upgrades
@@ -96,7 +132,7 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      Baking_scheduling.run cctxt ~canceler ~chain config delegates
+      Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped

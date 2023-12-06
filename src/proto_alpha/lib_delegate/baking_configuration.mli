@@ -69,6 +69,7 @@ type t = {
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
+  pre_emptive_forge_time : Time.System.Span.t;
 }
 
 val default_fees_config : fees_config
@@ -91,6 +92,8 @@ val default_state_recorder_config : state_recorder_config
 
 val default_extra_operations : Operations_source.t option
 
+val default_pre_emptive_forge_time : Time.System.Span.t
+
 val default_config : t
 
 val make :
@@ -107,6 +110,7 @@ val make :
   ?state_recorder:state_recorder_config ->
   ?extra_operations:Operations_source.t ->
   ?dal_node_endpoint:Uri.t ->
+  ?pre_emptive_forge_time:Time.System.Span.t ->
   unit ->
   t
 

@@ -35,6 +35,7 @@ module Baker : sig
     ?liquidity_baking:Baking_configuration.liquidity_baking_config ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
     ?dal_node_endpoint:Uri.t ->
+    ?pre_emptive_forge_time:Q.t ->
     ?force_apply:bool ->
     ?context_path:string ->
     ?state_recorder:Baking_configuration.state_recorder_config ->

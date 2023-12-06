@@ -247,7 +247,8 @@ let propose_at_next_level ~minimal_timestamp state =
       Baking_actions.perform_action
         ~state_recorder
         state
-        (Inject_block {block_to_bake; updated_state = state})
+        (Inject_block
+           {kind = Forge_and_inject block_to_bake; updated_state = state})
     in
     let*! () =
       cctxt#message
@@ -562,7 +563,8 @@ let rec baking_minimal_timestamp ~count state
     Baking_actions.perform_action
       ~state_recorder
       state
-      (Inject_block {block_to_bake; updated_state = state})
+      (Inject_block
+         {kind = Forge_and_inject block_to_bake; updated_state = state})
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
   if count <= 1 then return_unit

@@ -136,9 +136,14 @@ type block_to_bake = {
   force_apply : bool;
 }
 
+type inject_block_kind =
+  | Forge_and_inject of block_to_bake
+  | Inject_only of signed_block
+
 type action =
   | Do_nothing
-  | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
+  | Inject_block of {kind : inject_block_kind; updated_state : state}
+  | Forge_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preattestations of {
       preattestations : (consensus_key_and_delegate * consensus_content) list;
     }
@@ -167,7 +172,11 @@ type t = action
 
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
-  | Inject_block _ -> Format.fprintf fmt "inject block"
+  | Inject_block {kind; _} -> (
+      match kind with
+      | Forge_and_inject _ -> Format.fprintf fmt "forge and inject block"
+      | Inject_only _ -> Format.fprintf fmt "inject forged block")
+  | Forge_block _ -> Format.fprintf fmt "forge_block"
   | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
   | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
@@ -239,7 +248,7 @@ let sign_block_header state proposer unsigned_block_header =
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let inject_block ~state_recorder state block_to_bake ~updated_state =
+let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
   let open Lwt_result_syntax in
   let {
     predecessor;
@@ -402,21 +411,28 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
         Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
   in
   let* () = state_recorder ~new_state:updated_state in
-  let*! () =
-    Events.(
-      emit injecting_block (signed_block_header.shell.level, round, delegate))
+  let signed_block =
+    {round; delegate; operations; block_header = signed_block_header}
   in
+  return (signed_block, updated_state)
+
+let inject_block ~updated_state state signed_block =
+  let open Lwt_result_syntax in
+  let {round; delegate; block_header; operations} = signed_block in
+  let*! () =
+    Events.(emit injecting_block (block_header.shell.level, round, delegate))
+  in
+  let cctxt = state.global_state.cctxt in
   let* bh =
     Node_rpc.inject_block
       cctxt
       ~force:state.global_state.config.force
       ~chain:(`Hash state.global_state.chain_id)
-      signed_block_header
+      block_header
       operations
   in
   let*! () =
-    Events.(
-      emit block_injected (bh, signed_block_header.shell.level, round, delegate))
+    Events.(emit block_injected (bh, block_header.shell.level, round, delegate))
   in
   return updated_state
 
@@ -900,8 +916,33 @@ let rec perform_action ~state_recorder state (action : action) =
   | Do_nothing ->
       let* () = state_recorder ~new_state:state in
       return state
-  | Inject_block {block_to_bake; updated_state} ->
-      inject_block state ~state_recorder block_to_bake ~updated_state
+  | Inject_block {kind; updated_state} ->
+      let* signed_block, updated_state =
+        match kind with
+        | Forge_and_inject block_to_bake ->
+            forge_signed_block
+              ~state_recorder
+              ~updated_state
+              block_to_bake
+              state
+        | Inject_only signed_block -> return (signed_block, updated_state)
+      in
+      inject_block ~updated_state state signed_block
+  | Forge_block {block_to_bake; updated_state} ->
+      let+ signed_block, updated_state =
+        forge_signed_block ~state_recorder ~updated_state block_to_bake state
+      in
+      let updated_state =
+        {
+          updated_state with
+          level_state =
+            {
+              updated_state.level_state with
+              next_forged_block = Some signed_block;
+            };
+        }
+      in
+      updated_state
   | Inject_preattestations {preattestations} ->
       let* () = inject_consensus_vote state preattestations `Preattestation in
       perform_action ~state_recorder state Watch_proposal
