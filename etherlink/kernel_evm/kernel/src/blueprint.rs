@@ -170,12 +170,10 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     let proposals = seq_blueprints
         .into_iter()
         .map(|sb| {
-            // Note: this parsing will be done by the blueprint storage module
-            let transactions = rlp::decode_list(&sb.transactions);
-            let blueprint: Blueprint = Blueprint {
-                timestamp: sb.timestamp,
-                transactions,
-            };
+            // Note: this parsing will be done by the blueprint storage module,
+            // where failures will be properly handled.
+            let blueprint: Blueprint =
+                rlp::decode(&sb.chunk).expect("blueprint should be decodable");
             QueueElement::Blueprint(blueprint)
         })
         .collect();
