@@ -14,3 +14,7 @@ The following pages provide an overview of the DAL and cover its different aspec
    dal_p2p
    dal_node
    dal_bakers
+
+See also:
+
+- :doc:`Protocol support for the DAL <../alpha/dal_support>`.
