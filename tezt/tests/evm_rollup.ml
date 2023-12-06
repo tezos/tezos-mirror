@@ -509,6 +509,7 @@ let test_originate_evm_kernel =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Originate EVM kernel with installer"
   @@ fun protocol ->
@@ -554,6 +555,7 @@ let test_rpc_getBalance =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
@@ -580,6 +582,7 @@ let test_rpc_getBlockByNumber =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun protocol ->
@@ -611,6 +614,7 @@ let test_rpc_getBlockByHash =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getBlockByHash"
   @@ fun protocol ->
@@ -632,6 +636,7 @@ let test_l2_block_size_non_zero =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Block size is greater than zero"
   @@ fun protocol ->
@@ -664,6 +669,7 @@ let test_rpc_getTransactionCount =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
@@ -684,6 +690,7 @@ let test_rpc_getTransactionCountBatch =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun protocol ->
@@ -715,6 +722,7 @@ let test_rpc_batch =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC batch requests"
   @@ fun protocol ->
@@ -751,6 +759,7 @@ let test_l2_blocks_progression =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 blocks progression"
   @@ fun protocol ->
@@ -784,6 +793,7 @@ let test_consistent_block_hashes =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 blocks consistency of hashes"
   @@ fun protocol ->
@@ -927,6 +937,7 @@ let test_l2_deploy_simple_storage =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 contract deployment"
   @@ fun protocol ->
@@ -964,6 +975,7 @@ let test_l2_call_simple_storage =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 contract call"
   @@ fun protocol ->
@@ -1025,6 +1037,7 @@ let test_l2_deploy_erc20 =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 erc20 contract deployment"
   @@ fun protocol ->
@@ -1155,6 +1168,7 @@ let test_deploy_contract_for_shanghai =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Check that a contract containing PUSH0 can successfully be deployed."
@@ -1417,6 +1431,7 @@ let test_l2_transfer =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 transfers are applied"
     transfer
@@ -1430,6 +1445,7 @@ let test_chunked_transaction =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 chunked transfers are applied"
   @@ transfer ~data:("0x" ^ String.make 12_000 'a')
@@ -1443,6 +1459,7 @@ let test_rpc_txpool_content =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check RPC txpool_content is available"
   @@ fun protocol ->
@@ -1463,6 +1480,7 @@ let test_rpc_web3_clientVersion =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check RPC web3_clientVersion"
   @@ fun protocol ->
@@ -1488,6 +1506,7 @@ let test_rpc_web3_sha3 =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check RPC web3_sha3"
   @@ fun protocol ->
@@ -1517,6 +1536,7 @@ let test_simulate =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"A block can be simulated in the rollup node"
     (fun protocol ->
@@ -1559,6 +1579,7 @@ let test_full_blocks =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
@@ -1624,6 +1645,7 @@ let test_latest_block =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Check `evm_getBlockByNumber` works correctly when asking for the \
@@ -1656,6 +1678,7 @@ let test_eth_call_nullable_recipient =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check `eth_call.to` input can be null"
   @@ fun protocol ->
@@ -1682,6 +1705,7 @@ let test_inject_100_transactions =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check blocks can contain more than 64 transactions"
   @@ fun protocol ->
@@ -1738,6 +1762,7 @@ let test_eth_call_large =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"eth_estimateGas with a large amount of data"
     (fun protocol ->
@@ -1780,6 +1805,7 @@ let test_estimate_gas =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"eth_estimateGas for contract creation"
     (fun protocol ->
@@ -1817,6 +1843,7 @@ let test_estimate_gas_additionnal_field =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"eth_estimateGas allows additional fields"
     (fun protocol ->
@@ -1864,6 +1891,7 @@ let test_eth_call_storage_contract_rollup_node =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Try to call a view (directly through proxy)"
     (fun protocol ->
@@ -1940,6 +1968,7 @@ let test_eth_call_storage_contract_proxy =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Try to call a view (directly through rollup node)"
     (fun protocol ->
@@ -1994,6 +2023,7 @@ let test_eth_call_storage_contract_eth_cli =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Try to call a view through an ethereum client"
     (fun protocol ->
@@ -2048,6 +2078,7 @@ let test_preinitialized_evm_kernel =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Creates a kernel with an initialized administrator key"
   @@ fun protocol ->
@@ -2209,6 +2240,7 @@ let test_deposit_and_withdraw =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
@@ -2388,6 +2420,7 @@ let test_kernel_upgrade_to_debug =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
   @@ fun protocol ->
@@ -2405,6 +2438,7 @@ let test_kernel_upgrade_evm_to_evm =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to itself"
   @@ fun protocol ->
@@ -2432,6 +2466,7 @@ let test_kernel_upgrade_wrong_key =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
@@ -2458,6 +2493,7 @@ let test_kernel_upgrade_wrong_rollup_address =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
   @@ fun protocol ->
@@ -2483,6 +2519,7 @@ let test_kernel_upgrade_no_administrator =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
@@ -2507,6 +2544,7 @@ let test_kernel_upgrade_failing_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
@@ -2576,6 +2614,7 @@ let test_rpc_sendRawTransaction =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
@@ -2672,6 +2711,7 @@ let test_rpc_getTransactionByBlockHashAndIndex =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
   @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
@@ -2685,6 +2725,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
   @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
@@ -2698,6 +2739,7 @@ let test_validation_result =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Ensure validation returns appropriate address for a given transaction."
@@ -2809,6 +2851,7 @@ let test_kernel_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
   @@ fun protocol ->
@@ -2848,7 +2891,8 @@ let test_deposit_dailynet =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "deposit"; "dailynet"]
-    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
+    ~uses:(fun _protocol ->
+      Constant.[octez_smart_rollup_node; smart_rollup_installer; octez_evm_node])
     ~title:"deposit on dailynet"
   @@ fun protocol ->
   let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
@@ -2961,6 +3005,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Returns an error if the nonce is too low"
   @@ fun protocol ->
@@ -2997,6 +3042,7 @@ let test_rpc_sendRawTransaction_nonce_too_high =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Accepts transactions with nonce too high."
   @@ fun protocol ->
@@ -3019,6 +3065,7 @@ let test_deposit_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
@@ -3091,6 +3138,7 @@ let test_block_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
@@ -3119,6 +3167,7 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Returns an error if the chainId is not correct."
   @@ fun protocol ->
@@ -3151,6 +3200,7 @@ let test_kernel_upgrade_version_change =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
@@ -3172,6 +3222,7 @@ let test_transaction_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
@@ -3288,6 +3339,7 @@ let test_rpc_getBlockTransactionCountBy =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "RPC methods eth_getBlockTransactionCountByHash and \
@@ -3353,6 +3405,7 @@ let test_rpc_getUncleCountByBlock =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "RPC methods eth_getUncleCountByBlockHash and \
@@ -3405,6 +3458,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "RPC methods eth_getUncleByBlockHashAndIndex and \
@@ -3441,6 +3495,7 @@ let test_simulation_eip2200 =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Simulation is EIP2200 resilient"
   @@ fun protocol ->
@@ -3472,6 +3527,7 @@ let test_cover_fees =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Transaction is invalid if sender cannot cover the fees"
   @@ fun protocol ->
@@ -3514,6 +3570,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Can submit many transactions."
   @@ fun protocol ->
@@ -3561,6 +3618,7 @@ let test_rpc_sendRawTransaction_not_included =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:
       "Tx with nonce too high are not included without previous transactions."
@@ -3599,6 +3657,7 @@ let test_rpc_gasPrice =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC methods eth_gasPrice"
   @@ fun protocol ->
@@ -3636,6 +3695,7 @@ let test_rpc_getStorageAt =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"RPC methods eth_getStorageAt"
   @@ fun protocol ->
@@ -3695,6 +3755,7 @@ let test_accounts_double_indexing =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Accounts have a unique index"
   @@ fun protocol ->
@@ -3734,6 +3795,7 @@ let test_originate_evm_kernel_and_dump_pvm_state =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Originate EVM kernel with installer and dump PVM state"
   @@ fun protocol ->
@@ -3784,6 +3846,7 @@ let test_l2_call_inter_contract =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Protocol.sc_rollup_client protocol;
+        Constant.smart_rollup_installer;
       ])
     ~title:"Check L2 inter contract call"
   @@ fun protocol ->

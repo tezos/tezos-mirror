@@ -59,6 +59,9 @@ let octez_injector_server =
     ~path:
       "./_build/default/contrib/octez_injector_server/octez_injector_server.exe"
 
+let smart_rollup_installer =
+  Uses.make ~tag:"smart_rollup_installer" ~path:"smart-rollup-installer"
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
