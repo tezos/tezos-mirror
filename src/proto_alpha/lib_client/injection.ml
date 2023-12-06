@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -357,7 +358,8 @@ let estimated_gas_single (type kind)
             Ok consumed_gas
         | Zk_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
         | Zk_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas
-        | Zk_rollup_update_result {consumed_gas; _} -> Ok consumed_gas)
+        | Zk_rollup_update_result {consumed_gas; _} -> Ok consumed_gas
+        | Host_result {consumed_gas} -> Ok consumed_gas)
     | Skipped _ ->
         error_with "Cannot estimate gas of skipped operation"
         (* There must be another error for this to happen, and it should not
@@ -429,7 +431,7 @@ let estimated_storage_single (type kind) ~origination_size
         *)
         | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
         | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
-        | Sc_rollup_recover_bond_result _ ->
+        | Sc_rollup_recover_bond_result _ | Host_result _ ->
             Ok Z.zero)
     | Skipped _ ->
         error_with "Cannot estimate storage of skipped operation"
@@ -508,7 +510,8 @@ let originated_contracts_single (type kind)
         | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
         | Sc_rollup_execute_outbox_message_result _
         | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
-        | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
+        | Zk_rollup_publish_result _ | Zk_rollup_update_result _ | Host_result _
+          ->
             return_nil)
     | Skipped _ ->
         error_with "Cannot know originated contracts of skipped operation"

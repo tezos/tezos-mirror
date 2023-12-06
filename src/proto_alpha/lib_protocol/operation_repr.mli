@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -54,6 +55,7 @@
       - zk rollup origination
       - zk rollup publish
       - zk rollup update
+      - host
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -143,6 +145,8 @@ module Kind : sig
 
   type zk_rollup_update = Zk_rollup_update_kind
 
+  type host = Host_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -167,6 +171,7 @@ module Kind : sig
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
     | Zk_rollup_update_manager_kind : zk_rollup_update manager
+    | Host_manager_kind : host manager
 end
 
 type 'a consensus_operation_type =
@@ -498,6 +503,11 @@ and _ manager_operation =
       update : Zk_rollup_update_repr.t;
     }
       -> Kind.zk_rollup_update manager_operation
+  | Host : {
+      guest : Signature.Public_key_hash.t;
+      guest_signature : Signature.t;
+    }
+      -> Kind.host manager_operation
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -763,6 +773,8 @@ module Encoding : sig
 
   val zk_rollup_update_case : Kind.zk_rollup_update Kind.manager case
 
+  val host_case : Kind.host Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -819,6 +831,8 @@ module Encoding : sig
     val zk_rollup_publish_case : Kind.zk_rollup_publish case
 
     val zk_rollup_update_case : Kind.zk_rollup_update case
+
+    val host_case : Kind.host case
   end
 end
 

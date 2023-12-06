@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -153,6 +154,10 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.zk_rollup_update successful_manager_operation_result
+  | Host_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.host successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -842,6 +847,18 @@ module Manager_result = struct
             (balance_updates, consumed_gas))
       ~inj:(fun (balance_updates, consumed_gas) ->
         Sc_rollup_recover_bond_result {balance_updates; consumed_gas})
+
+  let host_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.host_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Host_result _ as op) -> Some op | _ -> None)
+      ~kind:Kind.Host_manager_kind
+      ~proj:(function Host_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Host_result {consumed_gas})
 end
 
 let successful_manager_operation_result_encoding :
@@ -872,6 +889,7 @@ let successful_manager_operation_result_encoding :
          make Manager_result.set_deposits_limit_case;
          make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
+         make Manager_result.host_case;
        ]
 
 type 'kind contents_result =
@@ -1012,6 +1030,8 @@ let equal_manager_kind :
   | Kind.Zk_rollup_update_manager_kind, Kind.Zk_rollup_update_manager_kind ->
       Some Eq
   | Kind.Zk_rollup_update_manager_kind, _ -> None
+  | Kind.Host_manager_kind, Kind.Host_manager_kind -> Some Eq
+  | Kind.Host_manager_kind, _ -> None
 
 module Encoding = struct
   let consensus_result_encoding power_name =
@@ -1764,6 +1784,16 @@ module Encoding = struct
           ->
             Some (op, res)
         | _ -> None)
+
+  let host_manager_case =
+    make_manager_case
+      Operation.Encoding.host_case
+      Manager_result.host_case
+      (function
+        | Contents_and_result
+            ((Manager_operation {operation = Host _; _} as op), res) ->
+            Some (op, res)
+        | _ -> None)
 end
 
 let common_cases =
@@ -1797,6 +1827,7 @@ let common_cases =
     zk_rollup_origination_case;
     zk_rollup_publish_case;
     zk_rollup_update_case;
+    host_manager_case;
   ]
 
 let contents_cases =
@@ -2578,6 +2609,25 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Zk_rollup_update _; _}, _ -> None
+  | ( Manager_operation {operation = Host _; _},
+      Manager_operation_result {operation_result = Applied (Host_result _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Host _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Host_result _, _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Host _; _},
+      Manager_operation_result
+        {operation_result = Failed (Alpha_context.Kind.Host_manager_kind, _); _}
+    ) ->
+      Some Eq
+  | ( Manager_operation {operation = Host _; _},
+      Manager_operation_result
+        {operation_result = Skipped Alpha_context.Kind.Host_manager_kind; _} )
+    ->
+      Some Eq
+  | Manager_operation {operation = Host _; _}, _ -> None
 
 let rec kind_equal_list :
     type kind kind2.
