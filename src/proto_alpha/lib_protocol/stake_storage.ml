@@ -75,16 +75,6 @@ end
 
 let get_full_staking_balance = Storage.Stake.Staking_balance.get
 
-let get_initialized_stake ctxt delegate =
-  let open Lwt_result_syntax in
-  let* balance_opt = Storage.Stake.Staking_balance.find ctxt delegate in
-  match balance_opt with
-  | Some staking_balance -> return (staking_balance, ctxt)
-  | None ->
-      let balance = Full_staking_balance_repr.zero in
-      let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
-      return (balance, ctxt)
-
 let has_minimal_stake ctxt
     {Full_staking_balance_repr.own_frozen; staked_frozen; delegated} =
   let open Result_syntax in
@@ -123,7 +113,7 @@ let initialize_delegate ctxt delegate ~delegated =
 
 let update_stake ~f ctxt delegate =
   let open Lwt_result_syntax in
-  let* staking_balance_before, ctxt = get_initialized_stake ctxt delegate in
+  let* staking_balance_before = get_full_staking_balance ctxt delegate in
   let*? staking_balance = f staking_balance_before in
   let* ctxt =
     Storage.Stake.Staking_balance.update ctxt delegate staking_balance
