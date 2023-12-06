@@ -73,6 +73,8 @@ manuals: \
 		./scripts/man2txt.py > api/octez-proxy-server.txt
 	@../octez-smart-rollup-node man -verbosity 3 -format html | \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
+	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-dal-node.txt
 
 .PHONY: odoc
 odoc:

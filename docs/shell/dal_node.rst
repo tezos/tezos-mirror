@@ -61,11 +61,7 @@ The command ``init config`` creates a new configuration file in the specified da
 
 The command ``run`` runs the DAL node. The CLI arguments take precedence over the configuration file arguments, except for the list of bootstrap peers and of profiles, which are considered in addition to the ones from the configuration file. The configuration file is however not overridden with the new values of the node’s parameters. However, at the end of the execution, the node’s profiles, which may have been given as arguments or set via RPCs, are written to the configuration file.
 
-DAL node manual
-~~~~~~~~~~~~~~~
-
-The command line of the DAL node is documented in Unix man format, which can be obtained by running ``octez-dal-node --help``.
-The arguments of each DAL node command can be listed with ``octez-node <command> --help``.
+See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
 DAL configuration of the L1 node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
