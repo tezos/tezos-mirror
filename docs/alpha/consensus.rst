@@ -381,19 +381,30 @@ its attesting rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or it
 double (pre)attests (which means voting on two different proposals at the same
 level and round), a part of the frozen deposit is slashed. The slashed amount
-for double baking is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double
-(pre)attesting is a fixed percentage
-``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION`` of the frozen
-deposit. The payload producer that includes the misbehavior evidence is rewarded
-half of the slashed amount.
+for double baking and double (pre)attesting are fixed percentage of the frozen
+deposit: ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING`` and
+``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``.
+The payload producer that includes the misbehavior evidence is rewarded a
+seventh of the slashed amount, which corresponds to ``1 /
+(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
+
+If a delegate's deposit is smaller than the slashed amount, the deposit is
+simply emptied.
 
 The evidence for double signing at a given level can be collected by any
 :ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
-If a delegates' deposit is smaller than the slashed amount, the deposit is
-simply emptied, which leads to the delegate losing its baking and attesting
-rights for the rest of the cycle.
+If the recorded denunciation events in the previous and current cycle lead to
+slashing over 51% of the deposits, it immediately forbids the delegate to
+participate further in the consensus, either by baking or attesting.
+At the end of the first cycle in which both the sum of slashing events of a
+delegate over the last two cycles fall under the 51% threshold and its frozen
+deposits are at least half of its consensus rights for the given cycle, the
+delegate is allowed to participate again in the next cycle.
+
+The actual slashing and denunciation rewarding happen at the end of the cycle in
+which the denunciation has been included.
 
 We note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
@@ -428,8 +439,8 @@ Consensus related protocol parameters
      - 10
    * - ``MAX_SLASHING_PERIOD``
      - 2 cycles
-   * - ``DOUBLE_BAKING_PUNISHMENT``
-     - 640 tez
+   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
+     - 5%
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
      - 50%
    * - ``BAKING_REWARD_FIXED_PORTION``
@@ -438,6 +449,8 @@ Consensus related protocol parameters
      - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.002143 tez
    * - ``ATTESTING_REWARD_PER_SLOT``
      - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.001428 tez
+   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
+     - 5
 
 These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
