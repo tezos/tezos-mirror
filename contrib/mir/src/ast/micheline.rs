@@ -239,7 +239,6 @@ macro_rules! micheline_unsupported_instructions {
             | Prim::EDIV
             | Prim::LSL
             | Prim::LSR
-            | Prim::CREATE_CONTRACT
             | Prim::EMPTY_MAP
             | Prim::MAP
             | Prim::SAPLING_EMPTY_STATE

@@ -30,6 +30,7 @@ mod tests {
     use crate::ast::*;
     use crate::context::Ctx;
     use crate::gas::Gas;
+
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
     use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};

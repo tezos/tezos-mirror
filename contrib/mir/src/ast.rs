@@ -595,6 +595,7 @@ pub enum Instruction<'a> {
         tag: Option<FieldAnnotation<'a>>,
         arg_ty: Or<Type, Micheline<'a>>,
     },
+    CreateContract(Rc<ContractScript<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

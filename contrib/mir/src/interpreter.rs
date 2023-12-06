@@ -1291,6 +1291,7 @@ fn interpret_one<'a>(
             let res = bls::pairing::pairing_check(it);
             stack.push(V::Bool(res));
         }
+        I::CreateContract(_) => todo!(),
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
     }
     Ok(())

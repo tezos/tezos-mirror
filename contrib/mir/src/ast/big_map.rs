@@ -484,6 +484,7 @@ impl<'a> TypedValue<'a> {
                 crate::ast::Operation::Emit(_) => {
                     // Can contain only pushable values, thus no big maps
                 }
+                crate::ast::Operation::CreateContract(cc) => cc.storage.collect_big_maps(put_res),
             },
         }
     }
