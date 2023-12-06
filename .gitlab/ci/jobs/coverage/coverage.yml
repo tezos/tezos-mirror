@@ -92,6 +92,7 @@ unified_coverage:
     - "tezt-greedy-4k 3/4"
     - "tezt-greedy-4k 4/4"
     - "tezt-greedy-3k 1/1"
+    - "tezt-time-sensitive 1/1"
     - "unit:non-proto-x86_64"
     - "unit:proto-x86_64"
     - "unit:other-x86_64"
