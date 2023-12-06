@@ -33,7 +33,6 @@ group=tezos
 logdir=/var/log/tezos
 rotateonstart=yes
 protocols="@PROTOCOLS@"
-waitfornode=yes
 
 #shellcheck disable=SC1091
 [ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
@@ -49,19 +48,7 @@ initial_checks()
 	chown $user:$group ${PIDDIR}
 
 	mkdir -p ${logdir}
-
-}
-
-wait_for_bootstrap()
-{
-  echo "Waiting for node to be bootstrapped" >&2
-
-  while :; do
-    /usr/bin/octez-client bootstrapped >/dev/null 2>&1 && break
-    echo "Node not ready - sleeping for 30 seconds" >&2
-    sleep 30
-
-  done
+	chown $user:$group ${logdir}
 
 }
 
@@ -69,7 +56,8 @@ rotate_logs ()
 {
 	if [ ${rotateonstart} = "yes" ]; then
 		for p in ${protocols}; do
-			mv -f "${logfile_base}${p}.log" "${logfile_base}${p}.log.1"
+			[ -f "${logfile_base}${p}.log" ] && \
+				mv -f "${logfile_base}${p}.log" "${logfile_base}${p}.log.1"
 		done
 	fi
 }
@@ -77,7 +65,6 @@ rotate_logs ()
 case "$1" in
 start)	initial_checks
 	rotate_logs
-  [ "$waitfornode" == "yes" ] && wait_for_bootstrap
 	for p in ${protocols}; do
 		[ ! -x "${baker}-$p" ] && continue
 		su $user -c "${baker}-$p run vdf -K >> ${logfile_base}${p}.log 2>&1 & echo \$! > ${PIDFILE}-$p"
