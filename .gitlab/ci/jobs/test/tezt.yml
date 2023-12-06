@@ -103,7 +103,7 @@ tezt:
     TEZT_PARALLEL: 3
 
 # the following memory hungry tests are executed with -j 1
-tezt-greedy-4k:
+tezt-memory-4k:
   extends: [.tezt_tests]
   variables:
     TESTS: "memory_4k"
@@ -111,7 +111,7 @@ tezt-greedy-4k:
     TEZT_VARIANT: "-memory_4k"
   parallel: 4
 
-tezt-greedy-3k:
+tezt-memory-3k:
   extends: [.tezt_tests]
   variables:
     TESTS: "memory_3k"
