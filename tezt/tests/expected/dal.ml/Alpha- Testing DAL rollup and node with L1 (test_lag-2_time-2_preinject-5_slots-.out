@@ -84,11 +84,14 @@ This sequence of operations was run:
       Consumed gas: 170.492
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000037"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000037"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000037"
 

@@ -92,5 +92,6 @@ This sequence of operations was run:
       Consumed gas: 172.912
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "000001f6"
 
