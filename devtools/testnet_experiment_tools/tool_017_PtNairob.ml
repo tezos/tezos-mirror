@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Legacy_monad_globals
 open Lwt_result_syntax
 open Tezos_shell_services
 open Tezos_client_017_PtNairob
@@ -282,7 +281,7 @@ let compute_current_round_duration round_durations
       ~round:(Round.succ round)
   in
   let _end = Timestamp.to_seconds _end in
-  ok (Ptime.Span.of_int_s Int64.(sub _end start |> to_int))
+  Ok (Ptime.Span.of_int_s Int64.(sub _end start |> to_int))
 
 let one_minute = Ptime.Span.of_int_s 60
 
