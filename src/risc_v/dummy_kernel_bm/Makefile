@@ -5,8 +5,8 @@
 .PHONY: all
 all: build test check
 
-.PHONY: build-dev-deps
-build-dev-deps:
+.PHONY: build-deps
+build-deps:
 	@exec ./install-rust-std-hermit.sh
 
 .PHONY: build

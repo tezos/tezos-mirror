@@ -138,6 +138,7 @@ build-deps:
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
+	@make -C ${RISC_V_DUMMY_BM_DIR} build-deps
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
