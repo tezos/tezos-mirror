@@ -3027,14 +3027,10 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_gas_exhaustion() {
-        let mut ctx = &mut Ctx::default();
+        let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
-            typecheck_instruction(
-                &app!(COMPARE),
-                &mut ctx,
-                &mut tc_stk![Type::Unit, Type::Unit]
-            ),
+            typecheck_instruction(&app!(COMPARE), ctx, &mut tc_stk![Type::Unit, Type::Unit]),
             Err(TcError::OutOfGas(OutOfGas))
         );
     }

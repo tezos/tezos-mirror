@@ -9,9 +9,10 @@
 #[error("unknown primitive: {0}")]
 pub struct PrimError(pub String);
 
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Clone, thiserror::Error, Default)]
 pub enum LexerError {
     #[error("unknown token")]
+    #[default]
     UnknownToken,
     #[error("parsing of numeric literal {0} failed")]
     NumericLiteral(String),
@@ -23,10 +24,4 @@ pub enum LexerError {
     PrimError(#[from] PrimError),
     #[error("invalid hex sequence: {0}")]
     InvalidHex(#[from] hex::FromHexError),
-}
-
-impl Default for LexerError {
-    fn default() -> Self {
-        LexerError::UnknownToken
-    }
 }

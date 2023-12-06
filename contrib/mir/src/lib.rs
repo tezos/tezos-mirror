@@ -80,10 +80,10 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
-        let mut ctx = &mut Ctx::default();
+        let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1);
         assert_eq!(
-            ast.interpret(&mut ctx, &mut istack),
+            ast.interpret(ctx, &mut istack),
             Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
         );
     }
@@ -128,10 +128,10 @@ mod tests {
     #[test]
     fn typecheck_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
-        let mut ctx = &mut Ctx::default();
+        let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1000);
         assert_eq!(
-            ast.typecheck_instruction(&mut ctx, None, &[app!(nat)]),
+            ast.typecheck_instruction(ctx, None, &[app!(nat)]),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -216,14 +216,14 @@ mod tests {
     #[test]
     fn vote_contract() {
         use crate::ast::micheline::test_helpers::*;
-        let mut ctx = &mut Ctx::default();
+        let ctx = &mut Ctx::default();
         ctx.amount = 5_000_000;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .typecheck_script(ctx)
             .unwrap()
             .interpret(
-                &mut ctx,
+                ctx,
                 "foo".into(),
                 seq! {app!(Elt["bar", 0]); app!(Elt["baz", 0]); app!(Elt["foo", 0])},
             );

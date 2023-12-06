@@ -87,6 +87,7 @@ impl<T> Stack<T> {
     }
 
     /// Get the stack's element count.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
