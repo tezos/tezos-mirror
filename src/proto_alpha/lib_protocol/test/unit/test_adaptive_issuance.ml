@@ -110,11 +110,13 @@ let test_compute_bonus () =
   (* For simplicity, one cycle = one day *)
   let seconds_per_cycle = 86_400L in
   let compute_bonus ?(seconds_per_cycle = seconds_per_cycle) stake_ratio
-      previous =
+      previous_bonus =
     assert (Q.(stake_ratio <= one)) ;
     Lwt_main.run
       (let*?@ previous_bonus =
-         Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus previous
+         Issuance_bonus_repr.of_Q
+           ~max_bonus:reward_params.max_bonus
+           previous_bonus
        in
        let base_reward_coeff_ratio =
          compute_reward_coeff_ratio_without_bonus
@@ -129,6 +131,22 @@ let test_compute_bonus () =
            ~base_reward_coeff_ratio
            ~previous_bonus
            ~reward_params
+       in
+       let full_reward_coeff = Q.add (bonus :> Q.t) base_reward_coeff_ratio in
+       (* The full coeff should be within the bounds *)
+       let* () =
+         assert_fun
+           ~loc:__LOC__
+           ~f:Q.geq
+           full_reward_coeff
+           reward_params.issuance_ratio_min
+       in
+       let* () =
+         assert_fun
+           ~loc:__LOC__
+           ~f:Q.leq
+           full_reward_coeff
+           reward_params.issuance_ratio_max
        in
        return (bonus :> Q.t))
     |> Result.value_f ~default:(fun () -> assert false)
