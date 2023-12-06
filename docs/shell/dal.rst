@@ -13,3 +13,4 @@ The following pages provide an overview of the DAL and cover its different aspec
    dal_slots
    dal_p2p
    dal_node
+   dal_bakers
