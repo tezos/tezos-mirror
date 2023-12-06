@@ -151,26 +151,10 @@ tezt:static-binaries:
     - tezt:fetch-records
   variables:
     TESTS: "cli"
+    # Disable coverage
+    BISECT_FILE: ""
   before_script:
     - mv octez-binaries/x86_64/octez-* .
-  # Override script from .tezt_template to disable coverage reports.
-  # Note that the set of tests that are run for static executables
-  # is a subset, so this should not reduce apparent coverage.
-  script:
-    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}"'
-    - timeout -k 60 1860 _build/default/tezt/tests/main.exe
-        ${TESTS}
-        --color
-        --log-buffer-size 5000
-        --log-file tezt.log
-        --global-timeout 1800
-        --on-unknown-regression-files fail
-        --junit ${JUNIT}
-        --from-record tezt/records
-        --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-        --record tezt-results-${CI_NODE_INDEX}.json
-        --job-count 3
-        --retry 1
 
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #
