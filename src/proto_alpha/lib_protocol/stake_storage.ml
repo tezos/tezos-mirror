@@ -105,6 +105,22 @@ let has_minimal_stake_and_frozen_stake ctxt
   Tez_repr.(own_frozen >= minimal_frozen_stake)
   && has_minimal_stake ctxt full_staking_balance
 
+let initialize_delegate ctxt delegate ~delegated =
+  let open Lwt_result_syntax in
+  let balance =
+    Full_staking_balance_repr.make
+      ~own_frozen:Tez_repr.zero
+      ~staked_frozen:Tez_repr.zero
+      ~delegated
+  in
+  let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
+  if has_minimal_stake ctxt balance then
+    let*! ctxt =
+      Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
+    in
+    return ctxt
+  else return ctxt
+
 let update_stake ~f ctxt delegate =
   let open Lwt_result_syntax in
   let* staking_balance_before, ctxt = get_initialized_stake ctxt delegate in

@@ -34,6 +34,12 @@
     - {!Storage.Stake.Total_active_stake}
 *)
 
+val initialize_delegate :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  delegated:Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
 val get_full_staking_balance :
   Raw_context.t ->
   Signature.public_key_hash ->

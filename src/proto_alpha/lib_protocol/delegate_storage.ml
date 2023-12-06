@@ -148,8 +148,11 @@ module Contract = struct
       in
       let* c = Contract_delegate_storage.set c contract delegate in
       let* c =
-        (* This initializes the full staking balance of [delegate]. *)
-        Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+        (* Initializes the full staking balance of [delegate]. *)
+        Stake_storage.initialize_delegate
+          c
+          delegate
+          ~delegated:balance_and_frozen_bonds
       in
       let*! c = Storage.Delegates.add c delegate in
       let* c = Delegate_consensus_key.init c delegate pk in
