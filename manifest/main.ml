@@ -1841,8 +1841,8 @@ let octez_distributed_plonk =
     ~bisect_ppx:Yes
 
 let _octez_distributed_plonk_test_main =
-  private_exe
-    "main"
+  tezt
+    ["test_distribution"]
     ~opam:"octez-libs"
     ~path:"src/lib_distributed_plonk/test"
     ~deps:
@@ -1854,8 +1854,6 @@ let _octez_distributed_plonk_test_main =
         octez_aplonk;
         octez_plonk_test_helpers;
       ]
-    ~bisect_ppx:No
-    ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
 let _octez_distributed_plonk_worker_runner =
   private_exe

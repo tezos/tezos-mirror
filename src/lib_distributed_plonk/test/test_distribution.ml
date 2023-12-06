@@ -106,34 +106,47 @@ let test_distribution ?(circuit_builder = Circuit_Builder.base) dp () =
     ()
   in
   let ret = ref None in
-  Lwt.async (fun () ->
-      Worker0.D.run_node
-        ~process:(fun () ->
-          Worker0.D.register "worker" Worker0.(worker_proc DP.pp_file))
-        worker0_config) ;
-  Lwt.async (fun () ->
-      Worker1.D.run_node
-        ~process:(fun () ->
-          Worker1.D.register "worker" Worker1.(worker_proc DP.pp_file))
-        worker1_config) ;
-  Lwt_main.run
-    (let open Master_runner.Make (Master) in
+  Background.register
+    (Worker0.D.run_node
+       ~process:(fun () ->
+         Worker0.D.register "worker" Worker0.(worker_proc DP.pp_file))
+       worker0_config) ;
+  Background.register
+    (Worker1.D.run_node
+       ~process:(fun () ->
+         Worker1.D.register "worker" Worker1.(worker_proc DP.pp_file))
+       worker1_config) ;
+  let* () =
+    let open Master_runner.Make (Master) in
     Master.run_node
       ~process:(master_proc DP.(distributed_prover_main ~inputs pp_prover) ~ret)
-      master_config) ;
+      master_config
+  in
   let proof = Option.get !ret in
   let verifier_inputs = DP.MP.to_verifier_inputs pp_prover inputs in
-  assert (DP.MP.verify pp_verifier ~inputs:verifier_inputs proof)
+  assert (DP.MP.verify pp_verifier ~inputs:verifier_inputs proof) ;
+  Lwt.return ()
 
-let tests =
-  List.map
-    (fun (name, f) -> Alcotest.test_case name `Quick f)
-    [
-      ("test_distribution_kzg", test_distribution (module DP_Kzg ()));
-      ("test_distribution_kzg_pack", test_distribution (module DP_Pack ()));
-      ("test_distribution_meta", test_distribution (module DP_Meta ()));
-      ( "test_distribution_RC",
-        test_distribution
-          ~circuit_builder:Circuit_Builder.range_checks
-          (module DP_Pack ()) );
-    ]
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"test_distribution_kzg"
+    ~tags:["plonk"; "lib_distributed_plonk"]
+    (test_distribution (module DP_Kzg ())) ;
+  Test.register
+    ~__FILE__
+    ~title:"test_distribution_kzg_pack"
+    ~tags:["plonk"; "lib_distributed_plonk"]
+    (test_distribution (module DP_Pack ())) ;
+  Test.register
+    ~__FILE__
+    ~title:"test_distribution_meta"
+    ~tags:["plonk"; "lib_distributed_plonk"]
+    (test_distribution (module DP_Meta ())) ;
+  Test.register
+    ~__FILE__
+    ~title:"test_distribution_RC"
+    ~tags:["plonk"; "lib_distributed_plonk"]
+    (test_distribution
+       ~circuit_builder:Circuit_Builder.range_checks
+       (module DP_Pack ()))
