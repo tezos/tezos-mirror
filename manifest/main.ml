@@ -7257,6 +7257,7 @@ let yes_wallet_lib =
          octez_base_unix;
          lwt_unix;
          ezjsonm;
+         octez_node_config;
          octez_store;
          octez_shell_context;
          octez_context;

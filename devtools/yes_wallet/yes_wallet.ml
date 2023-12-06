@@ -163,9 +163,8 @@ let staking_share_opt_name = "--staking-share"
 
 let network_opt_name = "--network"
 
-let networks = [("mainnet", `Mainnet); ("ghostnet", `Ghostnet)]
-
-let supported_network = List.map fst networks
+let supported_network =
+  List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
 
 let force = ref false
 
@@ -237,8 +236,7 @@ let () =
     let rec aux argv =
       match argv with
       | [] -> None
-      | str :: net :: _ when str = network_opt_name ->
-          List.assoc_opt net networks
+      | str :: net :: _ when str = network_opt_name -> Some net
       | _ :: argv' -> aux argv'
     in
     aux argv
