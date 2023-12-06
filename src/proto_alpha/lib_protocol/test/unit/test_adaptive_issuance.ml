@@ -232,6 +232,144 @@ let test_compute_bonus () =
   in
   return_unit
 
+let test_compute_coeff () =
+  let open Delegate.Rewards.Internal_for_tests in
+  let open Lwt_result_wrap_syntax in
+  let assert_eq ~loc a b = Assert.equal ~loc Q.equal "" Q.pp_print a b in
+  let reward_params =
+    Default_parameters.constants_test.adaptive_issuance.adaptive_rewards_params
+  in
+  let base_total_issued_per_minute =
+    Default_parameters.constants_test.issuance_weights
+      .base_total_issued_per_minute |> Tez.to_mutez |> Tez_repr.of_mutez_exn
+  in
+  let compute_coeff
+      ?(base_total_issued_per_minute = base_total_issued_per_minute)
+      ?(q_total_supply = Q.of_int64 1_000_000_000L) () =
+    compute_coeff ~base_total_issued_per_minute ~q_total_supply ~reward_params
+  in
+  (* Test inverse linearity wrt base issuance
+     Base issuance * Issuance coeff = constant (= issuance per unit of time)
+     In other words, ∀α>0.αf(αx)=f(x), where x is the base issuance
+     and f is compute_coeff *)
+  let* () =
+    let base_issuance = 20_000_000L in
+    let compute_coeff base =
+      compute_coeff
+        ~base_total_issued_per_minute:(Tez_repr.of_mutez_exn base)
+        ~base_reward_coeff_ratio:Q.(1 // 100)
+        ~bonus:Issuance_bonus_repr.zero
+        ()
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff (Int64.div base_issuance 2L))
+        Q.(mul (2 // 1) (compute_coeff base_issuance))
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff (Int64.mul base_issuance 2L))
+        Q.(mul (1 // 2) (compute_coeff base_issuance))
+    in
+    (* Test edge case base = 0 *)
+    let* () = assert_eq ~loc:__LOC__ (compute_coeff 0L) Q.one in
+    return_unit
+  in
+  (* Test linearity wrt total_supply *)
+  let* () =
+    let total_supply = Q.of_int64 1_000_000_000L in
+    let compute_coeff q_total_supply =
+      compute_coeff
+        ~q_total_supply
+        ~base_reward_coeff_ratio:Q.(1 // 100)
+        ~bonus:Issuance_bonus_repr.zero
+        ()
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(mul (1 // 2) total_supply))
+        Q.(mul (1 // 2) (compute_coeff total_supply))
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(mul (2 // 1) total_supply))
+        Q.(mul (2 // 1) (compute_coeff total_supply))
+    in
+    return_unit
+  in
+  let* () =
+    let compute_coeff base_reward_coeff_ratio bonus =
+      (* bonus must be <= 5% *)
+      let bonus =
+        Lwt_main.run
+          (let*?@ b =
+             Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus bonus
+           in
+           return b)
+        |> function
+        | Ok b -> b
+        | Error _ -> assert false
+      in
+      compute_coeff ~base_reward_coeff_ratio ~bonus ()
+    in
+    (* Test linearity wrt base_reward_coeff_ratio *)
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(2 // 99) Q.zero)
+        Q.(mul (2 // 1) (compute_coeff Q.(1 // 99) Q.zero))
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(3 // 99) Q.zero)
+        Q.(
+          add
+            (compute_coeff Q.(2 // 99) Q.zero)
+            (compute_coeff Q.(1 // 99) Q.zero))
+    in
+    (* Test symmetry *)
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(1 // 99) Q.zero)
+        (compute_coeff Q.zero Q.(1 // 99))
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.(2 // 99) Q.(1 // 99))
+        (compute_coeff Q.(1 // 99) Q.(2 // 99))
+    in
+    (* Test min *)
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff Q.zero Q.zero)
+        (compute_coeff reward_params.issuance_ratio_min Q.zero)
+    in
+    (* Test max *)
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff (Q.add reward_params.issuance_ratio_max Q.one) Q.zero)
+        (compute_coeff reward_params.issuance_ratio_max Q.zero)
+    in
+    let* () =
+      assert_eq
+        ~loc:__LOC__
+        (compute_coeff reward_params.issuance_ratio_max Q.(1 // 100))
+        (compute_coeff reward_params.issuance_ratio_max Q.zero)
+    in
+    return_unit
+  in
+
+  return_unit
+
 let tests =
   Tztest.
     [
@@ -247,6 +385,10 @@ let tests =
         "adaptive issuance - reward bonus computation"
         `Quick
         test_compute_bonus;
+      tztest
+        "adaptive issuance - reward coeff computation"
+        `Quick
+        test_compute_coeff;
     ]
 
 let () =
