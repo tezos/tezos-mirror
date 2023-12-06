@@ -364,3 +364,12 @@ val wait_for_injecting_event :
   ?tags:string list -> ?count:int -> Sc_rollup_node.t -> int Lwt.t
 
 val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
+
+type transaction = {
+  destination : string;
+  entrypoint : string option;
+  parameters : string;
+  parameters_ty : string option;
+}
+
+val json_of_output_tx_batch : transaction list -> JSON.u

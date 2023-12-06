@@ -3898,7 +3898,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
   let perform_rollup_execution_and_cement source_address target_address =
-    let* payload = input_message sc_client target_address in
+    let* payload = input_message target_address in
     let* () =
       match payload with
       | `External payload ->
@@ -4055,7 +4055,7 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
   let boot_sector, input_message, expected_storage =
     match kind with
     | "arith" ->
-        let input_message _client contract_address =
+        let input_message contract_address =
           let payload =
             Printf.sprintf
               "%s %s%s"
@@ -4069,9 +4069,9 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
         (None, input_message, outbox_parameters)
     | "wasm_2_0_0" ->
         let bootsector = read_kernel "echo" in
-        let input_message client contract_address =
+        let input_message contract_address =
           let transaction =
-            Sc_rollup_client.
+            Sc_rollup_helpers.
               {
                 destination = contract_address;
                 entrypoint;
@@ -4079,10 +4079,12 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
                 parameters_ty = outbox_parameters_ty;
               }
           in
-          let* answer = Sc_rollup_client.encode_batch client [transaction] in
-          match answer with
-          | None -> failwith "Encoding of batch should not fail."
-          | Some answer -> return (wrap answer)
+          let* answer =
+            Codec.encode
+              ~name:"alpha.smart_rollup.outbox.message"
+              (Sc_rollup_helpers.json_of_output_tx_batch [transaction])
+          in
+          return (wrap (String.trim answer))
         in
         ( Some bootsector,
           input_message,

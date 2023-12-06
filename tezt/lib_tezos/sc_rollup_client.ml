@@ -170,18 +170,6 @@ let encode_json_outbox_msg ?hooks sc_client outbox_msg =
     ["encode"; "outbox"; "message"; JSON.encode_u outbox_msg]
   |> Runnable.map String.trim
 
-let encode_batch ?hooks ?expected_error sc_client batch =
-  let runnable =
-    encode_json_outbox_msg ?hooks sc_client (json_of_batch batch)
-  in
-  match expected_error with
-  | None ->
-      let* answer = Process.check_and_read_stdout runnable.value in
-      return (Some (String.trim answer))
-  | Some msg ->
-      let* () = Process.check_error ~msg runnable.value in
-      return None
-
 let rpc_get ?hooks sc_client path =
   spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
   |> Runnable.map @@ fun output ->

@@ -97,11 +97,7 @@ val outbox_proof :
 val encode_json_outbox_msg :
   ?hooks:Process.hooks -> t -> JSON.u -> string Runnable.process
 
-(** [encode_batch batch] returns the encoding of a [batch] of output
-   transactions. *)
-val encode_batch :
-  ?hooks:Process.hooks ->
-  ?expected_error:Base.rex ->
-  t ->
-  transaction list ->
-  string option Lwt.t
+(** [inject client messages] injects the [messages] in the queue the rollup
+    node's batcher and returns the list of message hashes injected. *)
+val inject :
+  ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process
