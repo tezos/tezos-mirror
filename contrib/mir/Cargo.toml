@@ -13,7 +13,9 @@ tezos_data_encoding = "0.5.1"
 thiserror = "1.0"
 logos = "0.13"
 hex = "0.4"
-tezos_crypto_rs = "0.5"
+tezos_crypto_rs = { version = "0.5", default-features = false, features = [
+  "bls",
+] }
 typed-arena = "2"
 base58 = "0.2"
 cryptoxide = "0.4"
