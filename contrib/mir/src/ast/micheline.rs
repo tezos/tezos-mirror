@@ -7,6 +7,7 @@
 
 use typed_arena::Arena;
 
+use super::annotations::{Annotations, NO_ANNS};
 use crate::lexer::Prim;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -17,17 +18,17 @@ pub enum Micheline<'a> {
     /// Application of a Micheline primitive to some arguments with optional
     /// annotations. The primitive is the first field, arguments are the second
     /// field, annotations are the last field.
-    App(Prim, &'a [Micheline<'a>], Vec<&'a str>),
+    App(Prim, &'a [Micheline<'a>], Annotations<'a>),
     Seq(&'a [Micheline<'a>]),
 }
 
 impl<'a> Micheline<'a> {
     pub fn prim0(prim: Prim) -> Self {
-        Micheline::App(prim, &[], vec![])
+        Micheline::App(prim, &[], NO_ANNS)
     }
 
     pub fn prim1(arena: &'a Arena<Micheline<'a>>, prim: Prim, arg: Micheline<'a>) -> Self {
-        Micheline::App(prim, arena.alloc_extend([arg]), vec![])
+        Micheline::App(prim, arena.alloc_extend([arg]), NO_ANNS)
     }
 
     pub fn prim2(
@@ -36,7 +37,7 @@ impl<'a> Micheline<'a> {
         arg1: Micheline<'a>,
         arg2: Micheline<'a>,
     ) -> Self {
-        Micheline::App(prim, arena.alloc_extend([arg1, arg2]), vec![])
+        Micheline::App(prim, arena.alloc_extend([arg1, arg2]), NO_ANNS)
     }
 }
 
@@ -183,21 +184,25 @@ pub mod test_helpers {
         ($prim:ident [$($args:expr),* $(,)*]) => {
             $crate::ast::micheline::Micheline::App(
                 $crate::lexer::Prim::$prim, &[$($crate::ast::micheline::Micheline::from($args)),*],
-                vec![],
+                $crate::ast::annotations::NO_ANNS,
             )
         };
         ($prim:ident) => {
-            $crate::ast::micheline::Micheline::App($crate::lexer::Prim::$prim, &[], vec![])
+            $crate::ast::micheline::Micheline::App(
+                $crate::lexer::Prim::$prim,
+                &[],
+                $crate::ast::annotations::NO_ANNS,
+            )
         };
     }
 
     #[test]
     fn test_app() {
         use super::*;
-        assert_eq!(app!(True), Micheline::App(Prim::True, &[], vec![]));
+        assert_eq!(app!(True), Micheline::App(Prim::True, &[], NO_ANNS));
         assert_eq!(
             app!(DUP[3]),
-            Micheline::App(Prim::DUP, &[Micheline::Int(3)], vec![])
+            Micheline::App(Prim::DUP, &[Micheline::Int(3)], NO_ANNS)
         );
         assert_eq!(
             app!(DIP[3, seq!{ app!(DROP) }]),
@@ -205,9 +210,9 @@ pub mod test_helpers {
                 Prim::DIP,
                 &[
                     Micheline::Int(3),
-                    Micheline::Seq(&[Micheline::App(Prim::DROP, &[], vec![])])
+                    Micheline::Seq(&[Micheline::App(Prim::DROP, &[], NO_ANNS)])
                 ],
-                vec![]
+                NO_ANNS
             )
         );
     }
@@ -227,13 +232,13 @@ pub mod test_helpers {
         assert_eq!(seq! {}, Micheline::Seq(&[]));
         assert_eq!(
             seq! { app!(CAR) },
-            Micheline::Seq(&[Micheline::App(Prim::CAR, &[], vec![])])
+            Micheline::Seq(&[Micheline::App(Prim::CAR, &[], NO_ANNS)])
         );
         assert_eq!(
             seq! { app!(CAR); app!(DUP); },
             Micheline::Seq(&[
-                Micheline::App(Prim::CAR, &[], vec![]),
-                Micheline::App(Prim::DUP, &[], vec![]),
+                Micheline::App(Prim::CAR, &[], NO_ANNS),
+                Micheline::App(Prim::DUP, &[], NO_ANNS),
             ])
         );
     }

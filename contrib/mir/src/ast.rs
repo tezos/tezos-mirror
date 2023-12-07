@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+pub mod annotations;
 pub mod comparable;
 pub mod micheline;
 pub mod michelson_address;

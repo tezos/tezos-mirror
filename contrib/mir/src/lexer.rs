@@ -139,9 +139,28 @@ pub enum PrimWithTzt {
     // `lex_prim` function as well.
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Annotation<'a> {
+    Special(&'a str),
+    Field(&'a str),
+    Variable(&'a str),
+    Type(&'a str),
+}
+
+impl std::fmt::Display for Annotation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Annotation::Special(s) => write!(f, "{s}"),
+            Annotation::Field(s) => write!(f, "%{s}"),
+            Annotation::Variable(s) => write!(f, "@{s}"),
+            Annotation::Type(s) => write!(f, ":{s}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
-pub enum Tok {
+pub enum Tok<'a> {
     #[regex(r"[A-Za-z_]+", lex_prim)]
     Prim(PrimWithTzt),
 
@@ -155,8 +174,8 @@ pub enum Tok {
     Bytes(Vec<u8>),
 
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
-    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*")]
-    Annotation,
+    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
+    Annotation(Annotation<'a>),
 
     #[token("(")]
     LParen,
@@ -170,7 +189,7 @@ pub enum Tok {
     Semi,
 }
 
-impl std::fmt::Display for Tok {
+impl std::fmt::Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
@@ -179,7 +198,7 @@ impl std::fmt::Display for Tok {
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
-            Tok::Annotation => write!(f, "<ann>"),
+            Tok::Annotation(ann) => write!(f, "{ann}"),
             Tok::LParen => write!(f, "("),
             Tok::RParen => write!(f, ")"),
             Tok::LBrace => write!(f, "{{"),
@@ -211,7 +230,7 @@ impl Default for LexerError {
     }
 }
 
-type Lexer<'a> = logos::Lexer<'a, Tok>;
+type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
 fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
     lex.slice()
@@ -275,6 +294,23 @@ fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
 /// prefix and converts the digits pairwise to `u8`.
 fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
     Ok(hex::decode(&lex.slice()[2..])?)
+}
+
+fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
+    match lex.slice() {
+        s @ ("@%" | "@%%" | "%@") => Annotation::Special(s),
+        s => {
+            if let Some(s) = s.strip_prefix('@') {
+                Annotation::Variable(s)
+            } else if let Some(s) = s.strip_prefix('%') {
+                Annotation::Field(s)
+            } else if let Some(s) = s.strip_prefix(':') {
+                Annotation::Type(s)
+            } else {
+                unreachable!("regex for Annotation ensures it's either one of three")
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -50,7 +50,7 @@ mod tztrunner_tests {
     use mir::{parser::Parser, tzt::*};
     use TztTestError::*;
 
-    fn parse_tzt_test(s: &str) -> Result<TztTest, Box<dyn Error>> {
+    fn parse_tzt_test(s: &'static str) -> Result<TztTest, Box<dyn Error>> {
         let parser = Box::leak(Box::new(Parser::new()));
         parser.parse_tzt_test(s)
     }
