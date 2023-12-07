@@ -87,6 +87,11 @@ fn prepare_host() -> EvalHost {
     EvalHost::default_with_buffer(buffer)
 }
 
+fn prepare_host_with_buffer(execution_buffer: Vec<u8>) -> EvalHost {
+    let buffer = RefCell::new(execution_buffer);
+    EvalHost::default_with_buffer(buffer)
+}
+
 fn prepare_filler_source(
     host: &EvalHost,
     unit: &TestUnit,
@@ -283,9 +288,8 @@ pub fn run_test(
 
         let filler_source = prepare_filler_source(&host, &unit, opt)?;
 
-        initialize_accounts(&mut host, &unit);
-
         let mut env = initialize_env(&unit)?;
+        let info = &unit._info;
 
         // post and execution
         for (spec_name, tests) in &unit.post {
@@ -296,7 +300,20 @@ pub fn run_test(
                 _ => continue,
             };
 
-            for test_execution in tests.iter() {
+            for (test_index, test_execution) in tests.iter().enumerate() {
+                host = prepare_host_with_buffer(host.buffer.take());
+                initialize_accounts(&mut host, &unit);
+
+                let tx_label = info.labels.get(&test_index);
+                if let Some(tx_label) = tx_label {
+                    writeln!(
+                        output_file,
+                        "Executing test with label: {} and index: {}",
+                        tx_label, test_index
+                    )
+                    .unwrap();
+                }
+
                 let exec_result = execute_transaction(
                     &mut host,
                     &mut evm_account_storage,
@@ -307,24 +324,27 @@ pub fn run_test(
                     test_execution,
                 );
 
-                check_results(&host, &name, test_execution, &exec_result);
-            }
+                // Check the state after the execution of the result.
+                match filler_source.clone() {
+                    Some(filler_source) => process(
+                        &mut host,
+                        filler_source,
+                        spec_name,
+                        report_map,
+                        report_key.clone(),
+                        output_file,
+                        tx_label,
+                        test_index as i64,
+                    ),
+                    None => write_host!(
+                        host,
+                        "No filler file, the outcome of this test is uncertain."
+                    ),
+                };
 
-            // Check the state after the execution of the result.
-            match filler_source.clone() {
-                Some(filler_source) => process(
-                    &mut host,
-                    filler_source,
-                    spec_name,
-                    report_map,
-                    report_key.clone(),
-                    output_file,
-                ),
-                None => write_host!(
-                    host,
-                    "No filler file, the outcome of this test is uncertain."
-                ),
-            };
+                check_results(&host, &name, test_execution, &exec_result);
+                host.buffer.borrow_mut().clear();
+            }
         }
     }
     Ok(())
