@@ -125,6 +125,73 @@ let register_error_kind category ~id ~title ~description ?pp encoding from_error
     from_error
     to_error
 
+let transaction_encoding =
+  (* Copy from [sc_rollup_outbox_message_repr.ml] *)
+  let open Data_encoding in
+  let open Protocol.Alpha_context in
+  conv
+    (fun ({unparsed_parameters; destination; entrypoint} :
+           Sc_rollup.Outbox.Message.transaction) ->
+      (unparsed_parameters, destination, entrypoint))
+    (fun (unparsed_parameters, destination, entrypoint) ->
+      {unparsed_parameters; destination; entrypoint})
+  @@ obj3
+       (req "parameters" Script.expr_encoding)
+       (req "destination" Contract.originated_encoding)
+       Entrypoint.(dft "entrypoint" simple_encoding default)
+
+let typed_transaction_encoding =
+  (* Copy from [sc_rollup_outbox_message_repr.ml] *)
+  let open Data_encoding in
+  let open Protocol.Alpha_context in
+  conv
+    (fun ({unparsed_parameters; unparsed_ty; destination; entrypoint} :
+           Sc_rollup.Outbox.Message.typed_transaction) ->
+      (unparsed_parameters, unparsed_ty, destination, entrypoint))
+    (fun (unparsed_parameters, unparsed_ty, destination, entrypoint) ->
+      {unparsed_parameters; unparsed_ty; destination; entrypoint})
+  @@ obj4
+       (req "parameters" Script.expr_encoding)
+       (req "parameters_ty" Script.expr_encoding)
+       (req "destination" Contract.originated_encoding)
+       Entrypoint.(dft "entrypoint" simple_encoding default)
+
+let outbox_message_encoding =
+  (* Copy from [sc_rollup_outbox_message_repr.ml] because the encoding
+     is not exposed in [alpha_context.mli] *)
+  let open Data_encoding in
+  let open Protocol.Alpha_context in
+  check_size
+    Constants.sc_rollup_message_size_limit
+    (union
+       [
+         case
+           (Tag 0)
+           ~title:"Atomic_transaction_batch"
+           (obj2
+              (req "transactions" (list transaction_encoding))
+              (req "kind" (constant "untyped")))
+           (function
+             | Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}
+               ->
+                 Some (transactions, ())
+             | _ -> None)
+           (fun (transactions, ()) -> Atomic_transaction_batch {transactions});
+         case
+           (Tag 1)
+           ~title:"Atomic_transaction_batch_typed"
+           (obj2
+              (req "transactions" (list typed_transaction_encoding))
+              (req "kind" (constant "typed")))
+           (function
+             | Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed
+                 {transactions} ->
+                 Some (transactions, ())
+             | _ -> None)
+           (fun (transactions, ()) ->
+             Atomic_transaction_batch_typed {transactions});
+       ])
+
 (** Initialization calls that run on start-up. Register the various
     protocol encodings. *)
 let () =
@@ -245,6 +312,46 @@ let () =
        "voting_period"
        ["kind"]
        Protocol.Alpha_context.Voting_period.kind_encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Address.pp
+  @@ def
+       "smart_rollup"
+       ["address"]
+       Protocol.Alpha_context.Sc_rollup.Address.encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Kind.pp
+  @@ def "smart_rollup" ["kind"] Protocol.Alpha_context.Sc_rollup.Kind.encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Metadata.pp
+  @@ def
+       "smart_rollup"
+       ["metadata"]
+       Protocol.Alpha_context.Sc_rollup.Metadata.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["inbox"]
+       Protocol.Alpha_context.Sc_rollup.Inbox.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["inbox"; "message"]
+       Protocol.Alpha_context.Sc_rollup.Inbox_message.encoding ;
+  register @@ def "smart_rollup" ["outbox"; "message"] outbox_message_encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["output"]
+       Protocol.Alpha_context.Sc_rollup.output_encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["commmitment"]
+       Protocol.Alpha_context.Sc_rollup.Commitment.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["proof"]
+       Protocol.Alpha_context.Sc_rollup.Proof.encoding ;
+  register
+  @@ def "smart_rollup" ["game"] Protocol.Alpha_context.Sc_rollup.Game.encoding ;
   register
   @@ def
        "errors"
