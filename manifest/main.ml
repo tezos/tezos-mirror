@@ -6317,6 +6317,7 @@ let hash = Protocol.hash
               octez_mockup_proxy;
               octez_mockup_commands;
               tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
+              tezt_core_lib |> open_;
             ]
           ~bisect_ppx:No
       in

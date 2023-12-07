@@ -906,6 +906,34 @@ let create_fake_node_state ~i ~live_depth
       genesis_block_true_hash;
     }
 
+class tezt_printer : Tezos_client_base.Client_context.printer =
+  let open Tezos_client_base in
+  let open Client_context in
+  let wrap_tezt_log : (_ format4 -> _) -> _ format4 -> _ =
+   fun f x ->
+    Format.kasprintf
+      (fun msg ->
+        f "%s" msg ;
+        Lwt.return_unit)
+      x
+  in
+  object
+    method error : type a b. (a, b) lwt_format -> a =
+      Format.kasprintf (fun msg -> Lwt.fail (Failure msg))
+
+    method warning : type a. (a, unit) lwt_format -> a =
+      wrap_tezt_log Tezt_core.Log.warn
+
+    method message : type a. (a, unit) lwt_format -> a =
+      wrap_tezt_log (fun x -> Tezt_core.Log.info x)
+
+    method answer : type a. (a, unit) lwt_format -> a =
+      wrap_tezt_log (fun x -> Tezt_core.Log.info x)
+
+    method log : type a. string -> (a, unit) lwt_format -> a =
+      fun _log_output -> wrap_tezt_log (fun x -> Tezt_core.Log.info x)
+  end
+
 (** Start baker process. *)
 let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
     ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
@@ -1107,13 +1135,12 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
       delegate_selection
     |> Environment.wrap_tzresult
   in
+  let cctxt = new tezt_printer in
   let* initial_seed =
     match (delegate_selection, constants.initial_seed) with
     | [], seed_opt -> return seed_opt
     | selection, (Some _ as seed) -> (
-        let*! () =
-          Faked_client_context.logger#warning "Checking provided seed."
-        in
+        let*! () = cctxt#message "Checking provided seed." in
         let* result =
           Tenderbrute.check_seed
             ~bootstrap_accounts_json:bootstrap_accounts
@@ -1127,10 +1154,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
         | false ->
             failwith "Provided initial seed does not match delegate selection")
     | _, None ->
-        let*! () =
-          Faked_client_context.logger#warning
-            "No initial seed provided, bruteforcing."
-        in
+        let*! () = cctxt#message "No initial seed provided, bruteforcing." in
         Tenderbrute.bruteforce
           ~max:100_000_000_000
           ~bootstrap_accounts_json:bootstrap_accounts
@@ -1142,7 +1166,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
     | None -> Lwt.return_unit
     | _ when initial_seed = constants.initial_seed -> Lwt.return_unit
     | Some seed ->
-        Faked_client_context.logger#warning
+        cctxt#warning
           "Bruteforced seed is %a, please save into your test."
           State_hash.pp
           seed
@@ -1161,7 +1185,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
     in
     let* {chain = _; rpc_context = rpc_context0; protocol_data = _} =
       Mockup.M.init
-        ~cctxt:Faked_client_context.logger
+        ~cctxt
         ~parameters:reencoded_parameters
         ~constants_overrides_json:None
         ~bootstrap_accounts_json:(Some bootstrap_accounts)
@@ -1237,7 +1261,6 @@ module Default_hooks : Hooks = struct
 end
 
 type config = {
-  debug : bool;
   round0 : int64;
   round1 : int64;
   timeout : int;
@@ -1249,7 +1272,6 @@ type config = {
 
 let default_config =
   {
-    debug = false;
     round0 = 2L;
     (* Rounds should be long enough for the bakers to
        exchange all the necessary messages. *)
@@ -1287,16 +1309,6 @@ let run ?(config = default_config) bakers_spec =
   else if total_accounts > 5 then
     failwith "only up to 5 bootstrap accounts are available"
   else
-    (* When logging is enabled it may cause non-termination:
-
-       https://gitlab.com/nomadic-labs/tezos/-/issues/546
-
-       In particular, it seems that when logging is enabled the baker
-       process can get cancelled without executing its Lwt finalizer. *)
-    let*! () =
-      if config.debug then Tezos_base_unix.Internal_event_unix.init ()
-      else Lwt.return_unit
-    in
     let total_bakers = List.length bakers_spec in
     let* broadcast_pipes =
       List.init ~when_negative_length:() total_bakers (fun _ ->

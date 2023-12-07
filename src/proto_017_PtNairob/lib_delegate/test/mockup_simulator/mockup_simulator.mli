@@ -139,9 +139,6 @@ module Default_hooks : Hooks
 
 (** Simulation configuration. *)
 type config = {
-  debug : bool;
-      (** Whether to initialize the event system in order to display
-        information about the progress of the simulation. *)
   round0 : int64;  (** Duration of the round 0 in seconds. *)
   round1 : int64;  (** Duration of the round 1 in seconds. *)
   timeout : int;
