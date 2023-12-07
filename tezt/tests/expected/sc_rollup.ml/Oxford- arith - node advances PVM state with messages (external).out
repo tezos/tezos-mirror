@@ -63,6 +63,7 @@ This sequence of operations was run:
       Consumed gas: 170.530
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000007"
 
 
@@ -91,6 +92,7 @@ This sequence of operations was run:
       Consumed gas: 170.530
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000000a"
 
 
@@ -119,6 +121,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000000d"
 
 
@@ -147,6 +150,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000010"
 
 
@@ -175,6 +179,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000013"
 
 
@@ -203,6 +208,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000016"
 
 
@@ -231,6 +237,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000019"
 
 
@@ -259,6 +266,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000001c"
 
 
@@ -287,6 +295,7 @@ This sequence of operations was run:
       Consumed gas: 170.569
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000001f"
 
 
@@ -315,5 +324,6 @@ This sequence of operations was run:
       Consumed gas: 170.607
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000022"
 

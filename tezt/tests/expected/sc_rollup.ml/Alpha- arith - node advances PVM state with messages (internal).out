@@ -38,32 +38,42 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000007"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000000a"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000000d"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000010"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000013"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000016"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000019"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000001c"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "0000001f"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+200 OK
 "00000022"
 

@@ -86,6 +86,20 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
 let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
 
 let rpc_hooks : RPC_core.rpc_hooks =
-  let on_request input = replace_variables input |> Regression.capture in
-  let on_response output = replace_variables output |> Regression.capture in
+  let open RPC_core in
+  let on_request verb ~uri data =
+    Regression.capture (sf "%s %s" (show_verb verb) (replace_variables uri)) ;
+    match data with
+    | None -> ()
+    | Some (Data data) ->
+        Regression.capture "Content-type: application/json" ;
+        Regression.capture (JSON.encode_u data)
+    | Some (File f) ->
+        Regression.capture
+        @@ sf "Content-type: application/json (file %s)" (Filename.basename f)
+  in
+  let on_response status ~body =
+    Regression.capture (Cohttp.Code.string_of_status status) ;
+    Regression.capture (replace_variables body)
+  in
   {on_request; on_response}
