@@ -58,3 +58,11 @@ val memory_3k : string
 
 (** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
 val memory_4k : string
+
+(** ["time_sensitive"]: tag for time-sensitive tests.
+
+    They are executed with -j 1 to ensure that other tests do not
+    affect their executions. However, they are not particularly
+    cpu/memory-intensive hence they do not need to run on a particular
+    machine contrary to performance regression tests. *)
+val time_sensitive : string

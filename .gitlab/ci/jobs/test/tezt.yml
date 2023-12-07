@@ -98,12 +98,12 @@ tezt:
   variables:
     # Exclude tests with tags 'ci_disabled', 'flaky' and `memory_{3,4}k`.
     # See tezt/lib_tezos/tag.mli for more information.
-    TESTS: "/ci_disabled /flaky /memory_3k /memory_4k"
+    TESTS: "/ci_disabled /flaky /memory_3k /memory_4k /time_sensitive"
     # the -j option of tezt
     TEZT_PARALLEL: 3
 
 # the following memory hungry tests are executed with -j 1
-tezt-greedy-4k:
+tezt-memory-4k:
   extends: [.tezt_tests]
   variables:
     TESTS: "memory_4k"
@@ -111,12 +111,24 @@ tezt-greedy-4k:
     TEZT_VARIANT: "-memory_4k"
   parallel: 4
 
-tezt-greedy-3k:
+tezt-memory-3k:
   extends: [.tezt_tests]
   variables:
     TESTS: "memory_3k"
     TEZT_PARALLEL: 1
     TEZT_VARIANT: "-memory_3k"
+  parallel: 1
+
+# the following tests are executed with -j 1 to ensure that other
+# tests do not affect their executions. However, these tests are not
+# particularly cpu/memory-intensive hence they do not need to run on a
+# particular machine contrary to performance regression tests.
+tezt-time-sensitive:
+  extends: [.tezt_tests]
+  variables:
+    TESTS: "time_sensitive"
+    TEZT_PARALLEL: 1
+    TEZT_VARIANT: "-time_sensitive"
   parallel: 1
 
 # these are tezt tests as above, but run using the static binaries

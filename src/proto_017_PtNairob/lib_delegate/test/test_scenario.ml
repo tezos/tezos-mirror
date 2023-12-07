@@ -1705,7 +1705,7 @@ let test_scenario_m8 () =
   2. L1 - When QC is reached, observe that B emits time to forge event. Shortly after, observe
           that B emits time to bake event.
   3. L2 - A observes the block from B and ends.
-  
+
 *)
 let test_scenario_m9 () =
   let stop_level = Int32.of_int 2 in
@@ -1849,32 +1849,59 @@ let test_scenario_m10 () =
   in
   run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
 
+(* Copy-pasted from alcotezt *)
+let redirect_formatter fmt =
+  let buffer = Buffer.create 256 in
+  Format.pp_set_formatter_output_functions fmt (Buffer.add_substring buffer)
+  @@ fun () ->
+  Log.debug "%s" (String.trim (Buffer.contents buffer)) ;
+  Buffer.clear buffer
+
 let () =
-  Alcotest_lwt.run ~__FILE__ "mockup_baking"
-  @@ List.map
-       (fun (title, body) ->
-         let open Tezos_base_test_helpers.Tztest in
-         (title, [tztest title `Quick body]))
-       [
-         (Protocol.name ^ ": reaches level 5", test_level_5);
-         ( Protocol.name ^ ": cannot progress without new head",
-           test_preendorse_on_valid );
-         (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
-         (Protocol.name ^ ": scenario t1", test_scenario_t1);
-         (Protocol.name ^ ": scenario t2", test_scenario_t2);
-         (Protocol.name ^ ": scenario t3", test_scenario_t3);
-         (Protocol.name ^ ": scenario t4", test_scenario_t4);
-         (Protocol.name ^ ": scenario f1", test_scenario_f1);
-         (Protocol.name ^ ": scenario f2", test_scenario_f2);
-         (Protocol.name ^ ": scenario m1", test_scenario_m1);
-         (Protocol.name ^ ": scenario m2", test_scenario_m2);
-         (Protocol.name ^ ": scenario m3", test_scenario_m3);
-         (Protocol.name ^ ": scenario m4", test_scenario_m4);
-         (Protocol.name ^ ": scenario m5", test_scenario_m5);
-         (Protocol.name ^ ": scenario m6", test_scenario_m6);
-         (Protocol.name ^ ": scenario m7", test_scenario_m7);
-         (Protocol.name ^ ": scenario m8", test_scenario_m8);
-         (Protocol.name ^ ": scenario m9", test_scenario_m9);
-         (Protocol.name ^ ": scenario m10", test_scenario_m10);
-       ]
-  |> Lwt_main.run
+  redirect_formatter Format.std_formatter ;
+  redirect_formatter Format.err_formatter
+
+let () =
+  let open Lwt_result_syntax in
+  (* Activate a sink to record baker's events *)
+  let t = lazy (Tezt_sink.activate ()) in
+  let proto_name =
+    String.lowercase_ascii Protocol.name
+    |> String.map (function '-' -> '_' | x -> x)
+  in
+  let register_test (title, test) =
+    Test.register
+      ~__FILE__
+      ~title
+      ~tags:[proto_name; "baker"; "mockup"; Tag.time_sensitive]
+    @@ fun () ->
+    let*! () = Lazy.force t in
+    let*! r = test () in
+    match r with
+    | Ok () -> unit
+    | Error errs -> Test.fail ~__LOC__ "%a" pp_print_trace errs
+  in
+  List.iter
+    register_test
+    [
+      (Protocol.name ^ ": reaches level 5", test_level_5);
+      ( Protocol.name ^ ": cannot progress without new head",
+        test_preendorse_on_valid );
+      (Protocol.name ^ ": reset delayed pqc", test_reset_delayed_pqc);
+      (Protocol.name ^ ": scenario t1", test_scenario_t1);
+      (Protocol.name ^ ": scenario t2", test_scenario_t2);
+      (Protocol.name ^ ": scenario t3", test_scenario_t3);
+      (Protocol.name ^ ": scenario t4", test_scenario_t4);
+      (Protocol.name ^ ": scenario f1", test_scenario_f1);
+      (Protocol.name ^ ": scenario f2", test_scenario_f2);
+      (Protocol.name ^ ": scenario m1", test_scenario_m1);
+      (Protocol.name ^ ": scenario m2", test_scenario_m2);
+      (Protocol.name ^ ": scenario m3", test_scenario_m3);
+      (Protocol.name ^ ": scenario m4", test_scenario_m4);
+      (Protocol.name ^ ": scenario m5", test_scenario_m5);
+      (Protocol.name ^ ": scenario m6", test_scenario_m6);
+      (Protocol.name ^ ": scenario m7", test_scenario_m7);
+      (Protocol.name ^ ": scenario m8", test_scenario_m8);
+      (Protocol.name ^ ": scenario m9", test_scenario_m9);
+      (Protocol.name ^ ": scenario m10", test_scenario_m10);
+    ]

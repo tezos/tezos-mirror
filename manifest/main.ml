@@ -1983,11 +1983,12 @@ let octez_event_logging_test_helpers =
     ~deps:
       [
         octez_stdlib;
-        octez_lwt_result_stdlib;
+        octez_lwt_result_stdlib |> open_;
         data_encoding;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_event_logging |> open_;
         octez_test_helpers |> open_;
+        tezt_core_lib |> open_;
         alcotezt;
       ]
     ~js_compatible:true
@@ -6326,7 +6327,7 @@ let hash = Protocol.hash
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_protocol_environment |> if_ N.(number <= 011);
-            octez_test_helpers |> if_ N.(number <= 011);
+            octez_test_helpers |> open_;
             octez_micheline |> open_;
             client |> if_some |> open_;
             main |> open_;
@@ -6337,7 +6338,7 @@ let hash = Protocol.hash
             baking |> open_;
             parameters |> if_some |> if_ N.(number >= 012);
             octez_crypto |> if_ N.(number >= 012);
-            alcotezt;
+            octez_event_logging_test_helpers |> open_;
             uri;
           ]
     in
@@ -6977,7 +6978,6 @@ let octez_store_tests =
       "test_store";
       "test_testchain";
       "test_utils";
-      "tezt_sink";
       "assert_lib";
     ]
     ~path:"src/lib_store/unix/test"
@@ -7005,6 +7005,7 @@ let octez_store_tests =
         alcotezt;
         tezt_lib;
         octez_test_helpers |> open_;
+        octez_event_logging_test_helpers |> open_;
       ]
 
 (* [_octez_bench_store_lib_tests_exe] is a bench for the store locator,
