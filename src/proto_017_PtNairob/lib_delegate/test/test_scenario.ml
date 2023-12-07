@@ -592,7 +592,8 @@ let test_scenario_t4 () =
   let config =
     {
       default_config with
-      initial_seed = None;
+      initial_seed =
+        some_seed "rngG9pS9mbDWnz6YLUFrd8sbb9KMUzfAUMpSpnxNHY9BFnSB8L3zq";
       delegate_selection =
         [
           (1l, [(0l, bootstrap1); (1l, bootstrap2)]);
