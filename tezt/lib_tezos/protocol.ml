@@ -329,13 +329,21 @@ let add_to_test_parameters protocol title tags uses =
   let uses = match uses with None -> [] | Some uses -> uses protocol in
   (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
 
-let register_test ~__FILE__ ~title ~tags ?uses ?supports body protocols =
+let register_test ~__FILE__ ~title ~tags ?uses ?uses_client ?uses_admin_client
+    ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
-  Test.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
+  Test.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses
+    ?uses_client
+    ?uses_admin_client
+    (fun () -> body protocol)
 
-let register_long_test ~__FILE__ ~title ~tags ?uses ?supports ?team ~executors
-    ~timeout body protocols =
+let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_client
+    ?uses_admin_client ?supports ?team ~executors ~timeout body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
   Long_test.register
@@ -343,16 +351,25 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?supports ?team ~executors
     ~title
     ~tags
     ~uses
+    ?uses_client
+    ?uses_admin_client
     ?team
     ~executors
     ~timeout
     (fun () -> body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ?uses ?supports body
-    protocols =
+let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_client
+    ?uses_admin_client ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
-  Regression.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
+  Regression.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses
+    ?uses_client
+    ?uses_admin_client
+    (fun () -> body protocol)
 
 let with_predecessor f protocol =
   match previous_protocol protocol with

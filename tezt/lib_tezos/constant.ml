@@ -24,9 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let octez_client = "./octez-client"
+(* Some constants such as [octez_client] are automatically added to [~uses],
+   so they have to be defined in the wrapper library.
+   [Constant] merely provides an alias. *)
+let octez_client = Uses.octez_client
 
-let octez_admin_client = "./octez-admin-client"
+let octez_admin_client = Uses.octez_admin_client
 
 let octez_node = "./octez-node"
 
