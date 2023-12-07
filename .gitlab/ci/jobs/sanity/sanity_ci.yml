@@ -4,6 +4,7 @@ sanity_ci:
     - .image_template__runtime_prebuild_dependencies
   stage: sanity
   script:
+    - eval $(opam env)
     - ./scripts/ci/take_ownership.sh
     - make -C manifest check
     - ./scripts/lint.sh --check-gitlab-ci-yml

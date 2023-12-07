@@ -11,6 +11,7 @@ script:snapshot_alpha_and_link:
   stage: test
   before_script:
     - . ./scripts/version.sh
+    - eval $(opam env)
   needs:
     - "build_x86_64-released"
     - "build_x86_64-exp-dev-extra"
@@ -37,6 +38,7 @@ script:test-gen-genesis:
   needs: [trigger]
   before_script:
     - cd scripts/gen-genesis
+    - eval $(opam env)
   script:
     - dune build gen_genesis.exe
 

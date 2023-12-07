@@ -2,6 +2,8 @@
 
 set -eu
 
+eval "$(opam env)"
+
 if [ -z "${build_deps_image_name}" ]; then echo "build_deps_image_name is unset" && exit 3; fi
 if [ -z "${build_deps_image_version}" ]; then echo "build_deps_image_version is unset" && exit 3; fi
 
