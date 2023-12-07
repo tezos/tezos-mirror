@@ -60,7 +60,7 @@ type ('key, 'value) layout = {
     Besides implementing a key-value store, this module must properly
     handle resource utilization, especially file descriptors.
 
-    The structure [File.t] guarantees that no more than the specified
+    The structure {!Files.t} guarantees that no more than the specified
     [lru_size] file descriptors can be open at the same time.
 
     This modules also enables each file to come with its own layout.
@@ -107,6 +107,8 @@ end = struct
      With a true bitset, we'd have [max_number_of_keys/8] *)
   let bitset_size = max_number_of_keys
 
+  (* A handle to a physical file. The [bitset] encodes which keys have been
+     written to. *)
   type handle = {fd : Lwt_unix.file_descr; bitset : Lwt_bytes.t}
 
   let key_exists handle index = handle.bitset.{index} <> '\000'
@@ -163,7 +165,15 @@ end = struct
         match Lwt.state p with Return () | Fail _ -> false | Sleep -> true)
       l
 
-  (* The type of files. The domains of [handles] and [lru] should be
+  (* The type of files.
+
+     [handles] is a hash table of file handles with pending callbacks (ongoing
+     writes/reads) in order to ensure that these pending operations are resolved
+     before we evict a key from the LRU.
+
+     [lru] is the current cache of open, memory-mapped files.
+
+     The domains of [handles] and [lru] should be
      the same, before and after calling the functions [write] and
      [read] in this module. *)
   type 'value t = {
