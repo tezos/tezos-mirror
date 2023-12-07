@@ -1023,7 +1023,7 @@ let test_gc variant ~challenge_window ~commitment_period ~history_mode =
    - we import the snapshot in the second and a fresh rollup node
    - we ensure they are all synchronized
    - we also try to import invalid snapshots to make sure they are rejected. *)
-let test_snapshots ~challenge_window ~commitment_period ~history_mode =
+let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
@@ -1032,9 +1032,12 @@ let test_snapshots ~challenge_window ~commitment_period ~history_mode =
       description =
         sf "snapshot can be exported and checked (%s)" history_mode_str;
     }
+    ~kind
     ~challenge_window
     ~commitment_period
   @@ fun _protocol sc_rollup_node _rollup_client sc_rollup node client ->
+  (* Originate another rollup for sanity checks *)
+  let* other_rollup = originate_sc_rollup ~alias:"other_rollup" ~kind client in
   (* We want to produce snapshots for rollup node which have cemented
      commitments *)
   let* level = Node.get_level node in
@@ -1052,11 +1055,16 @@ let test_snapshots ~challenge_window ~commitment_period ~history_mode =
   let rollup_node_3 =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
   in
+  let rollup_node_4 =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
   let* () = Sc_rollup_node.run ~history_mode rollup_node_2 sc_rollup [] in
+  let* () = Sc_rollup_node.run ~history_mode rollup_node_4 other_rollup [] in
   let rollup_node_processing =
     let* () = bake_levels stop_rollup_node_2_levels client in
     Log.info "Stopping rollup node 2 before snapshot is made." ;
     let* () = Sc_rollup_node.terminate rollup_node_2 in
+    let* () = Sc_rollup_node.terminate rollup_node_4 in
     let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
     let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
     unit
@@ -1070,6 +1078,15 @@ let test_snapshots ~challenge_window ~commitment_period ~history_mode =
   if not exists then
     Test.fail ~__LOC__ "Snapshot file %s does not exist" snapshot_file ;
   let* () = rollup_node_processing in
+  Log.info "Try importing snapshot for wrong rollup." ;
+  let*? process_other =
+    Sc_rollup_node.import_snapshot rollup_node_4 ~snapshot_file
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "The existing rollup node is for")
+      process_other
+  in
   Log.info "Importing snapshot in empty rollup node." ;
   let*! () = Sc_rollup_node.import_snapshot rollup_node_3 ~snapshot_file in
   (* rollup_node_2 was stopped before so it has data but is late with respect to
