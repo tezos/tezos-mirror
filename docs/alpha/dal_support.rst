@@ -78,7 +78,7 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``attestation_lag`` (4): The timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
 - ``attestation_threshold`` (50): The percentage of shards attested for a given slot to declare the slot available
 - ``blocks_per_epoch`` (1): Unused. Could be removed in the future
-- ``page_size`` (4KiB): The size of a page (see :doc:`../shell/dal_slots`)
-- ``slot_size`` (1MiB): The size of a slot (see :doc:`../shell/dal_slots`)
-- ``redundancy_factor`` (16): The erasure-code factor (see :doc:`../shell/dal_slots`)
-- ``number_of_shards`` (2048): The number of shards per slot (see :doc:`../shell/dal_slots`)
+- ``page_size`` (4KiB): The size of a page (see :ref:`dal_slots`)
+- ``slot_size`` (1MiB): The size of a slot (see :ref:`dal_slots`)
+- ``redundancy_factor`` (16): The erasure-code factor (see :ref:`dal_slots`)
+- ``number_of_shards`` (2048): The number of shards per slot (see :ref:`dal_slots`)

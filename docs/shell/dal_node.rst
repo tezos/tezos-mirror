@@ -9,7 +9,7 @@ Concepts and features
 DAL P2P network
 ^^^^^^^^^^^^^^^
 
-The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :doc:`the DAL's P2P protocol <./dal_p2p>` is based on a gossip algorithm for distributing shards, running on top of a networking layer using the same p2p library as L1 nodes.
+The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :ref:`the DAL's P2P protocol <dal_p2p>` is based on a gossip algorithm for distributing shards, running on top of a networking layer using the same p2p library as L1 nodes.
 
 Actors with various roles may need to run the DAL node, for instance bootstrap DAL node operators, slot producers, bakers.
 
@@ -109,7 +109,7 @@ The life cycle of slots and shards is described by the following steps:
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>
 
-#. Once the operation is included in a final block (that is, there is another block on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :doc:`./dal_p2p`), and they store previously unknown shards.
+#. Once the operation is included in a final block (that is, there is another block on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
 #. Attesters check, for all published slots, the availability of the shards they are assigned by interrogating their DAL node, via the RPC ``GET /profiles/<pkh>/attested_levels/<level>/attestable_slots``, where level is the level at which the slot was published plus ``attestation_lag``, and ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
 #. Attesters inject via their baker binary a DAL attestation operation containing the information received at step 6. (See also :doc:`dal_bakers`)
 #. The protocol aggregates the received DAL attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.

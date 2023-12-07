@@ -2,7 +2,7 @@ Bakers & the DAL
 ================
 
 This page documents some aspects that are most useful to know for bakers when participating to the DAL network (baking the DAL is a serious matter!).
-We assume the reader is familiar with the DAL basics and terminology introduced in :doc:`./dal_overview` and :doc:`./dal_slots`.
+We assume the reader is familiar with the DAL basics and terminology introduced in :doc:`./dal_overview` and :ref:`dal_slots`.
 
 Bakers play a crucial role in Tezos through the Tenderbake protocol, by validating transactions and securing the network. This participation involves producing new blocks when assigned the rights by the protocol, attesting proposed valid blocks to make the chain progress, and (indirectly) slashing misbehavior that would put the chain at risk. Due to their strategic role in Tezos, entrusting them with verifying and attesting data availability using the DAL is natural.
 
