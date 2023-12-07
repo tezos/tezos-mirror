@@ -19,7 +19,7 @@ use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::rlp_helpers::{decode_array, decode_field, decode_tx_hash, next};
+use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
@@ -153,23 +153,17 @@ pub struct KernelUpgrade {
 
 impl Decodable for KernelUpgrade {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 1 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-        let mut preimage_hash = [0u8; PREIMAGE_HASH_SIZE];
+        let hash: Vec<u8> = decoder.as_val()?;
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hash
+            .try_into()
+            .map_err(|_| DecoderError::RlpInvalidLength)?;
 
-        let mut it = decoder.iter();
-        decode_array(next(&mut it)?, PREIMAGE_HASH_SIZE, &mut preimage_hash)?;
         Ok(Self { preimage_hash })
     }
 }
 
 impl Encodable for KernelUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(1);
         stream.append_iter(self.preimage_hash);
     }
 }
