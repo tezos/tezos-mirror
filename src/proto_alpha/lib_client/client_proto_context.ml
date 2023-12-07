@@ -731,6 +731,7 @@ let batch_transfer_operation_encoding =
        (opt "entrypoint" Entrypoint.simple_encoding))
 
 let read_key key =
+  let open Lwt_result_syntax in
   match Bip39.of_words key.mnemonic with
   | None -> failwith ""
   | Some t ->

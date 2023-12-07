@@ -28,6 +28,7 @@ open Protocol_client_context
 open Tezos_micheline
 
 let return_single_manager_result (oph, _, op, result) =
+  let open Lwt_result_syntax in
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
