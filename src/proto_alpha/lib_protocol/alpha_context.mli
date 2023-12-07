@@ -2279,17 +2279,17 @@ module Delegate : sig
   val prepare_stake_distribution : context -> context tzresult Lwt.t
 
   module Rewards : sig
-    val baking_reward_fixed_portion : t -> Tez.t
+    val baking_reward_fixed_portion : t -> Tez.t tzresult
 
-    val baking_reward_bonus_per_slot : t -> Tez.t
+    val baking_reward_bonus_per_slot : t -> Tez.t tzresult
 
-    val attesting_reward_per_slot : t -> Tez.t
+    val attesting_reward_per_slot : t -> Tez.t tzresult
 
-    val liquidity_baking_subsidy : t -> Tez.t
+    val liquidity_baking_subsidy : t -> Tez.t tzresult
 
-    val seed_nonce_revelation_tip : t -> Tez.t
+    val seed_nonce_revelation_tip : t -> Tez.t tzresult
 
-    val vdf_revelation_tip : t -> Tez.t
+    val vdf_revelation_tip : t -> Tez.t tzresult
 
     module For_RPC : sig
       type reward_kind =
@@ -2307,7 +2307,10 @@ module Delegate : sig
           It verifies [reward_from_constants ~coeff csts ~reward_kind =
           coeff * reward_from_constants csts ~reward_kind]. *)
       val reward_from_constants :
-        ?coeff:Q.t -> Constants.Parametric.t -> reward_kind:reward_kind -> Tez.t
+        ?coeff:Q.t ->
+        Constants.Parametric.t ->
+        reward_kind:reward_kind ->
+        Tez.t tzresult
 
       (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
           from the storage.

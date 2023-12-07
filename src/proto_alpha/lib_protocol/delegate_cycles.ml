@@ -52,7 +52,7 @@ let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
 
 let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   let open Lwt_result_syntax in
-  let attesting_reward_per_slot =
+  let*? attesting_reward_per_slot =
     Delegate_rewards.attesting_reward_per_slot ctxt
   in
   let unrevealed_nonces_set =

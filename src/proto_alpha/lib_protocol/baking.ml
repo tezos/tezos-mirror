@@ -61,7 +61,7 @@ let () =
 let bonus_baking_reward ctxt ~attestation_power =
   let open Result_syntax in
   let consensus_threshold = Constants.consensus_threshold ctxt in
-  let baking_reward_bonus_per_slot =
+  let* baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
   let extra_attestation_power = attestation_power - consensus_threshold in

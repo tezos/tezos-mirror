@@ -99,7 +99,7 @@ let double_preattestation ctxt ?(correct_order = true) op1 op2 =
     delegate and exposed by a double_attestation operation. Also verify
     that punishment is operated. *)
 let test_valid_double_attestation_evidence () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let constants =
     {
       Default_parameters.constants_test with
@@ -180,7 +180,7 @@ let test_valid_double_attestation_evidence () =
   (* Check that [baker] is rewarded with:
      - baking_reward_fixed_portion for baking and,
      - half of the frozen_deposits for including the evidence *)
-  let baking_reward =
+  let*?@ baking_reward =
     Delegate.Rewards.For_RPC.reward_from_constants
       constants
       ~reward_kind:Baking_reward_fixed_portion

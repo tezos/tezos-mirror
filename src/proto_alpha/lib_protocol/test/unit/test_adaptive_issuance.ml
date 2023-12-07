@@ -35,12 +35,13 @@ open Protocol
 open Alpha_context
 
 let test_reward_coefficient () =
+  let open Lwt_result_wrap_syntax in
   let csts = Default_parameters.constants_test in
-  let default =
+  let*?@ default =
     Delegate.Rewards.For_RPC.(
       reward_from_constants csts ~reward_kind:Baking_reward_fixed_portion)
   in
-  let default_times_4 =
+  let*?@ default_times_4 =
     Delegate.Rewards.For_RPC.(
       reward_from_constants
         ~coeff:(Q.of_int 4)

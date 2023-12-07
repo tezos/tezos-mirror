@@ -204,7 +204,7 @@ module For_RPC = struct
         let Ratio_repr.{numerator; denominator} =
           Constants_storage.minimal_participation_ratio ctxt
         in
-        let attesting_reward_per_slot =
+        let*? attesting_reward_per_slot =
           Delegate_rewards.attesting_reward_per_slot ctxt
         in
         let minimal_cycle_activity =

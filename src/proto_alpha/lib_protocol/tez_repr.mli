@@ -41,9 +41,9 @@ type t = Tez_tag of repr [@@ocaml.unboxed]
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
-  | Multiplication_overflow of t * int64 (* `Temporary *)
-  | Negative_multiplicator of t * int64 (* `Temporary *)
-  | Invalid_divisor of t * int64 (* `Temporary *)
+  | Multiplication_overflow of t * Z.t (* `Temporary *)
+  | Negative_multiplicator of t * Z.t (* `Temporary *)
+  | Invalid_divisor of t * Z.t (* `Temporary *)
 
 val zero : t
 
@@ -75,6 +75,13 @@ val div2 : t -> t
     [rounding] controls the rounding of the division. *)
 val mul_ratio :
   rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
+
+(** [mul_ratio_z] is the same as [mul_ratio], but takes [Z.t] as arguments *)
+val mul_ratio_z :
+  rounding:[`Down | `Up] -> t -> num:Z.t -> den:Z.t -> t tzresult
+
+(** [mul_q] is the same as [mul_ratio_z], but takes a [Q.t] as an argument *)
+val mul_q : rounding:[`Down | `Up] -> t -> Q.t -> t tzresult
 
 (** [mul_percentage tez percentage] returns [tez * percentage / 100].
     No errors can happen. *)
