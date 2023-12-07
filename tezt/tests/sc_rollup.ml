@@ -1098,6 +1098,16 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   and* () = Sc_rollup_node.run ~history_mode rollup_node_3 sc_rollup [] in
   let* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_2
   and* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_3 in
+  Log.info "Try importing outdated snapshot." ;
+  let* () = Sc_rollup_node.terminate rollup_node_2 in
+  let*? outdated =
+    Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "The rollup node is already at level")
+      outdated
+  in
   unit
 
 (* One can retrieve the list of originated SCORUs.
