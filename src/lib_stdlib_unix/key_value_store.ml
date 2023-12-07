@@ -100,12 +100,12 @@ end = struct
     let hash = Hashtbl.hash
   end)
 
-  let max_number_of_files = 4096
+  let max_number_of_keys = 4096
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
      For now the bitset is a byte set...
-     With a true bitset, we'd have [max_number_of_files/8] *)
-  let bitset_size = max_number_of_files
+     With a true bitset, we'd have [max_number_of_keys/8] *)
+  let bitset_size = max_number_of_keys
 
   type handle = {fd : Lwt_unix.file_descr; bitset : Lwt_bytes.t}
 
@@ -119,7 +119,7 @@ end = struct
        code below should be on the order of a few tenth of a millisecond
        on a Linux system. *)
     let fd = Unix.openfile path [O_RDWR; O_CREAT; O_EXCL; O_CLOEXEC] 0o660 in
-    let total_size = bitset_size + (max_number_of_files * value_size) in
+    let total_size = bitset_size + (max_number_of_keys * value_size) in
     try
       Unix.ftruncate fd total_size ;
       let bitset = Lwt_bytes.map_file ~fd ~shared:true ~size:bitset_size () in
