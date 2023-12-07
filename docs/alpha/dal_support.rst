@@ -16,7 +16,7 @@ DAL publish slot header
 - Commitment: The `KZG commitment <https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html>`__ over the data.
 - Commitment proof: A proof that the commitment commits over data that does not exceed the size ``slot_size``.
 
-Users can create and manage these commitments and proofs through the :doc:`DAL node <dal_node>` using these RPCs:
+Users can create and manage these commitments and proofs through the :doc:`DAL node <../shell/dal_node>` using these RPCs:
 
 - To create a commitment: ``POST /commitment``
 - To retrieve a commitment’s proof: ``GET /commitments/<commitment>/proof``

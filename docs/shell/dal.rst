@@ -15,4 +15,4 @@ The following pages provide an overview of the DAL and cover its different aspec
 
 See also:
 
-- :doc:`Protocol support for the DAL <../alpha/dal_support>`.
+- :doc:`Protocol support for the DAL <../alpha/dal_support>`
