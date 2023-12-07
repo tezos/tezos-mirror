@@ -626,6 +626,18 @@ pub(crate) fn typecheck_instruction<'a>(
             pop!();
             I::Add(overloads::Add::MutezMutez)
         }
+        (App(ADD, [], _), [.., T::Bls12381Fr, T::Bls12381Fr]) => {
+            pop!();
+            I::Add(overloads::Add::Bls12381Fr)
+        }
+        (App(ADD, [], _), [.., T::Bls12381G1, T::Bls12381G1]) => {
+            pop!();
+            I::Add(overloads::Add::Bls12381G1)
+        }
+        (App(ADD, [], _), [.., T::Bls12381G2, T::Bls12381G2]) => {
+            pop!();
+            I::Add(overloads::Add::Bls12381G2)
+        }
         (App(ADD, [], _), [.., _, _]) => no_overload!(ADD),
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -838,7 +850,11 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(INT, [], _), [.., T::Nat]) => {
             stack[0] = Type::Int;
-            I::Int
+            I::Int(overloads::Int::Nat)
+        }
+        (App(INT, [], _), [.., T::Bls12381Fr]) => {
+            stack[0] = Type::Int;
+            I::Int(overloads::Int::Bls12381Fr)
         }
         (App(INT, [], _), [.., _]) => no_overload!(INT),
         (App(INT, [], _), []) => no_overload!(INT, len 1),
@@ -1955,13 +1971,26 @@ mod typecheck_tests {
     }
 
     #[test]
-    fn test_int() {
+    fn test_int_nat() {
         let mut stack = tc_stk![Type::Nat];
         let expected_stack = tc_stk![Type::Int];
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
-            Ok(Int)
+            Ok(Int(overloads::Int::Nat))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+    }
+
+    #[test]
+    fn test_int_bls12_381_fr() {
+        let mut stack = tc_stk![Type::Bls12381Fr];
+        let expected_stack = tc_stk![Type::Int];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
+            Ok(Int(overloads::Int::Bls12381Fr))
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
@@ -2216,6 +2245,45 @@ mod typecheck_tests {
                 reason: None
             })
         );
+    }
+
+    #[test]
+    fn test_add_bls12_381_fr() {
+        let mut stack = tc_stk![Type::Bls12381Fr, Type::Bls12381Fr];
+        let expected_stack = tc_stk![Type::Bls12381Fr];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            Ok(Add(overloads::Add::Bls12381Fr))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+    }
+
+    #[test]
+    fn test_add_bls12_381_g1() {
+        let mut stack = tc_stk![Type::Bls12381G1, Type::Bls12381G1];
+        let expected_stack = tc_stk![Type::Bls12381G1];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            Ok(Add(overloads::Add::Bls12381G1))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+    }
+
+    #[test]
+    fn test_add_bls12_381_g2() {
+        let mut stack = tc_stk![Type::Bls12381G2, Type::Bls12381G2];
+        let expected_stack = tc_stk![Type::Bls12381G2];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            Ok(Add(overloads::Add::Bls12381G2))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]

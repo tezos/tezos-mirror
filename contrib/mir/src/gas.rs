@@ -232,8 +232,12 @@ pub mod interpret_cost {
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
     pub const INT_NAT: u32 = 10;
+    pub const INT_BLS_FR: u32 = 115;
     pub const PUSH: u32 = 10;
     pub const ADD_TEZ: u32 = 20;
+    pub const ADD_BLS_FR: u32 = 30;
+    pub const ADD_BLS_G1: u32 = 900;
+    pub const ADD_BLS_G2: u32 = 2470;
     pub const UNIT: u32 = 10;
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;
