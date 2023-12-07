@@ -629,12 +629,12 @@ let register () =
   register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
-      let csts = (Constants.all ctxt).parametric in
       let last_unslashable_cycle =
         Option.value ~default:Cycle.root
         @@ Cycle.sub
              ctxt_cycle
-             (csts.preserved_cycles + Constants_repr.max_slashing_period)
+             (Constants.slashable_deposits_period ctxt
+             + Constants_repr.max_slashing_period)
       in
       let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
       let* requests =

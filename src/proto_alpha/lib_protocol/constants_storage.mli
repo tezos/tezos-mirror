@@ -182,3 +182,7 @@ val tolerated_inactivity_period : Raw_context.t -> int
 
 (** Delay before the activation of a consensus key, in cycles *)
 val consensus_key_activation_delay : Raw_context.t -> int
+
+(** Period, in cycles, during which frozen tokens remain slashable after the
+    cycle of their deposit *)
+val slashable_deposits_period : Raw_context.t -> int

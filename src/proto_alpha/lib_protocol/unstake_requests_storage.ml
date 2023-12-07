@@ -68,9 +68,12 @@ let prepared_finalize_unstake_encoding :
        (req "finalizable" finalizable_encoding)
        (req "unfinalizable" stored_requests_encoding))
 
-let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
+let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
+    =
   let first_cycle_to_apply_slash = from_cycle in
-  let last_cycle_to_apply_slash = Cycle_repr.add from_cycle preserved_cycles in
+  let last_cycle_to_apply_slash =
+    Cycle_repr.add from_cycle slashable_deposits_period
+  in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
   List.fold_left
     (fun remain (slashing_cycle, slashing_percentage) ->
@@ -91,9 +94,13 @@ let apply_slashes ~preserved_cycles slashing_history ~from_cycle amount =
 let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
     contract =
   let open Lwt_result_syntax in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
   let max_slashing_period = Constants_repr.max_slashing_period in
-  let preserved_plus_slashing = preserved_cycles + max_slashing_period in
+  let slashable_plus_denunciation_delay =
+    slashable_deposits_period + max_slashing_period
+  in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let current_cycle =
     if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
@@ -103,7 +110,7 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
   match requests_opt with
   | None | Some {delegate = _; requests = []} -> return_none
   | Some {delegate; requests} -> (
-      match Cycle_repr.sub current_cycle preserved_plus_slashing with
+      match Cycle_repr.sub current_cycle slashable_plus_denunciation_delay with
       | None (* no finalizable cycle *) ->
           return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->
@@ -122,7 +129,7 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
                 if Cycle_repr.(request_cycle <= greatest_finalizable_cycle) then
                   let new_amount =
                     apply_slashes
-                      ~preserved_cycles
+                      ~slashable_deposits_period
                       slashing_history
                       ~from_cycle:request_cycle
                       request_amount
@@ -162,7 +169,9 @@ module For_RPC = struct
     let current_level = Raw_context.current_level ctxt in
     let cycle_eras = Raw_context.cycle_eras ctxt in
     let is_last_of_cycle = Level_repr.last_of_cycle ~cycle_eras current_level in
-    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    let slashable_deposits_period =
+      Constants_storage.slashable_deposits_period ctxt
+    in
     let* slashing_history_opt =
       Storage.Contract.Slashed_deposits.find
         ctxt
@@ -239,7 +248,7 @@ module For_RPC = struct
       (fun (request_cycle, request_amount) ->
         let new_amount =
           apply_slashes
-            ~preserved_cycles
+            ~slashable_deposits_period
             slashing_history
             ~from_cycle:request_cycle
             request_amount
