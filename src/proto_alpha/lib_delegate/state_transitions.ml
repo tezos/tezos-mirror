@@ -597,8 +597,9 @@ let propose_block_action state delegate round ~last_proposal =
           List.fold_left
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
-            (List.map Operation.pack proposal.block.quorum
-            @ List.map Operation.pack prequorum.preattestations)
+            ((List.map Operation.pack proposal.block.quorum
+             @ List.map Operation.pack prequorum.preattestations)
+            @ List.map Operation.pack proposal.block.dal_attestations)
         in
         let attestation_filter =
           {
