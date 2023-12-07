@@ -111,3 +111,33 @@ val information : t -> Worker_types.worker_information
 val pipeline_length : t -> int
 
 val rpc_directory : t option Tezos_rpc.Directory.t
+
+module Internal_for_tests : sig
+  module Tools : sig
+    type tools = {
+      advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
+      chain_tools : Store.Block.t Prevalidator_classification.chain_tools;
+      fetch :
+        ?peer:P2p_peer.Id.t ->
+        ?timeout:Time.System.Span.t ->
+        Operation_hash.t ->
+        Operation.t tzresult Lwt.t;
+      read_block : Block_hash.t -> Store.Block.t tzresult Lwt.t;
+      send_get_current_head : ?peer:P2p_peer_id.t -> unit -> unit;
+      set_mempool : head:Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
+    }
+  end
+
+  val mk_chain_tools :
+    Distributed_db.chain_db ->
+    Store.Block.t Prevalidator_classification.chain_tools
+
+  val create :
+    Tools.tools ->
+    Shell_limits.prevalidator_limits ->
+    (module Protocol_plugin.T) ->
+    Distributed_db.chain_db ->
+    t tzresult Lwt.t
+
+  val advertise_mempool : t -> unit Lwt.t
+end

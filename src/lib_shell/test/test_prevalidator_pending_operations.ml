@@ -37,44 +37,91 @@ module CompareListQ = Compare.List (Q)
 
 let pending_of_list =
   List.fold_left
-    (fun pendings ((op : _ Shell_operation.operation), priority) ->
+    (fun pendings ((op : _ Shell_operation.operation), status_and_priority) ->
       if Operation_hash.Set.mem op.hash (Pending_ops.hashes pendings) then
         (* no duplicate hashes *)
         pendings
-      else Pending_ops.add op priority pendings)
+      else Pending_ops.add op status_and_priority pendings)
     Pending_ops.empty
 
 (* 1. Test iterators ordering *)
+
+let pp_priority fmt = function
+  | Pending_ops.High -> Format.fprintf fmt "high"
+  | Medium -> Format.fprintf fmt "medium"
+  | Low _ -> Format.fprintf fmt "low"
+
+let pp_status fmt = function
+  | Pending_ops.Fresh -> Format.fprintf fmt "fresh"
+  | Reclassified -> Format.fprintf fmt "reclassified"
+
+let pp_status_and_priority fmt status_and_priority =
+  Format.fprintf
+    fmt
+    "{status:%a;priority:%a}"
+    pp_status
+    status_and_priority.Pending_ops.status
+    pp_priority
+    status_and_priority.priority
 
 let test_iterators_ordering ~name ~iterator return_value =
   let open QCheck2 in
   Test.make
     ~name:
       (Format.sprintf
-         "Ensure that %s returns operations in their priority ordering"
+         "Ensure that %s returns operations in their status and priority \
+          ordering"
          name)
-    (Gen.small_list (Generators.operation_with_hash_and_priority_gen ()))
+    (Gen.small_list
+       (Generators.operation_with_hash_and_status_and_priority_gen ()))
   @@ fun ops ->
-  let previous_priority = ref `High in
-  let previous_prio_ok ~priority ~previous_priority =
-    match (previous_priority, priority) with
-    | `High, `High -> true
-    | (`High | `Medium), `Medium -> true
-    | (`High | `Medium), `Low _ -> true
-    | `Low q_prev, `Low q_new -> CompareListQ.(q_new <= q_prev)
+  let previous_status_and_priority =
+    ref Pending_ops.{status = Fresh; priority = High}
+  in
+  let compare_prio p1 p2 =
+    let open Pending_ops in
+    match (p1, p2) with
+    | High, (High | Medium | Low _) -> true
+    | Medium, (Medium | Low _) -> true
+    | Pending_ops.Low q_prev, Pending_ops.Low q_new ->
+        CompareListQ.(q_new <= q_prev)
     | _, _ -> false
   in
+  let previous_prio_ok ~status_and_priority ~previous_status_and_priority =
+    match
+      ( previous_status_and_priority.Pending_ops.status,
+        status_and_priority.Pending_ops.status )
+    with
+    | Fresh, Reclassified -> true
+    | Fresh, Fresh ->
+        compare_prio
+          previous_status_and_priority.priority
+          status_and_priority.priority
+    | Reclassified, Fresh -> false
+    | Pending_ops.Reclassified, Reclassified ->
+        compare_prio
+          previous_status_and_priority.priority
+          status_and_priority.priority
+  in
   iterator
-    (fun priority _hash _op () ->
+    (fun status_and_priority _hash _op () ->
       (* Here, we check the priority ordering in the iterators of
          prevalidator_pending_operations module : if the current considered
          priority is `High, it should be true that the previously seen is also
          `High. *)
-      if not @@ previous_prio_ok ~priority ~previous_priority:!previous_priority
+      if
+        not
+        @@ previous_prio_ok
+             ~status_and_priority
+             ~previous_status_and_priority:!previous_status_and_priority
       then
         QCheck.Test.fail_reportf
-          "Pending operations are not ordered by priority" ;
-      previous_priority := priority ;
+          "Pending operations are not ordered by priority: %a < %a"
+          pp_status_and_priority
+          status_and_priority
+          pp_status_and_priority
+          !previous_status_and_priority ;
+      previous_status_and_priority := status_and_priority ;
       return_value)
     (pending_of_list ops)
     ()
@@ -102,7 +149,8 @@ let test_partial_fold_es =
   Test.make
     ~name:"Test cardinal after partial iteration with fold_es"
     (Gen.pair
-       (Gen.small_list (Generators.operation_with_hash_and_priority_gen ()))
+       (Gen.small_list
+          (Generators.operation_with_hash_and_status_and_priority_gen ()))
        Gen.small_nat)
   @@ fun (ops, to_process) ->
   let pending = pending_of_list ops in

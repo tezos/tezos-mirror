@@ -106,20 +106,13 @@ module Tools = struct
   (** Functions provided by {!Distributed_db} and {!Store.chain_store}
       that are used in various places of the mempool. Gathered here so that we can test
       the mempool without requiring a full-fledged [Distributed_db]/[Store.Chain_store]. *)
-  type 'prevalidation_t tools = {
+  type tools = {
     advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
         (** [advertise_current_head mempool head] sends a
             [Current_head (chain_id, head_header, mempool)] message to all known
             active peers for the chain being considered. *)
     chain_tools : Store.Block.t Classification.chain_tools;
         (** Lower-level tools provided by {!Prevalidator_classification} *)
-    flush :
-      head:Store.Block.t ->
-      timestamp:Time.Protocol.t ->
-      'prevalidation_t ->
-      'prevalidation_t tzresult Lwt.t;
-        (** Create a new empty prevalidation state, recycling some elements
-            of the provided previous prevalidation state. *)
     fetch :
       ?peer:P2p_peer.Id.t ->
       ?timeout:Time.System.Span.t ->
@@ -156,9 +149,16 @@ module Tools = struct
   }
 end
 
-type 'a parameters = {
+type 'prevalidation_t parameters = {
   limits : Shell_limits.prevalidator_limits;
-  tools : 'a Tools.tools;
+  tools : Tools.tools;
+  flush :
+    head:Store.Block.t ->
+    timestamp:Time.Protocol.t ->
+    'prevalidation_t ->
+    'prevalidation_t tzresult Lwt.t;
+      (** Create a new empty prevalidation state, recycling some elements
+            of the provided previous prevalidation state. *)
 }
 
 (** The type needed for the implementation of [Make] below, but
@@ -370,7 +370,9 @@ module Make_s
        on an "harmless" field of [types_state_shell]: [operation_stream] *)
     Lwt_watcher.notify operation_stream (classification, op)
 
-  let pre_filter pv ~notifier parsed_op : [Pending_ops.priority | `Drop] Lwt.t =
+  type pre_filter_result = Drop | Priority of Pending_ops.priority
+
+  let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
     let open Lwt_syntax in
     let+ v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
@@ -379,8 +381,8 @@ module Make_s
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        `Drop
-    | `Passed_prefilter priority -> (priority :> [Pending_ops.priority | `Drop])
+        Drop
+    | `Passed_prefilter priority -> Priority priority
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -418,16 +420,21 @@ module Make_s
      operation is accumulated in the given [mempool].
 
      The function returns a tuple
-     [(validation_state, mempool, to_handle)], where:
+     [(validation_state, validated_operation, to_handle)],
+     where:
      - [validation_state] is the (possibly) updated validation_state,
-     - [mempool] is the (possibly) updated mempool,
+     - [validated_operation] is an (operation * bool) option set to [None] if
+     the operation has not been validated. If the operation has been validated
+     the function return [Some (operation,is_advertisable)]. [is_advertisable]
+     is true if the operation must be advertise.
      - [to_handle] contains the given operation and its classification, and all
        operations whose classes are changed/impacted by this classification
        (eg. in case of operation replacement).
   *)
-  let classify_operation shell ~config ~validation_state mempool op :
+  let classify_operation shell ~config ~validation_state
+      (status_and_priority : Pending_ops.status_and_priority) op :
       (prevalidation_t
-      * Mempool.t
+      * (Operation_hash.t * bool) option
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
@@ -441,13 +448,23 @@ module Make_s
         replacements
     in
     let to_handle = (op, classification) :: to_replace in
-    let mempool =
+    let validated_operation =
       match classification with
-      | `Validated -> Mempool.cons_valid op.hash mempool
-      | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ ->
-          mempool
+      | `Validated ->
+          let is_advertisable =
+            match
+              (status_and_priority.status, status_and_priority.priority)
+            with
+            | Fresh, _ | Reclassified, High -> true
+            | Reclassified, Medium | Reclassified, Low _ ->
+                (* Reclassified operations with medium and low priority are not
+                   reclassified *)
+                false
+          in
+          Some (op.hash, is_advertisable)
+      | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ -> None
     in
-    return (v_state, mempool, to_handle)
+    return (v_state, validated_operation, to_handle)
 
   (* Classify pending operations into either:
      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
@@ -470,44 +487,68 @@ module Make_s
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
-        (fun _prio oph op (acc_validation_state, acc_mempool, limit) ->
+        (fun status_and_priority
+             oph
+             op
+             ( acc_validation_state,
+               advertisable_mempool,
+               validated_mempool,
+               limit ) ->
           if limit <= 0 then
             (* Using Error as an early-return mechanism *)
-            Lwt.return_error (acc_validation_state, acc_mempool)
+            Lwt.return_error
+              (acc_validation_state, advertisable_mempool, validated_mempool)
           else (
             shell.pending <- Pending_ops.remove oph shell.pending ;
-            let* new_validation_state, new_mempool, to_handle =
+            let* new_validation_state, validated_operation, to_handle =
               classify_operation
                 shell
                 ~config
                 ~validation_state:acc_validation_state
-                acc_mempool
+                status_and_priority
                 op
             in
             let+ () = Events.(emit operation_reclassified) oph in
             List.iter (handle_classification ~notifier shell) to_handle ;
-            Ok (new_validation_state, new_mempool, limit - 1)))
+            let advertisable_mempool, validated_mempool =
+              match validated_operation with
+              | None -> (advertisable_mempool, validated_mempool)
+              | Some (oph, true) ->
+                  ( Mempool.cons_valid oph advertisable_mempool,
+                    Mempool.cons_valid oph validated_mempool )
+              | Some (oph, false) ->
+                  ( advertisable_mempool,
+                    Mempool.cons_valid oph validated_mempool )
+            in
+            Ok
+              ( new_validation_state,
+                advertisable_mempool,
+                validated_mempool,
+                limit - 1 )))
         shell.pending
-        (state, Mempool.empty, shell.parameters.limits.operations_batch_size)
+        ( state,
+          Mempool.empty,
+          Mempool.empty,
+          shell.parameters.limits.operations_batch_size )
     in
     match r with
-    | Error (state, advertised_mempool) ->
+    | Error (state, advertisable_mempool, validated_mempool) ->
         (* Early return after iteration limit was reached *)
         let* (_was_pushed : bool) =
           shell.worker.push_request Request.Leftover
         in
-        Lwt.return (state, advertised_mempool)
-    | Ok (state, advertised_mempool, _) -> Lwt.return (state, advertised_mempool)
+        Lwt.return (state, advertisable_mempool, validated_mempool)
+    | Ok (state, advertisable_mempool, validated_mempool, _) ->
+        Lwt.return (state, advertisable_mempool, validated_mempool)
 
-  let update_advertised_mempool_fields pv_shell delta_mempool =
+  let update_advertised_mempool_fields pv_shell advertisable_mempool
+      validated_mempool =
     let open Lwt_syntax in
-    if Mempool.is_empty delta_mempool then Lwt.return_unit
-    else
+    if not (Mempool.is_empty advertisable_mempool) then
       (* We only advertise newly classified operations. *)
-      let mempool_to_advertise =
-        Mempool.{delta_mempool with known_valid = delta_mempool.known_valid}
-      in
-      advertise pv_shell mempool_to_advertise ;
+      advertise pv_shell advertisable_mempool ;
+    if Mempool.is_empty validated_mempool then Lwt.return_unit
+    else
       let our_mempool =
         let validated_hashes =
           Classification.Sized_map.fold
@@ -529,7 +570,7 @@ module Make_s
     if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
     else
       let* () = Events.(emit processing_operations) () in
-      let* validation_state, delta_mempool =
+      let* validation_state, advertisable_mempool, validated_mempool =
         classify_pending_operations
           ~notifier
           pv.shell
@@ -537,7 +578,10 @@ module Make_s
           pv.validation_state
       in
       pv.validation_state <- validation_state ;
-      update_advertised_mempool_fields pv.shell delta_mempool
+      update_advertised_mempool_fields
+        pv.shell
+        advertisable_mempool
+        validated_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
@@ -626,8 +670,8 @@ module Make_s
                 parsed_op
             in
             match v with
-            | `Drop -> return_ok_unit
-            | (`High | `Medium | `Low _) as prio ->
+            | Drop -> return_ok_unit
+            | Priority ((High | Medium | Low _) as priority) ->
                 if
                   not
                     (Block_hash.Set.mem
@@ -639,8 +683,12 @@ module Make_s
                 else (
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                      Should this have an influence on the peer's score ? *)
+                  (* The operation has never been handled by the prevalidator,
+                     we add it with a Fresh status in the pending
+                     data-strutcure to be handled with higher priority *)
                   pv.shell.pending <-
-                    Pending_ops.add parsed_op prio pv.shell.pending ;
+                    Pending_ops.(
+                      add parsed_op {status = Fresh; priority} pv.shell.pending) ;
                   return_ok_unit))
 
     let on_inject (pv : types_state) ~force op =
@@ -651,7 +699,7 @@ module Make_s
          - We don't want to call prefilter to get the priority.
          But, this may change in the future
       *)
-      let prio = `High in
+      let status_and_priority = Pending_ops.{status = Fresh; priority = High} in
       if already_handled ~origin:Events.Injected pv.shell oph then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
@@ -671,7 +719,7 @@ module Make_s
                 pv.shell.parameters.tools.chain_tools.inject_operation oph op
               in
               pv.shell.pending <-
-                Pending_ops.add parsed_op prio pv.shell.pending ;
+                Pending_ops.add parsed_op status_and_priority pv.shell.pending ;
               let*! () = Events.(emit operation_injected) oph in
               return_unit)
             else if
@@ -688,12 +736,12 @@ module Make_s
                 op.Operation.shell.branch
             else
               let notifier = mk_notifier pv.operation_stream in
-              let*! validation_state, delta_mempool, to_handle =
+              let*! validation_state, validated_operation, to_handle =
                 classify_operation
                   pv.shell
                   ~config:pv.config
                   ~validation_state:pv.validation_state
-                  Mempool.empty
+                  status_and_priority
                   parsed_op
               in
               let op_status =
@@ -722,11 +770,19 @@ module Make_s
                   pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
-                  let*! v =
-                    update_advertised_mempool_fields pv.shell delta_mempool
+                  let*! () =
+                    match validated_operation with
+                    | None -> Lwt.return_unit
+                    | Some (oph, is_advertisable) ->
+                        update_advertised_mempool_fields
+                          pv.shell
+                          (if is_advertisable then
+                           Mempool.cons_valid oph Mempool.empty
+                          else Mempool.empty)
+                          (Mempool.cons_valid oph Mempool.empty)
                   in
                   let*! () = Events.(emit operation_injected) oph in
-                  return v
+                  return_unit
               | Some
                   ( _h,
                     ( `Branch_delayed e
@@ -771,7 +827,7 @@ module Make_s
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
       let* validation_state =
-        pv.shell.parameters.tools.flush
+        pv.shell.parameters.flush
           ~head:new_predecessor
           ~timestamp
           pv.validation_state
@@ -793,16 +849,23 @@ module Make_s
          does not exist for the moment. *)
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
-          (fun _oph op (pending, nb_pending) ->
+          (fun oph op (pending, nb_pending) ->
             let*! v =
               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
             in
             match v with
-            | `Drop -> Lwt.return (pending, nb_pending)
-            | (`High | `Medium | `Low _) as prio ->
-                (* Here, an operation injected in this node with `High priority will
+            | Drop -> Lwt.return (pending, nb_pending)
+            | Priority ((High | Medium | Low _) as priority) ->
+                (* Here, an operation injected in this node with High priority will
                    now get its approriate priority. *)
-                Lwt.return (Pending_ops.add op prio pending, nb_pending + 1))
+                let status =
+                  (* If the operation has not yet been classified we set its
+                     status to Fresh *)
+                  if Pending_ops.mem oph pv.shell.pending then Pending_ops.Fresh
+                  else Reclassified
+                in
+                Lwt.return
+                  (Pending_ops.add op {status; priority} pending, nb_pending + 1))
           new_pending_operations
           (Pending_ops.empty, 0)
       in
@@ -878,6 +941,8 @@ module type ARG = sig
   val chain_db : Distributed_db.chain_db
 
   val chain_id : Chain_id.t
+
+  val tools : Tools.tools
 end
 
 module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
@@ -1273,39 +1338,6 @@ module Make
         pv.shell.fetching ;
       Lwt.return_unit
 
-    let mk_tools (chain_db : Distributed_db.chain_db) : _ Tools.tools =
-      let advertise_current_head ~mempool bh =
-        Distributed_db.Advertise.current_head chain_db ~mempool bh
-      in
-      let chain_tools = mk_chain_tools chain_db in
-      let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
-      let fetch ?peer ?timeout oph =
-        Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
-      in
-      let read_block bh =
-        let chain_store = Distributed_db.chain_store chain_db in
-        Store.Block.read_block chain_store bh
-      in
-      let send_get_current_head ?peer () =
-        match peer with
-        | None -> Distributed_db.Request.current_head_from_all chain_db
-        | Some peer ->
-            Distributed_db.Request.current_head_from_peer chain_db peer
-      in
-      let set_mempool ~head mempool =
-        let chain_store = Distributed_db.chain_store chain_db in
-        Store.Chain.set_mempool chain_store ~head mempool
-      in
-      {
-        advertise_current_head;
-        chain_tools;
-        flush;
-        fetch;
-        read_block;
-        send_get_current_head;
-        set_mempool;
-      }
-
     let mk_worker_tools w : Tools.worker_tools =
       let push_request r = Worker.Queue.push_request w r in
       let push_request_now r = Worker.Queue.push_request_now w r in
@@ -1316,6 +1348,7 @@ module Make
     let on_launch w _ (limits, chain_db) : (state, launch_error) result Lwt.t =
       let open Lwt_result_syntax in
       let chain_store = Distributed_db.chain_store chain_db in
+      let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
       let*! head = Store.Chain.current_head chain_store in
       let*! mempool = Store.Chain.mempool chain_store in
       let*! live_blocks, live_operations =
@@ -1336,7 +1369,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; tools = mk_tools chain_db} in
+      let parameters = {limits; tools = Arg.tools; flush} in
       let shell =
         {
           classification;
@@ -1440,7 +1473,37 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Proto : Protocol_plugin.T) =
+let mk_tools chain_db : Tools.tools =
+  let advertise_current_head ~mempool bh =
+    Distributed_db.Advertise.current_head chain_db ~mempool bh
+  in
+  let chain_tools = mk_chain_tools chain_db in
+  let fetch ?peer ?timeout oph =
+    Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
+  in
+  let read_block bh =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Block.read_block chain_store bh
+  in
+  let send_get_current_head ?peer () =
+    match peer with
+    | None -> Distributed_db.Request.current_head_from_all chain_db
+    | Some peer -> Distributed_db.Request.current_head_from_peer chain_db peer
+  in
+  let set_mempool ~head mempool =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Chain.set_mempool chain_store ~head mempool
+  in
+  {
+    advertise_current_head;
+    chain_tools;
+    fetch;
+    read_block;
+    send_get_current_head;
+    set_mempool;
+  }
+
+let make limits chain_db chain_id tools (module Proto : Protocol_plugin.T) =
   let module Prevalidation_t = Prevalidation.Make (Proto) in
   let module Prevalidator =
     Make
@@ -1451,6 +1514,8 @@ let make limits chain_db chain_id (module Proto : Protocol_plugin.T) =
         let chain_db = chain_db
 
         let chain_id = chain_id
+
+        let tools = tools
       end)
       (Prevalidation_t)
   in
@@ -1479,7 +1544,9 @@ let create limits (module Proto : Protocol_plugin.T) chain_db =
     ChainProto_registry.find (chain_id, Proto.hash) !chain_proto_registry
   with
   | None ->
-      let prevalidator = make limits chain_db chain_id (module Proto) in
+      let prevalidator =
+        make limits chain_db chain_id (mk_tools chain_db) (module Proto)
+      in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
         ChainProto_registry.add
@@ -1600,3 +1667,36 @@ let rpc_directory : t option Tezos_rpc.Directory.t =
           let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
           Lwt.return
             (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+
+module Internal_for_tests = struct
+  module Tools = Tools
+
+  let mk_chain_tools = mk_chain_tools
+
+  let create tools limits (module Proto : Protocol_plugin.T) chain_db =
+    let open Lwt_result_syntax in
+    let chain_store = Distributed_db.chain_store chain_db in
+    let chain_id = Store.Chain.chain_id chain_store in
+    match
+      ChainProto_registry.find (chain_id, Proto.hash) !chain_proto_registry
+    with
+    | None ->
+        let prevalidator = make limits chain_db chain_id tools (module Proto) in
+        let (module Prevalidator : T) = prevalidator in
+        chain_proto_registry :=
+          ChainProto_registry.add
+            Prevalidator.name
+            prevalidator
+            !chain_proto_registry ;
+        return prevalidator
+    | Some p -> return p
+
+  let advertise_mempool (t : t) =
+    let module Prevalidator : T = (val t) in
+    let w = Lazy.force Prevalidator.worker in
+    let open Lwt_result_syntax in
+    let*! (_was_pushed : bool) =
+      Prevalidator.Worker.Queue.push_request w Request.Advertise
+    in
+    Lwt.return_unit
+end
