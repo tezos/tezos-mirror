@@ -36,8 +36,6 @@ Smart Rollups
 
 - Add private rollups: smart rollup with an updatable whitelist stakers. Only stakers on the whitelist can publish commitment and participate in a refutation game. (MRs :gl:`!9823`, :gl:`!10104`, :gl:`!9823`, :gl:`!9572`, :gl:`!9427`, :gl:`!9472`, :gl:`!9439`, :gl:`!9401`)
 
-- Register in ``octez-codec`` some of the smart rollup related encodings. (MR :gl:`!10174`)
-
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 

@@ -41,15 +41,15 @@ Client
 Baker
 -----
 
-- Added optional ``--pre-emptive-forge-time t`` argument that, when 
-  set, will cause the baker to pre-emptively forge its block if 
+- Added optional ``--pre-emptive-forge-time t`` argument that, when
+  set, will cause the baker to pre-emptively forge its block if
   the current level quorum has been reached, and it is the round 0
   proposer of the next level. The amount of time to wait before forging
   is ``round_time - t``. This optimization increases the chance for the
   proposed block to reach quorum by slightly reducing the operation
-  inclusion window. Note that a ``t`` value that is too high could 
+  inclusion window. Note that a ``t`` value that is too high could
   cause forging to begin too early and result in lower baking rewards.
-  If not given, defaults to ``0.15 * block_time``. Set to ``0`` to 
+  If not given, defaults to ``0.15 * block_time``. Set to ``0`` to
   ignore. (MR :gl:`!10712`)
 
 Accuser
@@ -78,6 +78,8 @@ Smart Rollup node
 
 - Introduced a new command ``generate openapi``, to generate the OpenAPI JSON
   specification and output it to stdout. (MR :gl:`!10118`)
+
+- Register in ``octez-codec`` some of the protocol smart rollup related encodings. (MR :gl:`!11200`)
 
 Smart Rollup WASM Debugger
 --------------------------
