@@ -219,3 +219,27 @@ let get_global_block_state ?(block = "head") ~key () =
       let out = JSON.as_string json in
       let bytes = `Hex out |> Hex.to_bytes in
       bytes)
+
+type 'output_type durable_state_operation =
+  | Value : string option durable_state_operation
+  | Length : int64 option durable_state_operation
+  | Subkeys : string list durable_state_operation
+
+let string_of_durable_state_operation (type a) (x : a durable_state_operation) =
+  match x with Value -> "value" | Length -> "length" | Subkeys -> "subkeys"
+
+let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
+    ~key () =
+  let op = string_of_durable_state_operation operation in
+  let f : type k. k durable_state_operation -> JSON.t -> k =
+   fun operation ->
+    match operation with
+    | Value -> JSON.as_string_opt
+    | Length -> JSON.as_int64_opt
+    | Subkeys -> fun json -> List.map JSON.as_string (JSON.as_list json)
+  in
+  make
+    ~query_string:[("key", String.trim key)]
+    GET
+    ["global"; "block"; block; "durable"; pvm_kind; op]
+    (f operation)

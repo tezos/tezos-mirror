@@ -228,13 +228,9 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
   "scmsg3fzM3qS4iPZ6qGHCNfupVUKiuYmrNe4k13uUj3ggrzX6rayaVA",
   "scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx",
   "scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q" ]
+GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version
+404 Not Found
 
-./octez-smart-rollup-client-PtNairob rpc get '/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version'
-Error
-  No service found at this URL
-  
+GET http://127.0.0.1:[PORT]/global/block/head/durable/arith/value?key=/readonly/wasm_version
+404 Not Found
 
-./octez-smart-rollup-client-PtNairob rpc get '/global/block/head/durable/arith/value?key=/readonly/wasm_version'
-Error
-  No service found at this URL
-  

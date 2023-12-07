@@ -58,24 +58,6 @@ val rpc_get_rich :
   (string * string) list ->
   JSON.t Runnable.process
 
-type 'output_type durable_state_operation =
-  | Value : string option durable_state_operation
-  | Length : int64 option durable_state_operation
-  | Subkeys : string list durable_state_operation
-
-(** [inspect_durable_state_value ?hooks ?log_output ?block client key]
-    gets the corresponding durable PVM state value mapped to [key] for
-    the [block] (default ["head"]). *)
-val inspect_durable_state_value :
-  ?hooks:Process.hooks ->
-  ?log_output:bool ->
-  ?block:string ->
-  t ->
-  pvm_kind:string ->
-  operation:'a durable_state_operation ->
-  key:string ->
-  'a Runnable.process
-
 type outbox_proof = {commitment_hash : string; proof : string}
 
 (** [outbox_proof_single] asks the rollup node for a proof that an

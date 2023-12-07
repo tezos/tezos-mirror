@@ -1268,9 +1268,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       match kind with
       | "arith" ->
           let* encoded_value =
-            Sc_rollup_node.RPC.call
-              sc_rollup_node
-              ~rpc_hooks:Tezos_regression.rpc_hooks
+            Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
             @@ Sc_rollup_rpc.get_global_block_state ~key:"vars/value" ()
           in
           let value =
@@ -4242,63 +4240,55 @@ let test_rpcs ~kind
     match kind with
     | "arith" ->
         (* Make sure we neither have WASM nor Arith PVM endpoint in arith PVM *)
-        let*? process =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:"wasm_2_0_0"
-            ~operation:Sc_rollup_client.Value
-            ~key:"/readonly/wasm_version"
+        let* response =
+          Sc_rollup_node.RPC.call_raw sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:"wasm_2_0_0"
+               ~operation:Sc_rollup_rpc.Value
+               ~key:"/readonly/wasm_version"
+               ()
         in
-        let* () =
-          Process.check_error
-            ~msg:(Base.rex "No service found at this URL")
-            process
+        let* () = return @@ RPC_core.check_string_response ~code:404 response in
+        let* response =
+          Sc_rollup_node.RPC.call_raw sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:"arith"
+               ~operation:Sc_rollup_rpc.Value
+               ~key:"/readonly/wasm_version"
+               ()
         in
-
-        let*? process =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:"arith"
-            ~operation:Sc_rollup_client.Value
-            ~key:"/readonly/wasm_version"
-        in
-        Process.check_error
-          ~msg:(Base.rex "No service found at this URL")
-          process
+        return @@ RPC_core.check_string_response ~code:404 response
     | "wasm_2_0_0" ->
-        let*! wasm_boot_sector =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:kind
-            ~operation:Sc_rollup_client.Value
-            ~key:"/kernel/boot.wasm"
+        let* wasm_boot_sector =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Value
+               ~key:"/kernel/boot.wasm"
+               ()
         in
         Check.(
           (wasm_boot_sector = Some Constant.wasm_echo_kernel_boot_sector)
             (option string))
           ~error_msg:"Encoded WASM kernel is %L but should be %R" ;
-
-        let*! nonexisting_wasm_boot_sector =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:kind
-            ~operation:Sc_rollup_client.Value
-            ~key:"/kernel/boot.wasm2"
+        let* nonexisting_wasm_boot_sector =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Value
+               ~key:"/kernel/boot.wasm2"
+               ()
         in
         Check.((nonexisting_wasm_boot_sector = None) (option string))
           ~error_msg:"Encoded WASM kernel is %L but should be %R" ;
 
-        let*! wasm_version_hex_opt =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:kind
-            ~operation:Sc_rollup_client.Value
-            ~key:"/readonly/wasm_version"
+        let* wasm_version_hex_opt =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Value
+               ~key:"/readonly/wasm_version"
+               ()
         in
         let wasm_version =
           Option.map
@@ -4310,13 +4300,13 @@ let test_rpcs ~kind
             (option string))
           ~error_msg:"Decoded WASM version is %L but should be %R" ;
 
-        let*! wasm_version_len =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:kind
-            ~operation:Sc_rollup_client.Length
-            ~key:"/readonly/wasm_version"
+        let* wasm_version_len =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Length
+               ~key:"/readonly/wasm_version"
+               ()
         in
         Check.(
           (wasm_version_len
@@ -4326,13 +4316,13 @@ let test_rpcs ~kind
             (option int64))
           ~error_msg:"WASM version value length is %L but should be %R" ;
 
-        let*! kernel_subkeys =
-          Sc_rollup_client.inspect_durable_state_value
-            ~hooks
-            sc_client
-            ~pvm_kind:kind
-            ~operation:Sc_rollup_client.Subkeys
-            ~key:"/readonly/kernel"
+        let* kernel_subkeys =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Subkeys
+               ~key:"/readonly/kernel"
+               ()
         in
         Check.((kernel_subkeys = ["boot.wasm"; "env"]) (list string))
           ~error_msg:"The key's subkeys are %L but should be %R" ;

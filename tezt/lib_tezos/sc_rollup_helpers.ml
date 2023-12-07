@@ -44,6 +44,8 @@ let replace_variables string =
 
 let hooks = Tezos_regression.hooks_custom ~replace_variables ()
 
+let rpc_hooks = Tezos_regression.rpc_hooks
+
 let hex_encode (input : string) : string =
   match Hex.of_string input with `Hex s -> s
 

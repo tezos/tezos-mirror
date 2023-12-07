@@ -153,3 +153,19 @@ val get_local_gc_info : unit -> gc_info RPC_core.t
     mapped to [key] for the [block] (default ["head"]). *)
 val get_global_block_state :
   ?block:string -> key:string -> unit -> bytes RPC_core.t
+
+type 'output_type durable_state_operation =
+  | Value : string option durable_state_operation
+  | Length : int64 option durable_state_operation
+  | Subkeys : string list durable_state_operation
+
+(** RPC: [GET global/block/<block>/durable/<pvm_kind>/<operation>] gets the
+    corresponding durable PVM state information (depending on [operation]) mapped to [key] for the [block]
+    (default ["head"]). *)
+val get_global_block_durable_state_value :
+  ?block:string ->
+  pvm_kind:string ->
+  operation:'a durable_state_operation ->
+  key:string ->
+  unit ->
+  'a RPC_core.t

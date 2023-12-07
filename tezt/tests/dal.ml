@@ -41,6 +41,8 @@
 
 let hooks = Tezos_regression.hooks
 
+let rpc_hooks = Tezos_regression.rpc_hooks
+
 module Dal = Dal_common
 module Cryptobox = Dal.Cryptobox
 
@@ -1924,7 +1926,7 @@ let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
   check_saved_value_in_pvm
-    ~rpc_hooks:Tezos_regression.rpc_hooks
+    ~rpc_hooks
     ~name:"value"
     ~expected_value
     sc_rollup_node
@@ -1936,7 +1938,7 @@ let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
    - At level N, publish a slot to the L1 and DAL.
    - Bake until [attestation_lag] blocks so the L1 attests the published slot.
    - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>". *)
-let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
+let test_reveal_dal_page_in_fast_exec_wasm_pvm _protocol parameters dal_node
     sc_rollup_node _sc_rollup_address node client pvm_name =
   Log.info "Assert attestation_lag value." ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6270
@@ -1977,7 +1979,6 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
   in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
   let slot_content = generate_dummy_slot slot_size in
@@ -2002,13 +2003,13 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
   Log.info "Read and assert against value written in durable storage." ;
   let key = "/output/slot-0" in
-  let*! value_written =
-    Sc_rollup_client.inspect_durable_state_value
-      ~hooks
-      sc_rollup_client
-      ~pvm_kind:pvm_name
-      ~operation:Sc_rollup_client.Value
-      ~key
+  let* value_written =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:pvm_name
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
   in
   let encoded_slot_content =
     match Hex.of_string slot_content with `Hex s -> s
@@ -2695,7 +2696,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     expected_value ;
   let* () =
     check_saved_value_in_pvm
-      ~rpc_hooks:Tezos_regression.rpc_hooks
+      ~rpc_hooks
       ~name:"value"
       ~expected_value
       sc_rollup_node
@@ -2708,7 +2709,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Lwt_list.iter_s
     (fun (_dal_node, rollup_node, _rollup_client) ->
       check_saved_value_in_pvm
-        ~rpc_hooks:Tezos_regression.rpc_hooks
+        ~rpc_hooks
         ~name:"value"
         ~expected_value
         rollup_node)
@@ -3821,16 +3822,17 @@ module Tx_kernel_e2e = struct
 
   (** [get_ticket_balance sc_rollup_client ~pvm_name ~pkh ~ticket_index] returns
       the L2 balance of the account with [pkh] for the ticket with [ticket_index] *)
-  let get_ticket_balance sc_rollup_client ~pvm_name ~pkh ~ticket_index =
-    Sc_rollup_client.inspect_durable_state_value
-      sc_rollup_client
-      ~pvm_kind:pvm_name
-      ~operation:Sc_rollup_client.Value
-      ~key:
-        (sf
-           "/accounts/%s/%d"
-           (Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh)
-           ticket_index)
+  let get_ticket_balance sc_rollup_node ~pvm_name ~pkh ~ticket_index =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:pvm_name
+         ~operation:Sc_rollup_rpc.Value
+         ~key:
+           (sf
+              "/accounts/%s/%d"
+              (Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh)
+              ticket_index)
+         ()
 
   (** E2E test using the tx-kernel. Scenario:
       1. Deposit [450] tickets to the L2 [pk1] using the deposit contract.
@@ -3876,7 +3878,6 @@ module Tx_kernel_e2e = struct
     let* () =
       Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
     in
-    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
     in
@@ -4004,8 +4005,8 @@ module Tx_kernel_e2e = struct
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
     in
     Log.info "Check that [pk1] has [300] tickets." ;
-    let*! balance =
-      get_ticket_balance sc_rollup_client ~pvm_name ~ticket_index:0 ~pkh:pkh1
+    let* balance =
+      get_ticket_balance sc_rollup_node ~pvm_name ~ticket_index:0 ~pkh:pkh1
     in
     Check.(
       (* [2c01000000000000] is [300] when interpreted as little-endian u64. *)
@@ -4014,8 +4015,8 @@ module Tx_kernel_e2e = struct
         (option string)
         ~error_msg:"Expected %R, got %L") ;
     Log.info "Check that [pk2] has [50] tickets." ;
-    let*! balance =
-      get_ticket_balance sc_rollup_client ~pvm_name ~ticket_index:0 ~pkh:pkh2
+    let* balance =
+      get_ticket_balance sc_rollup_node ~pvm_name ~ticket_index:0 ~pkh:pkh2
     in
     Check.(
       (* [3200000000000000] is [50] when interpreted as little-endian u64. *)
@@ -4025,7 +4026,7 @@ module Tx_kernel_e2e = struct
         ~error_msg:"Expected %R, got %L") ;
     unit
 
-  let test_echo_kernel_e2e protocol parameters dal_node sc_rollup_node
+  let test_echo_kernel_e2e _protocol parameters dal_node sc_rollup_node
       _sc_rollup_address node client pvm_name =
     Log.info "Originate the echo kernel." ;
     let* {boot_sector; _} =
@@ -4049,7 +4050,6 @@ module Tx_kernel_e2e = struct
     let* () =
       Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
     in
-    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
     let* current_level = Node.get_level node in
     let target_level =
       current_level + parameters.Dal.Parameters.attestation_lag + 1
@@ -4073,13 +4073,13 @@ module Tx_kernel_e2e = struct
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node target_level
     in
     let key = "/output/slot-0" in
-    let*! value_written =
-      Sc_rollup_client.inspect_durable_state_value
-        ~hooks
-        sc_rollup_client
-        ~pvm_kind:pvm_name
-        ~operation:Sc_rollup_client.Value
-        ~key
+    let* value_written =
+      Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:pvm_name
+           ~operation:Sc_rollup_rpc.Value
+           ~key
+           ()
     in
     match value_written with
     | None -> Test.fail "Expected a value to be found. But none was found."
