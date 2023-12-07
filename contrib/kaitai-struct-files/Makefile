@@ -1,4 +1,4 @@
-KSYS:=$(shell find . -name \*.ksy -print)
+KSYS:=$(shell find ./files -name \*.ksy -print)
 HTMLS:=$(patsubst %.ksy,doc/%.html,$(KSYS))
 
 all: $(HTMLS)
