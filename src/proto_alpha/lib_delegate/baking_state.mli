@@ -45,6 +45,9 @@ val consensus_key_and_delegate_encoding :
 val pp_consensus_key_and_delegate :
   Format.formatter -> consensus_key_and_delegate -> unit
 
+(** The validation mode specifies whether the baker (filters and) validates
+    mempool operations via an RPC to the node, or if it does so "locally", by
+    using the context. *)
 type validation_mode = Node | Local of Abstract_context_index.t
 
 type prequorum = {
