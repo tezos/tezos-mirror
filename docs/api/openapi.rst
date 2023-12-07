@@ -8,6 +8,9 @@ a specification and perform API calls from your browser.
 Several code generators also exist to generate API libraries for various
 programming languages.
 
+Octez Node
+~~~~~~~~~~
+
 The REST API served by the Octez node on the RPC port is described by the union of several OpenAPI specifications:
 
 - ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs
@@ -84,10 +87,38 @@ and specific to the Oxford protocol can be found at:
 
 - `oxford-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
 
+Smart Rollup Node
+~~~~~~~~~~~~~~~~~
+
+The smart rollup node exposes different RPCs depending on the underlying L1
+protocol in use. Their specification is given in the sections below.
+
+Nairobi RPCs
+------------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Nairobi
+(``PtNairob``) protocol can be found at:
+
+- `nairobi-smart-rollup-node-openapi.json (version from master branch)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-smart-rollup-node-openapi.json>`_
+  (The exact version of the rollup node for which this file is produced can be
+  seen in the field ``.info.version`` of the file.)
+
+Oxford RPCs
+-----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Nairobi
+(``Proxford``) protocol can be found at:
+
+- `oxford-smart-rollup-node-openapi.json (version from master branch)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
+  (The exact version of the rollup node for which this file is produced can be
+  seen in the field ``.info.version`` of the file.)
+
 .. _openapi_generate:
 
 How to Generate
----------------
+~~~~~~~~~~~~~~~
 
 To generate the above files, run the ``src/bin_openapi/generate.sh`` script
 from the root of the Octez repository.
@@ -107,7 +138,7 @@ For ``protocol_hash``, use the value defined in ``TEZOS_PROTOCOL``.
 
 
 How to Test
------------
+~~~~~~~~~~~
 
 You can test OpenAPI specifications using `Swagger Editor <https://editor.swagger.io/>`_
 to check for syntax issues (just copy-paste ``rpc-openapi.json`` into it or open

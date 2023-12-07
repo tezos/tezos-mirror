@@ -413,6 +413,9 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
+let tezt_json_lib =
+  external_sublib tezt_lib ~js_compatible:true "tezt.json" ~main_module:"JSON"
+
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
@@ -4275,7 +4278,7 @@ let octez_openapi =
     ~synopsis:
       "Tezos: a library for querying RPCs and converting into the OpenAPI \
        format"
-    ~deps:[ezjsonm; json_data_encoding; tezt_lib]
+    ~deps:[ezjsonm; json_data_encoding; tezt_json_lib]
 
 let _octez_protocol_compiler_bin =
   public_exe
@@ -4585,6 +4588,7 @@ let octez_smart_rollup_node_lib =
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
         cohttp_lwt_unix;
+        octez_openapi;
         octez_node_config;
         prometheus_app;
         camlzip;

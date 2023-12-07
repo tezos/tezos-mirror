@@ -39,11 +39,16 @@ let get_head_level_opt node_ctxt =
   let+ res = Node_context.last_processed_head_opt node_ctxt in
   Option.map (fun Sc_rollup_block.{header = {level; _}; _} -> level) res
 
-let get_proto_plugin_of_level node_ctxt level =
-  let open Lwt_result_syntax in
-  let* proto = Node_context.protocol_of_level node_ctxt level in
-  let*? plugin = Protocol_plugins.proto_plugin_for_protocol proto.protocol in
-  return plugin
+module Root_directory = Make_directory (struct
+  include Rollup_node_services.Root
+
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro
+
+  let context_of_prefix node_ctxt () =
+    Lwt_result.return (Node_context.readonly node_ctxt)
+end)
 
 module Global_directory = Make_directory (struct
   include Rollup_node_services.Global
@@ -343,38 +348,141 @@ let () =
 
   return status
 
+let add_describe dir =
+  Tezos_rpc.Directory.register_describe_directory_service
+    dir
+    Tezos_rpc.Service.description_service
+
 let top_directory (node_ctxt : _ Node_context.t) =
   List.fold_left
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
-    [Global_directory.build_directory; Local_directory.build_directory]
+    [
+      Root_directory.build_directory;
+      Global_directory.build_directory;
+      Local_directory.build_directory;
+    ]
+
+let block_prefix =
+  Tezos_rpc.Path.(
+    open_root / "global" / "block" /: Rollup_node_services.Arg.block_id)
+
+let protocol_directories = Protocol_hash.Table.create 3
+
+let build_protocol_directory node_ctxt proto =
+  let plugin =
+    match Protocol_plugins.proto_plugin_for_protocol proto with
+    | Error e ->
+        Format.kasprintf
+          Stdlib.failwith
+          "Cannot build RPC directory for %a.\n%a"
+          Protocol_hash.pp
+          proto
+          pp_print_trace
+          e
+    | Ok p -> p
+  in
+  let (module Plugin) = plugin in
+  let block_directory = Plugin.RPC_directory.block_directory node_ctxt in
+  let full_static_dir =
+    Tezos_rpc.Directory.merge
+      (top_directory node_ctxt)
+      (Tezos_rpc.Directory.prefix block_prefix block_directory)
+    |> add_describe
+  in
+  Protocol_hash.Table.replace
+    protocol_directories
+    proto
+    (block_directory, full_static_dir) ;
+  (block_directory, full_static_dir)
+
+let build_protocol_directories node_ctxt =
+  List.iter
+    (fun p -> ignore (build_protocol_directory node_ctxt p))
+    (Protocol_plugins.registered_protocols ())
+
+let get_proto_dir ?protocol (node_ctxt : _ Node_context.t) =
+  let proto = Option.value protocol ~default:node_ctxt.current_protocol.hash in
+  match Protocol_hash.Table.find protocol_directories proto with
+  | None -> error_with "Unknown protocol %a" Protocol_hash.pp proto
+  | Some (block_dir, full_dir) -> Ok (block_dir, full_dir, proto)
+
+let generate_openapi dir proto =
+  let open Lwt_result_syntax in
+  let*! descr =
+    Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir
+  in
+  let json_api =
+    Data_encoding.Json.construct
+      Tezos_rpc.Encoding.description_answer_encoding
+      descr
+  in
+  let open Tezos_openapi in
+  json_api
+  |> Json.annotate ~origin:"description"
+  |> Api.parse_tree |> Api.parse_services |> Api.flatten
+  |> Convert.convert_api
+       ~title:"Smart Rollup Node RPCs"
+       ~description:
+         (Format.asprintf
+            "Smart Rollup Node RPC API for protocol %a"
+            Protocol_hash.pp
+            proto)
+       Tezos_version_value.Bin_version.version_string
+  |> Openapi.to_json |> return
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.openapi
+  @@ fun node_ctxt {protocol} () ->
+  let open Lwt_result_syntax in
+  let*? _, dir, proto = get_proto_dir ?protocol node_ctxt in
+  generate_openapi dir proto
 
 let directory node_ctxt =
+  let dir = top_directory node_ctxt in
+  build_protocol_directories node_ctxt ;
   let path =
     Tezos_rpc.Path.(
       open_root / "global" / "block" /: Rollup_node_services.Arg.block_id)
   in
-  Tezos_rpc.Directory.register_dynamic_directory
-    ~descr:"Dynamic protocol specific RPC directory for the rollup node"
-    (top_directory node_ctxt)
-    path
-    (fun ((), block_id) ->
-      let open Lwt_syntax in
-      let+ dir =
-        let open Lwt_result_syntax in
-        let* level =
-          Block_directory_helpers.block_level_of_id node_ctxt block_id
+  let dir =
+    Tezos_rpc.Directory.register_dynamic_directory
+      ~descr:"Dynamic protocol specific RPC directory for the rollup node"
+      dir
+      path
+      (fun ((), block_id) ->
+        let open Lwt_syntax in
+        let+ dir =
+          let open Lwt_result_syntax in
+          let* level =
+            Block_directory_helpers.block_level_of_id node_ctxt block_id
+          in
+          let* () = Node_context.check_level_available node_ctxt level in
+          let* proto = Node_context.protocol_of_level node_ctxt level in
+          let*? block_directory, _, _ =
+            get_proto_dir ~protocol:proto.protocol node_ctxt
+          in
+          return block_directory
         in
-        let* () = Node_context.check_level_available node_ctxt level in
-        let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
-        Plugin.RPC_directory.block_directory node_ctxt
-      in
-      match dir with
-      | Ok dir -> dir
-      | Error e ->
-          Format.kasprintf
-            Stdlib.failwith
-            "Could not load block directory for block %s: %a"
-            (Rollup_node_services.Arg.construct_block_id block_id)
-            pp_print_trace
-            e)
+        match dir with
+        | Ok dir -> dir
+        | Error e ->
+            Format.kasprintf
+              Stdlib.failwith
+              "Could not load block directory for block %s: %a"
+              (Rollup_node_services.Arg.construct_block_id block_id)
+              pp_print_trace
+              e)
+  in
+  add_describe dir
+
+let generate_openapi ?protocol cctxt =
+  let open Lwt_result_syntax in
+  let protocol =
+    Option.value_f protocol ~default:Protocol_plugins.last_registered
+  in
+  let* node_ctxt =
+    Node_context.Internal_for_tests.openapi_context cctxt protocol
+  in
+  let _, dir = build_protocol_directory node_ctxt protocol in
+  generate_openapi dir protocol

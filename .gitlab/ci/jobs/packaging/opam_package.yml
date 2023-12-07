@@ -913,7 +913,12 @@ opam:tezos-dal-node-services:
 
 # Ignoring unreleased package tezos-micheline-rewriting.
 
-# Ignoring unreleased package tezos-openapi.
+opam:tezos-openapi:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: tezos-openapi
 
 opam:tezos-protocol-000-Ps9mPmXa:
   extends:

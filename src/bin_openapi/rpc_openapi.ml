@@ -27,20 +27,23 @@ open Tezos_openapi
 
 let main () =
   (* Parse command line arguments. *)
-  let version, filename =
-    if Array.length Sys.argv <> 3 then (
+  let version, title, description, filename =
+    if Array.length Sys.argv <> 5 then (
       prerr_endline
-        "Usage: rpc_openapi <VERSION> <API.json>\n\n\
-         Version is the version of the API, to be put in the \"version\" field \
+        "Usage: rpc_openapi <VERSION> <TITLE> <DESCRIPTION> <API.json>\n\n\
+         VERSION is the version of the API, to be put in the \"version\" field \
          of the output.\n\n\
+         TITLE is the string to be put in the \"title\" field of the output.\n\n\
+         DESCRIPTION is the string to be put in the \"description\" field of \
+         the output.\n\n\
          Multiple input files are not supported." ;
       exit (if Array.length Sys.argv = 1 then 0 else 1))
-    else (Sys.argv.(1), Sys.argv.(2))
+    else (Sys.argv.(1), Sys.argv.(2), Sys.argv.(3), Sys.argv.(4))
   in
   (* Parse input file and convert it. *)
   Json.parse_file filename |> Api.parse_tree |> Api.parse_services
   |> Api.flatten
-  |> Convert.convert_api version
+  |> Convert.convert_api ~title ~description version
   |> Openapi.to_json |> Json.output
 
 let () =
