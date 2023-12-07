@@ -394,6 +394,15 @@ fn parse_ty_with_entrypoints(
         App(signature, [], _) => Type::Signature,
         App(signature, ..) => unexpected()?,
 
+        App(bls12_381_fr, [], _) => Type::Bls12381Fr,
+        App(bls12_381_fr, ..) => unexpected()?,
+
+        App(bls12_381_g1, [], _) => Type::Bls12381G1,
+        App(bls12_381_g1, ..) => unexpected()?,
+
+        App(bls12_381_g2, [], _) => Type::Bls12381G2,
+        App(bls12_381_g2, ..) => unexpected()?,
+
         Seq(..)
         | micheline_fields!()
         | micheline_instructions!()

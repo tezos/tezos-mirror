@@ -94,6 +94,9 @@ pub enum Type {
     Lambda(Rc<(Type, Type)>),
     Ticket(Rc<Type>),
     Timestamp,
+    Bls12381Fr,
+    Bls12381G1,
+    Bls12381G2,
 }
 
 impl Type {
@@ -103,7 +106,8 @@ impl Type {
         use Type::*;
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
-            | Bytes | Key | Signature | KeyHash | Timestamp => 1,
+            | Bytes | Key | Signature | KeyHash | Timestamp | Bls12381Fr | Bls12381G1
+            | Bls12381G2 => 1,
             Pair(p) | Or(p) | Map(p) | Lambda(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => 1 + x.size_for_gas(),
         }
@@ -184,6 +188,9 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             Timestamp => Micheline::prim0(Prim::timestamp),
             KeyHash => Micheline::prim0(Prim::key_hash),
             Never => Micheline::prim0(Prim::never),
+            Bls12381Fr => Micheline::prim0(Prim::bls12_381_fr),
+            Bls12381G1 => Micheline::prim0(Prim::bls12_381_g1),
+            Bls12381G2 => Micheline::prim0(Prim::bls12_381_g2),
 
             Option(x) => Micheline::prim1(
                 arena,
