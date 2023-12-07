@@ -36,7 +36,7 @@ The size of the node’s storage depends on its profile. A bootstrap node uses n
 L1 monitoring
 ^^^^^^^^^^^^^
 
-The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 chain via an RPC. At each final block, it retrieves and stores the newly published commitments, and if its storage contains shards for these commitments, it publishes them on the P2P network. The DAL node also retrieves the slot attestation status from the block’s metadata. Finally, based on this information it updates the status of the stored commitments, where the status of a commitment can be one of the following:
+The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 chain via an RPC. Each time a block becomes final, it retrieves and stores the commitments published in that block, and if its storage contains shards for these commitments, it publishes them on the P2P network. The DAL node also retrieves the slot attestation status from the block’s metadata. Finally, based on this information it updates the status of the stored commitments, where the status of a commitment can be one of the following:
 
 - *waiting for attestation*: The commitment was included and applied in a finalized L1 block but the corresponding slot remains to be attested.
 - *attested*: The commitment was included in an L1 block and the corresponding slot is attested.
@@ -47,7 +47,12 @@ The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 
 RPC server
 ^^^^^^^^^^
 
-The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state. For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect or disconnect to peers.
+The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state.
+For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect to or disconnect from peers.
+
+The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
+The RPC server is started by default, even if this option is not given.
+
 
 Operational aspects
 -------------------
