@@ -41,7 +41,7 @@ impl Type {
         gas.consume(tc_cost::TYPE_PROP_STEP)?;
         let invalid_type_prop = || Err(TcError::InvalidTypeProperty(prop, self.clone()));
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Address | ChainId => (),
+            Nat | Int | Bool | Mutez | String | Unit | Address | ChainId | Bytes => (),
             Operation => match prop {
                 TypeProperty::Comparable
                 | TypeProperty::Passable

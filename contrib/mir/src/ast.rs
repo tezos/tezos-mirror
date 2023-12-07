@@ -41,6 +41,7 @@ pub enum Type {
     Contract(Box<Type>),
     Address,
     ChainId,
+    Bytes,
 }
 
 impl Type {
@@ -49,7 +50,7 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         match self {
-            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId => 1,
+            Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId | Bytes => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }
@@ -96,6 +97,7 @@ pub enum TypedValue {
     Address(Address),
     ChainId(ChainId),
     Contract(Address),
+    Bytes(Vec<u8>),
 }
 
 pub fn typed_value_to_value_optimized<'a>(
@@ -133,6 +135,7 @@ pub fn typed_value_to_value_optimized<'a>(
         TV::Address(x) => V::Bytes(x.to_bytes_vec()),
         TV::ChainId(x) => V::Bytes(x.into()),
         TV::Contract(x) => go(TV::Address(x)),
+        TV::Bytes(x) => V::Bytes(x),
     }
 }
 

@@ -347,6 +347,9 @@ fn parse_ty_with_entrypoints(
         }
         App(map, ..) => unexpected()?,
 
+        App(bytes, [], _) => Type::Bytes,
+        App(bytes, ..) => unexpected()?,
+
         Seq(..)
         | micheline_fields!()
         | micheline_instructions!()
@@ -1056,6 +1059,7 @@ pub(crate) fn typecheck_value(
             ctx.gas.consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
             TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
         }
+        (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
 }
@@ -3172,6 +3176,16 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::ExpectedU10(65536))
+        );
+    }
+
+    #[test]
+    fn push_bytes() {
+        assert_eq!(
+            parse("PUSH bytes 0xdeadf00d")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Bytes(hex::decode("deadf00d").unwrap())))
         );
     }
 }
