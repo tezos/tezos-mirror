@@ -115,6 +115,15 @@ pub mod tc_cost {
     // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
     pub const KEY_HASH_OPTIMIZED: u32 = 80;
 
+    // corresponds to cost_DECODING_BLS_FR in the protocol.
+    pub const BLS_FR: u32 = 120;
+
+    // corresponds to cost_DECODING_BLS_G1 in the protocol.
+    pub const BLS_G1: u32 = 54600;
+
+    // corresponds to cost_DECODING_BLS_G2 in the protocol.
+    pub const BLS_G2: u32 = 69000;
+
     // corresponds to cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls in the
     // protocol. the protocol computes cost as
     // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
@@ -473,7 +482,10 @@ pub mod interpret_cost {
                 | V::Contract(_)
                 | V::Operation(_)
                 | V::Ticket(_)
-                | V::Lambda(_),
+                | V::Lambda(_)
+                | V::Bls12381Fr(_)
+                | V::Bls12381G1(_)
+                | V::Bls12381G2(_),
                 _,
             ) => incomparable(),
         })

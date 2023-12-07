@@ -27,7 +27,10 @@ use std::{
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
-use crate::{ast::annotations::NO_ANNS, lexer::Prim};
+use crate::{
+    bls,
+    {ast::annotations::NO_ANNS, lexer::Prim},
+};
 
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
@@ -266,6 +269,9 @@ pub enum TypedValue<'a> {
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
     Timestamp(BigInt),
+    Bls12381Fr(bls::Fr),
+    Bls12381G1(bls::G1),
+    Bls12381G2(bls::G2),
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -307,6 +313,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
             TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
             TV::Timestamp(s) => V::Int(s),
+            TV::Bls12381Fr(x) => V::Bytes(x.to_bytes().to_vec()),
+            TV::Bls12381G1(x) => V::Bytes(x.to_bytes().to_vec()),
+            TV::Bls12381G2(x) => V::Bytes(x.to_bytes().to_vec()),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
                 Operation::TransferTokens(tt) => Micheline::App(

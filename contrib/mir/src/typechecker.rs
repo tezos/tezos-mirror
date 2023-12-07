@@ -23,13 +23,13 @@ use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
 use crate::gas::OutOfGas;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
+use crate::{ast::*, bls};
 
 /// Typechecker error type.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -1720,6 +1720,31 @@ pub(crate) fn typecheck_value<'a>(
                 _ => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
             }
         }
+        (T::Bls12381Fr, V::Int(i)) => {
+            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            TV::Bls12381Fr(bls::Fr::from_big_int(i))
+        }
+        (T::Bls12381Fr, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            TV::Bls12381Fr(
+                bls::Fr::from_bytes(bs)
+                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
+            )
+        }
+        (T::Bls12381G1, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::BLS_G1)?;
+            TV::Bls12381G1(
+                bls::G1::from_bytes(bs)
+                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
+            )
+        }
+        (T::Bls12381G2, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::BLS_G2)?;
+            TV::Bls12381G2(
+                bls::G2::from_bytes(bs)
+                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
+            )
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
 }
@@ -2491,6 +2516,151 @@ mod typecheck_tests {
             Ok(Push(TypedValue::String("foo".to_owned())))
         );
         assert_eq!(stack, tc_stk![Type::String]);
+    }
+
+    #[test]
+    fn push_bls_fr_int() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH bls12_381_fr 100500"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Bls12381Fr(bls::Fr::from_big_int(
+                &100500.into()
+            ))))
+        );
+        assert_eq!(stack, tc_stk![Type::Bls12381Fr]);
+    }
+
+    #[test]
+    fn push_bls_fr_hex() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH bls12_381_fr 0x01"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Bls12381Fr(
+                bls::Fr::from_bytes(&[1]).unwrap()
+            )))
+        );
+        assert_eq!(stack, tc_stk![Type::Bls12381Fr]);
+    }
+
+    #[test]
+    fn push_bls_fr_hex_too_long() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH bls12_381_fr 0x000000000000000000000000000000000000000000000000000000000000000000"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType("Bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(), Type::Bls12381Fr))
+        );
+    }
+
+    #[test]
+    fn push_bls_g1() {
+        let mut stack = tc_stk![];
+        let hex_val = "400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Bls12381G1(
+                bls::G1::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
+            )))
+        );
+    }
+
+    #[test]
+    fn push_bls_g1_short() {
+        let mut stack = tc_stk![];
+        let hex_val = "40000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                Type::Bls12381G1,
+            ))
+        );
+    }
+
+    #[test]
+    fn push_bls_g1_long() {
+        let mut stack = tc_stk![];
+        let hex_val = "40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                Type::Bls12381G1,
+            ))
+        );
+    }
+
+    #[test]
+    fn push_bls_g2() {
+        let mut stack = tc_stk![];
+        let hex_val = "400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Bls12381G2(
+                bls::G2::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
+            )))
+        );
+    }
+
+    #[test]
+    fn push_bls_g2_short() {
+        let mut stack = tc_stk![];
+        let hex_val = "40000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                Type::Bls12381G2,
+            ))
+        );
+    }
+
+    #[test]
+    fn push_bls_g2_long() {
+        let mut stack = tc_stk![];
+        let hex_val = "40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                Type::Bls12381G2,
+            ))
+        );
     }
 
     #[test]
