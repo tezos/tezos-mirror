@@ -386,8 +386,29 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// Record the base fee part of the transaction cost. We need the SputnikVM
     /// error code in case this goes wrong, so that's what we return.
-    fn record_base_gas_cost(&mut self) -> Result<(), ExitError> {
-        self.record_cost(self.config.gas_transaction_call)
+    fn record_base_gas_cost(
+        &mut self,
+        is_create: bool,
+        data: &[u8],
+    ) -> Result<(), ExitError> {
+        let base_cost = if is_create {
+            self.config.gas_transaction_create
+        } else {
+            self.config.gas_transaction_call
+        };
+
+        let data_cost: u64 = data
+            .iter()
+            .map(|datum| {
+                if *datum == 0_u8 {
+                    self.config.gas_transaction_zero_data
+                } else {
+                    self.config.gas_transaction_non_zero_data
+                }
+            })
+            .sum();
+
+        self.record_cost(base_cost + data_cost)
     }
 
     /// Add withdrawals to the current transaction layer
@@ -819,7 +840,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(is_static, gas_limit)?;
 
-        if let Err(err) = self.record_base_gas_cost() {
+        if let Err(err) = self.record_base_gas_cost(false, &input) {
             return self.end_initial_transaction(Ok((
                 ExitReason::Error(err),
                 None,
@@ -851,7 +872,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(false, gas_limit)?;
 
-        if let Err(err) = self.record_base_gas_cost() {
+        if let Err(err) = self.record_base_gas_cost(true, &input) {
             return self.end_initial_transaction(Ok((
                 ExitReason::Error(err),
                 None,
@@ -882,7 +903,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(false, gas_limit)?;
 
-        if let Err(err) = self.record_base_gas_cost() {
+        if let Err(err) = self.record_base_gas_cost(false, &[]) {
             return self.end_initial_transaction(Ok((
                 ExitReason::Error(err),
                 None,

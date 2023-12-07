@@ -557,7 +557,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(2u64);
-        let result = execute_precompiled(address, input, None, Some(21072));
+        let result = execute_precompiled(address, input, None, Some(22000));
 
         // assert
         let expected_hash = hex::decode(
@@ -565,8 +565,12 @@ mod tests {
         )
         .expect("Result should be hex string");
 
+        let expected_gas = 21000 // base cost
+            + 72 // sha256 cost
+            + 16; // transaction data cost
+
         let expected = ExecutionOutcome {
-            gas_used: 21072,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -584,7 +588,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(3u64);
-        let result = execute_precompiled(address, input, None, Some(22072));
+        let result = execute_precompiled(address, input, None, Some(22000));
 
         // assert
         let expected_hash = hex::decode(
@@ -592,8 +596,12 @@ mod tests {
         )
         .expect("Result should be hex string");
 
+        let expected_gas = 21000 // base cost
+        + 600 + 120// ripeMD cost
+        + 16; // transaction data cost
+
         let expected = ExecutionOutcome {
-            gas_used: 21720,
+            gas_used: expected_gas,
             is_success: true,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             new_address: None,
@@ -634,14 +642,17 @@ mod tests {
             value,
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(21000));
+        let result = execute_precompiled(target, input, transfer, Some(25000));
 
         let expected_output = vec![];
         let expected_target =
             Contract::from_b58check("tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w").unwrap();
 
+        let expected_gas = 21000 // base cost, no additional cost for withdrawal
+        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
+
         let expected = ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
@@ -685,15 +696,18 @@ mod tests {
             value,
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(21000));
+        let result = execute_precompiled(target, input, transfer, Some(25000));
 
         let expected_output = vec![];
 
         let expected_target =
             Contract::from_b58check("KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc").unwrap();
 
+        let expected_gas = 21000 // base cost, no additional cost for withdrawal
+        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
+
         let expected = ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: expected_gas,
             reason: ExitReason::Succeed(ExitSucceed::Returned),
             is_success: true,
             new_address: None,
@@ -727,10 +741,13 @@ mod tests {
 
         let transfer: Option<Transfer> = None;
 
-        let result = execute_precompiled(target, input, transfer, Some(21000));
+        let result = execute_precompiled(target, input, transfer, Some(25000));
+
+        let expected_gas = 21000 // base cost, no additional cost for withdrawal
+        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
 
         let expected = ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: expected_gas,
             reason: ExitReason::Revert(ExitRevert::Reverted),
             is_success: false,
             new_address: None,
@@ -754,7 +771,7 @@ mod tests {
         });
 
         let expected = ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: expected_gas,
             reason: ExitReason::Revert(ExitRevert::Reverted),
             is_success: false,
             new_address: None,
@@ -764,7 +781,7 @@ mod tests {
             estimated_ticks_used: 1_000_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(21000));
+        let result = execute_precompiled(target, input, transfer, Some(25000));
 
         assert_eq!(Ok(expected), result);
     }
@@ -901,7 +918,7 @@ mod tests {
 
         // act
         let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
 
         // assert
         // expected outcome is OK and address over 32 bytes
@@ -927,7 +944,7 @@ mod tests {
 
         // act
         let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
 
         // assert
         // expected outcome is OK and address over 32 bytes
