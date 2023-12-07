@@ -68,13 +68,13 @@ manuals: \
 	@ ../octez-dac-node man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-node.html
 	@ ../octez-dac-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-client.html
 	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
-		./scripts/man2txt.py > api/octez-node.txt
+		./scripts/man2txt.py -r > api/octez-node.txt
 	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
-		./scripts/man2txt.py > api/octez-proxy-server.txt
+		./scripts/man2txt.py -r > api/octez-proxy-server.txt
 	@../octez-smart-rollup-node man -verbosity 3 -format html | \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
 	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
-		./scripts/man2txt.py > api/octez-dal-node.txt
+		./scripts/man2txt.py -r > api/octez-dal-node.txt
 
 .PHONY: odoc
 odoc:
