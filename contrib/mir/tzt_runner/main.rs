@@ -148,6 +148,12 @@ mod tztrunner_tests {
     }
 
     #[test]
+    fn test_runner_implicit_parameter() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_IMPLICIT_PARAMETER).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
+    }
+
+    #[test]
     fn test_runner_chain_id() {
         assert_eq!(
             run_tzt_test(
@@ -250,4 +256,10 @@ mod tztrunner_tests {
     const TZT_SAMPLE_TC_FAIL_SPECIFIC: &str = r#"code { ADD } ;
         input { Stack_elt mutez 5 ; Stack_elt int 5 } ;
         output(StaticError "no matching overload for ADD on stack Stack([Int, Mutez])")"#;
+
+    const TZT_SAMPLE_IMPLICIT_PARAMETER: &str = r#"
+      code SELF;
+      input {};
+      output { Stack_elt (contract unit) "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" }
+    "#;
 }

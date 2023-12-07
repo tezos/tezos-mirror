@@ -5,9 +5,11 @@
 /*                                                                            */
 /******************************************************************************/
 
+use crate::ast::annotations::FieldAnnotation;
+
 use super::AddressError;
 
-#[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
 pub struct Entrypoint(String);
 
 impl std::fmt::Display for Entrypoint {
@@ -17,7 +19,7 @@ impl std::fmt::Display for Entrypoint {
 }
 
 // NB: default entrypoint is represented as literal "default", because it
-// affects comparision for addresses.
+// affects comparison for addresses.
 const DEFAULT_EP_NAME: &str = "default";
 const MAX_EP_LEN: usize = 31;
 
@@ -79,7 +81,22 @@ impl TryFrom<&[u8]> for Entrypoint {
     }
 }
 
-fn check_ep_name(ep: &[u8]) -> Result<(), AddressError> {
+impl TryFrom<FieldAnnotation<'_>> for Entrypoint {
+    type Error = AddressError;
+
+    /// NB: This only checks for the entrypoint length. `default` is sometimes
+    /// forbidden when converting from field annotations, other times not, it's
+    /// left to the discretion of the caller to make that check.
+    fn try_from(x: FieldAnnotation<'_>) -> Result<Self, Self::Error> {
+        let s = x.as_str();
+        // we already checked for allowed characters when constructing a field
+        // annotation, so here we only check length.
+        check_ep_name_len(s.as_bytes())?;
+        Ok(Entrypoint(s.to_owned()))
+    }
+}
+
+fn check_ep_name_len(ep: &[u8]) -> Result<(), AddressError> {
     if ep.len() > MAX_EP_LEN {
         return Err(AddressError::WrongFormat(format!(
             "entrypoint name must be at most {} characters long, but it is {} characters long",
@@ -87,6 +104,11 @@ fn check_ep_name(ep: &[u8]) -> Result<(), AddressError> {
             ep.len()
         )));
     }
+    Ok(())
+}
+
+fn check_ep_name(ep: &[u8]) -> Result<(), AddressError> {
+    check_ep_name_len(ep)?;
     let mut first_char = true;
     for c in ep {
         // direct encoding of the regex defined in

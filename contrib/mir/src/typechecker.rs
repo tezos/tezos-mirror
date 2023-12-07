@@ -5,7 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
-use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 use std::num::TryFromIntError;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -13,7 +14,7 @@ pub mod type_props;
 
 use type_props::TypeProperty;
 
-use crate::ast::annotations::NO_ANNS;
+use crate::ast::annotations::{AnnotationError, NO_ANNS};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
@@ -75,6 +76,10 @@ pub enum TcError {
     MissingTopLevelElt(Prim),
     #[error("expected a natural between 0 and 1023, but got {0}")]
     ExpectedU10(i128),
+    #[error(transparent)]
+    AnnotationError(#[from] AnnotationError),
+    #[error("duplicate entrypoint: {0}")]
+    DuplicateEntrypoint(Entrypoint),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -127,6 +132,8 @@ pub enum StacksNotEqualReason {
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
+pub type Entrypoints = HashMap<Entrypoint, Type>;
+
 impl Micheline<'_> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
     /// Validates the type.
@@ -152,24 +159,30 @@ impl Micheline<'_> {
         self_type: Option<&Micheline>,
         stack: &[Micheline],
     ) -> Result<Instruction, TcError> {
-        let self_type = self_type
+        let entrypoints = self_type
             .map(|ty| {
-                let ty = parse_ty(ctx, ty)?;
+                let (entrypoints, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
                 ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
-                Ok::<_, TcError>(ty)
+                Ok::<_, TcError>(entrypoints)
             })
             .transpose()?;
+
         let TopIsLast(checked_stack) = stack
             .iter()
             .map(|ty| parse_ty(ctx, ty))
             .collect::<Result<_, TcError>>()?;
         let mut opt_stack = FailingTypeStack::Ok(checked_stack);
-        typecheck_instruction(self, ctx, self_type.as_ref(), &mut opt_stack)
+        typecheck_instruction(self, ctx, entrypoints.as_ref(), &mut opt_stack)
     }
 
     /// Parse `Micheline` as a type. Validates the type.
     pub fn parse_ty(&self, ctx: &mut Ctx) -> Result<Type, TcError> {
         parse_ty(ctx, self)
+    }
+
+    pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
+        let (entrypoints, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
+        Ok(entrypoints)
     }
 
     /// Typecheck the contract script. Validates the script's types, then
@@ -214,9 +227,10 @@ impl Micheline<'_> {
                 }
             }
         }
-        let parameter = parameter_ty
-            .ok_or(TcError::MissingTopLevelElt(Prim::parameter))?
-            .parse_ty(ctx)?;
+        let (entrypoints, parameter) = parse_parameter_ty_with_entrypoints(
+            ctx,
+            parameter_ty.ok_or(TcError::MissingTopLevelElt(Prim::parameter))?,
+        )?;
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(ctx)?;
@@ -226,7 +240,7 @@ impl Micheline<'_> {
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
             ctx,
-            Some(&parameter),
+            Some(&entrypoints),
             &mut stack,
         )?;
         unify_stacks(
@@ -246,6 +260,14 @@ impl Micheline<'_> {
 }
 
 pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
+    parse_ty_with_entrypoints(ctx, ty, None)
+}
+
+fn parse_ty_with_entrypoints(
+    ctx: &mut Ctx,
+    ty: &Micheline,
+    mut entrypoints: Option<&mut Entrypoints>,
+) -> Result<Type, TcError> {
     use Micheline::*;
     use Prim::*;
     ctx.gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
@@ -262,7 +284,7 @@ pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
         })
     }
     let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
-    let ty = match ty {
+    let parsed_ty = match ty {
         App(int, [], _) => Type::Int,
         App(int, ..) => unexpected()?,
 
@@ -293,7 +315,11 @@ pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
         App(pair, [ty1, ty2, rest @ ..], _) => make_pair(ctx, (ty1, ty2, rest))?,
         App(pair, ..) => unexpected()?,
 
-        App(or, [l, r], _) => Type::new_or(parse_ty(ctx, l)?, parse_ty(ctx, r)?),
+        App(or, [l, r], _) => Type::new_or(
+            parse_ty_with_entrypoints(ctx, l, entrypoints.as_deref_mut())?,
+            parse_ty_with_entrypoints(ctx, r, entrypoints.as_deref_mut())?,
+        ),
+
         App(or, ..) => unexpected()?,
 
         App(option, [t], _) => Type::new_option(parse_ty(ctx, t)?),
@@ -327,25 +353,55 @@ pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
         | micheline_literals!()
         | micheline_values!() => unexpected()?,
     };
-    Ok(ty)
+    if let Option::Some(eps) = entrypoints {
+        // we just ensured it's an application of some type primitive
+        irrefutable_match!(ty; App, _prim, _args, anns);
+        if let Option::Some(field_ann) = anns.get_single_field_ann()? {
+            // NB: field annotations may be longer than entrypoints; however
+            // it's not an error to have an overly-long field annotation, it
+            // just doesn't count as an entrypoint.
+            if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
+                let entry = eps.entry(entrypoint);
+                match entry {
+                    Entry::Occupied(e) => {
+                        return Err(TcError::DuplicateEntrypoint(e.key().clone()))
+                    }
+                    Entry::Vacant(e) => e.insert(parsed_ty.clone()),
+                };
+            }
+        }
+    }
+    Ok(parsed_ty)
+}
+
+fn parse_parameter_ty_with_entrypoints(
+    ctx: &mut Ctx,
+    parameter_ty: &Micheline,
+) -> Result<(Entrypoints, Type), TcError> {
+    let mut entrypoints = Entrypoints::new();
+    let parameter = parse_ty_with_entrypoints(ctx, parameter_ty, Some(&mut entrypoints))?;
+    entrypoints
+        .entry(Entrypoint::default())
+        .or_insert_with(|| parameter.clone());
+    Ok((entrypoints, parameter))
 }
 
 /// Typecheck a sequence of instructions. Assumes the passed stack is valid, i.e.
 /// doesn't contain illegal types like `set operation` or `contract operation`.
 ///
-/// When `self_type` is `None`, `SELF` instruction is forbidden (e.g. like
-/// in lambdas).
+/// When `self_entrypoints` is `None`, `SELF` instruction is forbidden (e.g.
+/// like in lambdas).
 ///
-/// Self type is carried as an argument, not as part of context, because it has
-/// to be locally overridden during typechecking.
+/// Entrypoint map is carried as an argument, not as part of context, because it
+/// has to be locally overridden during typechecking.
 fn typecheck(
     ast: &[Micheline],
     ctx: &mut Ctx,
-    self_type: Option<&Type>,
+    self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Vec<Instruction>, TcError> {
     ast.iter()
-        .map(|i| typecheck_instruction(i, ctx, self_type, opt_stack))
+        .map(|i| typecheck_instruction(i, ctx, self_entrypoints, opt_stack))
         .collect()
 }
 
@@ -361,15 +417,15 @@ macro_rules! nothing_to_none {
 /// Typecheck a single instruction. Assumes passed stack is valid, i.e. doesn't
 /// contain illegal types like `set operation` or `contract operation`.
 ///
-/// When `self_type` is `None`, `SELF` instruction is forbidden (e.g. like
-/// in lambdas).
+/// When `self_entrypoints` is `None`, `SELF` instruction is forbidden (e.g.
+/// like in lambdas).
 ///
-/// Self type is carried as an argument, not as part of context, because it has
-/// to be locally overridden during typechecking.
+/// Entrypoint map is carried as an argument, not as part of context, because it
+/// has to be locally overridden during typechecking.
 pub(crate) fn typecheck_instruction(
     i: &Micheline,
     ctx: &mut Ctx,
-    self_type: Option<&Type>,
+    self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Instruction, TcError> {
     use Instruction as I;
@@ -522,7 +578,7 @@ pub(crate) fn typecheck_instruction(
             // Here we split off the protected portion of the stack, typecheck the code with the
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
-            let nested = typecheck(nested, ctx, self_type, opt_stack)?;
+            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
             opt_stack
                 .access_mut(TcError::FailNotInTail)?
                 .append(&mut protected);
@@ -572,8 +628,8 @@ pub(crate) fn typecheck_instruction(
             // Clone the stack so that we have a copy to run one branch on.
             // We can run the other branch on the live stack.
             let mut f_opt_stack = opt_stack.clone();
-            let nested_t = typecheck(nested_t, ctx, self_type, opt_stack)?;
-            let nested_f = typecheck(nested_f, ctx, self_type, &mut f_opt_stack)?;
+            let nested_t = typecheck(nested_t, ctx, self_entrypoints, opt_stack)?;
+            let nested_f = typecheck(nested_f, ctx, self_entrypoints, &mut f_opt_stack)?;
             // If stacks unify after typecheck, all is good.
             unify_stacks(ctx, opt_stack, f_opt_stack)?;
             I::If(nested_t, nested_f)
@@ -591,8 +647,8 @@ pub(crate) fn typecheck_instruction(
             let mut some_stack: TypeStack = stack.clone();
             some_stack.push(*ty);
             let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
-            let when_none = typecheck(when_none, ctx, self_type, opt_stack)?;
-            let when_some = typecheck(when_some, ctx, self_type, &mut some_opt_stack)?;
+            let when_none = typecheck(when_none, ctx, self_entrypoints, opt_stack)?;
+            let when_some = typecheck(when_some, ctx, self_entrypoints, &mut some_opt_stack)?;
             // If stacks unify, all is good
             unify_stacks(ctx, opt_stack, some_opt_stack)?;
             I::IfNone(when_none, when_some)
@@ -611,8 +667,8 @@ pub(crate) fn typecheck_instruction(
             // push it to the cons stack
             cons_stack.push(*ty);
             let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
-            let when_cons = typecheck(when_cons, ctx, self_type, &mut cons_opt_stack)?;
-            let when_nil = typecheck(when_nil, ctx, self_type, opt_stack)?;
+            let when_cons = typecheck(when_cons, ctx, self_entrypoints, &mut cons_opt_stack)?;
+            let when_nil = typecheck(when_nil, ctx, self_entrypoints, opt_stack)?;
             // If stacks unify, all is good
             unify_stacks(ctx, opt_stack, cons_opt_stack)?;
             I::IfCons(when_cons, when_nil)
@@ -631,8 +687,8 @@ pub(crate) fn typecheck_instruction(
             stack.push(tl);
             right_stack.push(tr);
             let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
-            let when_left = typecheck(when_left, ctx, self_type, opt_stack)?;
-            let when_right = typecheck(when_right, ctx, self_type, &mut opt_right_stack)?;
+            let when_left = typecheck(when_left, ctx, self_entrypoints, opt_stack)?;
+            let when_right = typecheck(when_right, ctx, self_entrypoints, &mut opt_right_stack)?;
             // If stacks unify, all is good
             unify_stacks(ctx, opt_stack, opt_right_stack)?;
             I::IfLeft(when_left, when_right)
@@ -657,7 +713,7 @@ pub(crate) fn typecheck_instruction(
             // Pop the bool off the top
             pop!();
             // Typecheck body with the current stack
-            let nested = typecheck(nested, ctx, self_type, opt_stack)?;
+            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
             // If the starting stack and result stack unify, all is good.
             unify_stacks(ctx, opt_stack, opt_copy)?;
             // pop the remaining bool off (if not failed)
@@ -678,7 +734,7 @@ pub(crate) fn typecheck_instruction(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(ty);
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, ctx, self_type, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans list) and result stack unify, all is good.
             unify_stacks(ctx, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::List, nested)
@@ -691,7 +747,7 @@ pub(crate) fn typecheck_instruction(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(T::Pair(kty_vty_box));
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, ctx, self_type, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans map) and result stack unify, all is good.
             unify_stacks(ctx, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::Map, nested)
@@ -849,15 +905,24 @@ pub(crate) fn typecheck_instruction(
         }
         (App(CHAIN_ID, expect_args!(0), _), _) => unexpected_micheline!(),
 
-        (App(SELF, [], _), ..) => {
+        (App(SELF, [], anns), ..) => {
+            let entrypoint = anns
+                .get_single_field_ann()?
+                .map(Entrypoint::try_from)
+                .transpose()?
+                .unwrap_or_default();
             stack.push(T::new_contract(
-                self_type.ok_or(TcError::SelfForbidden)?.clone(),
+                self_entrypoints
+                    .ok_or(TcError::SelfForbidden)?
+                    .get(&entrypoint)
+                    .ok_or_else(|| TcError::NoSuchEntrypoint(entrypoint.clone()))?
+                    .clone(),
             ));
-            I::ISelf
+            I::ISelf(entrypoint)
         }
         (App(SELF, expect_args!(0), _), _) => unexpected_micheline!(),
 
-        (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_type, opt_stack)?),
+        (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
 
@@ -2923,12 +2988,130 @@ mod typecheck_tests {
             super::typecheck_instruction(
                 &parse("SELF").unwrap(),
                 &mut Ctx::default(),
-                Some(&Type::Nat),
+                Some(&[(Entrypoint::default(), Type::Nat)].into()),
                 stk
             ),
-            Ok(Instruction::ISelf)
+            Ok(Instruction::ISelf(Entrypoint::default()))
         );
         assert_eq!(stk, &tc_stk![Type::new_contract(Type::Nat)]);
+    }
+
+    #[test]
+    fn self_instr_ep() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            super::typecheck_instruction(
+                &parse("SELF %foo").unwrap(),
+                &mut Ctx::default(),
+                Some(
+                    &[
+                        (Entrypoint::default(), Type::Nat),
+                        (Entrypoint::try_from("foo").unwrap(), Type::ChainId)
+                    ]
+                    .into()
+                ),
+                stk
+            ),
+            Ok(Instruction::ISelf(Entrypoint::try_from("foo").unwrap()))
+        );
+        assert_eq!(stk, &tc_stk![Type::new_contract(Type::ChainId)]);
+    }
+
+    #[test]
+    fn self_instr_no_ep() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            super::typecheck_instruction(
+                &parse("SELF %bar").unwrap(),
+                &mut Ctx::default(),
+                Some(&[(Entrypoint::default(), Type::Nat)].into()),
+                stk
+            ),
+            Err(TcError::NoSuchEntrypoint("bar".try_into().unwrap()))
+        );
+    }
+
+    #[test]
+    fn self_instr_duplicate_ann() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            super::typecheck_instruction(
+                &parse("SELF %bar %baz").unwrap(),
+                &mut Ctx::default(),
+                Some(&[(Entrypoint::default(), Type::Nat)].into()),
+                stk
+            ),
+            Err(AnnotationError::TooManyFieldAnns("baz".into()).into())
+        );
+    }
+
+    #[test]
+    fn self_instr_contract() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (or (int %foo) (unit %default));",
+                "storage unit;",
+                "code { DROP; SELF %foo; UNIT; FAILWITH };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::new_or(Type::Int, Type::Unit),
+                storage: Type::Unit,
+                code: Seq(vec![
+                    Drop(None),
+                    ISelf("foo".try_into().unwrap()),
+                    Unit,
+                    Failwith(Type::Unit)
+                ])
+            })
+        );
+    }
+
+    #[test]
+    fn self_instr_contract_overlong_ep() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (or (int %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq) (unit %default));",
+                "storage unit;",
+                "code { DROP; SELF %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq; UNIT; FAILWITH };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(AddressError::WrongFormat(
+                "entrypoint name must be at most 31 characters long, but it is 32 characters long"
+                    .into()
+            )
+            .into())
+        );
+    }
+
+    #[test]
+    fn self_instr_contract_overlong_field_ann() {
+        // NB: overlong field annotations are OK, but they don't work as
+        // entrypoints.
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (or (int %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq) (unit %default));",
+                "storage unit;",
+                "code { DROP; SELF; UNIT; FAILWITH };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::new_or(Type::Int, Type::Unit),
+                storage: Type::Unit,
+                code: Seq(vec![
+                    Drop(None),
+                    ISelf("default".try_into().unwrap()),
+                    Unit,
+                    Failwith(Type::Unit)
+                ])
+            })
+        );
     }
 
     #[test]

@@ -360,11 +360,11 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             ctx.gas.consume(interpret_cost::CHAIN_ID)?;
             stack.push(V::ChainId(ctx.chain_id.clone()));
         }
-        I::ISelf => {
+        I::ISelf(entrypoint) => {
             ctx.gas.consume(interpret_cost::SELF)?;
             stack.push(V::Contract(Address {
                 hash: ctx.self_address.clone(),
-                entrypoint: Entrypoint::default(),
+                entrypoint: entrypoint.clone(),
             }));
         }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
@@ -1321,11 +1321,35 @@ mod interpreter_tests {
             self_address: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap(),
             ..Ctx::default()
         };
-        assert_eq!(interpret(&vec![ISelf], ctx, stk), Ok(()));
+        assert_eq!(
+            interpret(&vec![ISelf(Entrypoint::default())], ctx, stk),
+            Ok(())
+        );
         assert_eq!(
             stk,
             &stk![TypedValue::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap()
+            )]
+        );
+    }
+
+    #[test]
+    fn self_instr_ep() {
+        let stk = &mut stk![];
+        let ctx = &mut Ctx {
+            self_address: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap(),
+            ..Ctx::default()
+        };
+        assert_eq!(
+            interpret(&vec![ISelf(Entrypoint::try_from("foo").unwrap())], ctx, stk),
+            Ok(())
+        );
+        assert_eq!(
+            stk,
+            &stk![TypedValue::Contract(
+                "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%foo"
+                    .try_into()
+                    .unwrap()
             )]
         );
     }
