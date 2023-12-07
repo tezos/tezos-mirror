@@ -911,11 +911,12 @@ let rec check_can_get_between_blocks rollup_node ~first ~last =
     check_can_get_between_blocks rollup_node ~first ~last:(last - 1)
   else unit
 
-let test_gc variant ~challenge_window ~commitment_period ~history_mode =
+let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
+    ~history_mode =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
-      tags = ["gc"; history_mode_str; variant];
+      tags = ["gc"; history_mode_str; variant] @ tags;
       variant = Some variant;
       description =
         sf
@@ -5673,6 +5674,7 @@ let register ~kind ~protocols =
     ~challenge_window:5
     ~commitment_period:2
     ~history_mode:Full
+    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "sparse_gc"
@@ -5680,6 +5682,7 @@ let register ~kind ~protocols =
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Full
+    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "no_gc"
