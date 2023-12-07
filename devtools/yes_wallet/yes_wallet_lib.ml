@@ -234,7 +234,7 @@ let genesis ~network =
   (Option.value_f ~default:(fun () ->
        Stdlib.failwith
        @@ Format.asprintf
-            "Unkown network alias %s.@.Known\n  networks are %a"
+            "@[Unkown network alias %s.@,Known networks are @[%a@]@]"
             network
             Format.(pp_print_list pp_print_string)
             (List.map
@@ -261,12 +261,21 @@ let load_bakers_public_keys ?(staking_share_opt = None)
   let open Tezos_store in
   let genesis = genesis ~network:network_opt in
   let* store =
-    Tezos_store.Store.init
-      ~store_dir:(Filename.concat base_dir "store")
-      ~context_dir:(Filename.concat base_dir "context")
-      ~allow_testchains:true
-      ~readonly:true
-      genesis
+    Lwt.catch
+      (fun () ->
+        Tezos_store.Store.init
+          ~store_dir:(Filename.concat base_dir "store")
+          ~context_dir:(Filename.concat base_dir "context")
+          ~allow_testchains:true
+          ~readonly:true
+          genesis)
+      (fun exn ->
+        Format.eprintf
+          "An error occured while initialising the store. It usually happens \
+           when using the wrong network alias.\n\
+           Network alias used was \"%s\".@."
+          network_opt ;
+        tzfail (Exn exn))
   in
   let main_chain_store = Store.main_chain_store store in
   let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
