@@ -9,6 +9,7 @@ oc.misc_checks:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   rules:
     # The linting job runs over the set of [source_directories]
     # defined in [scripts/lint.sh] that must be included here:
@@ -45,8 +46,6 @@ kaitai_checks:
   needs: [trigger]
   needs:
     - "oc.build_x86_64-released"
-  before_script:
-    - . ./scripts/version.sh
   script:
     - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
 

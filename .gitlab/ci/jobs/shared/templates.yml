@@ -90,6 +90,7 @@
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - . ./scripts/version.sh
+    - eval $(opam env)
 
 .oc.kernels_template:
   extends:

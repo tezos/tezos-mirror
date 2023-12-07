@@ -46,6 +46,7 @@ opam:prepare:
   stage: packaging
   needs: [trigger]
   script:
+    - eval $(opam env)
     - git init _opam-repo-for-release
     - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
     - git -C _opam-repo-for-release add packages
