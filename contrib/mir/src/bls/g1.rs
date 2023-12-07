@@ -130,7 +130,7 @@ impl Neg for G1 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::str::FromStr;
 
     use num_bigint::BigInt;
@@ -142,7 +142,7 @@ mod tests {
         G1::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
 
-    fn some_val() -> G1 {
+    pub fn some_val() -> G1 {
         let s = "026fcea34d1a4c5125142dfa3b616086309cab49e60e548d95de658af4d9329c269dc132bd5d884617e8767600daeee90c6f5d25f3d63540f3b799d291e5df4a90244346ed780d5c9d3afa8f3c9a196e089fa4edc4a9806592e8561d626579e3";
         G1::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
@@ -152,7 +152,7 @@ mod tests {
         G1::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
 
-    fn neg_some_val() -> G1 {
+    pub fn neg_some_val() -> G1 {
         let s = "026fcea34d1a4c5125142dfa3b616086309cab49e60e548d95de658af4d9329c269dc132bd5d884617e8767600daeee90d91b4c445a9b15957640de3b165cd8cd453083e060d0562c9f5d811ba16dcb6160c5b10ecaa7f9a2716a9e29d9a30c8";
         G1::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }

@@ -15,6 +15,7 @@ use std::rc::Rc;
 use typed_arena::Arena;
 
 use crate::ast::*;
+use crate::bls;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
@@ -990,6 +991,20 @@ fn interpret_one<'a>(
         I::TotalVotingPower => {
             ctx.gas.consume(interpret_cost::TOTAL_VOTING_POWER)?;
             stack.push(TypedValue::Nat(ctx.total_voting_power.clone()))
+        }
+        I::PairingCheck => {
+            let list = pop!(V::List);
+            ctx.gas
+                .consume(interpret_cost::pairing_check(list.len())?)?;
+            let it = list.iter().map(|elt| {
+                let (g1, g2) = irrefutable_match!(elt; V::Pair).as_ref();
+                (
+                    irrefutable_match!(g1; V::Bls12381G1),
+                    irrefutable_match!(g2; V::Bls12381G2),
+                )
+            });
+            let res = bls::pairing::pairing_check(it);
+            stack.push(V::Bool(res));
         }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
@@ -3754,5 +3769,20 @@ mod interpreter_tests {
             start_milligas - ctx.gas.milligas(),
             interpret_cost::TOTAL_VOTING_POWER + interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn pairing_check() {
+        let mut stack = stk![V::List(MichelsonList::from(vec![
+            V::new_pair(V::Bls12381G1(bls::G1::one()), V::Bls12381G2(bls::G2::one())),
+            V::new_pair(
+                V::Bls12381G1(bls::G1::one()),
+                V::Bls12381G2(bls::G2::neg_one())
+            )
+        ]))];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&PairingCheck, ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Bool(true)]);
+        assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
     }
 }
