@@ -179,3 +179,6 @@ val adaptive_issuance_activation_delay : Raw_context.t -> int
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
 val tolerated_inactivity_period : Raw_context.t -> int
+
+(** Delay before the activation of a consensus key, in cycles *)
+val consensus_key_activation_delay : Raw_context.t -> int
