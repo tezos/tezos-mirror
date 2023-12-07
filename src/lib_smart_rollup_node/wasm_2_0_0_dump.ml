@@ -14,6 +14,7 @@ let get_wasm_pvm_state ~(l2_header : Sc_rollup_block.header) data_dir =
   (* Now, we can checkout the state of the rollup of the given block hash *)
   let* context =
     Context.load
+      (module Irmin_context)
       ~cache_size:0
       Tezos_layer2_store.Store_sigs.Read_only
       (Configuration.default_context_dir data_dir)

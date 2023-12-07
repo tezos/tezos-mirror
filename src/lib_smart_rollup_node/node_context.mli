@@ -107,8 +107,7 @@ type 'a t = {
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
   store : 'a store;  (** The store for the persistent storage. *)
-  context : 'a Context.index;
-      (** The persistent context for the rollup node. *)
+  context : 'a Context.t;  (** The persistent context for the rollup node. *)
   lcc : ('a, lcc) Reference.t;
       (** Last cemented commitment on L1 (independently of synchronized status
           of rollup node) and its level. *)

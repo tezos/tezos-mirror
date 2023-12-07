@@ -35,7 +35,7 @@ type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
 (** The type of indexed repository for contexts. The parameter indicates if the
     index can be written or only read. *)
-type 'a index = 'a raw_index constraint 'a = [< `Read | `Write > `Read]
+type 'a index = ('a, repo) Context_sigs.index
 
 (** Read/write {!type:index}. *)
 type rw_index = [`Read | `Write] index
@@ -66,7 +66,7 @@ val equality_witness : (repo, tree) Context_sigs.equality_witness
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
-val load : cache_size:int -> 'a mode -> string -> 'a raw_index tzresult Lwt.t
+val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index
@@ -184,21 +184,6 @@ module PVMState : sig
       the updated context. Note: [set] does not perform any write on disk, this
       information must be committed using {!val:commit}. *)
   val set : 'a t -> value -> 'a t Lwt.t
-end
-
-(** Version of the context  *)
-module Version : sig
-  type t
-
-  (** The current and expected version of the context. *)
-  val version : t
-
-  (** The encoding for the context version. *)
-  val encoding : t Data_encoding.t
-
-  (** [check v] fails if [v] is different from the expected version of the
-      context. *)
-  val check : t -> unit tzresult
 end
 
 module Internal_for_tests : sig

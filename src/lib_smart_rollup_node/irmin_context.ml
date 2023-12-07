@@ -50,7 +50,7 @@ type tree = IStore.tree
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
-type nonrec 'a index = ('a, repo) Context_sigs.index
+type 'a index = ('a, repo) Context_sigs.index
 
 type rw_index = [`Read | `Write] index
 
@@ -253,26 +253,7 @@ module PVMState = struct
     {ctxt with tree}
 end
 
-module Version = struct
-  type t = V0
-
-  let version = V0
-
-  let encoding =
-    let open Data_encoding in
-    conv_with_guard
-      (fun V0 -> 0)
-      (function
-        | 0 -> Ok V0
-        | v -> Error ("Unsupported context version " ^ string_of_int v))
-      int31
-
-  let check = function V0 -> Result.return_unit
-end
-
-let load :
-    type a. cache_size:int -> a mode -> string -> a raw_index tzresult Lwt.t =
- fun ~cache_size mode path ->
+let load ~cache_size mode path =
   let open Lwt_result_syntax in
   let*! index = load ~cache_size mode path in
   return index

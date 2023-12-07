@@ -27,6 +27,7 @@
 
 open Protocol
 open Alpha_context
+open Context_wrapper.Irmin
 
 (** This function computes the inclusion/membership proof of the page
       identified by [page_id] in the slot whose data are provided in
@@ -123,7 +124,7 @@ let metadata (node_ctxt : _ Node_context.t) =
   Sc_rollup.Metadata.{address; origination_level}
 
 let generate_proof (node_ctxt : _ Node_context.t)
-    (game : Octez_smart_rollup.Game.t) start_state =
+    (game : Octez_smart_rollup.Game.t) (start_state : Context.pvmstate) =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let snapshot =
@@ -171,14 +172,14 @@ let generate_proof (node_ctxt : _ Node_context.t)
       ~inbox_level:game.inbox_level
       node_ctxt
       dal_parameters
-      start_state
+      (of_node_pvmstate start_state)
   in
   let module P = struct
     include PVM
 
-    let context = context
+    let context = (of_node_context context).index
 
-    let state = start_state
+    let state = of_node_pvmstate start_state
 
     let reveal hash =
       let open Lwt_syntax in
@@ -241,7 +242,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     end
   end in
   let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick start_state in
+  let*! start_tick = PVM.get_tick (of_node_pvmstate start_state) in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->

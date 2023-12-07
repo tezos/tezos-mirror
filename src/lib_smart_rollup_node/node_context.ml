@@ -97,7 +97,7 @@ type 'a t = {
   kind : Kind.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
-  context : 'a Context.index;
+  context : 'a Context.t;
   lcc : ('a, lcc) Reference.t;
   lpc : ('a, Commitment.t option) Reference.t;
   private_info : ('a, private_info option) Reference.t;

@@ -7,6 +7,7 @@
 
 open Protocol
 open Alpha_context
+module Context = Irmin_context
 
 module type Serializable_state_S = sig
   type context

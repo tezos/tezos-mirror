@@ -56,7 +56,9 @@ let pre_export_checks_and_get_snapshot_metadata ~data_dir =
     | Some m -> Ok m
   in
   let*? () = Context.Version.check metadata.context_version in
-  let* context = Context.load ~cache_size:1 Read_only context_dir in
+  let* context =
+    Context.load ~cache_size:1 (module Irmin_context) Read_only context_dir
+  in
   let* store =
     Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
   in
@@ -141,7 +143,9 @@ let post_import_checks ~message ~dest =
   let context_dir = Configuration.default_context_dir dest in
   (* Load context and stores in read-only to run checks. *)
   let* () = check_store_version store_dir in
-  let* context = Context.load ~cache_size:100 Read_only context_dir in
+  let* context =
+    Context.load ~cache_size:100 (module Irmin_context) Read_only context_dir
+  in
   let* store =
     Store.load
       Read_only

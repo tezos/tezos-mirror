@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type level_position = Start | Middle | End
+(** This modules offers functions to translate from node-context and
+    node-pvmstate representation to those used in the PVM *)
+open Context_sigs
 
-type info_per_level = {
-  predecessor_timestamp : Time.Protocol.t;
-  predecessor : Block_hash.t;
-}
+(* Context *)
+val of_node_context :
+  ('repo, 'tree) equality_witness ->
+  [`Read | `Write] Context.t ->
+  ([`Read | `Write], 'repo, 'tree) Context_sigs.t
 
-(** Type of the state for a simulation. *)
-type t = {
-  node_ctxt : Node_context.ro;
-  ctxt : Context.ro;
-  inbox_level : int32;
-  state : Context.pvmstate;
-  reveal_map : string Utils.Reveal_hash_map.t option;
-  nb_messages_inbox : int;
-  level_position : level_position;
-  info_per_level : info_per_level;
-  plugin : (module Protocol_plugin_sig.S);
-}
+val to_node_context :
+  (module Context_sigs.S with type tree = 'tree and type repo = 'repo) ->
+  ('a, 'repo, 'tree) Context_sigs.t ->
+  'a Context.t
 
-(** [start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file block] starts
-    a new simulation {e on top} of [block], i.e. for an hypothetical new inbox
-    (level). If [log_kernel_debug_file] is provided, kernel logs will be written
-    to [node_ctxt.data_dir/simulation_kernel_logs/log_kernel_debug_file]. *)
-val start_simulation :
-  Node_context.ro ->
-  reveal_map:string Utils.Reveal_hash_map.t option ->
-  ?log_kernel_debug_file:string ->
-  Layer1.head ->
-  t tzresult Lwt.t
+(* PVMState *)
+val of_node_pvmstate :
+  ('repo, 'tree) equality_witness -> Context.pvmstate -> 'tree
 
-(** [simulate_messages sim messages] runs a simulation of new [messages] in the
-    given simulation (state) [sim] and returns a new simulation state, the
-    remaining fuel (when [?fuel] is provided) and the number of ticks that
-    happened. *)
-val simulate_messages : t -> string list -> (t * Z.t) tzresult Lwt.t
+val to_node_pvmstate :
+  (module Context_sigs.S with type tree = 'tree) -> 'tree -> Context.pvmstate
 
-(** [end_simulation sim] adds and [End_of_level] message and marks the
-    simulation as ended. *)
-val end_simulation : t -> (t * Z.t) tzresult Lwt.t
+(** Specialized module to handle translation to/from Irmin_context *)
+module Irmin : sig
+  val of_node_context :
+    'a Context.t -> ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t
+
+  val to_node_context :
+    ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t -> 'a Context.t
+
+  val of_node_pvmstate : Context.pvmstate -> Irmin_context.tree
+
+  val to_node_pvmstate : Irmin_context.tree -> Context.pvmstate
+end

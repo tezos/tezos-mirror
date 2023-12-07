@@ -115,6 +115,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   in
   let* context =
     Context.load
+      (module Irmin_context)
       ~cache_size:irmin_cache_size
       mode
       (Configuration.default_context_dir data_dir)
@@ -254,6 +255,7 @@ module Internal_for_tests = struct
     in
     let* context =
       Context.load
+        (module Irmin_context)
         Read_write
         (Configuration.default_context_dir data_dir)
         ~cache_size:irmin_cache_size

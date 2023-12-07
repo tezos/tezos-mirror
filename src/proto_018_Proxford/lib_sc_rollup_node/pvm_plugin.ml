@@ -25,45 +25,48 @@
 (*****************************************************************************)
 open Protocol
 open Alpha_context
+open Context_wrapper.Irmin
 
 let context = Pvm.context
-
-module Context = Irmin_context
 
 let get_tick kind state =
   let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind kind) in
-  let+ tick = PVM.get_tick state in
+  let+ tick = PVM.get_tick (of_node_pvmstate state) in
   Sc_rollup.Tick.to_z tick
 
 let state_hash kind state =
   let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind kind) in
-  let+ hash = PVM.state_hash state in
+  let+ hash = PVM.state_hash (of_node_pvmstate state) in
   Sc_rollup_proto_types.State_hash.to_octez hash
 
 let initial_state kind =
+  let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind kind) in
-  PVM.initial_state ~empty:(PVM.State.empty ())
+  let+ state = PVM.initial_state ~empty:(PVM.State.empty ()) in
+  to_node_pvmstate state
 
 let parse_boot_sector kind =
   let module PVM = (val Pvm.of_kind kind) in
   PVM.parse_boot_sector
 
 let install_boot_sector kind state boot_sector =
+  let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind kind) in
-  PVM.install_boot_sector state boot_sector
+  let+ state = PVM.install_boot_sector (of_node_pvmstate state) boot_sector in
+  to_node_pvmstate state
 
 let get_current_level kind state =
   let open Lwt_option_syntax in
   let module PVM = (val Pvm.of_kind kind) in
-  let+ current_level = PVM.get_current_level state in
+  let+ current_level = PVM.get_current_level (of_node_pvmstate state) in
   Raw_level.to_int32 current_level
 
 let get_status (node_ctxt : _ Node_context.t) state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! current_level = PVM.get_current_level state in
+  let*! current_level = PVM.get_current_level (of_node_pvmstate state) in
   let* constants =
     match current_level with
     | None -> return node_ctxt.current_protocol.constants
@@ -78,7 +81,7 @@ let get_status (node_ctxt : _ Node_context.t) state =
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status = PVM.get_status ~is_reveal_enabled state in
+  let*! status = PVM.get_status ~is_reveal_enabled (of_node_pvmstate state) in
   return (PVM.string_of_status status)
 
 module Fueled = Fueled_pvm
@@ -104,7 +107,7 @@ let find_whitelist_update_output_index node_ctxt state ~outbox_level =
   let open Lwt_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
   let outbox_level = Raw_level.of_int32_exn outbox_level in
-  let* outbox = PVM.get_outbox outbox_level state in
+  let* outbox = PVM.get_outbox outbox_level (of_node_pvmstate state) in
   let rec aux i = function
     | [] -> None
     | Sc_rollup.{message = Whitelist_update _; _} :: _rest -> Some i
@@ -117,6 +120,7 @@ let find_whitelist_update_output_index node_ctxt state ~outbox_level =
 let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
     =
   let open Lwt_result_syntax in
+  let state = of_node_pvmstate state in
   let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
   let outbox_level = Raw_level.of_int32_exn outbox_level in
   let*! outbox = PVM.get_outbox outbox_level state in
@@ -124,7 +128,12 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
   match output with
   | None -> invalid_arg "invalid index"
   | Some output -> (
-      let*! proof = PVM.produce_output_proof node_ctxt.context state output in
+      let*! proof =
+        PVM.produce_output_proof
+          (of_node_context node_ctxt.context).index
+          state
+          output
+      in
       match proof with
       | Ok proof ->
           let serialized_proof =
@@ -138,10 +147,20 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
             err)
 
 module Wasm_2_0_0 = struct
-  let decode_durable_state =
+  let decode_durable_state enc tree =
     Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
+      enc
+      (of_node_pvmstate tree)
 
-  let proof_mem_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree
+  let proof_mem_tree tree =
+    Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree (of_node_pvmstate tree)
 
-  let proof_fold_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
+  let proof_fold_tree ?depth tree key ~order ~init ~f =
+    Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
+      ?depth
+      (of_node_pvmstate tree)
+      key
+      ~order
+      ~init
+      ~f:(fun a b c -> f a (to_node_pvmstate b) c)
 end
