@@ -9,6 +9,7 @@ use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
 use crate::KernelUpgrade;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -48,8 +49,14 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     // TODO: store delayed inbox messages (transactions).
     // Store the blueprints.
     for seq_blueprint in sequencer_blueprints {
-        let number = seq_blueprint.number;
-        store_sequencer_blueprint(host, seq_blueprint, number)?
+        log!(
+            host,
+            Debug,
+            "Storing chunk {} of sequencer blueprint number {}",
+            seq_blueprint.chunk_index,
+            seq_blueprint.number
+        );
+        store_sequencer_blueprint(host, seq_blueprint)?
     }
     Ok(kernel_upgrade)
 }
