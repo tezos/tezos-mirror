@@ -364,11 +364,7 @@ let test_rollup_node_running ~kind =
              sc_rollup
              _tezos_node
              _tezos_client ->
-  let metrics_port = string_of_int (Port.fresh ()) in
-  let metrics_addr = "localhost:" ^ metrics_port in
-  let* () =
-    Sc_rollup_node.run rollup_node sc_rollup ["--metrics-addr"; metrics_addr]
-  in
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* sc_rollup_from_rpc =
     Sc_rollup_node.RPC.call rollup_node
@@ -381,7 +377,10 @@ let test_rollup_node_running ~kind =
          sc_rollup
          sc_rollup_from_rpc)
   else
-    let url = "http://" ^ metrics_addr ^ "/metrics" in
+    let metrics_addr, metrics_port = Sc_rollup_node.metrics rollup_node in
+    let url =
+      "http://" ^ metrics_addr ^ ":" ^ string_of_int metrics_port ^ "/metrics"
+    in
     let*! metrics = Curl.get_raw url in
     let regexp = Str.regexp "\\(#HELP.*\n.*#TYPE.*\n.*\\)+" in
     if not (Str.string_match regexp metrics 0) then
