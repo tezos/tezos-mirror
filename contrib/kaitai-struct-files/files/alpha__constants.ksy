@@ -193,6 +193,8 @@ seq:
   type: n
 - id: preserved_cycles
   type: u1
+- id: consensus_rights_delay
+  type: u1
 - id: blocks_per_cycle
   type: s4
 - id: blocks_per_commitment
