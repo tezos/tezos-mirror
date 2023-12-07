@@ -347,7 +347,7 @@ let install_finalizer state =
   let* () = Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in
   let* () = Refutation_coordinator.shutdown () in
-  let* (_ : unit tzresult) = Node_context.close state.node_ctxt in
+  let* (_ : unit tzresult) = Node_context_loader.close state.node_ctxt in
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
@@ -701,7 +701,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     }
   in
   let* node_ctxt =
-    Node_context.init
+    Node_context_loader.init
       cctxt
       ~data_dir
       ~irmin_cache_size

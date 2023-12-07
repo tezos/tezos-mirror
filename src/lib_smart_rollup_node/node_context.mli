@@ -29,10 +29,39 @@
 
 type lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
+type genesis_info = Metadata.genesis_info = {
+  level : int32;
+  commitment_hash : Commitment.Hash.t;
+}
 
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
+
+(** Exposed functions to manipulate Node_context store outside of this module *)
+module Node_store : sig
+  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory]
+    loads a store form the data persisted [directory] as described in
+    {!Store_sigs.load} *)
+  val load :
+    'a Store_sigs.mode ->
+    index_buffer_size:int ->
+    l2_blocks_cache_size:int ->
+    string ->
+    'a store tzresult Lwt.t
+
+  (** [close_store store] closes the store *)
+  val close : 'a store -> unit tzresult Lwt.t
+
+  (** [check_and_set_history_mode store history_mode] checks the
+    compatibility between given history mode and that of the store.
+    History mode can be converted from Archive to Full. Trying to
+    convert from Full to Archive will trigger an error.*)
+  val check_and_set_history_mode :
+    'a Store_sigs.mode ->
+    'a store ->
+    Configuration.history_mode ->
+    unit tzresult Lwt.t
+end
 
 type debug_logger = string -> unit Lwt.t
 
@@ -145,31 +174,6 @@ val check_op_in_whitelist_or_bailout_mode :
     purpose.
 *)
 val get_fee_parameter : _ t -> Operation_kind.t -> Injector_common.fee_parameter
-
-(** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
-    initializes the rollup representation. The rollup origination level and kind
-    are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC
-    requests.
-*)
-val init :
-  #Client_context.full ->
-  data_dir:string ->
-  irmin_cache_size:int ->
-  index_buffer_size:int ->
-  ?log_kernel_debug_file:string ->
-  ?last_whitelist_update:Z.t * Int32.t ->
-  'a Store_sigs.mode ->
-  Layer1.t ->
-  genesis_info ->
-  lcc:lcc ->
-  lpc:Commitment.t option ->
-  Kind.t ->
-  current_protocol ->
-  Configuration.t ->
-  'a t tzresult Lwt.t
-
-(** Closes the store, context and Layer 1 monitor. *)
-val close : _ t -> unit tzresult Lwt.t
 
 (** The path for the lockfile used in block processing. *)
 val processing_lockfile_path : data_dir:string -> string
@@ -546,25 +550,12 @@ val make_kernel_logger :
   string ->
   ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
 
-(**/**)
-
 module Internal_for_tests : sig
-  (** Create a node context which really stores data on disk but does not
-      connect to any layer 1 node. It is meant to be used in unit tests for the
-      rollup node functions. *)
-  val create_node_context :
-    #Client_context.full ->
-    current_protocol ->
-    data_dir:string ->
-    Kind.t ->
-    Store_sigs.rw t tzresult Lwt.t
+  val write_protocols_in_store :
+    [> `Write] store -> Store.Protocols.value -> unit tzresult Lwt.t
 
   (** Extract the underlying store from the node context. This function is
-      unsafe to use outside of tests as it breaks the abstraction barrier
-      provided by the [Node_context]. *)
+           unsafe to use outside of tests as it breaks the abstraction barrier
+           provided by the [Node_context]. *)
   val unsafe_get_store : 'a t -> 'a Store.t
-
-  (** Create a dummy context to generate OpenAPI specification. *)
-  val openapi_context :
-    #Client_context.full -> Protocol_hash.t -> Store_sigs.rw t tzresult Lwt.t
 end
