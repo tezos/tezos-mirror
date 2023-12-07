@@ -538,7 +538,7 @@ let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
   let updated_state = update_current_phase updated_state Idle in
   Inject_block {kind; updated_state}
 
-let propose_block_action state delegate round (proposal : proposal) =
+let propose_block_action state delegate round ~last_proposal =
   let open Lwt_syntax in
   (* Possible cases:
      1. There was a proposal but the PQC was not reached.
@@ -556,18 +556,20 @@ let propose_block_action state delegate round (proposal : proposal) =
       (* Invariant: there is no locked round if there is no attestable
          payload *)
       assert (state.level_state.locked_round = None) ;
-      let attestations_in_last_proposal = proposal.block.quorum in
+      let attestations_in_last_proposal = last_proposal.block.quorum in
       (* Also insert the DAL attestations from the proposal, because the mempool
          may not contain them anymore *)
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
          The block may therefore contain multiple attestations for the same delegate. *)
-      let dal_attestations_in_last_proposal = proposal.block.dal_attestations in
+      let dal_attestations_in_last_proposal =
+        last_proposal.block.dal_attestations
+      in
       propose_fresh_block_action
         ~attestations:attestations_in_last_proposal
         ~dal_attestations:dal_attestations_in_last_proposal
         state
-        ~last_proposal:proposal.block
-        ~predecessor:proposal.predecessor
+        ~last_proposal:last_proposal.block
+        ~predecessor:last_proposal.predecessor
         delegate
         round
   | Some {proposal; prequorum} ->
@@ -681,7 +683,7 @@ let end_of_round state current_round =
             new_state
             consensus_key_and_delegate
             new_round
-            state.level_state.latest_proposal
+            ~last_proposal:state.level_state.latest_proposal
         in
         return (new_state, action)
 

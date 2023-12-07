@@ -373,7 +373,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                         state
                         consensus_key_and_delegate
                         round
-                        state.level_state.latest_proposal
+                        ~last_proposal:state.level_state.latest_proposal
                     in
                     let* state = do_action (state, action) in
                     let*! () =
@@ -425,7 +425,7 @@ let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
               state
               consensus_key_and_delegate
               round
-              state.level_state.latest_proposal
+              ~last_proposal:state.level_state.latest_proposal
           in
           let* state = do_action (state, action) in
           let*! () =
