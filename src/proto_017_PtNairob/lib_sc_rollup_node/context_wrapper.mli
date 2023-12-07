@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,12 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Pvm_sig.S
+(** This modules offers functions to translate from node-context and
+    node-pvmstate representation to those used in the PVM *)
+open Context_sigs
 
-let of_kind : Kind.t -> (module S) = function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
-  | Riscv -> invalid_arg "Riscv rollup is inactive in this protocol"
+(* Context *)
+val of_node_context :
+  ('repo, 'tree) equality_witness ->
+  [`Read | `Write] Context.t ->
+  ([`Read | `Write], 'repo, 'tree) Context_sigs.t
 
-let context : Kind.t -> (module Context_sigs.S) = function
-  | _ -> (module Irmin_context)
+val to_node_context :
+  (module Context_sigs.S with type tree = 'tree and type repo = 'repo) ->
+  ('a, 'repo, 'tree) Context_sigs.t ->
+  'a Context.t
+
+(* PVMState *)
+val of_node_pvmstate :
+  ('repo, 'tree) equality_witness -> Context.pvmstate -> 'tree
+
+val to_node_pvmstate :
+  (module Context_sigs.S with type tree = 'tree) -> 'tree -> Context.pvmstate
+
+(** Specialized module to handle translation to/from Irmin_context *)
+module Irmin : sig
+  val of_node_context :
+    'a Context.t -> ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t
+
+  val to_node_context :
+    ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t -> 'a Context.t
+
+  val of_node_pvmstate : Context.pvmstate -> Irmin_context.tree
+
+  val to_node_pvmstate : Irmin_context.tree -> Context.pvmstate
+end

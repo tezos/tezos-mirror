@@ -16,7 +16,9 @@ open Store_sigs
 
 let commit_new_state context key =
   let open Lwt_syntax in
-  let* state = Context.Internal_for_tests.get_a_tree key in
+  let* state =
+    Context.Internal_for_tests.get_a_tree (module Irmin_context) key
+  in
   let* context = Context.PVMState.set context state in
   let* hash = Context.commit context in
   Lwt.return (context, hash)
@@ -28,6 +30,7 @@ let test_gc data_dir =
   let open Lwt_result_syntax in
   let* context =
     Context.load
+      (module Irmin_context)
       ~cache_size:Configuration.default_irmin_cache_size
       Read_write
       (Configuration.default_context_dir data_dir)

@@ -148,7 +148,7 @@ let initialize_node_context protocol ?(constants = default_constants) kind
     {Node_context.hash = protocol; proto_level = 0; constants}
   in
   let* ctxt =
-    Node_context.Internal_for_tests.create_node_context
+    Node_context_loader.Internal_for_tests.create_node_context
       cctxt
       current_protocol
       ~data_dir
@@ -170,7 +170,7 @@ let with_node_context ?constants kind protocol ~boot_sector f =
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
-  let* _ = Node_context.close node_ctxt in
+  let* _ = Node_context_loader.close node_ctxt in
   return_unit
 
 let head_of_level ~predecessor level =

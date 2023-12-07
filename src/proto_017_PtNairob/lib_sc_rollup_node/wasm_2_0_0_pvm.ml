@@ -32,7 +32,7 @@ open Alpha_context
     It is imperative that this is aligned with the protocol's implementation.
 *)
 module Wasm_2_0_0_proof_format =
-  Context.Proof
+  Irmin_context.Proof
     (struct
       include Sc_rollup.State_hash
 
@@ -120,7 +120,7 @@ module type Durable_state = sig
 end
 
 module Make_durable_state
-    (T : Tezos_tree_encoding.TREE with type tree = Context.tree) :
+    (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
   Durable_state with type state = T.tree = struct
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
@@ -168,7 +168,7 @@ module Impl : Pvm_sig.S = struct
 
   let new_dissection = Game_helpers.Wasm.new_dissection
 
-  module State = Context.PVMState
+  module State = Irmin_context.PVMState
 
   module Inspect_durable_state = struct
     let lookup state keys =

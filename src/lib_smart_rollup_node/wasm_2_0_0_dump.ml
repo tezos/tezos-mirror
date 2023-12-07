@@ -7,13 +7,16 @@
 
 (** [get_wasm_pvm_state ~l2_header data_dir] reads the WASM PVM state in
     [data_dir] for the given [l2_header].*)
-let get_wasm_pvm_state ~(l2_header : Sc_rollup_block.header) data_dir =
+let get_wasm_pvm_state (module Plugin : Protocol_plugin_sig.S)
+    ~(l2_header : Sc_rollup_block.header) data_dir =
   let open Lwt_result_syntax in
   let context_hash = l2_header.context in
   let block_hash = l2_header.block_hash in
+  let (module C) = Plugin.Pvm.context Wasm_2_0_0 in
   (* Now, we can checkout the state of the rollup of the given block hash *)
   let* context =
     Context.load
+      (module C)
       ~cache_size:0
       Tezos_layer2_store.Store_sigs.Read_only
       (Configuration.default_context_dir data_dir)
@@ -150,7 +153,7 @@ let dump_durable_storage ~block ~data_dir ~file =
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
     | Some header -> return header
   in
-  let* state = get_wasm_pvm_state ~l2_header data_dir in
+  let* state = get_wasm_pvm_state plugin ~l2_header data_dir in
   let* instrs = generate_durable_storage ~plugin state in
   let*? contents =
     if Filename.check_suffix file ".yaml" then Installer_config.emit_yaml instrs

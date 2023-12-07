@@ -247,7 +247,7 @@ module type REFUTATION_GAME_HELPERS = sig
     for the current [game] for the execution step starting with
     [start_state]. *)
   val generate_proof :
-    Node_context.rw -> Game.t -> Context.tree -> string tzresult Lwt.t
+    Node_context.rw -> Game.t -> Context.pvmstate -> string tzresult Lwt.t
 
   (** [make_dissection plugin node_ctxt ~start_state ~start_chunk ~our_stop_chunk
     ~default_number_of_sections ~last_level] computes a dissection from between

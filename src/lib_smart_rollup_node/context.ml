@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,225 +23,185 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
-module Context_encoding = Tezos_context_encoding.Context_binary
+let err_implementation_mismatch ~expected ~got =
+  Format.kasprintf
+    invalid_arg
+    "Context implementation mismatch: expecting %s, got %s"
+    expected
+    got
 
-(* We shadow [Tezos_context_encoding] to prevent accidentally using
-   [Tezos_context_encoding.Context] instead of
-   [Tezos_context_encoding.Context_binary] during a future
-   refactoring.*)
-module Tezos_context_encoding = struct end
+open Context_sigs
 
-module Maker = Irmin_pack_unix.Maker (Context_encoding.Conf)
+type ('repo, 'tree) pvm_context_impl =
+  (module Context_sigs.S with type repo = 'repo and type tree = 'tree)
 
-module IStore = struct
-  include Maker.Make (Context_encoding.Schema)
-  module Schema = Context_encoding.Schema
-end
-
-module IStoreTree =
-  Tezos_context_helpers.Context.Make_tree (Context_encoding.Conf) (IStore)
-
-type tree = IStore.tree
-
-type 'a raw_index = {path : string; repo : IStore.Repo.t}
-
-type 'a index = 'a raw_index constraint 'a = [< `Read | `Write > `Read]
-
-type rw_index = [`Read | `Write] index
-
-type ro_index = [`Read] index
-
-type 'a t = {index : 'a index; tree : tree}
-
-type rw = [`Read | `Write] t
-
-type ro = [`Read] t
-
-type commit = IStore.commit
+let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
 
 type hash = Smart_rollup_context_hash.t
 
-type path = string list
+type 'a t =
+  | Context : {
+      index : ('a, 'repo) index;
+      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+      impl_name : string;
+      tree : 'tree;
+      equality_witness : ('repo, 'tree) equality_witness;
+    }
+      -> 'a t
 
-let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
+type ro = [`Read] t
 
-let hash_to_istore_hash h =
-  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+type rw = [`Read | `Write] t
 
-let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
+let make ~index ~tree ~pvm_context_impl ~equality_witness ~impl_name =
+  Context {index; tree; pvm_context_impl; equality_witness; impl_name}
 
-let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
- fun ~cache_size mode path ->
+let load :
+    type tree repo.
+    (repo, tree) pvm_context_impl ->
+    cache_size:int ->
+    'a Store_sigs.mode ->
+    string ->
+    'a t tzresult Lwt.t =
+ fun (module Pvm_Context_Impl) ~cache_size mode path ->
+  let open Lwt_result_syntax in
+  let* index = Pvm_Context_Impl.load ~cache_size mode path in
+  let equality_witness = Pvm_Context_Impl.equality_witness in
+  let impl_name = Pvm_Context_Impl.impl_name in
+  return
+  @@ make
+       ~index
+       ~tree:(Pvm_Context_Impl.PVMState.empty ())
+       ~pvm_context_impl:(module Pvm_Context_Impl)
+       ~equality_witness
+       ~impl_name
+
+let index c = c
+
+let close (type a)
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) :
+    unit Lwt.t =
+  Pvm_Context_Impl.close index
+
+let readonly (type a)
+    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a t) : ro =
+  Context {o with index = Pvm_Context_Impl.readonly index}
+
+let checkout (type a)
+    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a t) hash : a t option Lwt.t =
   let open Lwt_syntax in
-  let readonly = match mode with Read_only -> true | Read_write -> false in
-  let+ repo =
-    IStore.Repo.v
-      (Irmin_pack.config
-         ~readonly
-           (* Note that the use of GC in the context requires that
-            * the [always] indexing strategy not be used. *)
-         ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
-         ~lru_size:cache_size
-         path)
-  in
-  {path; repo}
+  let+ ctx = Pvm_Context_Impl.checkout index hash in
+  match ctx with
+  | None -> None
+  | Some {index; tree} -> Some (Context {o with index; tree})
 
-let close ctxt =
-  let _interrupted_gc = IStore.Gc.cancel ctxt.repo in
-  IStore.Repo.close ctxt.repo
+let empty (type a)
+    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a t) : a t =
+  let {index; tree} = Pvm_Context_Impl.empty index in
+  Context {o with index; tree}
 
-let readonly (index : [> `Read] index) = (index :> [`Read] index)
+let commit ?message
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} :
+      [> `Write] t) =
+  Pvm_Context_Impl.commit ?message {index; tree}
 
-let raw_commit ?(message = "") index tree =
-  let info = IStore.Info.v ~author:"Tezos" 0L ~message in
-  IStore.Commit.v index.repo ~info ~parents:[] tree
+let is_gc_finished
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] t) =
+  Pvm_Context_Impl.is_gc_finished index
 
-let commit ?message ctxt =
-  let open Lwt_syntax in
-  let+ commit = raw_commit ?message ctxt.index ctxt.tree in
-  IStore.Commit.hash commit |> istore_hash_to_hash
+let gc
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] t) ?callback hash =
+  Pvm_Context_Impl.gc index ?callback hash
 
-let checkout index key =
-  let open Lwt_syntax in
-  let* o = IStore.Commit.of_hash index.repo (hash_to_istore_hash key) in
-  match o with
-  | None -> return_none
-  | Some commit ->
-      let tree = IStore.Commit.tree commit in
-      return_some {index; tree}
+let wait_gc_completion
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] t) =
+  Pvm_Context_Impl.wait_gc_completion index
 
-let empty index = {index; tree = IStore.Tree.empty ()}
+type pvmstate =
+  | PVMState : {
+      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+      impl_name : string;
+      pvmstate : 'tree;
+      equality_witness : ('repo, 'tree) equality_witness;
+    }
+      -> pvmstate
 
-let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
+let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
+  PVMState {pvm_context_impl; impl_name; pvmstate; equality_witness}
 
-(* adapted from lib_context/disk/context.ml *)
-let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
-    (hash : hash) =
-  let open Lwt_syntax in
-  let repo = index.repo in
-  let istore_hash = hash_to_istore_hash hash in
-  let* commit_opt = IStore.Commit.of_hash index.repo istore_hash in
-  match commit_opt with
-  | None ->
-      Fmt.failwith "%a: unknown context hash" Smart_rollup_context_hash.pp hash
-  | Some commit -> (
-      let finished = function
-        | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
-            let total_duration =
-              Irmin_pack_unix.Stats.Latest_gc.total_duration stats
-            in
-            let finalise_duration =
-              Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
-            in
-            let* () = callback () in
-            Event.ending_context_gc
-              ( Time.System.Span.of_seconds_exn total_duration,
-                Time.System.Span.of_seconds_exn finalise_duration )
-        | Error (`Msg err) -> Event.context_gc_failure err
-      in
-      let commit_key = IStore.Commit.key commit in
-      let* launch_result = IStore.Gc.run ~finished repo commit_key in
-      match launch_result with
-      | Error (`Msg err) -> Event.context_gc_launch_failure err
-      | Ok false -> Event.context_gc_already_launched ()
-      | Ok true -> Event.starting_context_gc hash)
+(** State of the PVM that this rollup node deals with *)
+module PVMState = struct
+  type value = pvmstate
 
-let wait_gc_completion index =
-  let open Lwt_syntax in
-  let* r = IStore.Gc.wait index.repo in
-  match r with
-  | Ok _stats_opt -> return_unit
-  | Error (`Msg _msg) ->
-      (* Logs will be printed by the [gc] caller. *)
-      return_unit
+  let empty : type a. a t -> value =
+   fun (Context
+         {
+           pvm_context_impl = (module Pvm_Context_Impl);
+           equality_witness;
+           impl_name;
+           _;
+         }) ->
+    make_pvmstate
+      ~pvm_context_impl:(module Pvm_Context_Impl)
+      ~equality_witness
+      ~pvmstate:(Pvm_Context_Impl.PVMState.empty ())
+      ~impl_name
 
-let is_gc_finished index = IStore.Gc.is_finished index.repo
-
-let index context = context.index
-
-module Proof (Hash : sig
-  type t
-
-  val of_context_hash : Context_hash.t -> t
-end) (Proof_encoding : sig
-  val proof_encoding :
-    Tezos_context_sigs.Context.Proof_types.tree
-    Tezos_context_sigs.Context.Proof_types.t
-    Data_encoding.t
-end) =
-struct
-  module IStoreProof =
-    Tezos_context_helpers.Context.Make_proof (IStore) (Context_encoding.Conf)
-
-  module Tree = struct
-    include IStoreTree
-
-    type t = rw_index
-
-    type tree = IStore.tree
-
-    type key = path
-
-    type value = bytes
-  end
-
-  type tree = Tree.tree
-
-  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
-
-  let hash_tree tree = Hash.of_context_hash (Tree.hash tree)
-
-  let proof_encoding = Proof_encoding.proof_encoding
-
-  let proof_before proof =
-    let (`Value hash | `Node hash) = proof.IStoreProof.Proof.before in
-    Hash.of_context_hash hash
-
-  let proof_after proof =
-    let (`Value hash | `Node hash) = proof.IStoreProof.Proof.after in
-    Hash.of_context_hash hash
-
-  let produce_proof index tree step =
+  let find : type a. a t -> value option Lwt.t =
+   fun (Context
+         {
+           pvm_context_impl = (module Pvm_Context_Impl);
+           index;
+           tree;
+           equality_witness;
+           impl_name;
+           _;
+         }) ->
     let open Lwt_syntax in
-    (* Committing the context is required by Irmin to produce valid proofs. *)
-    let* _commit_key = raw_commit index tree in
-    match Tree.kinded_key tree with
-    | Some k ->
-        let* p = IStoreProof.produce_tree_proof index.repo k step in
-        return_some p
-    | None -> return_none
+    let+ pvmstate = Pvm_Context_Impl.PVMState.find {index; tree} in
+    match pvmstate with
+    | None -> None
+    | Some pvmstate ->
+        Some
+          (make_pvmstate
+             ~pvm_context_impl:(module Pvm_Context_Impl)
+             ~equality_witness
+             ~pvmstate
+             ~impl_name)
 
-  let verify_proof proof step =
-    (* The rollup node is not supposed to verify proof. We keep
-       this part in case this changes in the future. *)
+  let lookup : value -> string list -> bytes option Lwt.t =
+   fun (PVMState {pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _})
+       path ->
+    Pvm_Context_Impl.PVMState.lookup pvmstate path
+
+  let set : type a. a t -> value -> a t Lwt.t =
+   fun (Context
+         ({pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} as o1))
+       (PVMState o2) ->
     let open Lwt_syntax in
-    let* result = IStoreProof.verify_tree_proof proof step in
-    match result with
-    | Ok v -> return_some v
-    | Error _ ->
-        (* We skip the error analysis here since proof verification is not a
-           job for the rollup node. *)
-        return_none
+    match equiv o1.equality_witness o2.equality_witness with
+    | Some Refl, Some Refl ->
+        let+ ctxt = Pvm_Context_Impl.PVMState.set {index; tree} o2.pvmstate in
+        Context {o1 with index = ctxt.index; tree = ctxt.tree}
+    | _ -> err_implementation_mismatch ~expected:o1.impl_name ~got:o2.impl_name
 end
 
-(** State of the PVM that this rollup node deals with. *)
-module PVMState = struct
-  type value = tree
-
-  let key = ["pvm_state"]
-
-  let empty () = IStore.Tree.empty ()
-
-  let find ctxt = IStore.Tree.find_tree ctxt.tree key
-
-  let lookup tree path = IStore.Tree.find tree path
-
-  let set ctxt state =
+module Internal_for_tests = struct
+  let get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t =
+   fun (module Pvm_Context_Impl) key ->
     let open Lwt_syntax in
-    let+ tree = IStore.Tree.add_tree ctxt.tree key state in
-    {ctxt with tree}
+    let+ tree = Pvm_Context_Impl.Internal_for_tests.get_a_tree key in
+    make_pvmstate
+      ~pvm_context_impl:(module Pvm_Context_Impl)
+      ~equality_witness:Pvm_Context_Impl.equality_witness
+      ~impl_name:Pvm_Context_Impl.impl_name
+      ~pvmstate:tree
 end
 
 module Version = struct
@@ -260,17 +219,4 @@ module Version = struct
       int31
 
   let check = function V0 -> Result.return_unit
-end
-
-let load :
-    type a. cache_size:int -> a mode -> string -> a raw_index tzresult Lwt.t =
- fun ~cache_size mode path ->
-  let open Lwt_result_syntax in
-  let*! index = load ~cache_size mode path in
-  return index
-
-module Internal_for_tests = struct
-  let get_a_tree key =
-    let tree = IStore.Tree.empty () in
-    IStore.Tree.add tree [key] Bytes.empty
 end
