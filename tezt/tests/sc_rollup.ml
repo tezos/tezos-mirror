@@ -1108,6 +1108,26 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
       ~msg:(rex "The rollup node is already at level")
       outdated
   in
+  Log.info "Bake until next commitment." ;
+  let* () =
+    let event_name = "smart_rollup_node_new_commitment.v0" in
+    bake_until_event client ~event_name
+    @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
+  in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
+  let*! snapshot_file = Sc_rollup_node.export_snapshot sc_rollup_node dir in
+  (* The rollup node should not have published its commitment yet *)
+  Log.info "Try importing snapshot without published commitment." ;
+  Log.info "Try importing outdated snapshot." ;
+  let* () = Sc_rollup_node.terminate rollup_node_2 in
+  let*? unpublished =
+    Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Last commitment of snapshot is not published on L1.")
+      unpublished
+  in
   unit
 
 (* One can retrieve the list of originated SCORUs.
