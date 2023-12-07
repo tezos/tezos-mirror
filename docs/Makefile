@@ -75,6 +75,8 @@ manuals: \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
 	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
 		./scripts/man2txt.py -r > api/octez-dal-node.txt
+	@../octez-dal-node config init --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-dal-node-config-init.txt
 
 .PHONY: odoc
 odoc:

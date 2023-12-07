@@ -10,8 +10,7 @@ octez-dac-node.html
 /api/octez-codec.html
 /api/octez-admin-client.html
 /api/octez-signer.html
-/api/octez-node.txt
-/api/octez-proxy-server.txt
+/api/octez-*.txt
 
 /alpha/rpc.rst
 /shell/rpc.rst

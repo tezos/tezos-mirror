@@ -47,7 +47,7 @@ The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 
 RPC server
 ^^^^^^^^^^
 
-The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state. For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect or disconnect to peers. For the full list of the DAL node’s RPC see :doc:`./dal_rpc`.
+The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state. For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect or disconnect to peers.
 
 Operational aspects
 -------------------
@@ -60,6 +60,12 @@ The DAL node has two commands ``config init`` and ``run``.
 The command ``init config`` creates a new configuration file in the specified data directory or in the default location (ie ``~/.tezos-dal-node``) with the parameters provided on the command-line by the corresponding arguments, in case no configuration file exists already. If such a file already exists, it overrides it with the provided parameters (old parameters are lost).
 
 The command ``run`` runs the DAL node. The CLI arguments take precedence over the configuration file arguments, except for the list of bootstrap peers and of profiles, which are considered in addition to the ones from the configuration file. The configuration file is however not overridden with the new values of the node’s parameters. However, at the end of the execution, the node’s profiles, which may have been given as arguments or set via RPCs, are written to the configuration file.
+
+Both commands have the same arguments, which can be seen by executing, e.g., ``octez-dal-node config init --help``:
+
+.. literalinclude:: ../api/octez-dal-node-config-init.txt
+    :start-at: OPTIONS
+    :end-before: COMMON OPTIONS
 
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
