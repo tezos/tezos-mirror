@@ -302,6 +302,7 @@ pub enum CSRegister {
 
 impl CSRegister {
     /// Determine the priviledge level required to access this CSR.
+    #[inline(always)]
     pub fn privilege(self) -> Privilege {
         match self as usize {
             0x000..=0x0FF
@@ -349,6 +350,13 @@ impl CSRegister {
             reg => unreachable!("Invalid CSR {reg:#x}",),
         }
     }
+
+    /// Determines if the register is read-only
+    #[inline(always)]
+    pub fn is_read_only(self) -> bool {
+        // Rules & Table of read-write / read-only ranges are in section 2.1 & table 2.1
+        (self as usize >> 10) & 0b11 == 0b11
+    }
 }
 
 /// Value in a CSR
@@ -370,6 +378,19 @@ pub type Result<R> = core::result::Result<R, Exception>;
 #[inline(always)]
 pub fn check_privilege(reg: CSRegister, mode: Mode) -> Result<()> {
     if mode.privilege() < reg.privilege() {
+        return Err(Exception::IllegalInstruction);
+    }
+
+    Ok(())
+}
+
+/// Checks that `reg` is write-able.
+///
+/// Throws [`Exception::IllegalInstruction`] in case of wrong access rights.
+/// Section 2.1 - privileged spec
+#[inline(always)]
+pub fn check_write(reg: CSRegister) -> Result<()> {
+    if reg.is_read_only() {
         return Err(Exception::IllegalInstruction);
     }
 
@@ -467,5 +488,29 @@ pub mod tests {
         assert!(check(csreg::cycle, Mode::Machine).is_ok());
         assert!(check(csreg::frm, Mode::Supervisor).is_ok());
         assert!(check(csreg::fcsr, Mode::User).is_ok());
+    }
+
+    #[test]
+    fn test_read_write_access() {
+        use crate::csregisters::check_write as check;
+        use crate::csregisters::{CSRegister as csreg, Exception};
+
+        let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
+
+        // Machine registers
+        assert!(check(csreg::mcause).is_ok());
+        assert!(check(csreg::mhartid).is_err_and(is_illegal_instr));
+
+        // Supervisor registers
+        assert!(check(csreg::stvec).is_ok());
+
+        // Hypervisor registers
+        assert!(check(csreg::henvcfg).is_ok());
+        assert!(check(csreg::hgeip).is_err_and(is_illegal_instr));
+
+        // User registers
+        assert!(check(csreg::fcsr).is_ok());
+        assert!(check(csreg::instret).is_err_and(is_illegal_instr));
+        assert!(check(csreg::cycle).is_err_and(is_illegal_instr));
     }
 }
