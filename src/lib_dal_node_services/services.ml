@@ -54,6 +54,28 @@ let post_commitment :
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(open_root / "commitments")
 
+let post_slot :
+    < meth : [`POST]
+    ; input : Cryptobox.slot
+    ; output : Cryptobox.commitment * Cryptobox.commitment_proof
+    ; prefix : unit
+    ; params : unit
+    ; query : < padding : char > >
+    service =
+  Tezos_rpc.Service.post_service
+    ~description:
+      "Post a slot to the DAL node, computes its commitment and commitment \
+       proof, then computes the correspoding shards with their proof. The \
+       result of this RPC can be directly used to publish a slot header."
+    ~query:Types.slot_query
+    ~input:slot_encoding
+    ~output:
+      Data_encoding.(
+        obj2
+          (req "commitment" Cryptobox.Commitment.encoding)
+          (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
+    Tezos_rpc.Path.(open_root / "slot")
+
 let patch_commitment :
     < meth : [`PATCH]
     ; input : slot_id

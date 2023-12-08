@@ -54,6 +54,19 @@ val post_commitment :
   ; query : unit >
   service
 
+(** This RPC should be used by a slot producer. It allows to produce a
+    commitment, a commitment proof and the shards from a slot. A
+    padding is added if the slot is not of the expected size
+    ([slot_size] from the Cryptobox). *)
+val post_slot :
+  < meth : [`POST]
+  ; input : Cryptobox.slot
+  ; output : Cryptobox.commitment * Cryptobox.commitment_proof
+  ; prefix : unit
+  ; params : unit
+  ; query : < padding : char > >
+  service
+
 (** Associate a commitment to a level and a slot index. See {!val:
     Slot_manager.associate_slot_id_with_commitment} for more details. *)
 val patch_commitment :
