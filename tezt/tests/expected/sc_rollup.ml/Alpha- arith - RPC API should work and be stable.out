@@ -33,201 +33,186 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
-
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "312d31",
   "312d32",
   "312d33",
   "312d34",
   "312d35"
-]'
-[ "scmsg37MjxsWwLdnhRqRn8suc1oMvpa9riqGvazTg7giMNKDDU56Qfv",
-  "scmsg3X1MAjzt2B4r6gZnLf7mzoRf9UohkLw3Q2DTzLKctivKPYLXZ9",
-  "scmsg3prfVZhL8jFf5LSmxijjd96pKcz98ws6xe81qKagYcSg53e22N",
-  "scmsg2SY3VZWZ8y8491xbXvn8tQtHRCAq3zPJWQ7n4K6Rusw2YKVyNx",
-  "scmsg2zdjgY1tnuHMZqMavgPyc7qNj9MMvY4ywd38yauj3WfaiqDieE" ]
+]
+200 OK
+["scmsg37MjxsWwLdnhRqRn8suc1oMvpa9riqGvazTg7giMNKDDU56Qfv","scmsg3X1MAjzt2B4r6gZnLf7mzoRf9UohkLw3Q2DTzLKctivKPYLXZ9","scmsg3prfVZhL8jFf5LSmxijjd96pKcz98ws6xe81qKagYcSg53e22N","scmsg2SY3VZWZ8y8491xbXvn8tQtHRCAq3zPJWQ7n4K6Rusw2YKVyNx","scmsg2zdjgY1tnuHMZqMavgPyc7qNj9MMvY4ywd38yauj3WfaiqDieE"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "322d31",
   "322d32",
   "322d33",
   "322d34",
   "322d35"
-]'
-[ "scmsg33G4qMwJ869CUzuYWpsdF9bnQ4ezN2YHyERN64j2Q4t9L99CnA",
-  "scmsg3ew4TRYot9RPWjagZdNGdSTD3wzUAKU5WFz6JosGBtEr1UT5o5",
-  "scmsg3Q6eecZLng9BK7maLP1DGqRpfbygCsQj8vPxc3USjpQxhCfEkn",
-  "scmsg2GAoC8FEUfHZfQAKotvjRMpmSknHRpn4w35Y1YWZ4uVZDYvzUL",
-  "scmsg2sqy4npoYQq8iWJWQQgrdG126y3Btxn8ZzVPav8JmptWnVowGz" ]
+]
+200 OK
+["scmsg33G4qMwJ869CUzuYWpsdF9bnQ4ezN2YHyERN64j2Q4t9L99CnA","scmsg3ew4TRYot9RPWjagZdNGdSTD3wzUAKU5WFz6JosGBtEr1UT5o5","scmsg3Q6eecZLng9BK7maLP1DGqRpfbygCsQj8vPxc3USjpQxhCfEkn","scmsg2GAoC8FEUfHZfQAKotvjRMpmSknHRpn4w35Y1YWZ4uVZDYvzUL","scmsg2sqy4npoYQq8iWJWQQgrdG126y3Btxn8ZzVPav8JmptWnVowGz"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "332d31",
   "332d32",
   "332d33",
   "332d34",
   "332d35"
-]'
-[ "scmsg3EYkw2o4MC45NXUKZsEpzugW9sfumidS78TC8ygnJJznyAe9Yb",
-  "scmsg23CHWGTe3u8Utu3RpafBSEzvwnBKNRLxufPp8QindEWanu8UB6",
-  "scmsg3WnqzTRN8wvANvLKV4MouiTQZzq7X2G3CfKcomuQy4nKDFGRhX",
-  "scmsg3PVb7jXpE723XWdC1B8L34wVenMTi8r4b62Qja6owSMVo3h73C",
-  "scmsg2BZBgg1AFG7Zsar6DD1ZKPK36UakNZNj78npg6SUBoR26FpBdQ" ]
+]
+200 OK
+["scmsg3EYkw2o4MC45NXUKZsEpzugW9sfumidS78TC8ygnJJznyAe9Yb","scmsg23CHWGTe3u8Utu3RpafBSEzvwnBKNRLxufPp8QindEWanu8UB6","scmsg3WnqzTRN8wvANvLKV4MouiTQZzq7X2G3CfKcomuQy4nKDFGRhX","scmsg3PVb7jXpE723XWdC1B8L34wVenMTi8r4b62Qja6owSMVo3h73C","scmsg2BZBgg1AFG7Zsar6DD1ZKPK36UakNZNj78npg6SUBoR26FpBdQ"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "342d31",
   "342d32",
   "342d33",
   "342d34",
   "342d35"
-]'
-[ "scmsg3BLN9sVbJN6BrDh8mu3yDYeVfTBnm83Ciom55sS3dKvvXMk1nR",
-  "scmsg2Nsbi6zbwQUTwpBVcTEhi7oVWxbuka1kiHMJ9BLiUg8QfzyLYM",
-  "scmsg3Ti1eX6WyPXKjy3NdkJnQdzi5RbkFJ8piWhEpDQwWn8VdNMuCK",
-  "scmsg3TMS4Q8jtUhr6YcgkMqwWAXKkXLJMhSRvJcMEgq61t8xftRMFv",
-  "scmsg2AWA1jULPBJb7usha9gJg62T5PdiW9Uz1HdHLhaYDRx4qRvLTL" ]
+]
+200 OK
+["scmsg3BLN9sVbJN6BrDh8mu3yDYeVfTBnm83Ciom55sS3dKvvXMk1nR","scmsg2Nsbi6zbwQUTwpBVcTEhi7oVWxbuka1kiHMJ9BLiUg8QfzyLYM","scmsg3Ti1eX6WyPXKjy3NdkJnQdzi5RbkFJ8piWhEpDQwWn8VdNMuCK","scmsg3TMS4Q8jtUhr6YcgkMqwWAXKkXLJMhSRvJcMEgq61t8xftRMFv","scmsg2AWA1jULPBJb7usha9gJg62T5PdiW9Uz1HdHLhaYDRx4qRvLTL"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "352d31",
   "352d32",
   "352d33",
   "352d34",
   "352d35"
-]'
-[ "scmsg26t9x2GH9Pt9hiGLnSyNRALPzL8BYcTHik6PvU4vGDbUYM6JkV",
-  "scmsg3rtv5BpkWSR835sbwXJDBYZZW1ptXr8KKxprn4nJnhSacn6t1R",
-  "scmsg32QBihqJwKecppnv3o4MpRVYycR6puAHyhZhDVtewFQwmTdR3Z",
-  "scmsg3LQsvXBvj1qDWFRACbLuyAbZK6tHVTUeiYsPSU9KGxyf6ySxrY",
-  "scmsg3oXBwG2rAT3cjgDbRNyBnTirrkqTAeVMxMSJ5KUno8daWpY2rL" ]
+]
+200 OK
+["scmsg26t9x2GH9Pt9hiGLnSyNRALPzL8BYcTHik6PvU4vGDbUYM6JkV","scmsg3rtv5BpkWSR835sbwXJDBYZZW1ptXr8KKxprn4nJnhSacn6t1R","scmsg32QBihqJwKecppnv3o4MpRVYycR6puAHyhZhDVtewFQwmTdR3Z","scmsg3LQsvXBvj1qDWFRACbLuyAbZK6tHVTUeiYsPSU9KGxyf6ySxrY","scmsg3oXBwG2rAT3cjgDbRNyBnTirrkqTAeVMxMSJ5KUno8daWpY2rL"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "362d31",
   "362d32",
   "362d33",
   "362d34",
   "362d35"
-]'
-[ "scmsg2pUJoCjenPKAK3WnftrcnnKFf8RjTmoie2PS5Xa9jh2f6V4CpU",
-  "scmsg3M61S4suJDXn1yZyQrk9iy3WrDTXbPA6JHaeDWMjUJ4bhFTyAf",
-  "scmsg3SSJRKjcqvMFg2y6tuKWbikFx49kE5PfGg71uhxYdoMHBzutgU",
-  "scmsg3MPjHQ6m6BPJaGnAan8kCnadyCbn37DKAZa7LTbTtz3N36JgtW",
-  "scmsg2mUAHp9G2cJoqKwr4dpagFK6Wa4cNu7NGPXXB3zTfCpLmCP3Yr" ]
+]
+200 OK
+["scmsg2pUJoCjenPKAK3WnftrcnnKFf8RjTmoie2PS5Xa9jh2f6V4CpU","scmsg3M61S4suJDXn1yZyQrk9iy3WrDTXbPA6JHaeDWMjUJ4bhFTyAf","scmsg3SSJRKjcqvMFg2y6tuKWbikFx49kE5PfGg71uhxYdoMHBzutgU","scmsg3MPjHQ6m6BPJaGnAan8kCnadyCbn37DKAZa7LTbTtz3N36JgtW","scmsg2mUAHp9G2cJoqKwr4dpagFK6Wa4cNu7NGPXXB3zTfCpLmCP3Yr"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "372d31",
   "372d32",
   "372d33",
   "372d34",
   "372d35"
-]'
-[ "scmsg2VzSQUy8uj6yXYjwhLp2Qsmr77NixYmsXqqBGJpGsSxVBZHBPN",
-  "scmsg2p1iyQ4MHjNZrZhRmatcGXCzSr3Af7GKg6jawijWAe5ZpwFUMR",
-  "scmsg2xU6itfmj6XeuzYVqGza4Z95uAUXG44mnkM8uKkkdmbv8DyhS3",
-  "scmsg3YhsmhbfMXKmhsjGXej2ySwYFDYKQE1yUs7LcVkZ2ikaotWQKg",
-  "scmsg28neefD54Wsf46QgPtv22mKT32oNFv5ToU95DDsufcWFCZoovM" ]
+]
+200 OK
+["scmsg2VzSQUy8uj6yXYjwhLp2Qsmr77NixYmsXqqBGJpGsSxVBZHBPN","scmsg2p1iyQ4MHjNZrZhRmatcGXCzSr3Af7GKg6jawijWAe5ZpwFUMR","scmsg2xU6itfmj6XeuzYVqGza4Z95uAUXG44mnkM8uKkkdmbv8DyhS3","scmsg3YhsmhbfMXKmhsjGXej2ySwYFDYKQE1yUs7LcVkZ2ikaotWQKg","scmsg28neefD54Wsf46QgPtv22mKT32oNFv5ToU95DDsufcWFCZoovM"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "382d31",
   "382d32",
   "382d33",
   "382d34",
   "382d35"
-]'
-[ "scmsg3krb3ZX2JqPJkoBkrrFJcEtguu4sJDFS1XukN4PboYfxVRMZB8",
-  "scmsg2CXLxs8exJxS49Fi1bQFHhyy27fpTUwNZ8xhbuyd2uo4YmgWYL",
-  "scmsg2XJwuzAw5tZhfiTpUoDNSiM56W97YNEB4YyzGnrBcEgYpL9KMh",
-  "scmsg3RM54nLATBFqzCjvSwPybSbiiWJZey2ZiLbe1gjr9v9Vmoc9H3",
-  "scmsg2NpFWt1MhyDGhacEUpaeEheC8XWzNC3LaNaECXwzpi39QqPX14" ]
+]
+200 OK
+["scmsg3krb3ZX2JqPJkoBkrrFJcEtguu4sJDFS1XukN4PboYfxVRMZB8","scmsg2CXLxs8exJxS49Fi1bQFHhyy27fpTUwNZ8xhbuyd2uo4YmgWYL","scmsg2XJwuzAw5tZhfiTpUoDNSiM56W97YNEB4YyzGnrBcEgYpL9KMh","scmsg3RM54nLATBFqzCjvSwPybSbiiWJZey2ZiLbe1gjr9v9Vmoc9H3","scmsg2NpFWt1MhyDGhacEUpaeEheC8XWzNC3LaNaECXwzpi39QqPX14"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "392d31",
   "392d32",
   "392d33",
   "392d34",
   "392d35"
-]'
-[ "scmsg2nWa7VYthVQxL9antueegTTcyGzTqZzbFPVibWk8xzRGWvfdt8",
-  "scmsg3KfqCW3JtQAFWYUUKfaxUZ3zeR8t6233UU5frsUgZXjwyRaftR",
-  "scmsg2TJRQjXv5VYgrcVYM4upqfptRz4gLmDV1AMLcxqGJz2faoKfDK",
-  "scmsg2DBhcJVTm8JRWQHLWDXxiCi2PvUZzixqxkqyYupDZW2XU3cdvJ",
-  "scmsg2jKWtDbw5Jsdpc453XsgAVBKyYUzt3pKKsZtQNtvJvhPemp4WN" ]
+]
+200 OK
+["scmsg2nWa7VYthVQxL9antueegTTcyGzTqZzbFPVibWk8xzRGWvfdt8","scmsg3KfqCW3JtQAFWYUUKfaxUZ3zeR8t6233UU5frsUgZXjwyRaftR","scmsg2TJRQjXv5VYgrcVYM4upqfptRz4gLmDV1AMLcxqGJz2faoKfDK","scmsg2DBhcJVTm8JRWQHLWDXxiCi2PvUZzixqxkqyYupDZW2XU3cdvJ","scmsg2jKWtDbw5Jsdpc453XsgAVBKyYUzt3pKKsZtQNtvJvhPemp4WN"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31302d31",
   "31302d32",
   "31302d33",
   "31302d34",
   "31302d35"
-]'
-[ "scmsg3hFFdb5QTM1kbP7UmHviyd6VWfYaT9KTWDcTjE51BtRdjbCJjq",
-  "scmsg318GJr61qixBt6P4BxuUZ9zXZGct9fpknY7bky676r8esQjLrt",
-  "scmsg2twRwJCXXzvMYcD4Zu3zQSkHjhsDs9ZBczAi4Lvx7ogvJmeCGZ",
-  "scmsg3YFj784yYxTr4LbNfaLpHGpN5hKJgbBA8gUEJ4vief5KL8U5vS",
-  "scmsg2GY9Q5VTRSrjCPewduDXtPtZZ9hhMshPe3zUToBvFHTD9AhKkB" ]
+]
+200 OK
+["scmsg3hFFdb5QTM1kbP7UmHviyd6VWfYaT9KTWDcTjE51BtRdjbCJjq","scmsg318GJr61qixBt6P4BxuUZ9zXZGct9fpknY7bky676r8esQjLrt","scmsg2twRwJCXXzvMYcD4Zu3zQSkHjhsDs9ZBczAi4Lvx7ogvJmeCGZ","scmsg3YFj784yYxTr4LbNfaLpHGpN5hKJgbBA8gUEJ4vief5KL8U5vS","scmsg2GY9Q5VTRSrjCPewduDXtPtZZ9hhMshPe3zUToBvFHTD9AhKkB"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31312d31",
   "31312d32",
   "31312d33",
   "31312d34",
   "31312d35"
-]'
-[ "scmsg2S7XcHeyAHTQy6cJ6pVgxYqdW7XTBz3PsiCx26gyp2EHfCUJTh",
-  "scmsg34AzeCpQWbx2MicoEqumBeh5PzkmeB3XkASNCeEn4u5AC2TQtC",
-  "scmsg23m7SEy65fobQJ22FS7dmnHqPe2pmpCaA5iVWA8KYm4ZU3CVfK",
-  "scmsg3KLGXHeokSBbJcfsrvRkoAjMt5Yi7nj67WFHh6nkW8Ce8Kd4yn",
-  "scmsg2Eaop6LYBSnKMQXqPWijq9fBa4nPw5ZLndHRCH97kumZqLT7pn" ]
+]
+200 OK
+["scmsg2S7XcHeyAHTQy6cJ6pVgxYqdW7XTBz3PsiCx26gyp2EHfCUJTh","scmsg34AzeCpQWbx2MicoEqumBeh5PzkmeB3XkASNCeEn4u5AC2TQtC","scmsg23m7SEy65fobQJ22FS7dmnHqPe2pmpCaA5iVWA8KYm4ZU3CVfK","scmsg3KLGXHeokSBbJcfsrvRkoAjMt5Yi7nj67WFHh6nkW8Ce8Kd4yn","scmsg2Eaop6LYBSnKMQXqPWijq9fBa4nPw5ZLndHRCH97kumZqLT7pn"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31322d31",
   "31322d32",
   "31322d33",
   "31322d34",
   "31322d35"
-]'
-[ "scmsg3Rbcvi4zn7DSuXY8FHordHD4BMqXGi8XhrYAg9Z369qN2qPuPf",
-  "scmsg2JtmeQPL8JBY2MgEKx5f6XvH1bJjnqrjTpPVapmDaVBVcGHf8L",
-  "scmsg2xrhpVNNsUzYNF7LsNmeAbX2wJsZWE8Ub7DQRe8sToXxSjKR4T",
-  "scmsg3HMVWn75kiJ4Lr3KquJNQTkkFtwg9pmiKMythhUJ5h74Nznjd3",
-  "scmsg24y1317Sy46HnzTpvCLRe88LghadZ4eAjkb6EzvEsQVRhPbKzu" ]
+]
+200 OK
+["scmsg3Rbcvi4zn7DSuXY8FHordHD4BMqXGi8XhrYAg9Z369qN2qPuPf","scmsg2JtmeQPL8JBY2MgEKx5f6XvH1bJjnqrjTpPVapmDaVBVcGHf8L","scmsg2xrhpVNNsUzYNF7LsNmeAbX2wJsZWE8Ub7DQRe8sToXxSjKR4T","scmsg3HMVWn75kiJ4Lr3KquJNQTkkFtwg9pmiKMythhUJ5h74Nznjd3","scmsg24y1317Sy46HnzTpvCLRe88LghadZ4eAjkb6EzvEsQVRhPbKzu"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31332d31",
   "31332d32",
   "31332d33",
   "31332d34",
   "31332d35"
-]'
-[ "scmsg2vjhNLAF3AeKmzkWbwkVELTGnQcEdsPeD6imGgeejsQta46LxA",
-  "scmsg2mQYGCav4HTBebHEeeVscAeMGL8d17eDZSCeTEBsukRyri51mZ",
-  "scmsg3CyDxp7PAws2HXGTyCeeamNDCs3acBnN7Jymj3GVW3WCS1GKEz",
-  "scmsg2Safqm8tXs1k51v1A7VMyALCDRn5DAgYCJ9kbUD38jwPqtob6B",
-  "scmsg28V9X7iiXCDZM4mFCHKsMxuvc8wNopLGkcnZwo14sSs4dW1E73" ]
+]
+200 OK
+["scmsg2vjhNLAF3AeKmzkWbwkVELTGnQcEdsPeD6imGgeejsQta46LxA","scmsg2mQYGCav4HTBebHEeeVscAeMGL8d17eDZSCeTEBsukRyri51mZ","scmsg3CyDxp7PAws2HXGTyCeeamNDCs3acBnN7Jymj3GVW3WCS1GKEz","scmsg2Safqm8tXs1k51v1A7VMyALCDRn5DAgYCJ9kbUD38jwPqtob6B","scmsg28V9X7iiXCDZM4mFCHKsMxuvc8wNopLGkcnZwo14sSs4dW1E73"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31342d31",
   "31342d32",
   "31342d33",
   "31342d34",
   "31342d35"
-]'
-[ "scmsg2LeoW8SZzjCREGXpS2kwSfWCQBLf4M39gCQbuo7MPdcNUQgskZ",
-  "scmsg3KJEQRBNfv4DUb4LCA7EWAh9swowVibwH4Hx7CYn4mjFTEKNfC",
-  "scmsg2fWu16weRJCcgdvJzNtdWDNATvftgUVFfpgi5z3BDn9h2zE1Z2",
-  "scmsg29adqVUp1NnCAVSZVaKCVbrUdMth3C1yuUvBRZtmW9hsDtm8d1",
-  "scmsg2cDM9bscYDvXwkeB6h7RmN82wFgmL3wv5jJmwJukS9ju5zgKWA" ]
+]
+200 OK
+["scmsg2LeoW8SZzjCREGXpS2kwSfWCQBLf4M39gCQbuo7MPdcNUQgskZ","scmsg3KJEQRBNfv4DUb4LCA7EWAh9swowVibwH4Hx7CYn4mjFTEKNfC","scmsg2fWu16weRJCcgdvJzNtdWDNATvftgUVFfpgi5z3BDn9h2zE1Z2","scmsg29adqVUp1NnCAVSZVaKCVbrUdMth3C1yuUvBRZtmW9hsDtm8d1","scmsg2cDM9bscYDvXwkeB6h7RmN82wFgmL3wv5jJmwJukS9ju5zgKWA"]
 
-./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
+POST http://127.0.0.1:[PORT]/local/batcher/injection
+Content-type: application/json
+[
   "31352d31",
   "31352d32",
   "31352d33",
   "31352d34",
   "31352d35"
-]'
-[ "scmsg2DSE1zcsJXhEFsAFMo3qN7jV13LoxrG6qa1RaJtUFkPgJCBN5R",
-  "scmsg2StxsCnbG5vQmzdiY3F4M5bsrkb6Qh3CyrMod5thRVAbZHd38c",
-  "scmsg3fzM3qS4iPZ6qGHCNfupVUKiuYmrNe4k13uUj3ggrzX6rayaVA",
-  "scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx",
-  "scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q" ]
+]
+200 OK
+["scmsg2DSE1zcsJXhEFsAFMo3qN7jV13LoxrG6qa1RaJtUFkPgJCBN5R","scmsg2StxsCnbG5vQmzdiY3F4M5bsrkb6Qh3CyrMod5thRVAbZHd38c","scmsg3fzM3qS4iPZ6qGHCNfupVUKiuYmrNe4k13uUj3ggrzX6rayaVA","scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx","scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q"]
+
 GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version
 404 Not Found
 

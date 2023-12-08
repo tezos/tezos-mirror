@@ -105,8 +105,3 @@ val encode_batch :
   t ->
   transaction list ->
   string option Lwt.t
-
-(** [inject client messages] injects the [messages] in the queue the rollup
-    node's batcher and returns the list of message hashes injected. *)
-val inject :
-  ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process

@@ -243,3 +243,13 @@ let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
     GET
     ["global"; "block"; block; "durable"; pvm_kind; op]
     (f operation)
+
+let post_local_batcher_injection ~messages =
+  let data =
+    Data (`A (List.map (fun s -> `String Hex.(of_string s |> show)) messages))
+  in
+  make
+    POST
+    ["local"; "batcher"; "injection"]
+    ~data
+    JSON.(fun json -> as_list json |> List.map as_string)
