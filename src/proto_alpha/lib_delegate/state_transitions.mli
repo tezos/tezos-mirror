@@ -52,24 +52,23 @@ val extract_pqc :
 val handle_proposal :
   is_proposal_applied:bool -> state -> proposal -> (state * action) Lwt.t
 
-val propose_fresh_block_action :
-  attestations:Kind.attestation Operation.t list ->
-  dal_attestations:Kind.dal_attestation Operation.t list ->
-  ?last_proposal:block_info ->
-  predecessor:block_info ->
+(** Propose a block at the start of the given round for the given delegate,
+    given that there was already a proposal at the current level, the last one
+    being [last_proposal]. *)
+val propose_block_action :
   state ->
   consensus_key_and_delegate ->
   Round.t ->
+  last_proposal:proposal ->
   action Lwt.t
 
-val propose_block_action :
-  state -> consensus_key_and_delegate -> Round.t -> proposal -> action Lwt.t
-
 (** Increase the current round and propose at the new round (same
-   level), if the baker has a proposer slot. *)
+    level), if the baker has a proposer slot. *)
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
-(** Propose (if possible) for the first time at a new level. *)
+(** Propose for the first time at a level at the given round. There was no
+    previous proposal at the current level. (The function is called when
+    "moving" to a new level, hence the name.) *)
 val time_to_bake_at_next_level : state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state

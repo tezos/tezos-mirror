@@ -38,8 +38,6 @@ type simulation_kind =
       payload_hash : Block_payload_hash.t;
     }
 
-type simulation_mode = Local of Context.index | Node
-
 (* [forge_faked_protocol_data ?payload_hash ~payload_round ~seed_nonce_hash
    ~liquidity_baking_toggle_vote ~adaptive_issuance_vote] forges a fake [block_header_data] with
    [payload_hash] ([zero] by default), [payload_round], [seed_nonce_hash],

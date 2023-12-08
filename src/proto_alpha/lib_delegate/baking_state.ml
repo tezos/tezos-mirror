@@ -315,10 +315,10 @@ type signed_block = {
   operations : Tezos_base.Operation.t list list;
 }
 
-(* Updated only when we receive a block at a different level.
-
-   N.B. it may be our own: implying that we should not update unless
-   we already baked a block *)
+(* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},
+   {next_level_proposed_round} are updated only when we receive a block at a
+   different level than {current_level}.  Note that this means that there is
+   always a {latest_proposal}, which may be our own baked block. *)
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;

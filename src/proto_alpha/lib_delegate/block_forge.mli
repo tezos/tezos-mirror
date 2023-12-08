@@ -31,14 +31,16 @@ type unsigned_block = {
   operations : Tezos_base.Operation.t list list;
 }
 
+(** The simulation kind specifies whether the baker should first filter (and
+    then apply) the provided operations, or just apply them. The former case is
+    used for fresh proposals, while the latter for re-proposals (of an already
+    proposed payload). *)
 type simulation_kind =
   | Filter of Operation_pool.Prioritized.t
   | Apply of {
       ordered_pool : Operation_pool.ordered_pool;
       payload_hash : Block_payload_hash.t;
     }
-
-type simulation_mode = Local of Context.index | Node
 
 val forge :
   #Protocol_client_context.full ->
