@@ -1163,3 +1163,37 @@ let wait_for_injecting_event ?(tags = []) ?count node =
 let injecting_refute_event _tezos_node rollup_node =
   let* _injected = wait_for_injecting_event ~tags:["refute"] rollup_node in
   unit
+
+type transaction = {
+  destination : string;
+  entrypoint : string option;
+  parameters : string;
+  parameters_ty : string option;
+}
+
+let json_of_output_tx_batch txs =
+  let json_of_transaction {destination; entrypoint; parameters; parameters_ty} =
+    let parameters_json = `O [("int", `String parameters)] in
+    `O
+      (List.filter_map
+         Fun.id
+         [
+           Some ("destination", `String destination);
+           Some ("parameters", parameters_json);
+           Option.map (fun v -> ("entrypoint", `String v)) entrypoint;
+           Option.map
+             (fun v -> ("parameters_ty", `O [("prim", `String v)]))
+             parameters_ty;
+         ])
+  in
+  let transactions_json = List.map json_of_transaction txs in
+  let parameters_ty =
+    match txs with [] -> None | hd :: _ -> hd.parameters_ty
+  in
+  `O
+    [
+      ("transactions", `A transactions_json);
+      ( "kind",
+        `String
+          (match parameters_ty with Some _ -> "typed" | None -> "untyped") );
+    ]

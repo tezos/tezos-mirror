@@ -91,17 +91,3 @@ val outbox_proof :
   message_index:int ->
   outbox_level:int ->
   outbox_proof option Lwt.t
-
-(** [encode_json_outbox_msg outbox_msg_json] returns the encoding of
-    an outbox message. *)
-val encode_json_outbox_msg :
-  ?hooks:Process.hooks -> t -> JSON.u -> string Runnable.process
-
-(** [encode_batch batch] returns the encoding of a [batch] of output
-   transactions. *)
-val encode_batch :
-  ?hooks:Process.hooks ->
-  ?expected_error:Base.rex ->
-  t ->
-  transaction list ->
-  string option Lwt.t

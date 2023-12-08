@@ -3898,7 +3898,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
   let perform_rollup_execution_and_cement source_address target_address =
-    let* payload = input_message sc_client target_address in
+    let* payload = input_message protocol target_address in
     let* () =
       match payload with
       | `External payload ->
@@ -4055,7 +4055,7 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
   let boot_sector, input_message, expected_storage =
     match kind with
     | "arith" ->
-        let input_message _client contract_address =
+        let input_message _protocol contract_address =
           let payload =
             Printf.sprintf
               "%s %s%s"
@@ -4069,9 +4069,9 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
         (None, input_message, outbox_parameters)
     | "wasm_2_0_0" ->
         let bootsector = read_kernel "echo" in
-        let input_message client contract_address =
+        let input_message protocol contract_address =
           let transaction =
-            Sc_rollup_client.
+            Sc_rollup_helpers.
               {
                 destination = contract_address;
                 entrypoint;
@@ -4079,10 +4079,14 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
                 parameters_ty = outbox_parameters_ty;
               }
           in
-          let* answer = Sc_rollup_client.encode_batch client [transaction] in
-          match answer with
-          | None -> failwith "Encoding of batch should not fail."
-          | Some answer -> return (wrap answer)
+          let* answer =
+            Codec.encode
+              ~name:
+                (Protocol.encoding_prefix protocol
+                ^ ".smart_rollup.outbox.message")
+              (Sc_rollup_helpers.json_of_output_tx_batch [transaction])
+          in
+          return (wrap (String.trim answer))
         in
         ( Some bootsector,
           input_message,
@@ -4862,10 +4866,15 @@ let test_rollup_whitelist_update ~kind =
     ~commitment_period
     ~challenge_window
     ~operator:Constant.bootstrap1.public_key_hash
-  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
+  @@ fun protocol rollup_node _rollup_client rollup_addr node client ->
   let encode_whitelist_msg whitelist =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O [("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist))]
+    Codec.encode
+      ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
+      (`O
+        [
+          ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
+          ("kind", `String "whitelist_update");
+        ])
   in
   let send_whitelist_then_bake_until_exec encoded_whitelist_msgs =
     let* _res =
@@ -4916,7 +4925,7 @@ let test_rollup_whitelist_update ~kind =
     unit
   in
   let* () =
-    let*! encoded_whitelist_update =
+    let* encoded_whitelist_update =
       encode_whitelist_msg
         [
           Constant.bootstrap1.public_key_hash;
@@ -4942,12 +4951,14 @@ let test_rollup_whitelist_update ~kind =
     "submits two whitelist update in one inbox level. Only the second update \
      is executed by the rollup node." ;
   let* () =
-    let*! encoded_whitelist_update1 =
+    let* encoded_whitelist_update1 =
       encode_whitelist_msg [Constant.bootstrap3.public_key_hash]
     in
-    let*! encoded_whitelist_update2 =
-      Sc_rollup_client.encode_json_outbox_msg rollup_client
-      @@ `O [("whitelist", `Null)]
+    let* encoded_whitelist_update2 =
+      Codec.encode
+        ~name:
+          (Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
+        (`O [("kind", `String "whitelist_update")])
     in
     send_whitelist_then_bake_until_exec
       [encoded_whitelist_update1; encoded_whitelist_update2]
@@ -4994,23 +5005,30 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~supports:(From_protocol 018)
     ~commitment_period
     ~challenge_window
-  @@ fun _protocol rollup_node rollup_client rollup_addr _node client ->
+  @@ fun protocol rollup_node rollup_client rollup_addr _node client ->
   let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
-  let*! payload =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O [("whitelist", `A [`String Constant.bootstrap1.public_key_hash])]
+  let* payload =
+    Codec.encode
+      ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
+      (`O
+        [
+          ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
+          ("kind", `String "whitelist_update");
+        ])
   in
-  let*! payload2 =
-    Sc_rollup_client.encode_json_outbox_msg rollup_client
-    @@ `O
-         [
-           ( "whitelist",
-             `A
-               [
-                 `String Constant.bootstrap1.public_key_hash;
-                 `String Constant.bootstrap2.public_key_hash;
-               ] );
-         ]
+  let* payload2 =
+    Codec.encode
+      ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
+      (`O
+        [
+          ( "whitelist",
+            `A
+              [
+                `String Constant.bootstrap1.public_key_hash;
+                `String Constant.bootstrap2.public_key_hash;
+              ] );
+          ("kind", `String "whitelist_update");
+        ])
   in
   (* Execute whitelist update with outdated message index. *)
   let* _hash, outbox_level, message_index =
