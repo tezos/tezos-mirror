@@ -155,7 +155,7 @@ A rollup can do the following requests through the reveal data channel:
 
 #. **metadata requests** The rollup can request information from the
    protocol, namely the address and the origination level of the
-   rollup node itself. The rollup node retrieves this information
+   rollup itself. The rollup node retrieves this information
    through RPCs to answer the rollup.
 
 Information passing through the reveal data channel does not have to
