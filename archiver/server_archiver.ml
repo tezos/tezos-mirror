@@ -79,8 +79,12 @@ let send_something =
             !received
             !sent
         in
-        let () = Teztale_lib.Log.info logger (fun () -> msg) in
-        if resp.status <> `OK then Lwt.fail_with msg else Lwt.return_unit)
+        if resp.status = `OK then
+          let () = Teztale_lib.Log.debug logger (fun () -> msg) in
+          Lwt.return_unit
+        else
+          let () = Teztale_lib.Log.info logger (fun () -> msg) in
+          Lwt.fail_with msg)
       ctx.endpoints
 
 let send_rights ctx level rights =
