@@ -37,7 +37,7 @@ let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
   let mode =
     Evm_node.Sequencer {kernel = output; preimage_dir = preimages_dir}
   in
-  Evm_node.init ~mode ~devmode:false (Sc_rollup_node.endpoint sc_rollup_node)
+  Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
 
 let test_persistent_state =
   Protocol.register_test

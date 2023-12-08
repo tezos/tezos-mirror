@@ -19,7 +19,7 @@ pub struct SequencerBlueprint {
 impl Encodable for SequencerBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(3);
-        stream.append_list(&self.transactions);
+        stream.append(&self.transactions);
         append_timestamp(stream, self.timestamp);
         append_u256_le(stream, &self.number);
     }
@@ -35,7 +35,7 @@ impl Decodable for SequencerBlueprint {
         }
         let mut it = decoder.iter();
         let transactions =
-            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "transactions")?;
         let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
         let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
         Ok(Self {

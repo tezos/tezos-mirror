@@ -15,16 +15,28 @@ let now_bytes () =
   |> Z.of_int64 |> Z.to_bits |> Bytes.of_string
 
 let create ~smart_rollup_address ~number ~transactions =
-  let timestamp = Rlp.Value (now_bytes ()) in
+  let open Rlp in
+  let timestamp = Value (now_bytes ()) in
   let messages =
-    Rlp.List
+    List
       (List.map
-         (fun transaction -> Rlp.Value (Bytes.of_string transaction))
+         (fun transaction ->
+           let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
+           List
+             [
+               Value (Bytes.of_string tx_hash_str);
+               List
+                 [
+                   Value (Bytes.of_string "\001");
+                   Value (Bytes.of_string transaction);
+                 ];
+             ])
          transactions)
   in
-  let number = Rlp.Value (encode_u256_le number) in
+  let messages = Value (encode messages) in
+  let number = Value (encode_u256_le number) in
   let rlp_blueprint =
-    Rlp.List [messages; timestamp; number] |> Rlp.encode |> Bytes.to_string
+    List [messages; timestamp; number] |> encode |> Bytes.to_string
   in
 
   [

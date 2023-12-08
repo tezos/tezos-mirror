@@ -20,10 +20,13 @@ let execute ?(commit = false) ctxt inbox =
       ~destination:ctxt.Sequencer_context.smart_rollup_address
       ()
   in
-  let* pvm_state, _, _, _ =
+  let* evm_state, _, _, _ =
     Wasm.Commands.eval 0l inbox config Inbox ctxt.Sequencer_context.evm_state
   in
-  if commit then Sequencer_context.commit ctxt pvm_state else return ctxt
+  let* ctxt =
+    if commit then Sequencer_context.commit ctxt evm_state else return ctxt
+  in
+  return (ctxt, evm_state)
 
 let init ~smart_rollup_address ctxt =
   let open Lwt_result_syntax in
@@ -43,7 +46,8 @@ let init ~smart_rollup_address ctxt =
       ~transactions:[]
       ~number:Ethereum_types.(Qty Z.zero)
   in
-  execute ~commit:true ctxt inputs
+  let* ctxt, _evm_state = execute ~commit:true ctxt inputs in
+  return ctxt
 
 let inspect evm_state key =
   let open Lwt_syntax in
@@ -63,6 +67,6 @@ let execute_and_inspect ctxt
         | _ -> assert false)
       insight_requests
   in
-  let* ctxt = execute ctxt messages in
-  let*! values = List.map_p (fun key -> inspect ctxt.evm_state key) keys in
+  let* _ctxt, evm_state = execute ctxt messages in
+  let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
