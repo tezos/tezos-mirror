@@ -956,6 +956,24 @@ pub(crate) fn typecheck_instruction(
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(MEM, [], _), [.., T::Set(..), _]) => {
+            let ty_ = pop!();
+            let ty = *pop!(T::Set);
+            ensure_ty_eq(ctx, &ty, &ty_)?;
+            stack.push(T::Bool);
+            I::Mem(overloads::Mem::Set)
+        }
+        (App(MEM, [], _), [.., T::Map(..), _]) => {
+            let kty_ = pop!();
+            let (kty, _) = *pop!(T::Map);
+            ensure_ty_eq(ctx, &kty, &kty_)?;
+            stack.push(T::Bool);
+            I::Mem(overloads::Mem::Map)
+        }
+        (App(MEM, [], _), [.., _, _]) => no_overload!(MEM),
+        (App(MEM, [], _), [] | [_]) => no_overload!(MEM, len 2),
+        (App(MEM, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
@@ -2590,6 +2608,62 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn mem_map() {
+        let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Mem(overloads::Mem::Map))
+        );
+        assert_eq!(stack, tc_stk![Type::Bool]);
+    }
+
+    #[test]
+    fn mem_map_incomparable() {
+        assert_eq!(
+            parse("MEM").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[
+                    app!(map[app!(list[app!(int)]), app!(string)]),
+                    app!(list[app!(int)]),
+                ]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
+        );
+    }
+
+    #[test]
+    fn mem_map_wrong_type() {
+        let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into()),
+        );
+    }
+
+    #[test]
+    fn mem_set() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Mem(overloads::Mem::Set))
+        );
+        assert_eq!(stack, tc_stk![Type::Bool]);
+    }
+
+    #[test]
+    fn mem_set_wrong_type() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into()),
+        );
+    }
+
+    #[test]
     fn update_set() {
         let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Int];
         assert_eq!(
@@ -2901,6 +2975,11 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_mem_short() {
+        too_short_test(&app!(MEM), Prim::MEM, 2);
+    }
+
+    #[test]
     fn test_get_short() {
         too_short_test(&app!(GET), Prim::GET, 2);
     }
@@ -2982,6 +3061,19 @@ mod typecheck_tests {
             typecheck_instruction(&app!(GET), &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::GET,
+                stack: stk![Type::Unit, Type::Unit],
+                reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_mem_mismatch() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(MEM), &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::MEM,
                 stack: stk![Type::Unit, Type::Unit],
                 reason: None,
             })

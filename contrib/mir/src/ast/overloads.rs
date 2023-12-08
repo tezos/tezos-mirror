@@ -15,6 +15,12 @@ pub enum Add {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Mem {
+    Set,
+    Map,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
 }
