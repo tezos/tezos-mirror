@@ -550,16 +550,12 @@ module Make_s
     if Mempool.is_empty validated_mempool then Lwt.return_unit
     else
       let our_mempool =
-        let validated_hashes =
-          Classification.Sized_map.fold
-            (fun x _ acc -> Operation_hash.Set.add x acc)
-            pv_shell.classification.validated
-            Operation_hash.Set.empty
+        let known_valid =
+          Operation_hash.Set.union
+            validated_mempool.known_valid
+            pv_shell.mempool.known_valid
         in
-        {
-          Mempool.known_valid = validated_hashes;
-          pending = Pending_ops.hashes pv_shell.pending;
-        }
+        {Mempool.known_valid; pending = Pending_ops.hashes pv_shell.pending}
       in
       let* _res = set_mempool pv_shell our_mempool in
       Lwt.pause ()

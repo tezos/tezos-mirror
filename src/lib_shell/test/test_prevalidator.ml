@@ -159,7 +159,8 @@ let create_ddb () =
       in
       return (Distributed_db.activate db chain_store callback))
 
-let create_tools (advertised : Mempool.t ref) chain_db =
+let create_tools (advertised : Mempool.t ref) (mempool_set : Mempool.t ref)
+    chain_db =
   let open Lwt_result_syntax in
   let advertise_current_head ~(mempool : Mempool.t) _ =
     advertised :=
@@ -177,7 +178,19 @@ let create_tools (advertised : Mempool.t ref) chain_db =
     Store.Block.read_block chain_store bh
   in
   let send_get_current_head ?peer:_ () = assert false in
-  let set_mempool ~head:_ _mempool = return_unit in
+  let set_mempool ~head:_ (mempool : Mempool.t) =
+    (mempool_set :=
+       Mempool.
+         {
+           known_valid =
+             Operation_hash.Set.union
+               !advertised.known_valid
+               mempool.known_valid;
+           pending =
+             Operation_hash.Set.union !advertised.pending mempool.pending;
+         }) ;
+    return_unit
+  in
   Prevalidator.Internal_for_tests.Tools.
     {
       advertise_current_head;
@@ -202,7 +215,8 @@ let test_advertisement () =
     let prevalidator_limits = Shell_limits.default_prevalidator_limits in
     let* chain_db = create_ddb () in
     let advertised = ref Mempool.empty in
-    let tools = create_tools advertised chain_db in
+    let mempool_set = ref Mempool.empty in
+    let tools = create_tools advertised mempool_set chain_db in
     let* prevalidator =
       Prevalidator.Internal_for_tests.create
         tools
@@ -236,6 +250,9 @@ let test_advertisement () =
     assert (Operation_hash.Set.cardinal !advertised.pending = 0) ;
     assert (Operation_hash.Set.cardinal !advertised.known_valid = 3) ;
     advertised := Mempool.empty ;
+    assert (Operation_hash.Set.cardinal !mempool_set.pending = 0) ;
+    assert (Operation_hash.Set.cardinal !mempool_set.known_valid = 3) ;
+    mempool_set := Mempool.empty ;
     Format.eprintf
       "Flushing the mempool, pre_filter is called so that the operation have \
        their correct priority@." ;
@@ -255,6 +272,11 @@ let test_advertisement () =
     let*! () = wait_for_empty_request_queue prevalidator in
     assert (Operation_hash.Set.cardinal !advertised.pending = 0) ;
     assert (Operation_hash.Set.cardinal !advertised.known_valid = 1) ;
+
+    Format.printf
+      "Ensure that the Mempool.t contains all the validated operations" ;
+    assert (Operation_hash.Set.cardinal !mempool_set.pending = 0) ;
+    assert (Operation_hash.Set.cardinal !mempool_set.known_valid = 3) ;
     return_unit
   in
   match r with Error errs -> Test.fail "%a" pp_print_trace errs | Ok _ -> unit
