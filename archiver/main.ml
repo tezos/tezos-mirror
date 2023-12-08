@@ -159,7 +159,9 @@ let select_commands _ctxt Client_config.{chain; _} =
           in
           let dumper = Server_archiver.launch state "source-not-used" in
           let main =
+            let logger = Log.logger () in
             General_archiver.print_failures
+              logger
               (General_archiver.Server_loops.rights chain starting cctxt)
           in
           let*! out = Lwt.join [dumper; main] in
@@ -187,8 +189,10 @@ let select_commands _ctxt Client_config.{chain; _} =
               {cohttp_ctx; endpoints; backup = (fun _ -> Lwt.return_unit)}
           in
           let dumper = Server_archiver.launch state "source-not-used" in
+          let logger = Log.logger () in
           let main =
             General_archiver.print_failures
+              logger
               (General_archiver.Server_loops.applied_blocks
                  chain
                  starting

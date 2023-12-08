@@ -25,13 +25,16 @@
 
 open Lwt_result_syntax
 
-let print_failures f =
+let print_error logger e =
+  let () =
+    Teztale_lib.Log.error logger (fun () ->
+        Format.asprintf "%a" Error_monad.pp_print_trace e)
+  in
+  Lwt.return_unit
+
+let print_failures logger f =
   let*! o = f in
-  match o with
-  | Ok () -> Lwt.return_unit
-  | Error e ->
-      let () = Error_monad.pp_print_trace Format.err_formatter e in
-      Lwt.return_unit
+  match o with Ok () -> Lwt.return_unit | Error e -> print_error logger e
 
 let split_endorsements_preendorsements operations =
   List.fold_left
@@ -275,11 +278,10 @@ module Loops (Archiver : Archiver.S) = struct
           (* hack to ignore transition block because they need their own instantiation of Block_services *))
 
   let endorsements_loop cctx =
+    let logger = Teztale_lib.Log.logger () in
     let*! head_stream = Shell_services.Monitor.heads cctx cctx#chain in
     match head_stream with
-    | Error e ->
-        let () = Error_monad.pp_print_trace Format.err_formatter e in
-        Lwt.return_unit
+    | Error e -> print_error logger e
     | Ok (head_stream, _stopper) ->
         let*! _ =
           Lwt_stream.fold_s
@@ -326,7 +328,7 @@ module Loops (Archiver : Archiver.S) = struct
               in
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
-                print_failures (endorsements_recorder cctx block_level)
+                print_failures logger (endorsements_recorder cctx block_level)
               in
               Lwt.return acc')
             head_stream
@@ -340,13 +342,7 @@ module Loops (Archiver : Archiver.S) = struct
       Shell_services.Monitor.applied_blocks cctx ~chains:[cctx#chain] ()
     in
     match block_stream with
-    | Error e ->
-        let () =
-          Teztale_lib.Log.error logger (fun () ->
-              Format.asprintf "%a" Error_monad.pp_print_trace e)
-        in
-        let () = Error_monad.pp_print_trace Format.err_formatter e in
-        Lwt.return_unit
+    | Error e -> print_error logger e
     | Ok (block_stream, _stopper) ->
         let*! _ =
           Lwt_stream.fold_s
@@ -461,6 +457,7 @@ module Loops (Archiver : Archiver.S) = struct
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
                 print_failures
+                  logger
                   (block_recorder cctx block_level hash header [reception])
               in
               Lwt.return acc')
@@ -470,13 +467,12 @@ module Loops (Archiver : Archiver.S) = struct
         Lwt.return_unit
 
   let validation_blocks_loop cctx =
+    let logger = Log.logger () in
     let*! block_stream =
       Shell_services.Monitor.validated_blocks cctx ~chains:[cctx#chain] ()
     in
     match block_stream with
-    | Error e ->
-        let () = Error_monad.pp_print_trace Format.err_formatter e in
-        Lwt.return_unit
+    | Error e -> print_error logger e
     | Ok (block_stream, _stopper) ->
         let*! _ =
           Lwt_stream.fold_s
@@ -545,6 +541,7 @@ module Loops (Archiver : Archiver.S) = struct
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
                 print_failures
+                  logger
                   (block_recorder cctx block_level hash header [reception])
               in
               Lwt.return acc')
