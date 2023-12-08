@@ -107,6 +107,16 @@ pub mod tc_cost {
     // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
     pub const KEY_HASH_OPTIMIZED: u32 = 80;
 
+    // corresponds to cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, which happens to be `bls`
+    pub const KEY_READABLE: u32 = 3600;
+
+    // corresponds to cost_DECODING_PUBLIC_KEY_HASH_bls in the
+    // protocol. the protocol computes cost as
+    // `max(bls,ed25519,p256,secp256k1)`, but they're all equal
+    pub const KEY_OPTIMIZED: u32 = 60;
+
     // corresponds to cost_B58CHECK_DECODING_CHAIN_ID in the protocol
     pub const CHAIN_ID_READABLE: u32 = 1600;
 
@@ -246,6 +256,7 @@ pub mod interpret_cost {
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: usize = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
+        const CMP_KEY: u32 = 92; // hard-coded in the protocol
         let cmp_or = Checked::from(10u32);
         #[track_caller]
         fn incomparable() -> ! {
@@ -296,6 +307,9 @@ pub mod interpret_cost {
 
             (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len(), r.len())?,
             (V::Bytes(_), _) => incomparable(),
+
+            (V::Key(_), V::Key(_)) => CMP_KEY,
+            (V::Key(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
                 (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,

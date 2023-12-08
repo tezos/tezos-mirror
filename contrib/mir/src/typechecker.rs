@@ -19,6 +19,7 @@ use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
+use crate::ast::michelson_key::KeyError;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas;
@@ -80,6 +81,8 @@ pub enum TcError {
     AnnotationError(#[from] AnnotationError),
     #[error("duplicate entrypoint: {0}")]
     DuplicateEntrypoint(Entrypoint),
+    #[error("invalid value for type key: {0}")]
+    KeyError(#[from] KeyError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -349,6 +352,9 @@ fn parse_ty_with_entrypoints(
 
         App(bytes, [], _) => Type::Bytes,
         App(bytes, ..) => unexpected()?,
+
+        App(key, [], _) => Type::Key,
+        App(key, ..) => unexpected()?,
 
         Seq(..)
         | micheline_fields!()
@@ -1060,6 +1066,14 @@ pub(crate) fn typecheck_value(
             TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
         }
         (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
+        (T::Key, V::String(str)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            TV::Key(Key::from_base58_check(str)?)
+        }
+        (T::Key, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            TV::Key(Key::from_bytes(bs)?)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
 }
@@ -3186,6 +3200,32 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Bytes(hex::decode("deadf00d").unwrap())))
+        );
+    }
+
+    #[test]
+    fn push_key() {
+        assert_eq!(
+            parse("PUSH key \"p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB\"")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Key(
+                "p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB"
+                    .try_into()
+                    .unwrap()
+            )))
+        );
+        assert_eq!(
+            parse(
+                "PUSH key 0x01022c380cd1ff286a0a1a7c3aad6e891d237fa82e2a7cdeec08ccb55e90fdef995f"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Key(
+                "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
+                    .try_into()
+                    .unwrap()
+            )))
         );
     }
 }

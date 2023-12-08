@@ -40,6 +40,9 @@ impl PartialOrd for TypedValue {
             (Bytes(l), Bytes(r)) => l.partial_cmp(r),
             (Bytes(..), _) => None,
 
+            (Key(l), Key(r)) => l.partial_cmp(r),
+            (Key(..), _) => None,
+
             // non-comparable types
             (List(..) | Map(..) | Contract(..), _) => None,
         }
