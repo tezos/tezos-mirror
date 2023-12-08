@@ -132,23 +132,23 @@ $(ALL_EXECUTABLES):
 
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
-	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files
 	@$(MAKE) -C contrib/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
 check-kaitai-struct-files:
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
 	@dune build contrib/bin_codec_kaitai/codec.exe
-	@rm contrib/kaitai-struct-files/*.ksy
-	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
-	@git add contrib/kaitai-struct-files/*.ksy
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+	@rm contrib/kaitai-struct-files/files/*.ksy
+	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files 2>/dev/null
+	@git add contrib/kaitai-struct-files/files/*.ksy
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
 	@$(MAKE) check-kaitai-struct-files
-	@./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input 2>/dev/null || \
-	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input\""; exit 1)
+	@./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh contrib/kaitai-struct-files/files contrib/kaitai-struct-files/input 2>/dev/null || \
+	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh contrib/kaitai-struct-files/files contrib/kaitai-struct-files/input\""; exit 1)
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
