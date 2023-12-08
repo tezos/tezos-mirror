@@ -14,7 +14,22 @@ type t = string
 
 let verbosity : level ref = ref FATAL
 
-let verbosity_to_level = function
+let level_of_string = function
+  | "FATAL" -> Some DEBUG
+  | "ERROR" -> Some ERROR
+  | "WARNING" -> Some WARNING
+  | "INFO" -> Some INFO
+  | "DEBUG" -> Some DEBUG
+  | _ -> None
+
+let string_of_level = function
+  | FATAL -> "FATAL"
+  | ERROR -> "ERROR"
+  | WARNING -> "WARNING"
+  | INFO -> "INFO"
+  | DEBUG -> "DEBUG"
+
+let int_of_level = function
   | FATAL -> 0
   | ERROR -> 3
   | WARNING -> 4
@@ -22,19 +37,12 @@ let verbosity_to_level = function
   | DEBUG -> 7
 
 let log0 level id =
-  let v = verbosity_to_level level in
+  let v = int_of_level level in
   fun str ->
-    if v <= verbosity_to_level !verbosity then
+    if v <= int_of_level !verbosity then
       let s = Unix.gettimeofday () in
       let tm = Unix.gmtime s in
-      let level =
-        match level with
-        | FATAL -> "FATAL"
-        | ERROR -> "ERROR"
-        | WARNING -> "WARNING"
-        | INFO -> "INFO"
-        | DEBUG -> "DEBUG"
-      in
+      let level = string_of_level level in
       let str =
         match String.split_on_char '\n' @@ str () with
         | [] -> ""

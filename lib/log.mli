@@ -1,5 +1,9 @@
 type level = FATAL | ERROR | WARNING | INFO | DEBUG
 
+val level_of_string : string -> level option
+
+val string_of_level : level -> string
+
 val verbosity : level ref
 
 val level_encoding : level TzPervasives.Data_encoding.t

@@ -209,15 +209,10 @@ let select_commands _ctxt Client_config.{chain; _} =
               ~doc:"set verbosity level"
               ~long:"verbosity"
               ~placeholder:"FATAL|ERROR|WARNING|INFO|DEBUG"
-              (Tezos_clic.parameter (fun _ ->
-                   let open Teztale_lib.Log in
-                   function
-                   | "FATAL" -> return DEBUG
-                   | "ERROR" -> return ERROR
-                   | "WARNING" -> return WARNING
-                   | "INFO" -> return INFO
-                   | "DEBUG" -> return DEBUG
-                   | _ -> fail []))))
+              (Tezos_clic.parameter (fun _ arg ->
+                   match Teztale_lib.Log.level_of_string arg with
+                   | Some level -> return level
+                   | None -> fail []))))
         (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
         (fun (backup_path, level) endpoints cctxt ->
           Option.iter (fun level -> Teztale_lib.Log.verbosity := level) level ;
