@@ -752,9 +752,7 @@ let wait_for_publish_commitment node =
 (** Wait for the rollup node to detect a timeout *)
 let wait_for_timeout_detected sc_node =
   Sc_rollup_node.wait_for sc_node "smart_rollup_node_timeout_detected.v0"
-  @@ fun json ->
-  let other = JSON.(json |> as_string) in
-  Some other
+  @@ fun json -> Some (JSON.as_string json)
 
 (** Wait for the rollup node to compute a dissection *)
 let wait_for_computed_dissection sc_node =
@@ -796,9 +794,8 @@ let prioritize_refute_operations sc_rollup_node =
     (update "refute"
     @@ put
          ( "minimal-nanotez-per-gas-unit",
-           JSON.annotate
-             ~origin:"higher-priority"
-             (`A [`String "200"; `String "1"]) ))
+           annotate ~origin:"higher-priority" (`A [`String "200"; `String "1"])
+         ))
     config
 
 let send_text_messages ?(format = `Raw) ?hooks ?src client msgs =
