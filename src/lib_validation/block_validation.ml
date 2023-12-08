@@ -494,7 +494,8 @@ module Make (Proto : Protocol_plugin.T) = struct
     let should_include_metadata_hashes =
       match proto_env_version with
       | Protocol.V0 -> false
-      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11) ->
+      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12)
+        ->
           true
     in
     let block_metadata =
@@ -982,7 +983,7 @@ module Make (Proto : Protocol_plugin.T) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 -> true)
+        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 -> true)
       && not is_from_genesis
     in
     let* context =

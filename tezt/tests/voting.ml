@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 11
+    "expected_env_version": 12
 }
 |}
 

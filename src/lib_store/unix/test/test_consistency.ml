@@ -39,7 +39,7 @@ let nb_protocols = 5
 let register_protocol ~hash ~sources =
   let module M = struct
     include
-      Registered_protocol.Register_embedded_V11
+      Registered_protocol.Register_embedded_V12
         (Tezos_protocol_environment_demo_noops)
         (Tezos_protocol_demo_noops.Protocol)
         (struct
