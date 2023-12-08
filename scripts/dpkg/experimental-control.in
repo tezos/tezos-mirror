@@ -3,4 +3,4 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez experimental binaries
-Depends: @DPKG@-baker (>=@VERSION@), @DEPENDS@
+Depends: @DEPENDS@

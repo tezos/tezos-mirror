@@ -7,7 +7,7 @@ Packager:       @MAINT@
 License:	MIT
 URL:		http://tezos.gitlab.io
 
-Requires:	@DPKG@-baker
+Requires:	
 Source0:	@FAKESRC@
 
 %prep
