@@ -9,6 +9,7 @@ test_kernels:
     - make -f kernels.mk test
   rules:
     - changes:
+        - .gitlab-ci.yml
         - kernels.mk
         - src/kernel_*/**/*
         - src/risc_v/**/*
