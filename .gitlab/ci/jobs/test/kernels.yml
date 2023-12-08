@@ -9,6 +9,7 @@ test_kernels:
     - make -f kernels.mk test
   rules:
     - changes:
+        - kernels.mk
         - src/kernel_*/**/*
         - src/risc_v/**/*
         - etherlink/kernel_evm/**/*

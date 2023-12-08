@@ -165,7 +165,7 @@ check: build-dev-deps
 	@make -C ${RISC_V_TESTS_DIR} check
 
 	# Check formatting of all crates.
-	@find src -iname Cargo.lock -execdir cargo fmt --check \;
+	@exec scripts/check-format-rust.sh
 
 .PHONY: publish-sdk-deps
 publish-sdk-deps: build-deps
