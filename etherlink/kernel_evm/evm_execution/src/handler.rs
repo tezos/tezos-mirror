@@ -695,6 +695,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if let Ok(ExitReason::Succeed(_)) = result {
             let code_out = runtime.machine().return_value();
 
+            if code_out.first() == Some(&0xef) {
+                // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
+                return Ok((
+                    ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+                    None,
+                    vec![],
+                ));
+            }
+
             if let Err(err) =
                 self.record_cost(self.compute_gas_code_deposit(code_out.len()))
             {

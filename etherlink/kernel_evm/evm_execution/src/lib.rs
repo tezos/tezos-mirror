@@ -2365,4 +2365,85 @@ mod test {
 
         assert_eq!(expected_gas, result.gas_used);
     }
+
+    fn first_block() -> BlockConstants {
+        let base_fee_per_gas = U256::from(23000);
+        let mut base_fee_per_gas_bytes = [0u8; 32];
+        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
+        BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas)
+    }
+
+    fn deploy(
+        data: Vec<u8>,
+        all_the_gas: u64,
+    ) -> Result<Option<ExecutionOutcome>, EthereumError> {
+        // Arrange
+        let mut mock_runtime = MockHost::default();
+        let block = first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let caller = H160::from_low_u64_be(118u64);
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            all_the_gas.into(),
+        );
+
+        // Act
+
+        run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        )
+    }
+
+    fn test_eip_3541(data: Vec<u8>) {
+        // value not relevant to test, just needs to be big enough
+        let all_the_gas = 65_000_u64;
+
+        // Act
+        let result = deploy(data, all_the_gas);
+
+        // Assert
+        let result = unwrap_outcome!(&result, false);
+        assert_eq!(
+            ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+            result.reason
+        );
+    }
+
+    #[test]
+    fn test_eip_3541_errors() {
+        // Arrange: see test cases
+        // in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
+        test_eip_3541(hex::decode("60ef60005360016000f3").unwrap());
+        test_eip_3541(hex::decode("60ef60005360026000f3").unwrap());
+        test_eip_3541(hex::decode("60ef60005360036000f3").unwrap());
+        test_eip_3541(hex::decode("60ef60005360206000f3").unwrap());
+    }
+
+    #[test]
+    fn test_eip_3541_noerror() {
+        // value not relevant to test, just needs to be big enough
+        let all_the_gas = 65_000_u64;
+        let data = hex::decode("60fe60005360016000f3").unwrap();
+        // Act
+        let result = deploy(data, all_the_gas);
+
+        // Assert
+        let result = unwrap_outcome!(&result);
+        assert_eq!(ExitReason::Succeed(ExitSucceed::Returned), result.reason);
+    }
 }
