@@ -68,7 +68,7 @@ These pages:
 - present the key concepts and mechanisms for setting up Octez, including :doc:`user/setup-client`, :doc:`user/setup-node`, for different production or testing configurations;
 - empowers you to take advantage of Octez' basic and more advanced features, such as :doc:`user/key-management`, :doc:`user/multisig`, :doc:`user/logging`, and much more.
 
-If you intend to participate to Tezos not just as a mere user, but rather as a baker, you should aslo check more specialized documentation such as the ``Baking`` section on `Open Tezos <https://opentezos.com/>`__.
+If you intend to participate to Tezos not just as a user, but rather as a baker, you should also check more specialized documentation such as the  `Baking section on Open Tezos <https://opentezos.com/node-baking/overview/>`__.
 
 .. raw:: html
 
@@ -119,7 +119,7 @@ This website complements those resources with reference documentation, mostly in
 
 **Are you a platform developer?** Here are the nuts and bolts!
 
-One major focus of this website is on resources for platform developers, that is, contributing to Octez (Octez developers) and contributors to the Tezos protocol (protocol developers).
+One major focus of this website is on resources for platform developers, that is, contributors to Octez (Octez developers) and contributors to the Tezos protocol (protocol developers).
 
 Platform developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Contributing`` section, including:
 

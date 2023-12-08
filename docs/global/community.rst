@@ -4,7 +4,7 @@ The Community
 ~~~~~~~~~~~~~
 
 - The website of the `Tezos Foundation <https://tezos.foundation/>`_.
-- `Tezos Agora <https://www.tezosagora.org>`_ is the premier meeting point for the community.
+- `Tezos Agora <https://www.tezosagora.org>`_ is the main meeting point for the community.
 - Several community-built block explorers are available:
 
     - https://tzstats.com
