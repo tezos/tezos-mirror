@@ -987,6 +987,13 @@ let oog_call =
     bin = kernel_inputs_path ^ "/oog_call.bin";
   }
 
+let ether_wallet =
+  {
+    label = "ether_wallet";
+    abi = kernel_inputs_path ^ "/ether_wallet.abi";
+    bin = kernel_inputs_path ^ "/ether_wallet.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -4368,6 +4375,57 @@ let test_l2_intermediate_OOG_call =
   in
   check_tx_succeeded ~tx ~endpoint
 
+let test_l2_ether_wallet =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_call"; "wallet"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+      ])
+    ~title:"Check ether wallet functions correctly"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* ether_wallet_address, _tx =
+    deploy ~contract:ether_wallet ~sender evm_setup
+  in
+  let* tx1 =
+    let transaction =
+      Eth_cli.transaction_send
+        ~source_private_key:sender.private_key
+        ~to_public_key:ether_wallet_address
+        ~value:(Wei.of_eth_int 100)
+        ~endpoint
+    in
+    wait_for_application ~evm_node ~sc_rollup_node ~node ~client transaction ()
+  in
+  let* tx2 =
+    let call_withdraw (sender : Eth_account.t) n =
+      Eth_cli.contract_send
+        ~source_private_key:sender.private_key
+        ~endpoint
+        ~abi_label:ether_wallet.label
+        ~address:ether_wallet_address
+        ~method_call:(Printf.sprintf "withdraw(%d)" n)
+    in
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_withdraw sender 100)
+      ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx1 in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx2 in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4437,7 +4495,8 @@ let register_evm_node ~protocols =
   test_block_hash_regression protocols ;
   test_l2_revert_returns_unused_gas protocols ;
   test_l2_create_collision protocols ;
-  test_l2_intermediate_OOG_call protocols
+  test_l2_intermediate_OOG_call protocols ;
+  test_l2_ether_wallet protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
