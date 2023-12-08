@@ -1119,6 +1119,30 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SIZE, [], _), [.., T::String]) => {
+            stack[0] = T::Nat;
+            I::Size(overloads::Size::String)
+        }
+        (App(SIZE, [], _), [.., T::Bytes]) => {
+            stack[0] = T::Nat;
+            I::Size(overloads::Size::Bytes)
+        }
+        (App(SIZE, [], _), [.., T::List(_)]) => {
+            stack[0] = T::Nat;
+            I::Size(overloads::Size::List)
+        }
+        (App(SIZE, [], _), [.., T::Set(_)]) => {
+            stack[0] = T::Nat;
+            I::Size(overloads::Size::Set)
+        }
+        (App(SIZE, [], _), [.., T::Map(..)]) => {
+            stack[0] = T::Nat;
+            I::Size(overloads::Size::Map)
+        }
+        (App(SIZE, [], _), [.., _]) => no_overload!(SIZE),
+        (App(SIZE, [], _), []) => no_overload!(SIZE, len 1),
+        (App(SIZE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(CHAIN_ID, [], _), ..) => {
             stack.push(T::ChainId);
             I::ChainId
@@ -3253,6 +3277,41 @@ mod typecheck_tests {
                 Type::new_list(Type::Int)
             ))
         );
+    }
+
+    #[test]
+    fn size() {
+        fn check(inp_ty: Type, expected_overload: overloads::Size) {
+            let mut stack = tc_stk![inp_ty];
+            assert_eq!(
+                typecheck_instruction(&parse("SIZE").unwrap(), &mut Ctx::default(), &mut stack),
+                Ok(Size(expected_overload))
+            );
+            assert_eq!(stack, tc_stk![Type::Nat]);
+        }
+        check(Type::String, overloads::Size::String);
+        check(Type::Bytes, overloads::Size::Bytes);
+        check(Type::new_list(Type::Int), overloads::Size::List);
+        check(Type::new_set(Type::Int), overloads::Size::Set);
+        check(Type::new_map(Type::Int, Type::Nat), overloads::Size::Map);
+    }
+
+    #[test]
+    fn size_wrong_ty() {
+        let mut stack = tc_stk![Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("SIZE").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SIZE,
+                stack: stk![Type::Int],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_size_short() {
+        too_short_test(&app!(SIZE), Prim::SIZE, 1);
     }
 
     #[test]
