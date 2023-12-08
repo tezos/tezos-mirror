@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-open Tezos_micheline
+(* Testing
+   -------
+   Components: Michelson / TZT
+   Invocation: dune exec tezt/tests/main.exe -- --file tzt_regression.ml
+   Subject: Regression testing of the Octez TZT runner on the reference test suite.
+*)
 
-val print_expr : Format.formatter -> Script_repr.expr -> unit
+(* Using the lighter hook that only scrubs the clients [--base-dir] *)
+let hooks =
+  Tezos_regression.hooks_custom
+    ~scrubbed_global_options:["--base-dir"; "-d"]
+    ~replace_variables:Fun.id
+    ()
 
-val print_expr_unwrapped : Format.formatter -> Script_repr.expr -> unit
+let test_tzt protocols =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:(sf "Run TZT")
+    ~tags:["client"; "michelson"; "tzt"]
+    ~supports:(Protocol.From_protocol 019)
+    (fun protocol ->
+      let tests =
+        List.map
+          Michelson_script.path
+          (Michelson_script.find_all_tzt_tests protocol)
+      in
+      let* client = Client.init_mockup ~protocol () in
+      let* _ =
+        Client.spawn_run_tzt_unit_tests
+          ~tests
+          ~protocol_hash:(Protocol.hash protocol)
+          ~hooks
+          ~no_base_dir_warnings:true
+          client
+        |> Process.wait
+      in
+      unit)
+    protocols
 
-val unparse_stack :
-  'location ->
-  (Script_repr.expr * Script_repr.expr) list ->
-  ('location, string) Micheline.node
-
-val print_typed_stack :
-  Format.formatter -> (Script_repr.expr * Script_repr.expr) list -> unit
-
-val print_execution_trace :
-  Format.formatter -> Script_typed_ir.execution_trace -> unit
-
-val print_big_map_diff : Format.formatter -> Lazy_storage.diffs -> unit
-
-(** Insert the type map returned by the typechecker as comments in a
-    printable Micheline AST. *)
-val inject_types :
-  Script_tc_errors.type_map ->
-  Michelson_v1_parser.parsed ->
-  Micheline_printer.node
-
-(** Unexpand the macros and produce the result of parsing an
-    intermediate pretty printed source. Useful when working with
-    contracts extracted from the blockchain and not local files. *)
-val unparse_toplevel :
-  ?type_map:Script_tc_errors.type_map ->
-  Script.expr ->
-  Michelson_v1_parser.parsed
-
-val unparse_expression : Script.expr -> Michelson_v1_parser.parsed
-
-(** Unexpand the macros and produce the result of parsing an
-    intermediate pretty printed source. Works on generic trees,for
-    programs that fail to be converted to a specific script version. *)
-val unparse_invalid :
-  string Micheline.canonical -> string Michelson_v1_parser.parser_result
-
-val ocaml_constructor_of_prim : Michelson_v1_primitives.prim -> string
-
-val micheline_string_of_expression : zero_loc:bool -> Script.expr -> string
+let register ~protocols = test_tzt protocols

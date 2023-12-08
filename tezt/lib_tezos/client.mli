@@ -1691,6 +1691,24 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
+(** Run [octez-client run unit tests from ..]*)
+val run_tzt_unit_tests :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  tests:string list ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  unit Lwt.t
+
+(** Same as [run_tzt_unit_tests], but do not wait for the process to exit. *)
+val spawn_run_tzt_unit_tests :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  tests:string list ->
+  ?no_base_dir_warnings:bool ->
+  t ->
+  Process.t
+
 (** Same as [run_tzip4_view] but does not wait for the process to exit. *)
 val spawn_run_tzip4_view :
   ?hooks:Process.hooks ->
