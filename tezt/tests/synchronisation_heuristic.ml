@@ -77,7 +77,7 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
-        Tag.ci_disabled;
+        Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
         "node";
@@ -170,7 +170,7 @@ let check_prevalidator_start =
     ~title:"Check prevalidator start"
     ~tags:
       [
-        Tag.ci_disabled;
+        Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
         "node";
@@ -234,8 +234,7 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Setup network" ;
@@ -309,8 +308,7 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
@@ -377,8 +375,7 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let sync_latency = 3 in
@@ -441,8 +438,7 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info

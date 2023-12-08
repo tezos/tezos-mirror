@@ -3318,12 +3318,13 @@ let register_evm_migration ~protocols =
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols
 
-(* Flakyness: the rollup node batches the transactions before receiving all of them
-   issue for the fix: #6438 *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6438
+   The rollup node batches the transactions before receiving all of them.
+   This test fails deterministically and so is disabled. *)
 let test_reboot =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "reboot"; "loop"; Tag.flaky]
+    ~tags:["evm"; "reboot"; "loop"; Tag.ci_disabled]
     ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->

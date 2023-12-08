@@ -1,0 +1,18 @@
+include: .gitlab/ci/jobs/test/common.yml
+
+# Runs flaky Tezts in the 'schedule_extended_test' pipeline.
+tezt_flaky:
+  extends:
+    - .tezt_tests
+  variables:
+    # Run only flaky tests
+    TESTS: "flaky"
+    # To handle flakiness, consider tweaking TEZT_PARALLEL (passed to
+    # Tezt's '--job-count'), and TEZT_RETRY (passed to Tezt's
+    # '--retry')
+    TEZT_RETRY: 3
+    TEZT_PARALLEL: 1
+
+  # At the moment, there are few tests tagged as flaky, so this should
+  # suffice.
+  parallel: 1

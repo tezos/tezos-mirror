@@ -2,12 +2,19 @@ include:
   # Stage: build
   - .gitlab/ci/jobs/build/arm64.yml
 
+  # These jobs are necessary to run flaky tezts
+  - .gitlab/ci/jobs/build/x86_64.yml
+  - .gitlab/ci/jobs/build/kernels.yml
+  - .gitlab/ci/jobs/build/tezt_fetch_records.yml
+
   # Stage: packaging
   - .gitlab/ci/jobs/packaging/opam_prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/install_octez.yml
+  # Flaky tezts
+  - .gitlab/ci/jobs/test/tezt_flaky.yml
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/linkcheck.yml
