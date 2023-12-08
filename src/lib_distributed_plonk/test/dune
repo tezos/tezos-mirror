@@ -1,31 +1,40 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name src_lib_distributed_plonk_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   octez-libs.distributed-plonk
   octez-libs.plonk
   octez-libs.plonk.aggregation
   octez-libs.plonk.distribution
   octez-libs.aplonk
-  octez-libs.plonk.plonk-test))
+  octez-libs.plonk.plonk-test
+  octez-libs.test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_test_helpers)
+ (modules test_distribution))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_distributed_plonk_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package octez-libs)
- (action
-  (setenv RANDOM_SEED 42
-   (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
 (rule
- (alias runtest_slow)
- (package octez-libs)
- (action (run %{exe:main.exe})))
-
-(rule
- (alias runtest_slow_with_regression)
- (package octez-libs)
- (action
-  (setenv RANDOM_SEED 42
-   (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
