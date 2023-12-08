@@ -96,6 +96,51 @@ module Slots_handlers = struct
           ~with_proof
         |> Errors.to_option_tzresult)
 
+  let post_slot ctxt () query slot =
+    call_handler2
+      ctxt
+      (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
+      ->
+        let open Lwt_result_syntax in
+        let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+        let slot_length = String.length slot in
+        let*? slot =
+          if slot_length > slot_size then (* Raise an error *)
+            assert false
+          else if slot_length = slot_size then Ok (Bytes.of_string slot)
+          else
+            let padding = String.make (slot_size - slot_length) query#padding in
+            Ok (Bytes.of_string (slot ^ padding))
+        in
+        let* commitment =
+          Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
+        in
+        let*? commitment_proof =
+          match Cryptobox.polynomial_from_slot cryptobox slot with
+          | Error _ ->
+              (* Storage consistency ensures we can always compute the
+                 polynomial from the slot. *)
+              assert false
+          | Ok polynomial -> (
+              match Cryptobox.prove_commitment cryptobox polynomial with
+              (* [polynomial] was produced with the parameters from
+                 [cryptobox], thus we can always compute the proof from
+                 [polynomial]. *)
+              | Error _ -> assert false
+              | Ok proof -> Ok proof)
+        in
+        (* Cannot return None *)
+        let* (_ : unit option) =
+          Slot_manager.add_commitment_shards
+            ~shards_proofs_precomputation
+            store
+            cryptobox
+            commitment
+            ~with_proof:true
+          |> Errors.to_option_tzresult
+        in
+        return (commitment, commitment_proof))
+
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
     call_handler1 ctxt (fun store ->
         Slot_manager.get_commitment_by_published_level_and_index
