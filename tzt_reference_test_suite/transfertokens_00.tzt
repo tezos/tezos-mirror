@@ -1,0 +1,4 @@
+code { TRANSFER_TOKENS } ;
+input { Stack_elt unit Unit ; Stack_elt mutez 5 ; Stack_elt (contract unit) "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" } ;
+output { Stack_elt operation (Transfer_tokens Unit 5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" _) } ;
+other_contracts { Contract "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" unit }

@@ -1,0 +1,4 @@
+code { BALANCE } ;
+input { } ;
+output { Stack_elt mutez 22 } ;
+balance 22

@@ -1,0 +1,3 @@
+code { SLICE } ;
+input { Stack_elt nat 0 ; Stack_elt nat 1 ; Stack_elt bytes 0xaabbcc } ;
+output { Stack_elt (option bytes) (Some 0xaa) }

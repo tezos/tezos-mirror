@@ -1,0 +1,3 @@
+code { IF_LEFT { PUSH int 1 ; ADD } { UNIT ; FAILWITH } } ;
+input { Stack_elt (or int string) (Left 1) } ;
+output { Stack_elt int 2 }

@@ -1,0 +1,3 @@
+code { SET_DELEGATE } ;
+input { Stack_elt (option key_hash) (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") } ;
+output { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }

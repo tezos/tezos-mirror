@@ -1,0 +1,4 @@
+code { CHAIN_ID } ;
+input { } ;
+output { Stack_elt chain_id 0x00000000 } ;
+chain_id 0x00000000

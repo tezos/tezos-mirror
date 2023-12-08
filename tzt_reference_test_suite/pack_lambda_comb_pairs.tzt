@@ -1,0 +1,3 @@
+code { PACK };
+input {Stack_elt (lambda unit unit) {PUSH (pair nat int bool) {0; -3; False}; DROP}};
+output {Stack_elt bytes 0x05020000001e07430965000000060362035b035900000000070700000707004303030320}

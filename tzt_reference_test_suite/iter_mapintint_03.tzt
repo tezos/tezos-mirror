@@ -1,0 +1,3 @@
+code { ITER { DIP{ UNPAIR } ; UNPAIR ; DIG 2 ; ADD ; DIP { ADD } ; PAIR } } ;
+input { Stack_elt (map int int) { Elt 0 100 ; Elt 2 100 } ; Stack_elt (pair int int) (Pair 0 0) } ;
+output { Stack_elt (pair int int) (Pair 2 200) }

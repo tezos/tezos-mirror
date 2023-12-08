@@ -1,0 +1,3 @@
+code { ITER { FAILWITH } } ;
+input { Stack_elt (map int int) { } } ;
+output { }

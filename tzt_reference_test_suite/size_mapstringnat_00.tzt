@@ -1,0 +1,3 @@
+code { SIZE } ;
+input { Stack_elt (map string nat) { } } ;
+output { Stack_elt nat 0 }

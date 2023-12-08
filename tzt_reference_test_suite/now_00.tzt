@@ -1,0 +1,4 @@
+code { NOW } ;
+input { } ;
+output { Stack_elt timestamp 45 } ;
+now 45

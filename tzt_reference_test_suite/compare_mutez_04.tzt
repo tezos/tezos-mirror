@@ -1,0 +1,3 @@
+code { COMPARE } ;
+input { Stack_elt mutez 5 ; Stack_elt mutez 10 } ;
+output { Stack_elt int -1 }

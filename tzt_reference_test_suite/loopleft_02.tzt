@@ -1,0 +1,5 @@
+code { LOOP_LEFT { DUP; CAR; DIP{CDR};
+                   IF_CONS { SWAP; DIP{CONS}; PAIR; LEFT (list string) }
+                           { RIGHT (pair (list string) (list string)) } } } ;
+input { Stack_elt (or (pair (list string) (list string)) (list string)) (Left (Pair {"a" ; "b" ; "c" ; "d" } { } )) } ;
+output { Stack_elt (list string) { "d" ; "c" ; "b" ; "a" } }

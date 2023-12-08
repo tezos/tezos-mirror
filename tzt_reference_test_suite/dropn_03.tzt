@@ -1,0 +1,3 @@
+code { DROP 0 } ;
+input {} ;
+output {}

@@ -1,0 +1,3 @@
+code { LE } ;
+input { Stack_elt int -9999999 } ;
+output { Stack_elt bool True } ;

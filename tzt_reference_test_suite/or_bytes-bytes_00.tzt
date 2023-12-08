@@ -1,0 +1,3 @@
+code { OR } ;
+input { Stack_elt bytes 0x0C ; Stack_elt bytes 0x05 } ;
+output { Stack_elt bytes 0x0d }

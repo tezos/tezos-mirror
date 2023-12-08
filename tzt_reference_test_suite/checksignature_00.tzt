@@ -1,0 +1,5 @@
+code { CHECK_SIGNATURE } ;
+input { Stack_elt key "sppk7aQvNqSBYg2JJa7PAkrSNXuLmktaPdYUtgQSTQzdueqTjut9UXX" ;
+        Stack_elt signature "spsig1CzQigtXJRFdtX2p6xBQZ3KVmx6gx8gozcytf8einfzwXrpfuU8YwvhYMYTSpZGVo7KzVstPzvGZWMVXa1TW68zpJEzyPw" ;
+        Stack_elt bytes 0x12 } ;
+output { Stack_elt bool True }

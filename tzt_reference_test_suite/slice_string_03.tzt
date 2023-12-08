@@ -1,0 +1,3 @@
+code { SLICE } ;
+input { Stack_elt nat 20000 ; Stack_elt nat 0 ; Stack_elt string "hello world" } ;
+output { Stack_elt (option string) None }

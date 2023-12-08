@@ -1,0 +1,5 @@
+code { SELF } ;
+input { } ;
+parameter int ;
+self "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" ;
+output { Stack_elt (contract int) "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" }

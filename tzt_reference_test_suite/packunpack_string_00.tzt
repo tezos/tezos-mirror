@@ -1,0 +1,3 @@
+code { PACK ; UNPACK string } ;
+input { Stack_elt string "foobar" } ;
+output { Stack_elt (option string) (Some "foobar") }

@@ -1,0 +1,3 @@
+code { ADD } ;
+input { Stack_elt nat 5 ; Stack_elt int 5 } ;
+output { Stack_elt int 10 }

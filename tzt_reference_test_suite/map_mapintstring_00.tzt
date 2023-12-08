@@ -1,0 +1,3 @@
+code { MAP { CDR ; DUP ; CONCAT } } ;
+input { Stack_elt (map int string) { Elt 1 "AB" ; Elt 5 "CD" } } ;
+output { Stack_elt (map int string) { Elt 1 "ABAB" ; Elt 5 "CDCD" } }

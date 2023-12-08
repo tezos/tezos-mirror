@@ -1,0 +1,3 @@
+code { MAP { DUP ; ADD } } ;
+input { Stack_elt (list int) { 7 ; 11 ; 45 } } ;
+output { Stack_elt (list int) { 14 ; 22 ; 90 } }

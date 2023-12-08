@@ -1,0 +1,3 @@
+code { UNPAIR } ;
+input { Stack_elt string "a" } ;
+output (StaticError _) ;

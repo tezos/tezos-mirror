@@ -1,0 +1,3 @@
+code { IF_CONS { UNIT ; FAILWITH } { PUSH int 1 }} ;
+input { Stack_elt string "a" } ;
+output (StaticError _) ;

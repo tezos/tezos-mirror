@@ -1,0 +1,3 @@
+code { LOOP { PUSH bool False } } ;
+input { Stack_elt nat 1 } ;
+output (StaticError _)

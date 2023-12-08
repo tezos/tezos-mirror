@@ -1,0 +1,3 @@
+code { LSR } ;
+input { Stack_elt nat 32 ; Stack_elt nat 300 } ;
+output (GeneralOverflow 32 300)
