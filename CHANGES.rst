@@ -79,7 +79,8 @@ Smart Rollup node
 - Introduced a new command ``generate openapi``, to generate the OpenAPI JSON
   specification and output it to stdout. (MR :gl:`!10118`)
 
-- Register in ``octez-codec`` some of the protocol smart rollup related encodings. (MR :gl:`!11200`)
+- Register in ``octez-codec`` some of the protocol smart rollup
+  related encodings. (MRs :gl:`!10174`, :gl:`!11200`)
 
 Smart Rollup WASM Debugger
 --------------------------
