@@ -246,6 +246,43 @@ let get_users ~logger db_pool =
        db_pool)
     (fun users -> reply_public_json Data_encoding.(list string) users)
 
+let get_levels_at_timestamp0 db_pool timestamp =
+  let lower =
+    Caqti_request.Infix.(Caqti_type.(int32 ->* tup2 int32 int32))
+      "SELECT level, MIN(timestamp) FROM blocks, (SELECT MAX(level) AS m FROM \
+       blocks WHERE timestamp <= ?) WHERE level = m OR level = m + 1 GROUP BY \
+       level"
+  in
+  let upper =
+    Caqti_request.Infix.(Caqti_type.(int32 ->* tup2 int32 int32))
+      "SELECT level, MIN(timestamp) FROM blocks, (SELECT MIN(level) AS m FROM \
+       blocks WHERE timestamp >= ?) WHERE level = m OR level = m - 1 GROUP BY \
+       level"
+  in
+  Lwt_result.bind
+    (Caqti_lwt.Pool.use
+       (fun (module Db : Caqti_lwt.CONNECTION) ->
+         Db.collect_list lower timestamp)
+       db_pool)
+    (function
+      | [] ->
+          Caqti_lwt.Pool.use
+            (fun (module Db : Caqti_lwt.CONNECTION) ->
+              Db.collect_list upper timestamp)
+            db_pool
+      | l -> Lwt_result.return l)
+
+let get_levels_at_timestamp db_pool timestamp =
+  Lwt_result.map
+    (function
+      | [] -> (None, None)
+      | [((_, t) as r)] ->
+          if Int32.compare timestamp t = -1 then (None, Some r)
+          else (Some r, None)
+      | ((_, t1) as a) :: ((_, t2) as b) :: _ ->
+          if Int32.compare t1 t2 = -1 then (Some a, Some b) else (Some b, Some a))
+    (get_levels_at_timestamp0 db_pool timestamp)
+
 (** Fetch the list of allowed logins from db and update the list ref given as parameter. *)
 let refresh_users =
   let mutex = Lwt_mutex.create () in
@@ -818,6 +855,15 @@ let routes :
               Teztale_lib.Data.encoding
               body
               (import_callback ~logger db_pool g)) );
+    ( Re.seq [Re.str "/timestamp/"; Re.group (Re.rep1 Re.digit)],
+      fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+        get_only_endpoint meth (fun () ->
+            let level = Int32.of_string (Re.Group.get g 1) in
+            with_caqti_error
+              ~logger
+              (get_levels_at_timestamp db_pool level)
+              (reply_public_json Teztale_lib.Data.surrounding_levels_encoding))
+    );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
       fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->

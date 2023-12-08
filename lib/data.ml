@@ -315,6 +315,22 @@ let block_data_encoding =
           (req "endorsements" (list Consensus_ops.block_op_encoding))
           (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])))
 
+let level_timestamp_encoding =
+  let open Data_encoding in
+  conv
+    (fun x -> x)
+    (fun x -> x)
+    (obj2 (req "level" int32) (req "timestamp" int32))
+
+let surrounding_levels_encoding =
+  let open Data_encoding in
+  conv
+    (fun x -> x)
+    (fun x -> x)
+    (obj2
+       (opt "lower" level_timestamp_encoding)
+       (opt "upper" level_timestamp_encoding))
+
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)
   type problem = Missed | Forgotten | Sequestered | Incorrect
