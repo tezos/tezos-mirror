@@ -5,6 +5,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::blueprint::Queue;
+use crate::error::Error;
+use crate::error::UpgradeProcessError::Fallback;
+use crate::inbox::KernelUpgrade;
+use crate::migration::storage_migration;
+use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
+use crate::stage_one::fetch;
+use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
+use crate::upgrade::upgrade_kernel;
+use crate::Error::UpgradeError;
 use anyhow::Context;
 use block::ComputationResult;
 use evm_execution::Config;
@@ -17,28 +27,17 @@ use storage::{
     store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use tezos_evm_logging::{log, Level::*};
-
-use crate::inbox::KernelUpgrade;
-use crate::migration::storage_migration;
-use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
-
-use crate::blueprint::{fetch, Queue};
-use crate::error::Error;
-use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
-use crate::upgrade::upgrade_kernel;
-use crate::Error::UpgradeError;
-
 mod apply;
 mod block;
 mod block_in_progress;
 mod blueprint;
+mod blueprint_storage;
 mod error;
 mod inbox;
 mod indexable_storage;
@@ -49,6 +48,7 @@ mod parsing;
 mod safe_storage;
 mod sequencer_blueprint;
 mod simulation;
+mod stage_one;
 mod storage;
 mod tick_model;
 mod upgrade;
@@ -454,7 +454,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&mut host).is_err(),
+            storage::read_current_block_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -498,7 +498,7 @@ mod tests {
 
         // test there is a new block
         assert!(
-            storage::read_current_block_number(&mut host)
+            storage::read_current_block_number(&host)
                 .expect("should have found a block number")
                 > U256::zero(),
             "There should have been multiple blocks registered"

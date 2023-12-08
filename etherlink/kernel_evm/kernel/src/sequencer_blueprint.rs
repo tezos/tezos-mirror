@@ -4,23 +4,18 @@
 
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_ethereum::rlp_helpers::{
-    self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
-};
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_ethereum::rlp_helpers::{self, append_u256_le, decode_field_u256_le};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct SequencerBlueprint {
-    pub timestamp: Timestamp,
-    pub transactions: Vec<u8>,
+    pub chunk: Vec<u8>,
     pub number: U256,
 }
 
 impl Encodable for SequencerBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(3);
-        stream.append(&self.transactions);
-        append_timestamp(stream, self.timestamp);
+        stream.begin_list(2);
+        stream.append(&self.chunk);
         append_u256_le(stream, &self.number);
     }
 }
@@ -30,25 +25,20 @@ impl Decodable for SequencerBlueprint {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 3 {
+        if decoder.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let mut it = decoder.iter();
-        let transactions =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "transactions")?;
-        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+        let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
         let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
-        Ok(Self {
-            transactions,
-            timestamp,
-            number,
-        })
+        Ok(Self { chunk, number })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::SequencerBlueprint;
+    use crate::blueprint::Blueprint;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
@@ -96,10 +86,14 @@ mod tests {
 
     fn dummy_blueprint() -> SequencerBlueprint {
         let transactions = vec![dummy_transaction(0), dummy_transaction(1)];
-        let transaction_bytes = rlp::encode_list(&transactions).into();
+        let timestamp = Timestamp::from(42);
+        let blueprint = Blueprint {
+            timestamp,
+            transactions,
+        };
+        let chunk = rlp::Encodable::rlp_bytes(&blueprint);
         SequencerBlueprint {
-            timestamp: Timestamp::from(42),
-            transactions: transaction_bytes,
+            chunk: chunk.into(),
             number: U256::from(42),
         }
     }

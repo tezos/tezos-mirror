@@ -6,14 +6,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::current_timestamp;
-use crate::inbox::{read_inbox, KernelUpgrade, Transaction};
+use crate::inbox::{KernelUpgrade, Transaction};
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
 #[derive(PartialEq, Debug, Clone)]
@@ -137,65 +134,6 @@ impl Encodable for Queue {
         stream.begin_list(2);
         stream.append_list(&self.proposals);
         rlp_helpers::append_option(stream, &self.kernel_upgrade);
-    }
-}
-
-pub fn fetch_inbox_blueprints<Host: Runtime>(
-    host: &mut Host,
-    smart_rollup_address: [u8; 20],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
-) -> Result<Queue, anyhow::Error> {
-    let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    let transactions = inbox_content.transactions;
-    let timestamp = current_timestamp(host);
-    let blueprint = QueueElement::Blueprint(Blueprint {
-        transactions,
-        timestamp,
-    });
-    Ok(Queue {
-        proposals: vec![blueprint],
-        kernel_upgrade: inbox_content.kernel_upgrade,
-    })
-}
-
-fn fetch_sequencer_blueprints<Host: Runtime>(
-    host: &mut Host,
-    smart_rollup_address: [u8; 20],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
-) -> Result<Queue, anyhow::Error> {
-    let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    let seq_blueprints = inbox_content.sequencer_blueprints;
-    let proposals = seq_blueprints
-        .into_iter()
-        .map(|sb| {
-            // Note: this parsing will be done by the blueprint storage module
-            let transactions = rlp::decode_list(&sb.transactions);
-            let blueprint: Blueprint = Blueprint {
-                timestamp: sb.timestamp,
-                transactions,
-            };
-            QueueElement::Blueprint(blueprint)
-        })
-        .collect();
-    Ok(Queue {
-        proposals,
-        kernel_upgrade: inbox_content.kernel_upgrade,
-    })
-}
-
-pub fn fetch<Host: Runtime>(
-    host: &mut Host,
-    smart_rollup_address: [u8; 20],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
-    is_sequencer: bool,
-) -> Result<Queue, anyhow::Error> {
-    if is_sequencer {
-        fetch_sequencer_blueprints(host, smart_rollup_address, ticketer, admin)
-    } else {
-        fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
     }
 }
 
