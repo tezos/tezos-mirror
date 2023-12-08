@@ -38,33 +38,38 @@ type error += Missing_stored_kvs_data of string * int
     - safe when used in a concurrent setting
 
     This key-value store also features a best effort mechanism relying
-    on a cache to avoid I/Os.
+    on an LRU (least-recently used) cache to avoid I/Os.
 
-    The user of the key-value store can specify a "layout". This
-    layout aims to specify in which memory-mapped files the keys are
-    stored. It is up to the user to decide of the layout to store the
-    values. It is recommended that values that will be accessed
-    together frequently should be stored in the same file.
+    Each key-value pair is associated to a virtual file. Each virtual file has a
+    layout, given by the user, which specifies, among other things, an
+    underlying physical file for storing the key-value pairs.  It is up to the
+    user to decide which virtual file to use to store a key-value pair. It is
+    recommended that values that will be accessed together frequently should be
+    stored in the same file.
 
-    This layout assumes that the size of all the values stored is a
-    constant.
- *)
+    In a virtual file, all the stored values should the same size. Each key is
+    associated with an index from 0 to some maximum value (see
+    implementation). Different keys should be associated to different
+    indexes. *)
 
-(** An abstract representation of a key-value store. *)
+(** An abstract representation of a file-based key-value store. *)
 type ('file, 'key, 'value) t
 
-(** A [layout] specifies the layout of virtual files storing data of type ['value],
-    as well as the name of the underlying physical file. *)
+(** A [layout] specifies the layout of a virtual file storing keys of type
+    ['key] and values of type ['value], as well as the path to the underlying
+    physical file. *)
 type ('key, 'value) layout
 
-(** [layout ?encoded_value_size value_encoding path eq index_of] describes a layout.
-    - [encoded_value_size] is the size in bytes of values encoded with [value_encoding].
-      If [value_encoding] does not respect this property, the behaviour of the store
-      is undefined. If [encoded_value_size] is not given, [value_encoding] must be of fixed length.
-    - [value_encoding] is an encoding for values
-    - [path] is the path of the physical file
+(** [layout ?encoded_value_size value_encoding path eq index_of] describes a
+    virtual file layout.
+    - [encoded_value_size] is the size in bytes of any encoded value.  If
+    encoded values have different sizes, the behaviour of the store is
+    undefined. If [encoded_value_size] is not given, then the encoded value size
+    is deduced from [value_encoding], which must be of fixed length.
+    - [value_encoding] is an encoding for values.
+    - [path] is the path of the physical file.
     - [eq] is an equality function on values.
-    - [index_of] gives the index of a given key in the file.
+    - [index_of] gives the index of a given key.
 
    @raise Invalid_argument if [encoded_value_size=None] and [value_encoding] does not have a fixed length.
  *)
@@ -77,16 +82,13 @@ val layout :
   unit ->
   ('key, 'value) layout
 
-(** [init ~lru_size layout] initialises a key-value store. This is a
-    design where all keys/values are stored into a single physical
-    file.
-
-    For each file, we rely on a [layout] to explaining where to find
-    the values. The layout also specifies the physical location of the
-    file.
+(** [init ~lru_size layout_of] initialises a file-based key-value
+    store. [layout_of file] returns a {!type-layout} for a given virtual file
+    [file]. All the keys/values associated to [file] are stored in a single
+    physical file.
 
     [lru_size] is a parameter that represents the number of different
-   [values] that can be in memory. It is up to the user of this
+   values that can be in memory. It is up to the user of this
    library to decide this number depending on the sizes of the values.
 *)
 val init :
