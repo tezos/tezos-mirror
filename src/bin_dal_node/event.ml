@@ -87,21 +87,24 @@ let fetched_slot =
     ("shards", Data_encoding.int31)
 
 let layer1_node_new_head =
-  declare_2
+  declare_3
     ~section
     ~name:"dal_node_layer_1_new_head"
-    ~msg:"head of Layer 1 node updated to {hash} at level {level}"
+    ~msg:
+      "head of Layer 1 node updated to {hash} at level {level}, round {round}"
     ~level:Info
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
+    ("round", Data_encoding.int32)
 
 let layer1_node_final_block =
-  declare_1
+  declare_2
     ~section
     ~name:"dal_node_layer_1_new_final_block"
-    ~msg:"layer 1 node's block at level {level} is final"
+    ~msg:"layer 1 node's block at level {level}, round {round} is final"
     ~level:Notice
     ("level", Data_encoding.int32)
+    ("round", Data_encoding.int32)
 
 let layer1_node_tracking_started =
   declare_0
