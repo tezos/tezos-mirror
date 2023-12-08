@@ -17,9 +17,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     emu.cpu.mode = Mode::User;
 
     // Load the ELF binary into the emulator.
-    input::Input::load_file(&cli.input)?
-        .configure_emulator(&mut emu)
-        .map_err(exception_to_error)?;
+    let contents = std::fs::read(&cli.input)?;
+    input::configure_emulator(&contents, &mut emu)?;
 
     let mut prev_pc = emu.cpu.pc;
     loop {
