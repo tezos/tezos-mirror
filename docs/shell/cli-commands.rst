@@ -86,6 +86,17 @@ DAC client manual (Experimental)
 .. raw:: html
         :file: ../api/octez-dac-client.html
 
+.. _dal_node_manual:
+
+DAL node manual (Experimental)
+==============================
+
+The command line of the Octez DAL node is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-dal-node --help``.
+
+The manual briefly shows the available DAL node commands.
+Each command accepts its own set of options and arguments, that you can discover by running ``octez-dal-node <command> --help``.
+
+.. include:: ../api/octez-dal-node.txt
 
 .. _smart_rollup_node_manual:
 

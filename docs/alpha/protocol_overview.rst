@@ -139,6 +139,7 @@ See, for example:
 - :ref:`proof-of-stake parameters <ps_constants_alpha>`
 - :ref:`consensus-related parameters <cs_constants_alpha>`
 - :ref:`randomness generation parameters <rg_constants_alpha>`
+- :ref:`DAL parameters <dal_constants_alpha>`
 
 See also
 ~~~~~~~~

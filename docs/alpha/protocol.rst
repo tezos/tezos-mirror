@@ -115,3 +115,8 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    adaptive_issuance
+
+.. toctree::
+   :maxdepth: 2
+
+   dal_support
