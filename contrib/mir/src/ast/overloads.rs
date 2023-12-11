@@ -54,6 +54,17 @@ pub enum Mem {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Mul {
+    Bls12381G1Bls12381Fr,
+    Bls12381G2Bls12381Fr,
+    Bls12381FrBls12381Fr,
+    NatBls12381Fr,
+    IntBls12381Fr,
+    Bls12381FrNat,
+    Bls12381FrInt,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
 }

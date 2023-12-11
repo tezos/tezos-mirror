@@ -650,6 +650,42 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G1]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381G1);
+            I::Mul(overloads::Mul::Bls12381G1Bls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G2]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381G2);
+            I::Mul(overloads::Mul::Bls12381G2Bls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381Fr]) => {
+            pop!();
+            I::Mul(overloads::Mul::Bls12381FrBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Nat]) => {
+            pop!();
+            I::Mul(overloads::Mul::NatBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Int]) => {
+            pop!();
+            I::Mul(overloads::Mul::IntBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Nat, T::Bls12381Fr]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381Fr);
+            I::Mul(overloads::Mul::Bls12381FrNat)
+        }
+        (App(MUL, [], _), [.., T::Int, T::Bls12381Fr]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381Fr);
+            I::Mul(overloads::Mul::Bls12381FrInt)
+        }
+        (App(MUL, [], _), [.., _, _]) => no_overload!(MUL),
+        (App(MUL, [], _), [_] | []) => no_overload!(MUL, len 2),
+        (App(MUL, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(AND, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
             I::And(overloads::And::NatNat)
@@ -5031,6 +5067,76 @@ mod typecheck_tests {
     #[test]
     fn pairing_check_too_short() {
         too_short_test(&app!(PAIRING_CHECK), Prim::PAIRING_CHECK, 1)
+    }
+
+    mod mul {
+        use super::*;
+        use Type as T;
+
+        #[track_caller]
+        fn test_mul(
+            mut stack: FailingTypeStack,
+            expected_stack: FailingTypeStack,
+            overload: overloads::Mul,
+        ) {
+            assert_eq!(
+                typecheck_instruction(&parse("MUL").unwrap(), &mut Ctx::default(), &mut stack),
+                Ok(Mul(overload))
+            );
+            assert_eq!(stack, expected_stack);
+        }
+        macro_rules! test {
+            ($overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(tc_stk![$i2, $i1], tc_stk![$out], overloads::Mul::$overload);
+                }
+            };
+        }
+        test!(
+            Bls12381G1Bls12381Fr,
+            T::Bls12381G1,
+            T::Bls12381Fr,
+            T::Bls12381G1,
+        );
+        test!(
+            Bls12381G2Bls12381Fr,
+            T::Bls12381G2,
+            T::Bls12381Fr,
+            T::Bls12381G2,
+        );
+        test!(
+            Bls12381FrBls12381Fr,
+            T::Bls12381Fr,
+            T::Bls12381Fr,
+            T::Bls12381Fr,
+        );
+        test!(NatBls12381Fr, T::Nat, T::Bls12381Fr, T::Bls12381Fr);
+        test!(IntBls12381Fr, T::Int, T::Bls12381Fr, T::Bls12381Fr);
+        test!(Bls12381FrNat, T::Bls12381Fr, T::Nat, T::Bls12381Fr);
+        test!(Bls12381FrInt, T::Bls12381Fr, T::Int, T::Bls12381Fr);
+
+        #[test]
+        fn wrong_type() {
+            assert_eq!(
+                parse("MUL").unwrap().typecheck_instruction(
+                    &mut Ctx::default(),
+                    None,
+                    &[app!(unit), app!(unit)]
+                ),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::MUL,
+                    stack: stk![Type::Unit, Type::Unit],
+                    reason: None
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(MUL), Prim::MUL, 2)
+        }
     }
 
     #[test]

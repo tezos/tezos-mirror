@@ -398,6 +398,7 @@ impl<'a> TypedValue<'a> {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction<'a> {
     Add(overloads::Add),
+    Mul(overloads::Mul),
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),

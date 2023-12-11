@@ -199,6 +199,54 @@ fn interpret_one<'a>(
                 stack.push(V::Bls12381G2(o1 + o2));
             }
         },
+        I::Mul(overload) => match overload {
+            overloads::Mul::Bls12381G1Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
+                let x1 = pop!(V::Bls12381G1);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381G1(x1 * x2));
+            }
+            overloads::Mul::Bls12381G2Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_G2)?;
+                let x1 = pop!(V::Bls12381G2);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381G2(x1 * x2));
+            }
+            overloads::Mul::Bls12381FrBls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_FR)?;
+                let x1 = pop!(V::Bls12381Fr);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::NatBls12381Fr => {
+                let nat = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                let x1 = bls::Fr::from_big_int(&nat.into());
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::IntBls12381Fr => {
+                let int = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                let x1 = bls::Fr::from_big_int(&int);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::Bls12381FrNat => {
+                let x1 = pop!(V::Bls12381Fr);
+                let nat = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                let x2 = bls::Fr::from_big_int(&nat.into());
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::Bls12381FrInt => {
+                let x1 = pop!(V::Bls12381Fr);
+                let int = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                let x2 = bls::Fr::from_big_int(&int);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+        },
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
@@ -3784,5 +3832,89 @@ mod interpreter_tests {
         assert_eq!(interpret_one(&PairingCheck, ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Bool(true)]);
         assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+    }
+
+    mod mul {
+        use super::*;
+
+        #[track_caller]
+        fn test_mul(
+            overload: overloads::Mul,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Mul(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        use crate::bls::*;
+        use TypedValue as V;
+
+        macro_rules! test {
+            ($overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(overloads::Mul::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        // NB: actual bls arithmetic is tested in the bls module, here we only
+        // need to check the interpreter works.
+
+        test!(
+            Bls12381G1Bls12381Fr,
+            V::Bls12381G1(G1::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381G1(G1::one()),
+        );
+
+        test!(
+            Bls12381G2Bls12381Fr,
+            V::Bls12381G2(G2::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381G2(G2::one()),
+        );
+
+        test!(
+            Bls12381FrBls12381Fr,
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            NatBls12381Fr,
+            V::Nat(1u8.into()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            IntBls12381Fr,
+            V::Int(1.into()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            Bls12381FrNat,
+            V::Bls12381Fr(Fr::one()),
+            V::Nat(1u8.into()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            Bls12381FrInt,
+            V::Bls12381Fr(Fr::one()),
+            V::Int(1.into()),
+            V::Bls12381Fr(Fr::one()),
+        );
     }
 }
