@@ -232,6 +232,7 @@ val register_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
@@ -248,6 +249,7 @@ val register_long_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->
@@ -268,6 +270,7 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   ?uses:(t -> Uses.t list) ->
+  ?uses_node:bool ->
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?supports:supported_protocols ->

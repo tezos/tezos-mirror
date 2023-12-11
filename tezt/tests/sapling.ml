@@ -273,6 +273,7 @@ module Wallet = struct
       ~__FILE__
       ~title:"import key in sapling wallet"
       ~tags:["sapling"; "wallet"]
+      ~uses_node:false
     @@ fun protocol ->
     let client_with_contract () =
       (* A client with a pre-registered contract to link the wallet with. *)
@@ -333,6 +334,7 @@ module Wallet = struct
       ~__FILE__
       ~title:"address generation in sapling wallet"
       ~tags:["sapling"; "wallet"; "generation"]
+      ~uses_node:false
     @@ fun protocol ->
     let client_with_key () =
       (* A client with a pre-registered key in the sapling wallet. *)
@@ -422,6 +424,7 @@ let test_sapling_shielded_tez =
     ~__FILE__
     ~title:"test sapling with shielded tez"
     ~tags:["sapling"; "shield"]
+    ~uses_node:false
   @@ fun protocol ->
   let burn_cap = Tez.of_int 3 in
   let contract_path = sapling_contract_path protocol in
@@ -786,6 +789,7 @@ let test_sapling_state_corruption =
     ~__FILE__
     ~title:"test sapling state corruption"
     ~tags:["sapling"; "shield"; "state_corruption"]
+    ~uses_node:false
   @@ fun protocol ->
   let burn_cap = Tez.of_int 3 in
   let* client = Client.init_mockup ~protocol () in
@@ -840,6 +844,7 @@ module Memo_size = struct
       ~__FILE__
       ~title:"test sapling memo size"
       ~tags:["sapling"; "shield"; "memo_size"]
+      ~uses_node:false
     @@ fun protocol ->
     let burn_cap = Tez.of_int 3 in
     let contract_name memo_size =
@@ -911,6 +916,7 @@ module Memo_size = struct
       ~__FILE__
       ~title:"test sapling different memo size"
       ~tags:["sapling"; "shield"; "memo_size"]
+      ~uses_node:false
     @@ fun protocol ->
     let* client = Client.init_mockup ~protocol () in
     Log.info "Shield with different memo size" ;
@@ -954,6 +960,7 @@ module Memo_size = struct
       ~__FILE__
       ~title:"test sapling right memo size"
       ~tags:["sapling"; "shield"; "memo_size"]
+      ~uses_node:false
     @@ fun protocol ->
     let* client = Client.init_mockup ~protocol () in
     let tx_amount = Tez.of_int 100 in

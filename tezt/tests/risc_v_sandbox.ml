@@ -86,6 +86,7 @@ let register () =
     ~title:"Run the dummy kernel"
     ~tags:["riscv"; "sandbox"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
     test_dummy_kernel ;
@@ -96,6 +97,7 @@ let register () =
         ~title:(sf "Run risc-v unit tests (%s)" test_unit)
         ~tags:["riscv"; "sandbox"; "unit"; test_unit]
         ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+        ~uses_node:false
         ~uses_client:false
         ~uses_admin_client:false
         (test_user_level_risc_v_unit_tests test_unit))
@@ -105,6 +107,7 @@ let register () =
     ~title:"Run inline asm tests"
     ~tags:["riscv"; "sandbox"; "inline_asm"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
     test_inline_asm

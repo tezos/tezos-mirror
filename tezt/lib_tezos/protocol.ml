@@ -329,8 +329,8 @@ let add_to_test_parameters protocol title tags uses =
   let uses = match uses with None -> [] | Some uses -> uses protocol in
   (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
 
-let register_test ~__FILE__ ~title ~tags ?uses ?uses_client ?uses_admin_client
-    ?supports body protocols =
+let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
+    ?uses_admin_client ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
   Test.register
@@ -338,11 +338,12 @@ let register_test ~__FILE__ ~title ~tags ?uses ?uses_client ?uses_admin_client
     ~title
     ~tags
     ~uses
+    ?uses_node
     ?uses_client
     ?uses_admin_client
     (fun () -> body protocol)
 
-let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_client
+let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     ?uses_admin_client ?supports ?team ~executors ~timeout body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
@@ -351,6 +352,7 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_client
     ~title
     ~tags
     ~uses
+    ?uses_node
     ?uses_client
     ?uses_admin_client
     ?team
@@ -358,8 +360,8 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_client
     ~timeout
     (fun () -> body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_client
-    ?uses_admin_client ?supports body protocols =
+let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_node
+    ?uses_client ?uses_admin_client ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let title, tags, uses = add_to_test_parameters protocol title tags uses in
   Regression.register
@@ -367,6 +369,7 @@ let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_client
     ~title
     ~tags
     ~uses
+    ?uses_node
     ?uses_client
     ?uses_admin_client
     (fun () -> body protocol)

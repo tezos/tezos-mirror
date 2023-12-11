@@ -44,6 +44,7 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
     ~supports:(Protocol.From_protocol 10)
       (* Instructions SHA3 and KECCAK are both available since protocol 10 *)
     ~tags:["michelson"; "crypto"; "contract"; "hash"; hash_fun_name]
+    ~uses_node:false
     (fun protocol ->
       let state = Random.State.make [||] in
       let bytes_random n =

@@ -100,6 +100,7 @@ val register :
   title:string ->
   tags:string list ->
   ?uses:Uses.t list ->
+  ?uses_node:bool ->
   ?uses_client:bool ->
   ?uses_admin_client:bool ->
   ?team:string ->

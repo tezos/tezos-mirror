@@ -36,6 +36,7 @@ let test_big_map_to_self =
     ~__FILE__
     ~title:"Test sending big_map to self"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract =

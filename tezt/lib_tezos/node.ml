@@ -693,8 +693,8 @@ let wait_for_disconnections node disconnections =
   let* () = wait_for_ready node in
   waiter
 
-let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
-    ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
+let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
+    ?data_dir ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
     ?metrics_port ?(rpc_local = false) ?(rpc_host = "localhost") ?rpc_port
     ?rpc_tls ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in

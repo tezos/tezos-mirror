@@ -35,6 +35,7 @@ let generate_code_using_solution_test () =
     ~title:"snoop codegen"
     ~tags:["codegen"]
     ~uses:[Constant.octez_snoop]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
     ~__FILE__

@@ -39,6 +39,7 @@ let test_deprecated_typecheck script ~legacy =
          (if legacy then "in Legacy" else "Breaks")
          (Michelson_script.name_s script))
     ~tags:["client"; "script"; "michelson"; "typechecking"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let ill_typed_scripts =
@@ -62,6 +63,7 @@ let test_ill_typecheck script error_pattern =
     ~__FILE__
     ~title:(sf "Test Ill Typecheck - %s" script)
     ~tags:["client"; "script"; "michelson"; "typechecking"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script_path =
@@ -81,6 +83,7 @@ let test_legacy_typecheck protocols =
               "Test deprecated instructions typecheck conditionally - %s"
               script)
          ~tags:["client"; "script"; "michelson"; "typechecking"]
+         ~uses_node:false
      @@ fun protocol ->
        let* client = Client.init_mockup ~protocol () in
        let script_path =

@@ -31,7 +31,7 @@ let octez_client = Uses.octez_client
 
 let octez_admin_client = Uses.octez_admin_client
 
-let octez_node = "./octez-node"
+let octez_node = Uses.octez_node
 
 let octez_proxy_server =
   Uses.make ~tag:"proxy_server" ~path:"./octez-proxy-server"

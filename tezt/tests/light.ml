@@ -69,6 +69,7 @@ let test_no_endpoint () =
     ~__FILE__
     ~title:"mode light no endpoint"
     ~tags:["client"; "light"; "cli"]
+    ~uses_node:false
   @@ fun () ->
   let min_agreement = 1.0 in
   let uris = List.map (fun port -> sf "http://localhost:%d" port) [666; 667] in

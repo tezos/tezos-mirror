@@ -35,6 +35,7 @@ let test_script_hash_regression =
     ~__FILE__
     ~title:"Test script hash regression"
     ~tags:["script"; "michelson"; "hash"]
+    ~uses_node:false
   @@ fun protocol ->
   let hooks =
     (* We don't care about the actual command invoked, only script hashes. *)

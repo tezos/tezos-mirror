@@ -38,6 +38,7 @@ let test_call_contract_that_creates_contract =
     ~__FILE__
     ~title:"Create contract"
     ~tags:["client"; "michelson"]
+    ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract_id =

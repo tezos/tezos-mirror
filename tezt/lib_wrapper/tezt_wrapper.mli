@@ -52,7 +52,10 @@ module Uses : sig
   (** {2:default Default Uses} *)
 
   (** The following uses are added by default, but can be removed by specifying
-      [~uses_client:false] etc. *)
+      [~uses_node:false] or [~uses_client:false]. *)
+
+  (** ["./octez-node"], with tag ["node"]. *)
+  val octez_node : t
 
   (** ["./octez-client"], with tag ["client"]. *)
   val octez_client : t
@@ -70,6 +73,7 @@ module Test : sig
     title:string ->
     tags:string list ->
     ?uses:Uses.t list ->
+    ?uses_node:bool ->
     ?uses_client:bool ->
     ?uses_admin_client:bool ->
     ?seed:seed ->
@@ -86,6 +90,7 @@ module Regression : sig
     title:string ->
     tags:string list ->
     ?uses:Uses.t list ->
+    ?uses_node:bool ->
     ?uses_client:bool ->
     ?uses_admin_client:bool ->
     ?file:string ->
