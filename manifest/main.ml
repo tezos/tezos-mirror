@@ -7319,7 +7319,7 @@ let _testnet_experiment_tools =
         octez_base_unix;
         octez_stdlib_unix |> open_;
         Protocol.(client_exn alpha);
-        Protocol.(main alpha) |> open_;
+        Protocol.(main alpha);
       ]
     ~modules:["testnet_experiment_tools"; "format_baker_accounts"]
 
