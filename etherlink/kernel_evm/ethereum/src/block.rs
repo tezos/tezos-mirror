@@ -214,7 +214,7 @@ impl Encodable for L2Block {
         let transactions_bytes: Vec<Vec<u8>> =
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
-        s.append(&self.gas_used);
+        append_u256_le(s, &self.gas_used);
         append_timestamp(s, self.timestamp);
     }
 }
