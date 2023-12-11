@@ -98,7 +98,7 @@ initial_checks()
 rotate_logs ()
 {
 	if [ ${rotateonstart} = "yes" ]; then
-		mv -f "${logfile}" "${logfile}.1"
+		[ -f "${logfile}" ] && mv -f "${logfile}" "${logfile}.1"
 	fi
 }
 

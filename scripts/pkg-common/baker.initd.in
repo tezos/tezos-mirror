@@ -37,6 +37,9 @@ rotateonstart=yes
 protocols="@PROTOCOLS@"
 waitfornode=yes
 othercliopts_baker_@PROTOCOL@=""
+
+nodesetup=local 
+
 keepalive=yes
 keepalive_opt="-K"
 
@@ -52,22 +55,6 @@ accuser="/usr/bin/octez-accuser"
 
 [ "${keepalive}" != "yes" ] && keepalive_opt=""
 
-initial_checks()
-{
-	mkdir -p ${PIDDIR}
-	chown $user:$group ${PIDDIR}
-
-	mkdir -p ${logdir}
-	if [ -z "$lq_vote" ]; then
-		echo "lq_vote must be set in /etc/octez/baker.conf" >&2
-		exit 3
-	fi
-	if [ -z "$baking_key" ]; then
-		echo "baking_key must be set in /etc/octez/baker.conf" >&2
-		exit 3
-	fi
-
-}
 
 wait_for_bootstrap()
 {
@@ -77,8 +64,37 @@ wait_for_bootstrap()
 		/usr/bin/octez-client bootstrapped >/dev/null 2>&1 && break
 		echo "Node not ready - sleeping for 30 seconds" >&2
 		sleep 30
-
 	done
+}
+
+initial_checks()
+{
+	mkdir -p ${PIDDIR}
+	chown $user:$group ${PIDDIR}
+
+	mkdir -p ${logdir}
+	chown $user:$group ${logdir}
+
+	if [ -z "$lq_vote" ]; then
+		echo "lq_vote must be set in /etc/octez/baker.conf" >&2
+		exit 3
+	fi
+	if [ -z "$baking_key" ]; then
+		echo "baking_key must be set in /etc/octez/baker.conf" >&2
+		exit 3
+	fi
+
+	if [ "$nodesetup" != "local" ]; then
+		echo "Only local nodes currently supported by the package" >&2
+		exit 3
+	fi
+
+	if [ ! -d "$nodedir" ] && [ "$nodesetup" = "local" ]; then
+		echo "$nodedir must be set up with a local running node" >&2
+		exit 3
+	fi
+
+	[ "$waitfornode" = "yes" ] &&  wait_for_bootstrap
 
 }
 
@@ -86,8 +102,10 @@ rotate_logs ()
 {
 	if [ ${rotateonstart} = "yes" ]; then
 		for p in ${protocols}; do
-			mv -f "${logfile_baseb}${p}.log" "${logfile_baseb}${p}.log.1"
-			mv -f "${logfile_basea}${p}.log" "${logfile_basea}${p}.log.1"
+			[ -f "${logfile_baseb}${p}.log" ] && \
+				mv -f "${logfile_baseb}${p}.log" "${logfile_baseb}${p}.log.1"
+			[ -f "${logfile_basea}${p}.log" ] && \
+				mv -f "${logfile_basea}${p}.log" "${logfile_basea}${p}.log.1"
 		done
 	fi
 }
@@ -95,7 +113,6 @@ rotate_logs ()
 case "$1" in
 start)	initial_checks
 	rotate_logs
-	[ "$waitfornode" = "yes" ] &&  wait_for_bootstrap
 	for p in ${protocols}; do
 		[ ! -x "${baker}-$p" ] && continue
 
@@ -106,9 +123,8 @@ start)	initial_checks
 	;;
 stop)
 	for p in ${protocols}; do
-		[ ! -x "${baker}-$p" ] && continue
-    kill  "$(cat ${PIDFILEB}-$p)"
-    kill  "$(cat ${PIDFILEA}-$p)"
+		[ -f "${PIDFILEB}-$p" ] && kill  "$(cat ${PIDFILEB}-$p)"
+		[ -f "${PIDFILEA}-$p" ] && kill  "$(cat ${PIDFILEA}-$p)"
 		rm -f ${PIDFILEB}-$p ${PIDFILEA}-$p
 	done
         ;;

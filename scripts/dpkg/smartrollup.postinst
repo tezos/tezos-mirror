@@ -1,4 +1,16 @@
 #!/bin/sh
 
+user=tezos
+group=tezos
+homedir=/var/tezos
+
+# Ensure the tezos user is created
+getent group ${group} >/dev/null 2>&1 || addgroup --system ${group}
+getent passwd ${user} >/dev/null 2>&1 || adduser --system	\
+						--home $homedir \
+						--shell /bin/bash \
+						--disabled-password \
+						--ingroup ${group} ${user}
+
 # Reload to get new init scripts
 /usr/bin/systemctl daemon-reload
