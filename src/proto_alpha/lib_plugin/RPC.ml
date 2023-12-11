@@ -1212,9 +1212,9 @@ module Scripts = struct
       end)
       (op, chain_id)
 
-  let default_from_context ctxt get = function
-    | None -> get ctxt
-    | Some x -> return x
+  let default_from_context ctxt get =
+    let open Lwt_result_syntax in
+    function None -> get ctxt | Some x -> return x
 
   (* A convenience type for return values of [ensure_contracts_exist] below. *)
   type run_code_config = {
@@ -2325,6 +2325,7 @@ module Contract = struct
   end
 
   let get_contract contract f =
+    let open Lwt_result_syntax in
     match contract with
     | Contract.Implicit _ -> return_none
     | Contract.Originated contract -> f contract
@@ -3253,6 +3254,7 @@ module Forge = struct
   end
 
   let register () =
+    let open Lwt_result_syntax in
     Registration.register0_noctxt
       ~chunked:true
       S.operations
@@ -4152,10 +4154,10 @@ module Staking = struct
     else return_none
 
   let check_delegate_registered ctxt pkh =
-    Delegate.registered ctxt pkh >>= function
-    | true -> return_unit
-    | false ->
-        Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
+    let open Lwt_result_syntax in
+    let*! result = Delegate.registered ctxt pkh in
+    if result then return_unit
+    else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
 
   let register () =
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
@@ -4226,6 +4228,7 @@ let () =
     (fun () -> Negative_level_offset)
 
 let register () =
+  let open Lwt_result_syntax in
   Scripts.register () ;
   Forge.register () ;
   Parse.register () ;

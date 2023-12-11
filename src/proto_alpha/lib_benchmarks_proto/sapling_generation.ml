@@ -127,6 +127,7 @@ let rec gen_rcm state =
 
 (* Adds a commitment, ciphertext, cv to an rpc_diff *)
 let add_input diff vk index position sum state =
+  let open Lwt_result_syntax in
   let rcm = gen_rcm state in
   let amount = random_amount state sum in
   let new_idx, address =
@@ -272,6 +273,7 @@ let outputs nb_output proving_ctx vk state =
 
 (* Create the list of inputs. To use once the merkle tree is completed. *)
 let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
+  let open Lwt_result_syntax in
   List.map_ep
     (fun {rcm; position; amount; address; nf} ->
       let witness = Tezos_sapling.Storage.get_witness local_state position in

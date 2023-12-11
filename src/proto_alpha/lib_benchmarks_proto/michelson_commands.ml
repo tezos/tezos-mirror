@@ -33,6 +33,7 @@ let group =
 
 module Michelson_concat_cmd = struct
   let handler () file1 file2 file3 () =
+    let open Lwt_result_syntax in
     let trace1 = Michelson_mcmc_samplers.load ~filename:file1 in
     let trace2 = Michelson_mcmc_samplers.load ~filename:file2 in
     let terms = trace1 @ trace2 in
@@ -75,6 +76,7 @@ module Michelson_gen_cmd = struct
 
   let handler (min_size, max_size, burn_in, seed) terms_count terms_kind
       filename () =
+    let open Lwt_result_syntax in
     let default = Michelson_generation.default_generator_config in
     let min = Option.value ~default:default.target_size.min min_size in
     let max = Option.value ~default:default.target_size.max max_size in
@@ -132,6 +134,7 @@ module Michelson_gen_cmd = struct
     return_unit
 
   let min_size_arg =
+    let open Lwt_result_syntax in
     let min_size =
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
@@ -146,6 +149,7 @@ module Michelson_gen_cmd = struct
       min_size
 
   let max_size_arg =
+    let open Lwt_result_syntax in
     let max_size =
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
@@ -160,6 +164,7 @@ module Michelson_gen_cmd = struct
       max_size
 
   let burn_in_arg =
+    let open Lwt_result_syntax in
     let target_size =
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
@@ -174,6 +179,7 @@ module Michelson_gen_cmd = struct
       target_size
 
   let seed_arg =
+    let open Lwt_result_syntax in
     let seed =
       Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)

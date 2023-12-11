@@ -11,6 +11,7 @@ open Protocol.Alpha_context
 let possible_block_ids = ["head"; "finalized"; "cemented"; "<hash>"; "<level>"]
 
 let block_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"block"
     ~short:'B'

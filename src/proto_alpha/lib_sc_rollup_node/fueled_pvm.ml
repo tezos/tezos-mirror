@@ -35,6 +35,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
   type pvm_state = Irmin_context.tree
 
   let get_reveal ~dac_client ~data_dir ~pvm_kind reveal_map hash =
+    let open Lwt_result_syntax in
     let found_in_map =
       match reveal_map with
       | None -> None
