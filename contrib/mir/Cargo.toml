@@ -22,6 +22,10 @@ num-traits = "0.2"
 chrono = "0.4"
 integer-sqrt = "0.1"
 blst = "0.3"
+bitvec = "1.0"
+strum = "0.25"
+strum_macros = "0.25"
+smallvec = { version = "1.11", features = [ "const_new" ] }
 
 [[bin]]
 name = "tzt_runner"

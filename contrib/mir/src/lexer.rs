@@ -14,6 +14,7 @@ pub mod macros;
 pub use errors::*;
 use macros::*;
 use num_bigint::BigInt;
+use strum_macros::EnumCount;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -30,7 +31,7 @@ macro_rules! coalesce {
 /// representation of the identifiers.
 macro_rules! defprim {
     ($ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount)]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[repr(u8)]
         pub enum $ty {
@@ -171,6 +172,18 @@ impl std::fmt::Display for Annotation<'_> {
     }
 }
 
+pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {
+    match value {
+        s @ ("@%" | "@%%" | "%@") => Some(Annotation::Special(Cow::Borrowed(s))),
+        s => match s.as_bytes()[0] {
+            b'@' => Some(Annotation::Variable(Cow::Borrowed(&s[1..]))),
+            b'%' => Some(Annotation::Field(Cow::Borrowed(&s[1..]))),
+            b':' => Some(Annotation::Type(Cow::Borrowed(&s[1..]))),
+            _ => None,
+        },
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
@@ -304,20 +317,7 @@ fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
 }
 
 fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
-    match lex.slice() {
-        s @ ("@%" | "@%%" | "%@") => Annotation::Special(Cow::Borrowed(s)),
-        s => {
-            if let Some(s) = s.strip_prefix('@') {
-                Annotation::Variable(Cow::Borrowed(s))
-            } else if let Some(s) = s.strip_prefix('%') {
-                Annotation::Field(Cow::Borrowed(s))
-            } else if let Some(s) = s.strip_prefix(':') {
-                Annotation::Type(Cow::Borrowed(s))
-            } else {
-                unreachable!("regex for Annotation ensures it's either one of three")
-            }
-        }
-    }
+    try_ann_from_str(lex.slice()).expect("regex from annotation ensures it's valid")
 }
 
 #[cfg(test)]
