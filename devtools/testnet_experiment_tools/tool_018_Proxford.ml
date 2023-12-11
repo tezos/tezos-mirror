@@ -25,9 +25,9 @@
 
 open Lwt_result_syntax
 open Tezos_shell_services
-open Tezos_client_alpha
-open Tezos_baking_alpha
-open Tezos_protocol_alpha
+open Tezos_client_018_Proxford
+open Tezos_baking_018_Proxford
+open Tezos_protocol_018_Proxford
 open Protocol
 open Alpha_context
 
