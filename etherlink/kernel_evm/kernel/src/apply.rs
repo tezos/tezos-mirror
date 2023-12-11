@@ -237,7 +237,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         Some(account) => (
             account.nonce(host)?,
             account.balance(host)?,
-            account.code_exists(host)?.is_some(),
+            account.code_exists(host)?,
         ),
     };
 
