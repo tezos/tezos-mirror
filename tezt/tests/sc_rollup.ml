@@ -86,7 +86,7 @@ let disputed_commit = "Attempted to cement a disputed commitment"
 
 let register_test ?supports ?(regression = false) ~__FILE__ ~tags ?uses ~title f
     =
-  let tags = "sc_rollup" :: tags in
+  let tags = Tag.etherlink :: "sc_rollup" :: tags in
   if regression then
     Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags ?uses f
   else Protocol.register_test ?supports ~__FILE__ ~title ~tags ?uses f
