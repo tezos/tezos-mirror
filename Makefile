@@ -132,7 +132,7 @@ $(ALL_EXECUTABLES):
 
 .PHONY: kaitai-struct-files-update
 kaitai-struct-files-update:
-	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files
 
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
