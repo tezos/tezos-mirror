@@ -85,6 +85,7 @@ odoc:
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
+	@rm -rf $(CURDIR)/_build/api/odoc/_odocls
 
 odoc-lite:
 	rm -rf $(TMPDOCDIR)/
@@ -100,6 +101,7 @@ odoc-lite:
 	rm -rf $(CURDIR)/_build/api/odoc
 	mkdir -p $(CURDIR)/_build/api
 	cp -r $(TOPBUILDDIR_ABS)/default/_doc $(CURDIR)/_build/api/odoc
+	rm -rf $(CURDIR)/_build/api/odoc/_odocls
 
 .PHONY: linkcheck
 linkcheck: html
