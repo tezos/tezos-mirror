@@ -11,7 +11,7 @@ mod runner;
 use std::{
     collections::HashMap,
     ffi::OsStr,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -31,7 +31,7 @@ pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
         .collect::<Vec<PathBuf>>()
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ReportValue {
     pub successes: u16,
     pub failures: u16,
@@ -66,6 +66,165 @@ pub struct Opt {
         about = "Specify the file where the logs will be outputed. By default it will be outputed to 'evm_evaluation.regression'."
     )]
     output: String,
+}
+
+fn generate_final_report(
+    output_file: &mut File,
+    report_map: &mut HashMap<String, ReportValue>,
+) {
+    let mut successes_total = 0;
+    let mut failure_total = 0;
+    let mut final_report: HashMap<&str, Vec<(String, u16, u16)>> = HashMap::new();
+
+    for (key, report_value) in report_map {
+        let insert_element = (
+            key.to_string(),
+            report_value.successes,
+            report_value.failures,
+        );
+        successes_total += report_value.successes;
+        failure_total += report_value.failures;
+        if report_value.successes != 0 || report_value.failures != 0 {
+            if report_value.failures == 0 {
+                final_report
+                    .entry("Fully Successful Tests")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stMemExpandingEIP150Calls"
+                || key == "stEIP150singleCodeGasPrices"
+                || key == "stEIP150Specific"
+            {
+                final_report
+                    .entry("EIP-150")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stEIP1559" {
+                final_report
+                    .entry("EIP-1559")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stEIP158Specific"
+                || key == "stEIP2930"
+                || key == "stEIP3860-limitmeterinitcode"
+                || key == "stEIP3607"
+            {
+                final_report
+                    .entry("Other EIPs")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stPreCompiledContracts"
+                || key == "stPreCompiledContracts2"
+                || key == "stStaticFlagEnabled"
+            {
+                final_report
+                    .entry("Precompiled Contracts")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "vmIOandFlowOperations"
+                || key == "vmTests"
+                || key == "vmArithmeticTest"
+                || key == "vmPerformance"
+                || key == "vmLogTest"
+                || key == "vmBitwiseLogicOperation"
+            {
+                final_report
+                    .entry("VM Specific")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stBadOpcode"
+                || key == "stSolidityTest"
+                || key == "stRecursiveCreate"
+                || key == "stCreateTest"
+                || key == "stCreate2"
+                || key == "stCallCodes"
+                || key == "stCodeCopyTest"
+                || key == "stCallCreateCallCodeTest"
+                || key == "stZeroCallsTest"
+                || key == "stSStoreTest"
+                || key == "stSLoadTest"
+                || key == "stStaticCall"
+                || key == "stExtCodeHash"
+                || key == "stRevertTest"
+                || key == "stShift"
+                || key == "stSelfBalance"
+                || key == "stStackTests"
+                || key == "stNonZeroCallsTest"
+                || key == "stZeroCallsRevert"
+                || key == "stRefundTest"
+                || key == "stSystemOperationsTest"
+                || key == "stCodeSizeLimit"
+                || key == "stInitCodeTest"
+                || key == "stReturnDataTest"
+            {
+                final_report
+                    .entry("Smart Contracts - Opcodes - Solidity")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stMemoryTest" || key == "stMemoryStressTest" {
+                final_report
+                    .entry("Memory")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else if key == "stZeroKnowledge"
+                || key == "stZeroKnowledge2"
+                || key == "stHomesteadSpecific"
+                || key == "stCallDelegateCodesCallCodeHomestead"
+                || key == "stCallDelegateCodesHomestead"
+                || key == "stDelegatecallTestHomestead"
+            {
+                final_report
+                    .entry("Investigation/Suspended")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            } else {
+                final_report
+                    .entry("Arbitrary/Random Tests")
+                    .and_modify(|section_elems| {
+                        section_elems.push(insert_element.clone())
+                    })
+                    .or_insert_with(|| vec![insert_element]);
+            }
+        }
+    }
+
+    writeln!(output_file, "@========= FINAL REPORT =========@").unwrap();
+
+    for (section, items) in final_report {
+        writeln!(output_file, "\n••• {} •••\n", section).unwrap();
+        for (key, successes, failures) in items {
+            writeln!(
+                output_file,
+                "For sub-dir {}, there was(were) {} success(es) and {} failure(s).",
+                key, successes, failures
+            )
+            .unwrap();
+        }
+    }
+
+    writeln!(
+        output_file,
+        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
+        successes_total, failure_total
+    )
+    .unwrap();
 }
 
 pub fn main() {
@@ -310,24 +469,5 @@ pub fn main() {
         .unwrap();
     }
     writeln!(output_file, "@@@@@ END OF TESTING @@@@@\n").unwrap();
-
-    writeln!(output_file, "@@@@@@ FINAL REPORT @@@@@@").unwrap();
-    let mut successes_total = 0;
-    let mut failure_total = 0;
-    for (key, report_value) in report_map {
-        successes_total += report_value.successes;
-        failure_total += report_value.failures;
-        writeln!(
-            output_file,
-            "For sub-dir {}, there was {} success(es) and {} failure(s).",
-            key, report_value.successes, report_value.failures
-        )
-        .unwrap();
-    }
-    writeln!(
-        output_file,
-        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
-        successes_total, failure_total
-    )
-    .unwrap();
+    generate_final_report(&mut output_file, &mut report_map)
 }
