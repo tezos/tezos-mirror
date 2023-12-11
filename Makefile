@@ -130,9 +130,13 @@ $(ALL_EXECUTABLES):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
+.PHONY: kaitai-struct-files-update
+kaitai-struct-files-update:
+	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
-	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files
+	@$(MAKE) kaitai-struct-files-update
 	@$(MAKE) -C contrib/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
@@ -142,7 +146,7 @@ check-kaitai-struct-files:
 	@rm contrib/kaitai-struct-files/files/*.ksy
 	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files 2>/dev/null
 	@git add contrib/kaitai-struct-files/files/*.ksy
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
