@@ -1,4 +1,6 @@
 .bin_packages_common:
+   extends:
+    - .default_settings_template
    variables:
      TARGET: ""
      OCTEZ_PKGMAINTAINER: "nomadic-labs"
@@ -19,5 +21,3 @@
     name: "${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
     expire_in: 1 day
     when: on_success
-   tags:
-    - amd64

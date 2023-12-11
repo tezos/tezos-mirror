@@ -1,8 +1,6 @@
 include: .gitlab/ci/jobs/publish/common.yml
 
 gitlab:release:
-  extends:
-    - .tags_template__no_gcp
   # https://gitlab.com/tezos/docker-images/ci-release
   image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
   stage: publish_release_gitlab

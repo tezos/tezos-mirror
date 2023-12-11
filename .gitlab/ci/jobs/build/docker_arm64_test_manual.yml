@@ -4,7 +4,6 @@ docker:arm64:
   extends:
     - .build_docker_release_template
     - .tags_template__build_arm64
-    - .tags_template__no_gcp_arm64
   stage: manual
   needs: []
   when: manual
@@ -13,5 +12,3 @@ docker:arm64:
     CI_DOCKER_HUB: "false"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
   allow_failure: true
-  tags:
-    - arm64

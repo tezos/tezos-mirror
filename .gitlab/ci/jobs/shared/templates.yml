@@ -57,3 +57,17 @@
     - key: kernels
       paths:
         - cargo/
+
+.docker_auth_template:
+  extends:
+    - .default_settings_template
+  variables:
+    # Version of the docker to use, docker daemon ad client must
+    # be in the same version.git
+    DOCKER_VERSION: "24.0.7"
+  before_script:
+    - ./scripts/ci/docker_wait_for_daemon.sh
+    - ./scripts/ci/docker_check_version.sh ${DOCKER_VERSION}
+    - ./scripts/ci/docker_registry_auth.sh
+  services:
+    - docker:${DOCKER_VERSION}-dind
