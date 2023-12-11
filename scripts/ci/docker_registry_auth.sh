@@ -35,10 +35,12 @@ echo "RUST_TOOLCHAIN_IMAGE=${RUST_TOOLCHAIN_IMAGE:-}"
 if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
 then
   # Docker Hub
+  echo "### Logging into Docker Hub for pushing images"
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
 else
   # GitLab container registry
+  echo "### Logging into Gitlab Container Registry for pushing images"
   docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.gitlab.com
   docker_image_name="registry.gitlab.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
@@ -46,10 +48,18 @@ fi
 # Allow to pull from private AWS ECR if used as CI_REGISTRY
 if echo "${CI_REGISTRY}" | grep -q '\.dkr\.ecr\.'
 then
-  # Make sure Amazon ECR Docker Credential Helper is installed
-  docker-credential-ecr-login version > /dev/null
-  # Merge with existing Docker client configuration
-  jq ". + {\"credHelpers\": { \"${CI_REGISTRY}\": \"ecr-login\"}}" ~/.docker/config.json | sponge ~/.docker/config.json
+  echo "### Logging into Amazon ECR for pulling images"
+  if [ ! -f "/secrets/.aws_ecr/CI_AWS_ECR_TOKEN" ]
+  then
+    echo "Use Amazon ECR Docker Credential Helper"
+    # Make sure Amazon ECR Docker Credential Helper is installed
+    docker-credential-ecr-login version > /dev/null
+    # Merge with existing Docker client configuration
+    jq ". + {\"credHelpers\": { \"${CI_REGISTRY}\": \"ecr-login\"}}" ~/.docker/config.json | sponge ~/.docker/config.json
+  else
+    echo "Use the stored ECR token"
+    docker login --username AWS --password-stdin "${CI_REGISTRY}" < /secrets/.aws_ecr/CI_AWS_ECR_TOKEN
+  fi
   echo "### Amazon ECR Docker Credential Helper enabled for ${CI_REGISTRY}"
 fi
 

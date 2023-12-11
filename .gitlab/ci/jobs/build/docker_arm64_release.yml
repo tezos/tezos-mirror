@@ -4,7 +4,6 @@ docker:arm64:
   extends:
     - .tags_template__build_arm64
     - .build_docker_release_template
-    - .tags_template__no_gcp_arm64
   stage: build
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"

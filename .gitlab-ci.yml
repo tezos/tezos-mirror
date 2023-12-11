@@ -112,7 +112,7 @@ variables:
 # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding
 .image_template__docker:
   # https://gitlab.com/tezos/docker-images/ci-docker
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0"
 
 .image_template__alpine:
   # The Alpine version should be kept up to date with the version used

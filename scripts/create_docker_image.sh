@@ -34,6 +34,7 @@ done
 echo "### Building tezos..."
 
 docker build \
+  --network host \
   -t "$build_image_name:$image_version" \
   -f build.Dockerfile \
   --target "$docker_target" \
@@ -51,6 +52,7 @@ docker build \
 echo "### Successfully built docker image: $build_image_name:$image_version"
 
 docker build \
+  --network host \
   -t "${image_name}debug:$image_version" \
   --build-arg "BASE_IMAGE=$build_deps_image_name" \
   --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
@@ -64,6 +66,7 @@ docker build \
 echo "### Successfully built docker image: ${image_name}debug:$image_version"
 
 docker build \
+  --network host \
   -t "${image_name}bare:$image_version" \
   --build-arg "BASE_IMAGE=$build_deps_image_name" \
   --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
@@ -78,6 +81,7 @@ docker build \
 echo "### Successfully built docker image: ${image_name}bare:$image_version"
 
 docker build \
+  --network host \
   -t "${image_name%?}:$image_version" \
   --build-arg "BASE_IMAGE=$build_deps_image_name" \
   --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \

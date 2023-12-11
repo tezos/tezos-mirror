@@ -40,12 +40,10 @@
 
 .build_docker_release_template:
   extends:
-    - .default_settings_template
     - .image_template__docker
+    - .docker_auth_template
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
     IMAGE_ARCH_PREFIX: ""
-  before_script:
-    - ./scripts/ci/docker_registry_auth.sh
   script:
     - ./scripts/ci/docker_release.sh

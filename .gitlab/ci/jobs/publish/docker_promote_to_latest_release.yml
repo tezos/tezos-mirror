@@ -2,12 +2,10 @@ include: .gitlab/ci/jobs/publish/common.yml
 
 docker:promote_to_latest:
   extends:
+    - .docker_auth_template
     - .image_template__docker
-    - .tags_template__no_gcp
   stage: publish_release
   variables:
     CI_DOCKER_HUB: "true"
-  before_script:
-    - ./scripts/ci/docker_registry_auth.sh
   script:
     - ./scripts/ci/docker_promote_to_latest.sh
