@@ -43,3 +43,17 @@ pub fn construct_folder_path(
 
     path_buf
 }
+
+#[macro_export]
+macro_rules! write_host {
+    ($host: expr, $($args: expr),*) => {
+        {
+            extern crate alloc;
+            writeln!(
+                $host.buffer.borrow_mut(),
+                "{}",
+                { &alloc::format!($($args), *) },
+            ).unwrap()
+        }
+    };
+}
