@@ -83,13 +83,12 @@ let pre_export_checks_and_get_snapshot_metadata ~data_dir =
   let*! () = Context.close context in
   let* () = Store.close store in
   return
-    ( {
-        history_mode;
-        address = metadata.rollup_address;
-        head_level = head.header.level;
-        last_commitment = Sc_rollup_block.most_recent_commitment head.header;
-      },
-      (module Plugin : Protocol_plugin_sig.S) )
+    {
+      history_mode;
+      address = metadata.rollup_address;
+      head_level = head.header.level;
+      last_commitment = Sc_rollup_block.most_recent_commitment head.header;
+    }
 
 let first_available_level ~data_dir store =
   let open Lwt_result_syntax in
@@ -105,10 +104,135 @@ let first_available_level ~data_dir store =
 let check_some hash what = function
   | Some x -> Ok x
   | None ->
-      error_with "Could not read %s at %a after export." what Block_hash.pp hash
+      error_with "Could not read %s at %a after import." what Block_hash.pp hash
+
+let check_block_data_and_get_content (store : _ Store.t) context hash =
+  let open Lwt_result_syntax in
+  let* b = Store.L2_blocks.read store.l2_blocks hash in
+  let*? _b, header = check_some hash "L2 block" b in
+  let* messages = Store.Messages.read store.messages header.inbox_witness in
+  let*? _messages, _ = check_some hash "messages" messages in
+  let* inbox = Store.Inboxes.read store.inboxes header.inbox_hash in
+  let*? inbox, () = check_some hash "inbox" inbox in
+  let* commitment =
+    match header.commitment_hash with
+    | None -> return_none
+    | Some commitment_hash ->
+        let* commitment =
+          Store.Commitments.read store.commitments commitment_hash
+        in
+        let*? commitment, () = check_some hash "commitment" commitment in
+        return_some commitment
+  in
+  (* Ensure head context is available. *)
+  let*! head_ctxt = Context.checkout context header.context in
+  let*? head_ctxt = check_some hash "context" head_ctxt in
+  return (header, inbox, commitment, head_ctxt)
+
+let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
+    context hash next_commitment =
+  let open Lwt_result_syntax in
+  let* header, inbox, commitment, head_ctxt =
+    check_block_data_and_get_content store context hash
+  in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store header.level
+  in
+  let*! pvm_state = Context.PVMState.find head_ctxt in
+  let*? pvm_state = check_some hash "pvm_state" pvm_state in
+  let*! state_hash = Plugin.Pvm.state_hash metadata.kind pvm_state in
+  let* () =
+    match (commitment, header.commitment_hash) with
+    | None, None -> return_unit
+    | Some _, None | None, Some _ ->
+        (* The commitment is fetched from the header value *)
+        assert false
+    | Some commitment, Some commitment_hash ->
+        let hash_of_commitment = Commitment.hash commitment in
+        let*? () =
+          error_unless Commitment.Hash.(hash_of_commitment = commitment_hash)
+          @@ error_of_fmt
+               "Erroneous commitment hash %a for level %ld instead of %a."
+               Commitment.Hash.pp
+               hash_of_commitment
+               header.level
+               Commitment.Hash.pp
+               commitment_hash
+        in
+        let*? () =
+          error_unless State_hash.(state_hash = commitment.compressed_state)
+          @@ error_of_fmt
+               "Erroneous state hash %a for level %ld instead of %a."
+               State_hash.pp
+               state_hash
+               header.level
+               State_hash.pp
+               commitment.compressed_state
+        in
+        let*? () =
+          error_unless (commitment.inbox_level = header.level)
+          @@ error_of_fmt
+               "Erroneous inbox level %ld in commitment instead of level %ld."
+               commitment.inbox_level
+               header.level
+        in
+        let*? () =
+          if header.level = metadata.genesis_info.level then Ok ()
+          else
+            error_unless
+              Commitment.Hash.(
+                header.previous_commitment_hash = commitment.predecessor)
+            @@ error_of_fmt
+                 "Erroneous previous commitment hash %a for level %ld instead \
+                  of %a."
+                 Commitment.Hash.pp
+                 header.previous_commitment_hash
+                 header.level
+                 Commitment.Hash.pp
+                 commitment.predecessor
+        in
+        return_unit
+  in
+  let*? () =
+    match (next_commitment, header.commitment_hash) with
+    | None, _ | _, None ->
+        (* If there is no commitment for this block there is no check to do. *)
+        Ok ()
+    | Some next_commitment, Some commitment_hash ->
+        error_unless
+          Commitment.Hash.(
+            next_commitment.Commitment.predecessor = commitment_hash)
+        @@ error_of_fmt
+             "Commitment hash %a for level %ld was expected to be %a in the \
+              chain of commitments."
+             Commitment.Hash.pp
+             commitment_hash
+             header.level
+             Commitment.Hash.pp
+             next_commitment.predecessor
+  in
+  let hash_of_inbox = Inbox.hash inbox in
+  let*? () =
+    error_unless Inbox.Hash.(hash_of_inbox = header.inbox_hash)
+    @@ error_of_fmt
+         "Erroneous inbox %a for level %ld instead of %a."
+         Inbox.Hash.pp
+         hash_of_inbox
+         header.level
+         Inbox.Hash.pp
+         header.inbox_hash
+  in
+  return (header, commitment)
+
+let check_block_data (store : _ Store.t) context hash _next_commitment =
+  let open Lwt_result_syntax in
+  let* header, _inbox, commitment, _head_ctxt =
+    check_block_data_and_get_content store context hash
+  in
+  return (header, commitment)
 
 let check_l2_chain ~message ~data_dir (store : _ Store.t) context
-    (head : Sc_rollup_block.t) =
+    (head : Sc_rollup_block.t) check_block =
   let open Lwt_result_syntax in
   let* first_available_level = first_available_level ~data_dir store in
   let blocks_to_check =
@@ -122,39 +246,114 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
       blocks_to_check
   in
   Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
-  let rec check_block hash =
-    let* b = Store.L2_blocks.read store.l2_blocks hash in
-    let*? _b, header = check_some hash "L2 block" b in
-    let* messages = Store.Messages.read store.messages header.inbox_witness in
-    let*? _messages = check_some hash "messages" messages in
-    let* inbox = Store.Inboxes.read store.inboxes header.inbox_hash in
-    let*? _inbox = check_some hash "inbox" inbox in
-    let* () =
-      match header.commitment_hash with
-      | None -> return_unit
-      | Some commitment_hash ->
-          let* commitment =
-            Store.Commitments.read store.commitments commitment_hash
-          in
-          let*? _commitment = check_some hash "commitment" commitment in
-          return_unit
-    in
-    (* Ensure head context is available. *)
-    let*! head_ctxt = Context.checkout context header.context in
-    let*? _head_ctxt = check_some hash "context" head_ctxt in
+  let rec check_chain hash next_commitment =
+    let* header, commitment = check_block store context hash next_commitment in
     let*! () = count_progress 1 in
-    if header.level <= first_available_level then return_unit
-    else check_block header.predecessor
+    if header.Sc_rollup_block.level <= first_available_level then return_unit
+    else
+      check_chain header.predecessor (Option.either commitment next_commitment)
   in
-  check_block head.header.block_hash
+  check_chain head.header.block_hash None
 
-let post_import_checks ~message ~dest protocol_plugin =
+let check_last_commitment head snapshot_metadata =
+  let last_snapshot_commitment =
+    Sc_rollup_block.most_recent_commitment head.Sc_rollup_block.header
+  in
+  error_unless
+    Commitment.Hash.(
+      snapshot_metadata.last_commitment = last_snapshot_commitment)
+  @@ error_of_fmt
+       "Last commitment in snapshot is %a but should be %a."
+       Commitment.Hash.pp
+       last_snapshot_commitment
+       Commitment.Hash.pp
+       snapshot_metadata.last_commitment
+
+let check_last_commitment_published cctxt snapshot_metadata =
+  let open Lwt_result_syntax in
+  Error.trace_lwt_result_with
+    "Last commitment of snapshot is not published on L1."
+  @@ let* {current_protocol; _} =
+       Tezos_shell_services.Shell_services.Blocks.protocols
+         cctxt
+         ~block:(`Head 0)
+         ()
+     in
+     let*? (module Plugin) =
+       Protocol_plugins.proto_plugin_for_protocol current_protocol
+     in
+     let* (_commitment : Commitment.t) =
+       Plugin.Layer1_helpers.get_commitment
+         cctxt
+         snapshot_metadata.address
+         snapshot_metadata.last_commitment
+     in
+     return_unit
+
+let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
+    (module Plugin : Protocol_plugin_sig.S) =
+  let open Lwt_result_syntax in
+  let* lcc =
+    Plugin.Layer1_helpers.get_last_cemented_commitment
+      cctxt
+      metadata.Metadata.rollup_address
+  in
+  if lcc.level > head.header.level then
+    (* The snapshot is older than the current LCC *)
+    return_unit
+  else
+    let* lcc_block_hash =
+      Store.Levels_to_hashes.find store.levels_to_hashes lcc.level
+    in
+    let*? lcc_block_hash =
+      match lcc_block_hash with
+      | None -> error_with "No block for LCC level %ld" lcc.level
+      | Some h -> Ok h
+    in
+    let* lcc_block_header =
+      Store.L2_blocks.header store.l2_blocks lcc_block_hash
+    in
+    match lcc_block_header with
+    | None ->
+        failwith
+          "Unknown block %a for LCC level %ld"
+          Block_hash.pp
+          lcc_block_hash
+          lcc.level
+    | Some {commitment_hash = None; _} ->
+        failwith
+          "No commitment for block %a for LCC level %ld"
+          Block_hash.pp
+          lcc_block_hash
+          lcc.level
+    | Some {commitment_hash = Some commitment_hash; _} ->
+        fail_unless Commitment.Hash.(lcc.commitment = commitment_hash)
+        @@ error_of_fmt
+             "Snapshot contains %a for LCC at level %ld but was expected to be \
+              %a."
+             Commitment.Hash.pp
+             commitment_hash
+             lcc.level
+             Commitment.Hash.pp
+             lcc.commitment
+
+let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
   let context_dir = Configuration.default_context_dir dest in
   (* Load context and stores in read-only to run checks. *)
   let* () = check_store_version store_dir in
-  let (module Plugin : Protocol_plugin_sig.S) = protocol_plugin in
+  let* store =
+    Store.load
+      Read_only
+      ~index_buffer_size:1000
+      ~l2_blocks_cache_size:100
+      store_dir
+  in
+  let* head = get_head store in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
+  in
   let* metadata = Metadata.read_metadata_file ~dir:dest in
   let*? metadata =
     match metadata with
@@ -165,24 +364,45 @@ let post_import_checks ~message ~dest protocol_plugin =
   let* context =
     Context.load (module C) ~cache_size:100 Read_only context_dir
   in
-  let* store =
-    Store.load
-      Read_only
-      ~index_buffer_size:1000
-      ~l2_blocks_cache_size:100
-      store_dir
-  in
-  let* head = get_head store in
   let* head = check_head head context in
-  let* () = check_l2_chain ~message ~data_dir:dest store context head in
+  let* check_block_data =
+    match action with
+    | `Export -> return check_block_data
+    | `Import cctxt -> (
+        let* metadata = Metadata.read_metadata_file ~dir:dest in
+        match metadata with
+        | None ->
+            (* We need the kind of the rollup to run the consistency checks in
+               order to verify state hashes. *)
+            failwith "No metadata (needs rollup kind)."
+        | Some metadata ->
+            let*? () = check_last_commitment head snapshot_metadata in
+            let* () = check_lcc metadata cctxt store head (module Plugin) in
+            return (check_block_data_consistency metadata))
+  in
+  let* () =
+    check_l2_chain ~message ~data_dir:dest store context head check_block_data
+  in
   let*! () = Context.close context in
   let* () = Store.close store in
   return_unit
 
-let post_export_checks ~snapshot_file context_plugin =
+let post_export_checks ~snapshot_file =
+  let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
-  extract gzip_reader stdlib_writer (fun _ -> ()) ~snapshot_file ~dest ;
-  post_import_checks ~message:"Checking snapshot   " ~dest context_plugin
+  let* snapshot_metadata =
+    extract
+      gzip_reader
+      stdlib_writer
+      (fun _ -> return_unit)
+      ~snapshot_file
+      ~dest
+  in
+  post_checks
+    ~action:`Export
+    ~message:"Checking snapshot   "
+    snapshot_metadata
+    ~dest
 
 let operator_local_file_regexp =
   Re.Str.regexp "^storage/\\(commitments_published_at_level.*\\|lpc$\\)"
@@ -193,16 +413,14 @@ let snapshotable_files_regexp =
 
 let export ~data_dir ~dest =
   let open Lwt_result_syntax in
-  let* uncompressed_snapshot, protocol_plugin =
+  let* uncompressed_snapshot =
     Format.eprintf "Acquiring GC lock@." ;
     (* Take GC lock first in order to not prevent progression of rollup node. *)
     Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
     Format.eprintf "Acquiring process lock@." ;
     Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
-    let* metadata, protocol_plugin =
-      pre_export_checks_and_get_snapshot_metadata ~data_dir
-    in
+    let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
     let dest_file_name =
       Format.asprintf
         "snapshot-%a-%ld.%s.uncompressed"
@@ -232,8 +450,90 @@ let export ~data_dir ~dest =
         ~dest:dest_file ;
       return_unit
     in
-    return (dest_file, protocol_plugin)
+    return dest_file
   in
   let snapshot_file = compress ~snapshot_file:uncompressed_snapshot in
-  let* () = post_export_checks ~snapshot_file protocol_plugin in
+  let* () = post_export_checks ~snapshot_file in
   return snapshot_file
+
+let pre_import_checks cctxt ~data_dir snapshot_metadata =
+  let open Lwt_result_syntax in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  (* Load stores in read-only to make simple checks. *)
+  let* store =
+    Store.load
+      Read_write
+      ~index_buffer_size:1000
+      ~l2_blocks_cache_size:100
+      store_dir
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir
+  and* history_mode = Store.History_mode.read store.history_mode
+  and* head = Store.L2_head.read store.l2_head in
+  let* () = Store.close store in
+  let*? () =
+    let open Result_syntax in
+    match (metadata, history_mode) with
+    | None, _ | _, None ->
+        (* The rollup node data dir was never initialized, i.e. the rollup node
+           wasn't run yet. *)
+        return_unit
+    | Some {rollup_address; _}, Some history_mode ->
+        let* () =
+          error_unless Address.(rollup_address = snapshot_metadata.address)
+          @@ error_of_fmt
+               "The existing rollup node is for %a, but the snapshot is for \
+                rollup %a."
+               Address.pp
+               rollup_address
+               Address.pp
+               snapshot_metadata.address
+        in
+        let a_history_str = function
+          | Configuration.Archive -> "an archive"
+          | Configuration.Full -> "a full"
+        in
+        error_unless (history_mode = snapshot_metadata.history_mode)
+        @@ error_of_fmt
+             "Cannot import %s snapshot into %s rollup node."
+             (a_history_str snapshot_metadata.history_mode)
+             (a_history_str history_mode)
+  in
+  let*? () =
+    let open Result_syntax in
+    match head with
+    | None ->
+        (* The rollup node has no L2 chain. *)
+        return_unit
+    | Some head ->
+        error_when (snapshot_metadata.head_level <= head.header.level)
+        @@ error_of_fmt
+             "The rollup node is already at level %ld but the snapshot is only \
+              for level %ld."
+             head.header.level
+             snapshot_metadata.head_level
+  in
+  let* () = check_last_commitment_published cctxt snapshot_metadata in
+  return_unit
+
+let import cctxt ~data_dir ~snapshot_file =
+  let open Lwt_result_syntax in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  let*! () = Event.acquiring_lock () in
+  Utils.with_lockfile
+    ~when_locked:`Fail
+    (Node_context.global_lockfile_path ~data_dir)
+  @@ fun () ->
+  let* snapshot_metadata =
+    extract
+      gzip_reader
+      stdlib_writer
+      (pre_import_checks cctxt ~data_dir)
+      ~snapshot_file
+      ~dest:data_dir
+  in
+  post_checks
+    ~action:(`Import cctxt)
+    ~message:"Checking imported data"
+    snapshot_metadata
+    ~dest:data_dir

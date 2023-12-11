@@ -140,6 +140,8 @@ let get_fee_parameter node_ctxt operation_kind =
   Operation_kind.Map.find operation_kind node_ctxt.config.fee_parameters
   |> Option.value ~default:(Configuration.default_fee_parameter operation_kind)
 
+let global_lockfile_path ~data_dir = Filename.concat data_dir "lock"
+
 let processing_lockfile_path ~data_dir =
   Filename.concat data_dir "processing_lock"
 

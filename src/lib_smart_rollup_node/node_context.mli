@@ -174,6 +174,9 @@ val check_op_in_whitelist_or_bailout_mode :
 *)
 val get_fee_parameter : _ t -> Operation_kind.t -> Injector_common.fee_parameter
 
+(** The path for the lockfile used when starting and running the node. *)
+val global_lockfile_path : data_dir:string -> string
+
 (** The path for the lockfile used in block processing. *)
 val processing_lockfile_path : data_dir:string -> string
 

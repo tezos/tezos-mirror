@@ -212,6 +212,13 @@ module type LAYER1_HELPERS = sig
   (** Retrieve information about the last whitelist update on L1. *)
   val find_last_whitelist_update :
     #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
+
+  (** Retrieve a commitment published on L1. *)
+  val get_commitment :
+    #Client_context.full ->
+    Address.t ->
+    Commitment.Hash.t ->
+    Commitment.t tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)

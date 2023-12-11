@@ -322,6 +322,10 @@ val dump_durable_storage :
     directory [dir]. *)
 val export_snapshot : t -> string -> string Runnable.process
 
+(** [import_snapshot rollup_node ~snapshot_file] imports the snapshot
+    [snapshot_file] in the rollup node [rollup_node].  *)
+val import_snapshot : t -> snapshot_file:string -> unit Runnable.process
+
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
 

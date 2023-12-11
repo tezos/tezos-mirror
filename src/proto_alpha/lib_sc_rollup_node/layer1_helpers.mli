@@ -84,3 +84,10 @@ val find_whitelist :
 (** Find and retrieve information about the last whitelist update. *)
 val find_last_whitelist_update :
   #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
+
+(** Retrieve a commitment published on L1. *)
+val get_commitment :
+  #Client_context.full ->
+  Address.t ->
+  Commitment.Hash.t ->
+  Commitment.t tzresult Lwt.t
