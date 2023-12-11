@@ -130,7 +130,7 @@ let check_block_data_and_get_content (store : _ Store.t) context hash =
   return (header, inbox, commitment, head_ctxt)
 
 let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
-    context hash =
+    context hash next_commitment =
   let open Lwt_result_syntax in
   let* header, inbox, commitment, head_ctxt =
     check_block_data_and_get_content store context hash
@@ -193,6 +193,24 @@ let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
         in
         return_unit
   in
+  let*? () =
+    match (next_commitment, header.commitment_hash) with
+    | None, _ | _, None ->
+        (* If there is no commitment for this block there is no check to do. *)
+        Ok ()
+    | Some next_commitment, Some commitment_hash ->
+        error_unless
+          Commitment.Hash.(
+            next_commitment.Commitment.predecessor = commitment_hash)
+        @@ error_of_fmt
+             "Commitment hash %a for level %ld was expected to be %a in the \
+              chain of commitments."
+             Commitment.Hash.pp
+             commitment_hash
+             header.level
+             Commitment.Hash.pp
+             next_commitment.predecessor
+  in
   let hash_of_inbox = Inbox.hash inbox in
   let*? () =
     error_unless Inbox.Hash.(hash_of_inbox = header.inbox_hash)
@@ -204,14 +222,14 @@ let check_block_data_consistency (metadata : Metadata.t) (store : _ Store.t)
          Inbox.Hash.pp
          header.inbox_hash
   in
-  return header
+  return (header, commitment)
 
-let check_block_data (store : _ Store.t) context hash =
+let check_block_data (store : _ Store.t) context hash _next_commitment =
   let open Lwt_result_syntax in
-  let* header, _inbox, _commitment, _head_ctxt =
+  let* header, _inbox, commitment, _head_ctxt =
     check_block_data_and_get_content store context hash
   in
-  return header
+  return (header, commitment)
 
 let check_l2_chain ~message ~data_dir (store : _ Store.t) context
     (head : Sc_rollup_block.t) check_block =
@@ -228,13 +246,14 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
       blocks_to_check
   in
   Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
-  let rec check_chain hash =
-    let* header = check_block store context hash in
+  let rec check_chain hash next_commitment =
+    let* header, commitment = check_block store context hash next_commitment in
     let*! () = count_progress 1 in
     if header.Sc_rollup_block.level <= first_available_level then return_unit
-    else check_chain header.predecessor
+    else
+      check_chain header.predecessor (Option.either commitment next_commitment)
   in
-  check_chain head.header.block_hash
+  check_chain head.header.block_hash None
 
 let check_last_commitment head snapshot_metadata =
   let last_snapshot_commitment =
