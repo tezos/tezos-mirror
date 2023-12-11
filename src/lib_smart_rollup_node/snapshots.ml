@@ -290,6 +290,53 @@ let check_last_commitment_published cctxt snapshot_metadata =
      in
      return_unit
 
+let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
+    (module Plugin : Protocol_plugin_sig.S) =
+  let open Lwt_result_syntax in
+  let* lcc =
+    Plugin.Layer1_helpers.get_last_cemented_commitment
+      cctxt
+      metadata.Metadata.rollup_address
+  in
+  if lcc.level > head.header.level then
+    (* The snapshot is older than the current LCC *)
+    return_unit
+  else
+    let* lcc_block_hash =
+      Store.Levels_to_hashes.find store.levels_to_hashes lcc.level
+    in
+    let*? lcc_block_hash =
+      match lcc_block_hash with
+      | None -> error_with "No block for LCC level %ld" lcc.level
+      | Some h -> Ok h
+    in
+    let* lcc_block_header =
+      Store.L2_blocks.header store.l2_blocks lcc_block_hash
+    in
+    match lcc_block_header with
+    | None ->
+        failwith
+          "Unknown block %a for LCC level %ld"
+          Block_hash.pp
+          lcc_block_hash
+          lcc.level
+    | Some {commitment_hash = None; _} ->
+        failwith
+          "No commitment for block %a for LCC level %ld"
+          Block_hash.pp
+          lcc_block_hash
+          lcc.level
+    | Some {commitment_hash = Some commitment_hash; _} ->
+        fail_unless Commitment.Hash.(lcc.commitment = commitment_hash)
+        @@ error_of_fmt
+             "Snapshot contains %a for LCC at level %ld but was expected to be \
+              %a."
+             Commitment.Hash.pp
+             commitment_hash
+             lcc.level
+             Commitment.Hash.pp
+             lcc.commitment
+
 let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
@@ -321,7 +368,7 @@ let post_checks ~action ~message snapshot_metadata ~dest =
   let* check_block_data =
     match action with
     | `Export -> return check_block_data
-    | `Import -> (
+    | `Import cctxt -> (
         let* metadata = Metadata.read_metadata_file ~dir:dest in
         match metadata with
         | None ->
@@ -330,6 +377,7 @@ let post_checks ~action ~message snapshot_metadata ~dest =
             failwith "No metadata (needs rollup kind)."
         | Some metadata ->
             let*? () = check_last_commitment head snapshot_metadata in
+            let* () = check_lcc metadata cctxt store head (module Plugin) in
             return (check_block_data_consistency metadata))
   in
   let* () =
@@ -485,7 +533,7 @@ let import cctxt ~data_dir ~snapshot_file =
       ~dest:data_dir
   in
   post_checks
-    ~action:`Import
+    ~action:(`Import cctxt)
     ~message:"Checking imported data"
     snapshot_metadata
     ~dest:data_dir
