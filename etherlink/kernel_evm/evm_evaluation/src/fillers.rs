@@ -267,6 +267,7 @@ pub fn process(
     output_file: &mut File,
     tx_label: Option<&String>,
     tx_index: i64,
+    report_only: bool,
 ) {
     let mut good_state = true;
 
@@ -294,7 +295,9 @@ pub fn process(
     }
 
     if good_state {
-        writeln!(output_file, "\nFINAL RESULT: SUCCESS\n").unwrap();
+        if !report_only {
+            writeln!(output_file, "\nFINAL RESULT: SUCCESS\n").unwrap();
+        }
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes + 1,
@@ -302,13 +305,15 @@ pub fn process(
             };
         });
     } else {
-        write!(
-            output_file,
-            "{}",
-            String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
-        )
-        .unwrap();
-        writeln!(output_file, "FINAL RESULT: FAILURE\n").unwrap();
+        if !report_only {
+            write!(
+                output_file,
+                "{}",
+                String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
+            )
+            .unwrap();
+            writeln!(output_file, "FINAL RESULT: FAILURE\n").unwrap();
+        }
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes,
