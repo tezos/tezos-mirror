@@ -204,19 +204,6 @@ val run :
   argument list ->
   unit Lwt.t
 
-(** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
-    rollup_address arguments] is a lightweight version of {!run} that spawns a
-    process. *)
-val spawn_run :
-  ?loser_mode:string ->
-  ?allow_degraded:bool ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  t ->
-  string ->
-  argument list ->
-  Process.t
-
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t

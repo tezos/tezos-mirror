@@ -3143,12 +3143,12 @@ let bailout_mode_fail_to_start_without_operator ~kind =
           (Sc_rollup_node.Recovering, Constant.bootstrap1.alias);
         ]
   in
-  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
-  let* () =
-    Process.check_error
-      process
+  let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
+  and* () =
+    Sc_rollup_node.check_error
       ~exit_code:1
       ~msg:(rex "Missing operator for the purpose of operating.")
+      sc_rollup_node
   in
   unit
 
@@ -3164,10 +3164,10 @@ let bailout_mode_fail_operator_no_stake ~kind =
       description = "rollup node in bailout fails operator has no stake";
     }
   @@ fun _protocol sc_rollup_node sc_rollup _tezos_node _tezos_client ->
-  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
-  let* () =
-    Process.check_error
-      process
+  let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
+  and* () =
+    Sc_rollup_node.check_error
+      sc_rollup_node
       ~exit_code:1
       ~msg:(rex "This implicit account is not a staker of this smart rollup.")
   in
@@ -4657,24 +4657,29 @@ let test_arg_boot_sector_file ~kind =
   let () = write_file valid_boot_sector_file ~contents:boot_sector in
   (* Starts the rollup node with an invalid boot sector. Asserts that the
      node fails with an invalid genesis state. *)
-  let process =
-    Sc_rollup_node.spawn_run
+  let* () =
+    Sc_rollup_node.run
+      ~wait_ready:false
       rollup_node
       rollup
       [Boot_sector_file invalid_boot_sector_file]
+  and* () =
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:
+        (rex
+           "Genesis commitment computed (.*) is not equal to the rollup \
+            genesis (.*) commitment.*")
+      rollup_node
   in
-  let* () = Client.bake_for_and_wait client in
-  let* err = Process.check_and_read_stderr ~expect_failure:true process in
-  if
-    err
-    =~ rex "Genesis commitment computed * is not equal to the rollup genesis"
-  then
-    Test.fail
-      "The rollup node failed as expected but not with the expected error" ;
   (* Starts the rollup node with a valid boot sector. Asserts that the node
      works as expected by processing blocks. *)
   let* () =
     Sc_rollup_node.run
+    (* the restart is needed because the node and/or tezt daemon
+       might not fully stoped yet. Another solution would be to have
+       a sleep but it's more uncertain. *)
+      ~restart:true
       rollup_node
       rollup
       [Boot_sector_file valid_boot_sector_file]
@@ -4788,12 +4793,12 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
       client
   in
   let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
-  let run_process = Sc_rollup_node.spawn_run rollup_node rollup_address [] in
-  let* () = Client.bake_for_and_wait client in
-  let* () =
-    Process.check_error
+  let* () = Sc_rollup_node.run rollup_node rollup_address [] in
+  let* () = Client.bake_for_and_wait client
+  and* () =
+    Sc_rollup_node.check_error
       ~msg:(rex "Could not open file containing preimage of reveal hash")
-      run_process
+      rollup_node
   in
   Lwt.return_unit
 
@@ -4885,10 +4890,10 @@ let test_private_rollup_node_publish_not_in_whitelist =
     }
     ~kind:"arith"
   @@ fun _protocol rollup_node sc_rollup _tezos_node _client ->
-  let node_process = Sc_rollup_node.spawn_run rollup_node sc_rollup [] in
-  let* () =
-    Process.check_error
-      node_process
+  let* () = Sc_rollup_node.run ~wait_ready:false rollup_node sc_rollup []
+  and* () =
+    Sc_rollup_node.check_error
+      rollup_node
       ~exit_code:1
       ~msg:(rex ".*The operator is not in the whitelist.*")
   in
@@ -5254,11 +5259,14 @@ let custom_mode_empty_operation_kinds ~kind =
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:Constant.bootstrap1.alias
   in
-  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
-  Process.check_error
-    process
-    ~exit_code:1
-    ~msg:(rex "Operation kinds for custom mode are empty.")
+  let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
+  and* () =
+    Sc_rollup_node.check_error
+      sc_rollup_node
+      ~exit_code:1
+      ~msg:(rex "Operation kinds for custom mode are empty.")
+  in
+  unit
 
 (* adds multiple batcher keys for a rollup node runs in batcher mode
    and make sure all keys are used to sign batches and injected in a
@@ -5574,8 +5582,7 @@ let start_rollup_node_with_encrypted_key ~kind =
   let* () =
     repeat 3 (fun () ->
         Sc_rollup_node.write_in_stdin rollup_node "invalid_password")
-  in
-  let* () =
+  and* () =
     Sc_rollup_node.check_error
       rollup_node
       ~exit_code:1
@@ -5584,7 +5591,6 @@ let start_rollup_node_with_encrypted_key ~kind =
   let* () = Sc_rollup_node.kill rollup_node in
   let password_file = Filename.temp_file "password_file" "" in
   let () = write_file password_file ~contents:password in
-
   let* () = Sc_rollup_node.run ~password_file rollup_node sc_rollup [] in
   unit
 
