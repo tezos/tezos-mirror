@@ -255,7 +255,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
+    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k; Tag.layer1]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -330,7 +330,7 @@ let test_drag_after_rolling_import =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot drag after rolling import"
-    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"]
+    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"; Tag.layer1]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -479,7 +479,7 @@ let test_info_command =
   Protocol.register_test
     ~__FILE__
     ~title:(Format.asprintf "storage snapshot info command")
-    ~tags:["storage"; "snapshot"; "info"; "command"]
+    ~tags:["storage"; "snapshot"; "info"; "command"; Tag.layer1]
   @@ fun protocol ->
   let* node = Node.init ~name:"node" node_arguments in
   let* client = Client.init ~endpoint:(Node node) () in
