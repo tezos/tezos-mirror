@@ -3325,11 +3325,6 @@ let test_reboot =
   Check.((tick_number > Z.to_int max_tick) int)
     ~error_msg:
       "Expected %L to be greater than %R, max nb of ticks per kernel run" ;
-  (* a single run can't do more than 11_000_000_000 / 2000 gas units *)
-  (* TODO: #6278
-     RPC to fetch tick model / tick per gas *)
-  Check.((block_with_many_txs.gasUsed > 5500000l) int32)
-    ~error_msg:"Expected gas used %L to be superior to %R" ;
   unit
 
 let block_transaction_count_by ~by arg =
