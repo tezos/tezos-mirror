@@ -495,9 +495,7 @@ let store_raw_block chain_store ?resulting_context (raw_block : Block_repr.t) =
           message = Block_repr.message metadata;
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
           last_finalized_block_level =
-            (* Not yet implemented. We use the last_preserved_block_level by
-               default.*)
-            Block_repr.last_preserved_block_level metadata;
+            Int32.(max 0l (sub (Block_repr.level raw_block) 2l));
           last_preserved_block_level =
             Block_repr.last_preserved_block_level metadata;
         };
