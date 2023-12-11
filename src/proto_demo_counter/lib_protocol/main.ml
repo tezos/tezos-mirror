@@ -263,11 +263,8 @@ let init _chain_id context block_header =
       context = init_context;
       fitness;
       max_operations_ttl = 0;
-      last_finalized_block_level =
-        (* Not yet implemented. We use the last_preserved_block_level by
-           default.*)
-        block_header.level;
       last_preserved_block_level = block_header.level;
+      last_finalized_block_level = Compare.Int32.max 0l Int32.(sub block_header.level 2l) ;
     }
 
 let compare_operations _ _ = 0
