@@ -23,11 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let maybe_with_transaction (c : Config.t) (m : Lwt_mutex.t)
-    (module D : Caqti_lwt.CONNECTION) f =
-  if c.with_transaction then
-    Lwt_mutex.with_lock m (fun () -> D.with_transaction f)
-  else f ()
+let maybe_with_transaction (c : Config.t) (module D : Caqti_lwt.CONNECTION) f =
+  if c.with_transaction <> NONE then D.with_transaction f else f ()
 
 let method_not_allowed_respond meths =
   let headers =
@@ -371,7 +368,7 @@ let with_cache mutex request mem add (module Db : Caqti_lwt.CONNECTION) conf
     list =
   (* Note: even if data is already in cache,
      we add it again at the end in order to mark it as recent. *)
-  if conf.Config.with_transaction then
+  if conf.Config.with_transaction = FULL then
     Lwt_mutex.with_lock mutex @@ fun () ->
     Db.with_transaction @@ fun () ->
     Lwt_result.map (fun () -> List.iter add list)
@@ -622,7 +619,7 @@ let block_callback =
           in
           let* () =
             (* This data is non-redondant: we always treat it. *)
-            Db.with_transaction @@ fun () ->
+            maybe_with_transaction conf (module Db) @@ fun () ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
               (fun r ->
                 let open Teztale_lib.Data.Block in
@@ -685,7 +682,7 @@ let operations_callback ~logger conf db_pool g source operations =
         Teztale_lib.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations" level) ;
         let* () =
-          Db.with_transaction @@ fun () ->
+          maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es

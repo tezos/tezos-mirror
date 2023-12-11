@@ -27,6 +27,8 @@ type tls_conf = {crt : string; key : string}
 
 type connection = {source : string option; port : int; tls : tls_conf option}
 
+type opt_with_transactions = NONE | SAFE | FULL
+
 type t = {
   db_uri : string;
   network_interfaces : connection list;
@@ -34,7 +36,7 @@ type t = {
   admins : (string * string) list;
   users : (string * string) list;
   max_batch_size : int32;
-  with_transaction : bool;
+  with_transaction : opt_with_transactions;
   verbosity : Teztale_lib.Log.level;
 }
 
@@ -64,6 +66,9 @@ let connection_encoding =
 let login_encoding =
   let open Data_encoding in
   obj2 (req "login" string) (req "password" string)
+
+let opt_with_transactions_encoding : opt_with_transactions Data_encoding.t =
+  Data_encoding.string_enum [("NONE", NONE); ("SAFE", SAFE); ("FULL", FULL)]
 
 let encoding =
   let open Data_encoding in
@@ -121,5 +126,5 @@ let encoding =
        (req "admins" (list login_encoding))
        (req "users" (list login_encoding))
        (dft "max_batch_size" int32 0l)
-       (dft "with_transaction" bool false)
+       (dft "with_transaction" opt_with_transactions_encoding NONE)
        (dft "verbosity" Teztale_lib.Log.level_encoding ERROR))

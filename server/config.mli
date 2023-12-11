@@ -27,6 +27,8 @@ type tls_conf = {crt : string; key : string}
 
 type connection = {source : string option; port : int; tls : tls_conf option}
 
+type opt_with_transactions = NONE | SAFE | FULL
+
 type t = {
   db_uri : string;
   network_interfaces : connection list;
@@ -34,7 +36,7 @@ type t = {
   admins : (string * string) list;
   users : (string * string) list;
   max_batch_size : int32;
-  with_transaction : bool;
+  with_transaction : opt_with_transactions;
   verbosity : Teztale_lib.Log.level;
 }
 
