@@ -686,6 +686,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MUL, [], _), [_] | []) => no_overload!(MUL, len 2),
         (App(MUL, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        // NB: stack type doesn't change in these NEG overloads
+        (App(NEG, [], _), [.., T::Bls12381G1]) => I::Neg(overloads::Neg::Bls12381G1),
+        (App(NEG, [], _), [.., T::Bls12381G2]) => I::Neg(overloads::Neg::Bls12381G2),
+        (App(NEG, [], _), [.., T::Bls12381Fr]) => I::Neg(overloads::Neg::Bls12381Fr),
+        (App(NEG, [], _), [.., _]) => no_overload!(NEG),
+        (App(NEG, [], _), []) => no_overload!(NEG, len 1),
+        (App(NEG, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(AND, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
             I::And(overloads::And::NatNat)
@@ -5136,6 +5144,61 @@ mod typecheck_tests {
         #[test]
         fn too_short() {
             too_short_test(&app!(MUL), Prim::MUL, 2)
+        }
+    }
+
+    mod neg {
+        use super::*;
+        use Type as T;
+
+        #[track_caller]
+        fn test_neg(
+            mut stack: FailingTypeStack,
+            expected_stack: FailingTypeStack,
+            overload: overloads::Neg,
+        ) {
+            assert_eq!(
+                typecheck_instruction(&parse("NEG").unwrap(), &mut Ctx::default(), &mut stack),
+                Ok(Neg(overload))
+            );
+            assert_eq!(stack, expected_stack)
+        }
+        macro_rules! test {
+            ($overload:ident) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_neg(
+                        tc_stk![T::$overload],
+                        tc_stk![T::$overload],
+                        overloads::Neg::$overload,
+                    );
+                }
+            };
+        }
+        test!(Bls12381G1);
+        test!(Bls12381G2);
+        test!(Bls12381Fr);
+
+        #[test]
+        fn wrong_type() {
+            assert_eq!(
+                parse("NEG").unwrap().typecheck_instruction(
+                    &mut Ctx::default(),
+                    None,
+                    &[app!(unit)]
+                ),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::NEG,
+                    stack: stk![Type::Unit],
+                    reason: None
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(NEG), Prim::NEG, 1)
         }
     }
 

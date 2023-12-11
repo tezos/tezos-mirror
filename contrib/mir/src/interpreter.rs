@@ -247,6 +247,23 @@ fn interpret_one<'a>(
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
         },
+        I::Neg(overload) => match overload {
+            overloads::Neg::Bls12381G1 => {
+                ctx.gas.consume(interpret_cost::NEG_G1)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1);
+                *v = -(v as &bls::G1);
+            }
+            overloads::Neg::Bls12381G2 => {
+                ctx.gas.consume(interpret_cost::NEG_G2)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G2);
+                *v = -(v as &bls::G2);
+            }
+            overloads::Neg::Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::NEG_FR)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
+                *v = -(v as &bls::Fr);
+            }
+        },
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
@@ -3915,6 +3932,54 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
             V::Int(1.into()),
             V::Bls12381Fr(Fr::one()),
+        );
+    }
+
+    mod neg {
+        use super::*;
+
+        #[track_caller]
+        fn test_neg(overload: overloads::Neg, input: TypedValue, output: TypedValue) {
+            let mut stack = stk![input];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Neg(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        use crate::bls::*;
+        use TypedValue as V;
+
+        macro_rules! test {
+            ($overload:ident, $inp:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_neg(overloads::Neg::$overload, $inp, $out);
+                }
+            };
+        }
+
+        // NB: actual bls arithmetic is tested in the bls module, here we only
+        // need to check the interpreter works.
+
+        test!(
+            Bls12381G1,
+            V::Bls12381G1(G1::one()),
+            V::Bls12381G1(G1::neg_one()),
+        );
+
+        test!(
+            Bls12381G2,
+            V::Bls12381G2(G2::one()),
+            V::Bls12381G2(G2::neg_one()),
+        );
+
+        test!(
+            Bls12381Fr,
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(-Fr::one()),
         );
     }
 }

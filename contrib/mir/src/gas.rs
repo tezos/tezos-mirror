@@ -241,6 +241,9 @@ pub mod interpret_cost {
     pub const MUL_BLS_G1: u32 = 103000;
     pub const MUL_BLS_G2: u32 = 220000;
     pub const MUL_BLS_FR: u32 = 45;
+    pub const NEG_FR: u32 = 30;
+    pub const NEG_G1: u32 = 50;
+    pub const NEG_G2: u32 = 70;
     pub const UNIT: u32 = 10;
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;

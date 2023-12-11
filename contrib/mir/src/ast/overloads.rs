@@ -65,6 +65,13 @@ pub enum Mul {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Neg {
+    Bls12381G1,
+    Bls12381G2,
+    Bls12381Fr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
 }

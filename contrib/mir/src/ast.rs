@@ -399,6 +399,7 @@ impl<'a> TypedValue<'a> {
 pub enum Instruction<'a> {
     Add(overloads::Add),
     Mul(overloads::Mul),
+    Neg(overloads::Neg),
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),
