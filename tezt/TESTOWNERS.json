@@ -1,7 +1,8 @@
 {
   "infrastructure": {
     "tags": [
-      "binaries"
+      "binaries",
+      "infrastructure"
     ],
     "path_patterns": [
       "^devtools/yes_wallet"
@@ -16,7 +17,8 @@
       "protocol_table",
       "stresstest",
       "transaction",
-      "transfer"
+      "transfer",
+      "layer1"
     ],
     "path_patterns": [
       "^src/lib_requester",
@@ -33,7 +35,8 @@
     "tags": [
       "dac",
       "dac_node",
-      "vdf"
+      "vdf",
+      "tezos2"
     ],
     "path_patterns": [
       "^src/lib_aplonk",
@@ -47,7 +50,8 @@
       "sc_rollup",
       "rollup_node",
       "refutation",
-      "commitment"
+      "commitment",
+      "etherlink"
     ],
     "path_patterns": [
       "^tezt/tests/evm_rollup.ml$"
