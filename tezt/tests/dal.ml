@@ -419,6 +419,30 @@ let inject_dal_attestations ?level ?force
       inject_dal_attestation ?level ?force ~signer ~nb_slots availability client)
     signers
 
+let get_validated_dal_attestations_in_mempool node for_level =
+  let* mempool_json =
+    Node.RPC.call node
+    @@ RPC.get_chain_mempool_pending_operations
+         ~version:"2"
+         ~validated:true
+         ~branch_delayed:false
+         ~branch_refused:false
+         ~refused:false
+         ~outdated:false
+         ~validation_passes:[0]
+         ()
+  in
+  let validated = JSON.(mempool_json |-> "validated" |> as_list) in
+  List.filter
+    (fun op ->
+      let contents = JSON.(op |-> "contents" |> geti 0) in
+      let level = JSON.(contents |-> "level" |> as_int) in
+      level = for_level
+      && JSON.(contents |-> "kind" |> as_string)
+         |> String.equal "dal_attestation")
+    validated
+  |> return
+
 let test_feature_flag _protocol _parameters _cryptobox node client
     _bootstrap_key =
   (* This test ensures the feature flag works:
@@ -2230,6 +2254,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
         ~protocol
         ~dal_node
         ~delegates
+        ~state_recorder:true
         node
         client
     in
@@ -2263,36 +2288,51 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   in
   let* () = publish_and_bake ~init_level:first_level ~target_level:max_level in
   let* () = wait_block_processing in
-  let* first_not_attested_published_level =
-    let last_level_of_first_baker =
-      intermediary_level + parameters.attestation_lag
-    in
-    let last_level_of_second_baker = max_level + parameters.attestation_lag in
-    Log.info
-      "Run the first baker for all delegates till at least level %d."
-      last_level_of_first_baker ;
-    let* () = run_baker all_delegates last_level_of_first_baker in
-    (* (D) We tried to stop the baker as soon as it reaches
-       [intermediary_level + attestation_lag], but it may have baked a few
-       blocks more *)
-    let* node_level = Node.get_level node in
-    let first_not_attested_published_level =
-      node_level + 1 - parameters.attestation_lag
-    in
-    Log.info
-      "The first baker baked till level %d. Therefore \
-       first_not_attested_published_level is %d."
-      node_level
-      first_not_attested_published_level ;
-    Log.info
-      "Run the second baker for some (not all) delegates till at least level \
-       %d."
-      last_level_of_second_baker ;
-    if first_not_attested_published_level >= max_level then
-      Test.fail "test not checking for unattested slots; adjust parameters" ;
-    let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
-    return first_not_attested_published_level
+  let last_level_of_first_baker =
+    intermediary_level + parameters.attestation_lag
   in
+  let last_level_of_second_baker = max_level + parameters.attestation_lag in
+
+  Log.info
+    "Run the first baker for all delegates till at least level %d."
+    last_level_of_first_baker ;
+  let* () = run_baker all_delegates last_level_of_first_baker in
+  (* (D) We tried to stop the baker as soon as it reaches
+     [intermediary_level + attestation_lag], but it may have baked a few
+     blocks more *)
+  let* actual_intermediary_level = Node.get_level node in
+  Log.info "The first baker baked till level %d." actual_intermediary_level ;
+
+  let* dal_attestations =
+    get_validated_dal_attestations_in_mempool node actual_intermediary_level
+  in
+  let num_dal_attestations = List.length dal_attestations in
+  Log.info
+    "The number of validated DAL attestations in the mempool is %d."
+    num_dal_attestations ;
+
+  (* Let L := actual_intermediary_level and PL := L - lag, the corresponding
+     publish level.  The second baker may build a new block (1) at level L (and
+     a higher round) or (2) directly at level L+1. However, independently of
+     this, when it builds the block at level L+1, it should take into account
+     the DAL attestations at level L that are present in the mempool. If there
+     already 5 attestations then the slot at PL should be attested. If not, it
+     cannot be attested because the second baker may only include, when in case
+     (2), 4 new attestations. *)
+  let first_not_attested_published_level =
+    if num_dal_attestations = List.length all_delegates then
+      actual_intermediary_level + 2 - parameters.attestation_lag
+    else actual_intermediary_level + 1 - parameters.attestation_lag
+  in
+  Log.info
+    "We set first_not_attested_published_level to %d."
+    first_not_attested_published_level ;
+
+  Log.info
+    "Run the second baker for some (not all) delegates till at least level %d."
+    last_level_of_second_baker ;
+  let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
+
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =
     if level >= max_level then return ()
@@ -2310,22 +2350,17 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
         (slot_idx level = slot_index)
           int
           ~error_msg:"Expected index %L (got %R)") ;
-      (if
-       level < intermediary_level || level >= first_not_attested_published_level
-      then
-       (* We cannot know for sure the status of a slot between
-          [intermediary_level] and
-          [first_not_attested_published_level]. Before
-          [intermediary_level], it should be [attested], and above
-          [first_not_attested_published_level], it should be
-          [unattested]. *)
-       let expected_status =
-         if level < intermediary_level then "attested" else "unattested"
-       in
-       Check.(
-         (expected_status = status)
-           string
-           ~error_msg:"Expected status %L (got %R)")) ;
+      (* Before [first_not_attested_published_level], it should be [attested],
+         and above (and including) [first_not_attested_published_level], it
+         should be [unattested]. *)
+      let expected_status =
+        if level < first_not_attested_published_level then "attested"
+        else "unattested"
+      in
+      Check.(
+        (expected_status = status)
+          string
+          ~error_msg:"Expected status %L (got %R)") ;
       check_attestations (level + 1)
   in
   check_attestations first_level
