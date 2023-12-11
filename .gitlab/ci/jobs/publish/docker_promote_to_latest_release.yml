@@ -1,5 +1,3 @@
-include: .gitlab/ci/jobs/publish/common.yml
-
 docker:promote_to_latest:
   extends:
     - .docker_auth_template

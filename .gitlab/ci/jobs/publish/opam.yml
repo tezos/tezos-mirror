@@ -1,5 +1,3 @@
-include: .gitlab/ci/jobs/publish/common.yml
-
 opam:release:
   extends:
     - .default_settings_template
