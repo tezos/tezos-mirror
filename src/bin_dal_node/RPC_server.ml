@@ -35,14 +35,16 @@ let call_handler2 ctxt handler =
   let store = Node_context.get_store ctxt in
   handler store ready_ctxt
 
-type error += Cryptobox_error of string * string
+type error +=
+  | Cryptobox_error of string * string
+  | Post_slot_too_large of {expected : int; got : int}
 
 let () =
   register_error_kind
     `Permanent
     ~id:"cryptobox_error"
     ~title:"cryptobox error"
-    ~description:"A wrapper around an error raised by the cryptobox of the DAL"
+    ~description:"A wrapper around an error raised by the cryptobox of the DAL."
     ~pp:(fun fmt (f, msg) ->
       Format.fprintf
         fmt
@@ -51,7 +53,23 @@ let () =
         msg)
     Data_encoding.(obj2 (req "function_name" string) (req "explanation" string))
     (function Cryptobox_error (f, msg) -> Some (f, msg) | _ -> None)
-    (fun (f, msg) -> Cryptobox_error (f, msg))
+    (fun (f, msg) -> Cryptobox_error (f, msg)) ;
+  register_error_kind
+    `Permanent
+    ~id:"post_slot_too_large"
+    ~title:"Post slot too large"
+    ~description:
+      "The length of posted data exceeds the expected size of DAL slots."
+    ~pp:(fun fmt (expected, got) ->
+      Format.fprintf
+        fmt
+        "The RPC expects a slot_size of at most '%d'. Got: '%d' expected got"
+        expected
+        got)
+    Data_encoding.(obj2 (req "expected" int31) (req "got" int31))
+    (function
+      | Post_slot_too_large {expected; got} -> Some (expected, got) | _ -> None)
+    (fun (expected, got) -> Post_slot_too_large {expected; got})
 
 module Slots_handlers = struct
   let to_option_tzresult r =
@@ -135,8 +153,9 @@ module Slots_handlers = struct
         let slot_size = proto_parameters.cryptobox_parameters.slot_size in
         let slot_length = String.length slot in
         let*? slot =
-          if slot_length > slot_size then (* Raise an error *)
-            assert false
+          if slot_length > slot_size then
+            Result_syntax.tzfail
+              (Post_slot_too_large {expected = slot_size; got = slot_length})
           else if slot_length = slot_size then Ok (Bytes.of_string slot)
           else
             let padding = String.make (slot_size - slot_length) query#padding in
