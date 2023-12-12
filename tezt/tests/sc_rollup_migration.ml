@@ -836,7 +836,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~priority:`Priority_loser );
       ( "pvm_proof_2",
         7,
-        false,
+        true,
         refutation_scenario_parameters
           ~loser_modes:["7 7 22_000_002_000"]
           (inputs_for 10)
@@ -871,7 +871,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
             false );
           ( "at_published_commitment",
             published_commitment_event ~inbox_level:fault_level,
-            false );
+            true );
         ])
     tests
 
