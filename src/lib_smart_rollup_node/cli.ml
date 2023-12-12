@@ -413,6 +413,12 @@ let snapshot_file_param next =
     string_parameter
     next
 
+let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"no-checks"
+    ~doc:"Don't check integrity of the snapshot."
+    ()
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
