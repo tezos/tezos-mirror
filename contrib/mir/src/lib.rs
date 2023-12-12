@@ -89,6 +89,22 @@ mod tests {
     }
 
     #[test]
+    fn interpret_test_macro_if_some() {
+        let ast = parse(MACRO_IF_SOME_SRC).unwrap();
+        let ast = ast
+            .typecheck_instruction(&mut Ctx::default(), None, &[app!(option[app!(nat)])])
+            .unwrap();
+        let mut istack = stk![TypedValue::new_option(Some(TypedValue::Nat(5)))];
+        assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
+        assert_eq!(istack, stk![TypedValue::Nat(6)]);
+    }
+
+    #[test]
+    fn parse_naked_fail_in_if() {
+        assert!(parse("{IF FAIL FAIL}").is_ok());
+    }
+
+    #[test]
     fn typecheck_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
@@ -268,4 +284,6 @@ mod tests {
               NIL operation; PAIR
           }
       }";
+
+    const MACRO_IF_SOME_SRC: &str = "{IF_SOME { PUSH nat 1 ; ADD } { PUSH nat 5; }}";
 }

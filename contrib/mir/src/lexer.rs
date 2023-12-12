@@ -6,6 +6,11 @@
 /******************************************************************************/
 
 use logos::Logos;
+pub mod errors;
+pub mod macros;
+
+pub use errors::*;
+use macros::*;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -33,26 +38,23 @@ macro_rules! defprim {
                 match self {
                     $(
                         $ty::$prim => write!(f, "{}", coalesce!($($str)?, stringify!($prim))),
-                    )*
+                        )*
                 }
             }
         }
 
+
         impl std::str::FromStr for $ty {
-          type Err = PrimError;
-          fn from_str(s: &str) -> Result<Self, Self::Err> {
-              match s {
-                $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
-                _ => Err(PrimError(s.to_owned()))
-              }
-          }
+            type Err = PrimError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(coalesce!($($str)?, stringify!($prim)) => Ok($ty::$prim),)*
+                        _ => Err(PrimError(s.to_owned()))
+                }
+            }
         }
     };
 }
-
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-#[error("unknown primitive: {0}")]
-pub struct PrimError(String);
 
 // NB: Primitives will be lexed as written, so capitalization matters.
 defprim! {
@@ -81,6 +83,8 @@ defprim! {
     PUSH,
     INT,
     GT,
+    EQ,
+    LE,
     LOOP,
     DIP,
     ADD,
@@ -131,16 +135,15 @@ defprim! {
     StaticError,
     #[token("self")]
     self_,
+    #[token("_")]
+    Underscore,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PrimWithTzt {
+pub enum Noun {
     Prim(Prim),
     TztPrim(TztPrim),
-    Underscore,
-    // Including underscore spearately from TztPrim because the `defprim` macro won't work if we
-    // used a literal underscore there. parsing for this variant is handled specially in the
-    // `lex_prim` function as well.
+    MacroPrim(Macro),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,8 +168,8 @@ impl std::fmt::Display for Annotation<'_> {
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
-    #[regex(r"[A-Za-z_]+", lex_prim)]
-    Prim(PrimWithTzt),
+    #[regex(r"[A-Za-z_]+", lex_noun)]
+    Noun(Noun),
 
     #[regex("([+-]?)[0-9]+", lex_number)]
     Number(i128),
@@ -193,12 +196,20 @@ pub enum Tok<'a> {
     Semi,
 }
 
+impl std::fmt::Display for Noun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Noun::Prim(p) => p.fmt(f),
+            Noun::TztPrim(p) => p.fmt(f),
+            Noun::MacroPrim(m) => m.fmt(f),
+        }
+    }
+}
+
 impl std::fmt::Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Tok::Prim(PrimWithTzt::Prim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::TztPrim(p)) => p.fmt(f),
-            Tok::Prim(PrimWithTzt::Underscore) => write!(f, "_"),
+        match &self {
+            Tok::Noun(noun) => noun.fmt(f),
             Tok::Number(n) => n.fmt(f),
             Tok::String(s) => s.fmt(f),
             Tok::Bytes(bs) => write!(f, "0x{}", hex::encode(bs)),
@@ -212,40 +223,26 @@ impl std::fmt::Display for Tok<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
-pub enum LexerError {
-    #[error("unknown token")]
-    UnknownToken,
-    #[error("parsing of numeric literal {0} failed")]
-    NumericLiteral(String),
-    #[error("forbidden character found in string literal \"{0}\"")]
-    ForbiddenCharacterIn(String),
-    #[error("undefined escape sequence: \"\\{0}\"")]
-    UndefinedEscape(char),
-    #[error(transparent)]
-    PrimError(#[from] PrimError),
-    #[error("invalid hex sequence: {0}")]
-    InvalidHex(#[from] hex::FromHexError),
-}
-
-impl Default for LexerError {
-    fn default() -> Self {
-        LexerError::UnknownToken
-    }
-}
-
 type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
-fn lex_prim(lex: &mut Lexer) -> Result<PrimWithTzt, LexerError> {
+fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
+    let slice = lex.slice();
+    let mut inner = Macro::lexer(slice);
+    let next = inner.next().ok_or_else(|| PrimError(slice.to_string()))?;
+    // check if lexed token is at EOF
+    if matches!(inner.next(), Some(_)) {
+        return Err(PrimError(slice.to_string()));
+    }
+    next.map_err(|_| PrimError(slice.to_string()))
+}
+
+fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
     lex.slice()
         .parse()
-        .map(PrimWithTzt::Prim)
-        .or_else(|_| lex.slice().parse().map(PrimWithTzt::TztPrim))
-        .or_else(|_| match lex.slice() {
-            "_" => Ok(PrimWithTzt::Underscore),
-            s => Err(PrimError(s.to_owned())),
-        })
-        .map_err(LexerError::from)
+        .map(Noun::Prim)
+        .or_else(|_| lex.slice().parse().map(Noun::TztPrim))
+        .or_else(|_| lex_macro(lex).map(Noun::MacroPrim))
+        .map_err(LexerError::PrimError)
 }
 
 fn lex_number(lex: &mut Lexer) -> Result<i128, LexerError> {
