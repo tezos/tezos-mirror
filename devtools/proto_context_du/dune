@@ -4,7 +4,7 @@
 (executable
  (name main)
  (public_name proto_context_du)
- (package internal-devtools)
+ (package internal-devtools_proto-context-du)
  (libraries
   octez-libs.clic
   octez-libs.base

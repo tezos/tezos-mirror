@@ -5,6 +5,7 @@
 (using menhir 2.1)
 (package (name bls12-381))
 (package (name internal-devtools))
+(package (name internal-devtools_proto-context-du))
 (package (name kaitai))
 (package (name kaitai-of-data-encoding))
 (package (name octez-accuser-Proxford))
