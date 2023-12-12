@@ -72,6 +72,14 @@ let simulation :
     ~output:Data_encoding.Json.encoding
     (open_root / "global" / "block" / "head" / "simulate")
 
+let global_block_watcher :
+    ([`GET], unit, unit, unit, unit, Data_encoding.json) Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:"Monitor and streaming the L2 blocks"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.json
+    (open_root / "global" / "monitor_blocks")
+
 let call_service ~base ?(media_types = Media_type.all_media_types) =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
 

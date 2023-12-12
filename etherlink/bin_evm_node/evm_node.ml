@@ -310,7 +310,11 @@ let proxy_command =
           in
           let* () =
             Evm_node_lib_dev.Tx_pool.start
-              {rollup_node = backend_rpc; smart_rollup_address; mode = Proxy}
+              {
+                rollup_node = backend_rpc;
+                smart_rollup_address;
+                mode = Proxy {rollup_node_endpoint};
+              }
           in
           let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
