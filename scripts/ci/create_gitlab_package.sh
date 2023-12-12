@@ -1,6 +1,6 @@
 #!/bin/sh
-set -eu
-
+set -eux
+ 
 ### Create a GitLab package with raw binaries and tarballs
 
 ## Testing
