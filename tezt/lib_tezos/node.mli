@@ -63,7 +63,19 @@ type media_type = Json | Binary | Any
     Not all arguments are available here.
     Some are simply not implemented, and some are handled separately
     because they need special care. The latter are implemented as optional
-    labeled arguments (e.g. [?net_port] and [?data_dir]). *)
+    labeled arguments (e.g. [?net_port] and [?data_dir]).
+
+    About [RPC_additional_addr], at least one RPC port is always passed by
+    [Node.run], which causes the RPC ports from the configuration file to be
+    ignored. So these arguments are not written in the config file when using
+    [Node.init] and kept in the list of arguments of the persistent state to
+    make sure [Node.run] passes them too.
+
+    [Singleprocess] argument does not exist in the configuration file of the
+    node. It is only known as a command-line option. [Node.init] will neither
+    pass it to [Node.config] nor register it into node's arguments, but only
+    use it for [Node.run] function.
+*)
 type argument =
   | Network of string  (** [--network] *)
   | History_mode of history_mode  (** [--history-mode] *)
@@ -158,7 +170,9 @@ val create :
 
     The argument is passed to the next run of [octez-node config init].
     It is also passed to all runs of [octez-node run] that occur before
-    the next [octez-node config init]. *)
+    the next [octez-node config init].
+
+    There are some exceptions, see definition of type [argument]. *)
 val add_argument : t -> argument -> unit
 
 (** Add a [--peer] argument to a node.
