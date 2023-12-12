@@ -49,3 +49,8 @@ let mapping_position index map_position =
   |> Hex.of_bytes |> Hex.show |> add_0x
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
+
+let next_evm_level ~sc_rollup_node ~node ~client =
+  let* () = Client.bake_for_and_wait client in
+  let* level = Node.get_level node in
+  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level

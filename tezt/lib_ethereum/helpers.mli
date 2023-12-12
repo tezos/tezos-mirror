@@ -47,3 +47,8 @@ val mapping_position : string -> int -> string
 
 (** Transform an hexadecimal string to an integer using {!Z.of_bits}. *)
 val hex_string_to_int : string -> int
+
+(** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
+    the [node]'s next level. *)
+val next_evm_level :
+  sc_rollup_node:Sc_rollup_node.t -> node:Node.t -> client:Client.t -> int Lwt.t
