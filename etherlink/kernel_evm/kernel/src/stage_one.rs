@@ -7,7 +7,8 @@ use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint}
 use crate::current_timestamp;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
-use crate::KernelUpgrade;
+use crate::storage::store_kernel_upgrade;
+use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
@@ -19,7 +20,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     let InboxContent {
         kernel_upgrade,
         transactions,
@@ -32,7 +33,11 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     };
     // Store the blueprint.
     store_inbox_blueprint(host, blueprint)?;
-    Ok(kernel_upgrade)
+    // Store kernel upgrade.
+    if let Some(kernel_upgrade) = kernel_upgrade {
+        store_kernel_upgrade(host, &kernel_upgrade)?;
+    };
+    Ok(())
 }
 
 fn fetch_sequencer_blueprints<Host: Runtime>(
@@ -40,7 +45,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     let InboxContent {
         kernel_upgrade,
         transactions: _,
@@ -58,7 +63,11 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         );
         store_sequencer_blueprint(host, seq_blueprint)?
     }
-    Ok(kernel_upgrade)
+    // Store kernel upgrade.
+    if let Some(kernel_upgrade) = kernel_upgrade {
+        store_kernel_upgrade(host, &kernel_upgrade)?;
+    };
+    Ok(())
 }
 
 pub fn fetch<Host: Runtime>(
@@ -67,7 +76,7 @@ pub fn fetch<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
     is_sequencer: bool,
-) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     if is_sequencer {
         fetch_sequencer_blueprints(host, smart_rollup_address, ticketer, admin)
     } else {
