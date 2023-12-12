@@ -425,7 +425,7 @@ let make_dev_messages ~smart_rollup_address s =
       ~smart_rollup_address
       (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
   in
-  return messages
+  return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
 let chunker_command =
   let open Tezos_clic in
