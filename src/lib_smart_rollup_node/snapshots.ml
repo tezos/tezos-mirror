@@ -484,7 +484,7 @@ let export ~no_checks ~compression ~data_dir ~dest =
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
-let pre_import_checks cctxt ~data_dir snapshot_metadata =
+let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   (* Load stores in read-only to make simple checks. *)
@@ -541,7 +541,10 @@ let pre_import_checks cctxt ~data_dir snapshot_metadata =
              head.header.level
              snapshot_metadata.head_level
   in
-  let* () = check_last_commitment_published cctxt snapshot_metadata in
+  let* () =
+    unless no_checks @@ fun () ->
+    check_last_commitment_published cctxt snapshot_metadata
+  in
   return_unit
 
 let import ~no_checks cctxt ~data_dir ~snapshot_file =
@@ -559,7 +562,7 @@ let import ~no_checks cctxt ~data_dir ~snapshot_file =
     extract
       reader
       stdlib_writer
-      (pre_import_checks cctxt ~data_dir)
+      (pre_import_checks cctxt ~no_checks ~data_dir)
       ~snapshot_file
       ~dest:data_dir
   in
