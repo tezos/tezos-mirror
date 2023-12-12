@@ -576,8 +576,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
         (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
-           they are disconnected. *)
-        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then
+           they are disconnected. Also try to reconnect to bootstrap points. *)
+        if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then (
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6636
 
              Put the value [15L] as a parameter. *)
@@ -590,6 +590,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             Seq.empty
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
+          let p2p_output_stream = state.p2p_output_stream in
+          Point.Set.iter
+            (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
+            state.bootstrap_points) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
