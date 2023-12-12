@@ -963,7 +963,7 @@ let caller =
   }
 
 (** The info for the "events.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples] *)
+    See [etherlink/kernel_evm/solidity_examples/events.sol] *)
 let events =
   {
     label = "events";
@@ -971,6 +971,8 @@ let events =
     bin = kernel_inputs_path ^ "/events.bin";
   }
 
+(** The info for the "events.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/nested_create.sol] *)
 let nested_create =
   {
     label = "nested_create";
@@ -978,11 +980,22 @@ let nested_create =
     bin = kernel_inputs_path ^ "/nested_create.bin";
   }
 
+(** The info for the "events.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/revert.sol] *)
 let revert =
   {
     label = "revert";
     abi = kernel_inputs_path ^ "/revert.abi";
     bin = kernel_inputs_path ^ "/revert.bin";
+  }
+
+(** The info for the "events.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/create2.sol] *)
+let create2 =
+  {
+    label = "create2";
+    abi = kernel_inputs_path ^ "/create2.abi";
+    bin = kernel_inputs_path ^ "/create2.bin";
   }
 
 (** Test that the contract creation works.  *)
@@ -4271,6 +4284,63 @@ let test_l2_revert_returns_unused_gas =
     ~error_msg:"Expected gas fee paid to be %L, got %R" ;
   unit
 
+let test_l2_create_collision =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_create"; "collision"]
+    ~title:"Check L2 create collision"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
+       evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* create2_address, _tx = deploy ~contract:create2 ~sender evm_setup in
+
+  let call_create2 (sender : Eth_account.t) ~expect_failure =
+    Eth_cli.contract_send
+      ~expect_failure
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:create2.label
+      ~address:create2_address
+      ~method_call:(Printf.sprintf "create2()")
+  in
+
+  let* tx1 =
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_create2 sender ~expect_failure:false)
+      ()
+  in
+
+  let* tx2 =
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_create2 sender ~expect_failure:true)
+      ()
+  in
+
+  let* () = check_tx_succeeded ~tx:tx1 ~endpoint in
+
+  (* Eth-cli would wrap receipt of failed transaction in its own error message.
+      Since we currently don't parse error message from eth-cli,
+      we cannot fetch the tx_hash in this case and would get an empty string as tx_hash for failed transaction.
+      After handling of failed transaction is correctly implemented, the following check would need to be replaced with
+      let* () = check_tx_failed ~tx:tx2 ~endpoint in *)
+  Check.(
+    (tx2 = "")
+      string
+      ~error_msg:"Expected returned transaction hash to be %R but was %L.") ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4338,7 +4408,8 @@ let register_evm_node ~protocols =
   test_tx_pool_replacing_transactions protocols ;
   test_l2_nested_create protocols ;
   test_block_hash_regression protocols ;
-  test_l2_revert_returns_unused_gas protocols
+  test_l2_revert_returns_unused_gas protocols ;
+  test_l2_create_collision protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
