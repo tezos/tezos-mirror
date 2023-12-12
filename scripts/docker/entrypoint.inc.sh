@@ -166,7 +166,7 @@ snapshot_import() {
 
   check_image_version
 
-  exec "$node" snapshot "$@" import /snapshot --data-dir "$node_data_dir"
+  exec "$node" snapshot import /snapshot --data-dir "$node_data_dir" "$@"
 
 }
 
