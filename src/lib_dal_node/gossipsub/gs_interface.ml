@@ -89,6 +89,7 @@ module Worker_config :
      and type 'a Monad.t = 'a Lwt.t = struct
   module GS = Tezos_gossipsub.Automaton (Automaton_config)
   module Monad = Monad
+  module Point = Types.Point
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596
 

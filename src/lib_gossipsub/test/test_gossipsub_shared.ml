@@ -117,6 +117,15 @@ module Validity_hook = struct
   let apply msg msg_id = !validity msg msg_id
 end
 
+module Int_iterable = struct
+  include Compare.Int
+
+  let pp = Format.pp_print_int
+
+  module Map = Map.Make (Int)
+  module Set = Set.Make (Int)
+end
+
 module Automaton_config :
   AUTOMATON_CONFIG
     with type Time.t = Milliseconds.t
@@ -131,15 +140,6 @@ module Automaton_config :
     include Milliseconds
 
     let now = Time.now
-  end
-
-  module Int_iterable = struct
-    include Compare.Int
-
-    let pp = Format.pp_print_int
-
-    module Map = Map.Make (Int)
-    module Set = Set.Make (Int)
   end
 
   module String_iterable = struct
@@ -330,6 +330,7 @@ let pp_limits fmtr
 (** Instantiate the worker functor *)
 module Worker_config = struct
   module GS = GS
+  module Point = Int_iterable
 
   module Monad = struct
     type 'a t = 'a Lwt.t

@@ -1027,6 +1027,8 @@ module type WORKER_CONFIGURATION = sig
   (** The gossipsub automaton that will be used by the worker. *)
   module GS : AUTOMATON
 
+  module Point : ITERABLE
+
   (** Abstraction of the IO monad used by the worker. *)
   module Monad : sig
     (** The monad type. *)

@@ -191,6 +191,24 @@ module Peer = struct
   let encoding = P2p_peer.Id.encoding
 end
 
+module Point = struct
+  type t = P2p_point.Id.t
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare p1 p2 = P2p_point.Id.compare p1 p2
+  end
+
+  include Compare.Make (Cmp)
+  module Set = Set.Make (Cmp)
+  module Map = Map.Make (Cmp)
+
+  let pp = P2p_point.Id.pp
+
+  let encoding = P2p_point.Id.encoding
+end
+
 let get_value ~__LOC__ func =
   Option.value_f ~default:(fun () ->
       Stdlib.failwith

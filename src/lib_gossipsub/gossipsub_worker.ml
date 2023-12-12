@@ -32,7 +32,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   Gossipsub_intf.WORKER
     with module GS = C.GS
      and module Monad = C.Monad
-     and module Stream = C.Stream = struct
+     and module Stream = C.Stream
+     and module Point = C.Point = struct
   module GS = C.GS
   module Monad = C.Monad
   module Stream = C.Stream
@@ -41,6 +42,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   module Peer = GS.Peer
   module Message_id = GS.Message_id
   module Message = GS.Message
+  module Point = C.Point
 
   module Introspection = struct
     type stats = {
