@@ -1144,12 +1144,15 @@ module type WORKER = sig
     | P2P_input of p2p_input
     | App_input of app_input
 
-  (** [make ~events_logging rng limits parameters] initializes a new Gossipsub
-      automaton with the given arguments. Then, it initializes and returns a
-      worker for it. The [events_logging] function can be used to define a
-      handler for logging the worker's events. *)
+  (** [make ~events_logging ~bootstrap_points rng limits parameters] initializes
+      a new Gossipsub automaton with the given arguments. Then, it initializes
+      and returns a worker for it. The [events_logging] function can be used to
+      define a handler for logging the worker's events. The list of
+      [bootstrap_points] represents the list of initially known peers' addresses
+      to which we may want to reconnect in the worker. *)
   val make :
     ?events_logging:(event -> unit Monad.t) ->
+    ?bootstrap_points:Point.t list ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
     (GS.Peer.t, GS.Message_id.t) parameters ->

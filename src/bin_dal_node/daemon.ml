@@ -505,12 +505,12 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
       ^ Printexc.to_string exn
       |> Stdlib.failwith)
 
-let resolve peers =
+let resolve points =
   List.concat_map_es
     (Tezos_base_unix.P2p_resolve.resolve_addr
        ~default_addr:"::"
        ~default_port:(Configuration_file.default.listen_addr |> snd))
-    peers
+    points
 
 (* This function ensures the persistence of attester profiles
    to the configuration file at shutdown.
@@ -556,7 +556,10 @@ let run ~data_dir configuration_override =
   let* ({
           network_name;
           rpc_addr;
-          peers;
+          (* These are not the cryptographic identities of peers, but the points
+             (IP addresses + ports) of the nodes we want to connect to at
+             startup. *)
+          peers = points;
           endpoint;
           profiles;
           listen_addr;
@@ -574,6 +577,12 @@ let run ~data_dir configuration_override =
         return configuration
   in
   let*! () = Event.(emit configuration_loaded) () in
+  let cctxt = Rpc_context.make endpoint in
+  let* dal_config = fetch_dal_config cctxt in
+  (* Resolve:
+     - [points] from DAL node config file and CLI.
+     - [dal_config.bootstrap_peers] from the L1 network config. *)
+  let* points = resolve (points @ dal_config.bootstrap_peers) in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -607,7 +616,12 @@ let run ~data_dir configuration_override =
     in
     let gs_worker =
       Gossipsub.Worker.(
-        make ~events_logging:Logging.event rng limits peer_filter_parameters)
+        make
+          ~bootstrap_points:points
+          ~events_logging:Logging.event
+          rng
+          limits
+          peer_filter_parameters)
     in
     Gossipsub.Worker.start [] gs_worker ;
     gs_worker
@@ -624,7 +638,6 @@ let run ~data_dir configuration_override =
       ~network_name
   in
   let* store = Store.init config in
-  let cctxt = Rpc_context.make endpoint in
   let*! metrics_server = Metrics.launch config.metrics_addr in
   let ctxt =
     Node_context.init
@@ -640,11 +653,6 @@ let run ~data_dir configuration_override =
   in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
-  let* dal_config = fetch_dal_config cctxt in
-  (* Resolve:
-     - [peers] from DAL node config file and CLI.
-     - [dal_config.bootstrap_peers] from the L1 network config. *)
-  let* points = resolve (peers @ dal_config.bootstrap_peers) in
   (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer

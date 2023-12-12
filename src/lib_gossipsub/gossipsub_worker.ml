@@ -217,6 +217,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
+    bootstrap_points : Point.Set.t;
     trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -763,12 +764,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            resolved. *)
         event_loop_promise
 
-  let make ?(events_logging = fun _event -> Monad.return ()) rng limits
-      parameters =
+  let make ?(events_logging = fun _event -> Monad.return ())
+      ?(bootstrap_points = []) rng limits parameters =
     {
       status = Starting;
       state =
         {
+          bootstrap_points = Point.Set.of_list bootstrap_points;
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           trusted_peers = Peer.Set.empty;
