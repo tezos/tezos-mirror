@@ -83,26 +83,36 @@ let dal_encoding =
    you should ensure that there is a proper migration of the constants
    during context migration. See: `Raw_context.prepare_first_block` *)
 
-type tx_rollup = {
-  enable : bool;
-  origination_size : int;
-  hard_size_limit_per_inbox : int;
-  hard_size_limit_per_message : int;
-  commitment_bond : Tez_repr.t;
-  finality_period : int;
-  withdraw_period : int;
-  max_inboxes_count : int;
-  max_messages_per_inbox : int;
-  max_commitments_count : int;
-  cost_per_byte_ema_factor : int;
-  max_ticket_payload_size : int;
-  max_withdrawals_per_batch : int;
-  rejection_max_proof_size : int;
-  sunset_level : int32;
+type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
+
+type sc_rollup_reveal_activation_level = {
+  raw_data : sc_rollup_reveal_hashing_schemes;
+  metadata : Raw_level_repr.t;
+  dal_page : Raw_level_repr.t;
+  dal_parameters : Raw_level_repr.t;
 }
 
+let sc_rollup_reveal_hashing_schemes_encoding =
+  let open Data_encoding in
+  conv
+    (fun t -> t.blake2B)
+    (fun blake2B -> {blake2B})
+    (obj1 (req "Blake2B" Raw_level_repr.encoding))
+
+let sc_rollup_reveal_activation_level_encoding :
+    sc_rollup_reveal_activation_level Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun t -> (t.raw_data, t.metadata, t.dal_page, t.dal_parameters))
+    (fun (raw_data, metadata, dal_page, dal_parameters) ->
+      {raw_data; metadata; dal_page; dal_parameters})
+    (obj4
+       (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
+       (req "metadata" Raw_level_repr.encoding)
+       (req "dal_page" Raw_level_repr.encoding)
+       (req "dal_parameters" Raw_level_repr.encoding))
+
 type sc_rollup = {
-  enable : bool;
   arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
@@ -115,12 +125,44 @@ type sc_rollup = {
   timeout_period_in_blocks : int;
   max_number_of_stored_cemented_commitments : int;
   max_number_of_parallel_games : int;
+  reveal_activation_level : sc_rollup_reveal_activation_level;
+  private_enable : bool;
+  riscv_pvm_enable : bool;
 }
 
 type zk_rollup = {
   enable : bool;
   origination_size : int;
   min_pending_to_process : int;
+  max_ticket_payload_size : int;
+}
+
+type adaptive_rewards_params = {
+  issuance_ratio_min : Q.t;
+  issuance_ratio_max : Q.t;
+  max_bonus : Issuance_bonus_repr.max_bonus;
+  growth_rate : Q.t;
+  center_dz : Q.t;
+  radius_dz : Q.t;
+}
+
+type adaptive_issuance = {
+  global_limit_of_staking_over_baking : int;
+  edge_of_staking_over_delegation : int;
+  launch_ema_threshold : int32;
+  adaptive_rewards_params : adaptive_rewards_params;
+  activation_vote_enable : bool;
+  autostaking_enable : bool;
+}
+
+type issuance_weights = {
+  base_total_issued_per_minute : Tez_repr.t;
+  baking_reward_fixed_portion_weight : int;
+  baking_reward_bonus_weight : int;
+  attesting_reward_weight : int;
+  liquidity_baking_subsidy_weight : int;
+  seed_nonce_revelation_tip_weight : int;
+  vdf_revelation_tip_weight : int;
 }
 
 type t = {
@@ -134,18 +176,15 @@ type t = {
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   minimal_stake : Tez_repr.t;
+  minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
-  seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
-  baking_reward_fixed_portion : Tez_repr.t;
-  baking_reward_bonus_per_slot : Tez_repr.t;
-  endorsing_reward_per_slot : Tez_repr.t;
+  issuance_weights : issuance_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
-  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -153,10 +192,10 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   consensus_threshold : int;
-  max_slashing_period : int;
-  frozen_deposits_percentage : int;
-  double_baking_punishment : Tez_repr.t;
-  ratio_of_frozen_deposits_slashed_per_double_attestation : Ratio_repr.t;
+  limit_of_delegation_over_baking : int;
+  percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;
+  percentage_of_frozen_deposits_slashed_per_double_attestation :
+    Int_percentage.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -164,88 +203,17 @@ type t = {
   cache_script_size : int;
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
-  tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
+  adaptive_issuance : adaptive_issuance;
 }
-
-let tx_rollup_encoding =
-  let open Data_encoding in
-  conv
-    (fun (c : tx_rollup) ->
-      ( ( c.enable,
-          c.origination_size,
-          c.hard_size_limit_per_inbox,
-          c.hard_size_limit_per_message,
-          c.max_withdrawals_per_batch,
-          c.commitment_bond,
-          c.finality_period,
-          c.withdraw_period,
-          c.max_inboxes_count,
-          c.max_messages_per_inbox ),
-        ( c.max_commitments_count,
-          c.cost_per_byte_ema_factor,
-          c.max_ticket_payload_size,
-          c.rejection_max_proof_size,
-          c.sunset_level ) ))
-    (fun ( ( tx_rollup_enable,
-             tx_rollup_origination_size,
-             tx_rollup_hard_size_limit_per_inbox,
-             tx_rollup_hard_size_limit_per_message,
-             tx_rollup_max_withdrawals_per_batch,
-             tx_rollup_commitment_bond,
-             tx_rollup_finality_period,
-             tx_rollup_withdraw_period,
-             tx_rollup_max_inboxes_count,
-             tx_rollup_max_messages_per_inbox ),
-           ( tx_rollup_max_commitments_count,
-             tx_rollup_cost_per_byte_ema_factor,
-             tx_rollup_max_ticket_payload_size,
-             tx_rollup_rejection_max_proof_size,
-             tx_rollup_sunset_level ) ) ->
-      {
-        enable = tx_rollup_enable;
-        origination_size = tx_rollup_origination_size;
-        hard_size_limit_per_inbox = tx_rollup_hard_size_limit_per_inbox;
-        hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
-        max_withdrawals_per_batch = tx_rollup_max_withdrawals_per_batch;
-        commitment_bond = tx_rollup_commitment_bond;
-        finality_period = tx_rollup_finality_period;
-        withdraw_period = tx_rollup_withdraw_period;
-        max_inboxes_count = tx_rollup_max_inboxes_count;
-        max_messages_per_inbox = tx_rollup_max_messages_per_inbox;
-        max_commitments_count = tx_rollup_max_commitments_count;
-        cost_per_byte_ema_factor = tx_rollup_cost_per_byte_ema_factor;
-        max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
-        rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
-        sunset_level = tx_rollup_sunset_level;
-      })
-    (merge_objs
-       (obj10
-          (req "tx_rollup_enable" bool)
-          (req "tx_rollup_origination_size" int31)
-          (req "tx_rollup_hard_size_limit_per_inbox" int31)
-          (req "tx_rollup_hard_size_limit_per_message" int31)
-          (req "tx_rollup_max_withdrawals_per_batch" int31)
-          (req "tx_rollup_commitment_bond" Tez_repr.encoding)
-          (req "tx_rollup_finality_period" int31)
-          (req "tx_rollup_withdraw_period" int31)
-          (req "tx_rollup_max_inboxes_count" int31)
-          (req "tx_rollup_max_messages_per_inbox" int31))
-       (obj5
-          (req "tx_rollup_max_commitments_count" int31)
-          (req "tx_rollup_cost_per_byte_ema_factor" int31)
-          (req "tx_rollup_max_ticket_payload_size" int31)
-          (req "tx_rollup_rejection_max_proof_size" int31)
-          (req "tx_rollup_sunset_level" int32)))
 
 let sc_rollup_encoding =
   let open Data_encoding in
   conv
     (fun (c : sc_rollup) ->
-      ( ( c.enable,
-          c.arith_pvm_enable,
+      ( ( c.arith_pvm_enable,
           c.origination_size,
           c.challenge_window_in_blocks,
           c.stake_amount,
@@ -256,9 +224,11 @@ let sc_rollup_encoding =
         ( c.number_of_sections_in_dissection,
           c.timeout_period_in_blocks,
           c.max_number_of_stored_cemented_commitments,
-          c.max_number_of_parallel_games ) ))
-    (fun ( ( sc_rollup_enable,
-             sc_rollup_arith_pvm_enable,
+          c.max_number_of_parallel_games,
+          c.reveal_activation_level,
+          c.private_enable,
+          c.riscv_pvm_enable ) ))
+    (fun ( ( sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
              sc_rollup_stake_amount,
@@ -269,9 +239,11 @@ let sc_rollup_encoding =
            ( sc_rollup_number_of_sections_in_dissection,
              sc_rollup_timeout_period_in_blocks,
              sc_rollup_max_number_of_cemented_commitments,
-             sc_rollup_max_number_of_parallel_games ) ) ->
+             sc_rollup_max_number_of_parallel_games,
+             sc_rollup_reveal_activation_level,
+             sc_rollup_private_enable,
+             sc_rollup_riscv_pvm_enable ) ) ->
       {
-        enable = sc_rollup_enable;
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
         origination_size = sc_rollup_origination_size;
         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
@@ -286,10 +258,12 @@ let sc_rollup_encoding =
         max_number_of_stored_cemented_commitments =
           sc_rollup_max_number_of_cemented_commitments;
         max_number_of_parallel_games = sc_rollup_max_number_of_parallel_games;
+        reveal_activation_level = sc_rollup_reveal_activation_level;
+        private_enable = sc_rollup_private_enable;
+        riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
       })
     (merge_objs
-       (obj9
-          (req "smart_rollup_enable" bool)
+       (obj8
           (req "smart_rollup_arith_pvm_enable" bool)
           (req "smart_rollup_origination_size" int31)
           (req "smart_rollup_challenge_window_in_blocks" int31)
@@ -298,29 +272,210 @@ let sc_rollup_encoding =
           (req "smart_rollup_max_lookahead_in_blocks" int32)
           (req "smart_rollup_max_active_outbox_levels" int32)
           (req "smart_rollup_max_outbox_messages_per_level" int31))
-       (obj4
+       (obj7
           (req "smart_rollup_number_of_sections_in_dissection" uint8)
           (req "smart_rollup_timeout_period_in_blocks" int31)
           (req "smart_rollup_max_number_of_cemented_commitments" int31)
-          (req "smart_rollup_max_number_of_parallel_games" int31)))
+          (req "smart_rollup_max_number_of_parallel_games" int31)
+          (req
+             "smart_rollup_reveal_activation_level"
+             sc_rollup_reveal_activation_level_encoding)
+          (req "smart_rollup_private_enable" bool)
+          (req "smart_rollup_riscv_pvm_enable" bool)))
 
 let zk_rollup_encoding =
   let open Data_encoding in
   conv
-    (fun ({enable; origination_size; min_pending_to_process} : zk_rollup) ->
-      (enable, origination_size, min_pending_to_process))
+    (fun ({
+            enable;
+            origination_size;
+            min_pending_to_process;
+            max_ticket_payload_size;
+          } :
+           zk_rollup) ->
+      (enable, origination_size, min_pending_to_process, max_ticket_payload_size))
     (fun ( zk_rollup_enable,
            zk_rollup_origination_size,
-           zk_rollup_min_pending_to_process ) ->
+           zk_rollup_min_pending_to_process,
+           zk_rollup_max_ticket_payload_size ) ->
       {
         enable = zk_rollup_enable;
         origination_size = zk_rollup_origination_size;
         min_pending_to_process = zk_rollup_min_pending_to_process;
+        max_ticket_payload_size = zk_rollup_max_ticket_payload_size;
       })
-    (obj3
+    (obj4
        (req "zk_rollup_enable" bool)
        (req "zk_rollup_origination_size" int31)
-       (req "zk_rollup_min_pending_to_process" int31))
+       (req "zk_rollup_min_pending_to_process" int31)
+       (req "zk_rollup_max_ticket_payload_size" int31))
+
+let extremum_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num > Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Extremum Parameter: only positive values allowed")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let center_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
+          Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Parameter: dead zone center can only be between 0 \
+             and 1")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let radius_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Parameter: dead zone radius must be non-negative")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let growth_rate_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else Error "Invalid Reward Parameter: growth rate must be non-negative")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let adaptive_rewards_params_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           issuance_ratio_min;
+           issuance_ratio_max;
+           max_bonus;
+           growth_rate;
+           center_dz;
+           radius_dz;
+         } ->
+      ( issuance_ratio_min,
+        issuance_ratio_max,
+        max_bonus,
+        growth_rate,
+        center_dz,
+        radius_dz ))
+    (fun ( issuance_ratio_min,
+           issuance_ratio_max,
+           max_bonus,
+           growth_rate,
+           center_dz,
+           radius_dz ) ->
+      {
+        issuance_ratio_min;
+        issuance_ratio_max;
+        max_bonus;
+        growth_rate;
+        center_dz;
+        radius_dz;
+      })
+    (obj6
+       (req "issuance_ratio_min" extremum_encoding)
+       (req "issuance_ratio_max" extremum_encoding)
+       (req "max_bonus" Issuance_bonus_repr.max_bonus_encoding)
+       (req "growth_rate" growth_rate_encoding)
+       (req "center_dz" center_encoding)
+       (req "radius_dz" radius_encoding))
+
+let adaptive_issuance_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           global_limit_of_staking_over_baking;
+           edge_of_staking_over_delegation;
+           launch_ema_threshold;
+           adaptive_rewards_params;
+           activation_vote_enable;
+           autostaking_enable;
+         } ->
+      ( global_limit_of_staking_over_baking,
+        edge_of_staking_over_delegation,
+        launch_ema_threshold,
+        adaptive_rewards_params,
+        activation_vote_enable,
+        autostaking_enable ))
+    (fun ( global_limit_of_staking_over_baking,
+           edge_of_staking_over_delegation,
+           launch_ema_threshold,
+           adaptive_rewards_params,
+           activation_vote_enable,
+           autostaking_enable ) ->
+      {
+        global_limit_of_staking_over_baking;
+        edge_of_staking_over_delegation;
+        launch_ema_threshold;
+        adaptive_rewards_params;
+        activation_vote_enable;
+        autostaking_enable;
+      })
+    (obj6
+       (req "global_limit_of_staking_over_baking" uint8)
+       (req "edge_of_staking_over_delegation" uint8)
+       (req "adaptive_issuance_launch_ema_threshold" int32)
+       (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
+       (req "adaptive_issuance_activation_vote_enable" bool)
+       (req "autostaking_enable" bool))
+
+let issuance_weights_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({
+            base_total_issued_per_minute;
+            baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight;
+            attesting_reward_weight;
+            liquidity_baking_subsidy_weight;
+            seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight;
+          } :
+           issuance_weights) ->
+      ( base_total_issued_per_minute,
+        baking_reward_fixed_portion_weight,
+        baking_reward_bonus_weight,
+        attesting_reward_weight,
+        liquidity_baking_subsidy_weight,
+        seed_nonce_revelation_tip_weight,
+        vdf_revelation_tip_weight ))
+    (fun ( base_total_issued_per_minute,
+           baking_reward_fixed_portion_weight,
+           baking_reward_bonus_weight,
+           attesting_reward_weight,
+           liquidity_baking_subsidy_weight,
+           seed_nonce_revelation_tip_weight,
+           vdf_revelation_tip_weight ) ->
+      {
+        base_total_issued_per_minute;
+        baking_reward_fixed_portion_weight;
+        baking_reward_bonus_weight;
+        attesting_reward_weight;
+        liquidity_baking_subsidy_weight;
+        seed_nonce_revelation_tip_weight;
+        vdf_revelation_tip_weight;
+      })
+    (obj7
+       (req "base_total_issued_per_minute" Tez_repr.encoding)
+       (req "baking_reward_fixed_portion_weight" int31)
+       (req "baking_reward_bonus_weight" int31)
+       (req "attesting_reward_weight" int31)
+       (req "liquidity_baking_subsidy_weight" int31)
+       (req "seed_nonce_revelation_tip_weight" int31)
+       (req "vdf_revelation_tip_weight" int31))
 
 let encoding =
   let open Data_encoding in
@@ -336,18 +491,15 @@ let encoding =
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
           c.minimal_stake ),
-        ( ( c.vdf_difficulty,
-            c.seed_nonce_revelation_tip,
+        ( ( c.minimal_frozen_stake,
+            c.vdf_difficulty,
             c.origination_size,
-            c.baking_reward_fixed_portion,
-            c.baking_reward_bonus_per_slot,
-            c.endorsing_reward_per_slot,
+            c.issuance_weights,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
             c.quorum_min ),
           ( ( c.quorum_max,
               c.min_proposal_quorum,
-              c.liquidity_baking_subsidy,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -355,16 +507,16 @@ let encoding =
               c.consensus_committee_size,
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
-                c.max_slashing_period,
-                c.frozen_deposits_percentage,
-                c.double_baking_punishment,
-                c.ratio_of_frozen_deposits_slashed_per_double_attestation,
+                c.limit_of_delegation_over_baking,
+                c.percentage_of_frozen_deposits_slashed_per_double_baking,
+                c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.tx_rollup, (c.dal, (c.sc_rollup, c.zk_rollup))) ) ) ) ) ))
+                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_issuance)) ) )
+          ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -375,18 +527,15 @@ let encoding =
              hard_gas_limit_per_block,
              proof_of_work_threshold,
              minimal_stake ),
-           ( ( vdf_difficulty,
-               seed_nonce_revelation_tip,
+           ( ( minimal_frozen_stake,
+               vdf_difficulty,
                origination_size,
-               baking_reward_fixed_portion,
-               baking_reward_bonus_per_slot,
-               endorsing_reward_per_slot,
+               issuance_weights,
                cost_per_byte,
                hard_storage_limit_per_operation,
                quorum_min ),
              ( ( quorum_max,
                  min_proposal_quorum,
-                 liquidity_baking_subsidy,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -394,16 +543,15 @@ let encoding =
                  consensus_committee_size,
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
-                   max_slashing_period,
-                   frozen_deposits_percentage,
-                   double_baking_punishment,
-                   ratio_of_frozen_deposits_slashed_per_double_attestation,
+                   limit_of_delegation_over_baking,
+                   percentage_of_frozen_deposits_slashed_per_double_baking,
+                   percentage_of_frozen_deposits_slashed_per_double_attestation,
                    testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (tx_rollup, (dal, (sc_rollup, zk_rollup))) ) ) ) ) ) ->
+                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -415,38 +563,34 @@ let encoding =
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         minimal_stake;
+        minimal_frozen_stake;
         vdf_difficulty;
-        seed_nonce_revelation_tip;
         origination_size;
-        baking_reward_fixed_portion;
-        baking_reward_bonus_per_slot;
-        endorsing_reward_per_slot;
+        issuance_weights;
         cost_per_byte;
         hard_storage_limit_per_operation;
         quorum_min;
         quorum_max;
         min_proposal_quorum;
-        liquidity_baking_subsidy;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
         delay_increment_per_round;
         minimal_participation_ratio;
-        max_slashing_period;
         consensus_committee_size;
         consensus_threshold;
-        frozen_deposits_percentage;
-        double_baking_punishment;
-        ratio_of_frozen_deposits_slashed_per_double_attestation;
+        limit_of_delegation_over_baking;
+        percentage_of_frozen_deposits_slashed_per_double_baking;
+        percentage_of_frozen_deposits_slashed_per_double_attestation;
         testnet_dictator;
         initial_seed;
         cache_script_size;
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
-        tx_rollup;
         dal;
         sc_rollup;
         zk_rollup;
+        adaptive_issuance;
       })
     (merge_objs
        (obj10
@@ -465,21 +609,18 @@ let encoding =
           (req "proof_of_work_threshold" int64)
           (req "minimal_stake" Tez_repr.encoding))
        (merge_objs
-          (obj9
+          (obj7
+             (req "minimal_frozen_stake" Tez_repr.encoding)
              (req "vdf_difficulty" int64)
-             (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
-             (req "baking_reward_fixed_portion" Tez_repr.encoding)
-             (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-             (req "endorsing_reward_per_slot" Tez_repr.encoding)
+             (req "issuance_weights" issuance_weights_encoding)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj9
+             (obj8
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
-                (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
@@ -487,14 +628,15 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj7
+                (obj6
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
-                   (req "max_slashing_period" int31)
-                   (req "frozen_deposits_percentage" int31)
-                   (req "double_baking_punishment" Tez_repr.encoding)
+                   (req "limit_of_delegation_over_baking" uint8)
                    (req
-                      "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                      Ratio_repr.encoding)
+                      "percentage_of_frozen_deposits_slashed_per_double_baking"
+                      Int_percentage.encoding)
+                   (req
+                      "percentage_of_frozen_deposits_slashed_per_double_attestation"
+                      Int_percentage.encoding)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
@@ -503,7 +645,7 @@ let encoding =
                       (req "cache_stake_distribution_cycles" int8)
                       (req "cache_sampler_state_cycles" int8))
                    (merge_objs
-                      tx_rollup_encoding
+                      (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
-                         (obj1 (req "dal_parametric" dal_encoding))
-                         (merge_objs sc_rollup_encoding zk_rollup_encoding))))))))
+                         (merge_objs sc_rollup_encoding zk_rollup_encoding)
+                         adaptive_issuance_encoding)))))))

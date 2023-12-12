@@ -891,7 +891,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
+type previous_protocol = Genesis of Parameters_repr.t | Oxford_018
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -907,8 +907,7 @@ let check_and_update_protocol_version ctxt =
         else if Compare.String.(s = "genesis") then
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
-        else if Compare.String.(s = "nairobi_017") then
-          return (Nairobi_017, ctxt)
+        else if Compare.String.(s = "oxford_018") then return (Oxford_018, ctxt)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -947,7 +946,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp chain_id ctxt =
+let prepare_first_block ~level ~timestamp _chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
   let* ctxt =
@@ -966,25 +965,18 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         let* ctxt = set_cycle_eras ctxt cycle_eras in
         let*! result = add_constants ctxt param.constants in
         return result
-    | Nairobi_017 ->
+    | Oxford_018 ->
         let*! c = get_previous_protocol_constants ctxt in
 
-        let cryptobox_parameters =
-          {
-            Dal.page_size = c.dal.cryptobox_parameters.page_size;
-            number_of_shards = c.dal.cryptobox_parameters.number_of_shards;
-            slot_size = c.dal.cryptobox_parameters.slot_size;
-            redundancy_factor = c.dal.cryptobox_parameters.redundancy_factor;
-          }
-        in
+        let cryptobox_parameters = c.dal.cryptobox_parameters in
         let dal =
           Constants_parametric_repr.
             {
               feature_enable = c.dal.feature_enable;
               number_of_slots = c.dal.number_of_slots;
-              attestation_lag = 4;
+              attestation_lag = c.dal.attestation_lag;
               attestation_threshold = c.dal.attestation_threshold;
-              blocks_per_epoch = 1l;
+              blocks_per_epoch = c.dal.blocks_per_epoch;
               cryptobox_parameters;
             }
         in
@@ -1014,14 +1006,21 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                tezt/tests/mockup.ml). *)
             Raw_level_repr.of_int32_exn Int32.(pred max_int)
         in
-        (* When stitching from Oxford and after, [Raw_level_repr.root]
-           should be replaced by the previous value, that is
-           [c.reveal_activation_level.*]. *)
         let reveal_activation_level :
             Constants_parametric_repr.sc_rollup_reveal_activation_level =
+          let ({
+                 raw_data = {blake2B};
+                 metadata;
+                 dal_page = _;
+                 dal_parameters = _;
+               }
+                : Constants_parametric_previous_repr
+                  .sc_rollup_reveal_activation_level) =
+            c.sc_rollup.reveal_activation_level
+          in
           {
-            raw_data = {blake2B = Raw_level_repr.root};
-            metadata = Raw_level_repr.root;
+            raw_data = {blake2B};
+            metadata;
             dal_page = dal_activation_level;
             dal_parameters = dal_activation_level;
           }
@@ -1048,8 +1047,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               max_number_of_parallel_games =
                 c.sc_rollup.max_number_of_parallel_games;
               reveal_activation_level;
-              private_enable = true;
-              riscv_pvm_enable = false;
+              private_enable = c.sc_rollup.private_enable;
+              riscv_pvm_enable = c.sc_rollup.riscv_pvm_enable;
             }
         in
         let zk_rollup =
@@ -1058,62 +1057,62 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               enable = c.zk_rollup.enable;
               origination_size = c.zk_rollup.origination_size;
               min_pending_to_process = c.zk_rollup.min_pending_to_process;
-              max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
+              max_ticket_payload_size = c.zk_rollup.max_ticket_payload_size;
             }
         in
 
         let adaptive_rewards_params =
           Constants_parametric_repr.
             {
-              issuance_ratio_min = Q.(5 // 10_000) (* 0.05% *);
-              issuance_ratio_max = Q.(5 // 100);
-              max_bonus =
-                Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.(5 // 100);
-              growth_rate = Q.(1 // 100);
-              center_dz = Q.(50 // 100);
-              radius_dz = Q.(2 // 100);
+              issuance_ratio_min =
+                c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_min;
+              issuance_ratio_max =
+                c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
+              max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
+              growth_rate =
+                c.adaptive_issuance.adaptive_rewards_params.growth_rate;
+              center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
+              radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
             }
         in
-
         let adaptive_issuance =
           Constants_parametric_repr.
             {
-              global_limit_of_staking_over_baking = 5;
-              edge_of_staking_over_delegation = 2;
-              launch_ema_threshold =
-                (if Chain_id.equal Constants_repr.mainnet_id chain_id then
-                 (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l
-                else (* 5% for testnets *) 100_000_000l);
+              global_limit_of_staking_over_baking =
+                c.adaptive_issuance.global_limit_of_staking_over_baking;
+              edge_of_staking_over_delegation =
+                c.adaptive_issuance.edge_of_staking_over_delegation;
+              launch_ema_threshold = c.adaptive_issuance.launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable = false;
-              autostaking_enable = true;
+              activation_vote_enable =
+                c.adaptive_issuance.activation_vote_enable;
+              autostaking_enable = c.adaptive_issuance.autostaking_enable;
             }
         in
-        let issuance_weights =
-          let c_gen =
-            Constants_repr.Generated.generate
-              ~consensus_committee_size:c.consensus_committee_size
+        let issuance_weights : Constants_parametric_repr.issuance_weights =
+          let ({
+                 base_total_issued_per_minute;
+                 baking_reward_fixed_portion_weight;
+                 baking_reward_bonus_weight;
+                 attesting_reward_weight;
+                 liquidity_baking_subsidy_weight;
+                 seed_nonce_revelation_tip_weight;
+                 vdf_revelation_tip_weight;
+               }
+                : Constants_parametric_previous_repr.issuance_weights) =
+            c.issuance_weights
           in
-          c_gen.issuance_weights
+          {
+            base_total_issued_per_minute;
+            baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight;
+            attesting_reward_weight;
+            liquidity_baking_subsidy_weight;
+            seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight;
+          }
         in
-
-        let percentage_of_frozen_deposits_slashed_per_double_baking =
-          Int_percentage.p5
-        in
-        let percentage_of_frozen_deposits_slashed_per_double_attestation =
-          Int_percentage.of_ratio_bounded
-            c.ratio_of_frozen_deposits_slashed_per_double_attestation
-        in
-        let limit_of_delegation_over_baking =
-          (100 / c.frozen_deposits_percentage) - 1
-        in
-        let minimal_frozen_stake =
-          Tez_repr.(
-            div_exn c.minimal_stake (limit_of_delegation_over_baking + 1))
-        in
-
         let direct_ticket_spending_enable = false in
-
         let constants =
           Constants_parametric_repr.
             {
@@ -1129,7 +1128,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               hard_gas_limit_per_block = c.hard_gas_limit_per_block;
               proof_of_work_threshold = c.proof_of_work_threshold;
               minimal_stake = c.minimal_stake;
-              minimal_frozen_stake;
+              minimal_frozen_stake = c.minimal_frozen_stake;
               vdf_difficulty = c.vdf_difficulty;
               origination_size = c.origination_size;
               max_operations_time_to_live = c.max_operations_time_to_live;
@@ -1147,9 +1146,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               consensus_committee_size = c.consensus_committee_size;
               consensus_threshold = c.consensus_threshold;
               minimal_participation_ratio = c.minimal_participation_ratio;
-              limit_of_delegation_over_baking;
-              percentage_of_frozen_deposits_slashed_per_double_baking;
-              percentage_of_frozen_deposits_slashed_per_double_attestation;
+              limit_of_delegation_over_baking =
+                c.limit_of_delegation_over_baking;
+              percentage_of_frozen_deposits_slashed_per_double_baking =
+                c.percentage_of_frozen_deposits_slashed_per_double_baking;
+              percentage_of_frozen_deposits_slashed_per_double_attestation =
+                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
               (* The `testnet_dictator` should absolutely be None on mainnet *)
               testnet_dictator = c.testnet_dictator;
               initial_seed = c.initial_seed;
