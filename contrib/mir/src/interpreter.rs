@@ -367,6 +367,14 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
                 entrypoint: entrypoint.clone(),
             }));
         }
+        I::CheckSignature => {
+            let key = pop!(V::Key);
+            let sig = pop!(V::Signature);
+            let msg = pop!(V::Bytes);
+            ctx.gas
+                .consume(interpret_cost::check_signature(&key, &msg)?)?;
+            stack.push(V::Bool(sig.check(&key, &msg)));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -1352,5 +1360,17 @@ mod interpreter_tests {
                     .unwrap()
             )]
         );
+    }
+
+    #[test]
+    fn check_signature() {
+        for (key, msg, sig, res) in michelson_signature::tests::signature_fixtures() {
+            let mut stack = stk![V::Bytes(msg.to_vec()), V::Signature(sig), V::Key(key)];
+            assert_eq!(
+                interpret_one(&CheckSignature, &mut Ctx::default(), &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![V::Bool(res)])
+        }
     }
 }

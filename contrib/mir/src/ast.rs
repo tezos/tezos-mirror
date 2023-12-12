@@ -198,6 +198,7 @@ pub enum Instruction {
     ChainId,
     /// `ISelf` because `Self` is a reserved keyword
     ISelf(Entrypoint),
+    CheckSignature,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
