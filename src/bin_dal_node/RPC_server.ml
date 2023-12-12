@@ -35,6 +35,24 @@ let call_handler2 ctxt handler =
   let store = Node_context.get_store ctxt in
   handler store ready_ctxt
 
+type error += Cryptobox_error of string * string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cryptobox_error"
+    ~title:"cryptobox error"
+    ~description:"A wrapper around an error raised by the cryptobox of the DAL"
+    ~pp:(fun fmt (f, msg) ->
+      Format.fprintf
+        fmt
+        "The DAL cryptobox function '%s' failed with:@.'%s'"
+        f
+        msg)
+    Data_encoding.(obj2 (req "function_name" string) (req "explanation" string))
+    (function Cryptobox_error (f, msg) -> Some (f, msg) | _ -> None)
+    (fun (f, msg) -> Cryptobox_error (f, msg))
+
 module Slots_handlers = struct
   let to_option_tzresult r =
     Errors.to_option_tzresult
@@ -62,18 +80,24 @@ module Slots_handlers = struct
   (* This function assumes the slot is valid since we already have
      computed a commitment for it. *)
   let commitment_proof_from_slot cryptobox slot =
+    let open Result_syntax in
     match Cryptobox.polynomial_from_slot cryptobox slot with
-    | Error _ ->
+    | Error (`Slot_wrong_size msg) ->
         (* Storage consistency ensures we can always compute the
-           polynomial from the slot. *)
-        assert false
+           polynomial from the slot. But let's returne an errror to be defensive. *)
+        tzfail (Cryptobox_error ("polynomial_from_slot", msg))
     | Ok polynomial -> (
         match Cryptobox.prove_commitment cryptobox polynomial with
         (* [polynomial] was produced with the parameters from
            [cryptobox], thus we can always compute the proof from
-           [polynomial]. *)
-        | Error _ -> assert false
-        | Ok proof -> proof)
+           [polynomial] except if an error happens with the loading of the SRS. *)
+        | Error (`Invalid_degree_strictly_less_than_expected _) ->
+            tzfail
+              (Cryptobox_error
+                 ( "prove_commitment",
+                   "Unexpected error. Maybe an issue with the SRS from the DAL \
+                    node." ))
+        | Ok proof -> return proof)
 
   let get_commitment_proof ctxt commitment () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
@@ -87,7 +111,7 @@ module Slots_handlers = struct
         match slot with
         | None -> return_none
         | Some slot ->
-            let proof = commitment_proof_from_slot cryptobox slot in
+            let*? proof = commitment_proof_from_slot cryptobox slot in
             return_some proof)
 
   let put_commitment_shards ctxt commitment () Types.{with_proof} =
@@ -121,7 +145,7 @@ module Slots_handlers = struct
         let* commitment =
           Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
         in
-        let commitment_proof = commitment_proof_from_slot cryptobox slot in
+        let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
         (* Cannot return None *)
         let* (_ : unit option) =
           Slot_manager.add_commitment_shards
