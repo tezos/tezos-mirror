@@ -101,6 +101,7 @@ pub const WORD_SIZE: usize = 32usize;
 
 // Path to the reboot context at end of previous reboot
 const REBOOT_CONTEXT: RefPath = RefPath::assert_from(b"/reboot_context");
+const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
 // Path to the flag denoting whether the kernel is in sequencer mode or not.
 const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
@@ -858,6 +859,72 @@ pub fn read_reboot_context<Host: Runtime>(
     );
     let decoder = Rlp::new(bytes.as_slice());
     RebootContext::decode(&decoder).context("Failed to decode current reboot context")
+}
+
+pub fn store_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+    bip: &BlockInProgress,
+) -> anyhow::Result<()> {
+    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
+    let bytes = &bip.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing Block In Progress of size {}",
+        bytes.len()
+    );
+    host.store_write_all(&path, bytes)
+        .context("Failed to store current block in progress")
+}
+
+pub fn read_block_in_progress<Host: Runtime>(
+    host: &Host,
+) -> anyhow::Result<Option<BlockInProgress>> {
+    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
+    if let Some(ValueType::Value) = host.store_has(&path)? {
+        let bytes = host
+            .store_read_all(&path)
+            .context("Failed to read current block in progress")?;
+        log!(
+            host,
+            Debug,
+            "Reading Block In Progress of size {}",
+            bytes.len()
+        );
+        let decoder = Rlp::new(bytes.as_slice());
+        let bip = BlockInProgress::decode(&decoder)
+            .context("Failed to decode current block in progress")?;
+        Ok(Some(bip))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&EVM_BLOCK_IN_PROGRESS)
+        .context("Failed to delete block in progress")
+}
+
+pub fn store_kernel_upgrade<Host: Runtime>(
+    host: &mut Host,
+    kernel_upgrade: &KernelUpgrade,
+) -> Result<(), anyhow::Error> {
+    let path = OwnedPath::from(KERNEL_UPGRADE);
+    let bytes = &kernel_upgrade.rlp_bytes();
+    host.store_write_all(&path, bytes)
+        .context("Failed to store kernel upgrade")
+}
+
+pub fn read_kernel_upgrade<Host: Runtime>(
+    host: &Host,
+) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+    let path = OwnedPath::from(KERNEL_UPGRADE);
+    read_optional_rlp(host, &path).context("Failed to decode kernel upgrade")
+}
+
+pub fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&KERNEL_UPGRADE)
+        .context("Failed to delete kernel upgrade")
 }
 
 pub(crate) mod internal_for_tests {
