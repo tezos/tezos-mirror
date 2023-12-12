@@ -12,6 +12,7 @@ module Wasm = Wasm_debugger.Make (TreeEncoding)
 
 let execute ?(commit = false) ctxt inbox =
   let open Lwt_result_syntax in
+  let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
   let config =
     Config.config
@@ -46,6 +47,9 @@ let init ~smart_rollup_address ctxt =
       ~transactions:[]
       ~number:Ethereum_types.(Qty Z.zero)
   in
+  let inputs =
+    List.map (function `External payload -> `Input ("\001" ^ payload)) inputs
+  in
   let* ctxt, _evm_state = execute ~commit:true ctxt inputs in
   return ctxt
 
@@ -67,6 +71,8 @@ let execute_and_inspect ctxt
         | _ -> assert false)
       insight_requests
   in
+  (* Messages from simulation requests are already valid inputs. *)
+  let messages = List.map (fun s -> `Input s) messages in
   let* _ctxt, evm_state = execute ctxt messages in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values

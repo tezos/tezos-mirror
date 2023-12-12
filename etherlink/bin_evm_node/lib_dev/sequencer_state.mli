@@ -11,7 +11,7 @@
 val execute :
   ?commit:bool ->
   Sequencer_context.t ->
-  string list ->
+  [< `Input of string] list ->
   (Sequencer_context.t * Sequencer_context.evm_state) tzresult Lwt.t
 
 (** [init ~smart_rollup_address ctxt] initializes the local state in

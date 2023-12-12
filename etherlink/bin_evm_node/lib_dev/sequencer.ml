@@ -42,6 +42,11 @@ end) : Services_backend_sig.Backend = struct
       in
       ctxt.next_blueprint_number <- Qty (Z.succ next) ;
       (* Execute the blueprint. *)
+      let inputs =
+        List.map
+          (function `External payload -> `Input ("\001" ^ payload))
+          inputs
+      in
       let* _ctxt = Sequencer_state.execute ~commit:true ctxt inputs in
       return_unit
   end
