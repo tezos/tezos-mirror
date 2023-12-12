@@ -1,7 +1,11 @@
-**The features described in this page are experimental and have not  undergone any security review.**
+Sapling support
+===============
 
-Sapling integration
-===================
+This page first give some details on Sapling and its underlying concepts, and then describes the support for Sapling in Octez and in the Michelson language (part of the Tezos protocol).
+For support in high-level smart contract languages, see the `Sapling documentation in OpenTezos <https://opentezos.com/smart-contracts/smart-contracts-concepts/#sapling>`__.
+
+Sapling
+-------
 
 Sapling is a protocol enabling privacy-preserving transactions of fungible
 tokens in a decentralised
@@ -9,19 +13,6 @@ environment. It was designed and implemented by the Electric Coin
 Company as the last iteration over a series of previous protocols and
 academic works starting with the `Zerocoin seminal
 paper <https://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
-
-The reference implementation of Sapling,
-`librustzcash <https://github.com/zcash/librustzcash>`_, was
-integrated in the Octez codebase during 2019. It will be proposed as
-part of a protocol amendment during 2020.
-
-Librustzcash and the Octez integration implement the protocol
-described in this `specification
-<https://github.com/zcash/zips/blob/2e26bb072dfd5f842fe9e779bdec8cabeb4fa9bf/protocol/protocol.pdf>`_, version 2020.1.0.
-
-
-Sapling
--------
 
 Keys
 ~~~~
@@ -197,48 +188,61 @@ We advice users to be familiar with the use of the TOR network and to
 use clients developed specifically to protect their privacy.
 
 
-Tezos integration
------------------
+Sapling integration
+-------------------
 
-Michelson: verify update
-~~~~~~~~~~~~~~~~~~~~~~~~
+The reference implementation of Sapling,
+`librustzcash <https://github.com/zcash/librustzcash>`_, has been
+integrated in the Octez codebase, and Sapling features were made available for production use with the Edo protocol amendment in early 2021.
 
-We introduce two new Michelson types ``sapling_state`` and
+Librustzcash and the Octez integration implement the protocol
+described in this `specification
+<https://github.com/zcash/zips/blob/2e26bb072dfd5f842fe9e779bdec8cabeb4fa9bf/protocol/protocol.pdf>`_, version 2020.1.0.
+
+Michelson support
+~~~~~~~~~~~~~~~~~
+
+Sapling support uses two new Michelson types ``sapling_state`` and
 ``sapling_transaction``, and two instructions called
 ``SAPLING_VERIFY_UPDATE`` and ``SAPLING_EMPTY_STATE``
 (see the :doc:`Michelson reference<michelson>`
 for more details).
+
 ``SAPLING_EMPTY_STATE`` pushes an empty ``sapling_state`` on the stack.
+
 ``SAPLING_VERIFY_UPDATE`` takes a transaction and a state and
 returns an
-option type which is Some (bound_data, balance and updated
-state) if the transaction is correct, None otherwise.
+option type which is ``Some(bound_data, balance and updated
+state)`` if the transaction is correct, ``None`` otherwise.
 A transaction has a list of inputs, outputs, a balance,
 the root of the Merkle tree containing its inputs, some bound data and a signature.
-The verification part checks the zero-knowledge proofs of all inputs
-and outputs of the transaction, which guarantee several properties of
-correctness.
-It also checks a (randomised) signature associated with each input
-(which guarantees that the owner forged the transaction), and the
-signature that binds the whole transaction together and guarantees the
-correctness of the balance.
+
+The verification part checks:
+
+- the zero-knowledge proofs of all inputs
+  and outputs of the transaction, which guarantee several properties of
+  correctness
+- a (randomised) signature associated with each input
+  (which guarantees that the owner forged the transaction), and the
+  signature that binds the whole transaction together and guarantees the
+  correctness of the balance
+- that the root of the Merkle tree appears in
+  one of the past states and that the nullifiers are not already
+  present (i.e. no double spending is happening).
+
 All the signatures are over the hash of the data that we wish to sign
 and the hash function used is Blake2-b, prefixed with the anti-replay string.
 The anti-replay string is the the concatenation of the chain id and
 the smart contract address. The same string has to be used by the client for
 signing.
 
-Verify_update also checks that the root of the Merkle tree appears in
-one of the past states and that the nullifiers are not already
-present (i.e. no double spending is happening).
-If one of the checks fails the instruction returns None.
-
-Otherwise the function adds to the new state the nullifiers given with each inputs
+If one of the checks fails, the instruction returns None.
+Otherwise the function adds to the new state the nullifiers given with each input
 and adds the outputs to the Merkle tree, which will produce a new root.
 It should be noted that it is possible to generate transactions
 referring to an old root, as long as the inputs used were present in
 the Merkle tree with that root and were not spent after.
-In particular the protocol keeps 120 previous roots and guarantees
+In particular, the protocol keeps 120 previous roots and guarantees
 that roots are updated only once per block.
 Considering 2 blocks per minute and that each block contains at least
 one call to the same contract, a client has 1 hour to have its
@@ -250,15 +254,15 @@ stored in a map indexed by the position of the commitment in the
 Merkle tree.
 
 Lastly the instruction pushes on the stack an option with the bound
-data, the balance and the updated state.
+data, the balance, and the updated state.
 
 A smart contract typically shields or unshields tokens if the balance
 is positive or negative, and simply updates the state if the balance
 is zero.
 Additionally in case of an unshield, it must use the bound data to
 authorize the transfer of unshielded tokens.
-For example it could convert the bound_data to a public_key_hash and
-use it as recipient address of Tezos transfer.
+For example it could convert the bound data to a public-key hash and
+use it as recipient address of a Tezos transfer.
 
 Example contracts
 ~~~~~~~~~~~~~~~~~
@@ -266,57 +270,60 @@ Example contracts
 Shielded tez
 ^^^^^^^^^^^^
 
-An example contract to have a shielded tez with a 1 to 1 conversion to
-mutez is available in the tests of the protocol at
-``src/proto_alpha/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz``.
+An example contract implementing a shielded pool of tokens with a 1 to 1 conversion rate to mutez is available in the tests of the protocol at
+:src:`src/proto_alpha/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz`.
 
-Simple Vote Contract
-^^^^^^^^^^^^^^^^^^^^
+Simple Voting Contract
+^^^^^^^^^^^^^^^^^^^^^^
 
-One might think to use Sapling to do private voting.
-It is possible to adapt shielded transactions to express preferences.
-**Note that this is not what Sapling is designed for and it doesn't provide the same properties as an actual private voting protocol.**
-A natural naive idea is the following.
+One might envision using Sapling to implement private voting (i.e., a secret ballot).
+It is possible to adapt shielded transactions to express and quantify preferences.
+**However, this is not what Sapling is designed for and it does not provide the same properties as an actual private voting protocol.**
+
+A naive idea is the following.
+
 Suppose we want a set of users to express a preference for option A or
-B, we can generate two Sapling keys with two addresses that are
+B. We can generate two Sapling keys with two addresses that are
 published and represent the two options.
 The contract lets each user create a token which represents one vote
 that can then be transferred to address A or B.
 Using the published viewing keys everyone can check the outcome of the
 vote.
-**However note that a transaction can be replayed and we can see the balance of A or B going up.
-This system does not offer ballot privacy.
-Therefore one should ensure that the vote he is casting cannot be linked to him.
-It is possible that the practical situation makes this usable but we recommend in general not to use
-it for any important vote.**
-Note that using a random elliptic curve element as incoming viewing key allows to generate a
+
+However note that:
+
+- A transaction can be replayed and we can see the balance of A or B going up.
+- This system does not offer ballot privacy.
+
+Therefore, this idea may be usable in some practical situations, but
+**we recommend in general not to use it for any important vote.**
+
+Note that using a random elliptic curve element as incoming viewing key (IVK) allows to generate a
 dummy address that cannot be spent. This eases the counting of the votes.
-To ensure that the ivk does not correspond to a normal address with spending key, one
+To ensure that the IVK does not correspond to a normal address with spending key, one
 can use the Fiat-Shamir heuristic.
 
 
 Fees issue
 ~~~~~~~~~~
 
-We have an additional privacy issue that Z-cash doesn't have. When
-interacting with a shielded pool we interact with a smart contract
-with a normal transaction and therefore have to pay fees from an
+The Sapling integration in Tezos exhibits a privacy issue that Z-cash doesn't have. When
+interacting with a shielded pool one interacts with a smart contract
+via a normal transaction and therefore have to pay fees from an
 implicit account.
 One could guess that private transactions whose fees are paid by the
 same implicit account are from the same user.
 This can be mitigated by making a service that act as a proxy by
-forwarding the user transactions and paying it fees. The user would
+forwarding the user transactions and paying its fees. The user would
 then include in the transaction a shielded output for the service that
 covers the fees plus a small bonus to pay the service.
 This output can be open by the service before sending the transaction
-to check that there is enough money to cover its fees. As for Z-cash,
+to check that there is enough money to cover its fees.
+
+As usually done for mitigating other Z-cash privacy issues,
 users interacting with the proxy should use TOR or mitigate network
 analysis as they wish.
 
-Gas, storage and costs
-~~~~~~~~~~~~~~~~~~~~~~
-
-Gas evaluation is not yet done.
 
 RPCs
 ~~~~
@@ -326,20 +333,23 @@ There are two Sapling RPCs under the prefix ``context/sapling``.
 and the size of the set of nullifiers.
 ``get_diff`` takes two optional starting offsets ``cm_from`` and ``nf_from``
 and returns the sapling state that was added from the offsets to the
-current size. In particular it returns three lists, commitments,
-ciphertexts from position ``cm_from`` up to the last one added and
-nullifiers, from ``nf_from`` to the last one added.
-Additionally it returns the last computed root of the merkle tree so
+current size. In particular it returns three lists:
+
+- commitments,
+- ciphertexts from position ``cm_from`` up to the last one added, and
+- nullifiers from ``nf_from`` to the last one added.
+
+Additionally it returns the last computed root of the Merkle tree so
 that a client updating its tree using the diff can verify the
 correctness of the result.
 
-Client
-~~~~~~
+Client support
+~~~~~~~~~~~~~~
 
 Wallet
 ^^^^^^
 
-octez-client supports Sapling keys and can send
+``octez-client`` supports Sapling keys and can send
 shielded transactions to smart contracts.
 
 The client supports two ways to generate a new Sapling spending key.
@@ -364,8 +374,7 @@ the address index. Not all indexes correspond to valid addresses for
 each key so it is normal to see an increasing counter that
 occasionally skips a few positions.
 
-Because for now the only support for Sapling keys is to interact with
-smart contracts, the client binds each newly generated key to a
+The client binds each newly generated key to a
 specific smart contract address.
 
 Operations
@@ -374,7 +383,7 @@ Operations
 The client also facilitates the creation of shielded transactions and
 their transfer as arguments of smart contracts.
 For now there is seamless integration to send transactions to the
-reference shielded-tez contract and we are planning to support a
+reference shielded-tez contract and there are plans to support a
 larger class of contracts.
 
 For the shielded-tez smart contract, the client supports shielding,
@@ -386,25 +395,13 @@ The idea is that a user should not use their own transparent tz{1,2,3}
 address to submit a shielded address but rather have a third party
 inject it.
 
-Message argument
-^^^^^^^^^^^^^^^^
-Sapling also allows to send an arbitrary encrypted message attached
-to an output.
-The message size has to be fixed by pool for privacy reasons.
-For now it is fixed overall at eight bytes. An incorrect message length
-will raise a failure in our client and the protocol will reject the
-transaction. Our client adds a default zero's filled message of the
-right length. If a message is provided with the --message option,
-the client will pad it or truncate it if necessary. A warning message
-is printed only if the user's message is truncated.
-
 
 Code base
 ~~~~~~~~~
 
 The current code-base is organized in three main components.
 There is a core library called ``lib_sapling`` which binds ``librustzcash``,
-adds all the data structures necessary to run the sapling
+adds all the data structures necessary to run the Sapling
 protocol and includes a simple client and baker.
 Under the protocol directory there is a ``lib_client_sapling`` library
 which implements a full client capable of handling Sapling keys and
@@ -416,33 +413,31 @@ Sapling storage, in the spirit of ``big_map``\ s, and the integration of
 Protocol
 ^^^^^^^^
 
-In order to export the Sapling library to the protocol we first need
-to expose it through the environment that sandboxes the protocol.
-The changes under :src:`src/lib_protocol_environment` are simple but very
-relevant as any change of the environment requires a manual update of the
-Tezos node. These changes are part of version V1 of the environment
-while protocols 000 to 006 depends on version V0.
+In order to make the Sapling library available to the protocol is has
+been exposed through the environment that sandboxes the protocol.
+The changes to :src:`src/lib_protocol_environment` were delivered
+as part of version V1 of the environment.
 
-There are two main changes to Tezos' economic protocol, the storage
+There are two main forms of support in the economic protocol: the storage
 for Sapling and the addition of ``SAPLING_VERIFY_UPDATE`` to the
 Michelson interpreter.
 
 Given that the storage of a Sapling contract can be substantially
 large, it is important to provide an efficient implementation.
-Similarly to what it's done for big_maps, the storage of Sapling can't
+Similarly to what is done for big_maps, the storage of Sapling can't
 be entirely deserialized and modified in memory but only a diff of the
 changes is kept by the interpreter and applied at the end of each
 smart contract call.
 
-In the Michelson interpreter two new types are added, ``sapling_state`` and
-``sapling_transaction``, and the instruction ``SAPLING_VERIFY_UPDATE``.
+The Michelson language offers two special-purpose types: ``sapling_state`` and
+``sapling_transaction``, and one instruction: ``SAPLING_VERIFY_UPDATE``.
 
 Client
 ^^^^^^
 
 Under ``lib_client_sapling`` there is the client integration
 with the support for Sapling keys and forging of transactions.
-The main difference from the existing Octez client is the need for the
+The main difference from the ``lib_client`` library is the need for the
 Sapling client to keep an additional state, for each contract.
 Because Sapling uses a UTXO model it is necessary for a client to
 compute the set of unspent outputs in order to forge new transactions.
@@ -454,7 +449,7 @@ Sapling command.
 The update is done using the RPCs to recover the new updates since the
 last known position.
 
-The state of all sapling contracts is stored in
+The state of all Sapling contracts is stored in
 ``~/.tezos-client/sapling_states``. This file can be regenerated from
 the chain in case of loss. However disclosure of this file will reveal
 the balance and the unspent outputs of all viewing keys.
@@ -469,11 +464,15 @@ For privacy reasons the size of the memo is fixed per contract
 and it is chosen at origination time.
 A transaction containing an output with a different memo-size
 will be rejected.
+Our client adds a default zero-filled message of the
+right length. If a message is provided with the ``--message`` option,
+the client will pad it or truncate it if necessary. A warning message
+is printed only if the user's message is truncated.
 
 Sandbox tutorial
 ~~~~~~~~~~~~~~~~
 
-As usual it's possible to test the system end-to-end using the
+Let us show how to test the system end-to-end using the
 :doc:`../user/sandbox`.
 After having set up the sandbox and originated the contract, a good
 way to get familiar with the system is to generate keys and then
@@ -495,7 +494,7 @@ unshielding.
    --init '{ }' --burn-cap 3 &
    octez-client bake for bootstrap1
 
-   # as usual you can check the octez-client manual
+   # if necessary, you can get information from the octez-client manual
    octez-client sapling man
 
    # generate two shielded keys for Alice and Bob and use them for the shielded-tez contract
