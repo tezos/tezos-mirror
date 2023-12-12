@@ -430,6 +430,12 @@ let compress_on_the_fly_arg : (bool, Client_context.full) Tezos_clic.arg =
        dir."
     ()
 
+let uncompressed : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"uncompressed"
+    ~doc:"Produce an uncompressed snapshot."
+    ()
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in

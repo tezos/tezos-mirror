@@ -5,17 +5,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [export ~no_checks ~compress_on_the_fly ~data_dir ~dest] creates a tar
-    gzipped archive in [dest] (or the current directory) containing a snapshot
-    of the data of the rollup node with data directory [data_dir]. The path of
-    the snapshot archive is returned. If [no_checks] is [true], the integrity of
-    the snapshot is not checked at the end. If [compress_on_the_fly] is [true]
-    the snapshot will be produced as compressed on the fly and the rollup node
-    will use less disk space to produce the snapshot but will lock the rollup
-    node (if running) for a longer (~10x) time. *)
+(** Compression strategy for snapshot archives. *)
+type compression =
+  | No  (** Produce uncompressed archive. Takes more space. *)
+  | On_the_fly
+      (** Compress archive on the fly. The rollup node will use less disk space
+          to produce the snapshot but will lock the rollup node (if running) for
+          a longer time. *)
+  | After
+      (** Compress archive after snapshot creation. Uses more disk space
+          temporarily than {!On_the_fly} but does not lock the rollup node for
+          very long. *)
+
+(** [export ~no_checks ~compression ~data_dir ~dest] creates a tar gzipped
+    archive in [dest] (or the current directory) containing a snapshot of the
+    data of the rollup node with data directory [data_dir]. The path of the
+    snapshot archive is returned. If [no_checks] is [true], the integrity of the
+    snapshot is not checked at the end. *)
 val export :
   no_checks:bool ->
-  compress_on_the_fly:bool ->
+  compression:compression ->
   data_dir:string ->
   dest:string option ->
   string tzresult Lwt.t
