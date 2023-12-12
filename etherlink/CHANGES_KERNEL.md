@@ -8,6 +8,7 @@
 - Fix contract creation gas cost and transaction data cost. (!10349)
 - Implementation of EIP-3541, new code starting with the 0xEF byte cannot be
 deployed. (!11225)
+- Implement EIP-684: Prevent create collision. Reject contract creation to non-empty address (!11150)
 
 ### Bug fixes
 
