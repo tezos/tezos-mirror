@@ -3597,30 +3597,13 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
   let* () = Lwt_unix.sleep 2.0 in
   check_profiles ~__LOC__ dal_node ~expected:(Operator profiles)
 
-(** Tests that a peer can discover another peer via a bootstrap node.
-
-    There are three nodes in the test:
-    - dal_node1: The bootstrap node.
-    - dal_node2: An attester for pkh of boostrap1.
-    - dal_node3: A slot producer for slot index 0.
-
-    [dal_node2] should connect to [dal_node1] at startup.
-    [dal_node3] should also connect to [dal_node1] at startup.
-    [dal_node2] and [dal_node3] should find each other via [dal_node1]. *)
-let connect_nodes_via_bootstrap_node _protocol _parameters _cryptobox node
-    client dal_node1 =
-  let* dal_node2 =
-    make_dal_node
-      ~peers:[Dal_node.listen_addr dal_node1]
-      ~attester_profiles:[Constant.bootstrap1.public_key_hash]
-      node
-  in
-  let* dal_node3 =
-    make_dal_node
-      ~peers:[Dal_node.listen_addr dal_node1]
-      ~producer_profiles:[0]
-      node
-  in
+(** This helper funciton terminates dal_node2 and dal_node3 (in addition to
+    those in [extra_nodes_to_restart]), and restart them after creating two
+    connection events to check that dal_node2 and dal_node3 find each other. *)
+let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
+    dal_node2 dal_node3 =
+  let nodes = dal_node2 :: dal_node3 :: extra_nodes_to_restart in
+  let* () = List.map Dal_node.terminate nodes |> Lwt.join in
   let check_conn_event_from_2_to_3 =
     check_new_connection_event
       ~main_node:dal_node2
@@ -3633,6 +3616,7 @@ let connect_nodes_via_bootstrap_node _protocol _parameters _cryptobox node
       ~other_node:dal_node2
       ~is_trusted:false
   in
+  let* () = List.map (Dal_node.run ~wait_ready:true) nodes |> Lwt.join in
   Log.info "Bake two times to finalize a block." ;
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
@@ -3641,37 +3625,66 @@ let connect_nodes_via_bootstrap_node _protocol _parameters _cryptobox node
   let* () =
     Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
   in
-  Lwt.return (dal_node2, dal_node3)
-
-(** See {!connect_nodes_via_bootstrap_node} for the doc. *)
-let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
-    client dal_node1 =
-  let* _dal_node2, _dal_node3 =
-    connect_nodes_via_bootstrap_node
-      _protocol
-      _parameters
-      _cryptobox
-      node
-      client
-      dal_node1
-  in
   unit
 
+(** This function tests that a peer can discover another peer via a bootstrap
+    node and that discovery works even when the bootstrap is (re-)started at the
+    same time (or after) the two other nodes we want to connect. *)
+let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+    client dal_node1 =
+  (* Phase 1: dal_node1 is already running. Start dal_node2 and dal_node3 and
+     use dal_node1 to establish connections between them. *)
+  let* dal_node2 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~attester_profiles:[Constant.bootstrap1.public_key_hash]
+      node
+  in
+  let* dal_node3 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~producer_profiles:[0]
+      node
+  in
+  (* Here, we observe a first nodes connection via bootstrap nodes thanks to
+     peers exchange. *)
+  let* () = observe_nodes_connection_via_bootstrap client dal_node2 dal_node3 in
+
+  (* In this variant, we also restart the bootstrap node [dal_node1]. So,
+     connections to it from dal_node2 and dal_node3 are always done at startup,
+     but Gossipsub worker might be needed to retry connection. *)
+  observe_nodes_connection_via_bootstrap
+    ~extra_nodes_to_restart:[dal_node1]
+    client
+    dal_node2
+    dal_node3
+
 (** Connect two nodes [dal_node2] and [dal_node3] via a trusted bootstrap peer
-    [dal_node1]. Then, disconnect all the nodes and wait for reconnection. *)
+    [dal_node1]. Then, disconnect all the nodes (without restarting them) and
+    wait for reconnection. *)
 let test_peers_reconnection _protocol _parameters _cryptobox node client
     dal_node1 =
   (* Connect two nodes via bootstrap peer. *)
   Log.info "Connect two nodes via bootstrap peer." ;
-  let* dal_node2, dal_node3 =
-    connect_nodes_via_bootstrap_node
-      _protocol
-      _parameters
-      _cryptobox
+  let* dal_node2 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~attester_profiles:[Constant.bootstrap1.public_key_hash]
       node
-      client
-      dal_node1
   in
+  let* dal_node3 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~producer_profiles:[0]
+      node
+  in
+  let* () =
+    (* Here, we observe a first nodes connection via bootstrap nodes thanks to
+       peers exchange. Below, we disconnect the nodes without restarting
+       them. *)
+    observe_nodes_connection_via_bootstrap client dal_node2 dal_node3
+  in
+
   (* Get the nodes' identities. *)
   let id dal_node =
     JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
