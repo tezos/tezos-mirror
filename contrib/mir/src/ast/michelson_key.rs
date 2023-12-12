@@ -5,39 +5,11 @@
 /*                                                                            */
 /******************************************************************************/
 
-use tezos_crypto_rs::{
-    base58::FromBase58CheckError,
-    hash::{
-        FromBytesError, Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyError,
-        PublicKeyP256, PublicKeySecp256k1,
-    },
+use tezos_crypto_rs::hash::{
+    Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-pub enum KeyError {
-    #[error("unknown key prefix: {0}")]
-    UnknownPrefix(String),
-    #[error("wrong key format: {0}")]
-    WrongFormat(String),
-}
-
-impl From<FromBase58CheckError> for KeyError {
-    fn from(value: FromBase58CheckError) -> Self {
-        Self::WrongFormat(value.to_string())
-    }
-}
-
-impl From<PublicKeyError> for KeyError {
-    fn from(value: PublicKeyError) -> Self {
-        Self::WrongFormat(value.to_string())
-    }
-}
-
-impl From<FromBytesError> for KeyError {
-    fn from(value: FromBytesError) -> Self {
-        Self::WrongFormat(value.to_string())
-    }
-}
+use super::byte_repr_trait::{ByteReprError, ByteReprTrait};
 
 macro_rules! key_type_and_impls {
     ($($con:ident($ty:ident)),* $(,)*) => {
@@ -67,14 +39,6 @@ macro_rules! key_type_and_impls {
                 }
             }
         }
-
-        impl Key {
-            pub fn to_base58_check(&self) -> String {
-                match self {
-                    $(Key::$con(h) => h.to_base58_check()),*
-                }
-            }
-        }
     };
 }
 
@@ -86,23 +50,23 @@ key_type_and_impls! {
 }
 
 impl TryFrom<&[u8]> for Key {
-    type Error = KeyError;
+    type Error = ByteReprError;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_bytes(value)
     }
 }
 
 impl TryFrom<&str> for Key {
-    type Error = KeyError;
+    type Error = ByteReprError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_base58_check(value)
     }
 }
 
-fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), KeyError> {
+fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), ByteReprError> {
     let size = data.len();
     if size < min_size {
-        Err(KeyError::WrongFormat(format!(
+        Err(ByteReprError::WrongFormat(format!(
             "key must be at least {min_size} {name} long, but it is {size} {name} long"
         )))
     } else {
@@ -119,8 +83,10 @@ impl Key {
     /// Smallest key size
     pub const MIN_BASE58_SIZE: usize = 54;
     pub const MIN_BYTE_SIZE: usize = 32;
+}
 
-    pub fn from_base58_check(data: &str) -> Result<Self, KeyError> {
+impl ByteReprTrait for Key {
+    fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         use Key::*;
 
         check_size(data.as_bytes(), Self::MIN_BASE58_SIZE, "characters")?;
@@ -130,11 +96,11 @@ impl Key {
             "sppk" => Secp256k1(HashTrait::from_b58check(data)?),
             "p2pk" => P256(HashTrait::from_b58check(data)?),
             "BLpk" => Bls(HashTrait::from_b58check(data)?),
-            s => return Err(KeyError::UnknownPrefix(s.to_owned())),
+            s => return Err(ByteReprError::UnknownPrefix(s.to_owned())),
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeyError> {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
         use Key::*;
 
         check_size(bytes, Self::MIN_BYTE_SIZE, "bytes")?;
@@ -145,7 +111,7 @@ impl Key {
             TAG_P256 => P256(HashTrait::try_from_bytes(&bytes[1..])?),
             TAG_BLS => Bls(HashTrait::try_from_bytes(&bytes[1..])?),
             _ => {
-                return Err(KeyError::UnknownPrefix(format!(
+                return Err(ByteReprError::UnknownPrefix(format!(
                     "0x{}",
                     hex::encode(&bytes[..1])
                 )))
@@ -153,7 +119,17 @@ impl Key {
         })
     }
 
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+    fn to_base58_check(&self) -> String {
+        use Key::*;
+        match self {
+            Ed25519(hash) => hash.to_base58_check(),
+            Secp256k1(hash) => hash.to_base58_check(),
+            P256(hash) => hash.to_base58_check(),
+            Bls(hash) => hash.to_base58_check(),
+        }
+    }
+
+    fn to_bytes(&self, out: &mut Vec<u8>) {
         use Key::*;
         fn go(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<Hash>) {
             out.push(tag);
@@ -165,12 +141,6 @@ impl Key {
             P256(hash) => go(out, TAG_P256, hash),
             Bls(hash) => go(out, TAG_BLS, hash),
         }
-    }
-
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.to_bytes(&mut out);
-        out
     }
 }
 
@@ -196,7 +166,7 @@ mod tests {
                 &hex::decode("ff9c0f7c35a4352c2eb5e3ad30bf3ea9ecabb8b65b40ccfeea3d58bea08a36c286")
                     .unwrap()
             ),
-            Err(KeyError::UnknownPrefix("0xff".to_owned())),
+            Err(ByteReprError::UnknownPrefix("0xff".to_owned())),
         );
 
         for (b58, hex) in FIXTURES {

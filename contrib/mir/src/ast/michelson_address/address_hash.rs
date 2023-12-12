@@ -5,7 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
-use super::AddressError;
+use super::{ByteReprError, ByteReprTrait};
 
 use tezos_crypto_rs::hash::{
     ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash,
@@ -40,14 +40,6 @@ macro_rules! address_hash_type_and_impls {
                 }
             }
         }
-
-        impl AddressHash {
-            pub fn to_base58_check(&self) -> String {
-                match self {
-                    $(AddressHash::$con(h) => h.to_base58_check()),*
-                }
-            }
-        }
     };
 }
 
@@ -61,23 +53,23 @@ address_hash_type_and_impls! {
 }
 
 impl TryFrom<&[u8]> for AddressHash {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_bytes(value)
     }
 }
 
 impl TryFrom<&str> for AddressHash {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_base58_check(value)
     }
 }
 
-pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), AddressError> {
+pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), ByteReprError> {
     let size = data.len();
     if size < min_size {
-        Err(AddressError::WrongFormat(format!(
+        Err(ByteReprError::WrongFormat(format!(
             "address must be at least {min_size} {name} long, but it is {size} {name} long"
         )))
     } else {
@@ -102,8 +94,10 @@ impl AddressHash {
     // padding to the end
     pub const BYTE_SIZE: usize = Self::HASH_SIZE + 2;
     pub const BASE58_SIZE: usize = 36;
+}
 
-    pub fn from_base58_check(data: &str) -> Result<Self, AddressError> {
+impl ByteReprTrait for AddressHash {
+    fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         use AddressHash::*;
 
         check_size(data.as_bytes(), Self::BASE58_SIZE, "characters")?;
@@ -115,17 +109,29 @@ impl AddressHash {
             "tz2" => Tz2(HashTrait::from_b58check(data)?),
             "tz3" => Tz3(HashTrait::from_b58check(data)?),
             "tz4" => Tz4(HashTrait::from_b58check(data)?),
-            s => return Err(AddressError::UnknownPrefix(s.to_owned())),
+            s => return Err(ByteReprError::UnknownPrefix(s.to_owned())),
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AddressError> {
+    fn to_base58_check(&self) -> String {
+        use AddressHash::*;
+        match self {
+            Kt1(hash) => hash.to_base58_check(),
+            Sr1(hash) => hash.to_base58_check(),
+            Tz1(hash) => hash.to_base58_check(),
+            Tz2(hash) => hash.to_base58_check(),
+            Tz3(hash) => hash.to_base58_check(),
+            Tz4(hash) => hash.to_base58_check(),
+        }
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
         use AddressHash::*;
 
         check_size(bytes, Self::BYTE_SIZE, "bytes")?;
         let validate_padding_byte = || match bytes.last().unwrap() {
             0 => Ok(()),
-            b => Err(AddressError::WrongFormat(format!(
+            b => Err(ByteReprError::WrongFormat(format!(
                 "address must be padded with byte 0x00, but it was padded with 0x{}",
                 hex::encode([*b])
             ))),
@@ -138,7 +144,7 @@ impl AddressHash {
                 TAG_TZ3 => Tz3(HashTrait::try_from_bytes(&bytes[2..])?),
                 TAG_TZ4 => Tz4(HashTrait::try_from_bytes(&bytes[2..])?),
                 _ => {
-                    return Err(AddressError::UnknownPrefix(format!(
+                    return Err(ByteReprError::UnknownPrefix(format!(
                         "0x{}",
                         hex::encode(&bytes[..2])
                     )))
@@ -154,7 +160,7 @@ impl AddressHash {
                 Sr1(HashTrait::try_from_bytes(&bytes[1..bytes.len() - 1])?)
             }
             _ => {
-                return Err(AddressError::UnknownPrefix(format!(
+                return Err(ByteReprError::UnknownPrefix(format!(
                     "0x{}",
                     hex::encode(&bytes[..1])
                 )))
@@ -162,7 +168,7 @@ impl AddressHash {
         })
     }
 
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+    fn to_bytes(&self, out: &mut Vec<u8>) {
         use AddressHash::*;
         fn go(out: &mut Vec<u8>, tag: &[u8], hash: impl AsRef<Hash>, sep: &[u8]) {
             out.extend_from_slice(tag);
@@ -177,11 +183,5 @@ impl AddressHash {
             Kt1(hash) => go(out, &[TAG_KT1], hash, PADDING_SMART),
             Sr1(hash) => go(out, &[TAG_SR1], hash, PADDING_SMART),
         }
-    }
-
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.to_bytes(&mut out);
-        out
     }
 }

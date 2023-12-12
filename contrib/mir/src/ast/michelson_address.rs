@@ -7,13 +7,13 @@
 
 pub mod address_hash;
 pub mod entrypoint;
-pub mod error;
 
 pub use self::address_hash::AddressHash;
 pub use self::entrypoint::Entrypoint;
-pub use self::error::AddressError;
 
 use address_hash::check_size;
+
+use super::{ByteReprError, ByteReprTrait};
 
 #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
 pub struct Address {
@@ -22,7 +22,13 @@ pub struct Address {
 }
 
 impl Address {
-    pub fn from_base58_check(data: &str) -> Result<Self, AddressError> {
+    pub fn is_default_ep(&self) -> bool {
+        self.entrypoint.is_default()
+    }
+}
+
+impl ByteReprTrait for Address {
+    fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         let (hash, ep) = if let Some(ep_sep_pos) = data.find('%') {
             (&data[..ep_sep_pos], &data[ep_sep_pos + 1..])
         } else {
@@ -34,7 +40,7 @@ impl Address {
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AddressError> {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ByteReprError> {
         check_size(bytes, AddressHash::BYTE_SIZE, "bytes")?;
 
         let (hash, ep) = bytes.split_at(AddressHash::BYTE_SIZE);
@@ -44,24 +50,14 @@ impl Address {
         })
     }
 
-    pub fn is_default_ep(&self) -> bool {
-        self.entrypoint.is_default()
-    }
-
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+    fn to_bytes(&self, out: &mut Vec<u8>) {
         self.hash.to_bytes(out);
         if !self.is_default_ep() {
             out.extend_from_slice(self.entrypoint.as_bytes())
         }
     }
 
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.to_bytes(&mut out);
-        out
-    }
-
-    pub fn to_base58_check(&self) -> String {
+    fn to_base58_check(&self) -> String {
         if self.is_default_ep() {
             self.hash.to_base58_check()
         } else {
@@ -75,14 +71,14 @@ impl Address {
 }
 
 impl TryFrom<&[u8]> for Address {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_bytes(value)
     }
 }
 
 impl TryFrom<&str> for Address {
-    type Error = AddressError;
+    type Error = ByteReprError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::from_base58_check(value)
     }
@@ -125,7 +121,7 @@ mod tests {
             Address::from_bytes(
                 &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74").unwrap()
             ),
-            Err(AddressError::WrongFormat(_)),
+            Err(ByteReprError::WrongFormat(_)),
         ));
 
         // unknown implicit tag
@@ -133,7 +129,7 @@ mod tests {
             dbg!(Address::from_bytes(
                 &hex::decode("00ff7b09f782e0bcd67739510afa819d85976119d5ef").unwrap()
             )),
-            Err(AddressError::UnknownPrefix("0x00ff".to_owned())),
+            Err(ByteReprError::UnknownPrefix("0x00ff".to_owned())),
         );
 
         // unknown tag
@@ -141,7 +137,7 @@ mod tests {
             Address::from_bytes(
                 &hex::decode("ffff7b09f782e0bcd67739510afa819d85976119d5ef").unwrap()
             ),
-            Err(AddressError::UnknownPrefix("0xff".to_owned())),
+            Err(ByteReprError::UnknownPrefix("0xff".to_owned())),
         );
 
         for (b58, hex) in FIXTURES {

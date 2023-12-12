@@ -63,6 +63,8 @@ impl Ord for TypedValue {
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
 
+    use crate::ast::ByteReprTrait;
+
     use super::*;
 
     #[test]
