@@ -4,6 +4,7 @@ include:
   - .gitlab/ci/jobs/build/static_arm64_release.yml
   - .gitlab/ci/jobs/build/docker_amd64_release.yml
   - .gitlab/ci/jobs/build/docker_arm64_release.yml
+  - .gitlab/ci/jobs/build/bin_packages.yml
 
   # Stage: prepare
   - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_release.yml
