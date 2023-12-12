@@ -419,6 +419,17 @@ let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Don't check integrity of the snapshot."
     ()
 
+let compress_on_the_fly_arg : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"compress-on-the-fly"
+    ~doc:
+      "Produce a compressed snapshot on the fly. The rollup node will use less \
+       disk space to produce the snapshot but will lock the rollup node (if \
+       running) for a longer time. Without this option, producing a snaphsot \
+       requires the available disk space to be around the size of the data \
+       dir."
+    ()
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in

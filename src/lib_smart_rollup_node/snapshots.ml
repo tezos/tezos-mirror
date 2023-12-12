@@ -411,9 +411,9 @@ let snapshotable_files_regexp =
   Re.Str.regexp
     "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|context/.*\\|metadata$\\)"
 
-let export ~no_checks ~data_dir ~dest =
+let export ~no_checks ~compress_on_the_fly ~data_dir ~dest =
   let open Lwt_result_syntax in
-  let* uncompressed_snapshot =
+  let* snapshot_file =
     Format.eprintf "Acquiring GC lock@." ;
     (* Take GC lock first in order to not prevent progression of rollup node. *)
     Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
@@ -421,13 +421,15 @@ let export ~no_checks ~data_dir ~dest =
     Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
     let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+    let suffix = if compress_on_the_fly then "" else ".uncompressed" in
     let dest_file_name =
       Format.asprintf
-        "snapshot-%a-%ld.%s.uncompressed"
+        "snapshot-%a-%ld.%s%s"
         Address.pp_short
         metadata.address
         metadata.head_level
         (Configuration.string_of_history_mode metadata.history_mode)
+        suffix
     in
     let dest_file =
       match dest with
@@ -441,9 +443,10 @@ let export ~no_checks ~data_dir ~dest =
         Re.Str.string_match snapshotable_files_regexp relative_path 0
         && not (Re.Str.string_match operator_local_file_regexp relative_path 0)
       in
+      let writer = if compress_on_the_fly then gzip_writer else stdlib_writer in
       create
         stdlib_reader
-        stdlib_writer
+        writer
         metadata
         ~dir:data_dir
         ~include_file
@@ -452,7 +455,9 @@ let export ~no_checks ~data_dir ~dest =
     in
     return dest_file
   in
-  let snapshot_file = compress ~snapshot_file:uncompressed_snapshot in
+  let snapshot_file =
+    if compress_on_the_fly then snapshot_file else compress ~snapshot_file
+  in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 

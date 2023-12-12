@@ -318,9 +318,10 @@ val change_node_mode : t -> mode -> t
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
-(** [export_snapshot rollup_node dir] creates a snapshot of the rollup node in
-    directory [dir]. *)
-val export_snapshot : t -> string -> string Runnable.process
+(** [export_snapshot ?compress_on_the_fly rollup_node dir] creates a snapshot of
+    the rollup node in directory [dir]. *)
+val export_snapshot :
+  ?compress_on_the_fly:bool -> t -> string -> string Runnable.process
 
 (** [import_snapshot rollup_node ~snapshot_file] imports the snapshot
     [snapshot_file] in the rollup node [rollup_node].  *)
