@@ -151,6 +151,56 @@ fn next_bip_from_blueprints<Host: Runtime>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn compute_bip<Host: KernelRuntime>(
+    host: &mut Host,
+    mut block_in_progress: BlockInProgress,
+    current_constants: &mut BlockConstants,
+    current_block_number: &mut U256,
+    current_block_parent_hash: &mut H256,
+    precompiles: &PrecompileBTreeMap<Host>,
+    evm_account_storage: &mut EthereumAccountStorage,
+    accounts_index: &mut IndexableStorage,
+    tick_counter: &mut TickCounter,
+) -> anyhow::Result<ComputationResult> {
+    let result = compute(
+        host,
+        &mut block_in_progress,
+        current_constants,
+        precompiles,
+        evm_account_storage,
+        accounts_index,
+    )?;
+    match result {
+        ComputationResult::RebootNeeded => {
+            log!(
+                host,
+                Info,
+                "Ask for reboot. Estimated ticks: {}",
+                &block_in_progress.estimated_ticks
+            );
+            storage::store_block_in_progress(host, &block_in_progress)?;
+            storage::add_reboot_flag(host)?;
+            host.mark_for_reboot()?
+        }
+        ComputationResult::Finished => {
+            *tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
+            let new_block = block_in_progress
+                .finalize_and_store(host)
+                .context("Failed to finalize the block in progress")?;
+            *current_block_number = new_block.number + 1;
+            *current_block_parent_hash = new_block.hash;
+            *current_constants = new_block.constants(
+                current_constants.chain_id,
+                current_constants.base_fee_per_gas,
+            );
+            // Drop the processed blueprint from the storage
+            drop_head_blueprint(host)?
+        }
+    }
+    Ok(result)
+}
+
 pub fn produce<Host: KernelRuntime>(
     host: &mut Host,
     chain_id: U256,
@@ -182,43 +232,28 @@ pub fn produce<Host: KernelRuntime>(
     // TODO: Read block in progress from storage in case of reboot
     // (Solved in a future commit)
 
-    while let Some(mut block_in_progress) = next_bip_from_blueprints(
+    // Execute stored blueprints
+    while let Some(block_in_progress) = next_bip_from_blueprints(
         host,
         current_block_number,
         current_block_parent_hash,
         &current_constants,
         &tick_counter,
     )? {
-        match compute(
+        match compute_bip(
             host,
-            &mut block_in_progress,
-            &current_constants,
+            block_in_progress,
+            &mut current_constants,
+            &mut current_block_number,
+            &mut current_block_parent_hash,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
+            &mut tick_counter,
         )? {
+            ComputationResult::Finished => (),
             ComputationResult::RebootNeeded => {
-                log!(
-                    host,
-                    Info,
-                    "Ask for reboot. Estimated ticks: {}",
-                    &block_in_progress.estimated_ticks
-                );
-                storage::store_block_in_progress(host, &block_in_progress)?;
-                storage::add_reboot_flag(host)?;
-                host.mark_for_reboot()?;
-                return Ok(ComputationResult::RebootNeeded);
-            }
-            ComputationResult::Finished => {
-                tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
-                let new_block = block_in_progress
-                    .finalize_and_store(host)
-                    .context("Failed to finalize the block in progress")?;
-                current_block_number = new_block.number + 1;
-                current_block_parent_hash = new_block.hash;
-                current_constants = new_block.constants(chain_id, base_fee_per_gas);
-                // Drop the processed blueprint from the storage
-                drop_head_blueprint(host)?
+                return Ok(ComputationResult::RebootNeeded)
             }
         }
     }
