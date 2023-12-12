@@ -890,6 +890,15 @@ fn interpret_one<'a>(
             let encoded = mich.encode_for_pack();
             stack.push(V::Bytes(encoded));
         }
+        I::Unpack(ty) => {
+            let bytes = pop!(V::Bytes);
+            ctx.gas.consume(interpret_cost::unpack(bytes.as_slice())?)?;
+            let mut try_unpack = || -> Option<TypedValue> {
+                let mich = Micheline::decode_packed(arena, &bytes).ok()?;
+                crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
+            };
+            stack.push(V::new_option(try_unpack()));
+        }
         I::CheckSignature => {
             let key = pop!(V::Key);
             let sig = pop!(V::Signature);
@@ -4429,5 +4438,30 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dug(4), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn unpack() {
+        let mut stack = stk![V::Bytes(hex::decode("0500f1a2f3ad07").unwrap())];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(Some(V::int(-987654321)))]);
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+    }
+
+    #[test]
+    fn unpack_bad_input() {
+        let mut stack = stk![V::Bytes(hex::decode("05ffff").unwrap())];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None)]);
+    }
+
+    #[test]
+    fn unpack_bad_type() {
+        let mut stack = stk![V::Bytes(hex::decode("0500f1a2f3ad07").unwrap())];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&Unpack(Type::Unit), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None)]);
     }
 }
