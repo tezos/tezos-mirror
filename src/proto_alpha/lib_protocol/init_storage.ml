@@ -341,10 +341,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = clear_staking_balance_snapshots_for_o ctxt in
         let* ctxt = migrate_stake_distribution_for_o ctxt in
         let*! ctxt = initialize_total_supply_for_o chain_id ctxt in
-        let*! ctxt =
-          Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries
-            ctxt
-        in
         let* ctxt = Adaptive_issuance_storage.init ctxt in
         let*! ctxt = migrate_pending_consensus_keys_for_o ctxt in
         (* Migration of refutation games needs to be kept for each protocol. *)
