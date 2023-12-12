@@ -1,5 +1,3 @@
-**The features described in this page are experimental and have not undergone any security review.**
-
 Sapling support
 ===============
 
