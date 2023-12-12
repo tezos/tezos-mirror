@@ -59,6 +59,22 @@ module Slots_handlers = struct
         Slot_manager.get_commitment_slot store cryptobox commitment
         |> to_option_tzresult)
 
+  (* This function assumes the slot is valid since we already have
+     computed a commitment for it. *)
+  let commitment_proof_from_slot cryptobox slot =
+    match Cryptobox.polynomial_from_slot cryptobox slot with
+    | Error _ ->
+        (* Storage consistency ensures we can always compute the
+           polynomial from the slot. *)
+        assert false
+    | Ok polynomial -> (
+        match Cryptobox.prove_commitment cryptobox polynomial with
+        (* [polynomial] was produced with the parameters from
+           [cryptobox], thus we can always compute the proof from
+           [polynomial]. *)
+        | Error _ -> assert false
+        | Ok proof -> proof)
+
   let get_commitment_proof ctxt commitment () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
@@ -70,19 +86,9 @@ module Slots_handlers = struct
         in
         match slot with
         | None -> return_none
-        | Some slot -> (
-            match Cryptobox.polynomial_from_slot cryptobox slot with
-            | Error _ ->
-                (* Storage consistency ensures we can always compute the
-                   polynomial from the slot. *)
-                assert false
-            | Ok polynomial -> (
-                match Cryptobox.prove_commitment cryptobox polynomial with
-                (* [polynomial] was produced with the parameters from
-                   [cryptobox], thus we can always compute the proof from
-                   [polynomial]. *)
-                | Error _ -> assert false
-                | Ok proof -> return_some proof)))
+        | Some slot ->
+            let proof = commitment_proof_from_slot cryptobox slot in
+            return_some proof)
 
   let put_commitment_shards ctxt commitment () Types.{with_proof} =
     call_handler2
@@ -115,20 +121,7 @@ module Slots_handlers = struct
         let* commitment =
           Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
         in
-        let*? commitment_proof =
-          match Cryptobox.polynomial_from_slot cryptobox slot with
-          | Error _ ->
-              (* Storage consistency ensures we can always compute the
-                 polynomial from the slot. *)
-              assert false
-          | Ok polynomial -> (
-              match Cryptobox.prove_commitment cryptobox polynomial with
-              (* [polynomial] was produced with the parameters from
-                 [cryptobox], thus we can always compute the proof from
-                 [polynomial]. *)
-              | Error _ -> assert false
-              | Ok proof -> Ok proof)
-        in
+        let commitment_proof = commitment_proof_from_slot cryptobox slot in
         (* Cannot return None *)
         let* (_ : unit option) =
           Slot_manager.add_commitment_shards
