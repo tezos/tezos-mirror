@@ -229,8 +229,26 @@ pub fn produce<Host: KernelRuntime>(
     let precompiles = precompiles::precompile_set::<Host>();
     let mut tick_counter = TickCounter::new(0u64);
 
-    // TODO: Read block in progress from storage in case of reboot
-    // (Solved in a future commit)
+    // Check if there's a BIP in storage to resume its execution
+    match storage::read_block_in_progress(host)? {
+        None => (),
+        Some(block_in_progress) => match compute_bip(
+            host,
+            block_in_progress,
+            &mut current_constants,
+            &mut current_block_number,
+            &mut current_block_parent_hash,
+            &precompiles,
+            &mut evm_account_storage,
+            &mut accounts_index,
+            &mut tick_counter,
+        )? {
+            ComputationResult::Finished => storage::delete_block_in_progress(host)?,
+            ComputationResult::RebootNeeded => {
+                return Ok(ComputationResult::RebootNeeded)
+            }
+        },
+    }
 
     // Execute stored blueprints
     while let Some(block_in_progress) = next_bip_from_blueprints(
