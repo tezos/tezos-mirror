@@ -8,6 +8,7 @@
   octez-libs.base.unix
   lwt.unix
   ezjsonm
+  octez-node-config
   octez-shell-libs.store
   octez-shell-libs.shell-context
   octez-libs.tezos-context

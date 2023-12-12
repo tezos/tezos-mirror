@@ -231,27 +231,20 @@ let protocol_of_hash protocol_hash =
 (** load mainnet store from [base_dir]
 *)
 let genesis ~network =
-  match network with
-  | `Mainnet ->
-      {
-        Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-      }
-  | `Ghostnet ->
-      {
-        Genesis.time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-      }
+  (Option.value_f ~default:(fun () ->
+       Stdlib.failwith
+       @@ Format.asprintf
+            "@[Unkown network alias %s.@,Known networks are @[%a@]@]"
+            network
+            Format.(pp_print_list pp_print_string)
+            (List.map
+               (fun (alias, _) -> alias)
+               Octez_node_config.Config_file.builtin_blockchain_networks))
+  @@ List.assoc
+       ~equal:String.equal
+       network
+       Octez_node_config.Config_file.builtin_blockchain_networks)
+    .genesis
 
 (** [load_mainnet_bakers_public_keys base_dir active_backers_only
     alias_phk_pk_list] checkouts the head context at the given
@@ -263,17 +256,26 @@ let genesis ~network =
     the list.
 *)
 let load_bakers_public_keys ?(staking_share_opt = None)
-    ?(network_opt = `Mainnet) base_dir ~active_bakers_only alias_pkh_pk_list =
+    ?(network_opt = "mainnet") base_dir ~active_bakers_only alias_pkh_pk_list =
   let open Lwt_result_syntax in
   let open Tezos_store in
   let genesis = genesis ~network:network_opt in
   let* store =
-    Tezos_store.Store.init
-      ~store_dir:(Filename.concat base_dir "store")
-      ~context_dir:(Filename.concat base_dir "context")
-      ~allow_testchains:true
-      ~readonly:true
-      genesis
+    Lwt.catch
+      (fun () ->
+        Tezos_store.Store.init
+          ~store_dir:(Filename.concat base_dir "store")
+          ~context_dir:(Filename.concat base_dir "context")
+          ~allow_testchains:true
+          ~readonly:true
+          genesis)
+      (fun exn ->
+        Format.eprintf
+          "An error occured while initialising the store. It usually happens \
+           when using the wrong network alias.\n\
+           Network alias used was \"%s\".@."
+          network_opt ;
+        tzfail (Exn exn))
   in
   let main_chain_store = Store.main_chain_store store in
   let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
