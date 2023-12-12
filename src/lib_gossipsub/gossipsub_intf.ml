@@ -1130,6 +1130,11 @@ module type WORKER = sig
     | Connect of {peer : GS.Peer.t; origin : peer_origin}
         (** Inform the p2p_output messages processor that we want to connect to
             the peer [peer] advertised by some other peer [origin]. *)
+    | Connect_point of {point : Point.t}
+        (** Version of connect where we provide a point directly. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6741
+
+       Unify the two Connect versions. Have the peers cache in the worker. *)
     | Forget of {peer : GS.Peer.t; origin : GS.Peer.t}
         (** Inform the p2p_output messages processor that we don't want to
             connect to the peer [peer] advertised by some other peer [origin]. *)

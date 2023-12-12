@@ -351,6 +351,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin} ->
           try_connect p2p_layer px_cache ~px_peer:peer ~origin
+      | Connect_point {point} ->
+          let* (_ : _ P2p.connection tzresult) = P2p.connect p2p_layer point in
+          return_unit
       | Forget {peer; origin} ->
           PX_cache.drop px_cache ~px_peer:peer ~origin:(PX origin) ;
           return_unit

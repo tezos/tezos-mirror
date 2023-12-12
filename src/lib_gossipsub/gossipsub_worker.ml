@@ -204,6 +204,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Disconnect of {peer : Peer.t}
     | Kick of {peer : Peer.t}
     | Connect of {peer : Peer.t; origin : peer_origin}
+    | Connect_point of {point : Point.t}
     | Forget of {peer : Peer.t; origin : Peer.t}
 
   type app_output = message_with_header
@@ -244,7 +245,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | Message_with_header _ ->
               Introspection.update_count_sent_app_messages stats `Incr
           | Subscribe _ | Unsubscribe _ -> ())
-      | Connect _ | Disconnect _ | Forget _ | Kick _ -> ()
+      | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
       let maybe_emit to_peer =
@@ -260,7 +261,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                      IWant if the remote peer has a bootstrap profile. *)
                   false
               | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
-          | Connect _ | Disconnect _ | Forget _ | Kick _ -> true
+          | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ ->
+              true
         in
         if do_emit then (
           update_sent_stats stats message ;
@@ -854,6 +856,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | PX peer -> Peer.pp fmt peer
             | Trusted -> Format.fprintf fmt "(trusted)")
           origin
+    | Connect_point {point} ->
+        Format.fprintf fmt "Connect_point{point=%a}" Point.pp point
     | Forget {peer; origin} ->
         Format.fprintf
           fmt
