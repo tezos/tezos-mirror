@@ -11,6 +11,7 @@ pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_key;
 pub mod michelson_list;
+pub mod michelson_signature;
 pub mod or;
 pub mod overloads;
 
@@ -24,6 +25,7 @@ use crate::lexer::Prim;
 pub use michelson_address::*;
 pub use michelson_key::Key;
 pub use michelson_list::MichelsonList;
+pub use michelson_signature::Signature;
 pub use or::Or;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -45,6 +47,7 @@ pub enum Type {
     ChainId,
     Bytes,
     Key,
+    Signature,
 }
 
 impl Type {
@@ -54,7 +57,7 @@ impl Type {
         use Type::*;
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Operation | Address | ChainId | Bytes
-            | Key => 1,
+            | Key | Signature => 1,
             Pair(p) | Or(p) | Map(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Contract(x) => 1 + x.size_for_gas(),
         }
@@ -103,6 +106,7 @@ pub enum TypedValue {
     Contract(Address),
     Bytes(Vec<u8>),
     Key(Key),
+    Signature(Signature),
 }
 
 pub fn typed_value_to_value_optimized<'a>(
@@ -142,6 +146,7 @@ pub fn typed_value_to_value_optimized<'a>(
         TV::Contract(x) => go(TV::Address(x)),
         TV::Bytes(x) => V::Bytes(x),
         TV::Key(k) => V::Bytes(k.to_bytes_vec()),
+        TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
     }
 }
 

@@ -92,7 +92,8 @@ macro_rules! micheline_types {
                 | Prim::contract
                 | Prim::map
                 | Prim::bytes
-                | Prim::key,
+                | Prim::key
+                | Prim::signature,
             ..,
         )
     };

@@ -115,6 +115,7 @@ defprim! {
     SELF,
     bytes,
     key,
+    signature,
 }
 
 defprim! {
