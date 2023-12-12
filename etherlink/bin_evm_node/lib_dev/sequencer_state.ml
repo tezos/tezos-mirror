@@ -29,7 +29,7 @@ let execute ?(commit = false) ctxt inbox =
   in
   return (ctxt, evm_state)
 
-let init ~smart_rollup_address ctxt =
+let init ~smart_rollup_address ~rollup_node_endpoint ctxt =
   let open Lwt_result_syntax in
   let* evm_state =
     Wasm.start
@@ -47,6 +47,7 @@ let init ~smart_rollup_address ctxt =
       ~transactions:[]
       ~number:Ethereum_types.(Qty Z.zero)
   in
+  let* () = Rollup_node_services.publish ~rollup_node_endpoint inputs in
   let inputs =
     List.map (function `External payload -> `Input ("\001" ^ payload)) inputs
   in

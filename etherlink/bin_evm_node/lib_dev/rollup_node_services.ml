@@ -105,3 +105,15 @@ let smart_rollup_address base =
         base
         pp_print_trace
         tztrace
+
+let publish :
+    rollup_node_endpoint:Uri.t ->
+    [< `External of string] list ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint inputs ->
+  let open Lwt_result_syntax in
+  let inputs = List.map (function `External s -> s) inputs in
+  let* _answer =
+    call_service ~base:rollup_node_endpoint batcher_injection () () inputs
+  in
+  return_unit
