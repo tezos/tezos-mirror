@@ -355,6 +355,9 @@ fn parse_ty_with_entrypoints(
         App(key, [], _) => Type::Key,
         App(key, ..) => unexpected()?,
 
+        App(key_hash, [], _) => Type::KeyHash,
+        App(key_hash, ..) => unexpected()?,
+
         App(signature, [], _) => Type::Signature,
         App(signature, ..) => unexpected()?,
 
@@ -1063,10 +1066,7 @@ pub(crate) fn typecheck_value(
         (T::Contract(ty), addr) => {
             let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
             match t_addr.hash {
-                AddressHash::Tz1(_)
-                | AddressHash::Tz2(_)
-                | AddressHash::Tz3(_)
-                | AddressHash::Tz4(_) => {
+                AddressHash::Implicit(_) => {
                     if !t_addr.is_default_ep() {
                         return Err(TcError::NoSuchEntrypoint(t_addr.entrypoint));
                     }
@@ -1117,6 +1117,17 @@ pub(crate) fn typecheck_value(
             TV::Signature(
                 Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
+        }
+        (T::KeyHash, V::String(str)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            TV::KeyHash(
+                KeyHash::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e))?,
+            )
+        }
+        (T::KeyHash, V::Bytes(bs)) => {
+            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
         }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
     })
@@ -3005,7 +3016,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
-            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0x00ff"
+            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
         );
         assert_matches!(
             typecheck_instruction(
@@ -3324,6 +3335,26 @@ mod typecheck_tests {
                 "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
                     .try_into()
                     .unwrap()
+            )))
+        );
+    }
+
+    #[test]
+    fn push_key_hash() {
+        assert_eq!(
+            parse("PUSH key_hash \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::KeyHash(
+                "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap()
+            )))
+        );
+        assert_eq!(
+            parse("PUSH key_hash 0x036342f30484dd46b6074373aa6ddca9dfb70083d6")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::KeyHash(
+                "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN".try_into().unwrap()
             )))
         );
     }

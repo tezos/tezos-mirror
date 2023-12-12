@@ -129,7 +129,7 @@ mod tests {
             dbg!(Address::from_bytes(
                 &hex::decode("00ff7b09f782e0bcd67739510afa819d85976119d5ef").unwrap()
             )),
-            Err(ByteReprError::UnknownPrefix("0x00ff".to_owned())),
+            Err(ByteReprError::UnknownPrefix("0xff".to_owned())),
         );
 
         // unknown tag

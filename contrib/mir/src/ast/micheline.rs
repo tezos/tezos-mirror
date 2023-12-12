@@ -93,6 +93,7 @@ macro_rules! micheline_types {
                 | Prim::map
                 | Prim::bytes
                 | Prim::key
+                | Prim::key_hash
                 | Prim::signature,
             ..,
         )
