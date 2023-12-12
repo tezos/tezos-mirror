@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use crate::block_in_progress::BlockInProgress;
+use crate::inbox::KernelUpgrade;
 use crate::indexable_storage::IndexableStorage;
-use crate::reboot_context::RebootContext;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -99,8 +100,6 @@ const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
-// Path to the reboot context at end of previous reboot
-const REBOOT_CONTEXT: RefPath = RefPath::assert_from(b"/reboot_context");
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
 // Path to the flag denoting whether the kernel is in sequencer mode or not.
@@ -826,39 +825,6 @@ pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::
 
 pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
     Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
-}
-
-pub fn store_reboot_context<Host: Runtime>(
-    host: &mut Host,
-    reboot_context: &RebootContext,
-) -> Result<(), anyhow::Error> {
-    let path = OwnedPath::from(REBOOT_CONTEXT);
-    let bytes = &reboot_context.rlp_bytes();
-    log!(
-        host,
-        Debug,
-        "Storing Reboot Context of size {}",
-        bytes.len()
-    );
-    host.store_write_all(&path, bytes)
-        .context("Failed to store current reboot context")
-}
-
-pub fn read_reboot_context<Host: Runtime>(
-    host: &Host,
-) -> Result<RebootContext, anyhow::Error> {
-    let reboot_context_path = OwnedPath::from(REBOOT_CONTEXT);
-    let bytes = host
-        .store_read_all(&reboot_context_path)
-        .context("Failed to read current reboot context")?;
-    log!(
-        host,
-        Debug,
-        "Reading Reboot Context of size {}",
-        bytes.len()
-    );
-    let decoder = Rlp::new(bytes.as_slice());
-    RebootContext::decode(&decoder).context("Failed to decode current reboot context")
 }
 
 pub fn store_block_in_progress<Host: Runtime>(
