@@ -755,6 +755,64 @@ mod tests {
         );
     }
 
+    #[test]
+    fn dig() {
+        run_e2e_test(
+            "DIG 3",
+            stk![Type::Unit, Type::Nat, Type::Int, Type::String],
+            stk![Type::Nat, Type::Int, Type::String, Type::Unit],
+            stk![
+                TypedValue::new_pair(TypedValue::Unit, TypedValue::Unit),
+                TypedValue::Unit,
+                TypedValue::nat(10),
+                TypedValue::int(20),
+            ],
+            stk![
+                TypedValue::Unit,
+                TypedValue::nat(10),
+                TypedValue::int(20),
+                TypedValue::new_pair(TypedValue::Unit, TypedValue::Unit),
+            ],
+            Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn dug() {
+        run_e2e_test(
+            "DUG 2",
+            stk![
+                Type::Unit,
+                Type::Nat,
+                Type::Int,
+                Type::Bool,
+                Type::Bool,
+                Type::String
+            ],
+            stk![
+                Type::Unit,
+                Type::Nat,
+                Type::Int,
+                Type::String,
+                Type::Bool,
+                Type::Bool
+            ],
+            stk![
+                TypedValue::new_pair(TypedValue::Unit, TypedValue::Unit),
+                TypedValue::Unit,
+                TypedValue::nat(10),
+                TypedValue::int(20),
+            ],
+            stk![
+                TypedValue::new_pair(TypedValue::Unit, TypedValue::Unit),
+                TypedValue::int(20),
+                TypedValue::Unit,
+                TypedValue::nat(10),
+            ],
+            Ctx::default(),
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
