@@ -390,6 +390,15 @@ let with_cache mutex request mem add (module Db : Caqti_lwt.CONNECTION) conf
            else Db.exec request x))
       list
 
+let without_cache mutex request =
+  (* We don't use the cache feature here,
+     but we want to reuse the mutex and transactions handling from above.
+     Typically used by functions when you need to process multiple requests
+     before marking the key as done in an external cache,
+     or when it is relevant to use a cache the whole list as single item.
+     (e.g. use the level as cache key instead of one key for each list element) *)
+  with_cache mutex request (fun _ -> false) (fun _ -> ())
+
 let may_insert_delegates =
   let module Cache =
     Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
@@ -414,10 +423,6 @@ let may_insert_operations =
     Sql_requests.maybe_insert_operation
     (fun x -> Cache.mem cache @@ hash x)
     (fun x -> Cache.add cache @@ hash x)
-
-let with_external_cache mutex request =
-  (* We don't use the cache feature here, only the SQL transaction option. *)
-  with_cache mutex request (fun _ -> false) (fun _ -> ())
 
 let format_block_op level delegate (op : Teztale_lib.Consensus_ops.operation) =
   ((level, op.hash, op.kind = Endorsement, op.round), delegate)
@@ -464,7 +469,7 @@ let endorsing_rights_callback =
                        (level, first_slot, power, address))
                      rights
                  in
-                 with_external_cache
+                 without_cache
                    Sql_requests.Mutex.endorsing_rights
                    Sql_requests.maybe_insert_endorsing_right
                    (module Db)
@@ -506,7 +511,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
           (block_hash, level) ))
       operations
   in
-  with_external_cache
+  without_cache
     Sql_requests.Mutex.operations_inclusion
     Sql_requests.insert_included_operation
     (module Db)
@@ -552,7 +557,7 @@ let block_callback =
                else
                  let* () = may_insert_delegates (module Db) conf [delegate] in
                  let* () =
-                   with_external_cache
+                   without_cache
                      Sql_requests.Mutex.blocks
                      Sql_requests.maybe_insert_block
                      (module Db)
@@ -565,7 +570,7 @@ let block_callback =
                    match cycle_info with
                    | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
                      ->
-                       with_external_cache
+                       without_cache
                          Sql_requests.Mutex.cycles
                          Sql_requests.maybe_insert_cycle
                          (module Db)
