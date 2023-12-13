@@ -5,11 +5,9 @@
 /*                                                                            */
 /******************************************************************************/
 
-#![warn(clippy::redundant_clone)]
-
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
-use num_bigint::{BigInt, BigUint};
+use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{Signed, Zero};
 use std::rc::Rc;
 use typed_arena::Arena;
@@ -290,6 +288,16 @@ fn interpret_one<'a>(
             }
         },
         I::Neg(overload) => match overload {
+            overloads::Neg::Nat => {
+                let v = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                stack.push(V::Int(BigInt::from_biguint(Sign::Minus, v)));
+            }
+            overloads::Neg::Int => {
+                let v = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                stack.push(V::Int(-v));
+            }
             overloads::Neg::Bls12381G1 => {
                 ctx.gas.consume(interpret_cost::NEG_G1)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
@@ -4135,5 +4143,22 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
             V::Bls12381Fr(-Fr::one()),
         );
+
+        mod positive {
+            use super::*;
+            test!(Int, V::int(100500), V::int(-100500));
+            test!(Nat, V::nat(100500), V::int(-100500));
+        }
+
+        mod negative {
+            use super::*;
+            test!(Int, V::int(-100500), V::int(100500));
+        }
+
+        mod zero {
+            use super::*;
+            test!(Int, V::int(0), V::int(0));
+            test!(Nat, V::nat(0), V::int(0));
+        }
     }
 }

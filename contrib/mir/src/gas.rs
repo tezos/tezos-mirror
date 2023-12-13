@@ -729,6 +729,12 @@ pub mod interpret_cost {
         let size = Checked::from(int.byte_size());
         (265 + ((size >> 4) + size)).as_gas_cost()
     }
+
+    pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        // NB: taken from the protocol, this doesn't fit with MIR implementation.
+        let size = Checked::from(int.byte_size());
+        (25 + (size >> 1)).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

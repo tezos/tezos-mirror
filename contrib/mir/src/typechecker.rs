@@ -709,7 +709,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MUL, [], _), [_] | []) => no_overload!(MUL, len 2),
         (App(MUL, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NEG, [], _), [.., T::Nat]) => {
+            stack[0] = T::Int;
+            I::Neg(overloads::Neg::Nat)
+        }
         // NB: stack type doesn't change in these NEG overloads
+        (App(NEG, [], _), [.., T::Int]) => I::Neg(overloads::Neg::Int),
         (App(NEG, [], _), [.., T::Bls12381G1]) => I::Neg(overloads::Neg::Bls12381G1),
         (App(NEG, [], _), [.., T::Bls12381G2]) => I::Neg(overloads::Neg::Bls12381G2),
         (App(NEG, [], _), [.., T::Bls12381Fr]) => I::Neg(overloads::Neg::Bls12381Fr),
@@ -5198,21 +5203,24 @@ mod typecheck_tests {
             assert_eq!(stack, expected_stack)
         }
         macro_rules! test {
-            ($overload:ident) => {
+            ($overload:ident, $expected:ident) => {
                 #[test]
                 #[allow(non_snake_case)]
                 fn $overload() {
                     test_neg(
                         tc_stk![T::$overload],
-                        tc_stk![T::$overload],
+                        tc_stk![T::$expected],
                         overloads::Neg::$overload,
                     );
                 }
             };
         }
-        test!(Bls12381G1);
-        test!(Bls12381G2);
-        test!(Bls12381Fr);
+        test!(Bls12381G1, Bls12381G1);
+        test!(Bls12381G2, Bls12381G2);
+        test!(Bls12381Fr, Bls12381Fr);
+
+        test!(Nat, Int);
+        test!(Int, Int);
 
         #[test]
         fn wrong_type() {
