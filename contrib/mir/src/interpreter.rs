@@ -569,6 +569,26 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
             stack.push(V::Nat(BigUint::from_bytes_be(&i)))
         }
+        I::Bytes(overload) => match overload {
+            overloads::Bytes::Nat => {
+                let i = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::bytes_nat(&i)?)?;
+                stack.push(V::Bytes(if i.is_zero() {
+                    Vec::new() // empty
+                } else {
+                    i.to_bytes_be()
+                }));
+            }
+            overloads::Bytes::Int => {
+                let i = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::bytes_int(&i)?)?;
+                stack.push(V::Bytes(if i.is_zero() {
+                    Vec::new() // empty
+                } else {
+                    i.to_signed_bytes_be()
+                }));
+            }
+        },
         I::Loop(nested) => {
             ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
             loop {
@@ -1747,6 +1767,52 @@ mod interpreter_tests {
         test("ff", 255u32);
         test("ff00", 65280u32);
         test("00ff00", 65280u32);
+    }
+
+    mod bytes {
+        use super::*;
+
+        #[test]
+        fn nat() {
+            #[track_caller]
+            fn test(result: &str, input: impl Into<BigUint>) {
+                let mut stack = stk![V::Nat(input.into())];
+                let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
+                let mut ctx = Ctx::default();
+                assert!(interpret_one(&Bytes(overloads::Bytes::Nat), &mut ctx, &mut stack).is_ok());
+                assert_eq!(stack, expected_stack);
+            }
+            // checked against octez-client
+            test("", 0u32);
+            test("01", 1u32);
+            test("0100", 256u32);
+            test("1000", 4096u32);
+            test("f000", 61440u32);
+            test("ff", 255u32);
+            test("ff00", 65280u32);
+        }
+
+        #[test]
+        fn int() {
+            #[track_caller]
+            fn test(result: &str, input: impl Into<BigInt>) {
+                let mut stack = stk![V::Int(input.into())];
+                let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
+                let mut ctx = Ctx::default();
+                assert!(interpret_one(&Bytes(overloads::Bytes::Int), &mut ctx, &mut stack).is_ok());
+                assert_eq!(stack, expected_stack);
+            }
+            // checked against octez-client
+            test("", 0);
+            test("01", 1);
+            test("0100", 256);
+            test("1000", 4096);
+            test("f000", -4096);
+            test("00f000", 61440);
+            test("ff", -1);
+            test("ff00", -256);
+            test("00ff00", 65280);
+        }
     }
 
     #[test]

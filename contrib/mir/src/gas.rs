@@ -226,7 +226,7 @@ impl BigIntByteSize for BigUint {
 
 pub mod interpret_cost {
     use checked::Checked;
-    use num_bigint::BigUint;
+    use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
@@ -758,6 +758,16 @@ pub mod interpret_cost {
     pub fn nat_bytes(size: usize) -> Result<u32, OutOfGas> {
         let size = Checked::from(size);
         (45 + ((size >> 1) + (size * 2))).as_gas_cost()
+    }
+
+    pub fn bytes_int(int: &BigInt) -> Result<u32, OutOfGas> {
+        let size = Checked::from(int.byte_size());
+        (90 + (size * 3)).as_gas_cost()
+    }
+
+    pub fn bytes_nat(int: &BigUint) -> Result<u32, OutOfGas> {
+        let size = Checked::from(int.byte_size());
+        (75 + (size * 3)).as_gas_cost()
     }
 }
 

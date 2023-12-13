@@ -126,3 +126,9 @@ pub enum Int {
     Bls12381Fr,
     Bytes,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Bytes {
+    Int,
+    Nat,
+}

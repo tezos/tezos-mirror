@@ -985,6 +985,18 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NAT, [], _), []) => no_overload!(NAT, len 1),
         (App(NAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(BYTES, [], _), [.., T::Int]) => {
+            stack[0] = Type::Bytes;
+            I::Bytes(overloads::Bytes::Int)
+        }
+        (App(BYTES, [], _), [.., T::Nat]) => {
+            stack[0] = Type::Bytes;
+            I::Bytes(overloads::Bytes::Nat)
+        }
+        (App(BYTES, [], _), [.., _]) => no_overload!(BYTES),
+        (App(BYTES, [], _), []) => no_overload!(BYTES, len 1),
+        (App(BYTES, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(ABS, [], _), [.., T::Int]) => {
             stack[0] = Type::Nat;
             I::Abs
@@ -2274,6 +2286,54 @@ mod typecheck_tests {
                 typecheck_instruction(&app!(NAT), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::NAT,
+                    stack: stk![Type::String],
+                    reason: None,
+                })
+            );
+        }
+    }
+
+    mod bytes {
+        use super::*;
+
+        fn test(input: Type, overload: overloads::Bytes) {
+            let mut stack = tc_stk![input];
+            let expected_stack = tc_stk![Type::Bytes];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(BYTES), &mut ctx, &mut stack),
+                Ok(Instruction::Bytes(overload)),
+            );
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        macro_rules! test {
+            ($overload:ident) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test(Type::$overload, overloads::Bytes::$overload);
+                }
+            };
+        }
+
+        test!(Nat);
+        test!(Int);
+
+        #[test]
+        fn test_int_short() {
+            too_short_test(&app!(BYTES), Prim::BYTES, 1);
+        }
+
+        #[test]
+        fn test_int_mismatch() {
+            let mut stack = tc_stk![Type::String];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(BYTES), &mut ctx, &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::BYTES,
                     stack: stk![Type::String],
                     reason: None,
                 })

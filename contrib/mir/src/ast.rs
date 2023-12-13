@@ -423,6 +423,7 @@ pub enum Instruction<'a> {
     IfNone(Vec<Self>, Vec<Self>),
     Int(overloads::Int),
     Nat,
+    Bytes(overloads::Bytes),
     Abs,
     IsNat,
     Loop(Vec<Self>),
