@@ -969,6 +969,10 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = Type::Int;
             I::Int(overloads::Int::Bls12381Fr)
         }
+        (App(INT, [], _), [.., T::Bytes]) => {
+            stack[0] = Type::Int;
+            I::Int(overloads::Int::Bytes)
+        }
         (App(INT, [], _), [.., _]) => no_overload!(INT),
         (App(INT, [], _), []) => no_overload!(INT, len 1),
         (App(INT, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -2184,30 +2188,53 @@ mod typecheck_tests {
         too_short_test(&app!(ISNAT), Prim::ISNAT, 1);
     }
 
-    #[test]
-    fn test_int_nat() {
-        let mut stack = tc_stk![Type::Nat];
-        let expected_stack = tc_stk![Type::Int];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
-            Ok(Int(overloads::Int::Nat))
-        );
-        assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
-    }
+    mod int {
+        use super::*;
 
-    #[test]
-    fn test_int_bls12_381_fr() {
-        let mut stack = tc_stk![Type::Bls12381Fr];
-        let expected_stack = tc_stk![Type::Int];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
-            Ok(Int(overloads::Int::Bls12381Fr))
-        );
-        assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        fn test(input: Type, overload: overloads::Int) {
+            let mut stack = tc_stk![input];
+            let expected_stack = tc_stk![Type::Int];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
+                Ok(Instruction::Int(overload)),
+            );
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        macro_rules! test {
+            ($overload:ident) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test(Type::$overload, overloads::Int::$overload);
+                }
+            };
+        }
+
+        test!(Nat);
+        test!(Bls12381Fr);
+        test!(Bytes);
+
+        #[test]
+        fn test_int_short() {
+            too_short_test(&app!(INT), Prim::INT, 1);
+        }
+
+        #[test]
+        fn test_int_mismatch() {
+            let mut stack = tc_stk![Type::String];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::INT,
+                    stack: stk![Type::String],
+                    reason: None,
+                })
+            );
+        }
     }
 
     #[test]
@@ -4117,25 +4144,6 @@ mod typecheck_tests {
     #[test]
     fn test_if_none_short() {
         too_short_test(&app!(IF_NONE[seq![], seq![]]), Prim::IF_NONE, 1);
-    }
-
-    #[test]
-    fn test_int_short() {
-        too_short_test(&app!(INT), Prim::INT, 1);
-    }
-
-    #[test]
-    fn test_int_mismatch() {
-        let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
-            Err(TcError::NoMatchingOverload {
-                instr: Prim::INT,
-                stack: stk![Type::String],
-                reason: None,
-            })
-        );
     }
 
     #[test]

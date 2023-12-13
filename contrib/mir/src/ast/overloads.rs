@@ -124,4 +124,5 @@ pub enum Concat {
 pub enum Int {
     Nat,
     Bls12381Fr,
+    Bytes,
 }

@@ -558,6 +558,11 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::INT_BLS_FR)?;
                 stack.push(V::Int(i.to_big_int()))
             }
+            overloads::Int::Bytes => {
+                let i = pop!(V::Bytes);
+                ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+                stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
+            }
         },
         I::Loop(nested) => {
             ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
@@ -1688,6 +1693,31 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Int(overloads::Int::Bls12381Fr), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_int_bytes() {
+        fn test(input: &str, result: impl Into<BigInt>) {
+            let mut stack = stk![V::Bytes(hex::decode(input).unwrap())];
+            let expected_stack = stk![V::Int(result.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Int(overloads::Int::Bytes), &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+        }
+        // checked against octez-client
+        test("", 0);
+        test("00", 0);
+        test("0000", 0);
+        test("01", 1);
+        test("0001", 1);
+        test("000001", 1);
+        test("0100", 256);
+        test("1000", 4096);
+        test("f000", -4096);
+        test("00f000", 61440);
+        test("ff", -1);
+        test("ff00", -256);
+        test("00ff00", 65280);
     }
 
     #[test]
