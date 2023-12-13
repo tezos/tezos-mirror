@@ -200,18 +200,24 @@ check_licenses_git_new () {
         return 1
     fi
 
+    diff=$(mktemp)
+    git diff-tree --no-commit-id --name-only -r --diff-filter=A \
+        "${CHECK_LICENSES_DIFF_BASE:-}" HEAD > "$diff"
+
     # Check that new ml(i) files have a valid license header.
-    if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
-         "${CHECK_LICENSES_DIFF_BASE:-}" HEAD |
-            grep '\.ml\(i\|\)$' |
-            xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
+    if ! grep '\.ml\(i\|\)$' "$diff" | xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
 
         echo "/!\\ Some files .ml(i) does not have a correct license header /!\\" ;
         echo "/!\\ See https://tezos.gitlab.io/developer/guidelines.html#license /!\\" ;
-        exit 1 ;
+
+        res=1
     else
         echo "OCaml file license headers OK!"
+        res=0
     fi
+
+    rm -f "$diff"
+    return $res
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
