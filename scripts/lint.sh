@@ -14,6 +14,7 @@ Where <action> can be:
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
+* --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --help: display this and return 0.
 EOF
 }
