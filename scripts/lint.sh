@@ -36,6 +36,11 @@ say () {
 declare -a source_directories
 
 source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
+# Set of newline-separated basic regular expressions to exclude from --check-licenses-git-new.
+license_check_exclude=$(
+    cat <<'EOF'
+EOF
+)
 
 update_all_dot_ocamlformats () {
     if ! type ocamlformat > /dev/null 2>&-; then
@@ -209,7 +214,12 @@ check_licenses_git_new () {
 
     diff=$(mktemp)
     git diff-tree --no-commit-id --name-only -r --diff-filter=A \
-        "${CHECK_LICENSES_DIFF_BASE:-}" HEAD > "$diff"
+        "${CHECK_LICENSES_DIFF_BASE:-}" HEAD -- "${source_directories[@]}" > "$diff"
+    if [ -n "$license_check_exclude" ]; then
+       diff2=$(mktemp)
+       grep -v "$license_check_exclude" "$diff" > "$diff2"
+       mv "$diff2" "$diff"
+    fi
 
     # Check that new ml(i) files have a valid license header.
     if ! grep '\.ml\(i\|\)$' "$diff" | xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
