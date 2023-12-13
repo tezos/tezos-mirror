@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Runnable.Syntax
-
 type t = {
   name : string;
   path : string;
@@ -73,85 +71,6 @@ let spawn_command ?hooks ?log_output sc_client command =
       (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
   in
   Runnable.{value = process; run = Process.check_and_read_stdout}
-
-type transaction = {
-  destination : string;
-  entrypoint : string option;
-  parameters : string;
-  parameters_ty : string option;
-}
-
-let json_of_batch ts =
-  let json_of_transaction {destination; entrypoint; parameters; parameters_ty} =
-    `O
-      (List.filter_map
-         Fun.id
-         [
-           Some ("destination", `String destination);
-           Some ("parameters", `String parameters);
-           Option.map (fun v -> ("entrypoint", `String v)) entrypoint;
-           Option.map (fun v -> ("parameters_ty", `String v)) parameters_ty;
-         ])
-  in
-  `A (List.map json_of_transaction ts)
-
-let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level
-    transactions =
-  let*? process =
-    spawn_command
-      ?hooks
-      sc_client
-      (List.concat
-         [
-           [
-             "get";
-             "proof";
-             "for";
-             "message";
-             string_of_int message_index;
-             "of";
-             "outbox";
-             "at";
-             "level";
-             string_of_int outbox_level;
-           ];
-           (match transactions with
-           | Some batch -> ["transferring"; JSON.encode_u (json_of_batch batch)]
-           | None -> []);
-         ])
-  in
-  match expected_error with
-  | None ->
-      let* answer = Process.check_and_read_stdout process in
-      let open JSON in
-      let open Sc_rollup_rpc in
-      let json = parse ~origin:"outbox_proof" answer in
-      let commitment_hash = json |-> "commitment_hash" |> as_string in
-      let proof = json |-> "proof" |> as_string in
-      return (Some {commitment_hash; proof})
-  | Some msg ->
-      let* () = Process.check_error ~msg process in
-      return None
-
-let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
-    ~outbox_level batch =
-  outbox_proof
-    ?hooks
-    ?expected_error
-    sc_client
-    (Some batch)
-    ~message_index
-    ~outbox_level
-
-let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
-    sc_client ~message_index ~outbox_level ~destination ~parameters =
-  outbox_proof_batch
-    ?hooks
-    ?expected_error
-    sc_client
-    ~message_index
-    ~outbox_level
-    [{destination; entrypoint; parameters; parameters_ty}]
 
 let rpc_get ?hooks sc_client path =
   spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]

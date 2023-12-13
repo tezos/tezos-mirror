@@ -368,8 +368,9 @@ val injecting_refute_event : 'a -> Sc_rollup_node.t -> unit Lwt.t
 type transaction = {
   destination : string;
   entrypoint : string option;
-  parameters : string;
-  parameters_ty : string option;
+  parameters : JSON.u;
+  parameters_ty : JSON.u option;
 }
 
+(** Converts a list of transactions into a JSON object. *)
 val json_of_output_tx_batch : transaction list -> JSON.u
