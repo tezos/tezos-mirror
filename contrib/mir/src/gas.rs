@@ -225,6 +225,11 @@ pub mod tc_cost {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
+
+    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(size) * 50).as_gas_cost()
+    }
 }
 
 pub trait BigIntByteSize {
@@ -845,6 +850,11 @@ pub mod interpret_cost {
     pub fn get_n(size: usize) -> Result<u32, OutOfGas> {
         let size = Checked::from(size);
         (20 + ((size >> 1) + (size >> 4))).as_gas_cost()
+    }
+
+    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        (30 + ((size >> 5) + ((size >> 2) + size))).as_gas_cost()
     }
 }
 

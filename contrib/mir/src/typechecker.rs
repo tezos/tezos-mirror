@@ -1439,6 +1439,23 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
+
+        (App(UPDATE, [Micheline::Int(n)], _), [.., _, _]) => {
+            let n = validate_u10(n)?;
+            let new_val = pop!();
+            let old_val = match get_nth_field_ref(n, &mut stack[0]) {
+                Ok(res) => res,
+                Err(ty) => {
+                    // restores the initial stack
+                    stack.push(new_val);
+                    no_overload!(UPDATE, NMOR::ExpectedPair(ty));
+                }
+            };
+            *old_val = new_val;
+            I::UpdateN(n)
+        }
+        (App(UPDATE, [Micheline::Int(_)], _), [] | [_]) => no_overload!(UPDATE, len 2),
+
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
@@ -4541,6 +4558,101 @@ mod typecheck_tests {
             let mut stack = tc_stk![ty];
             assert_eq!(
                 typecheck_instruction(&parse("GET 1024").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::ExpectedU10(1024.into()))
+            );
+        }
+    }
+
+    mod update_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, ty: Type, new_ty: Type) {
+            let mut stack = tc_stk![ty, Type::Unit];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("UPDATE {n}")).unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Ok(UpdateN(n))
+            );
+            assert_eq!(stack, tc_stk![new_ty])
+        }
+
+        #[test]
+        fn ok_0() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(0, ty, Type::Unit);
+        }
+
+        #[test]
+        fn ok_1() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                1,
+                ty,
+                Type::new_pair(Type::Unit, Type::new_pair(Type::String, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_2() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(2, ty, Type::new_pair(Type::Nat, Type::Unit));
+        }
+
+        #[test]
+        fn ok_3() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                3,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::Unit, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_4() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                4,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Unit)),
+            );
+        }
+
+        #[test]
+        fn fail_5() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+
+            let mut stack = tc_stk![ty.clone(), Type::Unit];
+            assert_eq!(
+                typecheck_instruction(&parse("UPDATE 5").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::UPDATE,
+                    stack: stk![ty, Type::Unit],
+                    reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Int))
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(UPDATE[0]), Prim::UPDATE, 2);
+        }
+
+        #[test]
+        fn too_large() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+
+            let mut stack = tc_stk![ty, Type::Unit];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse("UPDATE 1024").unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
                 Err(TcError::ExpectedU10(1024.into()))
             );
         }

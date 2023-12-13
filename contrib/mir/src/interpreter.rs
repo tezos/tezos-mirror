@@ -964,6 +964,12 @@ fn interpret_one<'a>(
                 overloads::Size::Map => run_size!(Map, SIZE_MAP),
             }
         }
+        I::UpdateN(n) => {
+            ctx.gas.consume(interpret_cost::update_n(*n as usize)?)?;
+            let new_val = pop!();
+            let field = get_nth_field_ref(*n, &mut stack[0]);
+            *field = new_val;
+        }
         I::ChainId => {
             ctx.gas.consume(interpret_cost::CHAIN_ID)?;
             stack.push(V::ChainId(ctx.chain_id.clone()));
@@ -2839,6 +2845,62 @@ mod interpreter_tests {
         fn ok_4() {
             let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
             check(4, val, V::int(4));
+        }
+    }
+
+    mod update_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, val: TypedValue, new_val: TypedValue) {
+            let mut stack = stk![val, TypedValue::nat(100500)];
+            assert_eq!(
+                interpret_one(&UpdateN(n), &mut Ctx::default(), &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![new_val])
+        }
+
+        #[test]
+        fn ok_0() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(0, val, V::nat(100500));
+        }
+
+        #[test]
+        fn ok_1() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                1,
+                val,
+                V::new_pair(V::nat(100500), V::new_pair(V::int(3), V::int(4))),
+            );
+        }
+
+        #[test]
+        fn ok_2() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(2, val, V::new_pair(V::int(1), V::nat(100500)));
+        }
+
+        #[test]
+        fn ok_3() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                3,
+                val,
+                V::new_pair(V::int(1), V::new_pair(V::nat(100500), V::int(4))),
+            );
+        }
+
+        #[test]
+        fn ok_4() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                4,
+                val,
+                V::new_pair(V::int(1), V::new_pair(V::int(3), V::nat(100500))),
+            );
         }
     }
 

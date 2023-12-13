@@ -558,6 +558,7 @@ pub enum Instruction<'a> {
     GetAndUpdate(overloads::GetAndUpdate),
     Concat(overloads::Concat),
     Size(overloads::Size),
+    UpdateN(u16),
     Seq(Vec<Self>),
     Unpair,
     UnpairN(u16),
