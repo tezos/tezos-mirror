@@ -201,7 +201,7 @@ pub mod interpret_cost {
     use num_bigint::BigUint;
 
     use super::{AsGasCost, BigIntByteSize, OutOfGas};
-    use crate::ast::{Key, KeyHash, Micheline, Or, TypedValue};
+    use crate::ast::{Key, KeyHash, Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -257,6 +257,11 @@ pub mod interpret_cost {
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
+
+    pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
+        compare(&t1.content, &t2.content)?;
+        add_num(&t1.amount, &t2.amount)
+    }
 
     pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, OutOfGas> {
         use std::mem::size_of_val;

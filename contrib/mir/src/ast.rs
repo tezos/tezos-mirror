@@ -431,6 +431,7 @@ pub enum Instruction<'a> {
     },
     ReadTicket,
     SplitTicket,
+    JoinTickets,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

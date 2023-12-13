@@ -828,6 +828,21 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(None));
             }
         }
+        I::JoinTickets => {
+            let tickets = pop!(V::Pair);
+            let mut ticket_left = irrefutable_match!(tickets.0; V::Ticket);
+            let ticket_right = irrefutable_match!(tickets.1; V::Ticket);
+            ctx.gas
+                .consume(interpret_cost::join_tickets(&ticket_left, &ticket_right)?)?;
+            if ticket_left.content == ticket_right.content
+                && ticket_left.ticketer == ticket_right.ticketer
+            {
+                ticket_left.amount += ticket_right.amount;
+                stack.push(V::new_option(Some(TypedValue::Ticket(ticket_left))));
+            } else {
+                stack.push(V::new_option(None));
+            }
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -2615,8 +2630,10 @@ mod interpreter_tests {
 
     #[test]
     fn read_ticket() {
+        use crate::ast::Ticket;
+
         let mut ctx = Ctx::default();
-        let ticket = crate::ast::Ticket {
+        let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
             content: V::Unit,
@@ -2874,8 +2891,11 @@ mod interpreter_tests {
 
     #[test]
     fn split_ticket() {
+        use crate::ast::Ticket;
+
+        // Test successful execution
         let mut ctx = Ctx::default();
-        let ticket = crate::ast::Ticket {
+        let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
             content: V::Unit,
@@ -2886,12 +2906,12 @@ mod interpreter_tests {
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&[SplitTicket], &mut ctx, &mut stack), Ok(()));
 
-        let ticket_exp_left = crate::ast::Ticket {
+        let ticket_exp_left = Ticket {
             amount: 20u32.into(),
             ..ticket.clone()
         };
 
-        let ticket_exp_right = crate::ast::Ticket {
+        let ticket_exp_right = Ticket {
             amount: 80u32.into(),
             ..ticket
         };
@@ -2912,17 +2932,88 @@ mod interpreter_tests {
         // When one of the amounts is zero
         let mut stack = stk![V::new_pair(V::nat(0), V::nat(100)), ticket_val.clone(),];
         assert_eq!(interpret_one(&SplitTicket, &mut ctx, &mut stack), Ok(()));
-
         assert_eq!(stack, stk![V::new_option(None),]);
 
         // When one of the amounts is zero
         let mut stack = stk![V::new_pair(V::nat(100), V::nat(0)), ticket_val.clone(),];
         assert_eq!(interpret_one(&SplitTicket, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None),]);
 
         // When sum of the amounts is larger than original ticekt
         let mut stack = stk![V::new_pair(V::nat(70), V::nat(80)), ticket_val];
         assert_eq!(interpret_one(&SplitTicket, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None),]);
+    }
 
+    #[test]
+    fn join_tickets() {
+        use crate::ast::Ticket;
+
+        // Test successful execution
+        let mut ctx = Ctx::default();
+        let ticket = Ticket {
+            ticketer: ctx.self_address.clone(),
+            amount: 100u32.into(),
+            content: V::nat(10),
+        };
+        let ticket_left = V::new_ticket(ticket.clone());
+        let ticket_right_ = Ticket {
+            amount: 20u32.into(),
+            ..ticket.clone()
+        };
+        let ticket_right = V::new_ticket(ticket_right_.clone());
+        let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[JoinTickets], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::join_tickets(&ticket, &ticket_right_).unwrap()
+                + interpret_cost::INTERPRET_RET
+        );
+
+        let ticket_result = Ticket {
+            amount: 120u32.into(),
+            ..ticket
+        };
+
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::new_ticket(ticket_result))),]
+        );
+
+        // When content is different
+        let mut ctx = Ctx::default();
+        let ticket = Ticket {
+            ticketer: ctx.self_address.clone(),
+            amount: 100u32.into(),
+            content: V::nat(10),
+        };
+        let ticket_left = V::new_ticket(ticket.clone());
+        let ticket_right = V::new_ticket(Ticket {
+            amount: 20u32.into(),
+            content: V::nat(20),
+            ..ticket
+        });
+        let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
+        assert_eq!(interpret_one(&JoinTickets, &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None),]);
+
+        // When Ticketer is different
+        use crate::interpreter::AddressHash;
+        let mut ctx = Ctx::default();
+        let ticket = Ticket {
+            ticketer: AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
+            amount: 100u32.into(),
+            content: V::nat(10),
+        };
+        let ticket_left = V::new_ticket(ticket.clone());
+        let ticket_right = V::new_ticket(Ticket {
+            amount: 20u32.into(),
+            ticketer: AddressHash::try_from("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap(),
+            ..ticket
+        });
+        let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
+        assert_eq!(interpret_one(&JoinTickets, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::new_option(None),]);
     }
 }

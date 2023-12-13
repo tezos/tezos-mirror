@@ -1283,6 +1283,20 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(SPLIT_TICKET, [], _), [] | [_]) => no_overload!(SPLIT_TICKET, len 2),
         (App(SPLIT_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(JOIN_TICKETS, [], _), [.., T::Pair(tickets)])
+            if matches!(tickets.as_ref(), (Type::Ticket(_), Type::Ticket(_))) =>
+        {
+            let lt = irrefutable_match!(&tickets.0; Type::Ticket);
+            let rt = irrefutable_match!(&tickets.1; Type::Ticket);
+
+            ensure_ty_eq(ctx, lt, rt)?;
+            stack[0] = Type::new_option(tickets.0.clone());
+            I::JoinTickets
+        }
+        (App(JOIN_TICKETS, [], _), [.., _]) => no_overload!(JOIN_TICKETS),
+        (App(JOIN_TICKETS, [], _), []) => no_overload!(JOIN_TICKETS, len 1),
+        (App(JOIN_TICKETS, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -4811,6 +4825,52 @@ mod typecheck_tests {
                 Type::new_ticket(Type::Unit),
                 Type::new_ticket(Type::Unit)
             ))]
+        );
+    }
+
+    #[test]
+    fn join_tickets() {
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::JOIN_TICKETS,
+                stack: stk![Type::Nat],
+                reason: None
+            })
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::JOIN_TICKETS,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::new_pair(
+            Type::new_ticket(Type::Int),
+            Type::new_ticket(Type::Unit)
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Unit)))
+        );
+
+        let stk = &mut tc_stk![Type::new_pair(
+            Type::new_ticket(Type::Unit),
+            Type::new_ticket(Type::Unit)
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            Ok(JoinTickets)
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::new_option(Type::new_ticket(Type::Unit))]
         );
     }
 
