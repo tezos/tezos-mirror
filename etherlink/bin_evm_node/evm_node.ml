@@ -265,19 +265,29 @@ let time_between_blocks_arg =
     ~placeholder:"10."
     Params.float
 
+let keep_alive_arg =
+  Tezos_clic.switch
+    ~doc:
+      "Keep the EVM node process alive even if the connection is lost with the \
+       rollup node."
+    ~short:'K'
+    ~long:"keep-alive"
+    ()
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in proxy mode"
-    (args7
+    (args8
        data_dir_arg
        devmode_arg
        rpc_addr_arg
        rpc_port_arg
        cors_allowed_origins_arg
        cors_allowed_headers_arg
-       verbose_arg)
+       verbose_arg
+       keep_alive_arg)
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
     (fun ( data_dir,
@@ -286,7 +296,8 @@ let proxy_command =
            rpc_port,
            cors_origins,
            cors_headers,
-           verbose )
+           verbose,
+           _keep_alive )
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
