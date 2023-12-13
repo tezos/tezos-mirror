@@ -121,8 +121,10 @@ let test_consensus_key_storage () =
   let* ctxt, del1, del2 = create () in
   let a1 = Account.new_account () in
   let a2 = Account.new_account () in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let* () = Assert.equal_int ~loc:__LOC__ preserved_cycles 3 in
+  let consensus_key_activation_delay =
+    Constants_storage.consensus_key_activation_delay ctxt
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ consensus_key_activation_delay 3 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt del1.pkh in
     Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh del1.pkh
