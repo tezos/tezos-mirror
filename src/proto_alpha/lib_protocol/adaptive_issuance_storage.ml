@@ -106,6 +106,14 @@ let truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f =
   let f = Q.max f issuance_ratio_min in
   f
 
+let compute_min
+    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
+  reward_params.issuance_ratio_min
+
+let compute_max
+    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
+  reward_params.issuance_ratio_max
+
 let compute_reward_coeff_ratio_without_bonus =
   let q_1600 = Q.of_int 1600 in
   fun ~stake_ratio ~issuance_ratio_max ~issuance_ratio_min ->
@@ -119,7 +127,7 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
   let Constants_parametric_repr.
         {
           issuance_ratio_min = _;
-          issuance_ratio_max;
+          issuance_ratio_max = _;
           max_bonus;
           growth_rate;
           center_dz;
@@ -127,6 +135,7 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
         } =
     reward_params
   in
+  let issuance_ratio_max = compute_max ~reward_params in
   let base_reward_coeff_dist_to_max =
     Q.(issuance_ratio_max - base_reward_coeff_ratio)
   in
@@ -163,10 +172,8 @@ let compute_coeff =
       ~reward_params ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
-      let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
-          =
-        reward_params
-      in
+      let issuance_ratio_min = compute_min ~reward_params in
+      let issuance_ratio_max = compute_max ~reward_params in
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
@@ -208,11 +215,13 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let stake_ratio =
       Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
     in
+    let issuance_ratio_min = compute_min ~reward_params in
+    let issuance_ratio_max = compute_max ~reward_params in
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
-        ~issuance_ratio_max:reward_params.issuance_ratio_max
-        ~issuance_ratio_min:reward_params.issuance_ratio_min
+        ~issuance_ratio_max
+        ~issuance_ratio_min
     in
     let*? bonus =
       compute_bonus
