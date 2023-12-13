@@ -196,11 +196,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
-        let* opt = Storage.Tenderbake.Endorsement_branch.find ctxt in
-        let*! ctxt = Storage.Tenderbake.Endorsement_branch.remove ctxt in
-        let*! ctxt =
-          Storage.Tenderbake.Attestation_branch.add_or_remove ctxt opt
-        in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
