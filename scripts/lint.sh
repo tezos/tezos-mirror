@@ -198,6 +198,12 @@ check_licenses_git_new () {
         echo
         echo "  CHECK_LICENSES_DIFF_BASE=\$(git merge-base HEAD origin/master) $0 --check-licenses-git-new"
         return 1
+    elif ! git cat-file -t "${CHECK_LICENSES_DIFF_BASE:-}" > /dev/null 2>&1; then
+        echo "The commit specified in CHECK_LICENSES_DIFF_BASE ('$CHECK_LICENSES_DIFF_BASE') could not be found."
+        echo 'Consider running:'
+        echo
+        echo "  git fetch origin $CHECK_LICENSES_DIFF_BASE"
+        return 1
     fi
 
     diff=$(mktemp)
