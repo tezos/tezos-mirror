@@ -415,7 +415,7 @@ let snapshot_file_param next =
 
 let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
-    ~long:"no-checks"
+    ~long:"no-check"
     ~doc:"Don't check integrity of the snapshot."
     ()
 
