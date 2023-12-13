@@ -108,8 +108,20 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  issuance_ratio_final_min : (* Maximum yearly issuance rate *) Q.t;
-  issuance_ratio_final_max : (* Minimum yearly issuance rate *) Q.t;
+  issuance_ratio_final_min : (* Minimum yearly issuance rate *) Q.t;
+  issuance_ratio_final_max : (* Maximum yearly issuance rate *) Q.t;
+  issuance_ratio_initial_min :
+    (* Minimum yearly issuance rate at adaptive issuance activation *) Q.t;
+  issuance_ratio_initial_max :
+    (* Maximum yearly issuance rate at adaptive issuance activation *) Q.t;
+  initial_period :
+    (* Period in cycles during which the minimum and maximum yearly
+       issuance rate values stay at their initial values *)
+    int;
+  transition_period :
+    (* Period in cycles during which the minimum and maximum yearly
+       issuance rate values decrease/increase until they reach their global values *)
+    int;
   max_bonus : (* Maximum issuance bonus value *) Issuance_bonus_repr.max_bonus;
   growth_rate : (* Bonus value's growth rate *) Q.t;
   center_dz : (* Center for bonus *) Q.t;

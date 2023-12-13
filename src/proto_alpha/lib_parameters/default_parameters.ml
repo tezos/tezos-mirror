@@ -281,6 +281,12 @@ let constants_mainnet =
           {
             issuance_ratio_final_min = Q.(5 // 10000);
             issuance_ratio_final_max = Q.(1 // 20);
+            (* Placeholder values for progressive min/max *)
+            (* TODO #6732: fix adaptive rewards parameters *)
+            issuance_ratio_initial_min = Q.(2 // 100);
+            issuance_ratio_initial_max = Q.(2 // 100);
+            initial_period = 3;
+            transition_period = 3;
             max_bonus =
               Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn
                 Q.(5 // 100);

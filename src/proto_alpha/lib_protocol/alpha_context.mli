@@ -857,6 +857,10 @@ module Constants : sig
     type adaptive_rewards_params = {
       issuance_ratio_final_min : Q.t;
       issuance_ratio_final_max : Q.t;
+      issuance_ratio_initial_min : Q.t;
+      issuance_ratio_initial_max : Q.t;
+      initial_period : int;
+      transition_period : int;
       max_bonus : Issuance_bonus_repr.max_bonus;
       growth_rate : Q.t;
       center_dz : Q.t;

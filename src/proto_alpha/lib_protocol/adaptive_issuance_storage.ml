@@ -128,6 +128,10 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
         {
           issuance_ratio_final_min = _;
           issuance_ratio_final_max = _;
+          issuance_ratio_initial_min = _;
+          issuance_ratio_initial_max = _;
+          initial_period = _;
+          transition_period = _;
           max_bonus;
           growth_rate;
           center_dz;
