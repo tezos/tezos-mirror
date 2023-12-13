@@ -54,6 +54,15 @@ fn check_filler_constraints(
     false
 }
 
+fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
+    let cmp_spec_id = parse_and_get_cmp(filler_network);
+    let network = purify_network(filler_network);
+    let check_network_id = SpecId::from(&network) as u8;
+    let current_network_config_id = SpecId::from(&spec_name.to_str()) as u8;
+
+    cmp_spec_id(&current_network_config_id, &check_network_id)
+}
+
 fn check_should_not_exist(
     host: &mut EvalHost,
     account: &EthereumAccount,
@@ -269,17 +278,8 @@ pub fn process(
                     &filler_expectation.indexes,
                     tx_label,
                     tx_index,
-                ) {
-                    let cmp_spec_id = parse_and_get_cmp(&filler_network);
-                    let network = purify_network(&filler_network);
-                    let check_network_id = SpecId::from(&network) as u8;
-                    let current_network_config_id =
-                        SpecId::from(&spec_name.to_str()) as u8;
-
-                    if !cmp_spec_id(&current_network_config_id, &check_network_id) {
-                        continue;
-                    }
-
+                ) && check_if_network_match(&filler_network, spec_name)
+                {
                     write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
                     write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
 
