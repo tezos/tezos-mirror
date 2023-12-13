@@ -21,10 +21,7 @@
 local grafana = import '../../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local template = grafana.template;
-local singlestat = grafana.singlestat;
-local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
-local tablePanel = grafana.tablePanel;
 local prometheus = grafana.prometheus;
 local namespace = 'dal_gs';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
@@ -40,10 +37,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='The number of topics the node is subscribed to',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [topics]: 'blue',
       },
@@ -60,10 +54,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='The number of (bootstrap) connections',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [connections]: 'green',
         [bootstrap]: 'yellow',
@@ -86,10 +77,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='The size of different worker streams',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [input]: 'green',
         [p2p]: 'blue',
@@ -121,10 +109,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Average sent & received app messages (1-minute interval)',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [received_valid]: 'green',
         [received_invalid]: 'red',
@@ -162,10 +147,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Average sent control & metadata messages (1-minute interval)',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [grafts]: 'blue',
         [prunes]: 'yellow',
@@ -203,10 +185,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Average received control & metadata messages (1-minute interval)',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [grafts]: 'blue',
         [prunes]: 'yellow',
@@ -240,10 +219,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Score of the peers connected to this node',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
     ).addTargets([
       prometheus.target(
         namespace + '_scores_of_peers' + node_instance,
@@ -256,10 +232,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Number of peers in the mesh for each subscribed topic',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
     ).addTargets([
       prometheus.target(
         namespace + '_count_peers_per_topic' + node_instance,

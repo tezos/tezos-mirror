@@ -24,7 +24,6 @@ local template = grafana.template;
 local singlestat = grafana.singlestat;
 local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
-local tablePanel = grafana.tablePanel;
 local prometheus = grafana.prometheus;
 local namespace = 'dal_node';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
@@ -41,10 +40,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Layer 1 heads & finalized blocks seen by the DAL node',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [head]: 'blue',
         [finalized]: 'green',
@@ -70,10 +66,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Rounds of layer 1 heads & finalized blocks seen by the DAL node',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [head]: 'blue',
         [finalized]: 'green',
@@ -98,10 +91,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='The shards stored by this node (1-minute interval)',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [shards]: 'blue',
       },
@@ -119,10 +109,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Number of slots waiting for attesatation and of attested slots',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
       aliasColors={
         [waiting]: 'yellow',
         [attested]: 'green',
@@ -143,10 +130,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Indexes of slots waiting for attestation',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
     ).addTargets([
       prometheus.target(
         namespace + '_slots_waiting_for_attestaion' + node_instance,
@@ -159,10 +143,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     graphPanel.new(
       title='Indexes of attested slots',
       datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
       format='none',
-      legend_show=true,
     ).addTargets([
       prometheus.target(
         namespace + '_slots_attested' + node_instance,
