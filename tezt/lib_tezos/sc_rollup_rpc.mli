@@ -174,3 +174,13 @@ val get_global_block_durable_state_value :
     node's batcher and returns the list of message hashes injected. *)
 val post_local_batcher_injection :
   messages:string list -> string list RPC_core.t
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+(** RPC: [GET global/block/<block>/helpers/proofs/outbox/<outbox_level>/messages] *)
+val outbox_proof_simple :
+  ?block:string ->
+  outbox_level:int ->
+  message_index:int ->
+  unit ->
+  outbox_proof option RPC_core.t

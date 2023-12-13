@@ -61,15 +61,11 @@ let get_last_published_commitment =
   assert_some_client_command
     (Sc_rollup_rpc.get_local_last_published_commitment ())
 
-let get_outbox_proof ?hooks ?expected_error ~__LOC__ sc_rollup ~message_index
+let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
     ~outbox_level =
   let* proof =
-    Sc_rollup_client.outbox_proof
-      ?hooks
-      ?expected_error
-      sc_rollup
-      ~message_index
-      ~outbox_level
+    Sc_rollup_node.RPC.call ?rpc_hooks sc_rollup_node
+    @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
   in
   match proof with
   | Some v -> return v
@@ -4082,11 +4078,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
               ?parameters_ty:outbox_parameters_ty
           in
           let* proof' =
-            Sc_rollup_client.outbox_proof
-              sc_client
-              ?expected_error
-              ~message_index
-              ~outbox_level
+            Sc_rollup_node.RPC.call rollup_node
+            @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
           in
           (* Test outbox_proof command with/without input transactions. *)
           assert (proof' = proof) ;
@@ -5109,7 +5102,7 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~supports:(From_protocol 018)
     ~commitment_period
     ~challenge_window
-  @@ fun protocol rollup_node rollup_client rollup_addr _node client ->
+  @@ fun protocol rollup_node _rollup_client rollup_addr _node client ->
   let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
   let* payload =
     Codec.encode
@@ -5146,7 +5139,7 @@ let test_rollup_whitelist_outdated_update ~kind =
   Check.((message_index = 1) int)
     ~error_msg:"Executed output message of index %L expected %R." ;
   let* {commitment_hash; proof} =
-    get_outbox_proof rollup_client ~__LOC__ ~message_index:0 ~outbox_level
+    get_outbox_proof rollup_node ~__LOC__ ~message_index:0 ~outbox_level
   in
   let {value = process; _} =
     Client.Sc_rollup.execute_outbox_message
@@ -5175,7 +5168,7 @@ let test_rollup_whitelist_outdated_update ~kind =
       [payload; payload2]
   in
   let* {commitment_hash; proof} =
-    get_outbox_proof rollup_client ~__LOC__ ~message_index ~outbox_level
+    get_outbox_proof rollup_node ~__LOC__ ~message_index ~outbox_level
   in
   let {value = process; _} =
     Client.Sc_rollup.execute_outbox_message

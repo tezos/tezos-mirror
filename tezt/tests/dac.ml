@@ -1841,20 +1841,19 @@ module Tx_kernel_e2e = struct
     let* () = assert_state_changed sc_rollup_node prev_state_hash in
     return {prev_state_hash; prev_ticks; level}
 
-  let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_client
-      ~sc_rollup_address ~client =
+  let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_address
+      ~client =
     let* outbox =
       Sc_rollup_node.RPC.call sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:withdrawal_level ()
     in
     Log.info "Outbox is %s" @@ JSON.encode outbox ;
     let* answer =
-      let message_index = 0 in
-      let outbox_level = withdrawal_level in
-      Sc_rollup_client.outbox_proof
-        sc_rollup_client
-        ~message_index
-        ~outbox_level
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.outbox_proof_simple
+           ~message_index:0
+           ~outbox_level:withdrawal_level
+           ()
     in
     match answer with
     | Some {commitment_hash; proof} ->
@@ -1984,7 +1983,6 @@ module Tx_kernel_e2e = struct
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
     let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
     in
@@ -2089,7 +2087,6 @@ module Tx_kernel_e2e = struct
       verify_outbox_answer
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~withdrawal_level
     in
@@ -2154,7 +2151,6 @@ module Tx_kernel_e2e = struct
         sc_rollup_address
         ["--dac-observer"; Dac_node.endpoint observer_node]
     in
-    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
     in
@@ -2282,7 +2278,6 @@ module Tx_kernel_e2e = struct
       verify_outbox_answer
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~withdrawal_level
     in

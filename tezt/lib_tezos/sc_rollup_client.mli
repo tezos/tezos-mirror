@@ -58,8 +58,6 @@ val rpc_get_rich :
   (string * string) list ->
   JSON.t Runnable.process
 
-type outbox_proof = {commitment_hash : string; proof : string}
-
 (** [outbox_proof_single] asks the rollup node for a proof that an
     output of a given [message_index] is available in the outbox at a
     given [outbox_level] as a latent call to [destination]'s
@@ -74,7 +72,7 @@ val outbox_proof_single :
   outbox_level:int ->
   destination:string ->
   parameters:string ->
-  outbox_proof option Lwt.t
+  Sc_rollup_rpc.outbox_proof option Lwt.t
 
 type transaction = {
   destination : string;
@@ -82,12 +80,3 @@ type transaction = {
   parameters : string;
   parameters_ty : string option;
 }
-
-(** Same as [outbox_proof_single] without providing the outbox message *)
-val outbox_proof :
-  ?hooks:Process.hooks ->
-  ?expected_error:Base.rex ->
-  t ->
-  message_index:int ->
-  outbox_level:int ->
-  outbox_proof option Lwt.t
