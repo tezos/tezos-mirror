@@ -195,7 +195,7 @@ let operators_params rollup_node =
     (Option.to_list rollup_node.persistent_state.default_operator)
     rollup_node.persistent_state.operators
 
-let make_arguments node =
+let make_command_arguments node =
   [
     "--endpoint";
     Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
@@ -209,7 +209,8 @@ let spawn_command sc_node args =
     ~name:sc_node.name
     ~color:sc_node.color
     sc_node.path
-  @@ make_arguments sc_node @ args
+  @@ make_command_arguments sc_node
+  @ args
 
 let common_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
     sc_node =
@@ -479,7 +480,7 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_arguments node @ arguments in
+  let arguments = make_command_arguments node @ arguments in
   run
     ?runner:node.persistent_state.runner
     ?event_level
