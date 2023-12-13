@@ -722,6 +722,15 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NEG, [], _), []) => no_overload!(NEG, len 1),
         (App(NEG, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SUB_MUTEZ, [], _), [.., T::Mutez, T::Mutez]) => {
+            pop!();
+            stack[0] = Type::new_option(T::Mutez);
+            I::SubMutez
+        }
+        (App(SUB_MUTEZ, [], _), [.., _, _]) => no_overload!(SUB_MUTEZ),
+        (App(SUB_MUTEZ, [], _), [] | [_]) => no_overload!(SUB_MUTEZ, len 2),
+        (App(SUB_MUTEZ, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(AND, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
             I::And(overloads::And::NatNat)
@@ -2251,6 +2260,42 @@ mod typecheck_tests {
         );
         assert_eq!(stack, expected_stack);
         assert!(ctx.gas.milligas() < Gas::default().milligas());
+    }
+
+    mod sub_mutez {
+        use super::*;
+
+        #[test]
+        fn ok() {
+            let mut stack = tc_stk![Type::Mutez, Type::Mutez];
+            let expected_stack = tc_stk![Type::new_option(Type::Mutez)];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(SUB_MUTEZ), &mut ctx, &mut stack),
+                Ok(SubMutez)
+            );
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        #[test]
+        fn mismatch() {
+            let mut stack = tc_stk![Type::Unit, Type::Mutez];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(SUB_MUTEZ), &mut ctx, &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::SUB_MUTEZ,
+                    stack: stk![Type::Unit, Type::Mutez],
+                    reason: None,
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(SUB_MUTEZ), Prim::SUB_MUTEZ, 2);
+        }
     }
 
     #[test]

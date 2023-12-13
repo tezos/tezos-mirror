@@ -409,6 +409,7 @@ pub enum Instruction<'a> {
     Add(overloads::Add),
     Mul(overloads::Mul),
     Neg(overloads::Neg),
+    SubMutez,
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),

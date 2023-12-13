@@ -314,6 +314,16 @@ fn interpret_one<'a>(
                 *v = -(v as &bls::Fr);
             }
         },
+        I::SubMutez => {
+            ctx.gas.consume(interpret_cost::SUB_MUTEZ)?;
+            let v1 = pop!(V::Mutez);
+            let v2 = pop!(V::Mutez);
+            if v1 >= v2 {
+                stack.push(V::new_option(Some(V::Mutez(v1 - v2))));
+            } else {
+                stack.push(V::Option(None));
+            }
+        }
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
@@ -4220,5 +4230,25 @@ mod interpreter_tests {
             test!(Int, V::int(0), V::int(0));
             test!(Nat, V::nat(0), V::int(0));
         }
+    }
+
+    #[test]
+    fn test_sub_mutez() {
+        fn test(v1: i64, v2: i64, res: Option<i64>) {
+            let mut stack = stk![V::Mutez(v2), V::Mutez(v1)];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&SubMutez, ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![V::new_option(res.map(V::Mutez))]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+        test(0, 0, Some(0));
+        test(0, 1, None);
+        test(1, 0, Some(1));
+        test(1, 1, Some(0));
+        test(1, 2, None);
+        test(100500, 100, Some(100400));
+        test(100500, 100500, Some(0));
+        test(100500, 100500700, None);
     }
 }
