@@ -159,6 +159,7 @@ type 'prevalidation_t parameters = {
     'prevalidation_t tzresult Lwt.t;
       (** Create a new empty prevalidation state, recycling some elements
             of the provided previous prevalidation state. *)
+  chain_store : Store.chain_store;
 }
 
 (** The type needed for the implementation of [Make] below, but
@@ -1354,7 +1355,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; tools = Arg.tools; flush} in
+      let parameters = {limits; tools = Arg.tools; chain_store; flush} in
       let shell =
         {
           classification;
