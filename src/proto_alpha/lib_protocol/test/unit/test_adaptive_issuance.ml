@@ -124,8 +124,8 @@ let test_compute_bonus () =
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
-        ~issuance_ratio_max:reward_params.issuance_ratio_max
-        ~issuance_ratio_min:reward_params.issuance_ratio_min
+        ~issuance_ratio_max:reward_params.issuance_ratio_final_max
+        ~issuance_ratio_min:reward_params.issuance_ratio_final_min
     in
     let*?@ bonus =
       compute_bonus
@@ -142,14 +142,14 @@ let test_compute_bonus () =
         ~loc:__LOC__
         ~f:Q.geq
         (return full_reward_coeff)
-        reward_params.issuance_ratio_min
+        reward_params.issuance_ratio_final_min
     in
     let* () =
       assert_fun
         ~loc:__LOC__
         ~f:Q.leq
         (return full_reward_coeff)
-        reward_params.issuance_ratio_max
+        reward_params.issuance_ratio_final_max
     in
     return (bonus :> Q.t)
   in
@@ -360,20 +360,22 @@ let test_compute_coeff () =
       assert_eq_lwt
         ~loc:__LOC__
         (compute_coeff Q.zero Q.zero)
-        (compute_coeff reward_params.issuance_ratio_min Q.zero)
+        (compute_coeff reward_params.issuance_ratio_final_min Q.zero)
     in
     (* Test max *)
     let* () =
       assert_eq_lwt
         ~loc:__LOC__
-        (compute_coeff (Q.add reward_params.issuance_ratio_max Q.one) Q.zero)
-        (compute_coeff reward_params.issuance_ratio_max Q.zero)
+        (compute_coeff
+           (Q.add reward_params.issuance_ratio_final_max Q.one)
+           Q.zero)
+        (compute_coeff reward_params.issuance_ratio_final_max Q.zero)
     in
     let* () =
       assert_eq_lwt
         ~loc:__LOC__
-        (compute_coeff reward_params.issuance_ratio_max Q.(1 // 100))
-        (compute_coeff reward_params.issuance_ratio_max Q.zero)
+        (compute_coeff reward_params.issuance_ratio_final_max Q.(1 // 100))
+        (compute_coeff reward_params.issuance_ratio_final_max Q.zero)
     in
     return_unit
   in

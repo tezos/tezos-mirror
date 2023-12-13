@@ -1135,9 +1135,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let adaptive_rewards_params =
           Constants_parametric_repr.
             {
-              issuance_ratio_min =
+              issuance_ratio_final_min =
                 c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_min;
-              issuance_ratio_max =
+              issuance_ratio_final_max =
                 c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
               max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
               growth_rate =

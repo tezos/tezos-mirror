@@ -108,11 +108,11 @@ let truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f =
 
 let compute_min
     ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
-  reward_params.issuance_ratio_min
+  reward_params.issuance_ratio_final_min
 
 let compute_max
     ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
-  reward_params.issuance_ratio_max
+  reward_params.issuance_ratio_final_max
 
 let compute_reward_coeff_ratio_without_bonus =
   let q_1600 = Q.of_int 1600 in
@@ -126,8 +126,8 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
     ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
   let Constants_parametric_repr.
         {
-          issuance_ratio_min = _;
-          issuance_ratio_max = _;
+          issuance_ratio_final_min = _;
+          issuance_ratio_final_max = _;
           max_bonus;
           growth_rate;
           center_dz;
