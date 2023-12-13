@@ -1399,6 +1399,23 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(GET, [], _), [.., _, _]) => no_overload!(GET),
         (App(GET, [], _), [] | [_]) => no_overload!(GET, len 2),
+
+        (App(GET, [Micheline::Int(n)], _), [.., _]) => {
+            // NB: it's important to NOT pop from the stack here, otherwise
+            // no_overload! below won't report the type on the top of the stack.
+            let ty = &mut stack[0];
+            let n = validate_u10(n)?;
+            ctx.gas.consume(tc_cost::get_n(n as usize)?)?;
+            let res = match get_nth_field_ref(n, ty) {
+                Ok(res) => res,
+                Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
+            };
+            // this is a bit hacky, but borrow rules leave few other options
+            stack[0] = std::mem::replace(res, T::Unit);
+            I::GetN(n)
+        }
+        (App(GET, [Micheline::Int(_)], _), []) => no_overload!(GET, len 1),
+
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
@@ -1920,6 +1937,23 @@ pub(crate) fn typecheck_contract_address(
             })
         }
     }
+}
+
+fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
+    Ok(loop {
+        match (m, ty) {
+            (0, ty_) => break ty_,
+            (1, Type::Pair(p)) => break &mut Rc::make_mut(p).0,
+            (_, Type::Pair(p)) => {
+                ty = &mut Rc::make_mut(p).1;
+                m -= 2;
+            }
+            (_, ty) => {
+                let ty = ty.clone();
+                return Err(ty);
+            }
+        }
+    })
 }
 
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
@@ -4390,6 +4424,126 @@ mod typecheck_tests {
             typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
+    }
+
+    mod get_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, ty: Type, field_ty: Type) {
+            let mut stack = tc_stk![ty];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("GET {n}")).unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Ok(GetN(n))
+            );
+            assert_eq!(stack, tc_stk![field_ty])
+        }
+
+        #[test]
+        fn ok_0() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(0, ty.clone(), ty);
+        }
+
+        #[test]
+        fn ok_1() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(1, ty, Type::Unit);
+        }
+
+        #[test]
+        fn ok_2() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(
+                2,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_3() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(3, ty, Type::Nat);
+        }
+
+        #[test]
+        fn ok_4() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(4, ty, Type::new_pair(Type::String, Type::Int));
+        }
+
+        #[test]
+        fn ok_5() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(5, ty, Type::String);
+        }
+
+        #[test]
+        fn ok_6() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(6, ty, Type::Int);
+        }
+
+        #[test]
+        fn fail_7() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            let mut stack = tc_stk![ty.clone()];
+            assert_eq!(
+                typecheck_instruction(&parse("GET 7").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::GET,
+                    stack: stk![ty],
+                    reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Int))
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(GET[0]), Prim::GET, 1);
+        }
+
+        #[test]
+        fn too_large() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            let mut stack = tc_stk![ty];
+            assert_eq!(
+                typecheck_instruction(&parse("GET 1024").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::ExpectedU10(1024.into()))
+            );
+        }
     }
 
     #[test]

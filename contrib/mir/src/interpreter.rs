@@ -882,6 +882,12 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(result));
             }
         },
+        I::GetN(n) => {
+            ctx.gas.consume(interpret_cost::get_n(*n as usize)?)?;
+            let res = get_nth_field_ref(*n, &mut stack[0]);
+            // this is a bit hacky, but borrow rules leave few other options
+            stack[0] = std::mem::replace(res, V::Unit);
+        }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
                 let key = pop!();
@@ -1357,6 +1363,25 @@ fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Ad
     Address {
         hash: AddressHash::Kt1(HashTrait::try_from_bytes(digest.as_slice()).unwrap()),
         entrypoint: Entrypoint::default(),
+    }
+}
+
+fn get_nth_field_ref<'a, 'b>(
+    mut m: u16,
+    mut val: &'a mut TypedValue<'b>,
+) -> &'a mut TypedValue<'b> {
+    use TypedValue as V;
+    loop {
+        match (m, val) {
+            (0, val_) => break val_,
+            (1, V::Pair(p)) => break &mut p.0,
+
+            (_, V::Pair(p)) => {
+                val = &mut p.1;
+                m -= 2;
+            }
+            _ => unreachable_state(),
+        }
     }
 }
 
@@ -2771,6 +2796,50 @@ mod interpreter_tests {
                 - interpret_cost::map_get(&V::int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    mod get_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, val: TypedValue, field_val: TypedValue) {
+            let mut stack = stk![val];
+            assert_eq!(
+                interpret_one(&GetN(n), &mut Ctx::default(), &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![field_val])
+        }
+
+        #[test]
+        fn ok_0() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(0, val.clone(), val);
+        }
+
+        #[test]
+        fn ok_1() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(1, val, V::int(1));
+        }
+
+        #[test]
+        fn ok_2() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(2, val, V::new_pair(V::int(3), V::int(4)));
+        }
+
+        #[test]
+        fn ok_3() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(3, val, V::int(3));
+        }
+
+        #[test]
+        fn ok_4() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(4, val, V::int(4));
+        }
     }
 
     #[test]

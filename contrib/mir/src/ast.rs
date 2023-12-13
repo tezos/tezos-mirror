@@ -553,6 +553,7 @@ pub enum Instruction<'a> {
     EmptyBigMap(Type, Type),
     Mem(overloads::Mem),
     Get(overloads::Get),
+    GetN(u16),
     Update(overloads::Update),
     GetAndUpdate(overloads::GetAndUpdate),
     Concat(overloads::Concat),
