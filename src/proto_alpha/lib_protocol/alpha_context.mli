@@ -884,6 +884,7 @@ module Constants : sig
     type t = {
       preserved_cycles : int;
       consensus_rights_delay : int;
+      blocks_preservation_cycles : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
       nonce_revelation_threshold : int32;
@@ -945,6 +946,8 @@ module Constants : sig
   val preserved_cycles : context -> int
 
   val consensus_rights_delay : context -> int
+
+  val blocks_preservation_cycles : context -> int
 
   val blocks_per_cycle : context -> int32
 
