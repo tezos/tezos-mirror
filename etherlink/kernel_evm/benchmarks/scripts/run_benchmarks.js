@@ -90,8 +90,8 @@ function run_profiler(path, logs) {
         var estimated_ticks = [];
         var estimated_ticks_per_tx = [];
         var tx_size = [];
-        var reboot_context_store = [];
-        var reboot_context_read = [];
+        var block_in_progress_store = [];
+        var block_in_progress_read = [];
         var receipt_size = [];
         let bloom_size = [];
         let nb_reboots = 0;
@@ -131,8 +131,8 @@ function run_profiler(path, logs) {
             push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
             push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
             push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
-            push_match(output, reboot_context_store, /\bStoring Reboot Context of size\s*(\d+)/g)
-            push_match(output, reboot_context_read, /\bReading Reboot Context of size\s*(\d+)/g)
+            push_match(output, block_in_progress_store, /\bStoring Block In Progress of size\s*(\d+)/g)
+            push_match(output, block_in_progress_read, /\bReading Block In Progress of size\s*(\d+)/g)
             push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
             push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_profiler_sections(output, opcodes, precompiles);
@@ -160,11 +160,11 @@ function run_profiler(path, logs) {
             if (tx_status.length != bloom_size.length) {
                 console.log(new Error("Missing bloom size value (expected: " + tx_status.length + ", actual: " + bloom_size.length + ")"));
             }
-            if (reboot_context_store.length != nb_reboots) {
-                console.log(new Error("Missing stored reboot context size value (expected: " + nb_reboots + ", actual: " + reboot_context_store.length + ")"));
+            if (block_in_progress_store.length != nb_reboots) {
+                console.log(new Error("Missing stored block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_store.length + ")"));
             }
-            if (reboot_context_read.length != nb_reboots) {
-                console.log(new Error("Missing read reboot context size value (expected: " + nb_reboots + ", actual: " + reboot_context_read.length + ")"));
+            if (block_in_progress_read.length != nb_reboots) {
+                console.log(new Error("Missing read block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_read.length + ")"));
             }
             resolve({
                 profiler_output_path,
@@ -173,8 +173,8 @@ function run_profiler(path, logs) {
                 estimated_ticks,
                 estimated_ticks_per_tx,
                 tx_size,
-                reboot_context_store,
-                reboot_context_read,
+                block_in_progress_store,
+                block_in_progress_read,
                 receipt_size,
                 opcodes,
                 bloom_size,
@@ -231,8 +231,8 @@ async function analyze_profiler_output(path) {
     fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
     block_finalize = await get_ticks(path, "store_current_block");
     logs_to_bloom = await get_ticks(path, "logs_to_bloom");
-    reboot_context_store_ticks = await get_ticks(path, "store_reboot_context");
-    reboot_context_read_ticks = await get_ticks(path, "read_reboot_context");
+    block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
+    block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
     return {
         kernel_run_ticks: kernel_run_ticks,
         run_transaction_ticks: run_transaction_ticks,
@@ -245,8 +245,8 @@ async function analyze_profiler_output(path) {
         store_receipt_ticks,
         block_finalize,
         logs_to_bloom,
-        reboot_context_store_ticks,
-        reboot_context_read_ticks
+        block_in_progress_store_ticks,
+        block_in_progress_read_ticks
     };
 }
 
@@ -287,10 +287,10 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
     tx_size = run_benchmark_result.tx_size;
-    reboot_context_read = run_benchmark_result.reboot_context_read;
-    reboot_context_store = run_benchmark_result.reboot_context_store;
-    reboot_context_store_ticks = run_benchmark_result.reboot_context_store_ticks;
-    reboot_context_read_ticks = run_benchmark_result.reboot_context_read_ticks;
+    block_in_progress_read = run_benchmark_result.block_in_progress_read;
+    block_in_progress_store = run_benchmark_result.block_in_progress_store;
+    block_in_progress_store_ticks = run_benchmark_result.block_in_progress_store_ticks;
+    block_in_progress_read_ticks = run_benchmark_result.block_in_progress_read_ticks;
 
     console.log(`Number of transactions: ${tx_status.length}`)
     run_time_index = 0;
@@ -356,8 +356,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         estimated_ticks: estimated_ticks[0],
         inbox_size: run_benchmark_result.inbox_size,
         nb_tx: tx_status.length,
-        reboot_context_store: reboot_context_store[0] ? reboot_context_store[0] : '',
-        reboot_context_store_ticks: reboot_context_store[0] ? reboot_context_store_ticks[bip_idx++] : ''
+        block_in_progress_store: block_in_progress_store[0] ? block_in_progress_store[0] : '',
+        block_in_progress_store_ticks: block_in_progress_store[0] ? block_in_progress_store_ticks[bip_idx++] : ''
     });
 
     //reboots
@@ -369,12 +369,12 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             fetch_blueprint_ticks: fetch_blueprint_ticks[j],
             kernel_run_ticks: kernel_run_ticks[j],
             estimated_ticks: estimated_ticks[j],
-            reboot_context_store: reboot_context_store[j] ? reboot_context_store[j] : '',
-            reboot_context_store_ticks: reboot_context_store[j] ? reboot_context_store_ticks[bip_idx] : '',
-            reboot_context_read: reboot_context_read[j - 1], // the first read correspond to second run
-            reboot_context_read_ticks: reboot_context_read[j - 1] ? reboot_context_read_ticks[bip_idx - 1] : ''
+            block_in_progress_store: block_in_progress_store[j] ? block_in_progress_store[j] : '',
+            block_in_progress_store_ticks: block_in_progress_store[j] ? block_in_progress_store_ticks[bip_idx] : '',
+            block_in_progress_read: block_in_progress_read[j - 1], // the first read correspond to second run
+            block_in_progress_read_ticks: block_in_progress_read[j - 1] ? block_in_progress_read_ticks[bip_idx - 1] : ''
         });
-        if (reboot_context_read[j - 1]) bip_idx++
+        if (block_in_progress_read[j - 1]) bip_idx++
     }
 
     // ticks that are not covered by identified area of interest
@@ -448,10 +448,10 @@ async function run_all_benchmarks(benchmark_scripts) {
         "nb_tx",
         "inbox_size",
         "fetch_blueprint_ticks",
-        "reboot_context_read",
-        "reboot_context_read_ticks",
-        "reboot_context_store",
-        "reboot_context_store_ticks",
+        "block_in_progress_read",
+        "block_in_progress_read_ticks",
+        "block_in_progress_store",
+        "block_in_progress_store_ticks",
         "block_finalize",
         "kernel_run_ticks",
         "unaccounted_ticks",
