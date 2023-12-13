@@ -363,6 +363,13 @@ let test_drag_after_rolling_import =
   let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
     get_constants ~protocol client
   in
+  let finalized_block_distance =
+    match protocol with
+    | Nairobi | Oxford ->
+        (* Conservative TB finality *)
+        blocks_preservation_cycles * blocks_per_cycle
+    | Alpha -> (* TB finality *) 2
+  in
   Log.info "Baking a few blocks"
   (* Baking enough blocks so that the caboose is not the genesis
      anymore (depending on the max_op_ttl)*) ;
@@ -454,14 +461,21 @@ let test_drag_after_rolling_import =
     match history_mode with
     | Node.Full_history -> Test.fail "testing only rolling mode"
     | Node.Rolling_history ->
-        let checkpoint =
-          final_head - (blocks_preservation_cycles * blocks_per_cycle)
-        in
+        let checkpoint = final_head - finalized_block_distance in
         let savepoint =
           final_head
           - ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle)
         in
-        (checkpoint, savepoint, min savepoint (checkpoint - max_op_ttl))
+        let caboose =
+          max
+            0
+            (min
+               savepoint
+               (final_head
+               - (blocks_preservation_cycles * blocks_per_cycle)
+               - max_op_ttl))
+        in
+        (checkpoint, savepoint, caboose)
   in
   let* () =
     check_consistency_after_import
