@@ -1375,13 +1375,13 @@ mod test {
     }
 
     #[test]
-    fn test_rlp_decode_fails_without_chain_id() {
+    fn test_rlp_decode_succeeds_without_chain_id() {
         // This transaction is signed but its v doesn't equal to CHAIN_ID * 2 + 35 + {0, 1}
         // but equal to 27/28 as in "old" (before https://eips.ethereum.org/EIPS/eip-155)
         // six fields encoding
         let malformed_tx = "f86c0a8502540be400825208944bbeeb066ed09b7aed07bf39eee0460dfa261520880de0b6b3a7640000801ca0f3ae52c1ef3300f44df0bcfd1341c232ed6134672b16e35699ae3f5fe2493379a023d23d2955a239dd6f61c4e8b2678d174356ff424eac53da53e17706c43ef871".to_string();
         let e = EthereumTransactionCommon::from_hex(malformed_tx);
-        assert!(e.is_err());
+        assert!(e.is_ok());
     }
 
     #[test]
@@ -1394,7 +1394,7 @@ mod test {
     }
 
     #[test]
-    fn test_decoding_not_eip_155_fails_gracefully() {
+    fn test_roundtrip_pre_eip_155() {
         // decoding of a transaction that is not eip 155, ie v = 28 / 27
         // initial transaction:
         // {
@@ -1412,15 +1412,11 @@ mod test {
         let signed_tx = "f901cc8086010000000000830250008080b90178608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c634300081200331ca06d851632958801b6919ba534b4b1feb1bdfaabd0d42890bce200a11ac735d58da0219b058d7169d7a4839c5cdd555b0820b545797365287a81ba409419912de7b1";
         // act
         let tx = hex::decode(signed_tx).unwrap();
-        let decoded = EthereumTransactionCommon::from_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx).unwrap();
+        let encoded = EthereumTransactionCommon::to_bytes(&decoded);
 
         // sanity check
-        assert_eq!(
-            decoded.err(),
-            Some(DecoderError::Custom(
-                "v has to be greater than 36 for a signed EIP-155 transaction",
-            ))
-        );
+        assert_eq!(hex::encode(encoded), signed_tx);
     }
 
     #[test]
