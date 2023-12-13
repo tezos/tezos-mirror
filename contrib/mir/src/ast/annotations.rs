@@ -47,6 +47,14 @@ impl<'a> Annotations<'a> {
         self.0.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Annotation> {
+        self.0.iter()
+    }
+
     pub fn get_single_field_ann(&self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
         use Annotation::*;
         let mut res = None;
