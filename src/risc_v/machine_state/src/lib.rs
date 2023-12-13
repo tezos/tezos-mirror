@@ -5,9 +5,12 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod backend;
+pub mod bus;
 pub mod csregisters;
 pub mod memory_backend;
 pub mod registers;
+
+use bus::main_memory;
 
 /// RISC-V hart state
 pub struct HartState<M: backend::Manager> {
@@ -156,6 +159,25 @@ impl<M: backend::Manager> HartState<M> {
             xregisters: registers::XRegisters::new_in(space.0),
             fregisters: registers::FRegisters::new_in(space.1),
             csregisters: csregisters::CSRegisters::new_in(space.2),
+        }
+    }
+}
+
+/// Layout for the machine state
+pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>);
+
+/// Machine state
+pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
+    pub hart: HartState<M>,
+    pub bus: bus::Bus<ML, M>,
+}
+
+impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
+    /// Bind the machine state to the given allocated space.
+    pub fn new_in(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
+        Self {
+            hart: HartState::new_in(space.0),
+            bus: bus::Bus::new_in(space.1),
         }
     }
 }

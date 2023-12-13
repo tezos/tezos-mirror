@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::backend::{self, Layout};
-use std::{alloc, marker::PhantomData, ptr, slice};
+use std::{alloc, marker::PhantomData, mem, ptr, slice};
 
 /// In-memory state backend
 pub struct InMemoryBackend<L> {
@@ -126,6 +126,63 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
         };
 
         backing_storage
+    }
+
+    type VolatileRegion<E: backend::Elem, const LEN: usize> = VolatileRegion<'backend, E, LEN>;
+
+    fn allocate_volatile_region<E: backend::Elem, const LEN: usize>(
+        &mut self,
+        loc: backend::Volatile<backend::Location<[E; LEN]>>,
+    ) -> Self::VolatileRegion<E, LEN> {
+        let backing_storage = (self.backing_storage + loc.offset()) as *mut E;
+        VolatileRegion {
+            backing_storage,
+            _pd: PhantomData,
+        }
+    }
+}
+
+/// Region whose memory accesses are marked as "volatile"
+///
+/// See [std::ptr::read_volatile] and [std::ptr::write_volatile] for more information.
+#[repr(transparent)]
+pub struct VolatileRegion<'backend, E, const LEN: usize> {
+    backing_storage: *mut E,
+    _pd: PhantomData<&'backend mut [u8]>,
+}
+
+impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
+    for VolatileRegion<'backend, E, LEN>
+{
+    #[inline(always)]
+    fn read(&self, index: usize) -> E {
+        // Make sure the access is within bounds.
+        debug_assert!(index * mem::size_of::<E>() <= LEN - mem::size_of::<E>());
+
+        // The backing storage needs to be aligend properly for the resulting memory access to be
+        // properly aligned as well.
+        debug_assert_eq!(self.backing_storage.align_offset(mem::align_of::<E>()), 0);
+
+        let mut elem = unsafe { self.backing_storage.offset(index as isize).read_volatile() };
+        elem.from_stored_in_place();
+        elem
+    }
+
+    #[inline(always)]
+    fn write(&mut self, index: usize, mut value: E) {
+        // Make sure the access is within bounds.
+        debug_assert!(index * mem::size_of::<E>() <= LEN - mem::size_of::<E>());
+
+        // The backing storage needs to be aligend properly for the resulting memory access to be
+        // properly aligned as well.
+        debug_assert_eq!(self.backing_storage.align_offset(mem::align_of::<E>()), 0);
+
+        value.to_stored_in_place();
+        unsafe {
+            self.backing_storage
+                .offset(index as isize)
+                .write_volatile(value)
+        }
     }
 }
 
