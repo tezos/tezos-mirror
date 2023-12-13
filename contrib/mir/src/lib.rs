@@ -245,6 +245,146 @@ mod tests {
         };
     }
 
+    use crate::stack::{FailingTypeStack, Stack, TypeStack};
+    use crate::typechecker::typecheck_instruction;
+
+    fn run_e2e_test<'a>(
+        instr: &'a str,
+        input_type_stack: TypeStack,
+        output_type_stack: TypeStack,
+        mut input_stack: Stack<TypedValue<'a>>,
+        output_stack: Stack<TypedValue<'a>>,
+        mut ctx: Ctx,
+    ) {
+        let ast = parse(instr).unwrap();
+        let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
+        let ast =
+            typecheck_instruction(&ast, &mut ctx, None, &mut input_failing_type_stack).unwrap();
+        assert_eq!(
+            input_failing_type_stack,
+            FailingTypeStack::Ok(output_type_stack)
+        );
+        assert!(ast.interpret(&mut ctx, &mut input_stack).is_ok());
+        assert_eq!(input_stack, output_stack);
+    }
+
+    #[test]
+    fn ticket_instr() {
+        let ctx = Ctx::default();
+        run_e2e_test(
+            "TICKET",
+            stk![Type::Nat, Type::Int],
+            stk![Type::new_option(Type::new_ticket(Type::Int))],
+            stk![TypedValue::nat(10), TypedValue::int(20)],
+            stk![TypedValue::new_option(Some(TypedValue::new_ticket(
+                Ticket {
+                    amount: 10u32.into(),
+                    content: TypedValue::int(20),
+                    ticketer: ctx.self_address
+                }
+            )))],
+            Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn read_ticket() {
+        let ticketer_address_hash =
+            AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let ticketer_address = Address {
+            hash: ticketer_address_hash.clone(),
+            entrypoint: Entrypoint::default(),
+        };
+        let ticket = Ticket {
+            ticketer: ticketer_address_hash,
+            amount: 100u32.into(),
+            content: TypedValue::int(20),
+        };
+        run_e2e_test(
+            "READ_TICKET",
+            stk![Type::new_ticket(Type::Int)],
+            stk![
+                Type::new_ticket(Type::Int),
+                Type::new_pair(Type::Address, Type::new_pair(Type::Int, Type::Nat)),
+            ],
+            stk![TypedValue::new_ticket(ticket.clone())],
+            stk![
+                TypedValue::new_ticket(ticket),
+                TypedValue::new_pair(
+                    TypedValue::Address(ticketer_address),
+                    TypedValue::new_pair(TypedValue::int(20), TypedValue::nat(100))
+                ),
+            ],
+            Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn split_ticket() {
+        let ctx = Ctx::default();
+        let ticket = Ticket {
+            ticketer: ctx.self_address,
+            amount: 100u32.into(),
+            content: TypedValue::int(20),
+        };
+        run_e2e_test(
+            "SPLIT_TICKET",
+            stk![
+                Type::new_pair(Type::Nat, Type::Nat),
+                Type::new_ticket(Type::Int)
+            ],
+            stk![Type::new_option(Type::new_pair(
+                Type::new_ticket(Type::Int),
+                Type::new_ticket(Type::Int)
+            )),],
+            stk![
+                TypedValue::new_pair(TypedValue::nat(20), TypedValue::nat(80)),
+                TypedValue::new_ticket(ticket.clone())
+            ],
+            stk![TypedValue::new_option(Some(TypedValue::new_pair(
+                TypedValue::new_ticket(Ticket {
+                    amount: 20u32.into(),
+                    ..ticket.clone()
+                }),
+                TypedValue::new_ticket(Ticket {
+                    amount: 80u32.into(),
+                    ..ticket
+                })
+            ))),],
+            Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn join_tickets() {
+        let ctx = Ctx::default();
+        let ticket = Ticket {
+            ticketer: ctx.self_address,
+            amount: 100u32.into(),
+            content: TypedValue::int(20),
+        };
+        run_e2e_test(
+            "JOIN_TICKETS",
+            stk![Type::new_pair(
+                Type::new_ticket(Type::Int),
+                Type::new_ticket(Type::Int)
+            )],
+            stk![Type::new_option(Type::new_ticket(Type::Int)),],
+            stk![TypedValue::new_pair(
+                TypedValue::new_ticket(Ticket {
+                    amount: 20u32.into(),
+                    ..ticket.clone()
+                }),
+                TypedValue::new_ticket(Ticket {
+                    amount: 80u32.into(),
+                    ..ticket.clone()
+                })
+            )],
+            stk![TypedValue::new_option(Some(TypedValue::new_ticket(ticket))),],
+            Ctx::default(),
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
