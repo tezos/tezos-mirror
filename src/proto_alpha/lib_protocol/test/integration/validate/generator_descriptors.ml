@@ -521,10 +521,11 @@ let drain_delegate_prelude state =
 let drain_delegate_descriptor =
   {
     parameters = Fun.id;
-    required_cycle = (fun params -> params.constants.preserved_cycles + 1);
+    required_cycle = (fun params -> params.constants.consensus_rights_delay + 1);
     required_block = (fun _ -> 0);
     prelude =
-      (On (init_params.constants.preserved_cycles + 1), drain_delegate_prelude);
+      ( On (init_params.constants.consensus_rights_delay + 1),
+        drain_delegate_prelude );
     opt_prelude = None;
     candidates_generator =
       (fun state ->
