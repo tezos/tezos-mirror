@@ -281,8 +281,9 @@ pub fn run_test(
     let mut host = prepare_host();
 
     for (name, unit) in suit.0.into_iter() {
-        writeln!(output_file, "Running unit test: {}", name).unwrap();
-
+        if !opt.report_only {
+            writeln!(output_file, "Running unit test: {}", name).unwrap();
+        }
         let precompiles = precompile_set::<EvalHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -306,12 +307,14 @@ pub fn run_test(
 
                 let tx_label = info.labels.get(&test_index);
                 if let Some(tx_label) = tx_label {
-                    writeln!(
-                        output_file,
-                        "Executing test with label: {} and index: {}",
-                        tx_label, test_index
-                    )
-                    .unwrap();
+                    if !opt.report_only {
+                        writeln!(
+                            output_file,
+                            "Executing test with label: {} and index: {}",
+                            tx_label, test_index
+                        )
+                        .unwrap();
+                    }
                 }
 
                 let exec_result = execute_transaction(
@@ -335,6 +338,7 @@ pub fn run_test(
                         output_file,
                         tx_label,
                         test_index as i64,
+                        opt.report_only,
                     ),
                     None => write_host!(
                         host,

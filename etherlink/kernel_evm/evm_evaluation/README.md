@@ -53,8 +53,15 @@ $ evm-evaluation-assessor --output <output>
 $ evm-evaluation-assessor -o <output>
 ```
 
+Specify if you only want to output the final report:
 
-These can all be combined:
+```
+$ evm-evaluation-assessor --report-only <report-only>
+# or
+$ evm-evaluation-assessor -r <report-only>
+```
+
+Multiple options can be combined:
 
 ```
 $ evm-evaluation-assessor --eth-tests <ethereum-tests> --sub-directory <sub-dir> --test <test> --output <output>
