@@ -9,6 +9,7 @@
 - Implementation of EIP-3541, new code starting with the 0xEF byte cannot be
 deployed. (!11225)
 - Implement EIP-684: Prevent create collision. Reject contract creation to non-empty address (!11150)
+- Smart contract starts at nonce 1 following EIP-161. (!11276)
 
 ### Bug fixes
 
