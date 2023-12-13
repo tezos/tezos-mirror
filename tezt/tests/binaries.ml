@@ -40,23 +40,36 @@ let version_flag = "--version"
    Should we implement this via Component.run commands when possible?
 *)
 let spawn_command path =
+  let path = Uses.path path in
   Process.run_and_read_stdout ("./" ^ path) [version_flag]
 
-let test_versions path =
-  let node = Node.create [] in
-  (* We remove octez-node as it will be checked separately. It is the
-     binary whose version we assume to be canonical. *)
-  let* node_version = Node.get_version node in
-  let commands =
-    Base.read_file path |> String.split_on_char '\n'
-    |> List.filter @@ fun str ->
+let lookup_or_fail path =
+  match Uses.lookup path with
+  | None ->
+      (* We are hoping that [Uses.make] was already called for all executables.
+         For instance, since the [Constant] module is linked before this test,
+         it should be the case for all paths declared in [Constant]. *)
+      failwith
+        ("tezt/tests/binaries.ml: lookup_or_fail: executable " ^ path
+       ^ " has no corresponding Uses.t. Try to add it to Constant.Unused.")
+  | Some uses -> uses
+
+(* We remove octez-node as it will be checked separately. It is the
+   binary whose version we assume to be canonical. *)
+let read_executable_list path =
+  read_file path |> String.split_on_char '\n'
+  |> ( List.filter @@ fun str ->
        (not (String.equal str String.empty))
-       && not (String.equal str "octez-node")
-  in
+       && not (String.equal str "octez-node") )
+  |> List.map lookup_or_fail
+
+let test_versions commands =
+  let node = Node.create [] in
+  let* node_version = Node.get_version node in
   let loop cmd =
     Log.info
       "Check that %s supports %s as version flag, and returns version %s."
-      cmd
+      (Uses.path cmd)
       version_flag
       node_version ;
     let* result = spawn_command cmd in
@@ -69,20 +82,24 @@ let test_versions path =
 (* Test that all released binaries support the --version flag, and
    that they report the same version value as the Octez node. *)
 let test_released_versions () =
+  let executables = read_executable_list Constant.released_executables in
   Test.register
     ~__FILE__
     ~title:"Released binaries: report consistent version"
     ~tags:["binaries"; "released"; "node"; "baker"; "version"]
-  @@ fun () -> test_versions Constant.released_executables
+    ~uses:executables
+  @@ fun () -> test_versions executables
 
 (* Test that all experimental binaries support the --version flag, and
    that they report the same version value as the Octez node. *)
 let test_experimental_versions () =
+  let executables = read_executable_list Constant.experimental_executables in
   Test.register
     ~__FILE__
     ~title:"Experimental binaries: report consistent version"
     ~tags:["binaries"; "experimental"; "version"]
-  @@ fun () -> test_versions Constant.experimental_executables
+    ~uses:executables
+  @@ fun () -> test_versions executables
 
 let register_protocol_independent () =
   test_released_versions () ;

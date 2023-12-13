@@ -49,6 +49,13 @@ module Uses : sig
   (** Get the tag of a test dependency. *)
   val tag : t -> string
 
+  (** Get the first [Uses.t] that was created using [make] for a given path.
+
+      Paths are considered equal modulo some inconsequential variations.
+      For instance, ["./bin//./octez-node"] and ["bin/octez-node"]
+      are considered equivalent. *)
+  val lookup : string -> t option
+
   (** {2:default Default Uses} *)
 
   (** The following uses are added by default, but can be removed by specifying

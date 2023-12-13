@@ -27,6 +27,8 @@
 (* Declaration order must respect the version order. *)
 type t = Nairobi | Oxford | Alpha
 
+let all = [Nairobi; Oxford; Alpha]
+
 let encoding =
   Data_encoding.string_enum
     [("nairobi", Nairobi); ("oxford", Oxford); ("alpha", Alpha)]
@@ -79,9 +81,17 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 
-let protocol_dependent_uses ~tag ~path protocol =
-  let protocol = daemon_name protocol in
-  Uses.make ~tag:(tag ^ String.lowercase_ascii protocol) ~path:(path ^ protocol)
+let protocol_dependent_uses ~tag ~path =
+  let make protocol =
+    let protocol = daemon_name protocol in
+    Uses.make
+      ~tag:(tag ^ String.lowercase_ascii protocol)
+      ~path:(path ^ protocol)
+  in
+  (* Make sure [Uses.lookup] knows about all executables even before tests
+     actually registers themselves. *)
+  let _ = List.map make all in
+  make
 
 let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
@@ -273,8 +283,6 @@ let previous_protocol = function
   | Nairobi -> None
 
 let has_predecessor p = previous_protocol p <> None
-
-let all = [Nairobi; Oxford; Alpha]
 
 type supported_protocols =
   | Any_protocol
