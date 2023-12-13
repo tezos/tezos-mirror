@@ -1977,7 +1977,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm _protocol parameters dal_node
   in
   let* () = Client.bake_for_and_wait client in
   let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
@@ -3876,7 +3876,7 @@ module Tx_kernel_e2e = struct
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
     let* () =
-      Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+      Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
     in
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
@@ -4048,7 +4048,7 @@ module Tx_kernel_e2e = struct
     in
     let* () = Client.bake_for_and_wait client in
     let* () =
-      Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+      Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
     in
     let* current_level = Node.get_level node in
     let target_level =

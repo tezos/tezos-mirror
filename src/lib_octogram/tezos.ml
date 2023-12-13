@@ -1718,11 +1718,6 @@ module Start_rollup_node = struct
         args.path_client
     in
     let l1_endpoint = octez_endpoint state args.endpoint in
-    let metrics_port =
-      match args.metrics_port with
-      | Some x -> int_of_string x
-      | _ -> Port.fresh ()
-    in
     let rollup_node =
       Sc_rollup_node.(
         create_with_endpoint
@@ -1730,6 +1725,7 @@ module Start_rollup_node = struct
           ~rpc_host:"0.0.0.0"
           ?data_dir:args.data_dir_path
           ?rpc_port:(Option.map int_of_string args.rpc_port)
+          ?metrics_port:(Option.map int_of_string args.metrics_port)
           ~path
           (mode_of_string args.mode)
           ~default_operator:args.operator
@@ -1738,20 +1734,18 @@ module Start_rollup_node = struct
     in
     let kernel_log_args =
       match args.kernel_log_path with
-      | Some path -> ["--log-kernel-debug"; "--log-kernel-debug-file"; path]
+      | Some path ->
+          Sc_rollup_node.[Log_kernel_debug; Log_kernel_debug_file path]
       | None -> []
     in
-    let* () =
-      Sc_rollup_node.run rollup_node args.address
-      @@ ["--metrics-addr"; sf "0.0.0.0:%d" metrics_port]
-      @ kernel_log_args
-    in
+    let* () = Sc_rollup_node.run rollup_node args.address kernel_log_args in
 
     let* _ = Sc_rollup_node.unsafe_wait_sync ~path_client rollup_node in
     Agent_state.add
       (Rollup_node_k (Sc_rollup_node.name rollup_node))
       rollup_node
       state ;
+    let _metric_addr, metrics_port = Sc_rollup_node.metrics rollup_node in
     return
       {
         name = Sc_rollup_node.name rollup_node;

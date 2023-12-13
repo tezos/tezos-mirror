@@ -46,7 +46,7 @@ let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
       client
   in
   let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let mode =
     Evm_node.Sequencer {kernel = output; preimage_dir = preimages_dir}

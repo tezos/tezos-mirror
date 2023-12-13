@@ -341,7 +341,7 @@ let setup_evm_kernel ?config ?kernel_installee
       client
   in
   let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   (* EVM Kernel installation level. *)

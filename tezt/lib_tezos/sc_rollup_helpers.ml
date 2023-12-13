@@ -360,7 +360,7 @@ let call_rpc ~smart_rollup_node ~service =
 type bootstrap_smart_rollup_setup = {
   bootstrap_smart_rollup : Protocol.bootstrap_smart_rollup;
   smart_rollup_node_data_dir : string;
-  smart_rollup_node_extra_args : string list;
+  smart_rollup_node_extra_args : Sc_rollup_node.argument list;
 }
 
 let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
@@ -392,7 +392,7 @@ let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
     {
       bootstrap_smart_rollup;
       smart_rollup_node_data_dir;
-      smart_rollup_node_extra_args = ["--boot-sector-file"; boot_sector_file];
+      smart_rollup_node_extra_args = [Boot_sector_file boot_sector_file];
     }
 
 (* Refutation game scenarios

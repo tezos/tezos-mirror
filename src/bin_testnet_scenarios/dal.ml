@@ -364,9 +364,7 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
       let* _boot_sector = prepare_installer_kernel rollup_node in
       unit
   in
-  let* () =
-    Sc_rollup_node.run rollup_node rollup_alias ["--log-kernel-debug"]
-  in
+  let* () = Sc_rollup_node.run rollup_node rollup_alias [Log_kernel_debug] in
   let* first_level =
     let* crt = Node.get_level node in
     crt + 1 |> return
