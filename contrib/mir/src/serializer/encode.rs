@@ -8,12 +8,15 @@
 //! Micheline serialization.
 
 use std::mem::size_of;
+use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 
 use crate::{
     ast::{annotations::Annotations, Micheline},
     lexer::{Annotation, Prim},
 };
 
+/// Prefix denoting an encoded number.
+const NUMBER_TAG: u8 = 0x00;
 /// Prefix denoting an encoded string.
 const STRING_TAG: u8 = 0x01;
 /// Prefix denoting an encoded sequence.
@@ -158,7 +161,12 @@ fn put_seq<V>(list: &[V], out: &mut Vec<u8>, encoder: fn(&V, &mut Vec<u8>)) {
 fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
     use Micheline::*;
     match mich {
-        Int(_) => todo!(), // for a later MR
+        Int(n) => {
+            let z = Zarith((*n).into());
+            out.push(NUMBER_TAG);
+            z.bin_write(out)
+                .unwrap_or_else(|err| panic!("Encoding zarith number unexpectedly failed: {err}"))
+        }
         String(s) => put_string(s, out),
         Bytes(b) => put_bytes(b, out),
         Seq(s) => put_seq(s, out, encode_micheline),
@@ -179,6 +187,13 @@ impl<'a> Micheline<'a> {
         let mut out = Vec::from(start_bytes);
         encode_micheline(self, &mut out);
         out
+    }
+}
+
+impl<'a> BinWriter for Micheline<'a> {
+    fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+        encode_micheline(self, out);
+        Ok(())
     }
 }
 
@@ -210,6 +225,58 @@ mod test_encoding {
             check((), "0x030b");
             check(true, "0x030a");
             check(false, "0x0303");
+        }
+
+        mod number {
+            use super::*;
+
+            #[test]
+            fn zero() {
+                check(0, "0x0000");
+            }
+
+            #[test]
+            fn few_trivial_samples() {
+                check(1, "0x0001");
+                check(13, "0x000d");
+            }
+
+            #[test]
+            fn largest_1_byte_long() {
+                check(63, "0x003f");
+            }
+
+            #[test]
+            fn smallest_2_bytes_long() {
+                check(64, "0x008001");
+            }
+
+            #[test]
+            fn large() {
+                check(123456789, "0x0095b4de75");
+            }
+
+            #[test]
+            fn negative() {
+                check(-1, "0x0041");
+                check(-36, "0x0064");
+            }
+
+            // Don't mind this "largest", it is in absolute numeric value sense
+            #[test]
+            fn negative_largest_1_byte_long() {
+                check(-63, "0x007f");
+            }
+
+            #[test]
+            fn negative_smallest_2_bytes_long() {
+                check(-64, "0x00c001");
+            }
+
+            #[test]
+            fn negative_large() {
+                check(-987654321, "0x00f1a2f3ad07");
+            }
         }
 
         #[test]
