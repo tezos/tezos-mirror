@@ -348,6 +348,12 @@ mod tests {
         let mut stk = stk![1, 2, 3, 4];
         stk.remove(1);
         assert_eq!(stk, stk![1, 2, 4]);
+
+        stk.remove(2);
+        assert_eq!(stk, stk![2, 4]);
+
+        stk.remove(0);
+        assert_eq!(stk, stk![2]);
     }
 
     #[test]
@@ -355,6 +361,14 @@ mod tests {
         let mut stk = stk![1, 2, 3];
         stk.insert(2, 10);
         assert_eq!(stk, stk![1, 10, 2, 3]);
+
+        let mut stk = stk![];
+        stk.insert(0, 10);
+        assert_eq!(stk, stk![10]);
+
+        let mut stk = stk![1, 2, 3];
+        stk.insert(3, 10);
+        assert_eq!(stk, stk![10, 1, 2, 3]);
     }
 
     #[test]

@@ -461,6 +461,20 @@ fn interpret_one<'a>(
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             stack.push(stack[dup_height - 1].clone());
         }
+        I::Dig(dig_height) => {
+            ctx.gas.consume(interpret_cost::dig(*dig_height)?)?;
+            if *dig_height > 0 {
+                let e = stack.remove(*dig_height as usize);
+                stack.push(e);
+            }
+        }
+        I::Dug(dug_height) => {
+            ctx.gas.consume(interpret_cost::dug(*dug_height)?)?;
+            if *dug_height > 0 {
+                let e = pop!();
+                stack.insert(*dug_height as usize, e);
+            }
+        }
         I::Gt => {
             ctx.gas.consume(interpret_cost::GT)?;
             let i = pop!(V::Int);
@@ -4375,5 +4389,23 @@ mod interpreter_tests {
         test(100500, 100, Some(100400));
         test(100500, 100500, Some(0));
         test(100500, 100500700, None);
+    }
+
+    #[test]
+    fn test_dig() {
+        let mut stack = stk![V::Unit, V::nat(10), V::int(20), V::Bool(true), V::nat(5)];
+        let expected_stack = stk![V::nat(10), V::int(20), V::Bool(true), V::nat(5), V::Unit,];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Dig(4), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_dug() {
+        let mut stack = stk![V::Unit, V::nat(10), V::int(20), V::Bool(true), V::nat(5)];
+        let expected_stack = stk![V::nat(5), V::Unit, V::nat(10), V::int(20), V::Bool(true),];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Dug(4), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 }
