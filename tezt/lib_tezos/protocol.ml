@@ -278,7 +278,7 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some Nairobi
+  | Alpha -> Some Oxford
   | Oxford -> Some Nairobi
   | Nairobi -> None
 
