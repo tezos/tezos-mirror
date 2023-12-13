@@ -73,6 +73,16 @@ module type T = sig
 
     val fee_needed_to_overtake :
       op_to_overtake:operation -> candidate_op:operation -> int64 option
+
+    type ctxt
+
+    val get_context :
+      Tezos_protocol_environment.Context.t ->
+      head:Block_header.shell_header ->
+      ctxt tzresult Lwt.t
+
+    val sources_from_operation :
+      ctxt -> operation -> Signature.public_key_hash list Lwt.t
   end
 end
 
@@ -124,6 +134,12 @@ module No_plugin (Proto : Registered_protocol.T) :
     end
 
     let fee_needed_to_overtake ~op_to_overtake:_ ~candidate_op:_ = None
+
+    type ctxt = unit
+
+    let get_context _ ~head:_ = Lwt_result_syntax.return_unit
+
+    let sources_from_operation _ _ = Lwt_syntax.return_nil
   end
 end
 
