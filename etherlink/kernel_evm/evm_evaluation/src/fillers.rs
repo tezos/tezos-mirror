@@ -5,7 +5,9 @@
 use crate::evalhost::EvalHost;
 use crate::helpers::{parse_and_get_cmp, purify_network};
 use crate::models::spec::SpecId;
-use crate::models::{AccountInfoFiller, FillerSource, SpecName};
+use crate::models::{
+    AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
+};
 use crate::{write_host, ReportValue};
 
 use evm_execution::account_storage::EthereumAccount;
@@ -16,6 +18,50 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
+
+fn check_filler_constraints(
+    indexes: &FillerResultIndexes,
+    tx_label: Option<&String>,
+    tx_index: i64,
+) -> bool {
+    // A transaction matches the constraints if:
+    // - there are no constraints
+    // - OR, if it has a label, it matches one of the label of the test
+    // - OR, its index is the range of those identified
+
+    if indexes.data.is_empty() {
+        return true;
+    }
+
+    for index_kind in indexes.to_owned().data.into_iter() {
+        match index_kind {
+            IndexKind::Label(label) => {
+                if let Some(tx_label) = tx_label {
+                    if tx_label.eq(&label) {
+                        return true;
+                    }
+                }
+            }
+            IndexKind::Range(start, end) => {
+                if start <= tx_index && tx_index <= end {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // At this point, no constraint have been matched.
+    false
+}
+
+fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
+    let cmp_spec_id = parse_and_get_cmp(filler_network);
+    let network = purify_network(filler_network);
+    let check_network_id = SpecId::from(&network) as u8;
+    let current_network_config_id = SpecId::from(&spec_name.to_str()) as u8;
+
+    cmp_spec_id(&current_network_config_id, &check_network_id)
+}
 
 fn check_should_not_exist(
     host: &mut EvalHost,
@@ -211,6 +257,7 @@ fn check_durable_storage(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn process(
     host: &mut EvalHost,
     filler_source: FillerSource,
@@ -218,6 +265,8 @@ pub fn process(
     report_map: &mut HashMap<String, ReportValue>,
     report_key: String,
     output_file: &mut File,
+    tx_label: Option<&String>,
+    tx_index: i64,
 ) {
     let mut good_state = true;
 
@@ -225,19 +274,21 @@ pub fn process(
         write_host!(host, "Processing checks with filler: {}Filler\n", name);
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
-                let cmp_spec_id = parse_and_get_cmp(&filler_network);
-                let network = purify_network(&filler_network);
-                let check_network_id = SpecId::from(&network) as u8;
-                let current_network_config_id = SpecId::from(&spec_name.to_str()) as u8;
+                if check_filler_constraints(
+                    &filler_expectation.indexes,
+                    tx_label,
+                    tx_index,
+                ) && check_if_network_match(&filler_network, spec_name)
+                {
+                    write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
+                    write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
 
-                if !cmp_spec_id(&current_network_config_id, &check_network_id) {
-                    continue;
+                    check_durable_storage(
+                        host,
+                        &filler_expectation.result,
+                        &mut good_state,
+                    );
                 }
-
-                write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
-                write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
-
-                check_durable_storage(host, &filler_expectation.result, &mut good_state);
             }
         }
     }
