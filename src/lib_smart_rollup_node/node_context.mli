@@ -59,7 +59,7 @@ module Node_store : sig
   val check_and_set_history_mode :
     'a Store_sigs.mode ->
     'a store ->
-    Configuration.history_mode ->
+    Configuration.history_mode option ->
     unit tzresult Lwt.t
 end
 

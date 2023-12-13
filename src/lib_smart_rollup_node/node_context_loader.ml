@@ -245,7 +245,7 @@ module Internal_for_tests = struct
           log_kernel_debug = false;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
-          history_mode = Configuration.default_history_mode;
+          history_mode = None;
           cors = Resto_cohttp.Cors.default;
         }
     in

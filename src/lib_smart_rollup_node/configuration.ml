@@ -71,7 +71,7 @@ type t = {
   log_kernel_debug : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
-  history_mode : history_mode;
+  history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
 }
 
@@ -555,7 +555,7 @@ let encoding : t Data_encoding.t =
              (dft "log-kernel-debug" Data_encoding.bool false)
              (dft "no-degraded" Data_encoding.bool false)
              (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
-             (dft "history-mode" history_mode_encoding default_history_mode)
+             (opt "history-mode" history_mode_encoding)
              (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
 
 (** Maps a mode to their corresponding purposes. The Custom mode
@@ -704,7 +704,7 @@ module Cli = struct
               ~default:default_gc_parameters.frequency_in_blocks
               gc_frequency;
         };
-      history_mode = Option.value ~default:default_history_mode history_mode;
+      history_mode;
       cors =
         Resto_cohttp.Cors.
           {
@@ -785,8 +785,7 @@ module Cli = struct
                 ~default:configuration.gc_parameters.frequency_in_blocks
                 gc_frequency;
           };
-        history_mode =
-          Option.value ~default:configuration.history_mode history_mode;
+        history_mode = Option.either history_mode configuration.history_mode;
         cors =
           Resto_cohttp.Cors.
             {
