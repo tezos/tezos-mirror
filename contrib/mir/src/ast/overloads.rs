@@ -94,6 +94,11 @@ pub enum Update {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum GetAndUpdate {
+    Map,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Size {
     String,
     Bytes,

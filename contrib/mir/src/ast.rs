@@ -481,6 +481,7 @@ pub enum Instruction<'a> {
     Mem(overloads::Mem),
     Get(overloads::Get),
     Update(overloads::Update),
+    GetAndUpdate(overloads::GetAndUpdate),
     Concat(overloads::Concat),
     Size(overloads::Size),
     Seq(Vec<Self>),

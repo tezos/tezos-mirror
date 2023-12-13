@@ -890,6 +890,20 @@ fn interpret_one<'a>(
                 map.update(key, opt_new_val.map(|x| *x));
             }
         },
+        I::GetAndUpdate(overload) => match overload {
+            overloads::GetAndUpdate::Map => {
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let map = irrefutable_match!(&mut stack[0]; V::Map);
+                ctx.gas
+                    .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
+                let opt_old_val = match opt_new_val {
+                    None => map.remove(&key),
+                    Some(val) => map.insert(key, *val),
+                };
+                stack.push(V::new_option(opt_old_val));
+            }
+        },
         I::Size(overload) => {
             macro_rules! run_size {
                 ($ctor:tt, $gas:ident) => {{

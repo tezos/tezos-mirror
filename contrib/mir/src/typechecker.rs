@@ -1377,6 +1377,17 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            pop!();
+            I::GetAndUpdate(overloads::GetAndUpdate::Map)
+        }
+        (App(GET_AND_UPDATE, [], _), [.., _, _, _]) => no_overload!(GET_AND_UPDATE),
+        (App(GET_AND_UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(GET_AND_UPDATE, len 3),
+        (App(GET_AND_UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(SIZE, [], _), [.., T::String]) => {
             stack[0] = T::Nat;
             I::Size(overloads::Size::String)
@@ -4241,6 +4252,71 @@ mod typecheck_tests {
                 Type::new_list(Type::Int)
             ))
         );
+    }
+
+    #[test]
+    fn get_and_update_map() {
+        let mut stack = tc_stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(GetAndUpdate(overloads::GetAndUpdate::Map))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::new_map(Type::Int, Type::String),
+                Type::new_option(Type::String)
+            ]
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_wrong_ty() {
+        let mut stack = tc_stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::Nat),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TypesNotEqual(Type::String, Type::Nat).into())
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_incomparable() {
+        assert_eq!(
+            parse("GET_AND_UPDATE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[
+                    app!(map[app!(list[app!(int)]), app!(string)]),
+                    app!(option[app!(string)]),
+                    app!(list[app!(int)]),
+                ]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_too_short() {
+        too_short_test(&app!(GET_AND_UPDATE), Prim::GET_AND_UPDATE, 3)
     }
 
     #[test]
