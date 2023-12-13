@@ -3279,6 +3279,92 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn get_and_update_map_insert() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::new();
+        let mut stack = stk![
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
+        ];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::new_option(None),
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_update() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let mut stack = stk![
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
+        ];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::new_option(Some(V::String("bar".into())))
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_remove() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let mut stack = stk![V::Map(map), V::new_option(None), V::int(1)];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::new()),
+                V::new_option(Some(V::String("bar".into()))),
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+        );
+    }
+
+    #[test]
     fn update_big_map() {
         fn check<'a>(
             content: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
