@@ -147,7 +147,7 @@ let default_dal =
       cryptobox_parameters = default_cryptobox_parameters;
     }
 
-let constants_mainnet =
+let constants_mainnet : Constants.Parametric.t =
   let block_time = 10 in
   let consensus_committee_size = 7000 in
   let Constants.Generated.
@@ -180,7 +180,6 @@ let constants_mainnet =
   in
   let sc_rollup = make_sc_rollup_parameter ~dal_activation_level block_time in
   {
-    Constants.Parametric.preserved_cycles = 5;
     consensus_rights_delay = 5;
     blocks_preservation_cycles = 1;
     delegate_parameters_activation_delay = 5;
@@ -335,7 +334,6 @@ let constants_sandbox =
               ~mainnet_constants_divider:32;
         };
     issuance_weights;
-    Constants.Parametric.preserved_cycles = 2;
     blocks_preservation_cycles = 1;
     consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 2;
@@ -371,7 +369,6 @@ let constants_test =
               ~mainnet_constants_divider:64;
         };
     issuance_weights;
-    Constants.Parametric.preserved_cycles = 3;
     consensus_rights_delay = 3;
     delegate_parameters_activation_delay = 3;
     blocks_preservation_cycles = 1;

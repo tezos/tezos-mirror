@@ -172,7 +172,6 @@ type issuance_weights = {
 }
 
 type t = {
-  preserved_cycles : int;
   consensus_rights_delay : int;
   blocks_preservation_cycles : int;
   delegate_parameters_activation_delay : int;
@@ -519,8 +518,7 @@ let encoding =
   let open Data_encoding in
   conv
     (fun c ->
-      ( ( ( c.preserved_cycles,
-            c.consensus_rights_delay,
+      ( ( ( c.consensus_rights_delay,
             c.blocks_preservation_cycles,
             c.delegate_parameters_activation_delay ),
           ( c.blocks_per_cycle,
@@ -559,8 +557,7 @@ let encoding =
                   ( (c.sc_rollup, c.zk_rollup),
                     (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
               ) ) ) ) ))
-    (fun ( ( ( preserved_cycles,
-               consensus_rights_delay,
+    (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay ),
              ( blocks_per_cycle,
@@ -600,7 +597,6 @@ let encoding =
                        (adaptive_issuance, direct_ticket_spending_enable) ) ) )
                ) ) ) ) ->
       {
-        preserved_cycles;
         consensus_rights_delay;
         blocks_preservation_cycles;
         delegate_parameters_activation_delay;
@@ -644,8 +640,7 @@ let encoding =
       })
     (merge_objs
        (merge_objs
-          (obj4
-             (req "preserved_cycles" uint8)
+          (obj3
              (req "consensus_rights_delay" uint8)
              (req "blocks_preservation_cycles" uint8)
              (req "delegate_parameters_activation_delay" uint8))

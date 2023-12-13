@@ -1193,7 +1193,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let constants =
           Constants_parametric_repr.
             {
-              preserved_cycles = c.preserved_cycles;
               consensus_rights_delay = c.preserved_cycles;
               blocks_preservation_cycles = 1;
               delegate_parameters_activation_delay = c.preserved_cycles;

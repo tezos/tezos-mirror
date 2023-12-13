@@ -171,7 +171,6 @@ type issuance_weights = {
 }
 
 type t = {
-  preserved_cycles : int;
   (* Number of cycles after which computed consensus rights are used to actually
      participate in the consensus *)
   consensus_rights_delay : int;

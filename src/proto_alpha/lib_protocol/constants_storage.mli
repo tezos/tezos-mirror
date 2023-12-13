@@ -29,8 +29,6 @@
     from the context.
     See {!Constant_repr.parametric} for more details about these values. *)
 
-val preserved_cycles : Raw_context.t -> int
-
 val consensus_rights_delay : Raw_context.t -> int
 
 val blocks_preservation_cycles : Raw_context.t -> int

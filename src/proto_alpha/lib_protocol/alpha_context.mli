@@ -890,7 +890,6 @@ module Constants : sig
     }
 
     type t = {
-      preserved_cycles : int;
       consensus_rights_delay : int;
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
@@ -955,8 +954,6 @@ module Constants : sig
   val parametric : context -> Parametric.t
 
   val sc_rollup : context -> Parametric.sc_rollup
-
-  val preserved_cycles : context -> int
 
   val consensus_rights_delay : context -> int
 
