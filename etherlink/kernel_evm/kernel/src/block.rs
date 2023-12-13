@@ -366,7 +366,7 @@ mod tests {
         r: H256,
         s: H256,
     ) -> EthereumTransactionCommon {
-        let chain_id = DUMMY_CHAIN_ID;
+        let chain_id = Some(DUMMY_CHAIN_ID);
         let gas_price = U256::from(40000000u64);
         let gas_limit = 21000u64;
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
@@ -434,7 +434,7 @@ mod tests {
 
         let tx = EthereumTransactionCommon {
             type_: tezos_ethereum::transaction::TransactionType::Legacy,
-            chain_id: DUMMY_CHAIN_ID,
+            chain_id: Some(DUMMY_CHAIN_ID),
             nonce,
             max_priority_fee_per_gas: gas_price,
             max_fee_per_gas: gas_price,
@@ -1159,7 +1159,7 @@ mod tests {
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
         let tx = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
-            chain_id: U256::one(),
+            chain_id: Some(U256::one()),
             nonce,
             max_fee_per_gas: gas_price,
             max_priority_fee_per_gas: gas_price,

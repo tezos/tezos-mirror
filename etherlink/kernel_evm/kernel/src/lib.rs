@@ -373,7 +373,7 @@ mod tests {
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
         let tx = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
-            chain_id: U256::one(),
+            chain_id: Some(U256::one()),
             nonce,
             max_fee_per_gas: gas_price,
             max_priority_fee_per_gas: gas_price,

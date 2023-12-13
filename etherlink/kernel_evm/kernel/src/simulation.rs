@@ -209,7 +209,7 @@ impl TxValidation {
             return Ok(TxValidationOutcome::NonceTooLow);
         }
         // Check if the chain id is correct
-        if tx.chain_id != chain_id {
+        if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
             return Ok(TxValidationOutcome::InvalidChainId);
         }
         // Check if the gas limit is not too high
@@ -772,7 +772,7 @@ mod tests {
 
             EthereumTransactionCommon {
                 type_: TransactionType::Legacy,
-                chain_id: 1337.into(),
+                chain_id: Some(1337.into()),
                 nonce: 0.into(),
                 max_priority_fee_per_gas: U256::default(),
                 max_fee_per_gas: U256::default(),
@@ -821,7 +821,7 @@ mod tests {
 
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Eip1559,
-            chain_id: U256::from(1),
+            chain_id: Some(U256::from(1)),
             nonce: U256::from(0),
             max_priority_fee_per_gas: U256::zero(),
             max_fee_per_gas: U256::from(1),

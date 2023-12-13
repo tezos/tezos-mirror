@@ -210,7 +210,9 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     block_constant: &BlockConstants,
 ) -> Result<Validity, Error> {
     // Chain id is correct.
-    if block_constant.chain_id != transaction.chain_id {
+    if transaction.chain_id.is_some()
+        && Some(block_constant.chain_id) != transaction.chain_id
+    {
         log!(host, Debug, "Transaction status: ERROR_CHAINID");
         return Ok(Validity::InvalidChainId);
     }
@@ -603,7 +605,7 @@ mod tests {
     fn valid_tx() -> EthereumTransactionCommon {
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Eip1559,
-            chain_id: CHAIN_ID.into(),
+            chain_id: Some(CHAIN_ID.into()),
             nonce: U256::from(0),
             max_priority_fee_per_gas: U256::zero(),
             max_fee_per_gas: U256::from(21000),
@@ -746,7 +748,7 @@ mod tests {
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(21000 * 21000);
         let mut transaction = valid_tx();
-        transaction.chain_id = U256::from(42);
+        transaction.chain_id = Some(U256::from(42));
         transaction = resign(transaction);
 
         // fund account
@@ -869,7 +871,7 @@ mod tests {
             tx_hash: [0u8; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(EthereumTransactionCommon {
                 type_: TransactionType::Eip1559,
-                chain_id: U256::from(1),
+                chain_id: Some(U256::from(1)),
                 nonce: U256::from(1),
                 max_priority_fee_per_gas: U256::zero(),
                 max_fee_per_gas: U256::from(1),
