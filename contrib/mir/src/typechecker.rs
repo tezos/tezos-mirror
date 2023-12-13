@@ -972,6 +972,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ABS, [], _), []) => no_overload!(ABS, len 1),
         (App(ABS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(ISNAT, [], _), [.., T::Int]) => {
+            stack[0] = Type::new_option(Type::Nat);
+            I::IsNat
+        }
+        (App(ISNAT, [], _), [.., t]) => no_overload!(ISNAT, TypesNotEqual(T::Int, t.clone())),
+        (App(ISNAT, [], _), []) => no_overload!(ISNAT, len 1),
+        (App(ISNAT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(LOOP, [Seq(nested)], _), [.., T::Bool]) => {
             // copy stack for unifying with it later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
@@ -2133,6 +2141,38 @@ mod typecheck_tests {
     #[test]
     fn test_abs_too_short() {
         too_short_test(&app!(ABS), Prim::ABS, 1);
+    }
+
+    #[test]
+    fn test_is_nat() {
+        let mut stack = tc_stk![Type::Int];
+        let expected_stack = tc_stk![Type::new_option(Type::Nat)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ISNAT), &mut ctx, &mut stack),
+            Ok(IsNat)
+        );
+        assert_eq!(stack, expected_stack);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
+    }
+
+    #[test]
+    fn test_is_nat_mismatch() {
+        let mut stack = tc_stk![Type::Unit];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ISNAT), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::ISNAT,
+                stack: stk![Type::Unit],
+                reason: Some(TypesNotEqual(Type::Int, Type::Unit).into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_is_nat_too_short() {
+        too_short_test(&app!(ISNAT), Prim::ISNAT, 1);
     }
 
     #[test]

@@ -250,6 +250,7 @@ pub mod interpret_cost {
     pub const SWAP: u32 = 10;
     pub const ABS: u32 = 10;
     pub const INT_NAT: u32 = 10;
+    pub const ISNAT: u32 = 10;
     pub const INT_BLS_FR: u32 = 115;
     pub const PUSH: u32 = 10;
     pub const ADD_TEZ: u32 = 20;

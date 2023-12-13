@@ -532,6 +532,11 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::abs(&i)?)?;
             stack.push(V::Nat(i.into_parts().1));
         }
+        I::IsNat => {
+            let i = pop!(V::Int);
+            ctx.gas.consume(interpret_cost::ISNAT)?;
+            stack.push(V::new_option(i.try_into().ok().map(V::Nat)));
+        }
         I::Int(overload) => match overload {
             overloads::Int::Nat => {
                 let i = pop!(V::Nat);
@@ -1639,6 +1644,22 @@ mod interpreter_tests {
         test(0, 0u32);
         test(10, 10u32);
         test(-10, 10u32);
+    }
+
+    #[test]
+    fn test_is_nat() {
+        #[track_caller]
+        fn test(arg: impl Into<BigInt>, res: Option<impl Into<BigUint>>) {
+            let mut stack = stk![V::nat(20), V::Int(arg.into())];
+            let expected_stack = stk![V::nat(20), V::new_option(res.map(|x| V::Nat(x.into())))];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&IsNat, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
+        test(0, Some(0u32));
+        test(10, Some(10u32));
+        test(-10, None::<u32>);
     }
 
     #[test]
