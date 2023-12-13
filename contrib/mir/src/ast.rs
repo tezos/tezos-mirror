@@ -421,6 +421,7 @@ pub enum Instruction<'a> {
     If(Vec<Self>, Vec<Self>),
     IfNone(Vec<Self>, Vec<Self>),
     Int(overloads::Int),
+    Abs,
     Loop(Vec<Self>),
     Push(TypedValue<'a>),
     Swap,

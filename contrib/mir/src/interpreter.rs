@@ -527,6 +527,11 @@ fn interpret_one<'a>(
                 }
             }
         }
+        I::Abs => {
+            let i = pop!(V::Int);
+            ctx.gas.consume(interpret_cost::abs(&i)?)?;
+            stack.push(V::Nat(i.into_parts().1));
+        }
         I::Int(overload) => match overload {
             overloads::Int::Nat => {
                 let i = pop!(V::Nat);
@@ -1150,6 +1155,7 @@ mod interpreter_tests {
     use crate::ast::michelson_address as addr;
     use crate::bls;
     use crate::gas::Gas;
+    use num_bigint::BigUint;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
@@ -1617,6 +1623,22 @@ mod interpreter_tests {
         )
         .is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_abs() {
+        #[track_caller]
+        fn test(arg: impl Into<BigInt>, res: impl Into<BigUint>) {
+            let mut stack = stk![V::nat(20), V::Int(arg.into())];
+            let expected_stack = stk![V::nat(20), V::Nat(res.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Abs, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
+        test(0, 0u32);
+        test(10, 10u32);
+        test(-10, 10u32);
     }
 
     #[test]

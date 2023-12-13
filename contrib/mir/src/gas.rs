@@ -248,6 +248,7 @@ pub mod interpret_cost {
     pub const LOOP: u32 = 10;
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
+    pub const ABS: u32 = 10;
     pub const INT_NAT: u32 = 10;
     pub const INT_BLS_FR: u32 = 115;
     pub const PUSH: u32 = 10;
@@ -737,6 +738,14 @@ pub mod interpret_cost {
         // NB: taken from the protocol, this doesn't fit with MIR implementation.
         let size = Checked::from(int.byte_size());
         (25 + (size >> 1)).as_gas_cost()
+    }
+
+    pub fn abs(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        // NB: MIR implementation is constant-time and alloc free so could have
+        // a constant gas cost but for consistency with the protocol we use the
+        // same linear model.
+        let size = Checked::from(int.byte_size());
+        (20 + (size >> 1)).as_gas_cost()
     }
 }
 

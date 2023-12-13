@@ -964,6 +964,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(INT, [], _), []) => no_overload!(INT, len 1),
         (App(INT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(ABS, [], _), [.., T::Int]) => {
+            stack[0] = Type::Nat;
+            I::Abs
+        }
+        (App(ABS, [], _), [.., t]) => no_overload!(ABS, TypesNotEqual(T::Int, t.clone())),
+        (App(ABS, [], _), []) => no_overload!(ABS, len 1),
+        (App(ABS, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(LOOP, [Seq(nested)], _), [.., T::Bool]) => {
             // copy stack for unifying with it later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
@@ -2093,6 +2101,38 @@ mod typecheck_tests {
         );
         assert_eq!(stack, expected_stack);
         assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+    }
+
+    #[test]
+    fn test_abs() {
+        let mut stack = tc_stk![Type::Int];
+        let expected_stack = tc_stk![Type::Nat];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ABS), &mut ctx, &mut stack),
+            Ok(Abs)
+        );
+        assert_eq!(stack, expected_stack);
+        assert!(ctx.gas.milligas() < Gas::default().milligas());
+    }
+
+    #[test]
+    fn test_abs_mismatch() {
+        let mut stack = tc_stk![Type::Unit];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(ABS), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::ABS,
+                stack: stk![Type::Unit],
+                reason: Some(TypesNotEqual(Type::Int, Type::Unit).into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_abs_too_short() {
+        too_short_test(&app!(ABS), Prim::ABS, 1);
     }
 
     #[test]
