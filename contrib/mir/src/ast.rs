@@ -381,7 +381,7 @@ impl<'a> TypedValue<'a> {
 
     /// Helper for more easily constructing `Nat` variant with literals. Mostly
     /// useful in tests.
-    pub fn nat(n: u32) -> Self {
+    pub fn nat(n: u64) -> Self {
         Self::Nat(n.into())
     }
 

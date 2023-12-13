@@ -200,6 +200,48 @@ fn interpret_one<'a>(
             }
         },
         I::Mul(overload) => match overload {
+            overloads::Mul::NatNat => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * x2;
+                stack.push(V::Nat(res));
+            }
+            overloads::Mul::NatInt => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = BigInt::from(x1) * x2;
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::IntNat => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * BigInt::from(x2);
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::IntInt => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * x2;
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::MutezNat => {
+                ctx.gas.consume(interpret_cost::MUL_TEZ_NAT)?;
+                let x1 = pop!(V::Mutez);
+                let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
+                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                stack.push(V::Mutez(res));
+            }
+            overloads::Mul::NatMutez => {
+                ctx.gas.consume(interpret_cost::MUL_NAT_TEZ)?;
+                let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
+                let x2 = pop!(V::Mutez);
+                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                stack.push(V::Mutez(res));
+            }
             overloads::Mul::Bls12381G1Bls12381Fr => {
                 ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
                 let x1 = pop!(V::Bls12381G1);
@@ -2916,7 +2958,7 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_string() {
-        fn test(str: &str, offset: u32, length: u32, expected: Option<&str>) {
+        fn test(str: &str, offset: u64, length: u64, expected: Option<&str>) {
             let stk = &mut stk![V::String(str.to_string()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|str| V::String(str.to_string()));
@@ -2938,7 +2980,7 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_bytes() {
-        fn test(bytes: &[u8], offset: u32, length: u32, expected: Option<&[u8]>) {
+        fn test(bytes: &[u8], offset: u64, length: u64, expected: Option<&[u8]>) {
             let stk = &mut stk![V::Bytes(bytes.to_vec()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|bytes| V::Bytes(bytes.to_vec()));
@@ -3936,6 +3978,115 @@ mod interpreter_tests {
             V::Int(1.into()),
             V::Bls12381Fr(Fr::one()),
         );
+
+        macro_rules! test_nats {
+            ($overload:ident, $con1:expr, $con2:expr, $con3:expr) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(0),
+                        $con2(0),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(0),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(0),
+                        $con2(1),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(1),
+                        $con3(1u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(100500),
+                        $con2(1),
+                        $con3(100500u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(100500),
+                        $con3(100500u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(100500),
+                        $con2(100500),
+                        $con3(10100250000i64.try_into().unwrap()),
+                    );
+                }
+            };
+        }
+
+        mod naturals {
+            use super::*;
+            test_nats!(NatNat, V::nat, V::nat, V::nat);
+            test_nats!(NatInt, V::nat, V::int, V::Int);
+            test_nats!(IntNat, V::int, V::nat, V::Int);
+            test_nats!(IntInt, V::int, V::int, V::Int);
+            test_nats!(MutezNat, V::Mutez, V::nat, V::Mutez);
+            test_nats!(NatMutez, V::nat, V::Mutez, V::Mutez);
+        }
+        mod negatives {
+            use super::*;
+
+            #[test]
+            fn int_int() {
+                use overloads::Mul::*;
+                test_mul(IntInt, V::int(-1), V::int(0), V::int(0));
+                test_mul(IntInt, V::int(0), V::int(-1), V::int(0));
+                test_mul(IntInt, V::int(-1), V::int(-1), V::int(1));
+                test_mul(IntInt, V::int(-100500), V::int(-1), V::int(100500));
+                test_mul(IntInt, V::int(-1), V::int(-100500), V::int(100500));
+                test_mul(
+                    IntInt,
+                    V::int(-100500),
+                    V::int(-100500),
+                    V::int(10100250000i64),
+                );
+            }
+
+            #[test]
+            fn nat_int() {
+                use overloads::Mul::*;
+                test_mul(NatInt, V::nat(0), V::int(-1), V::int(0));
+                test_mul(NatInt, V::nat(1), V::int(-1), V::int(-1));
+                test_mul(NatInt, V::nat(100500), V::int(-1), V::int(-100500));
+                test_mul(NatInt, V::nat(1), V::int(-100500), V::int(-100500));
+                test_mul(
+                    NatInt,
+                    V::nat(100500),
+                    V::int(-100500),
+                    V::int(-10100250000i64),
+                );
+            }
+            #[test]
+            fn int_nat() {
+                use overloads::Mul::*;
+                test_mul(IntNat, V::int(-0), V::nat(1), V::int(0));
+                test_mul(IntNat, V::int(-1), V::nat(1), V::int(-1));
+                test_mul(IntNat, V::int(-100500), V::nat(1), V::int(-100500));
+                test_mul(IntNat, V::int(-1), V::nat(100500), V::int(-100500));
+                test_mul(
+                    IntNat,
+                    V::int(-100500),
+                    V::nat(100500),
+                    V::int(-10100250000i64),
+                );
+            }
+        }
     }
 
     mod neg {

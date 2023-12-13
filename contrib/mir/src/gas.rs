@@ -72,27 +72,40 @@ impl AsGasCost for checked::Checked<u64> {
     }
 }
 
-/// A hack to get the integral logarithm base 2, rounded up.
-/// Rounds up to the nearest power of 2 and counts trailing zeroes. Thus,
-///
-/// ```text
-/// log2i(1) = log2i(0b1) = 0;
-/// log2i(2) = log2i(0b10) = 1;
-/// log2i(3) = log2i(4) = log2i(0b100) = 2;
-/// ```
-/// &c
-///
-/// `log2i(0)` is not well-defined, and likely is a logic error, hence the
-/// function will panic on `0`.
-fn log2i(x: usize) -> u32 {
-    assert!(x != 0);
-    x.next_power_of_two().trailing_zeros()
+trait Log2i {
+    /// A hack to get the integral logarithm base 2, rounded up.
+    /// Rounds up to the nearest power of 2 and counts trailing zeroes. Thus,
+    ///
+    /// ```text
+    /// log2i(1) = log2i(0b1) = 0;
+    /// log2i(2) = log2i(0b10) = 1;
+    /// log2i(3) = log2i(4) = log2i(0b100) = 2;
+    /// ```
+    /// &c
+    ///
+    /// `log2i(0)` is not well-defined, and likely is a logic error, hence the
+    /// function will panic on `0`.
+    fn log2i(self) -> u32;
+}
+
+impl Log2i for usize {
+    fn log2i(self) -> u32 {
+        assert!(self != 0);
+        self.next_power_of_two().trailing_zeros()
+    }
+}
+
+impl Log2i for u64 {
+    fn log2i(self) -> u32 {
+        assert!(self != 0);
+        self.next_power_of_two().trailing_zeros()
+    }
 }
 
 pub mod tc_cost {
     use checked::Checked;
 
-    use super::{AsGasCost, OutOfGas};
+    use super::{AsGasCost, Log2i, OutOfGas};
 
     // Due to the quirk of the Tezos protocol implementation, step gas is
     // charged twice as often as in MIR.
@@ -176,7 +189,7 @@ pub mod tc_cost {
         // to avoid log2(0) it's more practical to compute log2(n + 1)
         let n = Checked::from(sz);
         let key_size = Checked::from(key_size);
-        let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
+        let log2n = (n + 1).ok_or(OutOfGas)?.log2i() as usize;
         (80 * n + key_size * n * log2n).as_gas_cost()
     }
 
@@ -184,7 +197,7 @@ pub mod tc_cost {
         // Similar to `construct_map`, only the coefficient differs
         let n = Checked::from(sz);
         let key_size = Checked::from(val_size);
-        let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
+        let log2n = (n + 1).ok_or(OutOfGas)?.log2i() as usize;
         (130 * n + key_size * n * log2n).as_gas_cost()
     }
 }
@@ -214,8 +227,9 @@ impl BigIntByteSize for BigUint {
 pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::BigUint;
+    use num_traits::Zero;
 
-    use super::{AsGasCost, BigIntByteSize, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
     use crate::ast::{Key, KeyHash, Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -241,6 +255,8 @@ pub mod interpret_cost {
     pub const MUL_BLS_G1: u32 = 103000;
     pub const MUL_BLS_G2: u32 = 220000;
     pub const MUL_BLS_FR: u32 = 45;
+    pub const MUL_TEZ_NAT: u32 = 50;
+    pub const MUL_NAT_TEZ: u32 = MUL_TEZ_NAT; // should be the same always
     pub const NEG_FR: u32 = 30;
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
@@ -401,6 +417,17 @@ pub mod interpret_cost {
         (30 + (sz >> 1)).as_gas_cost()
     }
 
+    pub fn mul_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
+        // log2 is ill-defined for zero, hence this check
+        let v0 = if a.is_zero() {
+            Checked::from(0)
+        } else {
+            a * (a.ok_or(OutOfGas)?.log2i() as u64)
+        };
+        (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
+    }
+
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
         use TypedValue as V;
         let cmp_bytes = |s1: u64, s2: u64| {
@@ -543,8 +570,9 @@ pub mod interpret_cost {
         //
         // "+ 1" is from the observation that a lookup in a map of size 1 does
         // exactly one comparison.
+        let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = super::log2i(map_size + 1);
+        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i();
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (80 + lookup_cost).as_gas_cost()
     }
@@ -552,15 +580,16 @@ pub mod interpret_cost {
     pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
-        let size_log = super::log2i(map_size + 1);
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (115 + lookup_cost).as_gas_cost()
     }
 
     pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_get
+        let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = super::log2i(map_size + 1);
+        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i();
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
@@ -570,7 +599,7 @@ pub mod interpret_cost {
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_update
         let compare_cost = compare(k, k)?;
-        let size_log = super::log2i(map_size + 1);
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // coefficient larger than in case of Map looks suspicious, something
         // to benchmark later
@@ -737,19 +766,34 @@ mod test {
 
     #[test]
     fn log2i_test() {
-        assert_eq!(log2i(1), 0);
-        assert_eq!(log2i(2), 1);
-        assert_eq!(log2i(3), 2);
-        assert_eq!(log2i(4), 2);
-        assert_eq!(log2i(5), 3);
-        assert_eq!(log2i(70_000), 17);
-        assert_eq!(log2i(100_000), 17);
-        assert_eq!(log2i(300_000), 19);
+        assert_eq!(1usize.log2i(), 0);
+        assert_eq!(2usize.log2i(), 1);
+        assert_eq!(3usize.log2i(), 2);
+        assert_eq!(4usize.log2i(), 2);
+        assert_eq!(5usize.log2i(), 3);
+        assert_eq!(70_000usize.log2i(), 17);
+        assert_eq!(100_000usize.log2i(), 17);
+        assert_eq!(300_000usize.log2i(), 19);
+
+        assert_eq!(1u64.log2i(), 0);
+        assert_eq!(2u64.log2i(), 1);
+        assert_eq!(3u64.log2i(), 2);
+        assert_eq!(4u64.log2i(), 2);
+        assert_eq!(5u64.log2i(), 3);
+        assert_eq!(70_000u64.log2i(), 17);
+        assert_eq!(100_000u64.log2i(), 17);
+        assert_eq!(300_000u64.log2i(), 19);
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: x != 0")]
-    fn log2i_test_panic() {
-        log2i(0);
+    #[should_panic(expected = "assertion failed: self != 0")]
+    fn log2i_test_panic_usize() {
+        0usize.log2i();
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed: self != 0")]
+    fn log2i_test_panic_u64() {
+        0u64.log2i();
     }
 }

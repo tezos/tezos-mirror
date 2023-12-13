@@ -55,6 +55,12 @@ pub enum Mem {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Mul {
+    NatNat,
+    NatInt,
+    IntNat,
+    IntInt,
+    MutezNat,
+    NatMutez,
     Bls12381G1Bls12381Fr,
     Bls12381G2Bls12381Fr,
     Bls12381FrBls12381Fr,

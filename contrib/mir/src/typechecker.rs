@@ -647,6 +647,32 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(MUL, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Mul(overloads::Mul::NatNat)
+        }
+        (App(MUL, [], _), [.., T::Int, T::Nat]) => {
+            pop!();
+            I::Mul(overloads::Mul::NatInt)
+        }
+        (App(MUL, [], _), [.., T::Int, T::Int]) => {
+            pop!();
+            I::Mul(overloads::Mul::IntInt)
+        }
+        (App(MUL, [], _), [.., T::Mutez, T::Nat]) => {
+            pop!();
+            I::Mul(overloads::Mul::NatMutez)
+        }
+        (App(MUL, [], _), [.., T::Nat, T::Int]) => {
+            stack.drop_top(2);
+            stack.push(T::Int);
+            I::Mul(overloads::Mul::IntNat)
+        }
+        (App(MUL, [], _), [.., T::Nat, T::Mutez]) => {
+            stack.drop_top(2);
+            stack.push(T::Mutez);
+            I::Mul(overloads::Mul::MutezNat)
+        }
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G1]) => {
             stack.drop_top(2);
             stack.push(T::Bls12381G1);
@@ -5125,6 +5151,13 @@ mod typecheck_tests {
         test!(IntBls12381Fr, T::Int, T::Bls12381Fr, T::Bls12381Fr);
         test!(Bls12381FrNat, T::Bls12381Fr, T::Nat, T::Bls12381Fr);
         test!(Bls12381FrInt, T::Bls12381Fr, T::Int, T::Bls12381Fr);
+
+        test!(NatNat, T::Nat, T::Nat, T::Nat);
+        test!(NatInt, T::Nat, T::Int, T::Int);
+        test!(IntNat, T::Int, T::Nat, T::Int);
+        test!(IntInt, T::Int, T::Int, T::Int);
+        test!(MutezNat, T::Mutez, T::Nat, T::Mutez);
+        test!(NatMutez, T::Nat, T::Mutez, T::Mutez);
 
         #[test]
         fn wrong_type() {
