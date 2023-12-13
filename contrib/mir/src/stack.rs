@@ -135,6 +135,10 @@ impl<T> Stack<T> {
             .rev()
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Borrow the stack content as an immutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_slice(&self) -> &[T] {

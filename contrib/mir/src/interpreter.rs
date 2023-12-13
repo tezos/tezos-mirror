@@ -717,6 +717,22 @@ fn interpret_one<'a>(
             stack.push(r);
             stack.push(l);
         }
+        I::UnpairN(n) => {
+            ctx.gas.consume(interpret_cost::unpair_n(*n as usize)?)?;
+            fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: TypedValue<'a>) {
+                if n == 0 {
+                    stack.push(p);
+                } else if let V::Pair(p) = p {
+                    fill(n - 1, stack, p.1);
+                    stack.push(p.0);
+                } else {
+                    unreachable_state();
+                }
+            }
+            let p = pop!();
+            stack.reserve(*n as usize);
+            fill(n - 1, stack, p);
+        }
         I::ISome => {
             ctx.gas.consume(interpret_cost::SOME)?;
             let v = pop!();
@@ -2392,6 +2408,40 @@ mod interpreter_tests {
         let mut stack = stk![V::new_pair(V::Bool(false), V::nat(42))];
         assert!(interpret(&[Unpair], &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::nat(42), V::Bool(false)]);
+    }
+
+    #[test]
+    fn unpair_n_3() {
+        let mut stack = stk![V::new_pair(
+            V::Bool(false),
+            V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+        )];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&UnpairN(3), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![
+                V::new_pair(V::Unit, V::String("foo".into())),
+                V::nat(42),
+                V::Bool(false)
+            ],
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+    }
+
+    #[test]
+    fn unpair_n_4() {
+        let mut stack = stk![V::new_pair(
+            V::Bool(false),
+            V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+        )];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&UnpairN(4), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)],
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]

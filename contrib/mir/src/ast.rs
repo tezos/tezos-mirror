@@ -559,6 +559,7 @@ pub enum Instruction<'a> {
     Size(overloads::Size),
     Seq(Vec<Self>),
     Unpair,
+    UnpairN(u16),
     Cons,
     And(overloads::And),
     Or(overloads::Or),
