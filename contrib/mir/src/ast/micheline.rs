@@ -152,7 +152,9 @@ macro_rules! micheline_instructions {
                 | Prim::CHAIN_ID
                 | Prim::SELF
                 | Prim::SWAP
-                | Prim::CHECK_SIGNATURE,
+                | Prim::CHECK_SIGNATURE
+                | Prim::SET_DELEGATE
+                | Prim::TRANSFER_TOKENS,
             ..,
         )
     };
@@ -171,7 +173,9 @@ macro_rules! micheline_values {
                 | Prim::Some
                 | Prim::Elt
                 | Prim::Left
-                | Prim::Right,
+                | Prim::Right
+                | Prim::Transfer_tokens
+                | Prim::Set_delegate,
             ..,
         )
     };

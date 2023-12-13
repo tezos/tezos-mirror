@@ -953,6 +953,25 @@ pub(crate) fn typecheck_instruction(
         }
         (App(SELF, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
+            ensure_ty_eq(ctx, ct, arg_t)?;
+            stack.drop_top(3);
+            stack.push(T::Operation);
+            I::TransferTokens
+        }
+        (App(TRANSFER_TOKENS, [], _), [.., _, _, _]) => no_overload!(TRANSFER_TOKENS),
+        (App(TRANSFER_TOKENS, [], _), [] | [_] | [_, _]) => no_overload!(TRANSFER_TOKENS, len 3),
+        (App(TRANSFER_TOKENS, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(SET_DELEGATE, [], _), [.., T::Option(ot)]) if matches!(ot.as_ref(), T::KeyHash) => {
+            pop!();
+            stack.push(T::Operation);
+            I::SetDelegate
+        }
+        (App(SET_DELEGATE, [], _), [.., _]) => no_overload!(SET_DELEGATE),
+        (App(SET_DELEGATE, [], _), []) => no_overload!(SET_DELEGATE, len 1),
+        (App(SET_DELEGATE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(CHECK_SIGNATURE, [], _), [.., T::Bytes, T::Signature, T::Key]) => {
             stack.drop_top(2);
             stack[0] = T::Bool;
@@ -2557,10 +2576,8 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_gas_exhaustion() {
-        let mut ctx = Ctx {
-            gas: Gas::new(gas::tc_cost::INSTR_STEP),
-            ..Ctx::default()
-        };
+        let mut ctx = &mut Ctx::default();
+        ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
             typecheck_instruction(
                 &app!(COMPARE),
@@ -3417,5 +3434,81 @@ mod typecheck_tests {
     #[test]
     fn check_signature_too_short() {
         too_short_test(&app!(CHECK_SIGNATURE), Prim::CHECK_SIGNATURE, 3)
+    }
+
+    #[test]
+    fn transfer_tokens() {
+        let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Mutez, Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            Err(TypesNotEqual(Type::Nat, Type::Int).into())
+        );
+
+        let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Int, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::TRANSFER_TOKENS,
+                stack: stk![Type::new_contract(Type::Nat), Type::Int, Type::Nat],
+                reason: None
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Nat, Type::Mutez, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::TRANSFER_TOKENS,
+                stack: stk![Type::Nat, Type::Mutez, Type::Nat],
+                reason: None
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::TRANSFER_TOKENS,
+                stack: stk![Type::Nat],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 3 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Mutez, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::TransferTokens)
+        );
+        assert_eq!(stk, &tc_stk![Type::Operation]);
+    }
+
+    #[test]
+    fn set_delegate() {
+        let stk = &mut tc_stk![Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SET_DELEGATE,
+                stack: stk![Type::Nat],
+                reason: None
+            })
+        );
+
+        let stk = &mut tc_stk![Type::new_option(Type::Nat)];
+        assert_eq!(
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::SET_DELEGATE,
+                stack: stk![Type::new_option(Type::Nat)],
+                reason: None
+            })
+        );
+
+        let stk = &mut tc_stk![Type::new_option(Type::KeyHash)];
+        assert_eq!(
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            Ok(Instruction::SetDelegate)
+        );
+        assert_eq!(stk, &tc_stk![Type::Operation]);
     }
 }

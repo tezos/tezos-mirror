@@ -122,6 +122,10 @@ defprim! {
     signature,
     CHECK_SIGNATURE,
     key_hash,
+    TRANSFER_TOKENS,
+    SET_DELEGATE,
+    Transfer_tokens,
+    Set_delegate,
 }
 
 defprim! {
