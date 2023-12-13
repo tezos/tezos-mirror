@@ -49,6 +49,8 @@ Protocol parameters
 
 - Added ``blocks_preservation_cycles`` parametric constant. (MR :gl:`!11280`)
 
+- Added ``delegate_parameters_activation_delay`` parametric constant. (MR :gl:`!11279`)
+
 Bug Fixes
 ---------
 
