@@ -86,7 +86,7 @@ let init_protocols store history_mode =
     {
       Test_utils.default_protocol_constants with
       blocks_per_cycle = Int32.of_int nb_blocks_per_cycle;
-      preserved_cycles = 1;
+      blocks_preservation_cycles = 1;
     }
   in
   let* () =
