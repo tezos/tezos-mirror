@@ -835,6 +835,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GT, [], _), []) => no_overload!(GT, len 1),
         (App(GT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(GE, [], _), [.., T::Int]) => {
+            stack[0] = T::Bool;
+            I::Ge
+        }
+        (App(GE, [], _), [.., t]) => no_overload!(GE, TypesNotEqual(T::Int, t.clone())),
+        (App(GE, [], _), []) => no_overload!(GE, len 1),
+        (App(GE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(EQ, [], _), [.., T::Int]) => {
             stack[0] = T::Bool;
             I::Eq
@@ -843,6 +851,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EQ, [], _), []) => no_overload!(EQ, len 1),
         (App(EQ, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NEQ, [], _), [.., T::Int]) => {
+            stack[0] = T::Bool;
+            I::Neq
+        }
+        (App(NEQ, [], _), [.., t]) => no_overload!(NEQ, TypesNotEqual(T::Int, t.clone())),
+        (App(NEQ, [], _), []) => no_overload!(NEQ, len 1),
+        (App(NEQ, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(LE, [], _), [.., T::Int]) => {
             stack[0] = T::Bool;
             I::Le
@@ -850,6 +866,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LE, [], _), [.., t]) => no_overload!(LE, TypesNotEqual(T::Int, t.clone())),
         (App(LE, [], _), []) => no_overload!(LE, len 1),
         (App(LE, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(LT, [], _), [.., T::Int]) => {
+            stack[0] = T::Bool;
+            I::Lt
+        }
+        (App(LT, [], _), [.., t]) => no_overload!(LT, TypesNotEqual(T::Int, t.clone())),
+        (App(LT, [], _), []) => no_overload!(LT, len 1),
+        (App(LT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(IF, [Seq(nested_t), Seq(nested_f)], _), [.., T::Bool]) => {
             // pop the bool off the stack
@@ -2134,19 +2158,6 @@ mod typecheck_tests {
         );
         assert_eq!(stack, expected_stack);
         assert!(ctx.gas.milligas() < Gas::default().milligas());
-    }
-
-    #[test]
-    fn test_gt() {
-        let mut stack = tc_stk![Type::Int];
-        let expected_stack = tc_stk![Type::Bool];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(GT), &mut ctx, &mut stack),
-            Ok(Gt)
-        );
-        assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
@@ -3907,61 +3918,56 @@ mod typecheck_tests {
         );
     }
 
-    #[test]
-    fn test_gt_mismatch() {
-        let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(GT), &mut ctx, &mut stack),
-            Err(TcError::NoMatchingOverload {
-                instr: Prim::GT,
-                stack: stk![Type::String],
-                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
-            })
-        );
-    }
+    mod int_comparison {
+        use super::*;
 
-    #[test]
-    fn test_eq_mismatch() {
-        let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(EQ), &mut ctx, &mut stack),
-            Err(TcError::NoMatchingOverload {
-                instr: Prim::EQ,
-                stack: stk![Type::String],
-                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
-            })
-        );
-    }
+        macro_rules! test {
+            ($op:ident, $instr:expr) => {
+                #[allow(non_snake_case)]
+                mod $op {
+                    use super::*;
 
-    #[test]
-    fn test_le_mismatch() {
-        let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
-        assert_eq!(
-            typecheck_instruction(&app!(LE), &mut ctx, &mut stack),
-            Err(TcError::NoMatchingOverload {
-                instr: Prim::LE,
-                stack: stk![Type::String],
-                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
-            })
-        );
-    }
+                    #[test]
+                    fn ok() {
+                        let mut stack = tc_stk![Type::Int];
+                        let expected_stack = tc_stk![Type::Bool];
+                        let mut ctx = Ctx::default();
+                        assert_eq!(
+                            typecheck_instruction(&app!($op), &mut ctx, &mut stack),
+                            Ok($instr)
+                        );
+                        assert_eq!(stack, expected_stack);
+                        assert!(ctx.gas.milligas() < Gas::default().milligas());
+                    }
 
-    #[test]
-    fn test_gt_short() {
-        too_short_test(&app!(GT), Prim::GT, 1);
-    }
+                    #[test]
+                    fn mismatch() {
+                        let mut stack = tc_stk![Type::String];
+                        let mut ctx = Ctx::default();
+                        assert_eq!(
+                            typecheck_instruction(&app!($op), &mut ctx, &mut stack),
+                            Err(TcError::NoMatchingOverload {
+                                instr: Prim::$op,
+                                stack: stk![Type::String],
+                                reason: Some(TypesNotEqual(Type::Int, Type::String).into())
+                            })
+                        );
+                    }
 
-    #[test]
-    fn test_eq_short() {
-        too_short_test(&app!(EQ), Prim::EQ, 1);
-    }
+                    #[test]
+                    fn short() {
+                        too_short_test(&app!($op), Prim::$op, 1);
+                    }
+                }
+            };
+        }
 
-    #[test]
-    fn test_le_short() {
-        too_short_test(&app!(LE), Prim::LE, 1);
+        test!(EQ, Eq);
+        test!(NEQ, Neq);
+        test!(GT, Gt);
+        test!(LT, Lt);
+        test!(GE, Ge);
+        test!(LE, Le);
     }
 
     #[test]

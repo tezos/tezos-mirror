@@ -456,15 +456,30 @@ fn interpret_one<'a>(
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_positive()));
         }
+        I::Ge => {
+            ctx.gas.consume(interpret_cost::GE)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(!i.is_negative()));
+        }
         I::Eq => {
             ctx.gas.consume(interpret_cost::EQ)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_zero()));
         }
+        I::Neq => {
+            ctx.gas.consume(interpret_cost::NEQ)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(!i.is_zero()));
+        }
         I::Le => {
             ctx.gas.consume(interpret_cost::LE)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(!i.is_positive()));
+        }
+        I::Lt => {
+            ctx.gas.consume(interpret_cost::LT)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(i.is_negative()));
         }
         I::If(nested_t, nested_f) => {
             ctx.gas.consume(interpret_cost::IF)?;
@@ -1520,58 +1535,60 @@ mod interpreter_tests {
         assert_eq!(stack, expected_stack);
     }
 
-    #[test]
-    fn test_gt() {
-        let mut stack = stk![V::int(20), V::int(10)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+    mod int_comparison {
+        use super::*;
 
-    #[test]
-    fn test_gt_false() {
-        let mut stack = stk![V::int(20), V::int(-10)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[track_caller]
+        fn test_comp(instr: Instruction, arg: impl Into<BigInt>, result: bool) {
+            let mut stack = stk![V::int(20), V::int(arg.into())];
+            let expected_stack = stk![V::int(20), V::Bool(result)];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
 
-    #[test]
-    fn test_eq() {
-        let mut stack = stk![V::int(20), V::int(0)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn gt() {
+            test_comp(Gt, 10, true);
+            test_comp(Gt, 0, false);
+            test_comp(Gt, -10, false);
+        }
 
-    #[test]
-    fn test_eq_false() {
-        let mut stack = stk![V::int(20), V::int(1)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn ge() {
+            test_comp(Ge, 10, true);
+            test_comp(Ge, 0, true);
+            test_comp(Ge, -10, false);
+        }
 
-    #[test]
-    fn test_le() {
-        let mut stack = stk![V::int(20), V::int(-1)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn eq() {
+            test_comp(Eq, 10, false);
+            test_comp(Eq, 0, true);
+            test_comp(Eq, -10, false);
+        }
 
-    #[test]
-    fn test_le_false() {
-        let mut stack = stk![V::int(20), V::int(1)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
+        #[test]
+        fn neq() {
+            test_comp(Neq, 10, true);
+            test_comp(Neq, 0, false);
+            test_comp(Neq, -10, true);
+        }
+
+        #[test]
+        fn le() {
+            test_comp(Le, 10, false);
+            test_comp(Le, 0, true);
+            test_comp(Le, -10, true);
+        }
+
+        #[test]
+        fn lt() {
+            test_comp(Lt, 10, false);
+            test_comp(Lt, 0, false);
+            test_comp(Lt, -10, true);
+        }
     }
 
     #[test]
