@@ -121,6 +121,20 @@ impl<T> Stack<T> {
             .truncate(len.checked_sub(size).expect("size too large in drop_top"));
     }
 
+    /// Removes the specified number of elements from the top of the stack and
+    /// returns them as an iterator over the removed items, starting with the stack's top.
+    ///
+    /// Panics if the `size` is larger than length of the stack.
+    ///
+    /// If you do not need the items, use `drop_top` instead.
+    #[must_use]
+    pub fn drain_top(&mut self, size: usize) -> impl DoubleEndedIterator<Item = T> + '_ {
+        let len = self.len();
+        self.0
+            .drain(len.checked_sub(size).expect("size too large in drain_top")..)
+            .rev()
+    }
+
     /// Borrow the stack content as an immutable slice. Note that stack top is
     /// the _rightmost_ element.
     pub fn as_slice(&self) -> &[T] {
@@ -387,10 +401,33 @@ mod tests {
     }
 
     #[test]
+    fn drain_top() {
+        let mut stk = stk![1, 2, 3, 4];
+        let drained = stk.drain_top(3);
+        assert_eq!(drained.collect::<Vec<_>>(), vec![4, 3, 2]);
+        assert_eq!(stk, stk![1]);
+    }
+
+    #[test]
+    fn drain_top_0() {
+        let mut stk = stk![1, 2, 3, 4];
+        let drained = stk.drain_top(0);
+        assert_eq!(drained.collect::<Vec<_>>(), vec![]);
+        assert_eq!(stk, stk![1, 2, 3, 4]);
+    }
+
+    #[test]
     #[should_panic(expected = "size too large in drop_top")]
     fn drop_top_out_of_bounds() {
         let mut stk = stk![1, 2, 3, 4];
         stk.drop_top(42);
+    }
+
+    #[test]
+    #[should_panic(expected = "size too large in drain_top")]
+    fn drain_top_out_of_bounds() {
+        let mut stk = stk![1, 2, 3, 4];
+        let _ = stk.drain_top(42);
     }
 
     #[test]

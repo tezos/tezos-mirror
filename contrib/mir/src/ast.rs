@@ -542,6 +542,7 @@ pub enum Instruction<'a> {
     Car,
     Cdr,
     Pair,
+    PairN(u16),
     /// `ISome` because `Some` is already taken
     ISome,
     None,

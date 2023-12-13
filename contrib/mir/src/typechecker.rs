@@ -27,7 +27,7 @@ use crate::ast::micheline::{
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
 use crate::gas::OutOfGas;
-use crate::gas::{self, Gas};
+use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -50,6 +50,8 @@ pub enum TcError {
     TypesNotEqual(#[from] TypesNotEqual),
     #[error("DUP 0 is forbidden")]
     Dup0,
+    #[error("PAIR {0} is forbidden")]
+    PairN01(u16),
     #[error("value {0} is invalid for type {1:?}")]
     InvalidValueForType(String, Type),
     #[error("value {0:?} is invalid element for container type {1:?}")]
@@ -1205,6 +1207,24 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Pair
         }
         (App(PAIR, [], _), [] | [_]) => no_overload!(PAIR, len 2),
+        (App(PAIR, [Micheline::Int(n)], _), _) => {
+            let n = validate_u10(n)?;
+            if n < 2 {
+                return Err(TcError::PairN01(n));
+            }
+            if stack.len() < n as usize {
+                no_overload!(PAIR, len n as usize);
+            }
+            ctx.gas.consume(tc_cost::pair_n(n as usize)?)?;
+            // unwrap is fine, n is non-zero.
+            let res = stack
+                .drain_top(n as usize)
+                .rev()
+                .reduce(|acc, e| Type::new_pair(e, acc))
+                .unwrap();
+            stack.push(res);
+            I::PairN(n)
+        }
         (App(PAIR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UNPAIR, [], _), [.., T::Pair(..)]) => {
@@ -3494,6 +3514,91 @@ mod typecheck_tests {
             Ok(Pair)
         );
         assert_eq!(stack, tc_stk![Type::new_pair(Type::Nat, Type::Int)]);
+    }
+
+    #[test]
+    fn pair_n_3() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 3").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(PairN(3))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::String,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::Int, Type::Unit))
+            ]
+        );
+    }
+
+    #[test]
+    fn pair_n_4() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 4").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(PairN(4))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![Type::new_pair(
+                Type::Nat,
+                Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+            )]
+        );
+    }
+
+    #[test]
+    fn pair_n_neg() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR -1").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::ExpectedU10((-1).into()))
+        );
+    }
+
+    #[test]
+    fn pair_n_0() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 0").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(0))
+        );
+    }
+
+    #[test]
+    fn pair_n_1() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 1").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(1))
+        );
+    }
+
+    #[test]
+    fn pair_n_too_large() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PAIR 1024").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ExpectedU10(1024.into()))
+        );
+    }
+
+    #[test]
+    fn pair_n_too_short() {
+        let mut stack = tc_stk![Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 10").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::PAIR,
+                stack: stk![Type::Int, Type::Nat],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 10 })
+            })
+        );
     }
 
     #[test]

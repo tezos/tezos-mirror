@@ -702,6 +702,15 @@ fn interpret_one<'a>(
             let r = pop!();
             stack.push(V::new_pair(l, r));
         }
+        I::PairN(n) => {
+            ctx.gas.consume(interpret_cost::pair_n(*n as usize)?)?;
+            let res = stack
+                .drain_top(*n as usize)
+                .rev()
+                .reduce(|acc, e| V::new_pair(e, acc))
+                .unwrap();
+            stack.push(res);
+        }
         I::Unpair => {
             ctx.gas.consume(interpret_cost::UNPAIR)?;
             let (l, r) = *pop!(V::Pair);
@@ -2346,6 +2355,36 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(42), V::Bool(false)]; // NB: bool is top
         assert!(interpret(&[Pair], &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_pair(V::Bool(false), V::nat(42))]);
+    }
+
+    #[test]
+    fn pair_n_3() {
+        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&PairN(3), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![
+                V::String("foo".into()),
+                V::new_pair(V::Bool(false), V::new_pair(V::nat(42), V::Unit))
+            ]
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+    }
+
+    #[test]
+    fn pair_n_4() {
+        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&PairN(4), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::new_pair(
+                V::Bool(false),
+                V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+            )]
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
