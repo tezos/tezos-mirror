@@ -754,6 +754,11 @@ pub mod interpret_cost {
         let size = Checked::from(size);
         (20 + ((size >> 1) + (size * 2))).as_gas_cost()
     }
+
+    pub fn nat_bytes(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        (45 + ((size >> 1) + (size * 2))).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

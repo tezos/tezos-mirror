@@ -564,6 +564,11 @@ fn interpret_one<'a>(
                 stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
             }
         },
+        I::Nat => {
+            let i = pop!(V::Bytes);
+            ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+            stack.push(V::Nat(BigUint::from_bytes_be(&i)))
+        }
         I::Loop(nested) => {
             ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
             loop {
@@ -1718,6 +1723,30 @@ mod interpreter_tests {
         test("ff", -1);
         test("ff00", -256);
         test("00ff00", 65280);
+    }
+
+    #[test]
+    fn test_nat_bytes() {
+        fn test(input: &str, result: impl Into<BigUint>) {
+            let mut stack = stk![V::Bytes(hex::decode(input).unwrap())];
+            let expected_stack = stk![V::Nat(result.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Nat, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+        }
+        // checked against octez-client
+        test("", 0u32);
+        test("00", 0u32);
+        test("0000", 0u32);
+        test("01", 1u32);
+        test("0001", 1u32);
+        test("000001", 1u32);
+        test("0100", 256u32);
+        test("1000", 4096u32);
+        test("f000", 61440u32);
+        test("ff", 255u32);
+        test("ff00", 65280u32);
+        test("00ff00", 65280u32);
     }
 
     #[test]

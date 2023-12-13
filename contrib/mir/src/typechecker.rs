@@ -977,6 +977,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(INT, [], _), []) => no_overload!(INT, len 1),
         (App(INT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NAT, [], _), [.., T::Bytes]) => {
+            stack[0] = Type::Nat;
+            I::Nat
+        }
+        (App(NAT, [], _), [.., _]) => no_overload!(NAT),
+        (App(NAT, [], _), []) => no_overload!(NAT, len 1),
+        (App(NAT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(ABS, [], _), [.., T::Int]) => {
             stack[0] = Type::Nat;
             I::Abs
@@ -2230,6 +2238,42 @@ mod typecheck_tests {
                 typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::INT,
+                    stack: stk![Type::String],
+                    reason: None,
+                })
+            );
+        }
+    }
+
+    mod nat {
+        use super::*;
+
+        #[test]
+        fn ok() {
+            let mut stack = tc_stk![Type::Bytes];
+            let expected_stack = tc_stk![Type::Nat];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(NAT), &mut ctx, &mut stack),
+                Ok(Instruction::Nat),
+            );
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        #[test]
+        fn test_int_short() {
+            too_short_test(&app!(NAT), Prim::NAT, 1);
+        }
+
+        #[test]
+        fn test_int_mismatch() {
+            let mut stack = tc_stk![Type::String];
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(NAT), &mut ctx, &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::NAT,
                     stack: stk![Type::String],
                     reason: None,
                 })
