@@ -3,15 +3,29 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::blueprint_storage;
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    self, read_storage_version, store_storage_version, STORAGE_VERSION,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+// In proxy mode, the value of `EVM_LAST_BLUEPRINT` indicates the number of
+// the last stored blueprint. This is used to store the next blueprint when
+// created from the inbox. If missing, the implementation of
+// `blueprint_storage` assumes the next blueprint should be number 0.
+// Therefore, migration needs to set this value to the current block's
+// number.
+fn migrate_blueprint_storage<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    let head_number = storage::read_current_block_number(host)?;
+    blueprint_storage::store_last_blueprint_number(host, head_number)
 }
 
 // The workflow for migration is the following:
@@ -25,7 +39,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
-
+        migrate_blueprint_storage(host)?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
