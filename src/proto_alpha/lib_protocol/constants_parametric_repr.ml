@@ -168,6 +168,7 @@ type issuance_weights = {
 type t = {
   preserved_cycles : int;
   consensus_rights_delay : int;
+  blocks_preservation_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -483,7 +484,9 @@ let encoding =
   let open Data_encoding in
   conv
     (fun c ->
-      ( ( (c.preserved_cycles, c.consensus_rights_delay),
+      ( ( ( c.preserved_cycles,
+            c.consensus_rights_delay,
+            c.blocks_preservation_cycles ),
           ( c.blocks_per_cycle,
             c.blocks_per_commitment,
             c.nonce_revelation_threshold,
@@ -521,7 +524,9 @@ let encoding =
                   ( (c.sc_rollup, c.zk_rollup),
                     (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
               ) ) ) ) ))
-    (fun ( ( (preserved_cycles, consensus_rights_delay),
+    (fun ( ( ( preserved_cycles,
+               consensus_rights_delay,
+               blocks_preservation_cycles ),
              ( blocks_per_cycle,
                blocks_per_commitment,
                nonce_revelation_threshold,
@@ -562,6 +567,7 @@ let encoding =
       {
         preserved_cycles;
         consensus_rights_delay;
+        blocks_preservation_cycles;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
@@ -603,9 +609,10 @@ let encoding =
       })
     (merge_objs
        (merge_objs
-          (obj2
+          (obj3
              (req "preserved_cycles" uint8)
-             (req "consensus_rights_delay" uint8))
+             (req "consensus_rights_delay" uint8)
+             (req "blocks_preservation_cycles" uint8))
           (obj9
              (req "blocks_per_cycle" int32)
              (req "blocks_per_commitment" int32)

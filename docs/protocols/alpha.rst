@@ -47,6 +47,8 @@ Protocol parameters
 
 - Added ``consensus_rights_delay`` parametric constant. (MR :gl:`!11188`)
 
+- Added ``blocks_preservation_cycles`` parametric constant. (MR :gl:`!11280`)
+
 Bug Fixes
 ---------
 
