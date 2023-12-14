@@ -41,10 +41,14 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
     attestation_slot_map = Consensus.allowed_attestations ctxt;
   }
 
-(** Map used to detect consensus operation conflicts. Each delegate
-    may (pre)attest at most once for each level and round, so two
-    attestations (resp. two preattestations) conflict when they have
+(** Map used to detect consensus operation conflicts. Each delegate may
+    (pre)attest at most once for each level and round, so two attestations
+    (resp. two DAL attestations or two preattestations) conflict when they have
     the same slot, level, and round.
+
+    Note that when validating the mempool, several (DAL/pre)attestations by the
+    same delegate at the same level and round would not conflict if they have
+    different Tenderbake slots.
 
     Note that when validating a block, all attestations (resp. all
     preattestations) must have the same level and round anyway, so only
