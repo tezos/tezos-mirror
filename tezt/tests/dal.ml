@@ -385,8 +385,8 @@ let wait_for_layer1_block_processing dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
-let inject_dal_attestation ?level ?force ?error ?request ~signer ~nb_slots
-    availability client =
+let inject_dal_attestation ?level ?(round = 0) ?force ?error ?request ~signer
+    ~nb_slots availability client =
   let attestation = Array.make nb_slots false in
   List.iter (fun i -> attestation.(i) <- true) availability ;
   let* level =
@@ -408,15 +408,22 @@ let inject_dal_attestation ?level ?force ?error ?request ~signer ~nb_slots
     ?error
     ?request
     ~signer
-    (Operation.Consensus.dal_attestation ~level ~attestation ~slot)
+    (Operation.Consensus.dal_attestation ~level ~round ~attestation ~slot)
     client
 
-let inject_dal_attestations ?level ?force
+let inject_dal_attestations ?level ?round ?force
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
     client =
   Lwt_list.map_s
     (fun signer ->
-      inject_dal_attestation ?level ?force ~signer ~nb_slots availability client)
+      inject_dal_attestation
+        ?level
+        ?round
+        ?force
+        ~signer
+        ~nb_slots
+        availability
+        client)
     signers
 
 let get_validated_dal_attestations_in_mempool node for_level =

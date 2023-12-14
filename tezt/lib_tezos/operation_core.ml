@@ -254,7 +254,12 @@ module Consensus = struct
         round : int;
         block_payload_hash : string;
       }
-    | Dal_attestation of {attestation : bool array; level : int; slot : int}
+    | Dal_attestation of {
+        attestation : bool array;
+        level : int;
+        round : int;
+        slot : int;
+      }
 
   let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
     Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
@@ -263,8 +268,8 @@ module Consensus = struct
 
   let preattestation = consensus ~kind:Preattestation
 
-  let dal_attestation ~attestation ~level ~slot =
-    Dal_attestation {attestation; level; slot}
+  let dal_attestation ~attestation ~level ~round ~slot =
+    Dal_attestation {attestation; level; round; slot}
 
   let kind_to_string kind use_legacy_name =
     let name = function true -> "endorsement" | false -> "attestation" in
@@ -284,7 +289,7 @@ module Consensus = struct
             ("round", Ezjsonm.int round);
             ("block_payload_hash", Ezjsonm.string block_payload_hash);
           ]
-    | Dal_attestation {attestation; level; slot} ->
+    | Dal_attestation {attestation; level; round; slot} ->
         let string_of_bool_vector attestation =
           let aux (acc, n) b =
             let bit = if b then 1 else 0 in
@@ -297,6 +302,7 @@ module Consensus = struct
             ("kind", Ezjsonm.string "dal_attestation");
             ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
             ("level", Ezjsonm.int level);
+            ("round", Ezjsonm.int round);
             ("slot", Ezjsonm.int slot);
           ]
 
