@@ -71,8 +71,12 @@ pub enum TcError {
     SelfForbidden,
     #[error("no such entrypoint: {0}")]
     NoSuchEntrypoint(Entrypoint),
+    #[error("no such contract")]
+    NoSuchContract,
     #[error("unexpected implicit account parameter type: {0:?}")]
     UnexpectedImplicitAccountType(Type),
+    #[error("Entrypoint specified from two different sources")]
+    EntrypointAmbiguity,
     #[error("unexpected syntax: {0}")]
     UnexpectedMicheline(String),
     #[error("duplicate top-level element: {0}")]
@@ -1394,6 +1398,62 @@ pub(crate) fn typecheck_instruction<'a>(
     })
 }
 
+pub(crate) fn typecheck_contract_address(
+    ctx: &mut Ctx,
+    address: Address,
+    ep: Entrypoint,
+    typ: &Type,
+) -> Result<Address, TcError> {
+    // Among the entrypoints from the address and from the instruction, the defaults
+    // ones are overridable by the non-default entrypoints. If both contain explicitly
+    // specified non-default ones, then the result is None.
+    let entrypoint = match (address.entrypoint.is_default(), ep.is_default()) {
+        (true, true) => Entrypoint::default(),
+        (false, true) => address.entrypoint,
+        (true, false) => ep,
+        (false, false) => return Err(TcError::EntrypointAmbiguity),
+    };
+    match address.hash {
+        // If the address is implicit, we handle it separately.
+        AddressHash::Implicit(_) => {
+            // For implicit addresses, the entrypoint of the call has to be the default one
+            // and the type of the contract should be Unit or Ticket.
+            if !entrypoint.is_default() {
+                return Err(TcError::NoSuchEntrypoint(entrypoint));
+            }
+            if matches!(typ, Type::Unit | Type::Ticket(_)) {
+                Ok(Address {
+                    entrypoint,
+                    hash: address.hash,
+                })
+            } else {
+                Err(TcError::UnexpectedImplicitAccountType(typ.clone()))
+            }
+        }
+        AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
+            // Check if we have a contract at the address_hash of the given address.
+            // and we have found a valid entrypoint to use.
+            let contract_entrypoints =
+                (ctx.lookup_contract)(&address.hash).ok_or(TcError::NoSuchContract)?;
+
+            // Do we have the entrypoint for the call in the entrypoints parsed
+            // from the destination contract parameter?
+            let contract_entrypoint_type = contract_entrypoints
+                .get(&entrypoint)
+                .ok_or(TcError::NoSuchEntrypoint(entrypoint.clone()))?;
+
+            // if the entrypoint is present, check that it is of the required
+            // type.
+            ensure_ty_eq(ctx, typ, contract_entrypoint_type)?;
+
+            Ok(Address {
+                entrypoint,
+                hash: address.hash,
+            })
+        }
+    }
+}
+
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
 pub(crate) fn typecheck_value<'a>(
@@ -1503,25 +1563,8 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Contract(ty), addr) => {
             let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
-            match t_addr.hash {
-                AddressHash::Implicit(_) => {
-                    if !t_addr.is_default_ep() {
-                        return Err(TcError::NoSuchEntrypoint(t_addr.entrypoint));
-                    }
-                    ctx.gas.consume(gas::tc_cost::ty_eq(
-                        ty.size_for_gas(),
-                        T::Unit.size_for_gas(),
-                    )?)?;
-                    match ty.as_ref() {
-                        T::Unit => {}
-                        ty => return Err(TcError::UnexpectedImplicitAccountType(ty.clone())),
-                    }
-                }
-                AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
-                    // TODO: verify against ctx
-                }
-            }
-            TV::Contract(t_addr)
+            typecheck_contract_address(ctx, t_addr, Entrypoint::default(), ty)
+                .map(TypedValue::Contract)?
         }
         (T::ChainId, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::CHAIN_ID_READABLE)?;
@@ -1738,7 +1781,7 @@ fn unify_stacks(
     Ok(())
 }
 
-pub(crate) fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
+fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
     ctx.gas
         .consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
@@ -4069,13 +4112,13 @@ mod typecheck_tests {
             ))
         );
         assert_matches!(
-            typecheck_instruction(
-                &parse("PUSH address \"tz9foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
-                &mut Ctx::default(),
-                &mut tc_stk![],
+        typecheck_instruction(
+            &parse("PUSH address \"tz9foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
+            &mut Ctx::default(),
+            &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(s))) if s == "tz9"
-        );
+            );
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address \"tz\"").unwrap(),
@@ -4099,21 +4142,21 @@ mod typecheck_tests {
             ))
         );
         assert_matches!(
-            typecheck_instruction(
-                &parse("PUSH address 0xff00fe0000000000000000000000000000000000000000").unwrap(),
-                &mut Ctx::default(),
-                &mut tc_stk![],
+        typecheck_instruction(
+            &parse("PUSH address 0xff00fe0000000000000000000000000000000000000000").unwrap(),
+            &mut Ctx::default(),
+            &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
-        );
+            );
         assert_matches!(
-            typecheck_instruction(
-                &parse("PUSH address 0x00fffe0000000000000000000000000000000000000000").unwrap(),
-                &mut Ctx::default(),
-                &mut tc_stk![],
+        typecheck_instruction(
+            &parse("PUSH address 0x00fffe0000000000000000000000000000000000000000").unwrap(),
+            &mut Ctx::default(),
+            &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
-        );
+            );
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x00").unwrap(),
@@ -4546,27 +4589,27 @@ mod typecheck_tests {
     fn push_signature() {
         assert_eq!(
             parse("PUSH signature \"p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v\"")
-                .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            .unwrap()
+            .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Signature(
-                "p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v"
-                    .try_into()
-                    .unwrap()
-            )))
-        );
+                        "p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v"
+                        .try_into()
+                        .unwrap()
+                        )))
+            );
         // NB: bytes are always treated as a generic signature
         assert_eq!(
             parse(
                 "PUSH signature 0x22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
-            )
+                )
             .unwrap()
             .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Signature(
-                "sigSTJNiwaPuZXmU2FscxNy9scPjjwpbxpPD5rY1QRBbyb4gHXYU7jN9Wcbs9sE4GMzuiSSG5S2egeyJhUjW1uJEgw4AWAXj"
-                    .try_into()
-                    .unwrap()
-            )))
-        );
+                        "sigSTJNiwaPuZXmU2FscxNy9scPjjwpbxpPD5rY1QRBbyb4gHXYU7jN9Wcbs9sE4GMzuiSSG5S2egeyJhUjW1uJEgw4AWAXj"
+                        .try_into()
+                        .unwrap()
+                        )))
+            );
     }
 
     #[test]
@@ -4926,6 +4969,41 @@ mod typecheck_tests {
                 &Type::new_ticket(Type::Unit)
             ),
             Ok(TypedValue::new_ticket(ticket))
+        );
+    }
+
+    #[test]
+    fn typecheck_contract_value() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_value(
+                &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
+                &mut ctx,
+                &Type::new_contract(Type::Unit)
+            ),
+            Ok(TypedValue::Contract(
+                addr::Address::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap()
+            ))
+        );
+
+        assert_eq!(
+            typecheck_value(
+                &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
+                &mut ctx,
+                &Type::new_contract(Type::new_ticket(Type::Unit))
+            ),
+            Ok(TypedValue::Contract(
+                addr::Address::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap()
+            ))
+        );
+
+        assert_eq!(
+            typecheck_value(
+                &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
+                &mut ctx,
+                &Type::new_contract(Type::Int)
+            ),
+            Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
     }
 

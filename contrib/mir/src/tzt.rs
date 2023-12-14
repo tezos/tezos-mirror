@@ -10,7 +10,9 @@ mod expectation;
 use std::fmt;
 
 use num_bigint::BigInt;
+use std::collections::HashMap;
 
+use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::*;
@@ -21,7 +23,6 @@ use crate::parser::Parser;
 use crate::stack::*;
 use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
-use crate::tzt::entrypoint::Entrypoints;
 use crate::tzt::expectation::*;
 
 pub type TestStack<'a> = Vec<(Type, TypedValue<'a>)>;
@@ -74,17 +75,35 @@ pub struct TztTest<'a> {
     pub amount: Option<i64>,
     pub balance: Option<i64>,
     pub chain_id: Option<ChainId>,
-    pub parameter: Option<Micheline<'a>>,
+    pub parameter: Option<Entrypoints>,
     pub self_addr: Option<AddressHash>,
 }
 
 fn typecheck_stack<'a>(
     stk: Vec<(Micheline<'a>, Micheline<'a>)>,
+    self_param: Option<(AddressHash, Option<Entrypoints>)>,
 ) -> Result<Vec<(Type, TypedValue<'a>)>, TcError> {
+    let mut ctx = Ctx::default();
+    match self_param {
+        None => {}
+        Some((ah, eps)) => {
+            ctx.lookup_contract = Box::new(move |x| {
+                if *x == ah {
+                    Some(
+                        eps.clone()
+                            .unwrap_or(HashMap::from([(Entrypoint::default(), Type::Unit)])),
+                    )
+                } else {
+                    None
+                }
+            });
+        }
+    }
+
     stk.into_iter()
         .map(|(t, v)| {
-            let t = parse_ty(&mut Ctx::default(), &t)?;
-            let tc_val = typecheck_value(&v, &mut Default::default(), &t)?;
+            let t = parse_ty(&mut ctx, &t)?;
+            let tc_val = typecheck_value(&v, &mut ctx, &t)?;
             Ok((t, tc_val))
         })
         .collect()
@@ -119,25 +138,23 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         use TztOutput::*;
         let mut m_code: Option<Micheline> = None;
         let mut m_input: Option<TestStack> = None;
-        let mut m_output: Option<TestExpectation> = None;
         let mut m_amount: Option<i64> = None;
         let mut m_balance: Option<i64> = None;
         let mut m_chain_id: Option<Micheline> = None;
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
 
+        // This would hold the untypechecked, expected output value. This is because If the self
+        // and parameters values are specified, then we need to fetch them and populate the context
+        // first, before we can typecheck output stack using it and properly construct the typed
+        // output stack expectation.
+        let mut m_output_inter: Option<TztOutput> = None;
+
         for e in tzt {
             match e {
                 Code(ib) => set_tzt_field("code", &mut m_code, ib)?,
-                Input(stk) => set_tzt_field("input", &mut m_input, typecheck_stack(stk)?)?,
-                Output(tzt_output) => set_tzt_field(
-                    "output",
-                    &mut m_output,
-                    match tzt_output {
-                        TztSuccess(stk) => ExpectSuccess(typecheck_stack(stk)?),
-                        TztError(error_exp) => ExpectError(error_exp),
-                    },
-                )?,
+                Input(stk) => set_tzt_field("input", &mut m_input, typecheck_stack(stk, None)?)?,
+                Output(tzt_output) => set_tzt_field("output", &mut m_output_inter, tzt_output)?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
                 Balance(m) => set_tzt_field("balance", &mut m_balance, m)?,
                 ChainId(id) => set_tzt_field("chain_id", &mut m_chain_id, id)?,
@@ -145,6 +162,39 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 SelfAddr(v) => set_tzt_field("self", &mut m_self, v)?,
             }
         }
+
+        // We process self address and parameter fields first because if specified, we need them to
+        // populate the context for type checking the output stack.
+        let self_addr = match m_self {
+            Some(s) => Some(
+                irrefutable_match!(
+                typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                TypedValue::Address
+                )
+                .hash,
+            ),
+            None => None,
+        };
+
+        let parameter = match m_parameter {
+            Some(p) => Some(p.get_entrypoints(&mut Ctx::default())?),
+            None => None,
+        };
+
+        // Once we have self_addr and parameter, we typecheck the output stack
+        // after populating the context's known_contracts with the self address.
+        // Later we may add the Tzt specs `other_contracts` fields. At that point
+        // we ll have to include those contracts here as well.
+        let m_output = match m_output_inter {
+            Some(x) => match x {
+                TztSuccess(stk) => Some(ExpectSuccess(typecheck_stack(
+                    stk,
+                    self_addr.clone().map(|x| (x, parameter.clone())),
+                )?)),
+                TztError(error_exp) => Some(ExpectError(error_exp)),
+            },
+            None => None,
+        };
 
         Ok(TztTest {
             code: m_code.ok_or("code section not found in test")?,
@@ -160,18 +210,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     ))
                 })
                 .transpose()?,
-            parameter: m_parameter,
-            self_addr: m_self
-                .map(|v| {
-                    Ok::<_, TcError>(
-                        irrefutable_match!(
-                        typecheck_value(&v, &mut Ctx::default(), &Type::Address)?;
-                        TypedValue::Address
-                        )
-                        .hash,
-                    )
-                })
-                .transpose()?,
+            parameter,
+            self_addr,
         })
     }
 }
@@ -257,7 +297,7 @@ pub enum TztOutput<'a> {
 fn execute_tzt_test_code<'a>(
     code: Micheline<'a>,
     ctx: &mut Ctx,
-    parameter: Option<&Micheline>,
+    m_parameter: Option<Entrypoints>,
     input: Vec<(Type, TypedValue<'a>)>,
 ) -> Result<(FailingTypeStack, IStack<'a>), TestError<'a>> {
     // Build initial stacks (type and value) for running the test from the test input
@@ -266,11 +306,7 @@ fn execute_tzt_test_code<'a>(
 
     let mut t_stack: FailingTypeStack = FailingTypeStack::Ok(TopIsFirst::from(typs).0);
 
-    let entrypoints = match parameter {
-        Some(parameter) => parameter.get_entrypoints(ctx)?,
-        // defaulting parameter type to `unit`
-        None => Entrypoints::from([(Entrypoint::default(), Type::Unit)]),
-    };
+    let parameter = m_parameter.unwrap_or(Entrypoints::from([(Entrypoint::default(), Type::Unit)]));
 
     // Run the code and save the status of the
     // final result as a Result<(), TestError>.
@@ -278,7 +314,7 @@ fn execute_tzt_test_code<'a>(
     // This value along with the test expectation
     // from the test file will be used to decide if
     // the test was a success or a fail.
-    let typechecked_code = typecheck_instruction(&code, ctx, Some(&entrypoints), &mut t_stack)?;
+    let typechecked_code = typecheck_instruction(&code, ctx, Some(&parameter), &mut t_stack)?;
     let mut i_stack: IStack = TopIsFirst::from(vals).0;
     typechecked_code.interpret(ctx, &mut i_stack)?;
     Ok((t_stack, i_stack))
@@ -294,7 +330,6 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
     ctx.balance = test.balance.unwrap_or_default();
     ctx.chain_id = test.chain_id.unwrap_or(Ctx::default().chain_id);
     ctx.self_address = test.self_addr.unwrap_or(Ctx::default().self_address);
-    let execution_result =
-        execute_tzt_test_code(test.code, &mut ctx, test.parameter.as_ref(), test.input);
+    let execution_result = execute_tzt_test_code(test.code, &mut ctx, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
 }

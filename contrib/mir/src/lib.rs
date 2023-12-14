@@ -444,7 +444,7 @@ mod tests {
                 Type::Unit
             )))],
             stk![TypedValue::Address(addr.clone())],
-            stk![TypedValue::new_option(None),],
+            stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
             {
                 let mut c = Ctx::default();
                 c.set_known_contracts(HashMap::new());

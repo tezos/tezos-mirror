@@ -19,7 +19,7 @@ use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::stack::*;
-use crate::typechecker::{ensure_ty_eq, typecheck_value};
+use crate::typechecker::{typecheck_contract_address, typecheck_value};
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError<'a> {
@@ -910,69 +910,11 @@ fn interpret_one<'a>(
         I::Contract(typ, ep) => {
             ctx.gas.consume(interpret_cost::CONTRACT)?;
             let address = pop!(V::Address);
-            match address.hash {
-                // If the address is implicit, we handle it separately.
-                AddressHash::Implicit(_) => {
-                    // For implicit addresses, the entrypoint of the call has to be the default one
-                    // and the type of the contract should be Unit.
-                    if ep.is_default()
-                        && address.entrypoint.is_default()
-                        && ensure_ty_eq(ctx, typ, &Type::Unit).is_ok()
-                    {
-                        stack.push(TypedValue::new_option(Some(TypedValue::Contract(
-                            Address {
-                                entrypoint: Entrypoint::default(),
-                                ..address.clone()
-                            },
-                        ))));
-                    } else {
-                        stack.push(TypedValue::new_option(None));
-                    }
-                }
-                _ => {
-                    'block: {
-                        // Among the entrypoints from the address and from the instruction, the defaults
-                        // ones are overridable by the non-default entrypoints. If both contain explicitly
-                        // specified non-default ones, then the result is None.
-                        let opt_entrypoint =
-                            match (address.entrypoint.is_default(), ep.is_default()) {
-                                (true, true) => Some(Entrypoint::default()),
-                                (false, true) => Some(address.entrypoint.clone()),
-                                (true, false) => Some(ep.clone()),
-                                (false, false) => None,
-                            };
-                        // Check if we have a contract at the address_hash of the given address.
-                        // and we have found a valid entrypoint to use.
-                        if let (Some(entrypoint), Some(contract_entrypoints)) =
-                            (opt_entrypoint, (ctx.lookup_contract)(&address.hash))
-                        {
-                            // Do we have the entrypoint for the call in the entrypoints parsed
-                            // from the destination contract parameter?
-                            if let Some(contract_entrypoint_type) =
-                                contract_entrypoints.get(&entrypoint)
-                            {
-                                // If the entrypoint is present, check that it is of the required
-                                // type.
-                                if ensure_ty_eq(ctx, typ, contract_entrypoint_type).is_ok() {
-                                    // if everything passes, push the contract value to stack,
-                                    // with address populated with the active entrypoint.
-                                    stack.push(TypedValue::new_option(Some(TypedValue::Contract(
-                                        Address {
-                                            entrypoint,
-                                            ..address.clone()
-                                        },
-                                    ))));
-                                    break 'block;
-                                }
-                            }
-                        }
-
-                        // If any of the above checks failed, then push a None value to
-                        // stack.
-                        stack.push(TypedValue::new_option(None));
-                    }
-                }
-            }
+            stack.push(TypedValue::new_option(
+                typecheck_contract_address(ctx, address, ep.clone(), typ)
+                    .ok()
+                    .map(TypedValue::Contract),
+            ));
         }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
@@ -3491,11 +3433,15 @@ mod interpreter_tests {
 
         // When the address is implicit.and contract type is Ticket
         let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let expected_address: Address = Address {
+            entrypoint: Entrypoint::default(),
+            ..addr.clone()
+        };
         run_contract_test(
             addr.clone(),
             None,
             stk![V::Address(addr)],
-            stk![TypedValue::new_option(None)],
+            stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
             Contract(Type::new_ticket(Type::Unit), Entrypoint::default()),
             None,
         );
