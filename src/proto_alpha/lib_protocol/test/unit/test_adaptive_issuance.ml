@@ -121,8 +121,8 @@ let test_compute_bonus () =
     let*?@ previous_bonus =
       Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus previous_bonus
     in
-    let issuance_ratio_max = reward_params.issuance_ratio_global_max in
-    let issuance_ratio_min = reward_params.issuance_ratio_global_min in
+    let issuance_ratio_max = reward_params.issuance_ratio_final_max in
+    let issuance_ratio_min = reward_params.issuance_ratio_final_min in
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
@@ -247,7 +247,6 @@ let test_compute_coeff () =
     let* b in
     Assert.equal ~loc Q.equal "" Q.pp_print a b
   in
-
   let reward_params =
     Default_parameters.constants_test.adaptive_issuance.adaptive_rewards_params
   in
@@ -386,7 +385,205 @@ let test_compute_coeff () =
     in
     return_unit
   in
+  return_unit
 
+let test_compute_min_max () =
+  let open Delegate.Rewards.Internal_for_tests in
+  let open Lwt_result_wrap_syntax in
+  (* let assert_eq ~loc a b = Assert.equal ~loc Q.equal "" Q.pp_print a b in *)
+  let assert_eq_list ~loc a b =
+    Assert.assert_equal_list ~loc Q.equal "" Q.pp_print a b
+  in
+  let reward_params =
+    Default_parameters.constants_test.adaptive_issuance.adaptive_rewards_params
+  in
+  let update_reward_params ?issuance_ratio_final_min ?issuance_ratio_final_max
+      ?issuance_ratio_initial_min ?issuance_ratio_initial_max ?initial_period
+      ?transition_period
+      (reward_params : Constants.Parametric.adaptive_rewards_params) =
+    let issuance_ratio_final_min =
+      Option.value
+        ~default:reward_params.issuance_ratio_final_min
+        issuance_ratio_final_min
+    in
+    let issuance_ratio_final_max =
+      Option.value
+        ~default:reward_params.issuance_ratio_final_max
+        issuance_ratio_final_max
+    in
+    let issuance_ratio_initial_min =
+      Option.value
+        ~default:reward_params.issuance_ratio_initial_min
+        issuance_ratio_initial_min
+    in
+    let issuance_ratio_initial_max =
+      Option.value
+        ~default:reward_params.issuance_ratio_initial_max
+        issuance_ratio_initial_max
+    in
+    let initial_period =
+      Option.value ~default:reward_params.initial_period initial_period
+    in
+    let transition_period =
+      Option.value ~default:reward_params.transition_period transition_period
+    in
+    {
+      reward_params with
+      issuance_ratio_final_min;
+      issuance_ratio_final_max;
+      issuance_ratio_initial_min;
+      issuance_ratio_initial_max;
+      initial_period;
+      transition_period;
+    }
+  in
+  let compute_aux ~f ?issuance_ratio_final_min ?issuance_ratio_final_max
+      ?issuance_ratio_initial_min ?issuance_ratio_initial_max ?initial_period
+      ?transition_period ?(launch_cycle = Some 0l) cycle =
+    let launch_cycle = Option.map Cycle_repr.of_int32_exn launch_cycle in
+    let new_cycle = Cycle_repr.of_int32_exn (Int32.of_int cycle) in
+    let reward_params =
+      update_reward_params
+        ?issuance_ratio_final_min
+        ?issuance_ratio_final_max
+        ?issuance_ratio_initial_min
+        ?issuance_ratio_initial_max
+        ?initial_period
+        ?transition_period
+        reward_params
+    in
+    f ~reward_params ~launch_cycle ~new_cycle
+  in
+  let compute_min = compute_aux ~f:compute_min in
+  let compute_max = compute_aux ~f:compute_max in
+  let assert_eq_on_interval ~loc ~f ~from ~to_ expected =
+    assert (List.length expected = to_ - from + 1) ;
+    let actual = Stdlib.List.init (to_ - from + 1) (fun i -> f (i + from)) in
+    assert_eq_list ~loc expected actual
+  in
+  (* Python-style list generation *)
+  let ( *+ ) a b = Stdlib.List.init b (fun _ -> a) in
+  (* Test before launch cycle *)
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:(compute_min ~launch_cycle:(Some 10l))
+      ~from:0
+      ~to_:10
+      (reward_params.issuance_ratio_initial_min *+ 11)
+  in
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:(compute_max ~launch_cycle:(Some 10l))
+      ~from:0
+      ~to_:10
+      (reward_params.issuance_ratio_initial_max *+ 11)
+  in
+  (* Test no launch cycle *)
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:(compute_min ~launch_cycle:None)
+      ~from:0
+      ~to_:10
+      (reward_params.issuance_ratio_initial_min *+ 11)
+  in
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:(compute_max ~launch_cycle:None)
+      ~from:0
+      ~to_:10
+      (reward_params.issuance_ratio_initial_max *+ 11)
+  in
+  (* From now on, launch_cycle = 0 *)
+  (* Test initial period *)
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:compute_min
+      ~from:0
+      ~to_:reward_params.initial_period
+      (reward_params.issuance_ratio_initial_min
+      *+ (reward_params.initial_period + 1))
+  in
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:compute_max
+      ~from:0
+      ~to_:reward_params.initial_period
+      (reward_params.issuance_ratio_initial_max
+      *+ (reward_params.initial_period + 1))
+  in
+  (* Test final period *)
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:compute_min
+      ~from:(reward_params.initial_period + reward_params.transition_period + 1)
+      ~to_:(reward_params.initial_period + reward_params.transition_period + 10)
+      (reward_params.issuance_ratio_final_min *+ 10)
+  in
+  let* () =
+    assert_eq_on_interval
+      ~loc:__LOC__
+      ~f:compute_max
+      ~from:(reward_params.initial_period + reward_params.transition_period + 1)
+      ~to_:(reward_params.initial_period + reward_params.transition_period + 10)
+      (reward_params.issuance_ratio_final_max *+ 10)
+  in
+  (* Test transition period *)
+  let* () =
+    let initial_period = 5 in
+    let transition_period = 5 in
+    let issuance_ratio_initial_min = Q.(7 // 100) in
+    let issuance_ratio_final_min = Q.(1 // 100) in
+    (* Min increases by 1/100th per cycle *)
+    let issuance_ratio_initial_max = Q.(1 // 10) in
+    let issuance_ratio_final_max = Q.(7 // 10) in
+    (* Max increases by 1/10th per cycle *)
+    let compute_min =
+      compute_min
+        ~initial_period
+        ~transition_period
+        ~issuance_ratio_initial_max
+        ~issuance_ratio_initial_min
+        ~issuance_ratio_final_max
+        ~issuance_ratio_final_min
+    in
+    let compute_max =
+      compute_max
+        ~initial_period
+        ~transition_period
+        ~issuance_ratio_initial_max
+        ~issuance_ratio_initial_min
+        ~issuance_ratio_final_max
+        ~issuance_ratio_final_min
+    in
+    let* () =
+      assert_eq_on_interval
+        ~loc:__LOC__
+        ~f:compute_min
+        ~from:0
+        ~to_:15
+        ((issuance_ratio_initial_min *+ 6)
+        @ Q.[6 // 100; 5 // 100; 4 // 100; 3 // 100; 2 // 100]
+        @ (issuance_ratio_final_min *+ 5))
+    in
+    let* () =
+      assert_eq_on_interval
+        ~loc:__LOC__
+        ~f:compute_max
+        ~from:0
+        ~to_:15
+        ((issuance_ratio_initial_max *+ 6)
+        @ Q.[2 // 10; 3 // 10; 4 // 10; 5 // 10; 6 // 10]
+        @ (issuance_ratio_final_max *+ 5))
+    in
+    return_unit
+  in
   return_unit
 
 let tests =
@@ -408,6 +605,10 @@ let tests =
         "adaptive issuance - reward coeff computation"
         `Quick
         test_compute_coeff;
+      tztest
+        "adaptive issuance - min/max coeff computation"
+        `Quick
+        test_compute_min_max;
     ]
 
 let () =
