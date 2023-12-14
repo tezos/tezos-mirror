@@ -180,54 +180,20 @@ let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = sc_node.persistent_state.base_dir
 
-let purposes = [Operating; Batching; Cementing; Recovering]
-
 let string_of_purpose = function
   | Operating -> "operating"
   | Batching -> "batching"
   | Cementing -> "cementing"
   | Recovering -> "recovering"
 
-(* For each purpose, it returns a list of associated operation kinds *)
-let operation_kinds_of_purpose = function
-  | Batching -> [Add_messages]
-  | Cementing -> [Cement]
-  | Operating -> [Publish; Refute; Timeout]
-  | Recovering -> [Recover]
-
-(* Map a list of operation kinds to their corresponding purposes,
-   based on their presence in the input list. *)
-let purposes_of_operation_kinds (operation_kinds : operation_kind list) :
-    purpose list =
-  purposes
-  |> List.filter (fun purpose ->
-         List.exists
-           (fun kind -> List.mem kind (operation_kinds_of_purpose purpose))
-           operation_kinds)
-
 (* Extracts operators from node state, handling custom mode, and
    formats them as "purpose:operator". Includes default operator if present. *)
-let operators_params sc_node =
-  let acc =
-    match sc_node.persistent_state.default_operator with
-    | None -> []
-    | Some operator -> [operator]
-  in
-  let operators =
-    match sc_node.persistent_state.mode with
-    | Custom op_kinds ->
-        (* Filter the operators based on the custom mode's operation kinds *)
-        let applicable_purposes = purposes_of_operation_kinds op_kinds in
-        List.filter
-          (fun (purpose, _) -> List.mem purpose applicable_purposes)
-          sc_node.persistent_state.operators
-    | _ -> sc_node.persistent_state.operators
-  in
+let operators_params rollup_node =
   List.fold_left
     (fun acc (purpose, operator) ->
       (string_of_purpose purpose ^ ":" ^ operator) :: acc)
-    acc
-    operators
+    (Option.to_list rollup_node.persistent_state.default_operator)
+    rollup_node.persistent_state.operators
 
 let make_arguments node =
   [
