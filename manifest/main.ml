@@ -7216,6 +7216,25 @@ let _get_contracts =
     ~modules:["get_contracts"]
     ~bisect_ppx:No
 
+let _proto_context_du =
+  public_exe
+    "proto_context_du"
+    ~internal_name:"main"
+    ~path:("devtools" // "proto_context_du")
+    ~release_status:Unreleased
+    ~synopsis:"A script to print protocol context disk usage"
+    ~opam:"internal-devtools_proto-context-du"
+    ~deps:
+      [
+        octez_clic;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_node_config;
+        octez_store;
+        Protocol.(main alpha);
+        Protocol.(client_exn alpha);
+      ]
+    ~bisect_ppx:No
+
 let yes_wallet_lib =
   let get_delegates_module proto =
     "devtools" // "yes_wallet"
