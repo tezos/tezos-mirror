@@ -968,6 +968,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
     | Oxford_018 ->
         let*! c = get_previous_protocol_constants ctxt in
 
+        (* When modifying the line below, be careful that the values are
+           compatible with the encodings exported by the environment did not
+           change. *)
         let cryptobox_parameters = c.dal.cryptobox_parameters in
         let dal =
           Constants_parametric_repr.
@@ -991,9 +994,12 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           else ok ()
         in
         let dal_activation_level =
-          if c.dal.feature_enable then Raw_level_repr.root
+          if c.dal.feature_enable then
+            (* if dal was enable in previous protocol, do as if it were always
+               activated *)
+            Raw_level_repr.root
           else if dal.feature_enable then
-            (* First level of the protocol with dal activated. *)
+            (* dal activates at first level of the new protocol. *)
             Raw_level_repr.of_int32_exn (Int32.succ level)
           else
             (* Deactivate the reveal if the dal is not enabled.
