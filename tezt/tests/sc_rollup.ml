@@ -1251,7 +1251,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
   let* ticks =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ()
   in
   Check.(ticks = 0)
@@ -1287,24 +1287,14 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
   @@ fun protocol sc_rollup_node sc_rollup _tezos_node client ->
-  let* genesis_info =
-    Client.RPC.call ~hooks client
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
-         sc_rollup
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  let* level =
-    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
-  in
-  Check.(level = init_level)
-    Check.int
-    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* level, forwarder =
-    if not internal then return (level, None)
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  let* forwarder =
+    if not internal then return None
     else
       let* contract_id = originate_forward_smart_contract client protocol in
-      return (level + 1, Some contract_id)
+      let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+      return (Some contract_id)
   in
   (* Called with monotonically increasing [i] *)
   let test_message i =
@@ -1313,7 +1303,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
     let* prev_ticks =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_total_ticks ()
     in
     let message = sf "%d %d + value" i ((i + 2) * 2) in
@@ -1335,9 +1325,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
           in
           Client.bake_for_and_wait client
     in
-    let* (_ : int) =
-      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + i)
-    in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
 
     (* specific per kind PVM checks *)
     let* () =
@@ -1383,7 +1371,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       Check.string
       ~error_msg:"State hash has not changed (%L <> %R)" ;
     let* ticks =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_total_ticks ()
     in
     Check.(ticks >= prev_ticks)

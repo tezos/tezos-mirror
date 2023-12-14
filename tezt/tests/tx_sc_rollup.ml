@@ -253,7 +253,7 @@ let assert_state_changed ?block sc_rollup_node prev_state_hash =
 
 let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
   let* ticks =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ?block ()
   in
   Check.(ticks > prev_ticks)
@@ -346,25 +346,13 @@ let tx_kernel_e2e setup protocol =
   in
 
   (* Run the rollup node, ensure origination succeeds. *)
-  let* genesis_info =
-    Client.RPC.call ~hooks client
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
-         sc_rollup_address
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address node_args in
-  let* level =
-    Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
-  in
-  Check.(level = init_level)
-    Check.int
-    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
   (* Originate a contract that will mint and transfer tickets to the tx kernel. *)
   let* mint_and_deposit_contract =
     Tezt_tx_kernel.Contracts.prepare_mint_and_deposit_contract client protocol
   in
-  let level = init_level + 1 in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
 
   (* gen two tz1 accounts *)
   let pkh1, pk1, sk1 = Tezos_crypto.Signature.Ed25519.generate_key () in
@@ -387,7 +375,7 @@ let tx_kernel_e2e setup protocol =
       ~ticket_content
       ~amount:450
   in
-  let level = level + 1 in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
 
   (* Construct transfer *)
   let sc_rollup_hash =
@@ -422,9 +410,8 @@ let tx_kernel_e2e setup protocol =
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
   let* () = send_message client (sf "hex:[%S]" transfer_message) in
-  let level = level + 1 in
 
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
   let* () = assert_state_changed sc_rollup_node prev_state_hash in
 
   (* After that pkh1 has 400 tickets, pkh2 has 50 tickets *)
@@ -436,7 +423,7 @@ let tx_kernel_e2e setup protocol =
       client
       protocol
   in
-  let level = level + 1 in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
   (* pk withdraws part of his tickets, pk2 withdraws all of his tickets *)
   let withdraw_message =
     Transaction_batch.(
@@ -468,14 +455,12 @@ let tx_kernel_e2e setup protocol =
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
   let* prev_ticks =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ()
   in
   let* () = send_message client (sf "hex:[%S]" withdraw_message) in
-  let level = level + 1 in
-  let withdrawal_level = level in
-  let* _ =
-    Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node withdrawal_level
+  let* withdrawal_level =
+    Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
   in
 
   let* _, last_lcc_level =

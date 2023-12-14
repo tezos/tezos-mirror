@@ -34,6 +34,8 @@ open Base
 
 let hooks = Tezos_regression.hooks
 
+let rpc_hooks = Tezos_regression.rpc_hooks
+
 (*
 
    Helpers
@@ -177,7 +179,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         @@ Sc_rollup_rpc.get_global_block_state_hash ()
       in
       let* prev_ticks =
-        Sc_rollup_node.RPC.call sc_rollup_node
+        Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
         @@ Sc_rollup_rpc.get_global_block_total_ticks ()
       in
       let message = sf "%d %d + value" i ((i + 2) * 2) in
@@ -244,7 +246,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         ~error_msg:"State hash has not changed (%L <> %R)" ;
 
       let* ticks =
-        Sc_rollup_node.RPC.call sc_rollup_node
+        Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
         @@ Sc_rollup_rpc.get_global_block_total_ticks ()
       in
       Check.(ticks >= prev_ticks)
