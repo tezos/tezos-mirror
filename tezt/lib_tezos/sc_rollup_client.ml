@@ -95,8 +95,6 @@ let json_of_batch ts =
   in
   `A (List.map json_of_transaction ts)
 
-type outbox_proof = {commitment_hash : string; proof : string}
-
 let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level
     transactions =
   let*? process =
@@ -126,6 +124,7 @@ let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level
   | None ->
       let* answer = Process.check_and_read_stdout process in
       let open JSON in
+      let open Sc_rollup_rpc in
       let json = parse ~origin:"outbox_proof" answer in
       let commitment_hash = json |-> "commitment_hash" |> as_string in
       let proof = json |-> "proof" |> as_string in
@@ -153,15 +152,6 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
     ~message_index
     ~outbox_level
     [{destination; entrypoint; parameters; parameters_ty}]
-
-let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level =
-  outbox_proof
-    ?hooks
-    ?expected_error
-    sc_client
-    None
-    ~message_index
-    ~outbox_level
 
 let rpc_get ?hooks sc_client path =
   spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]

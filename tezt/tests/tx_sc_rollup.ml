@@ -353,7 +353,6 @@ let tx_kernel_e2e setup protocol =
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address node_args in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
   in
@@ -514,10 +513,8 @@ let tx_kernel_e2e setup protocol =
   let execute_outbox_proof ~message_index =
     let outbox_level = withdrawal_level in
     let* proof =
-      Sc_rollup_client.outbox_proof
-        sc_rollup_client
-        ~message_index
-        ~outbox_level
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
     in
     match proof with
     | Some {commitment_hash; proof} ->

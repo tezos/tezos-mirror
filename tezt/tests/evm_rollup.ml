@@ -2227,7 +2227,7 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       ~parameters
       ~entrypoint:JSON.(outbox_message |-> "entrypoint" |> as_string)
   in
-  let Sc_rollup_client.{proof; commitment_hash} =
+  let Sc_rollup_rpc.{proof; commitment_hash} =
     match outbox_proof with
     | Some r -> r
     | None -> Test.fail "No outbox proof found for the withdrawal"

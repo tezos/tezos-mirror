@@ -253,3 +253,29 @@ let post_local_batcher_injection ~messages =
     ["local"; "batcher"; "injection"]
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =
+  let open RPC_core in
+  let query_string = [("index", string_of_int message_index)] in
+  make
+    ~query_string
+    GET
+    [
+      "global";
+      "block";
+      block;
+      "helpers";
+      "proofs";
+      "outbox";
+      string_of_int outbox_level;
+      "messages";
+    ]
+    (fun json ->
+      let open JSON in
+      let commitment_hash = json |-> "commitment" |> as_string in
+      let proof_string = json |-> "proof" |> as_string in
+      (* There is 0x return in the proof hash as it is a hex *)
+      let proof_hex = sf "0x%s" proof_string in
+      Some {commitment_hash; proof = proof_hex})
