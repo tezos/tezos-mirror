@@ -61,6 +61,12 @@ let test_persistent_state =
     ~__FILE__
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
   @@ fun protocol ->
   let* {evm_node; _} = setup_sequencer protocol in
   (* Sleep to let the sequencer produce some blocks. *)
@@ -91,6 +97,12 @@ let test_publish_blueprints =
     ~__FILE__
     ~tags:[Tag.flaky; "evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.octez_evm_node;
+      ])
   @@ fun protocol ->
   let* {evm_node; node; client; sc_rollup_node} = setup_sequencer protocol in
   (* Sleep to let the sequencer produce some blocks. *)

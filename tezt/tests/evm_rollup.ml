@@ -1286,6 +1286,12 @@ let test_log_index =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "log_index"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check that log index is correctly computed"
   @@ fun protocol ->
   (* setup *)
@@ -2239,6 +2245,7 @@ let test_deposit_and_withdraw =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.octez_codec;
       ])
     ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
@@ -3923,6 +3930,12 @@ let test_rpc_getLogs =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "rpc"; "get_logs"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check getLogs RPC"
   @@ fun protocol ->
   (* setup *)
@@ -4067,6 +4080,12 @@ let test_tx_pool_replacing_transactions =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "tx_pool"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Transactions can be replaced"
   @@ fun protocol ->
   let* {evm_node; sc_rollup_node; node; client; _} =
@@ -4106,6 +4125,12 @@ let test_l2_nested_create =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check L2 nested create"
   @@ fun protocol ->
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
@@ -4158,6 +4183,12 @@ let test_block_hash_regression =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "block"; "hash"; "regression"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Regression test for L2 block hash"
   @@ fun protocol ->
   let config =
@@ -4184,6 +4215,12 @@ let test_l2_revert_returns_unused_gas =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check L2 revert returns unused gas"
   @@ fun protocol ->
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
@@ -4229,6 +4266,12 @@ let test_l2_create_collision =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "l2_create"; "collision"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
     ~title:"Check L2 create collision"
   @@ fun protocol ->
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
@@ -4288,6 +4331,12 @@ let test_l2_intermediate_OOG_call =
     ~title:
       "Check that an L2 call to a smart contract with an intermediate call \
        that runs out of gas still succeeds."
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+      ])
   @@ fun protocol ->
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
