@@ -325,6 +325,10 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let v = pop!();
             stack.push(V::new_option(Some(v)));
         }
+        I::None => {
+            ctx.gas.consume(interpret_cost::NONE)?;
+            stack.push(V::new_option(None));
+        }
         I::Compare => {
             let l = pop!();
             let r = pop!();
@@ -490,6 +494,7 @@ mod interpreter_tests {
     use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
     use Instruction::*;
+    use Option::None;
     use TypedValue as V;
 
     #[test]
@@ -1114,6 +1119,18 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn none() {
+        let mut stack = stk![];
+        let mut ctx = Ctx::default();
+        assert!(interpret(&vec![Instruction::None], &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, stk![V::new_option(None)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::NONE - interpret_cost::INTERPRET_RET
         );
     }
 

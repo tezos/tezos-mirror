@@ -869,6 +869,13 @@ pub(crate) fn typecheck_instruction(
         (App(SOME, [], _), []) => no_overload!(SOME, len 1),
         (App(SOME, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NONE, [ty], _), _) => {
+            let ty = parse_ty(ctx, ty)?;
+            stack.push(T::new_option(ty));
+            I::None
+        }
+        (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(COMPARE, [], _), [.., u, t]) => {
             ensure_ty_eq(ctx, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
@@ -1267,6 +1274,7 @@ mod typecheck_tests {
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use Instruction::*;
+    use Option::None;
 
     /// hack to simplify syntax in tests
     fn typecheck_instruction(
@@ -2005,6 +2013,16 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("SOME").unwrap(), &mut Ctx::default(), &mut stack),
             Ok(ISome)
+        );
+        assert_eq!(stack, tc_stk![Type::new_option(Type::Int)]);
+    }
+
+    #[test]
+    fn none() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("NONE int").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Instruction::None)
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Int)]);
     }
