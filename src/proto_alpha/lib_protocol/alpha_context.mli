@@ -2367,6 +2367,7 @@ module Delegate : sig
         Q.t
 
       val compute_bonus :
+        issuance_ratio_max:Q.t ->
         seconds_per_cycle:int64 ->
         stake_ratio:Q.t ->
         base_reward_coeff_ratio:Q.t ->
@@ -2375,11 +2376,12 @@ module Delegate : sig
         Issuance_bonus_repr.t tzresult
 
       val compute_coeff :
+        issuance_ratio_max:Q.t ->
+        issuance_ratio_min:Q.t ->
         base_total_issued_per_minute:Tez_repr.t ->
         base_reward_coeff_ratio:Q.t ->
         q_total_supply:Q.t ->
         bonus:Issuance_bonus_repr.t ->
-        reward_params:Constants.Parametric.adaptive_rewards_params ->
         Q.t
     end
   end

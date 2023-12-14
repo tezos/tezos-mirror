@@ -121,14 +121,17 @@ let test_compute_bonus () =
     let*?@ previous_bonus =
       Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus previous_bonus
     in
+    let issuance_ratio_max = reward_params.issuance_ratio_global_max in
+    let issuance_ratio_min = reward_params.issuance_ratio_global_min in
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
-        ~issuance_ratio_max:reward_params.issuance_ratio_final_max
-        ~issuance_ratio_min:reward_params.issuance_ratio_final_min
+        ~issuance_ratio_max
+        ~issuance_ratio_min
     in
     let*?@ bonus =
       compute_bonus
+        ~issuance_ratio_max
         ~seconds_per_cycle
         ~stake_ratio
         ~base_reward_coeff_ratio
@@ -142,14 +145,14 @@ let test_compute_bonus () =
         ~loc:__LOC__
         ~f:Q.geq
         (return full_reward_coeff)
-        reward_params.issuance_ratio_final_min
+        issuance_ratio_min
     in
     let* () =
       assert_fun
         ~loc:__LOC__
         ~f:Q.leq
         (return full_reward_coeff)
-        reward_params.issuance_ratio_final_max
+        issuance_ratio_max
     in
     return (bonus :> Q.t)
   in
@@ -255,7 +258,11 @@ let test_compute_coeff () =
   let compute_coeff
       ?(base_total_issued_per_minute = base_total_issued_per_minute)
       ?(q_total_supply = Q.of_int64 1_000_000_000L) () =
-    compute_coeff ~base_total_issued_per_minute ~q_total_supply ~reward_params
+    compute_coeff
+      ~issuance_ratio_max:reward_params.issuance_ratio_final_max
+      ~issuance_ratio_min:reward_params.issuance_ratio_final_min
+      ~base_total_issued_per_minute
+      ~q_total_supply
   in
   (* Test inverse linearity wrt base issuance
      Base issuance * Issuance coeff = constant (= issuance per unit of time)

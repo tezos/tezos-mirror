@@ -122,8 +122,9 @@ let compute_reward_coeff_ratio_without_bonus =
     (* f is truncated so that 0.05% <= f <= 5% *)
     truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
-let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
-    ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
+let compute_bonus ~issuance_ratio_max ~seconds_per_cycle ~stake_ratio
+    ~base_reward_coeff_ratio ~(previous_bonus : Issuance_bonus_repr.t)
+    ~reward_params =
   let Constants_parametric_repr.
         {
           issuance_ratio_final_min = _;
@@ -139,7 +140,6 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
         } =
     reward_params
   in
-  let issuance_ratio_max = compute_max ~reward_params in
   let base_reward_coeff_dist_to_max =
     Q.(issuance_ratio_max - base_reward_coeff_ratio)
   in
@@ -169,15 +169,14 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_issued_per_minute
+  fun ~issuance_ratio_max
+      ~issuance_ratio_min
+      ~base_total_issued_per_minute
       ~base_reward_coeff_ratio
       ~q_total_supply
-      ~(bonus : Issuance_bonus_repr.t)
-      ~reward_params ->
+      ~(bonus : Issuance_bonus_repr.t) ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
-      let issuance_ratio_min = compute_min ~reward_params in
-      let issuance_ratio_max = compute_max ~reward_params in
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
@@ -229,6 +228,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     in
     let*? bonus =
       compute_bonus
+        ~issuance_ratio_max
         ~seconds_per_cycle
         ~stake_ratio
         ~base_reward_coeff_ratio
@@ -237,11 +237,12 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     in
     let coeff =
       compute_coeff
+        ~issuance_ratio_max
+        ~issuance_ratio_min
         ~base_total_issued_per_minute
         ~base_reward_coeff_ratio
         ~q_total_supply
         ~bonus
-        ~reward_params
     in
     let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
     let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
