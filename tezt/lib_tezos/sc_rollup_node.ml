@@ -54,6 +54,8 @@ module Parameters = struct
     base_dir : string;
     operators : (purpose * string) list;
     default_operator : string option;
+    metrics_addr : string option;
+    metrics_port : int;
     rpc_host : string;
     rpc_port : int;
     mode : mode;
@@ -166,6 +168,10 @@ let color sc_node = sc_node.color
 let rpc_host sc_node = sc_node.persistent_state.rpc_host
 
 let rpc_port sc_node = sc_node.persistent_state.rpc_port
+
+let metrics node =
+  ( Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr,
+    node.persistent_state.metrics_port )
 
 let endpoint sc_node =
   Printf.sprintf "http://%s:%d" (rpc_host sc_node) (rpc_port sc_node)
@@ -436,14 +442,18 @@ let handle_event sc_node {name; value; timestamp = _} =
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
-    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = [])
-    ?default_operator ?(dal_node : Dal_node.t option) mode endpoint =
+    ?event_pipe ?metrics_addr ?metrics_port ?(rpc_host = "127.0.0.1") ?rpc_port
+    ?(operators = []) ?default_operator ?(dal_node : Dal_node.t option) mode
+    endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
+  in
+  let metrics_port =
+    match metrics_port with None -> Port.fresh () | Some port -> port
   in
   let path =
     Option.value ~default:(Uses.path Constant.octez_smart_rollup_node) path
@@ -458,6 +468,8 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
       {
         data_dir;
         base_dir;
+        metrics_addr;
+        metrics_port;
         rpc_host;
         rpc_port;
         operators;
@@ -473,8 +485,9 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe ?rpc_host
-    ?rpc_port ?operators ?default_operator ?dal_node mode (node : Node.t) =
+let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
+    ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators ?default_operator
+    ?dal_node mode (node : Node.t) =
   create_with_endpoint
     ?runner
     ?path
@@ -483,6 +496,8 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe ?rpc_host
     ?data_dir
     ~base_dir
     ?event_pipe
+    ?metrics_addr
+    ?metrics_port
     ?rpc_host
     ?rpc_port
     ?operators
@@ -524,6 +539,12 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
           rollup_address
       in
       ["run"] @ args @ extra_arguments
+      @ [
+          "--metrics-addr";
+          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
+          ^ ":"
+          ^ string_of_int node.persistent_state.metrics_port;
+        ]
     else
       let default_mode, args =
         node_args
@@ -539,6 +560,12 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
       in
       Cli_arg.optional_arg "password-filename" Fun.id password_file
       @ ["run"; final_mode] @ args @ extra_arguments
+      @ [
+          "--metrics-addr";
+          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
+          ^ ":"
+          ^ string_of_int node.persistent_state.metrics_port;
+        ]
   in
   do_runlike_command ?event_level ?event_sections_levels node cmd
 

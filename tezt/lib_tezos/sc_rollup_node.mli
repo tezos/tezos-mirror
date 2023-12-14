@@ -96,6 +96,8 @@ val create :
   ?data_dir:string ->
   base_dir:string ->
   ?event_pipe:string ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?operators:(purpose * string) list ->
@@ -114,6 +116,8 @@ val create_with_endpoint :
   ?data_dir:string ->
   base_dir:string ->
   ?event_pipe:string ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?operators:(purpose * string) list ->
@@ -147,6 +151,9 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
+
+(** Get the metrics address and port of a node. *)
+val metrics : t -> string * int
 
 val string_of_purpose : purpose -> string
 
