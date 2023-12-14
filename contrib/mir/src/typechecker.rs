@@ -6,7 +6,7 @@
 /******************************************************************************/
 
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::num::TryFromIntError;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -343,6 +343,13 @@ fn parse_ty_with_entrypoints(
             Type::new_contract(t)
         }
         App(contract, ..) => unexpected()?,
+
+        App(set, [k], _) => {
+            let k = parse_ty(ctx, k)?;
+            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            Type::new_set(k)
+        }
+        App(set, ..) => unexpected()?,
 
         App(map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
@@ -774,6 +781,19 @@ pub(crate) fn typecheck_instruction(
             unify_stacks(ctx, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::List, nested)
         }
+        (App(ITER, [Seq(nested)], _), [.., T::Set(..)]) => {
+            // get the set element type
+            let ty = pop!(T::Set);
+            // clone the rest of the stack
+            let mut inner_stack = stack.clone();
+            // push the element type to the top of the inner stack and typecheck
+            inner_stack.push(*ty);
+            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
+            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
+            // If the starting stack (sans set) and result stack unify, all is good.
+            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            I::Iter(overloads::Iter::Set, nested)
+        }
         (App(ITER, [Seq(nested)], _), [.., T::Map(..)]) => {
             // get the map element type
             let kty_vty_box = pop!(T::Map);
@@ -928,6 +948,14 @@ pub(crate) fn typecheck_instruction(
         (App(CONS, [], _), [] | [_]) => no_overload!(CONS, len 2),
         (App(CONS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_SET, [ty], _), _) => {
+            let ty = parse_ty(ctx, ty)?;
+            ty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            stack.push(T::new_set(ty));
+            I::EmptySet
+        }
+        (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let (kty, vty) = *pop!(T::Map);
@@ -939,12 +967,16 @@ pub(crate) fn typecheck_instruction(
         (App(GET, [], _), [] | [_]) => no_overload!(GET, len 2),
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
+            ensure_ty_eq(ctx, ty, ty_)?;
+            stack.drop_top(2);
+            I::Update(overloads::Update::Set)
+        }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(ctx, kty, kty_)?;
             ensure_ty_eq(ctx, vty, vty_new)?;
-            pop!();
-            pop!();
+            stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
@@ -1052,9 +1084,9 @@ pub(crate) fn typecheck_instruction(
         }
         (App(RIGHT, [_ty_left], _), []) => no_overload!(RIGHT, len 1),
         (App(RIGHT, expect_args!(1), _), _) => unexpected_micheline!(),
-        
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
-        
+
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
@@ -1106,43 +1138,53 @@ pub(crate) fn typecheck_value(
                 .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
-        (T::Map(m), V::Seq(vs)) => {
-            let (tk, tv) = m.as_ref();
-            let tc_elt = |v: &Micheline| -> Result<(TypedValue, TypedValue), TcError> {
-                match v {
-                    Micheline::App(Prim::Elt, [k, v], _) => {
-                        let k = typecheck_value(k, ctx, tk)?;
-                        let v = typecheck_value(v, ctx, tv)?;
-                        Ok((k, v))
-                    }
-                    _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
-                }
-            };
-            let elts: Vec<(TypedValue, TypedValue)> =
-                vs.iter().map(tc_elt).collect::<Result<_, TcError>>()?;
-            if elts.len() > 1 {
-                let mut prev = &elts[0].0;
-                for i in &elts[1..] {
-                    ctx.gas.consume(gas::interpret_cost::compare(prev, &i.0)?)?;
-                    match prev.cmp(&i.0) {
-                        std::cmp::Ordering::Less => (),
-                        std::cmp::Ordering::Equal => {
-                            return Err(TcError::DuplicateElements(t.clone()))
-                        }
-                        std::cmp::Ordering::Greater => {
-                            return Err(TcError::ElementsNotSorted(t.clone()))
-                        }
-                    }
-                    prev = &i.0;
-                }
-            }
+        (set_ty @ T::Set(ty), V::Seq(vs)) => {
             ctx.gas
-                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), elts.len())?)?;
+                .consume(gas::tc_cost::construct_set(ty.size_for_gas(), vs.len())?)?;
+            let ctx_cell = std::cell::RefCell::new(ctx);
+            // See the same concern about constructing from ordered sequence as in Map
+            let set: BTreeSet<TypedValue> = OrderValidatingIterator {
+                it: vs
+                    .iter()
+                    .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), ty))
+                    .peekable(),
+                container_ty: set_ty,
+                to_key: |x| x,
+                ctx: &ctx_cell,
+            }
+            .collect::<Result<_, TcError>>()?;
+            TV::Set(set)
+        }
+        (map_ty @ T::Map(m), V::Seq(vs)) => {
+            let (tk, tv) = m.as_ref();
+            ctx.gas
+                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
+            let ctx_cell = std::cell::RefCell::new(ctx);
+            let tc_elt =
+                |v: &Micheline, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
+                    match v {
+                        Micheline::App(Prim::Elt, [k, v], _) => {
+                            let k = typecheck_value(k, ctx, tk)?;
+                            let v = typecheck_value(v, ctx, tv)?;
+                            Ok((k, v))
+                        }
+                        _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
+                    }
+                };
             // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
             // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
             // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
             // too much overhead.
-            let map: BTreeMap<TypedValue, TypedValue> = elts.into_iter().collect();
+            let map: BTreeMap<TypedValue, TypedValue> = OrderValidatingIterator {
+                it: vs
+                    .iter()
+                    .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
+                    .peekable(),
+                container_ty: map_ty,
+                to_key: |(k, _)| k,
+                ctx: &ctx_cell,
+            }
+            .collect::<Result<_, TcError>>()?;
             TV::Map(map)
         }
         (T::Address, V::String(str)) => {
@@ -1232,6 +1274,50 @@ fn validate_u10(n: i128) -> Result<u16, TcError> {
         return Err(TcError::ExpectedU10(n));
     }
     Ok(res)
+}
+
+/// An iterator that ensures the keys to be in strictly ascending order.
+/// (where you specify a getter to obtain the key from an element).
+///
+/// Also charges gas for this check.
+struct OrderValidatingIterator<'a, T: Iterator<Item = Result<I, TcError>>, I> {
+    it: std::iter::Peekable<T>,
+    to_key: fn(&I) -> &TypedValue,
+    container_ty: &'a Type,
+    ctx: &'a std::cell::RefCell<&'a mut Ctx>,
+}
+
+impl<T, I> Iterator for OrderValidatingIterator<'_, T, I>
+where
+    T: Iterator<Item = Result<I, TcError>>,
+{
+    type Item = Result<I, TcError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.next().map(|cur| {
+            let cur = cur?;
+            if let Some(Ok(next)) = self.it.peek() {
+                let mut ctx = self.ctx.borrow_mut();
+                let cur_key = (self.to_key)(&cur);
+                let next_key = (self.to_key)(next);
+                ctx.gas
+                    .consume(gas::interpret_cost::compare(cur_key, next_key)?)?;
+                match cur_key.cmp(next_key) {
+                    std::cmp::Ordering::Less => (),
+                    std::cmp::Ordering::Equal => {
+                        Err(TcError::DuplicateElements(self.container_ty.clone()))?
+                    }
+                    std::cmp::Ordering::Greater => {
+                        Err(TcError::ElementsNotSorted(self.container_ty.clone()))?
+                    }
+                }
+            }
+            Ok(cur)
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -1546,6 +1632,31 @@ mod typecheck_tests {
     #[test]
     fn test_iter_list_inner_mismatch() {
         let mut stack = tc_stk![Type::new_list(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::StacksNotEqual(
+                stk![],
+                stk![Type::Int],
+                StacksNotEqualReason::LengthsDiffer(0, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_iter_set() {
+        let mut stack = tc_stk![Type::new_set(Type::Int)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut ctx, &mut stack),
+            Ok(Iter(overloads::Iter::Set, vec![Drop(None)]))
+        );
+        assert_eq!(stack, tc_stk![]);
+    }
+
+    #[test]
+    fn test_iter_set_inner_mismatch() {
+        let mut stack = tc_stk![Type::new_set(Type::Int)];
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
@@ -2223,6 +2334,81 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn push_set() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 1; 2 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Push(TypedValue::Set(BTreeSet::from([
+                TypedValue::Int(1),
+                TypedValue::Int(2)
+            ]))))
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn push_set_unsorted() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 2; 1 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ElementsNotSorted(Type::new_set(Type::Int)))
+        );
+    }
+
+    #[test]
+    fn push_set_incomparable() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set (list int)) { }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
+        );
+    }
+
+    #[test]
+    fn push_set_wrong_key_type() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { "1"; 2 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"1\")".into(),
+                Type::Int
+            ))
+        );
+    }
+
+    #[test]
+    fn push_set_duplicate_key() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(r#"PUSH (set int) { 1; 1 }"#).unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::DuplicateElements(Type::new_set(Type::Int)))
+        );
+    }
+
+    #[test]
     fn push_map() {
         let mut stack = tc_stk![];
         assert_eq!(
@@ -2337,6 +2523,36 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn empty_set() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_SET int").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(EmptySet)
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn empty_set_incomparable() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_SET operation").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::Operation
+            ))
+        );
+    }
+
+    #[test]
     fn get_map() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Int];
         assert_eq!(
@@ -2370,6 +2586,44 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
+        );
+    }
+
+    #[test]
+    fn update_set() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Update(overloads::Update::Set))
+        );
+        assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn update_set_wrong_ty() {
+        let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Nat];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TypesNotEqual(Type::Int, Type::Nat).into())
+        );
+    }
+
+    #[test]
+    fn update_set_incomparable() {
+        assert_eq!(
+            parse("UPDATE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[
+                    app!(set[app!(list[app!(int)])]),
+                    app!(bool),
+                    app!(list[app!(int)])
+                ]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
         );
     }
 

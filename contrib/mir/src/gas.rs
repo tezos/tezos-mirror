@@ -156,6 +156,14 @@ pub mod tc_cost {
         let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
         (80 * n + key_size * n * log2n).as_gas_cost()
     }
+
+    pub fn construct_set(val_size: usize, sz: usize) -> Result<u32, OutOfGas> {
+        // Similar to `construct_map`, only the coefficient differs
+        let n = Checked::from(sz);
+        let key_size = Checked::from(val_size);
+        let log2n = super::log2i((n + 1).ok_or(OutOfGas)?) as usize;
+        (130 * n + key_size * n * log2n).as_gas_cost()
+    }
 }
 
 pub mod interpret_cost {
@@ -190,6 +198,7 @@ pub mod interpret_cost {
     pub const AMOUNT: u32 = 10;
     pub const NIL: u32 = 10;
     pub const CONS: u32 = 15;
+    pub const EMPTY_SET: u32 = 300;
     pub const CHAIN_ID: u32 = 15;
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
@@ -338,7 +347,9 @@ pub mod interpret_cost {
             .as_gas_cost()?,
             (V::Or(..), _) => incomparable(),
 
-            (V::List(..) | V::Map(..) | V::Contract(_) | V::Operation(_), _) => incomparable(),
+            (V::List(..) | V::Set(..) | V::Map(..) | V::Contract(_) | V::Operation(_), _) => {
+                incomparable()
+            }
         })
     }
 
@@ -368,6 +379,16 @@ pub mod interpret_cost {
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
         (80 + 2 * lookup_cost).as_gas_cost()
+    }
+
+    pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: same considerations as for map_update
+        let compare_cost = compare(k, k)?;
+        let size_log = super::log2i(map_size + 1);
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        // coefficient larger than in case of Map looks suspicious, something
+        // to benchmark later
+        (130 + 2 * lookup_cost).as_gas_cost()
     }
 
     /// Measures size of Michelson using several metrics.

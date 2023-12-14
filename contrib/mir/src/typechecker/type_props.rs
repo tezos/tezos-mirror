@@ -66,6 +66,15 @@ impl Type {
                 | TypeProperty::BigMapValue
                 | TypeProperty::Duplicable => x.ensure_prop(gas, prop)?,
             },
+            Set(x) => match prop {
+                TypeProperty::Comparable => return invalid_type_prop(),
+                TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue
+                | TypeProperty::Duplicable => x.ensure_prop(gas, prop)?,
+            },
             Map(p) => match prop {
                 TypeProperty::Comparable => return invalid_type_prop(),
                 TypeProperty::Passable
