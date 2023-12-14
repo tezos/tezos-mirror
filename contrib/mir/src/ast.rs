@@ -266,6 +266,7 @@ pub enum Instruction {
     TransferTokens,
     SetDelegate,
     Address,
+    Slice(overloads::Slice),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

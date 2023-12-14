@@ -29,3 +29,9 @@ pub enum Iter {
     List,
     Map,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Slice {
+    String,
+    Bytes,
+}
