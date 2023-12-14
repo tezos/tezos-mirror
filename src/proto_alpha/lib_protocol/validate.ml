@@ -65,18 +65,10 @@ module Consensus_conflict_map = Map.Make (struct
     Round.compare round1 round2
 end)
 
-module Dal_conflict_map = Map.Make (struct
-  type t = Slot.t * Raw_level.t
-
-  let compare (slot1, level1) (slot2, level2) =
-    Compare.or_else (Raw_level.compare level1 level2) @@ fun () ->
-    Slot.compare slot1 slot2
-end)
-
 type consensus_state = {
   preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_seen : Operation_hash.t Consensus_conflict_map.t;
-  dal_attestation_seen : Operation_hash.t Dal_conflict_map.t;
+  dal_attestation_seen : Operation_hash.t Consensus_conflict_map.t;
 }
 
 let consensus_conflict_map_encoding =
@@ -91,15 +83,6 @@ let consensus_conflict_map_encoding =
           (tup3 Slot.encoding Raw_level.encoding Round.encoding)
           Operation_hash.encoding))
 
-let dal_conflict_map_encoding =
-  let open Data_encoding in
-  conv
-    (fun map -> Dal_conflict_map.bindings map)
-    (fun l ->
-      Dal_conflict_map.(List.fold_left (fun m (k, v) -> add k v m) empty l))
-    (list
-       (tup2 (tup2 Slot.encoding Raw_level.encoding) Operation_hash.encoding))
-
 let consensus_state_encoding =
   let open Data_encoding in
   def "consensus_state"
@@ -111,13 +94,13 @@ let consensus_state_encoding =
        (obj3
           (req "preattestations_seen" consensus_conflict_map_encoding)
           (req "attestations_seen" consensus_conflict_map_encoding)
-          (req "dal_attestation_seen" dal_conflict_map_encoding))
+          (req "dal_attestation_seen" consensus_conflict_map_encoding))
 
 let empty_consensus_state =
   {
     preattestations_seen = Consensus_conflict_map.empty;
     attestations_seen = Consensus_conflict_map.empty;
-    dal_attestation_seen = Dal_conflict_map.empty;
+    dal_attestation_seen = Consensus_conflict_map.empty;
   }
 
 type voting_state = {
@@ -875,12 +858,12 @@ module Consensus = struct
 
   let check_dal_attestation_conflict vs oph
       (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round; slot})) =
       operation.protocol_data.contents
     in
     match
-      Dal_conflict_map.find_opt
-        (slot, level)
+      Consensus_conflict_map.find_opt
+        (slot, level, round)
         vs.consensus_state.dal_attestation_seen
     with
     | None -> ok_unit
@@ -895,7 +878,7 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
   let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round; slot})) =
       operation.protocol_data.contents
     in
     {
@@ -904,20 +887,20 @@ module Consensus = struct
         {
           vs.consensus_state with
           dal_attestation_seen =
-            Dal_conflict_map.add
-              (slot, level)
+            Consensus_conflict_map.add
+              (slot, level, round)
               oph
               vs.consensus_state.dal_attestation_seen;
         };
     }
 
   let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round; slot})) =
       operation.protocol_data.contents
     in
     let dal_attestation_seen =
-      Dal_conflict_map.remove
-        (slot, level)
+      Consensus_conflict_map.remove
+        (slot, level, round)
         vs.consensus_state.dal_attestation_seen
     in
     {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
