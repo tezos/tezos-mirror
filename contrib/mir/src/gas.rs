@@ -194,6 +194,8 @@ pub mod interpret_cost {
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
     pub const ADDRESS: u32 = 10;
+    pub const LEFT: u32 = 10;
+    pub const RIGHT: u32 = 10;
 
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 60;

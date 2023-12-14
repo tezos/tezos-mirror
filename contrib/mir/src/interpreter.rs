@@ -481,6 +481,16 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             };
             stack.push(V::new_option(result));
         }
+        I::Left => {
+            ctx.gas.consume(interpret_cost::LEFT)?;
+            let left = pop!();
+            stack.push(V::new_or(Or::Left(left)));
+        }
+        I::Right => {
+            ctx.gas.consume(interpret_cost::RIGHT)?;
+            let right = pop!();
+            stack.push(V::new_or(Or::Right(right)));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -1679,5 +1689,29 @@ mod interpreter_tests {
         test(b"foobar", 6, 0, None);
         test(b"foobar", 7, 0, None);
         test(b"", 0, 0, None);
+    }
+
+    #[test]
+    fn left() {
+        let mut stack = stk![V::Nat(10)];
+        let mut ctx = Ctx::default();
+        assert!(interpret(&vec![Instruction::Left], &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, stk![V::new_or(Or::Left(V::Nat(10)))]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::LEFT - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn right() {
+        let mut stack = stk![V::Nat(10)];
+        let mut ctx = Ctx::default();
+        assert!(interpret(&vec![Instruction::Right], &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, stk![V::new_or(Or::Right(V::Nat(10)))]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET
+        );
     }
 }

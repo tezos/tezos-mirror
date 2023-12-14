@@ -1022,8 +1022,26 @@ pub(crate) fn typecheck_instruction(
         (App(SLICE, [], _), _) => no_overload!(SLICE, len 3),
         (App(SLICE, expect_args!(0), _), _) => unexpected_micheline!(),
 
-        (App(other, ..), _) => todo!("Unhandled instruction {other}"),
+        (App(LEFT, [ty_right], _), [.., _]) => {
+            let ty_left = pop!();
+            let ty_right = parse_ty(ctx, ty_right)?;
+            stack.push(T::new_or(ty_left, ty_right));
+            I::Left
+        }
+        (App(LEFT, [_ty_right], _), []) => no_overload!(LEFT, len 1),
+        (App(LEFT, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(RIGHT, [ty_left], _), [.., _]) => {
+            let ty_right = pop!();
+            let ty_left = parse_ty(ctx, ty_left)?;
+            stack.push(T::new_or(ty_left, ty_right));
+            I::Right
+        }
+        (App(RIGHT, [_ty_left], _), []) => no_overload!(RIGHT, len 1),
+        (App(RIGHT, expect_args!(1), _), _) => unexpected_micheline!(),
+        
+        (App(other, ..), _) => todo!("Unhandled instruction {other}"),
+        
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
@@ -3365,6 +3383,40 @@ mod typecheck_tests {
                 reason: None,
             })
         );
+    }
+
+    #[test]
+    fn left() {
+        let mut stack = tc_stk![Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("LEFT nat").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Left)
+        );
+        assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Nat)]);
+    }
+
+    #[test]
+    fn left_too_short() {
+        too_short_test(&app!(LEFT["nat"]), Prim::LEFT, 1);
+    }
+
+    #[test]
+    fn right() {
+        let mut stack = tc_stk![Type::Int];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("RIGHT nat").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Right)
+        );
+        assert_eq!(stack, tc_stk![Type::new_or(Type::Nat, Type::Int)]);
+    }
+
+    #[test]
+    fn right_too_short() {
+        too_short_test(&app!(RIGHT["nat"]), Prim::RIGHT, 1);
     }
 
     #[test]
