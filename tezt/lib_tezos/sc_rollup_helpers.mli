@@ -125,7 +125,6 @@ val originate_sc_rollup :
   string Lwt.t
 
 val setup_rollup :
-  protocol:Protocol.t ->
   kind:string ->
   ?hooks:Process_hooks.t ->
   ?alias:string ->
@@ -141,7 +140,7 @@ val setup_rollup :
   ?sc_rollup:string ->
   Node.t ->
   Client.t ->
-  (Sc_rollup_node.t * Sc_rollup_client.t * string) Lwt.t
+  (Sc_rollup_node.t * string) Lwt.t
 
 val originate_forward_smart_contract :
   ?src:string -> Client.t -> Protocol.t -> string Lwt.t
@@ -352,7 +351,6 @@ val test_refutation_scenario_aux :
   refutation_scenario_parameters ->
   'a ->
   Sc_rollup_node.t ->
-  Sc_rollup_client.t ->
   string ->
   Node.t ->
   Client.t ->

@@ -267,7 +267,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
+let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string") ?(src = Constant.bootstrap1.alias)
     ?operator ?operators ?data_dir ?rollup_node_name ?whitelist ?sc_rollup
     tezos_node tezos_client =
@@ -295,8 +295,7 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       ?operators
       ?name:rollup_node_name
   in
-  let rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
-  return (sc_rollup_node, rollup_client, sc_rollup)
+  return (sc_rollup_node, sc_rollup)
 
 let originate_forward_smart_contract ?(src = Constant.bootstrap1.alias) client
     protocol =
@@ -860,7 +859,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       bad_reveal_at;
       priority;
       allow_degraded;
-    } protocol sc_rollup_node _sc_client1 sc_rollup_address node client =
+    } protocol sc_rollup_node sc_rollup_address node client =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let loser_keys =
     List.mapi

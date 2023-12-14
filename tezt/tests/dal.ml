@@ -2539,8 +2539,8 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
     which case the corresponding rollup node is launched in observer mode, or
     [Some account], in which case the [account] is used as the default
     operator of the SORU node. *)
-let create_additional_nodes ~protocol ~extra_node_operators rollup_address
-    l1_node l1_client dal_node =
+let create_additional_nodes ~extra_node_operators rollup_address l1_node
+    l1_client dal_node =
   (* The mutable variable [connect_dal_node_to] below is used to diversify a bit
      the topology of the DAL nodes network as follows:
 
@@ -2576,8 +2576,7 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
       in
       (* We start the rollup node and create a client for it. *)
       let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
-      let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
-      return (fresh_dal_node, sc_rollup_node, sc_rollup_client))
+      return (fresh_dal_node, sc_rollup_node))
     extra_node_operators
 
 (* This function allows to run an end-to-end test involving L1, DAL and rollup
@@ -2609,7 +2608,6 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   (* Generate new DAL and rollup nodes if requested. *)
   let* additional_nodes =
     create_additional_nodes
-      ~protocol
       ~extra_node_operators
       sc_rollup_address
       l1_node
@@ -2707,7 +2705,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     "[e2e.final_check_2] Check %d extra nodes@."
     (List.length additional_nodes) ;
   Lwt_list.iter_s
-    (fun (_dal_node, rollup_node, _rollup_client) ->
+    (fun (_dal_node, rollup_node) ->
       check_saved_value_in_pvm
         ~rpc_hooks
         ~name:"value"
