@@ -2894,6 +2894,7 @@ module Dal_errors : sig
         expected : Raw_level.t;
         given : Raw_level.t;
       }
+    | Dal_attestation_for_wrong_round of {expected : Round.t; given : Round.t}
     | Dal_cryptobox_error of {explanation : string}
     | Dal_unexpected_attestation_at_root_level
 end

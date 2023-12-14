@@ -28,13 +28,18 @@
 
 open Alpha_context
 
-(** [validate_attestation ctxt get_consensus_key op] checks whether the DAL
-    attestation [op] is valid, assuming the delegate returned by
-    [get_consensus_key ()] issued those attestations. If an [Error _] is
-    returned, the [op] is not valid. *)
+(** [validate_attestation ctxt get_consensus_key_and_round op] checks whether
+    the DAL attestation [op] is valid. If an [Error _] is returned, the [op]
+    is not valid. The checks made are:
+    * the level as expected;
+    * the round is as expected;
+    * the delegate is in the DAL committee.
+    [get_consensus_key_and_round_opt ()] returns the delegate that supposedly
+    issued the attestation and optionally the round at which it was emitted. The
+    round is not provided in the mempool validation mode. *)
 val validate_attestation :
   t ->
-  (unit -> Consensus_key.pk tzresult Lwt.t) ->
+  (unit -> (Consensus_key.pk * Round.t option) tzresult Lwt.t) ->
   Dal.Attestation.operation ->
   Consensus_key.pk tzresult Lwt.t
 

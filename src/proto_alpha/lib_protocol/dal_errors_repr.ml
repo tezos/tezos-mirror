@@ -52,6 +52,10 @@ type error +=
       expected : Raw_level_repr.t;
       given : Raw_level_repr.t;
     }
+  | Dal_attestation_for_wrong_round of {
+      expected : Round_repr.t;
+      given : Round_repr.t;
+    }
   | Dal_cryptobox_error of {explanation : string}
   | Dal_register_invalid_slot_header of {
       length : int;
@@ -231,7 +235,7 @@ let () =
     `Temporary
     ~id:"Dal_operation_for_future_level"
     ~title:"Dal operation for a future level"
-    ~description:"The Dal operation target a future level"
+    ~description:"The Dal operation targets a future level"
     ~pp:(fun ppf (expected_lvl, given_lvl) ->
       Format.fprintf
         ppf
@@ -249,6 +253,28 @@ let () =
           Some (expected, given)
       | _ -> None)
     (fun (expected, given) -> Dal_operation_for_future_level {expected; given}) ;
+  register_error_kind
+    `Temporary
+    ~id:"Dal_attestation_for_wrong_round"
+    ~title:"Dal attestation for a wrong round"
+    ~description:"The DAL attestation targets an unexpected round."
+    ~pp:(fun ppf (expected_round, given_round) ->
+      Format.fprintf
+        ppf
+        "The DAL attestation targets unexpected round %a, expected %a."
+        Round_repr.pp
+        given_round
+        Round_repr.pp
+        expected_round)
+    Data_encoding.(
+      obj2
+        (req "expected_round" Round_repr.encoding)
+        (req "given_round" Round_repr.encoding))
+    (function
+      | Dal_attestation_for_wrong_round {expected; given} ->
+          Some (expected, given)
+      | _ -> None)
+    (fun (expected, given) -> Dal_attestation_for_wrong_round {expected; given}) ;
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_attester_not_in_committee"

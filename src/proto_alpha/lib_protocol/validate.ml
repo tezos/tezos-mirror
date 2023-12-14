@@ -840,7 +840,7 @@ module Consensus = struct
         ~error:(trace_of_error Consensus_operation_not_allowed)
         vi.consensus_info
     in
-    let get_consensus_key () =
+    let get_consensus_key_and_round_opt () =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
           let*? consensus_key, _voting_power =
@@ -849,7 +849,7 @@ module Consensus = struct
               Dal_attestation
               op.slot
           in
-          return consensus_key
+          return (consensus_key, Some consensus_info.predecessor_round)
       | Mempool ->
           let* (_ctxt : t), consensus_key =
             Stake_distribution.slot_owner
@@ -857,11 +857,11 @@ module Consensus = struct
               (Level.from_raw vi.ctxt op.level)
               op.slot
           in
-          return consensus_key
+          return (consensus_key, None)
     in
     let* consensus_key =
       (* Note that this function checks the dal feature flag. *)
-      Dal_apply.validate_attestation vi.ctxt get_consensus_key op
+      Dal_apply.validate_attestation vi.ctxt get_consensus_key_and_round_opt op
     in
     let*? () =
       if check_signature then

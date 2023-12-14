@@ -53,12 +53,12 @@ let slot_of_int_e ~number_of_slots n =
 let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
   consensus_key.delegate
 
-let validate_attestation ctxt get_consensus_key op =
+let validate_attestation ctxt get_consensus_key_and_round_opt op =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
   (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/4462
      Reconsider the ordering of checks. *)
-  let Dal.Attestation.{attestation; level = given; round = _; slot = _} = op in
+  let Dal.Attestation.{attestation; level = given; round; slot = _} = op in
   let number_of_slots = Dal.number_of_slots ctxt in
   let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
@@ -85,7 +85,15 @@ let validate_attestation ctxt get_consensus_key op =
       Compare.Int32.(delta_levels < 0l)
       (Dal_operation_for_future_level {expected; given})
   in
-  let* consensus_key = get_consensus_key () in
+  let* consensus_key, round_opt = get_consensus_key_and_round_opt () in
+  let* () =
+    match round_opt with
+    | Some expected ->
+        fail_when
+          (not (Round.equal expected round))
+          (Dal_attestation_for_wrong_round {expected; given = round})
+    | None -> return_unit
+  in
   let attester = pkh_of_consensus_key consensus_key in
   let*? () =
     error_when
