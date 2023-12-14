@@ -45,7 +45,7 @@ build:
     - 'apk add zip'
     - 'apk add curl'
     - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/${CI_COMMIT_TAG:=latest}/${ARCHIVE}"'
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
