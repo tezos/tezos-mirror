@@ -67,6 +67,12 @@ Optionnally you can enable storage monitoring with ``filecheck``:
 STORAGE_MODE=filecheck
 ```
 
+**Deprecated:**
+If you use an old versoin of netdata you might need to use the legacy metrics by setting the `NETDATA` environment variable:
+
+```sh
+NETDATA=legacy
+```
 
 ### Distribution
 

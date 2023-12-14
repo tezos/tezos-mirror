@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -22,9 +22,8 @@ local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local stat = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
-
-local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else false;
-
+local filecheck = std.extVar('storage_mode') == 'filecheck';
+local netdata_legacy = std.extVar('netdata') == 'legacy';
 
 //##
 // Hardware relates stats
@@ -34,6 +33,12 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
   ios:
     local reads = 'reads';
     local writes = 'writes';
+    local reads_target =
+      if netdata_legacy then 'netdata_apps_lreads_KiB_persec_average{dimension="octez"}'
+      else 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + std.extVar('node_instance_label') + '="$node_instance"}';
+    local writes_target =
+      if netdata_legacy then 'netdata_apps_lwrites_KiB_persec_average{dimension="octez"}'
+      else 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + std.extVar('node_instance_label') + '="$node_instance"}';
     graphPanel.new(
       title='IOs',
       datasource='Prometheus',
@@ -51,18 +56,21 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lreads_KiB_persec_average{dimension="octez"}',
+        reads_target,
         legendFormat=reads,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lwrites_KiB_persec_average{dimension="octez"}',
+        writes_target,
         legendFormat=writes,
       )
     ),
 
   cpu:
     local load = 'Cpu load';
+    local load_target =
+      if netdata_legacy then 'netdata_apps_cpu_percentage_average{dimension="octez"}'
+      else 'sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"})';
     graphPanel.new(
       title='Cpu actitvity',
       datasource='Prometheus',
@@ -73,7 +81,7 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_cpu_percentage_average{dimension="octez"}',
+        load_target,
         legendFormat=load,
       )
     ),
@@ -81,6 +89,12 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
   memory:
     local ram = 'Memory usage';
     local swap = 'Swap usage';
+    local ram_target =
+      if netdata_legacy then 'netdata_apps_mem_MiB_average{dimension="octez"}'
+      else 'netdata_app_mem_usage_MiB_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
+    local swap_target =
+      if netdata_legacy then 'netdata_apps_swap_MiB_average{dimension="octez"}'
+      else 'netdata_app_swap_usage_MiB_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
     graphPanel.new(
       title='Memory usage',
       datasource='Prometheus',
@@ -98,12 +112,12 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_mem_MiB_average{dimension="octez"}',
+        ram_target,
         legendFormat=ram,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_swap_MiB_average{dimension="octez"}',
+        swap_target,
         legendFormat=swap,
       )
     ),
@@ -140,6 +154,16 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
     local sockets = 'Sockets';
     local files = 'Files';
     local pipes = 'Pipes';
+    local sockets_target =
+      if netdata_legacy then 'netdata_apps_sockets_open_sockets_average{dimension="octez"}'
+      else 'netdata_app_fds_open_fds_average{dimension="sockets",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
+    local files_target =
+      if netdata_legacy then 'netdata_apps_sockets_open_files_average{dimension="octez"}'
+      else 'netdata_app_fds_open_fds_average{dimension="files",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
+    local pipes_target =
+      if netdata_legacy then 'netdata_apps_sockets_open_pipes_average{dimension="octez"}'
+      else 'netdata_app_fds_open_fds_average{dimension="pipes",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
+    local total_target = 'sum(' + sockets_target + ') + sum(' + files_target + ') + sum(' + pipes_target + ')';
     graphPanel.new(
       title='File descriptors',
       datasource='Prometheus',
@@ -162,22 +186,22 @@ local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'sum(netdata_apps_pipes_open_pipes_average{dimension="octez"}) + sum(netdata_apps_files_open_files_average{dimension="octez"}) + sum(netdata_apps_sockets_open_sockets_average{dimension="octez"})',
+        total_target,
         legendFormat=total,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_sockets_open_sockets_average{dimension="octez"}',
+        sockets_target,
         legendFormat=sockets,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_files_open_files_average{dimension="octez"}',
+        files_target,
         legendFormat=files,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_pipes_open_pipes_average{dimension="octez"}',
+        pipes_target,
         legendFormat=pipes,
       )
     ),
