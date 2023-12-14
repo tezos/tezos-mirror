@@ -88,10 +88,6 @@ val accuser : t -> Uses.t
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> Uses.t
 
-(** Get the path of the smart rollup client of a protocol, such as
-    ["./octez-smart-rollup-client-alpha"]. *)
-val sc_rollup_client : t -> Uses.t
-
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
 
     This should not be used for anything except to compute the name of executables. *)
