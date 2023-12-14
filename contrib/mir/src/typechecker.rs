@@ -955,6 +955,15 @@ pub(crate) fn typecheck_instruction(
         }
         (App(SELF, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(PACK, [], _), [.., _]) => {
+            let t = pop!();
+            t.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
+            stack.push(T::Bytes);
+            I::Pack
+        }
+        (App(PACK, [], _), []) => no_overload!(PACK, len 1),
+        (App(PACK, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
             ensure_ty_eq(ctx, ct, arg_t)?;
             stack.drop_top(3);
@@ -3128,6 +3137,31 @@ mod typecheck_tests {
                 &mut tc_stk![]
             ),
             Ok(Instruction::ChainId)
+        );
+    }
+
+    #[test]
+    fn pack_instr() {
+        let stk = &mut tc_stk![Type::new_pair(Type::Int, Type::Unit)];
+        assert_eq!(
+            super::typecheck_instruction(&parse("PACK").unwrap(), &mut Ctx::default(), None, stk),
+            Ok(Instruction::Pack)
+        );
+        assert_eq!(stk, &tc_stk![Type::Bytes]);
+    }
+
+    #[test]
+    fn pack_instr_non_packable() {
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PACK").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::Operation]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Packable,
+                Type::Operation
+            ))
         );
     }
 

@@ -51,9 +51,13 @@ fn unify_interpreter_error(
                     // context of the interpreter, though here we have full type information for
                     // both values being compared, so it is probably safe to compare typed
                     // representation as well.
+
+                    // For now we compare values untyped to optimized form with a `PACK` flavor.
+                    // This means that comb pairs given in different forms (tree / linear) will
+                    // be considered distinct. This should be fine in most cases though.
                     let arena = typed_arena::Arena::new();
-                    typed_value_to_value_optimized(&arena, exp_typed_val)
-                        == typed_value_to_value_optimized(&arena, failed_typed_value.clone())
+                    typed_value_to_value_optimized_legacy(&arena, exp_typed_val)
+                        == typed_value_to_value_optimized_legacy(&arena, failed_typed_value.clone())
                 }
                 Err(_) => false,
             }
