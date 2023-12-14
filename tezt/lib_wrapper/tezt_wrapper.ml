@@ -8,6 +8,12 @@
 include Tezt
 open Base
 
+type error_mode = Ignore | Warn | Fail
+
+let error_mode_for_missing_use = ref Warn
+
+let error_mode_for_useless_use = ref Warn
+
 module Uses = struct
   type t = {tag : string; path : string}
 
@@ -49,6 +55,13 @@ module Uses = struct
   let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
 end
 
+let error mode =
+  Printf.ksprintf @@ fun message ->
+  match mode with
+  | Ignore -> ()
+  | Warn -> Log.warn "%s" message
+  | Fail -> Test.fail "%s" message
+
 (* Prepare parameters of a [Test.register]-like function. *)
 let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
     ?(uses_client = true) ?(uses_admin_client = true) ~run_test () =
@@ -78,7 +91,8 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
             Otherwise you'll get a stack overflow as the hook will trigger itself. *)
          unused_uses_tags := String_set.remove uses.tag !unused_uses_tags ;
          if not (String_set.mem uses.tag uses_tags) then
-           Log.warn
+           error
+             !error_mode_for_missing_use
              "In %S, test %S is not allowed to use %S. Try to add '%s' to its \
               ~uses."
              file
@@ -89,7 +103,8 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
     let* () = run_test () in
     (* Check for unused tags. *)
     String_set.iter
-      (Log.warn
+      (error
+         !error_mode_for_useless_use
          "In %S, test %S was declared with '%s' in its ~uses but did not call \
           Uses.path on it."
          file
