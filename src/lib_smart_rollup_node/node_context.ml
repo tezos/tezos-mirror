@@ -46,26 +46,29 @@ module Node_store = struct
     Store.load
 
   let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
-      (store : a Store.store) (history_mode : Configuration.history_mode) =
+      (store : a Store.store) (history_mode : Configuration.history_mode option)
+      =
     let open Lwt_result_syntax in
     let* stored_history_mode =
       match mode with
       | Read_only -> Store.History_mode.read store.history_mode
       | Read_write -> Store.History_mode.read store.history_mode
     in
-    let save_when_rw () =
+    let save_when_rw history_mode =
       match mode with
       | Read_only -> return_unit
       | Read_write -> Store.History_mode.write store.history_mode history_mode
     in
     match (stored_history_mode, history_mode) with
-    | None, _ -> save_when_rw ()
-    | Some Archive, Archive | Some Full, Full -> return_unit
-    | Some Archive, Full ->
+    | None, None -> save_when_rw Configuration.default_history_mode
+    | Some _, None -> return_unit
+    | None, Some history_mode -> save_when_rw history_mode
+    | Some Archive, Some Archive | Some Full, Some Full -> return_unit
+    | Some Archive, Some Full ->
         (* Data will be cleaned at next GC, just save new mode *)
         let*! () = Event.convert_history_mode Archive Full in
-        save_when_rw ()
-    | Some Full, Archive ->
+        save_when_rw Full
+    | Some Full, Some Archive ->
         failwith "Cannot transform a full rollup node into an archive one."
 end
 
@@ -923,7 +926,11 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
 
 let get_gc_level node_ctxt =
   let open Lwt_result_syntax in
-  match node_ctxt.config.history_mode with
+  let* history_mode = Store.History_mode.read node_ctxt.store.history_mode in
+  let history_mode =
+    Option.value history_mode ~default:Configuration.default_history_mode
+  in
+  match history_mode with
   | Archive ->
       (* Never call GC in archive mode *)
       return_none

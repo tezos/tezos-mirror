@@ -103,7 +103,7 @@ type t = {
   log_kernel_debug : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
-  history_mode : history_mode;
+  history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
 }
 
