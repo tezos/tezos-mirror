@@ -367,6 +367,22 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             ctx.gas.consume(interpret_cost::EMPTY_SET)?;
             stack.push(V::Set(BTreeSet::new()))
         }
+        I::Mem(overload) => match overload {
+            overloads::Mem::Set => {
+                let key = pop!();
+                let set = pop!(V::Set);
+                ctx.gas.consume(interpret_cost::set_mem(&key, set.len())?)?;
+                let result = set.contains(&key);
+                stack.push(V::Bool(result));
+            }
+            overloads::Mem::Map => {
+                let key = pop!();
+                let map = pop!(V::Map);
+                ctx.gas.consume(interpret_cost::map_mem(&key, map.len())?)?;
+                let result = map.contains_key(&key);
+                stack.push(V::Bool(result));
+            }
+        },
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key = pop!();
@@ -1373,6 +1389,72 @@ mod interpreter_tests {
                 - interpret_cost::map_get(&TypedValue::Int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn mem_map() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+        ]);
+        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(1)];
+        assert_eq!(
+            interpret(&vec![Mem(overloads::Mem::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(true)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::map_mem(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn mem_map_absent() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
+            (TypedValue::Int(2), TypedValue::String("bar".to_owned())),
+        ]);
+        let mut stack = stk![TypedValue::Map(map), TypedValue::Int(100500)];
+        assert_eq!(
+            interpret(&vec![Mem(overloads::Mem::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(false)]);
+    }
+
+    #[test]
+    fn mem_set() {
+        let mut ctx = Ctx::default();
+        let set = BTreeSet::from([TypedValue::Int(1), TypedValue::Int(2)]);
+        let mut stack = stk![TypedValue::Set(set), TypedValue::Int(1)];
+        assert_eq!(
+            interpret(&vec![Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(true)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas()
+                - interpret_cost::set_mem(&TypedValue::Int(1), 2).unwrap()
+                - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn mem_set_absent() {
+        let mut ctx = Ctx::default();
+        let set = BTreeSet::from([TypedValue::Int(1), TypedValue::Int(2)]);
+        let mut stack = stk![TypedValue::Set(set), TypedValue::Int(100500)];
+        assert_eq!(
+            interpret(&vec![Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(false)]);
     }
 
     #[test]

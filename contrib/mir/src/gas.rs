@@ -353,6 +353,10 @@ pub mod interpret_cost {
         })
     }
 
+    pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        map_get(k, map_size)
+    }
+
     pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: this doesn't copy the tezos model exactly; tezos model uses
         //
@@ -369,6 +373,14 @@ pub mod interpret_cost {
         let size_log = super::log2i(map_size + 1);
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (80 + lookup_cost).as_gas_cost()
+    }
+
+    pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: same considerations as for map_get
+        let compare_cost = compare(k, k)?;
+        let size_log = super::log2i(map_size + 1);
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        (115 + lookup_cost).as_gas_cost()
     }
 
     pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {

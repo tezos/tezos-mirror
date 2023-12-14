@@ -261,6 +261,7 @@ pub enum Instruction {
     Amount,
     Nil,
     EmptySet,
+    Mem(overloads::Mem),
     Get(overloads::Get),
     Update(overloads::Update),
     Seq(Vec<Self>),
