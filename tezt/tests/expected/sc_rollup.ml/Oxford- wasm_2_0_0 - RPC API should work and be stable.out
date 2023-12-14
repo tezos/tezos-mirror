@@ -33,6 +33,10 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+GET http://127.0.0.1:[PORT]/global/smart_rollup_address
+200 OK
+"[SMART_ROLLUP_HASH]"
+
 POST http://127.0.0.1:[PORT]/local/batcher/injection
 Content-type: application/json
 [
@@ -213,6 +217,22 @@ Content-type: application/json
 200 OK
 ["scmsg2DSE1zcsJXhEFsAFMo3qN7jV13LoxrG6qa1RaJtUFkPgJCBN5R","scmsg2StxsCnbG5vQmzdiY3F4M5bsrkb6Qh3CyrMod5thRVAbZHd38c","scmsg3fzM3qS4iPZ6qGHCNfupVUKiuYmrNe4k13uUj3ggrzX6rayaVA","scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx","scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q"]
 
+GET http://127.0.0.1:[PORT]/global/block/head/hash
+200 OK
+"[BLOCK_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/5/hash
+200 OK
+"[BLOCK_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/finalized/level
+200 OK
+16
+
+GET http://127.0.0.1:[PORT]/global/block/head/num_messages
+200 OK
+"8"
+
 GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/value?key=/kernel/boot.wasm
 200 OK
 "0061736d0100000001280760037f7f7f017f60027f7f017f60057f7f7f7f7f017f60017f0060017f017f60027f7f0060000002610311736d6172745f726f6c6c75705f636f72650a726561645f696e707574000011736d6172745f726f6c6c75705f636f72650c77726974655f6f7574707574000111736d6172745f726f6c6c75705f636f72650b73746f72655f77726974650002030504030405060503010001071402036d656d02000a6b65726e656c5f72756e00060aa401042a01027f41fa002f0100210120002f010021022001200247044041e4004112410041e400410010021a0b0b0800200041c4006b0b5001057f41fe002d0000210341fc002f0100210220002d0000210420002f0100210520011004210620042003460440200041016a200141016b10011a0520052002460440200041076a200610011a0b0b0b1d01017f41dc0141840241901c100021004184022000100541840210030b0b38050041e4000b122f6b65726e656c2f656e762f7265626f6f740041f8000b0200010041fa000b0200020041fc000b0200000041fe000b0101"
@@ -232,4 +252,24 @@ GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/length?key=/rea
 GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/subkeys?key=/readonly/kernel
 200 OK
 ["boot.wasm","env"]
+
+GET http://127.0.0.1:[PORT]/global/block/head/status
+200 OK
+"Waiting for input message"
+
+GET http://127.0.0.1:[PORT]/global/block/head/ticks
+200 OK
+"99000000000"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/tezos_head
+200 OK
+"[BLOCK_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/tezos_level
+200 OK
+18
 
