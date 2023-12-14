@@ -1774,9 +1774,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 2)
   in
-  (* TODO: add ~hooks, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* slots_headers =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_dal_slot_headers ()
   in
   let commitments =
@@ -1809,11 +1808,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
        expected = %R)" ;
 
   Log.info "Step 7: check that the two slots have been attested" ;
-  (* TODO: add ~hooks
-     https://gitlab.com/tezos/tezos/-/issues/6612
-  *)
   let* downloaded_slots =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_dal_processed_slots ()
   in
   let downloaded_confirmed_slots =
@@ -1850,11 +1846,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     "Step 9: verify that the rollup node has downloaded slot 2; slot 0 is \
      unconfirmed, and slot 1 has not been downloaded" ;
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
-  (* TODO: add ~hooks
-     https://gitlab.com/tezos/tezos/-/issues/6612
-  *)
   let* downloaded_slots =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_dal_processed_slots
          ~block:confirmed_level_as_string
          ()

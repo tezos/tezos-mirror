@@ -349,9 +349,8 @@ let test_rollup_node_running ~kind =
     ~kind
   @@ fun _protocol rollup_node sc_rollup _tezos_node _tezos_client ->
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* sc_rollup_from_rpc =
-    Sc_rollup_node.RPC.call rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks rollup_node
     @@ Sc_rollup_rpc.get_global_smart_rollup_address ()
   in
   if sc_rollup_from_rpc <> sc_rollup then
@@ -871,14 +870,12 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
 
 let rec check_can_get_between_blocks rollup_node ~first ~last =
   if last >= first then
-    (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
     let* _l2_block =
-      Sc_rollup_node.RPC.call rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash
            ~block:(string_of_int last)
            ()
     in
-    (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
     let* _l2_block =
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.get_global_block ~block:(string_of_int last) ()
@@ -1260,9 +1257,8 @@ let test_rollup_node_boots_into_initial_state ~kind =
   Check.(ticks = 0)
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* status =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_status ()
   in
   let expected_status =
@@ -1312,9 +1308,8 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   in
   (* Called with monotonically increasing [i] *)
   let test_message i =
-    (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
     let* prev_state_hash =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
     let* prev_ticks =
@@ -1380,9 +1375,8 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       | _otherwise -> raise (Invalid_argument kind)
     in
 
-    (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
     let* state_hash =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
     Check.(state_hash <> prev_state_hash)
@@ -1625,14 +1619,12 @@ let mode_publish mode publishes _protocol sc_rollup_node sc_rollup node client =
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* state_hash =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* state_hash_other =
-    Sc_rollup_node.RPC.call sc_rollup_other_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_other_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
   Check.((state_hash = state_hash_other) string)
@@ -2107,9 +2099,8 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup node1 client1 =
   Log.info "Nodes are following distinct branches." ;
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   let check_sc_head hash =
-    (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
     let* sc_head =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_hash ()
     in
     let sc_head = JSON.as_string sc_head in
@@ -2118,9 +2109,8 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup node1 client1 =
     unit
   in
   let* () = check_sc_head hash1 in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* state_hash1 =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ~block:hash1 ()
   in
   Log.info "Changing L1 node for rollup node (1st reorg)" ;
@@ -2133,9 +2123,8 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup node1 client1 =
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   let* () = check_sc_head hash2 in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* state_hash2 =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ~block:hash2 ()
   in
   Log.info
@@ -2595,9 +2584,8 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   let init_hash = (Option.get init_commitment).compressed_state in
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. rollup_node init_level in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* node_state_hash =
-    Sc_rollup_node.RPC.call rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
   Check.(
@@ -4267,10 +4255,9 @@ let test_rpcs ~kind
     Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
   in
   let* _level = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   (* Smart rollup address endpoint test *)
   let* sc_rollup_address =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_smart_rollup_address ()
   in
   Check.((sc_rollup_address = sc_rollup) string)
@@ -4291,9 +4278,8 @@ let test_rpcs ~kind
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node level in
   let* l1_block_hash = Client.RPC.call client @@ RPC.get_chain_block_hash () in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* l2_block_hash =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_hash ()
   in
   let l2_block_hash = JSON.as_string l2_block_hash in
@@ -4302,25 +4288,22 @@ let test_rpcs ~kind
   let* l1_block_hash_5 =
     Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* l2_block_hash_5 =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_hash ~block:"5" ()
   in
   let l2_block_hash_5 = JSON.as_string l2_block_hash_5 in
   Check.((l1_block_hash_5 = l2_block_hash_5) string)
     ~error_msg:"Block 5 on L1 is %L where as on L2 it is %R" ;
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* l2_finalied_block_level =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_level ~block:"finalized" ()
   in
   let l2_finalied_block_level = JSON.as_int l2_finalied_block_level in
   Check.((l2_finalied_block_level = level - 2) int)
     ~error_msg:"Finalized block is %L but should be %R" ;
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* l2_num_messages =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_num_messages ()
   in
   (* There are always 3 extra messages inserted by the protocol in the inbox. *)
@@ -4423,19 +4406,16 @@ let test_rpcs ~kind
         return ()
     | _ -> failwith "incorrect kind"
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* _status =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_status ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* _ticks =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_ticks ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* _state_hash =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_state_hash ()
   in
   let* _outbox =
@@ -4444,17 +4424,14 @@ let test_rpcs ~kind
          ~outbox_level:l2_finalied_block_level
          ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* _head =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_tezos_head ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* _level =
-    Sc_rollup_node.RPC.call sc_rollup_node
+    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_tezos_level ()
   in
-  (* TODO: add ~hook, https://gitlab.com/tezos/tezos/-/issues/6612 *)
   let* l2_block =
     Sc_rollup_node.RPC.call sc_rollup_node @@ Sc_rollup_rpc.get_global_block ()
   in
