@@ -283,3 +283,308 @@ mod tests {
 
     const MACRO_IF_SOME_SRC: &str = "{IF_SOME { PUSH nat 1 ; ADD } { PUSH nat 5; }}";
 }
+
+#[cfg(test)]
+mod multisig_tests {
+    use crate::ast::micheline::test_helpers::*;
+    use crate::ast::*;
+    use crate::context::Ctx;
+    use crate::interpreter::{ContractInterpretError, InterpretError};
+    use crate::parser::test_helpers::parse_contract_script;
+    use Type as T;
+    use TypedValue as TV;
+
+    // The comments below detail the steps used to
+    // prepare the signature for calling the multisig contract.
+
+    /*
+        # Create a private/public key pair.
+        $ octez-client import secret key bob 'unencrypted:edsk3SQWDxieaYEVsQbogKwVnArgwbWHQkQYaW1JcNmRmyWWLFXPTt'
+        $ octez-client show address bob
+        Public Key: edpku6Ffo8HgLgeBcArjtWeZ29hLEXP7ewsq5aAj8jr7giUVAAVnUM
+    */
+    static PUBLIC_KEY: &str = "edpku6Ffo8HgLgeBcArjtWeZ29hLEXP7ewsq5aAj8jr7giUVAAVnUM";
+
+    /*
+        $ PARAM_TYPE='
+            pair
+                (pair chain_id address)
+                nat
+                (or (pair mutez address) (or (option key_hash) (pair nat (list key))))'
+        $ SELF_ADDRESS='KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H'
+        $ CHAIN_ID='0xf3d48554'
+        $ ANTI_REPLAY_COUNTER='111'
+    */
+    fn make_ctx() -> Ctx {
+        let mut ctx = Ctx::default();
+        ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
+        ctx.chain_id = tezos_crypto_rs::hash::ChainId(hex::decode("f3d48554").unwrap());
+        ctx
+    }
+    static ANTI_REPLAY_COUNTER: i128 = 111;
+
+    #[test]
+    fn multisig_transfer() {
+        let mut ctx = make_ctx();
+        let threshold = 1;
+
+        /*
+            # Pack the parameter we will be sending to the multisig contract.
+            $ BYTES=$(octez-client --mode mockup hash data "
+                Pair
+                    (Pair $CHAIN_ID \"$SELF_ADDRESS\")
+                    $ANTI_REPLAY_COUNTER
+                    (Left (Pair 123 \"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j\"))
+                " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
+
+            # Sign the packed parameter.
+            $ octez-client --mode mockup sign bytes $BYTES for bob
+            Signature: edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v
+        */
+        let transfer_amount = 123;
+        let transfer_destination = "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j";
+        let signature = "edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v";
+
+        let interp_res = parse_contract_script(MULTISIG_SRC)
+            .unwrap()
+            .typecheck_script(&mut ctx)
+            .unwrap()
+            .interpret(
+                &mut ctx,
+                app!(Pair[
+                    // :payload
+                    app!(Pair[
+                        ANTI_REPLAY_COUNTER,
+                        app!(Left[
+                            // :transfer
+                            app!(Pair[transfer_amount as i128,transfer_destination])
+                        ])
+                    ]),
+                    // %sigs
+                    seq!{ app!(Some[signature]) }
+                ]),
+                // make_initial_storage(),
+                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+            );
+
+        assert_eq!(
+            collect_ops(interp_res),
+            Ok((
+                vec![OperationInfo {
+                    operation: Operation::TransferTokens(TransferTokens {
+                        param: TV::Unit,
+                        destination_address: transfer_destination.try_into().unwrap(),
+                        amount: transfer_amount,
+                    }),
+                    counter: 1
+                }],
+                TV::new_pair(
+                    TV::Nat(ANTI_REPLAY_COUNTER as u128 + 1),
+                    TV::new_pair(
+                        TV::Nat(threshold as u128),
+                        TV::List(MichelsonList::from(vec![TV::Key(
+                            PUBLIC_KEY.try_into().unwrap()
+                        )]))
+                    )
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn multisig_set_delegate() {
+        let mut ctx = make_ctx();
+        let threshold = 1;
+
+        /*
+            # Pack the parameter we will be sending to the multisig contract.
+            $ BYTES=$(octez-client --mode mockup hash data "
+                Pair
+                    (Pair $CHAIN_ID \"$SELF_ADDRESS\")
+                    $ANTI_REPLAY_COUNTER
+                    (Right (Left (Some \"tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy\")))
+                " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
+
+            # Sign the packed parameter.
+            $ octez-client --mode mockup sign bytes $BYTES for bob
+            Signature: edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST
+        */
+        let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
+        let signature = "edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST";
+
+        let interp_res = parse_contract_script(MULTISIG_SRC)
+            .unwrap()
+            .typecheck_script(&mut ctx)
+            .unwrap()
+            .interpret(
+                &mut ctx,
+                app!(Pair[
+                    // :payload
+                    app!(Pair[
+                        ANTI_REPLAY_COUNTER,
+                        app!(Right[ app!(Left[
+                            // %delegate
+                            app!(Some[new_delegate])
+                        ])])
+                    ]),
+                    // %sigs
+                    seq!{ app!(Some[signature]) }
+                ]),
+                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+            );
+
+        assert_eq!(
+            collect_ops(interp_res),
+            Ok((
+                vec![OperationInfo {
+                    operation: Operation::SetDelegate(SetDelegate(Some(
+                        new_delegate.try_into().unwrap()
+                    ))),
+                    counter: 1
+                }],
+                TV::new_pair(
+                    TV::Nat(ANTI_REPLAY_COUNTER as u128 + 1),
+                    TV::new_pair(
+                        TV::Nat(threshold as u128),
+                        TV::List(MichelsonList::from(vec![TV::Key(
+                            PUBLIC_KEY.try_into().unwrap()
+                        )]))
+                    )
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn invalid_signature() {
+        let mut ctx = make_ctx();
+        let threshold = 1;
+        let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
+        let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
+
+        let interp_res = parse_contract_script(MULTISIG_SRC)
+            .unwrap()
+            .typecheck_script(&mut ctx)
+            .unwrap()
+            .interpret(
+                &mut ctx,
+                app!(Pair[
+                    // :payload
+                    app!(Pair[
+                        ANTI_REPLAY_COUNTER,
+                        app!(Right[ app!(Left[
+                            // %delegate
+                            app!(Some[new_delegate])
+                        ])])
+                    ]),
+                    // %sigs
+                    seq!{ app!(Some[invalid_signature]) }
+                ]),
+                app!(Pair[ANTI_REPLAY_COUNTER, threshold, seq!{ PUBLIC_KEY }]),
+            );
+
+        assert_eq!(
+            collect_ops(interp_res),
+            Err(ContractInterpretError::InterpretError(
+                InterpretError::FailedWith(T::Unit, TV::Unit)
+            ))
+        );
+    }
+
+    // The interpretation result contains an iterator of operations,
+    // which does not implement `Eq` and therefore cannot be used with `assert_eq!`.
+    // This function collects the iterator into a vector so we can use `assert_eq!`.
+    fn collect_ops(
+        result: Result<(impl Iterator<Item = OperationInfo>, TypedValue), ContractInterpretError>,
+    ) -> Result<(Vec<OperationInfo>, TypedValue), ContractInterpretError> {
+        result.map(|(ops, val)| (ops.collect(), val))
+    }
+
+    // From: https://github.com/murbard/smart-contracts/blob/eb2b7d81aedcfeaea219da8b66cdd86652bf42f7/multisig/michelson/multisig.tz
+    const MULTISIG_SRC: &str = "
+        parameter (pair
+                    (pair :payload
+                        (nat %counter) # counter, used to prevent replay attacks
+                        (or :action    # payload to sign, represents the requested action
+                        (pair :transfer    # transfer tokens
+                            (mutez %amount) # amount to transfer
+                            (contract %dest unit)) # destination to transfer to
+                        (or
+                            (option %delegate key_hash) # change the delegate to this address
+                            (pair %change_keys          # change the keys controlling the multisig
+                                (nat %threshold)         # new threshold
+                                (list %keys key)))))     # new list of keys
+                    (list %sigs (option signature)));    # signatures
+
+        storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
+
+        code
+        {
+            UNPAIR ; SWAP ; DUP ; DIP { SWAP } ;
+            DIP
+            {
+                UNPAIR ;
+                # pair the payload with the current contract address, to ensure signatures
+                # can't be replayed accross different contracts if a key is reused.
+                DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
+                PACK ; # form the binary payload that we expect to be signed
+                DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP
+            } ;
+
+            # Check that the counters match
+            UNPAIR @stored_counter; DIP { SWAP };
+            ASSERT_CMPEQ ;
+
+            # Compute the number of valid signatures
+            DIP { SWAP } ; UNPAIR @threshold @keys;
+            DIP
+            {
+                # Running count of valid signatures
+                PUSH @valid nat 0; SWAP ;
+                ITER
+                {
+                    DIP { SWAP } ; SWAP ;
+                    IF_CONS
+                    {
+                        IF_SOME
+                        { SWAP ;
+                            DIP
+                            {
+                                SWAP ; DIIP { DUUP } ;
+                                # Checks signatures, fails if invalid
+                                CHECK_SIGNATURE ; ASSERT ;
+                                PUSH nat 1 ; ADD @valid } }
+                        { SWAP ; DROP }
+                    }
+                    {
+                        # There were fewer signatures in the list
+                        # than keys. Not all signatures must be present, but
+                        # they should be marked as absent using the option type.
+                        FAIL
+                    } ;
+                    SWAP
+                }
+            } ;
+            # Assert that the threshold is less than or equal to the
+            # number of valid signatures.
+            ASSERT_CMPLE ;
+            DROP ; DROP ;
+
+            # Increment counter and place in storage
+            DIP { UNPAIR ; PUSH nat 1 ; ADD @new_counter ; PAIR} ;
+
+            # We have now handled the signature verification part,
+            # produce the operation requested by the signers.
+            NIL operation ; SWAP ;
+            IF_LEFT
+            { # Transfer tokens
+                UNPAIR ; UNIT ; TRANSFER_TOKENS ; CONS }
+            { IF_LEFT {
+                        # Change delegate
+                        SET_DELEGATE ; CONS }
+                        {
+                        # Change set of signatures
+                        DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;
+            PAIR }
+        ";
+}
