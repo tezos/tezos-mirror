@@ -978,6 +978,15 @@ let create2 =
     bin = kernel_inputs_path ^ "/create2.bin";
   }
 
+(** The info for the "events.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/oog_call.sol] *)
+let oog_call =
+  {
+    label = "oog_call";
+    abi = kernel_inputs_path ^ "/oog_call.abi";
+    bin = kernel_inputs_path ^ "/oog_call.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -4274,6 +4283,44 @@ let test_l2_create_collision =
       ~error_msg:"Expected returned transaction hash to be %R but was %L.") ;
   unit
 
+let test_l2_intermediate_OOG_call =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "out_of_gas"; "call"]
+    ~title:
+      "Check that an L2 call to a smart contract with an intermediate call \
+       that runs out of gas still succeeds."
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* random_contract_address, _tx =
+    deploy ~contract:simple_storage ~sender evm_setup
+  in
+  let* oog_call_address, _tx = deploy ~contract:oog_call ~sender evm_setup in
+  let call_oog (sender : Eth_account.t) ~expect_failure =
+    Eth_cli.contract_send
+      ~expect_failure
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:oog_call.label
+      ~address:oog_call_address
+      ~method_call:
+        (Printf.sprintf "sendViaCall(\"%s\")" random_contract_address)
+  in
+  let* tx =
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (call_oog sender ~expect_failure:false)
+      ()
+  in
+  check_tx_succeeded ~tx ~endpoint
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4342,7 +4389,8 @@ let register_evm_node ~protocols =
   test_l2_nested_create protocols ;
   test_block_hash_regression protocols ;
   test_l2_revert_returns_unused_gas protocols ;
-  test_l2_create_collision protocols
+  test_l2_create_collision protocols ;
+  test_l2_intermediate_OOG_call protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
