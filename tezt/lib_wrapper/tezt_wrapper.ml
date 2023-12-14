@@ -10,7 +10,7 @@ open Base
 
 type error_mode = Ignore | Warn | Fail
 
-let error_mode_for_missing_use = ref Warn
+let error_mode_for_missing_use = ref Fail
 
 let error_mode_for_useless_use = ref Warn
 

@@ -114,7 +114,8 @@ type error_mode = Ignore | Warn | Fail
 
 (** What to do if a test uses something without having it declared in its [~uses].
 
-    Recommended setting for tests that are intended to run in the CI is [Fail]. *)
+    Recommended setting for tests that are intended to run in the CI is [Fail],
+    which is the default. *)
 val error_mode_for_missing_use : error_mode ref
 
 (** What to do if a test declares something in its [~uses] and does not use it.
