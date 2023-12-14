@@ -265,6 +265,7 @@ pub enum Instruction {
     CheckSignature,
     TransferTokens,
     SetDelegate,
+    Address,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
