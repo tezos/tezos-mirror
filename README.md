@@ -46,6 +46,7 @@ with `dashboard_name` one of:
 - `basic`: a simple dashboard displaying detailed node's metrics,
 - `logs`: same as `basic` but also displaying node's logs (thanks to [Loki and promtail](https://github.com/grafana/loki))
 - `full`: same as `logs` but also displaying hardware metrics (thanks to [netdata](https://www.netdata.cloud/))
+- `dal-basic`: a simple dashboard displaying some DAL node's metrics,
 
 To create the dashboards for a different branch
 
