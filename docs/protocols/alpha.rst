@@ -45,6 +45,8 @@ Operation receipts
 Protocol parameters
 -------------------
 
+- Added ``consensus_rights_delay`` parametric constant. (MR :gl:`!11188`)
+
 Bug Fixes
 ---------
 
