@@ -17,8 +17,10 @@ categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 [lib]
 crate-type = ["rlib"]
 
-[dependencies]
-dlmalloc = { version = "0.2.3", features = ["global"], optional = true}
+[target.'cfg(not(target_arch = "riscv64"))'.dependencies.dlmalloc]
+version = "0.2.3"
+features = ["global"]
+optional = true
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"

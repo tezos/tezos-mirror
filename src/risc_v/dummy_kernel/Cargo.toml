@@ -1,0 +1,14 @@
+[package]
+name = "risc-v-dummy"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.tezos_crypto_rs]
+version = "0.5.2"
+default-features = false
+
+[dependencies.tezos-smart-rollup]
+path = "../../kernel_sdk/sdk"
+version = "0.2.2"
+default-features = false
+features = ["debug_alloc", "proto-alpha", "panic-hook"]

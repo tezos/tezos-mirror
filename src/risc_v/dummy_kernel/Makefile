@@ -5,13 +5,14 @@
 .PHONY: all
 all: build test check
 
-.PHONY: build-deps
-build-deps:
-	@rustup component add rustfmt clippy
-
 .PHONY: build
 build:
-	@cargo build --release --target=riscv64gc-unknown-none-elf
+	@cargo build --release --target=riscv64gc-unknown-hermit
+
+.PHONY: build-deps
+build-deps:
+	@exec ./install-rust-std-hermit.sh
+	@rustup component add rustfmt clippy
 
 .PHONY: test
 test:
@@ -23,6 +24,7 @@ run:
 
 .PHONY: check
 check:
+	@cargo fmt --check
 	# TODO: Clippy! (currently doesn't work)
 
 .PHONY: clean

@@ -3,17 +3,8 @@ name = "risc-v-dummy-bm"
 version = "0.0.0"
 edition = "2021"
 
-[target.'cfg(target_os = "hermit")'.dependencies.hermit]
-version = "0.7.2"
-default-features = false
-
 [dependencies.riscv-rt]
 version = "*"
-optional = true
-
-[dependencies.tezos_crypto_rs]
-version = "0.5.2"
-default-features = false
 optional = true
 
 [dependencies.tezos-smart-rollup-panic-hook]
@@ -30,4 +21,3 @@ features = ["debug_alloc", "proto-alpha-no-mock"]
 [features]
 default = ["bare-metal"]
 bare-metal = ["riscv-rt"]
-crypto = ["tezos_crypto_rs"]

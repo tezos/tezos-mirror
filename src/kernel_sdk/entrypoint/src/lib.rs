@@ -8,7 +8,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(feature = "dlmalloc")]
+#[cfg(all(feature = "dlmalloc", not(target_arch = "riscv64")))]
 mod allocator {
     use dlmalloc::GlobalDlmalloc;
 
@@ -56,6 +56,17 @@ macro_rules! kernel_entry {
             use $crate::RollupHost;
             let mut host = unsafe { RollupHost::new() };
             $kernel_run(&mut host)
+        }
+
+        #[cfg(all(target_arch = "riscv64", target_os = "hermit"))]
+        pub fn main() -> ! {
+            $crate::set_panic_hook();
+            use $crate::RollupHost;
+            loop {
+                // TODO #6727: Capture and recover panics.
+                let mut host = unsafe { RollupHost::new() };
+                $kernel_run(&mut host);
+            }
         }
     };
 }
