@@ -2684,7 +2684,12 @@ module Dal : sig
   module Attestation : sig
     type t = private Bitset.t
 
-    type operation = {attestation : t; level : Raw_level.t; slot : Slot.t}
+    type operation = {
+      attestation : t;
+      level : Raw_level.t;
+      round : Round.t;
+      slot : Slot.t;
+    }
 
     type shard_index = int
 

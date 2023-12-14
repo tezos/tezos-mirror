@@ -137,6 +137,7 @@ let raw_dal_attestation ?delegate ?attestation block =
   let open Lwt_result_wrap_syntax in
   let ctxt = Context.B block in
   let*? level = Context.get_level ctxt in
+  let*?@ round = Block.get_round block in
   let* committee = Context.Dal.shards ctxt () in
   let delegate =
     match delegate with None -> Stdlib.List.hd committee |> fst | Some d -> d
@@ -158,7 +159,9 @@ let raw_dal_attestation ?delegate ?attestation block =
               in
               let branch = block.Block.header.shell.predecessor in
               let* signer = Account.find delegate in
-              let op = Single (Dal_attestation {attestation; level; slot}) in
+              let op =
+                Single (Dal_attestation {attestation; level; round; slot})
+              in
               sign
                 ~watermark:
                   Operation.(to_watermark (Dal_attestation Chain_id.zero))

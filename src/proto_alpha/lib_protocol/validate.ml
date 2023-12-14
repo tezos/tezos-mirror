@@ -875,7 +875,7 @@ module Consensus = struct
 
   let check_dal_attestation_conflict vs oph
       (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
       operation.protocol_data.contents
     in
     match
@@ -895,7 +895,7 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
   let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
       operation.protocol_data.contents
     in
     {
@@ -912,7 +912,7 @@ module Consensus = struct
     }
 
   let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestation = _; level; slot})) =
+    let (Single (Dal_attestation {attestation = _; level; round = _; slot})) =
       operation.protocol_data.contents
     in
     let dal_attestation_seen =

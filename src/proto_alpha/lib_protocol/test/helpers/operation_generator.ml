@@ -391,9 +391,10 @@ let generate_attestation =
 let generate_dal_attestation =
   let open QCheck2.Gen in
   let* level = gen_level in
+  let* round = gen_round in
   let+ slot = gen_slot in
   Dal_attestation
-    Dal.Attestation.{attestation = Dal.Attestation.empty; level; slot}
+    Dal.Attestation.{attestation = Dal.Attestation.empty; level; round; slot}
 
 let generate_vdf_revelation =
   let open QCheck2.Gen in

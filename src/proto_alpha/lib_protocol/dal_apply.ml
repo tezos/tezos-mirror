@@ -58,7 +58,7 @@ let validate_attestation ctxt get_consensus_key op =
   let*? () = assert_dal_feature_enabled ctxt in
   (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/4462
      Reconsider the ordering of checks. *)
-  let Dal.Attestation.{attestation; level = given; slot = _} = op in
+  let Dal.Attestation.{attestation; level = given; round = _; slot = _} = op in
   let number_of_slots = Dal.number_of_slots ctxt in
   let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in

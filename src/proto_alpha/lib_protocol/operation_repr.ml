@@ -1178,9 +1178,10 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
-    obj3
+    obj4
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
+      (req "round" Round_repr.encoding)
       (req "slot" Slot_repr.encoding)
 
   let dal_attestation_case =
@@ -1192,11 +1193,13 @@ module Encoding = struct
         select =
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
-            (attestation, level, slot));
+          (fun (Dal_attestation
+                 Dal_attestation_repr.{attestation; level; round; slot}) ->
+            (attestation, level, round, slot));
         inj =
-          (fun (attestation, level, slot) ->
-            Dal_attestation Dal_attestation_repr.{attestation; level; slot});
+          (fun (attestation, level, round, slot) ->
+            Dal_attestation
+              Dal_attestation_repr.{attestation; level; round; slot});
       }
 
   let seed_nonce_revelation_case =
@@ -2355,7 +2358,9 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
+  | Single
+      (Dal_attestation
+        Dal_attestation_repr.{attestation; level; round = _; slot}) ->
       W
         ( Consensus,
           Weight_dal_attestation

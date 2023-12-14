@@ -627,9 +627,9 @@ let sign_dal_attestations state attestations =
     }
   in
   List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content, published_level) ->
+    (fun (((consensus_key, _) as delegate), operation_content, published_level) ->
       let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
-      let contents = Single (Dal_attestation consensus_content) in
+      let contents = Single (Dal_attestation operation_content) in
       let unsigned_operation = (shell, Contents_list contents) in
       let unsigned_operation_bytes =
         Data_encoding.Binary.to_bytes_exn
@@ -651,12 +651,9 @@ let sign_dal_attestations state attestations =
           let protocol_data =
             Operation_data {contents; signature = Some signature}
           in
-          let operation : Operation.packed = {shell; protocol_data} in
+          let packed_operation : Operation.packed = {shell; protocol_data} in
           return_some
-            ( delegate,
-              operation,
-              consensus_content.Dal.Attestation.attestation,
-              published_level ))
+            (delegate, packed_operation, operation_content, published_level))
     attestations
 
 let inject_dal_attestations state attestations =
@@ -665,10 +662,7 @@ let inject_dal_attestations state attestations =
   let chain_id = state.global_state.chain_id in
   let* signed_operations = sign_dal_attestations state attestations in
   List.iter_ep
-    (fun ( delegate,
-           signed_operation,
-           (attestation : Dal.Attestation.t),
-           published_level ) ->
+    (fun (delegate, signed_operation, op_content, published_level) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn
           Operation.encoding_with_legacy_attestation_name
@@ -680,13 +674,19 @@ let inject_dal_attestations state attestations =
           ~chain:(`Hash chain_id)
           encoded_op
       in
-      let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
-      let attestation_level = state.level_state.current_level in
+      let bitset_int =
+        Bitset.to_z (op_content.Dal.Attestation.attestation :> Bitset.t)
+      in
       let*! () =
         Events.(
           emit
             dal_attestation_injected
-            (oph, delegate, bitset_int, published_level, attestation_level))
+            ( oph,
+              delegate,
+              bitset_int,
+              published_level,
+              op_content.level,
+              op_content.round ))
       in
       return_unit)
     signed_operations
@@ -745,7 +745,11 @@ let get_dal_attestations state =
                 | Attestable_slots {slots = attestation; published_level} ->
                     if List.exists Fun.id attestation then
                       return
-                        ((delegate, attestation, published_level, first_slot)
+                        (( delegate,
+                           attestation,
+                           published_level,
+                           state.round_state.current_round,
+                           first_slot )
                         :: acc)
                     else
                       (* No slot is attested, no need to send an attestation, at least
@@ -754,7 +758,10 @@ let get_dal_attestations state =
                         Events.(
                           emit
                             dal_attestation_void
-                            (delegate, attestation_level, published_level))
+                            ( delegate,
+                              attestation_level,
+                              state.round_state.current_round,
+                              published_level ))
                       in
                       return acc))
           []
@@ -764,7 +771,7 @@ let get_dal_attestations state =
         state.global_state.constants.parametric.dal.number_of_slots
       in
       List.map
-        (fun (delegate, attestation_flags, published_level, first_slot) ->
+        (fun (delegate, attestation_flags, published_level, round, first_slot) ->
           let attestation =
             List.fold_left_i
               (fun i acc flag ->
@@ -779,6 +786,7 @@ let get_dal_attestations state =
               {
                 attestation;
                 level = Raw_level.of_int32_exn attestation_level;
+                round;
                 slot = first_slot;
               },
             published_level ))
