@@ -638,6 +638,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     Tezos_base_unix.Internal_event_unix.enable_default_daily_logs_at
       ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
   in
+  let cctxt = Layer_1.client_context_with_timeout cctxt 60. in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
   let open Configuration in

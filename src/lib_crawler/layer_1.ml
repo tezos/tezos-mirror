@@ -49,6 +49,20 @@ let () =
     (function Cannot_find_predecessor hash -> Some hash | _ -> None)
     (fun hash -> Cannot_find_predecessor hash)
 
+type error += RPC_timeout of {path : string; timeout : float}
+
+let () =
+  register_error_kind
+    ~id:"lib_crawler.rpc_timeout"
+    ~title:"Timeout in RPC"
+    ~description:"An RPC did not respond after the timeout"
+    ~pp:(fun ppf (path, timeout) ->
+      Format.fprintf ppf "Call %s timeouted after %fs." path timeout)
+    `Temporary
+    Data_encoding.(obj2 (req "path" string) (req "timeout" float))
+    (function RPC_timeout {path; timeout} -> Some (path, timeout) | _ -> None)
+    (fun (path, timeout) -> RPC_timeout {path; timeout})
+
 (**
 
    State
@@ -149,6 +163,7 @@ let is_connection_error trace =
           (* This error can surface if the external RPC servers of the L1 node are
              shutdown but the request is still in the RPC worker. *)
           Re.Str.string_match regexp_ocaml_exception_connection_error s 0
+      | RPC_timeout _ -> true
       | _ -> false)
     false
     trace
@@ -401,3 +416,37 @@ module Internal_for_tests = struct
       running = false;
     }
 end
+
+let client_context_with_timeout (obj : #Client_context.full) timeout :
+    Client_context.full =
+  let open Lwt_syntax in
+  object
+    inherit Client_context.proxy_context (obj :> Client_context.full)
+
+    method! call_service
+        : 'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
+      fun service params query body ->
+        let timeout_promise =
+          let* () = Lwt_unix.sleep timeout in
+          let path = Tezos_rpc.(Service.Internal.to_service service).path in
+          let path =
+            Tezos_rpc.Service.Internal.from_path path
+            |> Tezos_rpc.Path.to_string
+          in
+          Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
+        in
+        Lwt.pick [obj#call_service service params query body; timeout_promise]
+
+    method! generic_media_type_call meth ?body uri =
+      let timeout_promise =
+        let* () = Lwt_unix.sleep timeout in
+        Lwt_result_syntax.tzfail
+          (RPC_timeout {path = Uri.to_string uri; timeout})
+      in
+      Lwt.pick [obj#generic_media_type_call meth ?body uri; timeout_promise]
+  end
