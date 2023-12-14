@@ -391,4 +391,8 @@ module Internal_for_tests = struct
   let compute_bonus = compute_bonus
 
   let compute_coeff = compute_coeff
+
+  let compute_min = compute_min
+
+  let compute_max = compute_max
 end

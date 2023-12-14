@@ -2383,6 +2383,18 @@ module Delegate : sig
         q_total_supply:Q.t ->
         bonus:Issuance_bonus_repr.t ->
         Q.t
+
+      val compute_min :
+        reward_params:Constants.Parametric.adaptive_rewards_params ->
+        launch_cycle:Cycle_repr.t option ->
+        new_cycle:Cycle_repr.t ->
+        Q.t
+
+      val compute_max :
+        reward_params:Constants.Parametric.adaptive_rewards_params ->
+        launch_cycle:Cycle_repr.t option ->
+        new_cycle:Cycle_repr.t ->
+        Q.t
     end
   end
 
