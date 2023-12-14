@@ -32,7 +32,7 @@ type t = {
   operations : packed_operation Operation_hash.Map.t;
 }
 
-type validation_info = Validate.info
+type validation_info = info
 
 type add_result = Added | Replaced of {removed : Operation_hash.t} | Unchanged
 
@@ -58,7 +58,7 @@ let encoding : t Data_encoding.t =
          {predecessor_hash; operation_state; operations})
   @@ obj3
        (req "predecessor_hash" Block_hash.encoding)
-       (req "operation_state" Validate.operation_conflict_state_encoding)
+       (req "operation_state" operation_conflict_state_encoding)
        (req
           "operations"
           (Operation_hash.Map.encoding
