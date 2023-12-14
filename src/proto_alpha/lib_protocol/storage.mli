@@ -830,16 +830,6 @@ module Tenderbake : sig
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t
 
-  (** Similar to [Attestation_branch] but only used for the stitching from
-      Nairobi.
-
-      TODO: https://gitlab.com/tezos/tezos/-/issues/6082
-      This should be removed once in the next protocol. *)
-  module Endorsement_branch :
-    Single_data_storage
-      with type value = Block_hash.t * Block_payload_hash.t
-       and type t := Raw_context.t
-
   (** [Forbidden_delegates] stores the set of delegates that are not
       allowed to bake or attest blocks. *)
   module Forbidden_delegates :

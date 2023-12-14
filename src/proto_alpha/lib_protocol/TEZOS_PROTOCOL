@@ -195,7 +195,6 @@
         "Sc_rollup_errors",
         "Sc_rollup_inbox_storage",
 
-        "Remove_zero_amount_ticket_migration_for_o",
         "Legacy_script_patches",
         "Sapling_validator",
 

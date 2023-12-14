@@ -117,7 +117,7 @@ let update_at_cycle_end ctxt ~new_cycle =
         let*! ctxt = set_forbidden_delegates ctxt forbidden_delegates in
         return ctxt
 
-let init_for_genesis_and_oxford ctxt =
+let init_for_genesis ctxt =
   Storage.Tenderbake.Forbidden_delegates.init
     ctxt
     Signature.Public_key_hash.Set.empty
