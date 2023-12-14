@@ -163,6 +163,7 @@ macro_rules! micheline_instructions {
                 | Prim::IF_LEFT
                 | Prim::IF_NONE
                 | Prim::FAILWITH
+                | Prim::NEVER
                 | Prim::DUP
                 | Prim::UNIT
                 | Prim::CAST
@@ -215,7 +216,6 @@ macro_rules! micheline_instructions {
                 | Prim::DUG
                 | Prim::LEVEL
                 | Prim::SELF_ADDRESS
-                | Prim::NEVER
                 | Prim::STEPS_TO_QUOTA
                 | Prim::CHECK_SIGNATURE
                 | Prim::CONCAT

@@ -294,6 +294,7 @@ fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(
             let x = pop!();
             return Err(InterpretError::FailedWith(ty.clone(), x));
         }
+        I::Never => unreachable_state(),
         I::Unit => {
             ctx.gas.consume(interpret_cost::UNIT)?;
             stack.push(V::Unit);
