@@ -22,13 +22,13 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
   "octez-protocol-compiler"
   "tezos-dal-node-lib"
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-injector"
   "octez-l2-libs"
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "octez-alcotezt" {with-test}
   "tezos-dac-node-lib" {with-test}
 ]

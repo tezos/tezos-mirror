@@ -613,7 +613,8 @@ let test_scenario_t4 () =
   let config =
     {
       default_config with
-      initial_seed = None;
+      initial_seed =
+        some_seed "rngG9pS9mbDWnz6YLUFrd8sbb9KMUzfAUMpSpnxNHY9BFnSB8L3zq";
       delegate_selection =
         [
           (1l, [(0l, bootstrap1); (1l, bootstrap2)]);
@@ -786,7 +787,6 @@ let test_scenario_f1 () =
             ] );
         ];
       timeout = 30;
-      debug = true;
     }
   in
   run
@@ -1896,18 +1896,6 @@ let test_scenario_m10 () =
     }
   in
   run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
-
-(* Copy-pasted from alcotezt *)
-let redirect_formatter fmt =
-  let buffer = Buffer.create 256 in
-  Format.pp_set_formatter_output_functions fmt (Buffer.add_substring buffer)
-  @@ fun () ->
-  Log.debug "%s" (String.trim (Buffer.contents buffer)) ;
-  Buffer.clear buffer
-
-let () =
-  redirect_formatter Format.std_formatter ;
-  redirect_formatter Format.err_formatter
 
 let () =
   let open Lwt_result_syntax in

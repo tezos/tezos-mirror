@@ -16,7 +16,8 @@
   octez-shell-libs.mockup
   octez-shell-libs.mockup-proxy
   octez-shell-libs.mockup-commands
-  octez-protocol-018-Proxford-libs.baking.tenderbrute)
+  octez-protocol-018-Proxford-libs.baking.tenderbrute
+  tezt.core)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -29,4 +30,5 @@
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
   -open Tezos_protocol_018_Proxford_parameters
-  -open Tenderbrute_018_Proxford))
+  -open Tenderbrute_018_Proxford
+  -open Tezt_core))
