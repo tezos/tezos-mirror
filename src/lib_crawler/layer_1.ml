@@ -153,37 +153,79 @@ let is_connection_error trace =
     false
     trace
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
-   Use Lwt_stream.iter_es once it is exposed. *)
+type 'a lwt_stream_get_result =
+  | Get_none
+  | Get_timeout of float
+  | Get_elt of 'a
+
+type lwt_stream_iter_with_timeout_ended =
+  | Closed
+  | Timeout of float
+  | Connection_error of tztrace
+
+let timeout_factor = 10.
+
+(** This function is similar to {!Lwt_stream.iter_s} excepted that it resolves
+    with {!Get_timeout} if waiting for the next element takes more than some
+    time (10x last elapsed time). [init_timeout] is used for the initial timeout
+    value (so it should be large enough) and [min_timeout] is the minimal timeout
+    considered. *)
+let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
+  let open Lwt_syntax in
+  let rec loop timeout =
+    let get_promise =
+      let+ res = Lwt_stream.get stream in
+      match res with None -> Get_none | Some e -> Get_elt e
+    in
+    let timeout_promise =
+      let+ () = Lwt_unix.sleep timeout in
+      Get_timeout timeout
+    in
+    let start_time = Unix.gettimeofday () in
+    let* res = Lwt.pick [get_promise; timeout_promise] in
+    match res with
+    | Get_none -> return_ok Closed
+    | Get_timeout t -> return_ok (Timeout t)
+    | Get_elt e -> (
+        let elapsed = Unix.gettimeofday () -. start_time in
+        let new_timeout = elapsed *. timeout_factor in
+        let timeout =
+          if new_timeout < min_timeout then timeout else new_timeout
+        in
+        let* res = protect @@ fun () -> f e in
+        match res with
+        | Ok () -> (loop [@ocaml.tailcall]) timeout
+        | Error trace when is_connection_error trace ->
+            return_ok (Connection_error trace)
+        | Error trace -> return_error trace)
+  in
+  loop init_timeout
+
 let iter_heads l1_ctxt f =
-  let exception Iter_error of tztrace in
   let rec loop l1_ctxt =
     let open Lwt_result_syntax in
-    let*! () =
-      Lwt_stream.iter_s
-        (fun head ->
-          let open Lwt_syntax in
-          let* res = f head in
-          match res with
-          | Ok () -> return_unit
-          | Error trace when is_connection_error trace ->
-              Format.eprintf
-                "@[<v 2>Connection error:@ %a@]@."
-                pp_print_trace
-                trace ;
-              l1_ctxt.stopper () ;
-              return_unit
-          | Error e -> raise (Iter_error e))
+    let* stopping_reason =
+      lwt_stream_iter_with_timeout
+        ~min_timeout:10.
+        ~init_timeout:300.
+        f
         l1_ctxt.heads
     in
     when_ l1_ctxt.running @@ fun () ->
-    let*! () = Layer1_event.connection_lost ~name:l1_ctxt.name in
+    l1_ctxt.stopper () ;
+    let*! () =
+      match stopping_reason with
+      | Closed -> Layer1_event.connection_lost ~name:l1_ctxt.name
+      | Timeout timeout ->
+          Layer1_event.connection_timeout ~name:l1_ctxt.name ~timeout
+      | Connection_error trace ->
+          Format.eprintf "@[<v 2>Connection error:@ %a@]@." pp_print_trace trace ;
+          Lwt.return_unit
+    in
     let*! l1_ctxt = reconnect l1_ctxt in
     loop l1_ctxt
   in
-  Lwt.catch
-    (fun () -> Lwt.no_cancel @@ loop l1_ctxt)
-    (function Iter_error e -> Lwt.return_error e | exn -> fail_with_exn exn)
+  loop l1_ctxt
 
 let wait_first l1_ctxt =
   let rec loop l1_ctxt =
