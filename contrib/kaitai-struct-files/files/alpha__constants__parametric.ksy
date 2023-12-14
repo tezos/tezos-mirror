@@ -5,10 +5,18 @@ doc: ! 'Encoding id: alpha.constants.parametric'
 types:
   adaptive_rewards_params:
     seq:
-    - id: issuance_ratio_min
-      type: issuance_ratio_min
-    - id: issuance_ratio_max
-      type: issuance_ratio_max
+    - id: issuance_ratio_final_min
+      type: issuance_ratio_final_min
+    - id: issuance_ratio_final_max
+      type: issuance_ratio_final_max
+    - id: issuance_ratio_initial_min
+      type: issuance_ratio_initial_min
+    - id: issuance_ratio_initial_max
+      type: issuance_ratio_initial_max
+    - id: initial_period
+      type: u1
+    - id: transition_period
+      type: u1
     - id: max_bonus
       type: s8
     - id: growth_rate
@@ -64,13 +72,25 @@ types:
       valid:
         min: -1073741824
         max: 1073741823
-  issuance_ratio_max:
+  issuance_ratio_final_max:
     seq:
     - id: numerator
       type: z
     - id: denominator
       type: z
-  issuance_ratio_min:
+  issuance_ratio_final_min:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_ratio_initial_max:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  issuance_ratio_initial_min:
     seq:
     - id: numerator
       type: z
