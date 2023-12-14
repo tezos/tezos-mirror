@@ -1,8 +1,4 @@
 
-./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
-{ "level": 2,
-  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
-
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
 Node is bootstrapped.
 Estimated gas: 2329.875 units (will add 100 for safety)
@@ -78,6 +74,10 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 183.803
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"143000000000"
+
 
 ./octez-client --wait none send smart rollup message '[SMART_ROLLUP_EXTERNAL_MESSAGES]' from bootstrap2
 Node is bootstrapped.
@@ -102,6 +102,10 @@ This sequence of operations was run:
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
       Consumed gas: 186.213
+
+GET http://127.0.0.1:[PORT]/global/block/12/total_ticks
+200 OK
+"341000000000"
 
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10

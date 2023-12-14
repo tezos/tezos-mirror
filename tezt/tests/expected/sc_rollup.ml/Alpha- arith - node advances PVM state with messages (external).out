@@ -33,13 +33,13 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
-
-./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
-{ "level": 2,
-  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"0"
 
 
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
@@ -74,9 +74,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"23"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"23"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -111,9 +119,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"44"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"44"
 
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
@@ -148,9 +164,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"66"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"66"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -185,9 +209,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"88"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"88"
 
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
@@ -222,9 +254,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"110"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"110"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -259,9 +299,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"132"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"132"
 
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
@@ -296,9 +344,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"154"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"154"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -333,9 +389,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"176"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"176"
 
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
@@ -370,9 +434,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"198"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"198"
 
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
@@ -406,4 +478,8 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"221"
 

@@ -33,13 +33,13 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
-
-./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
-{ "level": 2,
-  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"5"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -49,9 +49,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"26"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"26"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -61,9 +69,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"47"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"47"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -73,9 +89,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"69"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"69"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -85,9 +109,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"91"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"91"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -97,9 +129,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"113"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"113"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -109,9 +149,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"135"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"135"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -121,9 +169,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"157"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"157"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -133,9 +189,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"179"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"179"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -145,9 +209,17 @@ GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"201"
+
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"201"
 
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
@@ -156,4 +228,8 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 GET http://127.0.0.1:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+200 OK
+"224"
 
