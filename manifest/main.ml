@@ -6654,46 +6654,6 @@ let hash = Protocol.hash
             alcotezt;
           ]
     in
-    let octez_sc_rollup_client =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      private_lib
-        (sf "octez_smart_rollup_client_%s" short_hash)
-        ~path:(path // "lib_sc_rollup_client")
-        ~opam:(sf "octez-smart-rollup-client-%s" short_hash)
-        ~release_status:Experimental
-        ~deps:
-          [
-            octez_base |> open_ |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            main |> open_;
-            octez_client_commands |> open_;
-            octez_client_base |> open_;
-            octez_client_base_unix |> open_;
-            client |> if_some |> open_;
-            octez_smart_rollup_lib |> open_;
-            octez_sc_rollup |> if_some |> open_;
-            octez_sc_rollup_layer2 |> if_some |> open_;
-          ]
-    in
-    let _sc_rollup_client =
-      only_if (active && N.(number >= 016)) @@ fun () ->
-      public_exe
-        (sf "octez-smart-rollup-client-%s" short_hash)
-        ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
-        ~path:(path // "bin_sc_rollup_client")
-        ~synopsis:"Tezos/Protocol: Smart rollup client"
-        ~release_status:Experimental
-        ~with_macos_security_framework:true
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            octez_clic;
-            main |> open_;
-            octez_sc_rollup_client |> if_some |> open_;
-            octez_version_value;
-          ]
-    in
     let benchmark_type_inference =
       only_if active @@ fun () ->
       public_lib
