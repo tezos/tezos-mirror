@@ -46,6 +46,7 @@ build:
   script:
     - 'apk add zip'
     - 'apk add curl'
+    - export ARCHIVE=binaries-${ARCHIVE}-${CI_COMMIT_TAG:=latest}.zip
     - 'zip ./${ARCHIVE} archiver/main.exe server/main.exe'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ./${ARCHIVE} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/teztale/latest/${ARCHIVE}"'
 
@@ -54,28 +55,28 @@ release:amd64:v18.1:
   extends: .release
   dependencies: ["build: [amd64, v18.1]"]
   variables:
-    ARCHIVE: "binaries-amd64-v18.1.zip"
+    ARCHIVE: "amd64-v18.1"
 
 release:amd64:master:
   stage: deploy
   extends: .release
   dependencies: ["build: [amd64, master]"]
   variables:
-    ARCHIVE: "binaries-amd64-master.zip"
+    ARCHIVE: "amd64-master"
 
 release:arm64:v18.1:
   stage: deploy
   extends: .release
   dependencies: ["build: [arm64, v18.1]"]
   variables:
-    ARCHIVE: "binaries-arm64-v18.1.zip"
+    ARCHIVE: "arm64-v18.1"
 
 release:arm64:master:
   stage: deploy
   extends: .release
   dependencies: ["build: [arm64, master]"]
   variables:
-    ARCHIVE: "binaries-arm64-master.zip"
+    ARCHIVE: "arm64-master"
 
 docker:
   stage: docker
