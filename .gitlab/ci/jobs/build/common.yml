@@ -1,6 +1,6 @@
-.build:
+.oc.build:
   extends:
-    - .build_template
+    - .oc.build_template
     - .rules__octez_changes
   variables:
     ARCH: ""
@@ -26,7 +26,7 @@
 
 # similar to the build template above, this template
 # compiles all binaries using the static profile.
-.build_static_binaries_template:
+.oc.build_static_binaries_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
@@ -41,7 +41,7 @@
     paths:
       - "octez-binaries/$ARCH/*"
 
-.build_docker_release_template:
+.oc.build_docker_release_template:
   extends:
     - .image_template__docker
     - .docker_auth_template

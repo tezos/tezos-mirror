@@ -1,10 +1,10 @@
 # Fetch records for Tezt generated on the last merge request pipeline
 # on the most recently merged MR and makes them available in artifacts
 # for future merge request pipelines.
-tezt:fetch-records:
+oc.tezt:fetch-records:
   extends:
     - .tags_template__build
-    - .build_template
+    - .oc.build_template
     - .rules__octez_changes
   stage: build
   script:

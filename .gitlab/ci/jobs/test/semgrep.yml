@@ -1,4 +1,4 @@
-semgrep:
+oc.semgrep:
   extends:
     - .default_settings_template
   rules:

@@ -2,20 +2,20 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
-    - .template__coverage
+    - .oc.template__coverage
     - .rules__octez_changes
   needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
   stage: test
   before_script:
     - . ./scripts/version.sh
   retry: 2
 
 # Merge coverage files after the execution
-.template__coverage_files:
+.oc.template__coverage_files:
   extends:
-    - .template__coverage
+    - .oc.template__coverage
     - .rules__octez_changes
   artifacts:
     name: "coverage-files-$CI_JOB_ID"
@@ -94,7 +94,7 @@
   extends:
     - .test_template
     - .image_template__runtime_e2etest_dependencies
-    - .template__coverage_files
+    - .oc.template__coverage_files
     - .tezt_template
   variables:
     # Certain tests can be blacklisted by modifying the TESTS variable.
@@ -102,15 +102,15 @@
     # See tezt/lib_tezos/tag.mli for more information.
     TESTS: "/ci_disabled /flaky"
   dependencies:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
-    - "build_kernels"
-    - "tezt:fetch-records"
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
+    - "oc.build_kernels"
+    - "oc.tezt:fetch-records"
   needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
-    - "build_kernels"
-    - "tezt:fetch-records"
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
+    - "oc.build_kernels"
+    - "oc.tezt:fetch-records"
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60

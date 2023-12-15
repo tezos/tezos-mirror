@@ -2,10 +2,10 @@
 ## Stage: run scripts to check they are working properly  ##
 ############################################################
 
-# Note: this job actually probably doesn't need the build_x86_64 job
-# to have finished, but we don't want to start before build_x86_64 has finished either.
-# However, when build_x86_64-* don't exist, we don't need to wait for them.
-script:snapshot_alpha_and_link:
+# Note: this job actually probably doesn't need the oc.build_x86_64 job
+# to have finished, but we don't want to start before oc.build_x86_64 has finished either.
+# However, when oc.build_x86_64-* don't exist, we don't need to wait for them.
+oc.script:snapshot_alpha_and_link:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
@@ -14,9 +14,9 @@ script:snapshot_alpha_and_link:
     - . ./scripts/version.sh
   needs:
     - job: trigger
-    - job: "build_x86_64-released"
+    - job: "oc.build_x86_64-released"
       optional: true
-    - job: "build_x86_64-exp-dev-extra"
+    - job: "oc.build_x86_64-exp-dev-extra"
       optional: true
   script:
     - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
@@ -35,7 +35,7 @@ script:snapshot_alpha_and_link:
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: on_success
 
-script:test-gen-genesis:
+oc.script:test-gen-genesis:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
@@ -47,14 +47,14 @@ script:test-gen-genesis:
   script:
     - dune build gen_genesis.exe
 
-script:test_release_versions:
+oc.script:test_release_versions:
   extends: .test_template
   script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) ${CI_PROJECT_DIR}
     - ./scripts/test_release_version.sh
 
-check_scripts_b58_prefix:
+oc.check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
   extends:

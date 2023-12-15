@@ -1,6 +1,6 @@
 include: .gitlab/ci/jobs/build/bin_packages_common.yml
 
-build:dpkg:amd64:
+oc.build:dpkg:amd64:
   extends:
     - .tags_template__build
     - .bin_packages_common
@@ -16,7 +16,7 @@ build:dpkg:amd64:
     paths:
       - octez-*.deb
 
-build:rpm:amd64:
+oc.build:rpm:amd64:
   extends:
     - .tags_template__build
     - .bin_packages_common

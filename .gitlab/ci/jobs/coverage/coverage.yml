@@ -4,11 +4,11 @@
 
 include: .gitlab/ci/jobs/coverage/common.yml
 
-unified_coverage:
+oc.unified_coverage:
   extends:
     - .default_settings_template
     - .image_template__runtime_e2etest_dependencies
-    - .template__coverage_report
+    - .oc.template__coverage_report
   rules:
     # We do not run this job when margebot triggers the
     # pipeline. Instead, the coverage traces are downloaded in the
@@ -99,9 +99,9 @@ unified_coverage:
     - "tezt-memory-4k 4/4"
     - "tezt-memory-3k 1/1"
     - "tezt-time-sensitive 1/1"
-    - "unit:non-proto-x86_64"
-    - "unit:proto-x86_64"
-    - "unit:other-x86_64"
+    - "oc.unit:non-proto-x86_64"
+    - "oc.unit:proto-x86_64"
+    - "oc.unit:other-x86_64"
   script:
     # On the development branches, we compute coverage.
     # TODO: https://gitlab.com/tezos/tezos/-/issues/6173

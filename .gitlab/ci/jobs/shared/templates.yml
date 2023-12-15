@@ -68,24 +68,24 @@
       when: on_success
 
 # Add variables for bisect_ppx instrumentation
-.template__coverage:
+.oc.template__coverage:
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
     SLACK_COVERAGE_CHANNEL: "C02PHBE7W73"
 
-.build_template:
+.oc.build_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
-    - .template__coverage
+    - .oc.template__coverage
   stage: build
   before_script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - . ./scripts/version.sh
 
-.kernels_template:
+.oc.kernels_template:
   extends:
     - .default_settings_template
     - .image_template__rust_toolchain

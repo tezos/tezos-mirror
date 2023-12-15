@@ -1,8 +1,8 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-docker:arm64:
+oc.docker:arm64:
   extends:
-    - .build_docker_release_template
+    - .oc.build_docker_release_template
     - .tags_template__build_arm64
   stage: build
   variables:

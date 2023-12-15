@@ -11,8 +11,8 @@ docker:merge_manifests:
     - .docker_auth_template
     - .image_template__docker
   needs:
-    - docker:amd64
-    - docker:arm64
+    - oc.docker:amd64
+    - oc.docker:arm64
   stage: prepare_release
   variables:
     CI_DOCKER_HUB: "false"

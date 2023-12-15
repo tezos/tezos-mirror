@@ -1,6 +1,6 @@
 test_kernels:
   extends:
-    - .kernels_template
+    - .oc.kernels_template
   stage: test
   needs: [trigger]
   dependencies: []
