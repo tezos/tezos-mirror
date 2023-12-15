@@ -21,9 +21,6 @@ open Rpc.Syntax
 
 let pvm_kind = "wasm_2_0_0"
 
-let evm_type =
-  "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
-
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
 let exchanger_path () =
