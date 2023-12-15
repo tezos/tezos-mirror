@@ -18,6 +18,7 @@ deployed. (!11225)
 ### Internal
 
 - Added support for multi-testing to the `evm-evaluation`. (!11223)
+- Blueprints are now stored, the Queue is simplified. New storage version (3). (!11131)
 
 ## Version 32f957d52ace920916d54b9f02a2d32ee30e16b3
 
