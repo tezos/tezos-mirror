@@ -18,22 +18,11 @@
 open Sc_rollup_helpers
 open Helpers
 open Rpc.Syntax
+open Contract_path
 
 let pvm_kind = "wasm_2_0_0"
 
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
-
-let exchanger_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/exchanger.tz")
-
-let bridge_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/evm_bridge.tz")
-
-let admin_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/admin.tz")
-
-let withdrawal_abi_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/withdrawal.abi")
 
 type l1_contracts = {exchanger : string; bridge : string; admin : string}
 
