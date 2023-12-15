@@ -26,8 +26,8 @@ use crate::ast::micheline::{
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
-use crate::gas;
 use crate::gas::OutOfGas;
+use crate::gas::{self, Gas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -1207,7 +1207,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(COMPARE, [], _), [.., u, t]) => {
-            ensure_ty_eq(ctx, t, u).map_err(|e| match e {
+            ensure_ty_eq(&mut ctx.gas, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -1237,7 +1237,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NIL, ..), _) => unexpected_micheline!(),
 
         (App(CONS, [], _), [.., T::List(ty1), ty2]) => {
-            ensure_ty_eq(ctx, ty1, ty2)?;
+            ensure_ty_eq(&mut ctx.gas, ty1, ty2)?;
             pop!();
             I::Cons
         }
@@ -1278,14 +1278,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
-            ensure_ty_eq(ctx, &ty, &ty_)?;
+            ensure_ty_eq(&mut ctx.gas, &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx, &map_tys.as_ref().0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.as_ref().0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
@@ -1296,7 +1296,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx, &map_tys.0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
@@ -1305,14 +1305,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
-            ensure_ty_eq(ctx, ty, ty_)?;
+            ensure_ty_eq(&mut ctx.gas, ty, ty_)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx, kty, kty_)?;
-            ensure_ty_eq(ctx, vty, vty_new)?;
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
@@ -1387,7 +1387,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PACK, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
-            ensure_ty_eq(ctx, ct, arg_t)?;
+            ensure_ty_eq(&mut ctx.gas, ct, arg_t)?;
             stack.drop_top(3);
             stack.push(T::Operation);
             I::TransferTokens
@@ -1458,7 +1458,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
             let lam_tys = pop!(T::Lambda);
-            ensure_ty_eq(ctx, &lam_tys.0, &ty)?;
+            ensure_ty_eq(&mut ctx.gas, &lam_tys.0, &ty)?;
             stack.push(lam_tys.1.clone());
             I::Exec
         }
@@ -1489,7 +1489,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     })
                 }
             };
-            ensure_ty_eq(ctx, &pair_ty.0, &ty)?;
+            ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -1533,7 +1533,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let lt = irrefutable_match!(&tickets.0; Type::Ticket);
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
-            ensure_ty_eq(ctx, lt, rt)?;
+            ensure_ty_eq(&mut ctx.gas, lt, rt)?;
             stack[0] = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
@@ -1719,7 +1719,7 @@ pub(crate) fn typecheck_contract_address(
 
             // if the entrypoint is present, check that it is of the required
             // type.
-            ensure_ty_eq(ctx, typ, contract_entrypoint_type)?;
+            ensure_ty_eq(&mut ctx.gas, typ, contract_entrypoint_type)?;
 
             Ok(Address {
                 entrypoint,
@@ -1806,11 +1806,8 @@ pub(crate) fn typecheck_value<'a>(
                     .map_err(TcError::LazyStorageError)?
                     .ok_or(TcError::BigMapNotFound(id))?;
 
-                // Clone to avoid conflicting borrows of ctx.
-                let key_type = &key_type.clone();
-                let value_type = &value_type.clone();
-                ensure_ty_eq(ctx, key_type, tk)?;
-                ensure_ty_eq(ctx, value_type, tv)?;
+                ensure_ty_eq(&mut ctx.gas, key_type, tk)?;
+                ensure_ty_eq(&mut ctx.gas, value_type, tv)?;
                 Some(big_map_id)
             } else {
                 None
@@ -2129,7 +2126,7 @@ fn unify_stacks(
                     ));
                 }
                 for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-                    ensure_ty_eq(ctx, ty1, ty2).map_err(|e| match e {
+                    ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
                         TcError::TypesNotEqual(e) => {
                             TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
                         }
@@ -2146,9 +2143,8 @@ fn unify_stacks(
     Ok(())
 }
 
-fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
-    ctx.gas
-        .consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
+fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
+    gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
         Err(TypesNotEqual(ty1.clone(), ty2.clone()).into())
     } else {
