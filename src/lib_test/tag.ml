@@ -32,3 +32,11 @@ let memory_3k = "memory_3k"
 let memory_4k = "memory_4k"
 
 let time_sensitive = "time_sensitive"
+
+let infrastructure = "infrastructure"
+
+let layer1 = "layer1"
+
+let tezos2 = "tezos2"
+
+let etherlink = "etherlink"
