@@ -2,6 +2,13 @@ check_precommit_hook:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
+  rules:
+    - changes:
+        paths:
+          - scripts/pre_commit/pre_commit.py
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   stage: test
   needs: [trigger]
   before_script:

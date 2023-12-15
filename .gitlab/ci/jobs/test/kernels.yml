@@ -14,3 +14,5 @@ test_kernels:
         - src/kernel_*/**/*
         - src/risc_v/**/*
         - etherlink/kernel_evm/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml

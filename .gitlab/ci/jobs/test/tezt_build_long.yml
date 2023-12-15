@@ -3,6 +3,7 @@
 tezt:build-long:
   extends:
     - .build_template
+    - .rules__octez_changes
   stage: test
   # Artificial needs for ordering.
   needs:

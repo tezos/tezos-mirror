@@ -5,6 +5,7 @@ tezt:fetch-records:
   extends:
     - .tags_template__build
     - .build_template
+    - .rules__octez_changes
   stage: build
   script:
     - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info

@@ -1,5 +1,7 @@
 .build:
-  extends: .build_template
+  extends:
+    - .build_template
+    - .rules__octez_changes
   variables:
     ARCH: ""
     # We fix the value of GIT_{SHORTREF,DATETIME,VERSION} (these are
@@ -28,6 +30,7 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
+    - .rules__octez_changes
   stage: build
   variables:
     ARCH: ""
@@ -45,5 +48,25 @@
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
     IMAGE_ARCH_PREFIX: ""
+  rules:
+      - if: '$CI_COMMIT_BRANCH == "master"'
+        when: on_success
+      - changes:
+          - scripts/**/*
+          - script-inputs/**/*
+          - src/**/*
+          - tezt/**/*
+          - vendors/**/*
+          - dune
+          - dune-project
+          - dune-workspace
+          - opam
+          - Makefile
+          - kernels.mk
+          - build.Dockerfile
+          - Dockerfile
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+        when: on_success
   script:
     - ./scripts/ci/docker_release.sh

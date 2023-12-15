@@ -46,6 +46,7 @@ tezt:static-binaries:
     - .default_settings_template
     - .image_template__runtime_e2etest_dependencies
     - .tezt_template
+    - .rules__octez_changes
   dependencies:
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
     # build_x86_64-exp-dev-extra

@@ -5,7 +5,9 @@ docker:amd64:
     - .build_docker_release_template
   stage: manual
   needs: []
-  when: manual
+  # override the rules inherited from .build_docker_release_template:
+  rules:
+  - when: manual
   variables:
     DOCKER_BUILD_TARGET: "with-evm-artifacts"
     IMAGE_ARCH_PREFIX: "amd64_"

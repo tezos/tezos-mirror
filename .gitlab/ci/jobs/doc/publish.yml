@@ -11,6 +11,7 @@ publish:documentation:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
+    - .rules__octez_docs_changes
   stage: doc
   # Make the publish_documentation run in the beginning of the master
   # pipeline to ensure it has time to run before the next merge.

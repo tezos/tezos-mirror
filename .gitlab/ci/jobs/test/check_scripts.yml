@@ -4,6 +4,7 @@
 
 # Note: this job actually probably doesn't need the build_x86_64 job
 # to have finished, but we don't want to start before build_x86_64 has finished either.
+# However, when build_x86_64-* don't exist, we don't need to wait for them.
 script:snapshot_alpha_and_link:
   extends:
     - .default_settings_template
@@ -12,8 +13,11 @@ script:snapshot_alpha_and_link:
   before_script:
     - . ./scripts/version.sh
   needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
+    - job: trigger
+    - job: "build_x86_64-released"
+      optional: true
+    - job: "build_x86_64-exp-dev-extra"
+      optional: true
   script:
     - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
   rules:
@@ -21,6 +25,8 @@ script:snapshot_alpha_and_link:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - src/proto_alpha/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
         - scripts/snapshot_alpha_and_link.sh
         - scripts/snapshot_alpha.sh
         - scripts/user_activated_upgrade.sh
@@ -33,6 +39,7 @@ script:test-gen-genesis:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
+    - .rules__octez_changes
   stage: test
   needs: [trigger]
   before_script:
@@ -54,6 +61,14 @@ check_scripts_b58_prefix:
     - .default_settings_template
     # Requires Python
     - .image_template__runtime_build_test_dependencies
+  rules:
+    - changes:
+        paths:
+          - scripts/b58_prefix/b58_prefix.py
+          - scripts/b58_prefix/test_b58_prefix.py
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   stage: test
   needs: [trigger]
   before_script:

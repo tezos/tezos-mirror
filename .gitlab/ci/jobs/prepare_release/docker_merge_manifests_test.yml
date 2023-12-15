@@ -2,10 +2,17 @@
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,
 # here we handle all architectures so there is no such variable.
+
 docker:merge_manifests:
+  # This job merges the images produced in the jobs
+  # docker:{amd64,arm64} into a single multi-architecture image, and
+  # so must be run after these jobs.
   extends:
     - .docker_auth_template
     - .image_template__docker
+  needs:
+    - docker:amd64
+    - docker:arm64
   stage: prepare_release
   variables:
     CI_DOCKER_HUB: "false"

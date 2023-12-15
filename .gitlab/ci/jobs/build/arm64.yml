@@ -14,7 +14,12 @@ include: .gitlab/ci/jobs/build/common.yml
     # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
       when: on_success
-    - when: manual
+    - changes:
+        paths:
+          - src/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: manual
       allow_failure: true
 
 # The build_arm64 jobs are split in two to keep the artifact size

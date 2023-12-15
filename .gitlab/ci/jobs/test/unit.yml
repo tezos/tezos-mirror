@@ -1,5 +1,7 @@
 .unit_test_template:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .rules__octez_changes
   variables:
     ARCH: ""
     MAKE_TARGETS: ""

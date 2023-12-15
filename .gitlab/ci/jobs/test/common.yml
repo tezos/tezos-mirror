@@ -3,6 +3,7 @@
     - .default_settings_template
     - .image_template__runtime_build_dependencies
     - .template__coverage
+    - .rules__octez_changes
   needs:
     - "build_x86_64-released"
     - "build_x86_64-exp-dev-extra"
@@ -13,7 +14,9 @@
 
 # Merge coverage files after the execution
 .template__coverage_files:
-  extends: .template__coverage
+  extends:
+    - .template__coverage
+    - .rules__octez_changes
   artifacts:
     name: "coverage-files-$CI_JOB_ID"
     paths:

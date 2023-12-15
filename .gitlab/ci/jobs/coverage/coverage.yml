@@ -15,7 +15,13 @@ unified_coverage:
     # master pipeline and the report is computed there.
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: never
-    - when: on_success
+    - changes:
+        paths:
+          - src/**/*
+          - tezt/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   variables:
     # This inhibites the Makefile's opam version check, which this
     # job's opam-less image cannot pass.
