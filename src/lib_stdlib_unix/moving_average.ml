@@ -49,11 +49,16 @@ type state = {
 }
 
 let worker_loop state () =
+  let to_ms x =
+    (* code duplicated from Time in lib_base *)
+    Int64.to_int
+      Mtime.Span.(Int64.unsigned_div (to_uint64_ns x) (to_uint64_ns ms))
+  in
   let rec inner sleep time_at_entry =
     let* () = sleep in
     let sleep = Lwt_unix.sleep state.refresh_interval in
     let now = Mtime_clock.elapsed () in
-    let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms time_at_entry) in
+    let elapsed = to_ms Mtime.Span.(abs_diff now time_at_entry) in
     Inttbl.iter
       (fun _ c ->
         c.average <-

@@ -88,7 +88,9 @@ let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
 
-let caqti_lwt = external_lib "caqti-lwt" V.True
+let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
+
+let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
 let caqti_dynload = external_lib "caqti-dynload" V.True
 
@@ -170,10 +172,10 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.7.2" && less_than "3.8.0")
+let irmin = external_lib "irmin" V.(at_least "3.8.0" && less_than "3.9.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.7.2" && less_than "3.8.0")
+  external_lib "irmin-pack" V.(at_least "3.8.0" && less_than "3.9.0")
 
 let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
@@ -205,11 +207,7 @@ let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 
-let mtime =
-  external_lib
-    ~js_compatible:true
-    "mtime"
-    V.(at_least "1.4.0" && less_than "2.0.0")
+let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "2.0.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
@@ -2141,6 +2139,7 @@ let octez_base =
         octez_event_logging |> open_;
         ptime;
         ptime_clock_os;
+        mtime;
         ezjsonm;
         lwt;
         ipaddr;
@@ -7493,7 +7492,7 @@ let _get_teztale_data =
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
-        caqti_lwt;
+        caqti_lwt_unix;
         caqti_dynload;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
@@ -7900,7 +7899,7 @@ let _octez_tps_evaluation =
         octez_base |> open_ ~m:"TzPervasives";
         caqti;
         caqti_dynload;
-        caqti_lwt;
+        caqti_lwt_unix;
         data_encoding;
         lwt;
         Protocol.(baking_exn alpha);

@@ -140,7 +140,7 @@
  (libraries
   octez-libs.base
   octez-libs.clic
-  caqti-lwt
+  caqti-lwt.unix
   caqti-dynload
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix)

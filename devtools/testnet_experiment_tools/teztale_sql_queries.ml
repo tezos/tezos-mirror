@@ -79,7 +79,7 @@ let get_canonical_chain_head_id_query =
        ) |}
 
 let get_canonical_chain_entries_query =
-  Caqti_request.Infix.(Caqti_type.int ->* Caqti_type.(tup2 int (option int)))
+  Caqti_request.Infix.(Caqti_type.int ->* Caqti_type.(t2 int (option int)))
     {| WITH canonical_chain AS (
          SELECT id, predecessor
          FROM blocks
@@ -100,7 +100,7 @@ let get_canonical_chain_entries_query =
    but which have a strictly smaller round *)
 let get_reorganised_blocks_entries_query =
   Caqti_request.Infix.(
-    Caqti_type.int ->* Caqti_type.(tup4 int block_hash int int))
+    Caqti_type.int ->* Caqti_type.(t4 int block_hash int int))
     {| SELECT b2.id, b2.hash, b2.level, b2.round
        FROM blocks b
        JOIN canonical_chain c ON b.id = c.block_id
@@ -109,20 +109,19 @@ let get_reorganised_blocks_entries_query =
          AND b.level <= ( SELECT level FROM blocks WHERE id = $1 ) |}
 
 let get_delegate_address_query =
-  Caqti_request.Infix.(
-    Caqti_type.unit ->* Caqti_type.(tup2 int public_key_hash))
+  Caqti_request.Infix.(Caqti_type.unit ->* Caqti_type.(t2 int public_key_hash))
     {| SELECT id, address
        FROM delegates |}
 
 (* Populate tables queries *)
 
 let insert_canonical_chain_entry_query =
-  Caqti_request.Infix.(Caqti_type.(tup2 int int ->. unit))
+  Caqti_request.Infix.(Caqti_type.(t2 int int ->. unit))
     {| INSERT INTO canonical_chain(block_id, predecessor) 
        VALUES ($1, $2) ON CONFLICT DO NOTHING |}
 
 let insert_reorganised_blocks_entry_query =
-  Caqti_request.Infix.(Caqti_type.(tup4 int string int int ->. unit))
+  Caqti_request.Infix.(Caqti_type.(t4 int string int int ->. unit))
     {| INSERT INTO reorganised_blocks(block_id, block_hash, level, round) 
        VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING |}
 
@@ -132,7 +131,7 @@ let insert_baker_nodes_entry_query =
        VALUES ($1) ON CONFLICT DO NOTHING |}
 
 let insert_delegates_of_baker_entry_query =
-  Caqti_request.Infix.(Caqti_type.(tup2 string int ->. unit))
+  Caqti_request.Infix.(Caqti_type.(t2 string int ->. unit))
     {| INSERT INTO delegates_of_baker(baker_id, delegate_id) 
        VALUES (
          (SELECT id FROM baker_nodes WHERE pod_name = $1), 

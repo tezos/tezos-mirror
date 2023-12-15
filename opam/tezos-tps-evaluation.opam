@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "caqti"
   "caqti-dynload"
-  "caqti-lwt"
+  "caqti-lwt" { >= "2.0.1" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt" { >= "5.7.0" }
   "octez-protocol-alpha-libs"

@@ -131,7 +131,7 @@ let reporter () =
       k ()
     in
     let with_stamp h _tags k fmt =
-      let dt = Mtime.Span.to_us (Mtime_clock.elapsed ()) in
+      let dt = Time.Monotonic.Span.to_float_us (Mtime_clock.elapsed ()) in
       Fmt.kpf
         k
         Fmt.stderr

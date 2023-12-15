@@ -15,8 +15,8 @@ depends: [
   "tezos-dac-lib"
   "tezos-dac-node-lib"
   "octez-l2-libs"
-  "irmin-pack" { >= "3.7.2" & < "3.8.0" }
-  "irmin" { >= "3.7.2" & < "3.8.0" }
+  "irmin-pack" { >= "3.8.0" & < "3.9.0" }
+  "irmin" { >= "3.8.0" & < "3.9.0" }
   "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
 ]

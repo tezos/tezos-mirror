@@ -47,7 +47,7 @@ let index_log_size = 2_500_000
 (* Caps the number of entries stored in the Irmin's LRU cache. As a
    trade-off, increasing this value will increase the memory
    consumption.*)
-let lru_size = 5_000
+let lru_size = 15_000
 
 (* This limit ensures that no trees with more than [auto_flush]
    mutations can exist in memory, bounding the memory usage of a

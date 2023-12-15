@@ -800,7 +800,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       let*! () = save_injected_operations cctxt state in
       stat_on_exit cctxt state
     else
-      let start = Mtime_clock.elapsed () in
+      let start = Mtime_clock.counter () in
       let*! () =
         log Debug (fun () ->
             cctxt#message "launch.loop: invoke sample_transfer")
@@ -814,8 +814,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       in
       let* () = inject_transfer cctxt parameters state transfer in
       incr injected ;
-      let stop = Mtime_clock.elapsed () in
-      let elapsed = Mtime.Span.(to_s stop -. to_s start) in
+      let elapsed = Time.Monotonic.Span.to_float_s (Mtime_clock.count start) in
       let remaining = dt -. elapsed in
       let*! () =
         if remaining <= 0.0 then
