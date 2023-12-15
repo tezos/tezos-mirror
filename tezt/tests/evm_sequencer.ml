@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Sc_rollup_helpers
+open Rpc.Syntax
 
 (** Renaming the helper to avoid confusion on its behavior. *)
 let next_rollup_node_level = Helpers.next_evm_level
@@ -72,7 +73,7 @@ let test_persistent_state =
   (* Sleep to let the sequencer produce some blocks. *)
   let* () = Lwt_unix.sleep 20. in
   (* Ask for the current block. *)
-  let* block_number = Rpc.block_number evm_node in
+  let*@ block_number = Rpc.block_number evm_node in
   Check.is_true
     ~__LOC__
     (block_number > 0l)
@@ -85,7 +86,7 @@ let test_persistent_state =
      that the block number is exactly the same as {!block_number} can
      be flaky if a block is produced between the restart and the
      RPC. *)
-  let* new_block_number = Rpc.block_number evm_node in
+  let*@ new_block_number = Rpc.block_number evm_node in
   Check.is_true
     ~__LOC__
     (new_block_number >= block_number)
@@ -108,7 +109,7 @@ let test_publish_blueprints =
   (* Sleep to let the sequencer produce some blocks. *)
   let* () = Lwt_unix.sleep 20. in
   (* Ask for the current block. *)
-  let* sequencer_head = Rpc.block_number evm_node in
+  let*@ sequencer_head = Rpc.block_number evm_node in
   (* Stop the EVM node. *)
   let* () = Evm_node.terminate evm_node in
 
@@ -125,7 +126,7 @@ let test_publish_blueprints =
   let* proxy_evm =
     Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let* rollup_head = Rpc.block_number proxy_evm in
+  let*@ rollup_head = Rpc.block_number proxy_evm in
   Check.((sequencer_head = rollup_head) int32)
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit

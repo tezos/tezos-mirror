@@ -17,6 +17,7 @@
 *)
 open Sc_rollup_helpers
 open Helpers
+open Rpc.Syntax
 
 let pvm_kind = "wasm_2_0_0"
 
@@ -178,7 +179,7 @@ let wait_for_application ~evm_node ~sc_rollup_node ~node ~client apply () =
       match Evm_node.mode evm_node with
       | Proxy _ -> next_evm_level ~sc_rollup_node ~node ~client
       | Sequencer _ ->
-          let* head = Rpc.block_number evm_node in
+          let*@ head = Rpc.block_number evm_node in
           return (Int32.to_int head)
     in
     if start_level + max_iteration < new_level then
@@ -1619,7 +1620,7 @@ let test_simulate =
       let* {evm_node; sc_rollup_node; _} =
         setup_past_genesis ~admin:None protocol
       in
-      let* block_number = Rpc.block_number evm_node in
+      let*@ block_number = Rpc.block_number evm_node in
       let* simulation_result =
         Sc_rollup_node.RPC.call sc_rollup_node
         @@ Sc_rollup_rpc.post_global_block_simulate
@@ -1815,7 +1816,7 @@ let test_inject_100_transactions =
         ~error_msg:"Expected %R transactions in the latest block, got %L") ;
 
   let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-  let* latest_evm_level = Rpc.block_number evm_node in
+  let*@ latest_evm_level = Rpc.block_number evm_node in
   (* At each loop, the kernel reads the previous block. Until the patch, the
      kernel failed to read the previous block if there was more than 64 hash,
      this test ensures it works by assessing new blocks are produced. *)
