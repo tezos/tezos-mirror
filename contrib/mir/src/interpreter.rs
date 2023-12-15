@@ -880,6 +880,15 @@ fn interpret_one<'a>(
                     Some(val) => map.insert(key, *val),
                 };
             }
+            overloads::Update::BigMap => {
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let map = irrefutable_match!(&mut stack[0]; V::BigMap);
+                // the protocol intentionally uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_update(&key, map.overlay.len())?)?;
+                map.update(key, opt_new_val.map(|x| *x));
+            }
         },
         I::Size(overload) => {
             macro_rules! run_size {
@@ -2969,6 +2978,86 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(2)]);
+    }
+
+    #[test]
+    fn update_big_map() {
+        fn check<'a>(
+            content: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            overlay: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            new_value: Option<TypedValue<'a>>,
+            result: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+        ) {
+            let mut ctx = Ctx::default();
+            let id = ctx
+                .big_map_storage
+                .big_map_new(&Type::Int, &Type::String)
+                .unwrap();
+            ctx.big_map_storage
+                .big_map_bulk_update(&id, content)
+                .unwrap();
+            let big_map = BigMap {
+                id: Some(id.clone()),
+                overlay: overlay.into_iter().collect(),
+                key_type: Type::Int,
+                value_type: Type::String,
+            };
+            let mut stack = stk![
+                TypedValue::BigMap(big_map),
+                TypedValue::new_option(new_value),
+                TypedValue::int(1)
+            ];
+            assert_eq!(
+                interpret_one(&Update(overloads::Update::BigMap), &mut ctx, &mut stack),
+                Ok(())
+            );
+            assert_eq!(
+                stack,
+                stk![TypedValue::BigMap(BigMap {
+                    id: Some(id),
+                    overlay: result.into_iter().collect(),
+                    key_type: Type::Int,
+                    value_type: Type::String,
+                })]
+            );
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        // insert
+        check(
+            [],
+            [],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // remove in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            None,
+            [(TypedValue::int(1), None)],
+        );
+        // remove in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            None,
+            [(TypedValue::int(1), None)],
+        );
     }
 
     #[test]

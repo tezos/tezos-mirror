@@ -90,6 +90,7 @@ pub enum Get {
 pub enum Update {
     Set,
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

@@ -1366,6 +1366,13 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
+        (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            stack.drop_top(2);
+            I::Update(overloads::Update::BigMap)
+        }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -4188,6 +4195,20 @@ mod typecheck_tests {
             Ok(Update(overloads::Update::Map))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
+    }
+
+    #[test]
+    fn update_big_map() {
+        let mut stack = tc_stk![
+            Type::new_big_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Update(overloads::Update::BigMap))
+        );
+        assert_eq!(stack, tc_stk![Type::new_big_map(Type::Int, Type::String)]);
     }
 
     #[test]
