@@ -16,6 +16,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 open Sc_rollup_helpers
+open Helpers
 
 let pvm_kind = "wasm_2_0_0"
 
@@ -143,13 +144,6 @@ let check_storage_size sc_rollup_client ~address size =
   Check.((storage_size = size) int)
     ~error_msg:"Unexpected storage size, should be %R, but is %L" ;
   unit
-
-(** [next_evm_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
-    the [node]'s next level. *)
-let next_evm_level ~sc_rollup_node ~node ~client =
-  let* () = Client.bake_for_and_wait client in
-  let* level = Node.get_level node in
-  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]

@@ -47,9 +47,9 @@ let create ~smart_rollup_address ~number ~transactions =
     List [Value chunk; number] |> encode |> Bytes.to_string
   in
   [
-    "\001" (* External message *) ^ "\000"
-    (* Framed protocol *) ^ smart_rollup_address
-    ^ "\003"
-    ^ (* Sequencer blueprint *)
-    rlp_sequencer_blueprint;
+    `External
+      ("\000" (* Framed protocol *) ^ smart_rollup_address
+      ^ "\003"
+      ^ (* Sequencer blueprint *)
+      rlp_sequencer_blueprint);
   ]
