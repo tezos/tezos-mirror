@@ -103,7 +103,7 @@ fn read_last_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     read_u256_default(host, EVM_LAST_BLUEPRINT.into(), U256::max_value())
 }
 
-fn store_last_blueprint_number<Host: Runtime>(
+pub fn store_last_blueprint_number<Host: Runtime>(
     host: &mut Host,
     number: U256,
 ) -> Result<(), Error> {
@@ -151,7 +151,6 @@ fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     }
 }
 
-#[allow(dead_code)]
 pub fn read_next_blueprint<Host: Runtime>(
     host: &Host,
 ) -> Result<Option<Blueprint>, Error> {

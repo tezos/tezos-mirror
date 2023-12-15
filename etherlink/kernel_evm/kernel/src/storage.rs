@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
-use crate::blueprint::Queue;
 use crate::indexable_storage::IndexableStorage;
+use crate::reboot_context::RebootContext;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -27,7 +27,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 2;
+pub const STORAGE_VERSION: u64 = 3;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const SMART_ROLLUP_ADDRESS: RefPath =
@@ -99,8 +99,8 @@ const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
-// Path to the queue left at end of previous reboot
-const QUEUE_IN_PROGRESS: RefPath = RefPath::assert_from(b"/queue");
+// Path to the reboot context at end of previous reboot
+const REBOOT_CONTEXT: RefPath = RefPath::assert_from(b"/reboot_context");
 
 // Path to the flag denoting whether the kernel is in sequencer mode or not.
 const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
@@ -827,25 +827,37 @@ pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
     Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
 }
 
-pub fn store_queue<Host: Runtime>(
+pub fn store_reboot_context<Host: Runtime>(
     host: &mut Host,
-    queue: &Queue,
+    reboot_context: &RebootContext,
 ) -> Result<(), anyhow::Error> {
-    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
-    let bytes = &queue.rlp_bytes();
-    log!(host, Debug, "Storing Queue of size {}", bytes.len());
-    host.store_write_all(&queue_path, bytes)
-        .context("Failed to store current queue")
+    let path = OwnedPath::from(REBOOT_CONTEXT);
+    let bytes = &reboot_context.rlp_bytes();
+    log!(
+        host,
+        Debug,
+        "Storing Reboot Context of size {}",
+        bytes.len()
+    );
+    host.store_write_all(&path, bytes)
+        .context("Failed to store current reboot context")
 }
 
-pub fn read_queue<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
-    let queue_path = OwnedPath::from(QUEUE_IN_PROGRESS);
+pub fn read_reboot_context<Host: Runtime>(
+    host: &Host,
+) -> Result<RebootContext, anyhow::Error> {
+    let reboot_context_path = OwnedPath::from(REBOOT_CONTEXT);
     let bytes = host
-        .store_read_all(&queue_path)
-        .context("Failed to read current queue")?;
-    log!(host, Debug, "Reading Queue of size {}", bytes.len());
+        .store_read_all(&reboot_context_path)
+        .context("Failed to read current reboot context")?;
+    log!(
+        host,
+        Debug,
+        "Reading Reboot Context of size {}",
+        bytes.len()
+    );
     let decoder = Rlp::new(bytes.as_slice());
-    Queue::decode(&decoder).context("Failed to decode current queue")
+    RebootContext::decode(&decoder).context("Failed to decode current reboot context")
 }
 
 pub(crate) mod internal_for_tests {
