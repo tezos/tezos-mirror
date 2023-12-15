@@ -260,6 +260,7 @@ mod tztrunner_tests {
     const TZT_SAMPLE_IMPLICIT_PARAMETER: &str = r#"
       code SELF;
       input {};
+      self "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
       output { Stack_elt (contract unit) "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" }
     "#;
 }
