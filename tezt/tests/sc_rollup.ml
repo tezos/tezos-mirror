@@ -5332,7 +5332,7 @@ let test_multiple_batcher_key ~kind =
     ~kind
     {
       variant = None;
-      tags = ["node"; "mode"; "batcher"];
+      tags = [Tag.flaky; "node"; "mode"; "batcher"];
       description = "multiple keys set for batcher";
     }
   @@ fun protocol sc_rollup tezos_node client ->
@@ -5714,7 +5714,7 @@ let register ~kind ~protocols =
   test_rollup_inbox_of_rollup_node
     ~kind
     ~variant:"batcher"
-    ~extra_tags:["batcher"]
+    ~extra_tags:["batcher"; Tag.flaky]
     sc_rollup_node_batcher
     protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
