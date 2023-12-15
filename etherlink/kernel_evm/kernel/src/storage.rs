@@ -622,7 +622,7 @@ pub fn store_last_info_per_level_timestamp<Host: Runtime>(
 }
 
 pub fn read_timestamp_path<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
     path: &OwnedPath,
 ) -> Result<Timestamp, Error> {
     let mut buffer = [0u8; 8];
@@ -632,7 +632,7 @@ pub fn read_timestamp_path<Host: Runtime>(
 }
 
 pub fn read_last_info_per_level_timestamp<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
@@ -672,10 +672,7 @@ pub fn index_account(
     }
 }
 
-fn read_b58_kt1<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-) -> Option<ContractKt1Hash> {
+fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
     let mut buffer = [0; 36];
     store_read_slice(host, path, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
