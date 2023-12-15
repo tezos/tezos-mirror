@@ -166,6 +166,24 @@ let publish :
   in
   return_unit
 
+let durable_state_subkeys :
+    ( [`GET],
+      unit,
+      unit * Block_id.t,
+      state_value_query,
+      unit,
+      string list option )
+    Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve subkeys by key from PVM durable storage. PVM state is taken \
+       with respect to the specified block level. Value returned in hex \
+       format."
+    ~query:state_value_query
+    ~output:Data_encoding.(option (list string))
+    (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
+   / "subkeys")
+
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)
 let smart_rollup_address base =
