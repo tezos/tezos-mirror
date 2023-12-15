@@ -1,3 +1,10 @@
-code { APPLY } ;
-input { Stack_elt string "Hi" ; Stack_elt (lambda (pair string int) nat) { DROP ; PUSH nat 1 } } ;
-output { Stack_elt (lambda int nat) { PUSH string "Hi" ; PAIR ; { DROP ; PUSH nat 1 } } }
+code APPLY;
+input
+  {
+    Stack_elt string "Hi" ;
+    Stack_elt (lambda (pair string int) nat) { DROP ; PUSH nat 1 } ;
+  } ;
+output
+  {
+    Stack_elt (lambda int nat) { PUSH string "Hi" ; PAIR ; { DROP ; PUSH nat 1 } }
+  }

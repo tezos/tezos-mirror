@@ -8,6 +8,8 @@ Nairobi.
 ### `APPLY`
 
 - [apply_00.tzt](apply_00.tzt)
+- [apply_01.tzt](apply_01.tzt)
+- [apply_02.tzt](apply_02.tzt)
 
 Does not check the behavior that the values that are not both pushable and
 storable cannot be captured.
