@@ -1384,6 +1384,13 @@ pub(crate) fn typecheck_instruction<'a>(
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::Map)
         }
+        (App(GET_AND_UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            pop!();
+            I::GetAndUpdate(overloads::GetAndUpdate::BigMap)
+        }
         (App(GET_AND_UPDATE, [], _), [.., _, _, _]) => no_overload!(GET_AND_UPDATE),
         (App(GET_AND_UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(GET_AND_UPDATE, len 3),
         (App(GET_AND_UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -4273,6 +4280,30 @@ mod typecheck_tests {
             stack,
             tc_stk![
                 Type::new_map(Type::Int, Type::String),
+                Type::new_option(Type::String)
+            ]
+        );
+    }
+
+    #[test]
+    fn get_and_update_big_map() {
+        let mut stack = tc_stk![
+            Type::new_big_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(GetAndUpdate(overloads::GetAndUpdate::BigMap))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::new_big_map(Type::Int, Type::String),
                 Type::new_option(Type::String)
             ]
         );

@@ -96,6 +96,7 @@ pub enum Update {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum GetAndUpdate {
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

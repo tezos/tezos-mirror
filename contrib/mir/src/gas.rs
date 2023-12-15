@@ -643,6 +643,10 @@ pub mod interpret_cost {
         // reflect update vs get overhead, but it seems like an overestimation,
         // get_and_update should cost almost exactly the same as update, any
         // observable difference would be in the constant term.
+        //
+        // However, note that this function is also reused for big_map version
+        // of GET_AND_UPDATE, wherein it's more justified. That is to say, take
+        // care when updating this.
         (80 + 3 * lookup_cost).as_gas_cost()
     }
 
