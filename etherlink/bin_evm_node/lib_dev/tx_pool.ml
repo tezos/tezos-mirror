@@ -17,16 +17,22 @@ module Pool = struct
   }
 
   type t = {
+    delayed_transactions : Ethereum_types.Delayed_transaction.t list;
     transactions : transaction Nonce_map.t Pkey_map.t;
     global_index : int64; (* Index to order the transactions. *)
   }
 
-  let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
+  let empty : t =
+    {
+      transactions = Pkey_map.empty;
+      global_index = Int64.zero;
+      delayed_transactions = [];
+    }
 
-  (** Add a transacion to the pool.*)
+  (** Add a transaction to the pool.*)
   let add t pkey base_fee raw_tx =
     let open Result_syntax in
-    let {transactions; global_index} = t in
+    let {transactions; global_index; delayed_transactions} = t in
     let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
     let transaction = {index = global_index; raw_tx; gas_price} in
@@ -51,7 +57,18 @@ module Pool = struct
                    user_transactions))
         transactions
     in
-    return {transactions; global_index = Int64.(add global_index one)}
+    return
+      {
+        transactions;
+        global_index = Int64.(add global_index one);
+        delayed_transactions;
+      }
+
+  (** Add a delayed transacion to the pool.*)
+  let add_delayed t tx =
+    let open Result_syntax in
+    let delayed_transactions = tx :: t.delayed_transactions in
+    return {t with delayed_transactions}
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -59,7 +76,8 @@ module Pool = struct
 
   (** Returns the transaction matching the predicate.
       And remove them from the pool. *)
-  let partition pkey predicate {transactions; global_index} =
+  let partition pkey predicate
+      {transactions; global_index; delayed_transactions} =
     (* Get the sequence of transaction *)
     let selected, remaining =
       transactions |> Pkey_map.find pkey
@@ -73,7 +91,7 @@ module Pool = struct
     in
     (* Convert the sequence to a list *)
     let selected = selected |> Nonce_map.bindings |> List.map snd in
-    (selected, {transactions; global_index})
+    (selected, {transactions; global_index; delayed_transactions})
 
   (** Removes from the pool the transactions matching the predicate
       for the given pkey. *)
@@ -85,7 +103,7 @@ module Pool = struct
       Returns the given nonce if the user does not have any transactions in the pool. *)
   let next_nonce pkey current_nonce (t : t) =
     let open Ethereum_types in
-    let {transactions; global_index = _} = t in
+    let ({transactions; _} : t) = t in
     (* Retrieves the list of transactions for a given user. *)
     let user_transactions =
       Pkey_map.find pkey transactions
@@ -112,7 +130,9 @@ type parameters = {
   mode : mode;
 }
 
-type add_transaction = Transaction of string
+type add_transaction =
+  | Transaction of string
+  | Delayed of Ethereum_types.Delayed_transaction.t
 
 let add_transaction_encoding =
   let open Data_encoding in
@@ -122,8 +142,14 @@ let add_transaction_encoding =
         (Tag 0)
         ~title:"transaction"
         string
-        (function Transaction transaction -> Some transaction)
+        (function Transaction transaction -> Some transaction | _ -> None)
         (function transaction -> Transaction transaction);
+      case
+        (Tag 1)
+        ~title:"delayed"
+        Ethereum_types.Delayed_transaction.encoding
+        (function Delayed delayed -> Some delayed | _ -> None)
+        (fun delayed -> Delayed delayed);
     ]
 
 module Types = struct
@@ -195,7 +221,16 @@ module Request = struct
     | Add_transaction transaction -> (
         match transaction with
         | Transaction tx_raw ->
-            Format.fprintf ppf "Add tx [%s] to tx-pool" tx_raw)
+            Format.fprintf
+              ppf
+              "Add tx [%s] to tx-pool"
+              (Hex.of_string tx_raw |> Hex.show)
+        | Delayed delayed ->
+            Format.fprintf
+              ppf
+              "Add tx [%a] to tx-pool"
+              Ethereum_types.Delayed_transaction.pp_short
+              delayed)
     | Inject_transactions (force, timestamp) ->
         Format.fprintf
           ppf
@@ -237,9 +272,22 @@ let on_normal_transaction state tx_raw =
       state.pool <- pool ;
       return (Ok hash)
 
+let on_delayed_transaction state delayed_tx =
+  let open Lwt_result_syntax in
+  let open Types in
+  let {rollup_node = (module Rollup_node); pool; _} = state in
+  let open Ethereum_types.Delayed_transaction in
+  let {hash; _} = delayed_tx in
+  (* Add the tx to the pool*)
+  let*? pool = Pool.add_delayed pool (Transaction delayed_tx) in
+  state.pool <- pool ;
+  return (Ok hash)
+
 let on_transaction state transaction =
   match transaction with
   | Transaction transaction -> on_normal_transaction state transaction
+  | Delayed (Transaction delayed_transaction) ->
+      on_delayed_transaction state delayed_transaction
 
 let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     =
@@ -297,8 +345,12 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
   in
 
-  let n = List.length txs in
+  let n = List.length txs + List.length pool.delayed_transactions in
 
+  (* Add delayed transactions and empty the list *)
+  let delayed, pool =
+    (pool.delayed_transactions, {pool with delayed_transactions = []})
+  in
   if n > 0 || force then
     (* Send the txs to the rollup *)
     let*! hashes =
@@ -306,7 +358,7 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
         ~timestamp
         ~smart_rollup_address
         ~transactions:txs
-        ~delayed:[]
+        ~delayed
     in
     let* nb_transactions =
       match hashes with
@@ -456,6 +508,14 @@ let add raw_tx =
   Worker.Queue.push_request_and_wait
     w
     (Request.Add_transaction (Transaction raw_tx))
+  |> handle_request_error
+
+let add_delayed delayed =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    w
+    (Request.Add_transaction (Delayed delayed))
   |> handle_request_error
 
 let nonce pkey =
