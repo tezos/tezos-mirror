@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 
 use crate::{
-    inbox::{Transaction, TransactionContent},
+    inbox::{Deposit, Transaction, TransactionContent},
     linked_list::LinkedList,
 };
 use anyhow::Result;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
-    transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    rlp_helpers::FromRlpBytes, transaction::TRANSACTION_HASH_SIZE,
+    tx_common::EthereumTransactionCommon,
 };
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 
@@ -15,8 +16,11 @@ pub struct DelayedInbox(LinkedList<Hash, DelayedTransaction>);
 
 pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
 
-// Tags that indicates the delayed transaction is a eth transaction.
+// Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x00;
+
+// Tag that indicates the delayed transaction is a deposit.
+pub const DELAYED_DEPOSIT_TAG: u8 = 0x01;
 
 /// Hash of a transaction
 ///
@@ -47,12 +51,13 @@ impl AsRef<[u8]> for Hash {
 }
 
 /// Delayed transaction
-/// Later it might be turn into a struct
+/// Later it might be turned into a struct
 /// And fields like the timestamp might be added
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum DelayedTransaction {
     Ethereum(EthereumTransactionCommon),
+    Deposit(Deposit),
 }
 
 impl Encodable for DelayedTransaction {
@@ -62,6 +67,10 @@ impl Encodable for DelayedTransaction {
             DelayedTransaction::Ethereum(delayed_tx) => {
                 stream.append(&DELAYED_TRANSACTION_TAG);
                 stream.append(&delayed_tx.to_bytes());
+            }
+            DelayedTransaction::Deposit(delayed_deposit) => {
+                stream.append(&DELAYED_DEPOSIT_TAG);
+                stream.append(delayed_deposit);
             }
         }
     }
@@ -83,6 +92,11 @@ impl Decodable for DelayedTransaction {
                 let delayed_tx = EthereumTransactionCommon::from_bytes(&payload)?;
                 Ok(Self::Ethereum(delayed_tx))
             }
+            DELAYED_DEPOSIT_TAG => {
+                let payload: Vec<u8> = payload.as_val()?;
+                let delayed_tx = FromRlpBytes::from_rlp_bytes(&payload)?;
+                Ok(DelayedTransaction::Deposit(delayed_tx))
+            }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
     }
@@ -102,10 +116,7 @@ impl DelayedInbox {
         let Transaction { tx_hash, content } = tx;
         let delayed_transaction = match content {
             TransactionContent::Ethereum(tx) => DelayedTransaction::Ethereum(tx),
-            _ => {
-                // not yet supported
-                return Ok(());
-            }
+            TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
         };
         self.0.push(host, &Hash(tx_hash), &delayed_transaction)?;
         Ok(())
