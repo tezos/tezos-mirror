@@ -99,7 +99,7 @@ val empty : 'a index -> 'a t
 val is_empty : _ t -> bool
 
 (** [split ctxt] creates a new suffix file, also called "chunk", into the
-    irmin's file hierarchy. This split function is expected to be called after
+    Irmin's file hierarchy. This split function is expected to be called after
     committing a commit that will be a future candidate for a GC target.  *)
 val split : _ index -> unit
 

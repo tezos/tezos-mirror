@@ -34,8 +34,8 @@ open Context_sigs
 type ('repo, 'tree) pvm_context_impl =
   (module Context_sigs.S with type repo = 'repo and type tree = 'tree)
 
-(* Context existential that embeds the context_module embedded
-   associated to pvm protocol_plugins *)
+(* Context existential that embeds the context_module associated to
+   pvm protocol_plugins *)
 
 (** See {!module:Tezos_protocol_environment.Environement_context.t} *)
 type 'a t = private
@@ -69,9 +69,10 @@ val equiv :
 
 type hash = Smart_rollup_context_hash.t
 
-(** [load cache_size path] initializes from disk a context from [path].
-    [cache_size] allows to change the LRU cache size of Irmin
-    (100_000 by default at irmin-pack/config.ml *)
+(** [load cache_size path] initializes from disk a context from
+    [path]. [cache_size] allows to change size of the Context Backend
+    in use (for instance, the LRU cache size of Irmin (100_000 by
+    default at irmin-pack/config.ml) *)
 val load :
   ('repo, 'tree) pvm_context_impl ->
   cache_size:int ->
@@ -105,8 +106,8 @@ val commit : ?message:string -> [`Read | `Write] t -> hash Lwt.t
     if a GC is running for [index]. *)
 val is_gc_finished : [`Read | `Write] t -> bool
 
-(** [split ctxt] creates a new suffix file, also called "chunk", into the
-    irmin's file hierarchy. This split function is expected to be called after
+(** [split ctxt] creates a new suffix file, also called "chunk", into the context's
+    file hierarchy. This split function is expected to be called after
     committing a commit that will be a future candidate for a GC target.  *)
 val split : _ t -> unit
 

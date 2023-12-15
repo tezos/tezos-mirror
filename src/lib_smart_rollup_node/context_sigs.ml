@@ -89,9 +89,10 @@ module type S = sig
 
   type hash = Smart_rollup_context_hash.t
 
-  (** [load cache_size path] initializes from disk a context from [path].
-    [cache_size] allows to change the LRU cache size of Irmin
-    (100_000 by default at irmin-pack/config.ml *)
+  (** [load cache_size path] initializes from disk a context from
+    [path]. [cache_size] allows to change size of the Context Backend
+    in use (for instance, the LRU cache size of Irmin (100_000 by
+    default at irmin-pack/config.ml) *)
   val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
 
   (** [index context] is the repository of the context [context]. *)
