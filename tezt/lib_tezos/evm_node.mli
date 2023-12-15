@@ -61,9 +61,10 @@ val create :
   string ->
   t
 
-(** [run evm_node] launches the EVM node server with the arguments
-    given during {!create}. *)
-val run : t -> unit Lwt.t
+(** [run ?extra_arguments evm_node] launches the EVM node server with
+    the arguments given during {!create}, additiona arguments can be
+    passed via [extra_arguments]. *)
+val run : ?extra_arguments:string list -> t -> unit Lwt.t
 
 (** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
@@ -77,8 +78,9 @@ val init :
   string ->
   t Lwt.t
 
-(** [spawn_run evm_node] same as {!run} but spawns a process. *)
-val spawn_run : t -> Process.t
+(** [spawn_run ?extra_arguments evm_node] same as {!run} but spawns a
+    process. *)
+val spawn_run : ?extra_arguments:string list -> t -> Process.t
 
 (** Send SIGTERM and wait for the process to terminate.
 
