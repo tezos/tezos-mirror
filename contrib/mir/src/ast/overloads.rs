@@ -82,6 +82,7 @@ pub enum Neg {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

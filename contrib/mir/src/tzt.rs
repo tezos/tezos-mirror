@@ -339,7 +339,7 @@ pub enum TztOutput<'a> {
 
 fn execute_tzt_test_code<'a>(
     code: Micheline<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     arena: &'a Arena<Micheline<'a>>,
     m_parameter: Option<Entrypoints>,
     input: Vec<(Type, TypedValue<'a>)>,

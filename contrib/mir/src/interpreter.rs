@@ -12,7 +12,7 @@ use num_traits::{Signed, Zero};
 use std::rc::Rc;
 use typed_arena::Arena;
 
-use crate::ast::big_map::BigMap;
+use crate::ast::big_map::{BigMap, LazyStorageError};
 use crate::ast::*;
 use crate::bls;
 use crate::context::Ctx;
@@ -29,6 +29,8 @@ pub enum InterpretError<'a> {
     MutezOverflow,
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
+    #[error("lazy storage error: {0}")]
+    LazyStorageError(#[from] LazyStorageError),
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -51,7 +53,7 @@ impl<'a> ContractScript<'a> {
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
-        ctx: &mut crate::context::Ctx,
+        ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
         storage: Micheline<'a>,
@@ -87,7 +89,7 @@ impl<'a> Instruction<'a> {
     /// When the instruction can't be executed on the provided stack.
     pub fn interpret(
         &self,
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
@@ -97,7 +99,7 @@ impl<'a> Instruction<'a> {
 
 fn interpret<'a>(
     ast: &[Instruction<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
@@ -117,7 +119,7 @@ fn unreachable_state() -> ! {
 
 fn interpret_one<'a>(
     i: &Instruction<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
@@ -835,6 +837,15 @@ fn interpret_one<'a>(
                 let result = map.get(&key);
                 stack.push(V::new_option(result.cloned()));
             }
+            overloads::Get::BigMap => {
+                let key = pop!();
+                let map = pop!(V::BigMap);
+                // the protocol intentionally uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_get(&key, map.overlay.len())?)?;
+                let result = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                stack.push(V::new_option(result));
+            }
         },
         I::Update(overload) => match overload {
             overloads::Update::Set => {
@@ -1235,6 +1246,7 @@ mod interpreter_tests {
 
     use super::*;
     use super::{Lambda, Or};
+    use crate::ast::big_map::InMemoryLazyStorage;
     use crate::ast::michelson_address as addr;
     use crate::bls;
     use crate::gas::Gas;
@@ -1250,7 +1262,7 @@ mod interpreter_tests {
 
     fn interpret<'a>(
         ast: &[Instruction<'a>],
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -1259,7 +1271,7 @@ mod interpreter_tests {
 
     fn interpret_one<'a>(
         i: &Instruction<'a>,
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -2509,6 +2521,49 @@ mod interpreter_tests {
             Gas::default().milligas()
                 - interpret_cost::map_get(&V::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn get_big_map() {
+        // overlay semantics are tested in big_map module, here we only check
+        // the interpreter works
+        let mut ctx = Ctx::default();
+        ctx.big_map_storage = Box::new(InMemoryLazyStorage::new());
+        let big_map_id = ctx
+            .big_map_storage
+            .big_map_new(&Type::Int, &Type::String)
+            .unwrap();
+        ctx.big_map_storage
+            .big_map_update(
+                &big_map_id,
+                TypedValue::int(1),
+                Some(TypedValue::String("foo".to_owned())),
+            )
+            .unwrap();
+        let big_map = BigMap {
+            id: Some(big_map_id),
+            overlay: BTreeMap::from([(
+                TypedValue::int(2),
+                Some(TypedValue::String("bar".to_owned())),
+            )]),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut stack = stk![TypedValue::BigMap(big_map), TypedValue::int(1)];
+        assert_eq!(
+            interpret_one(&Get(overloads::Get::BigMap), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::new_option(Some(TypedValue::String(
+                "foo".to_owned()
+            )))]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get(&TypedValue::int(1), 1).unwrap()
         );
     }
 
