@@ -884,7 +884,7 @@ conveying errors, as shown in the next table.
 ======= =======================================================================================================
 
 Implementing a WASM Kernel in Rust
-----------------------------------
+""""""""""""""""""""""""""""""""""
 
 Though WASM is a good fit for efficiently executing computation-intensive, arbitrary
 programs, it is a low-level, stack-based, memory unsafe language.
@@ -897,8 +897,10 @@ WASM as a first class citizen when it comes to compilation targets,
 but its approach to memory safety eliminates large classes of bugs and
 vulnerabilities that arbitrary WASM programs may suffer from.
 
+Additionally there is support for implementing kernels in Rust, in the form of the `Smart Rollup Kernel SDK <https://crates.io/crates/tezos-smart-rollup>`__.
+
 Setting-up Rust
-"""""""""""""""
+~~~~~~~~~~~~~~~
 
 `rustup <https://rustup.rs>`_ is the standard way to get Rust. Once
 ``rustup`` is installed, enabling WASM as a compilation target is as
@@ -993,7 +995,7 @@ deploy in our rollup. For instance, our “noop” kernel weighs
 kernel (down to 115 bytes in our case).
 
 Host Functions in Rust
-""""""""""""""""""""""
+~~~~~~~~~~~~~~~~~~~~~~
 
 The host functions exported by the WASM runtime to Rust programs
 are exposed by the following API. The ``link`` pragma is used to specify the
