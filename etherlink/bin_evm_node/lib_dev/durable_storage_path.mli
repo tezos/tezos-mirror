@@ -61,3 +61,11 @@ module Transaction_object : sig
   (** Path to the given transaction object. *)
   val object_ : hash -> path
 end
+
+module Delayed_transaction : sig
+  (** Path to the list of hashes of the delayed inbox. *)
+  val hashes : path
+
+  (** Path to the delayed transaction. *)
+  val transaction : hash -> path
+end
