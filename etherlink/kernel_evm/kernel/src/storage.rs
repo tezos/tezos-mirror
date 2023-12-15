@@ -37,6 +37,7 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
@@ -864,3 +865,13 @@ mod internal_for_tests {
 
 #[cfg(test)]
 pub use internal_for_tests::*;
+
+/// Smart Contract of the delayed bridge
+///
+/// This smart contract is used to submit transactions to the rollup
+/// when in sequencer mode
+pub fn read_delayed_transaction_bridge<Host: Runtime>(
+    host: &Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &DELAYED_BRIDGE.into())
+}
