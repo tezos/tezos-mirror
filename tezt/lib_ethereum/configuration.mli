@@ -16,5 +16,6 @@ val make_config :
   ?ticketer:string ->
   ?administrator:string ->
   ?sequencer:bool ->
+  ?delayed_bridge:string ->
   unit ->
   [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option
