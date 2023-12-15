@@ -54,21 +54,21 @@ module JSONRPC = struct
 
   type id = id_repr option
 
-  type 'params request = {
+  type request = {
     method_ : string;
-    parameters : 'params option;
+    parameters : Data_encoding.json option;
     id : id;
   }
 
-  let request_encoding method_ parameters_encoding =
+  let request_encoding =
     Data_encoding.(
       conv
-        (fun {parameters; id; _} -> ((), (), parameters, id))
-        (fun ((), (), parameters, id) -> {method_; parameters; id})
+        (fun {parameters; id; method_; _} -> ((), method_, parameters, id))
+        (fun ((), method_, parameters, id) -> {method_; parameters; id})
         (obj4
            (req "jsonrpc" (constant version))
-           (req "method" (constant method_))
-           (opt "params" parameters_encoding)
+           (req "method" string)
+           (opt "params" Data_encoding.json)
            (opt "id" id_repr_encoding)))
 
   type 'data error = {code : int; message : string; data : 'data option}
@@ -83,12 +83,11 @@ module JSONRPC = struct
            (req "message" string)
            (opt "data" data_encoding)))
 
-  type ('result, 'data_error) response = {
-    value : ('result, 'data_error error) result;
-    id : id;
-  }
+  type value = (Data_encoding.json, Data_encoding.json error) result
 
-  let response_encoding result_encoding error_data_encoding =
+  type response = {value : value; id : id}
+
+  let response_encoding =
     Data_encoding.(
       conv
         (fun {value; id} ->
@@ -108,14 +107,10 @@ module JSONRPC = struct
           {value; id})
         (obj4
            (req "jsonrpc" (constant version))
-           (opt "result" result_encoding)
-           (opt "error" (error_encoding error_data_encoding))
+           (opt "result" Data_encoding.json)
+           (opt "error" (error_encoding Data_encoding.json))
            (req "id" (option id_repr_encoding))))
 end
-
-type 'method_ input = ..
-
-type 'method_ output = ..
 
 module Error = struct
   type t = unit
@@ -125,9 +120,9 @@ end
 
 type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
-module type METHOD_DEF = sig
-  type method_
+type ('input, 'output) method_ = ..
 
+module type METHOD = sig
   val method_ : string
 
   type input
@@ -137,66 +132,11 @@ module type METHOD_DEF = sig
   val input_encoding : input Data_encoding.t
 
   val output_encoding : output Data_encoding.t
+
+  type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-module type METHOD = sig
-  type method_
-
-  type m_input
-
-  type m_output
-
-  (* The parameters MAY be omitted. See JSONRPC Specification. *)
-  type 'method_ input += Input : m_input option -> method_ input
-
-  type 'method_ output += Output : m_output rpc_result -> method_ output
-
-  val method_ : string
-
-  val request_encoding : m_input JSONRPC.request Data_encoding.t
-
-  val request : m_input option -> JSONRPC.id -> m_input JSONRPC.request
-
-  val response_encoding : (m_output, Error.t) JSONRPC.response Data_encoding.t
-
-  val response :
-    (m_output, Error.t JSONRPC.error) result ->
-    JSONRPC.id ->
-    (m_output, Error.t) JSONRPC.response
-
-  val response_ok :
-    m_output -> JSONRPC.id -> (m_output, Error.t) JSONRPC.response
-end
-
-module MethodMaker (M : METHOD_DEF) :
-  METHOD with type m_input = M.input and type m_output = M.output = struct
-  type m_input = M.input
-
-  type m_output = M.output
-
-  type method_ = M.method_
-
-  type 'a input += Input : m_input option -> method_ input
-
-  type 'a output += Output : m_output rpc_result -> method_ output
-
-  let method_ = M.method_
-
-  let request_encoding = JSONRPC.request_encoding M.method_ M.input_encoding
-
-  let request parameters id = JSONRPC.{method_; parameters; id}
-
-  let response_encoding =
-    JSONRPC.response_encoding M.output_encoding Error.encoding
-
-  let response value id = JSONRPC.{value; id}
-
-  let response_ok result id = response (Ok result) id
-end
-
-module Kernel_version = MethodMaker (struct
-  type method_
-
+module Kernel_version = struct
   type input = unit
 
   type output = string
@@ -206,11 +146,11 @@ module Kernel_version = MethodMaker (struct
   let output_encoding = Data_encoding.string
 
   let method_ = "tez_kernelVersion"
-end)
 
-module Network_id = MethodMaker (struct
-  type method_
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
 
+module Network_id = struct
   type input = unit
 
   type output = string
@@ -220,11 +160,11 @@ module Network_id = MethodMaker (struct
   let output_encoding = Data_encoding.string
 
   let method_ = "net_version"
-end)
 
-module Chain_id = MethodMaker (struct
-  type method_
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
 
+module Chain_id = struct
   type input = unit
 
   type output = Ethereum_types.quantity
@@ -234,11 +174,11 @@ module Chain_id = MethodMaker (struct
   let output_encoding = Ethereum_types.quantity_encoding
 
   let method_ = "eth_chainId"
-end)
 
-module Accounts = MethodMaker (struct
-  type method_
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
 
+module Accounts = struct
   type input = unit
 
   type output = Ethereum_types.address list
@@ -248,12 +188,12 @@ module Accounts = MethodMaker (struct
   let output_encoding = Data_encoding.list Ethereum_types.address_encoding
 
   let method_ = "eth_accounts"
-end)
 
-module Get_balance = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_balance = struct
   open Ethereum_types
-
-  type method_
 
   type input = address * block_param
 
@@ -264,12 +204,12 @@ module Get_balance = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getBalance"
-end)
 
-module Get_storage_at = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_storage_at = struct
   open Ethereum_types
-
-  type method_
 
   type input = address * quantity * block_param
 
@@ -281,12 +221,12 @@ module Get_storage_at = MethodMaker (struct
   let output_encoding = hex_encoding
 
   let method_ = "eth_getStorageAt"
-end)
 
-module Block_number = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Block_number = struct
   open Ethereum_types
-
-  type method_
 
   type input = unit
 
@@ -297,12 +237,12 @@ module Block_number = MethodMaker (struct
   let output_encoding = block_height_encoding
 
   let method_ = "eth_blockNumber"
-end)
 
-module Get_block_by_number = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_block_by_number = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_param * bool
 
@@ -314,12 +254,12 @@ module Get_block_by_number = MethodMaker (struct
   let output_encoding = block_encoding
 
   let method_ = "eth_getBlockByNumber"
-end)
 
-module Get_block_by_hash = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_block_by_hash = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_hash * bool
 
@@ -330,12 +270,12 @@ module Get_block_by_hash = MethodMaker (struct
   let output_encoding = block_encoding
 
   let method_ = "eth_getBlockByHash"
-end)
 
-module Get_code = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_code = struct
   open Ethereum_types
-
-  type method_
 
   type input = address * block_param
 
@@ -346,12 +286,12 @@ module Get_code = MethodMaker (struct
   let output_encoding = hex_encoding
 
   let method_ = "eth_getCode"
-end)
 
-module Gas_price = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Gas_price = struct
   open Ethereum_types
-
-  type method_
 
   type input = unit
 
@@ -362,12 +302,12 @@ module Gas_price = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_gasPrice"
-end)
 
-module Get_transaction_count = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_transaction_count = struct
   open Ethereum_types
-
-  type method_
 
   type input = address * block_param
 
@@ -378,12 +318,12 @@ module Get_transaction_count = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getTransactionCount"
-end)
 
-module Get_block_transaction_count_by_hash = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_block_transaction_count_by_hash = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_hash
 
@@ -394,12 +334,12 @@ module Get_block_transaction_count_by_hash = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getBlockTransactionCountByHash"
-end)
 
-module Get_block_transaction_count_by_number = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_block_transaction_count_by_number = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_param
 
@@ -410,12 +350,12 @@ module Get_block_transaction_count_by_number = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getBlockTransactionCountByNumber"
-end)
 
-module Get_uncle_count_by_block_hash = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_uncle_count_by_block_hash = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_hash
 
@@ -426,12 +366,12 @@ module Get_uncle_count_by_block_hash = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getUncleCountByBlockHash"
-end)
 
-module Get_uncle_count_by_block_number = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_uncle_count_by_block_number = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_param
 
@@ -442,12 +382,12 @@ module Get_uncle_count_by_block_number = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_getUncleCountByBlockNumber"
-end)
 
-module Get_transaction_receipt = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_transaction_receipt = struct
   open Ethereum_types
-
-  type method_
 
   type input = hash
 
@@ -458,12 +398,12 @@ module Get_transaction_receipt = MethodMaker (struct
   let output_encoding = Data_encoding.option transaction_receipt_encoding
 
   let method_ = "eth_getTransactionReceipt"
-end)
 
-module Get_transaction_by_hash = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_transaction_by_hash = struct
   open Ethereum_types
-
-  type method_
 
   type input = hash
 
@@ -474,12 +414,12 @@ module Get_transaction_by_hash = MethodMaker (struct
   let output_encoding = Data_encoding.option transaction_object_encoding
 
   let method_ = "eth_getTransactionByHash"
-end)
 
-module Get_transaction_by_block_hash_and_index = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_transaction_by_block_hash_and_index = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_hash * quantity
 
@@ -490,12 +430,12 @@ module Get_transaction_by_block_hash_and_index = MethodMaker (struct
   let output_encoding = Data_encoding.option transaction_object_encoding
 
   let method_ = "eth_getTransactionByBlockHashAndIndex"
-end)
 
-module Get_transaction_by_block_number_and_index = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_transaction_by_block_number_and_index = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_param * quantity
 
@@ -506,12 +446,12 @@ module Get_transaction_by_block_number_and_index = MethodMaker (struct
   let output_encoding = Data_encoding.option transaction_object_encoding
 
   let method_ = "eth_getTransactionByBlockNumberAndIndex"
-end)
 
-module Get_uncle_by_block_hash_and_index = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_uncle_by_block_hash_and_index = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_hash * quantity
 
@@ -522,12 +462,12 @@ module Get_uncle_by_block_hash_and_index = MethodMaker (struct
   let output_encoding = Data_encoding.option block_encoding
 
   let method_ = "eth_getUncleByBlockHashAndIndex"
-end)
 
-module Get_uncle_by_block_number_and_index = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_uncle_by_block_number_and_index = struct
   open Ethereum_types
-
-  type method_
 
   type input = block_param * quantity
 
@@ -538,12 +478,12 @@ module Get_uncle_by_block_number_and_index = MethodMaker (struct
   let output_encoding = Data_encoding.option block_encoding
 
   let method_ = "eth_getUncleByBlockNumberAndIndex"
-end)
 
-module Send_raw_transaction = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Send_raw_transaction = struct
   open Ethereum_types
-
-  type method_
 
   type input = hex
 
@@ -554,12 +494,12 @@ module Send_raw_transaction = MethodMaker (struct
   let output_encoding = hash_encoding
 
   let method_ = "eth_sendRawTransaction"
-end)
 
-module Send_transaction = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Send_transaction = struct
   open Ethereum_types
-
-  type method_
 
   type input = transaction
 
@@ -570,12 +510,12 @@ module Send_transaction = MethodMaker (struct
   let output_encoding = hash_encoding
 
   let method_ = "eth_sendTransaction"
-end)
 
-module Eth_call = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Eth_call = struct
   open Ethereum_types
-
-  type method_
 
   type input = call * block_param
 
@@ -586,12 +526,12 @@ module Eth_call = MethodMaker (struct
   let output_encoding = hash_encoding
 
   let method_ = "eth_call"
-end)
 
-module Get_estimate_gas = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_estimate_gas = struct
   open Ethereum_types
-
-  type method_
 
   type input = call * block_param
 
@@ -619,12 +559,12 @@ module Get_estimate_gas = MethodMaker (struct
   let output_encoding = quantity_encoding
 
   let method_ = "eth_estimateGas"
-end)
 
-module Txpool_content = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Txpool_content = struct
   open Ethereum_types
-
-  type method_
 
   type input = unit
 
@@ -635,12 +575,12 @@ module Txpool_content = MethodMaker (struct
   let output_encoding = txpool_encoding
 
   let method_ = "txpool_content"
-end)
 
-module Web3_clientVersion = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Web3_clientVersion = struct
   type input = unit
-
-  type method_
 
   type output = string
 
@@ -649,12 +589,12 @@ module Web3_clientVersion = MethodMaker (struct
   let output_encoding = Data_encoding.string
 
   let method_ = "web3_clientVersion"
-end)
 
-module Web3_sha3 = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Web3_sha3 = struct
   open Ethereum_types
-
-  type method_
 
   type input = hex
 
@@ -665,12 +605,12 @@ module Web3_sha3 = MethodMaker (struct
   let output_encoding = hash_encoding
 
   let method_ = "web3_sha3"
-end)
 
-module Get_logs = MethodMaker (struct
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_logs = struct
   open Ethereum_types
-
-  type method_
 
   type input = filter
 
@@ -681,9 +621,19 @@ module Get_logs = MethodMaker (struct
   let output_encoding = Data_encoding.list filter_changes_encoding
 
   let method_ = "eth_getLogs"
-end)
 
-let methods : (module METHOD) list =
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+type map_result =
+  | Method :
+      ('input, 'output) method_
+      * (module METHOD with type input = 'input and type output = 'output)
+      -> map_result
+  | Unsupported
+  | Unknown
+
+let supported_methods : (module METHOD) list =
   [
     (module Kernel_version);
     (module Network_id);
@@ -717,41 +667,28 @@ let methods : (module METHOD) list =
     (module Web3_sha3);
   ]
 
-module Input = struct
-  type t = Box : 'a input -> t [@@ocaml.unboxed]
+let unsupported_methods : string list =
+  [
+    "net_listening";
+    "net_peerCount";
+    "eth_protocolVersion";
+    "eth_syncing";
+    "eth_coinbase";
+    "eth_mining";
+    "eth_hashrate";
+    "eth_accounts";
+    "eth_sign";
+    "eth_signTransaction";
+    "eth_sendTransaction";
+  ]
 
-  let case_maker tag_id (module M : METHOD) =
-    let open Data_encoding in
-    case
-      ~title:M.method_
-      (Tag tag_id)
-      M.request_encoding
-      (function
-        | Box (M.Input input), id -> Some (M.request input id) | _ -> None)
-      (fun {parameters; id; _} -> (Box (M.Input parameters), id))
-
-  let encoding =
-    let open Data_encoding in
-    union @@ List.mapi case_maker methods
-end
-
-module Output = struct
-  type nonrec 'a result = ('a, error JSONRPC.error) result
-
-  type t = Box : 'a output -> t [@@ocaml.unboxed]
-
-  let case_maker tag_id (module M : METHOD) =
-    let open Data_encoding in
-    case
-      ~title:M.method_
-      (Tag tag_id)
-      M.response_encoding
-      (function
-        | Box (M.Output accounts), id -> Some JSONRPC.{value = accounts; id}
-        | _ -> None)
-      (fun {value = req; id} -> (Box (M.Output req), id))
-
-  let encoding =
-    let open Data_encoding in
-    union @@ List.mapi case_maker methods
-end
+let map_method_name method_name =
+  match
+    List.find
+      (fun (module M : METHOD) -> M.method_ = method_name)
+      supported_methods
+  with
+  | Some (module M) -> Method (M.Method, (module M))
+  | None ->
+      if List.mem ~equal:( = ) method_name unsupported_methods then Unsupported
+      else Unknown
