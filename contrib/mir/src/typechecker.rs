@@ -524,10 +524,12 @@ pub(crate) fn typecheck_instruction<'a>(
         };
     }
 
-    /// Pattern synonym matching any number of slice elements _except_ the number
-    /// passed as the argument. If the number is suffixed with `seq`, the pattern
-    /// will also match the number of elements equal to the argument iff either of
-    /// those isn't `Micheline::Seq`.
+    /// Pattern synonym matching any number of slice elements _except_ the
+    /// number passed as the argument. If the number is suffixed with `seq`, the
+    /// pattern will also match the number of elements equal to the argument iff
+    /// either of those isn't `Micheline::Seq`. If the number is suffixed with
+    /// `last_seq`, only the last argument will get the special treatment for
+    /// `Seq`.
     ///
     /// This is useful for the last "catchall" pattern for invalid Micheline to
     /// recover some measure of totality.
@@ -541,6 +543,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (2) => {
             [] | [_] | [_, _, _, ..]
         };
+        (3) => {
+            [] | [_] | [_, _] | [_, _, _, _, ..]
+        };
         (1 seq) => {
             expect_args!(1) | [micheline_non_seq!()]
         };
@@ -549,6 +554,9 @@ pub(crate) fn typecheck_instruction<'a>(
                 | [micheline_non_seq!(), micheline_non_seq!()]
                 | [Micheline::Seq(..), micheline_non_seq!()]
                 | [micheline_non_seq!(), Micheline::Seq(..)]
+        };
+        (3 last_seq) => {
+            expect_args!(3) | [_, _, micheline_non_seq!()]
         };
     }
 
@@ -1107,6 +1115,15 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(RIGHT, [_ty_left], _), []) => no_overload!(RIGHT, len 1),
         (App(RIGHT, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(prim @ (LAMBDA | LAMBDA_REC), [ty1, ty2, Seq(instrs)], _), ..) => {
+            let in_ty = parse_ty(ctx, ty1)?;
+            let out_ty = parse_ty(ctx, ty2)?;
+            stack.push(Type::new_lambda(in_ty.clone(), out_ty.clone()));
+            let res = typecheck_lambda(instrs, ctx, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
+            I::Lambda(res)
+        }
+        (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -1449,6 +1466,7 @@ fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 
 #[cfg(test)]
 mod typecheck_tests {
+    use super::Lambda;
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
@@ -4170,12 +4188,31 @@ mod typecheck_tests {
                 code: vec![Drop(None), Unit]
             })))
         );
+        assert_eq!(
+            parse("LAMBDA unit unit { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Lambda(Lambda::Lambda {
+                micheline_code: seq! { app!(DROP); app!(UNIT) },
+                code: vec![Drop(None), Unit]
+            }))
+        );
     }
 
     #[test]
     fn push_lambda_bad_result() {
         assert_eq!(
             parse("PUSH (lambda unit int) { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::Unit],
+                stk![Type::Int],
+                TypesNotEqual(Type::Unit, Type::Int).into()
+            ))
+        );
+        assert_eq!(
+            parse("LAMBDA unit int { DROP ; UNIT }")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::StacksNotEqual(
@@ -4198,6 +4235,16 @@ mod typecheck_tests {
                 reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
             })
         );
+        assert_eq!(
+            parse("LAMBDA int unit { IF { UNIT } { UNIT } }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
+            })
+        );
     }
 
     #[test]
@@ -4208,12 +4255,24 @@ mod typecheck_tests {
                 .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
             Err(TcError::SelfForbidden)
         );
+        assert_eq!(
+            parse("LAMBDA unit unit { SELF }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
     }
 
     #[test]
     fn push_lambda_rec_with_self() {
         assert_eq!(
             parse("PUSH (lambda unit unit) (Lambda_rec { SELF })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
+        assert_eq!(
+            parse("LAMBDA_REC unit unit { SELF }")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
             Err(TcError::SelfForbidden)
@@ -4231,6 +4290,15 @@ mod typecheck_tests {
                 code: vec![Dip(None, vec![Drop(None)])]
             })))
         );
+        assert_eq!(
+            parse("LAMBDA_REC unit unit { DIP { DROP } }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Lambda(Lambda::LambdaRec {
+                micheline_code: seq! { app!(DIP[seq! { app!(DROP) } ]) },
+                code: vec![Dip(None, vec![Drop(None)])]
+            }))
+        );
     }
 
     #[test]
@@ -4245,12 +4313,32 @@ mod typecheck_tests {
                 TypesNotEqual(Type::new_lambda(Type::Unit, Type::Unit), Type::Unit).into()
             ))
         );
+        assert_eq!(
+            parse("LAMBDA_REC unit unit { DROP }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::new_lambda(Type::Unit, Type::Unit)],
+                stk![Type::Unit],
+                TypesNotEqual(Type::new_lambda(Type::Unit, Type::Unit), Type::Unit).into()
+            ))
+        );
     }
 
     #[test]
     fn push_lambda_rec_bad_input() {
         assert_eq!(
             parse("PUSH (lambda int unit) (Lambda_rec { IF { UNIT } { UNIT }; DIP { DROP } })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
+            })
+        );
+        assert_eq!(
+            parse("LAMBDA_REC int unit { IF { UNIT } { UNIT }; DIP { DROP } }")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Err(TcError::NoMatchingOverload {

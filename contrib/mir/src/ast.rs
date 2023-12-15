@@ -308,6 +308,7 @@ pub enum Instruction<'a> {
     Slice(overloads::Slice),
     Left,
     Right,
+    Lambda(Lambda<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
