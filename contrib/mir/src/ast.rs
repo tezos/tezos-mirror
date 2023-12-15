@@ -309,6 +309,7 @@ pub enum Instruction<'a> {
     Left,
     Right,
     Lambda(Lambda<'a>),
+    Exec,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
