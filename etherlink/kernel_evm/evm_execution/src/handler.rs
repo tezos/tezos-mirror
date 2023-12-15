@@ -741,6 +741,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
 
             self.set_contract_code(address, code_out)?;
+            // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
+            // A created smart contract nonce must start at 1.
+            self.increment_nonce(address)?;
         }
 
         Ok((result?, Some(address), vec![]))

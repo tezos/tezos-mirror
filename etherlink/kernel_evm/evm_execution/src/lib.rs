@@ -193,6 +193,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::account_storage::EthereumAccount;
+
     use super::*;
     use account_storage::{
         account_path, init_account_storage as init_evm_account_storage,
@@ -2574,5 +2576,46 @@ mod test {
                 exit_error
             ),
         }
+    }
+
+    #[test]
+    fn created_contract_start_at_nonce_one() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let callee = None;
+        let caller = H160::from_low_u64_be(117);
+        let transaction_value = U256::from(0);
+        let data_str = "6101aa6064526000600060206000600073b000000000000000000000000000000000000000620493e0f1506000600060006000733000000000000000000000000000000000000000620493e0f450600060006020600073b000000000000000000000000000000000000000620493e0f45060006000600060006000733000000000000000000000000000000000000000620493e0f25060006000600060006000732000000000000000000000000000000000000000620927c0f100";
+        let call_data: Vec<u8> = hex::decode(data_str).unwrap();
+
+        let gas_limit = 2_400_000;
+        let balance = block.gas_price.saturating_mul(gas_limit.into());
+
+        set_balance(&mut host, &mut evm_account_storage, &caller, balance);
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            callee,
+            caller,
+            call_data,
+            Some(gas_limit),
+            Some(transaction_value),
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let result = unwrap_outcome!(result);
+        let ExecutionOutcome { new_address, .. } = result;
+        let address = new_address.unwrap();
+        let smart_contract = EthereumAccount::from_address(&address).unwrap();
+
+        assert_eq!(smart_contract.nonce(&host).unwrap(), U256::one())
     }
 }
