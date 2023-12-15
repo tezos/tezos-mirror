@@ -618,6 +618,7 @@ pub enum Instruction<'a> {
         arg_ty: Or<Type, Micheline<'a>>,
     },
     CreateContract(Rc<ContractScript<'a>>, &'a Micheline<'a>),
+    Map(overloads::Map, Vec<Self>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

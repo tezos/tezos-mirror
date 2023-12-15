@@ -141,3 +141,10 @@ pub enum Bytes {
     Int,
     Nat,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Map {
+    List,
+    Option,
+    Map,
+}

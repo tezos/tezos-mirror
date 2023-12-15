@@ -240,7 +240,6 @@ macro_rules! micheline_unsupported_instructions {
             | Prim::LSL
             | Prim::LSR
             | Prim::EMPTY_MAP
-            | Prim::MAP
             | Prim::SAPLING_EMPTY_STATE
             | Prim::SAPLING_VERIFY_UPDATE
             | Prim::OPEN_CHEST
