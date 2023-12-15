@@ -5,9 +5,10 @@
 /*                                                                            */
 /******************************************************************************/
 
+use num_bigint::{BigInt, BigUint, TryFromBigIntError};
+use num_traits::{Signed, Zero};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::num::TryFromIntError;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
 pub mod type_props;
@@ -39,7 +40,7 @@ pub enum TcError {
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
     #[error("numeric conversion failed: {0}")]
-    NumericConversion(#[from] TryFromIntError),
+    NumericConversion(#[from] TryFromBigIntError<()>),
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
     #[error("DUP 0 is forbidden")]
@@ -77,7 +78,7 @@ pub enum TcError {
     #[error("missing top-level element: {0}")]
     MissingTopLevelElt(Prim),
     #[error("expected a natural between 0 and 1023, but got {0}")]
-    ExpectedU10(i128),
+    ExpectedU10(BigInt),
     #[error(transparent)]
     AnnotationError(#[from] AnnotationError),
     #[error("duplicate entrypoint: {0}")]
@@ -592,7 +593,7 @@ pub(crate) fn typecheck_instruction(
 
         (App(DIP, args, _), ..) => {
             let (opt_height, nested) = match args {
-                [Int(height), Seq(nested)] => (Option::Some(validate_u10(*height)?), nested),
+                [Int(height), Seq(nested)] => (Option::Some(validate_u10(height)?), nested),
                 [Seq(nested)] => (Option::None, nested),
                 _ => unexpected_micheline!(),
             };
@@ -613,7 +614,7 @@ pub(crate) fn typecheck_instruction(
 
         (App(DROP, args, _), ..) => {
             let opt_height = match args {
-                [Int(height)] => Option::Some(validate_u10(*height)?),
+                [Int(height)] => Option::Some(validate_u10(height)?),
                 [] => Option::None,
                 _ => unexpected_micheline!(),
             };
@@ -625,10 +626,10 @@ pub(crate) fn typecheck_instruction(
         }
 
         // DUP instruction requires an argument that is > 0.
-        (App(DUP, [Int(0)], _), ..) => return Err(TcError::Dup0),
+        (App(DUP, [Int(n)], _), ..) if n.is_zero() => return Err(TcError::Dup0),
         (App(DUP, args, _), ..) => {
             let opt_height = match args {
-                [Int(height)] => Option::Some(validate_u10(*height)?),
+                [Int(height)] => Option::Some(validate_u10(height)?),
                 [] => Option::None,
                 _ => unexpected_micheline!(),
             };
@@ -1121,11 +1122,11 @@ pub(crate) fn typecheck_value(
     use TypedValue as TV;
     ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
     Ok(match (t, v) {
-        (T::Nat, V::Int(n)) => TV::Nat((*n).try_into()?),
-        (T::Int, V::Int(n)) => TV::Int(*n),
+        (T::Nat, V::Int(n)) => TV::Nat(BigUint::try_from(n)?),
+        (T::Int, V::Int(n)) => TV::Int(n.clone()),
         (T::Bool, V::App(Prim::True, [], _)) => TV::Bool(true),
         (T::Bool, V::App(Prim::False, [], _)) => TV::Bool(false),
-        (T::Mutez, V::Int(n)) if *n >= 0 => TV::Mutez((*n).try_into()?),
+        (T::Mutez, V::Int(n)) if !n.is_negative() => TV::Mutez(i64::try_from(n)?),
         (T::String, V::String(s)) => TV::String(s.clone()),
         (T::Unit, V::App(Prim::Unit, [], _)) => TV::Unit,
         (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _)) if !rest.is_empty() => {
@@ -1286,10 +1287,10 @@ pub(crate) fn typecheck_value(
     })
 }
 
-fn validate_u10(n: i128) -> Result<u16, TcError> {
-    let res = u16::try_from(n).map_err(|_| TcError::ExpectedU10(n))?;
+fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
+    let res = u16::try_from(n).map_err(|_| TcError::ExpectedU10(n.clone()))?;
     if res >= 1024 {
-        return Err(TcError::ExpectedU10(n));
+        return Err(TcError::ExpectedU10(n.clone()));
     }
     Ok(res)
 }
@@ -1505,7 +1506,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(&app!(PUSH[app!(int), 1]), &mut ctx, &mut stack),
-            Ok(Push(TypedValue::Int(1)))
+            Ok(Push(TypedValue::int(1)))
         );
         assert_eq!(stack, expected_stack);
         assert!(ctx.gas.milligas() < Gas::default().milligas());
@@ -1531,7 +1532,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(&parse("DIP 1 {PUSH nat 6}").unwrap(), &mut ctx, &mut stack),
-            Ok(Dip(Some(1), vec![Push(TypedValue::Nat(6))]))
+            Ok(Dip(Some(1), vec![Push(TypedValue::nat(6))]))
         );
         assert_eq!(stack, expected_stack);
         assert!(ctx.gas.milligas() < Gas::default().milligas());
@@ -1847,8 +1848,8 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Push(TypedValue::new_pair(
-                TypedValue::Int(-5),
-                TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
+                TypedValue::int(-5),
+                TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
             )))
         );
         assert_eq!(
@@ -1869,7 +1870,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_or(Or::Left(TypedValue::Int(1)))))
+            Ok(Push(TypedValue::new_or(Or::Left(TypedValue::int(1)))))
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
     }
@@ -1897,7 +1898,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_option(Some(TypedValue::Nat(3)))))
+            Ok(Push(TypedValue::new_option(Some(TypedValue::nat(3)))))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Nat)]);
     }
@@ -1927,8 +1928,8 @@ mod typecheck_tests {
             ),
             Ok(Seq(vec![
                 Push(TypedValue::new_pair(
-                    TypedValue::Int(-5),
-                    TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
+                    TypedValue::int(-5),
+                    TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
                 )),
                 Car
             ]))
@@ -1947,8 +1948,8 @@ mod typecheck_tests {
             ),
             Ok(Seq(vec![
                 Push(TypedValue::new_pair(
-                    TypedValue::Int(-5),
-                    TypedValue::new_pair(TypedValue::Nat(3), TypedValue::Bool(false))
+                    TypedValue::int(-5),
+                    TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
                 )),
                 Cdr
             ]))
@@ -2039,7 +2040,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(IfNone(vec![Push(TypedValue::Int(5))], vec![]))
+            Ok(IfNone(vec![Push(TypedValue::int(5))], vec![]))
         );
         assert_eq!(stack, tc_stk![Type::Int]);
     }
@@ -2240,7 +2241,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Push(TypedValue::List(
-                vec![TypedValue::Int(1), TypedValue::Int(2), TypedValue::Int(3),].into()
+                vec![TypedValue::int(1), TypedValue::int(2), TypedValue::int(3),].into()
             )))
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
@@ -2361,8 +2362,8 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Push(TypedValue::Set(BTreeSet::from([
-                TypedValue::Int(1),
-                TypedValue::Int(2)
+                TypedValue::int(1),
+                TypedValue::int(2)
             ]))))
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
@@ -2436,8 +2437,8 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Push(TypedValue::Map(BTreeMap::from([
-                (TypedValue::Int(1), TypedValue::String("foo".to_owned())),
-                (TypedValue::Int(2), TypedValue::String("bar".to_owned()))
+                (TypedValue::int(1), TypedValue::String("foo".to_owned())),
+                (TypedValue::int(2), TypedValue::String("bar".to_owned()))
             ]))))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
@@ -3026,14 +3027,10 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_gas_exhaustion() {
-        let mut ctx = &mut Ctx::default();
+        let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
-            typecheck_instruction(
-                &app!(COMPARE),
-                &mut ctx,
-                &mut tc_stk![Type::Unit, Type::Unit]
-            ),
+            typecheck_instruction(&app!(COMPARE), ctx, &mut tc_stk![Type::Unit, Type::Unit]),
             Err(TcError::OutOfGas(OutOfGas))
         );
     }
@@ -3854,19 +3851,19 @@ mod typecheck_tests {
             parse("DROP 1025")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
-            Err(TcError::ExpectedU10(1025))
+            Err(TcError::ExpectedU10(1025.into()))
         );
         assert_eq!(
             parse("DIP 1024 {}")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
-            Err(TcError::ExpectedU10(1024))
+            Err(TcError::ExpectedU10(1024.into()))
         );
         assert_eq!(
             parse("DUP 65536")
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
-            Err(TcError::ExpectedU10(65536))
+            Err(TcError::ExpectedU10(65536.into()))
         );
     }
 

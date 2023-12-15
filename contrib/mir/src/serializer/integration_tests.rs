@@ -62,8 +62,8 @@ mod test_typed_encode {
         // Should be encoded as a tree
         check(
             TypedValue::new_pair(
-                TypedValue::Nat(1),
-                TypedValue::new_pair(TypedValue::Nat(2), TypedValue::Nat(3)),
+                TypedValue::nat(1),
+                TypedValue::new_pair(TypedValue::nat(2), TypedValue::nat(3)),
             ),
             "0x0507070001070700020003",
         )

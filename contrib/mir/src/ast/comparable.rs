@@ -81,13 +81,13 @@ mod tests {
             };
         }
 
-        assert_cmp!(Int; -1; 0; Less);
-        assert_cmp!(Int; -1; -1; Equal);
-        assert_cmp!(Int; -1; -2; Greater);
+        assert_cmp!(V::int; -1; 0; Less);
+        assert_cmp!(V::int; -1; -1; Equal);
+        assert_cmp!(V::int; -1; -2; Greater);
 
-        assert_cmp!(Nat; 3; 4; Less);
-        assert_cmp!(Nat; 4; 4; Equal);
-        assert_cmp!(Nat; 5; 4; Greater);
+        assert_cmp!(V::nat; 3; 4; Less);
+        assert_cmp!(V::nat; 4; 4; Equal);
+        assert_cmp!(V::nat; 5; 4; Greater);
 
         assert_cmp!(Mutez; 3; 4; Less);
         assert_cmp!(Mutez; 3; 3; Equal);
@@ -105,31 +105,31 @@ mod tests {
         assert_cmp!(String; "foo".to_owned(); "bar".to_owned(); Greater);
 
         assert_cmp!(V::new_option; None; None; Equal);
-        assert_cmp!(V::new_option; None; Some(Int(3)); Less);
-        assert_cmp!(V::new_option; Some(Int(3)); None; Greater);
-        assert_cmp!(V::new_option; Some(Int(3)); Some(Int(4)); Less);
-        assert_cmp!(V::new_option; Some(Int(4)); Some(Int(4)); Equal);
-        assert_cmp!(V::new_option; Some(Int(4)); Some(Int(3)); Greater);
+        assert_cmp!(V::new_option; None; Some(V::int(3)); Less);
+        assert_cmp!(V::new_option; Some(V::int(3)); None; Greater);
+        assert_cmp!(V::new_option; Some(V::int(3)); Some(V::int(4)); Less);
+        assert_cmp!(V::new_option; Some(V::int(4)); Some(V::int(4)); Equal);
+        assert_cmp!(V::new_option; Some(V::int(4)); Some(V::int(3)); Greater);
 
-        assert_cmp!(V::new_pair; Int(3), Nat(4); Int(3), Nat(5); Less);
-        assert_cmp!(V::new_pair; Int(3), Nat(4); Int(4), Nat(4); Less);
-        assert_cmp!(V::new_pair; Int(3), Nat(4); Int(3), Nat(4); Equal);
-        assert_cmp!(V::new_pair; Int(4), Nat(4); Int(3), Nat(4); Greater);
-        assert_cmp!(V::new_pair; Int(3), Nat(5); Int(3), Nat(4); Greater);
+        assert_cmp!(V::new_pair; V::int(3), V::nat(4); V::int(3), V::nat(5); Less);
+        assert_cmp!(V::new_pair; V::int(3), V::nat(4); V::int(4), V::nat(4); Less);
+        assert_cmp!(V::new_pair; V::int(3), V::nat(4); V::int(3), V::nat(4); Equal);
+        assert_cmp!(V::new_pair; V::int(4), V::nat(4); V::int(3), V::nat(4); Greater);
+        assert_cmp!(V::new_pair; V::int(3), V::nat(5); V::int(3), V::nat(4); Greater);
 
         use crate::ast::Or;
 
-        assert_cmp!(V::new_or; Or::Left(Int(3)); Or::Left(Int(4)); Less);
-        assert_cmp!(V::new_or; Or::Left(Int(5)); Or::Left(Int(4)); Greater);
-        assert_cmp!(V::new_or; Or::Left(Int(4)); Or::Left(Int(4)); Equal);
-        assert_cmp!(V::new_or; Or::Right(Int(3)); Or::Right(Int(4)); Less);
-        assert_cmp!(V::new_or; Or::Right(Int(5)); Or::Right(Int(4)); Greater);
-        assert_cmp!(V::new_or; Or::Right(Int(4)); Or::Right(Int(4)); Equal);
-        assert_cmp!(V::new_or; Or::Left(Int(5)); Or::Right(Int(3)); Less);
-        assert_cmp!(V::new_or; Or::Right(Int(3)); Or::Left(Int(5)); Greater);
+        assert_cmp!(V::new_or; Or::Left(V::int(3)); Or::Left(V::int(4)); Less);
+        assert_cmp!(V::new_or; Or::Left(V::int(5)); Or::Left(V::int(4)); Greater);
+        assert_cmp!(V::new_or; Or::Left(V::int(4)); Or::Left(V::int(4)); Equal);
+        assert_cmp!(V::new_or; Or::Right(V::int(3)); Or::Right(V::int(4)); Less);
+        assert_cmp!(V::new_or; Or::Right(V::int(5)); Or::Right(V::int(4)); Greater);
+        assert_cmp!(V::new_or; Or::Right(V::int(4)); Or::Right(V::int(4)); Equal);
+        assert_cmp!(V::new_or; Or::Left(V::int(5)); Or::Right(V::int(3)); Less);
+        assert_cmp!(V::new_or; Or::Right(V::int(3)); Or::Left(V::int(5)); Greater);
 
         // different types don't compare
-        assert_eq!(Bool(true).partial_cmp(&Int(5)), None);
+        assert_eq!(Bool(true).partial_cmp(&V::int(5)), None);
     }
 
     #[test]
@@ -199,8 +199,9 @@ mod tests {
     #[should_panic(expected = "Comparing incomparable values in TypedValue")]
     fn compare_different_comparable() {
         // Comparable panics on different types
+        use TypedValue as V;
         use TypedValue::*;
-        let _ = Bool(true).cmp(&Int(5)); //panics
+        let _ = Bool(true).cmp(&V::int(5)); //panics
     }
 }
 

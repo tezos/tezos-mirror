@@ -721,6 +721,8 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
+ "num-bigint",
+ "num-traits",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",

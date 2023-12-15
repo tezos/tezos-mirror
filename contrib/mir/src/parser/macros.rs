@@ -91,10 +91,10 @@ pub fn expand_macro<'a>(
 
         // Do not wrap expansion of DII+P and DUU+P in a Seq to
         // match octez-client behavior.
-        (DIIP(c), OneArg(ib)) => Ok(M::prim2(arena, DIP, M::Int(*c as i128), ib)),
+        (DIIP(c), OneArg(ib)) => Ok(M::prim2(arena, DIP, M::Int((*c).into()), ib)),
         (DIIP(_), _) => Err(unex_arg_err),
 
-        (DUUP(c), NoArgs) => Ok(M::prim1(arena, DUP, M::Int(*c as i128))),
+        (DUUP(c), NoArgs) => Ok(M::prim1(arena, DUP, M::Int((*c).into()))),
         (DUUP(_), _) => Err(unex_arg_err),
     }
 }

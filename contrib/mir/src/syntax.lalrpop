@@ -20,6 +20,7 @@ use crate::tzt::*;
 use Noun::*;
 use Noun as PT;
 use typed_arena::Arena;
+use num_bigint::BigInt;
 
 grammar<'a>(arena: &'a Arena<Micheline<'a>>);
 
@@ -37,7 +38,7 @@ extern {
         "StaticError" => Tok::Noun(TztPrim(TzP::StaticError)),
         "amount" => Tok::Noun(TztPrim(TzP::amount)),
         "self" => Tok::Noun(TztPrim(TzP::self_)),
-        number => Tok::Number(<i128>),
+        number => Tok::Number(<BigInt>),
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
         ann => Tok::Annotation(<Annotation<'a>>),
@@ -134,7 +135,7 @@ tztStack : Vec<(Micheline<'a>, Micheline<'a>)> = {
 }
 
 mutezAmount : i64 =
-  <n:number> =>? i64::try_from(n)
+  <n:number> =>? i64::try_from(&n)
     .map_err(|_| ParserError::LexerError(LexerError::NumericLiteral(n.to_string())).into() );
 
 use ErrorExpectation::*;
