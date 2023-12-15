@@ -34,7 +34,12 @@ module MakeBackend (Base : sig
 end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
-      call_service ~base:Base.base durable_state_value () {key = path} ()
+      call_service
+        ~base:Base.base
+        durable_state_value
+        ((), Block_id.Head)
+        {key = path}
+        ()
   end
 
   module TxEncoder = struct

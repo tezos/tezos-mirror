@@ -50,6 +50,30 @@ let smart_rollup_address :
 
 type state_value_query = {key : string}
 
+module Block_id = struct
+  type t = Head | Level of Int32.t
+
+  let construct = function
+    | Head -> "head"
+    | Level level -> Int32.to_string level
+
+  let destruct id =
+    match id with
+    | "head" -> Ok Head
+    | n -> (
+        match Int32.of_string_opt n with
+        | Some n -> Ok (Level n)
+        | None -> Error "Cannot parse block id")
+
+  let arg : t Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"An L1 block identifier."
+      ~name:"block_id"
+      ~construct
+      ~destruct
+      ()
+end
+
 let state_value_query : state_value_query Tezos_rpc.Query.t =
   let open Tezos_rpc.Query in
   query (fun key -> {key})
@@ -57,15 +81,20 @@ let state_value_query : state_value_query Tezos_rpc.Query.t =
   |> seal
 
 let durable_state_value :
-    ([`GET], unit, unit, state_value_query, unit, bytes option) Service.service
-    =
+    ( [`GET],
+      unit,
+      unit * Block_id.t,
+      state_value_query,
+      unit,
+      bytes option )
+    Service.service =
   Tezos_rpc.Service.get_service
     ~description:
       "Retrieve value by key from PVM durable storage. PVM state is taken with \
        respect to the specified block level. Value returned in hex format."
     ~query:state_value_query
     ~output:Data_encoding.(option bytes)
-    (open_root / "global" / "block" / "head" / "durable" / "wasm_2_0_0"
+    (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
    / "value")
 
 let batcher_injection :
