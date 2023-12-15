@@ -123,6 +123,11 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       head
       ctxt
   in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
+  let commit_is_gc_candidate =
+    history_mode <> Archive && Option.is_some commitment_hash
+  in
+  if commit_is_gc_candidate then Context.split node_ctxt.context ;
   let* () =
     unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
     Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox

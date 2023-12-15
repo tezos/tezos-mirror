@@ -125,6 +125,8 @@ let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
 
+let split ctxt = IStore.split ctxt.repo
+
 (* adapted from lib_context/disk/context.ml *)
 let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
     (hash : hash) =

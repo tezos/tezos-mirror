@@ -98,6 +98,11 @@ val empty : 'a index -> 'a t
     empty. *)
 val is_empty : _ t -> bool
 
+(** [split ctxt] creates a new suffix file, also called "chunk", into the
+    irmin's file hierarchy. This split function is expected to be called after
+    committing a commit that will be a future candidate for a GC target.  *)
+val split : _ index -> unit
+
 (** [gc index ?callback hash] removes all data older than [hash] from disk.
     If passed, [callback] will be executed when garbage collection finishes. *)
 val gc :

@@ -120,6 +120,11 @@ module type S = sig
     if a GC is running for [index]. *)
   val is_gc_finished : [> `Write] index -> bool
 
+  (** [split ctxt] splits the current context in order to chunk the file if the
+      backend supports it. This split function is expected to be called after
+      committing a commit that will be a future candidate for a GC target.  *)
+  val split : _ index -> unit
+
   (** [gc index ?callback hash] removes all data older than [hash] from disk.
     If passed, [callback] will be executed when garbage collection finishes. *)
   val gc :

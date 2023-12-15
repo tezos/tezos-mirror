@@ -105,6 +105,11 @@ val commit : ?message:string -> [`Read | `Write] t -> hash Lwt.t
     if a GC is running for [index]. *)
 val is_gc_finished : [`Read | `Write] t -> bool
 
+(** [split ctxt] creates a new suffix file, also called "chunk", into the
+    irmin's file hierarchy. This split function is expected to be called after
+    committing a commit that will be a future candidate for a GC target.  *)
+val split : _ t -> unit
+
 (** [gc index ?callback hash] removes all data older than [hash] from disk.
     If passed, [callback] will be executed when garbage collection finishes. *)
 val gc :
