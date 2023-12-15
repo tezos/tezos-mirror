@@ -1762,54 +1762,10 @@ pub(crate) fn typecheck_value<'a>(
                 .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
-        (set_ty @ T::Set(ty), V::Seq(vs)) => {
-            ctx.gas
-                .consume(gas::tc_cost::construct_set(ty.size_for_gas(), vs.len())?)?;
-            let ctx_cell = std::cell::RefCell::new(ctx);
-            // See the same concern about constructing from ordered sequence as in Map
-            let set: BTreeSet<TypedValue> = OrderValidatingIterator {
-                it: vs
-                    .iter()
-                    .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), ty))
-                    .peekable(),
-                container_ty: set_ty,
-                to_key: |x| x,
-                ctx: &ctx_cell,
-            }
-            .collect::<Result<_, TcError>>()?;
-            TV::Set(set)
-        }
-        (map_ty @ T::Map(m), V::Seq(vs)) => {
+        (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
+        (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            ctx.gas
-                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
-            let ctx_cell = std::cell::RefCell::new(ctx);
-            let tc_elt =
-                |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
-                    match v {
-                        Micheline::App(Prim::Elt, [k, v], _) => {
-                            let k = typecheck_value(k, ctx, tk)?;
-                            let v = typecheck_value(v, ctx, tv)?;
-                            Ok((k, v))
-                        }
-                        _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
-                    }
-                };
-            // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
-            // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
-            // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
-            // too much overhead.
-            let map: BTreeMap<TypedValue, TypedValue> = OrderValidatingIterator {
-                it: vs
-                    .iter()
-                    .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
-                    .peekable(),
-                container_ty: map_ty,
-                to_key: |(k, _)| k,
-                ctx: &ctx_cell,
-            }
-            .collect::<Result<_, TcError>>()?;
-            TV::Map(map)
+            TV::Map(typecheck_map(ctx, t, tk, tv, vs, |v| v)?)
         }
         (T::Address, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
@@ -2020,6 +1976,69 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+}
+
+fn typecheck_set<'a>(
+    ctx: &mut Ctx,
+    set_ty: &Type,
+    elem_ty: &Type,
+    vs: &[Micheline<'a>],
+) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
+    ctx.gas.consume(gas::tc_cost::construct_set(
+        elem_ty.size_for_gas(),
+        vs.len(),
+    )?)?;
+    let ctx_cell = std::cell::RefCell::new(ctx);
+    // See the same concern about constructing from ordered sequence as in [typecheck_map]
+    OrderValidatingIterator {
+        it: vs
+            .iter()
+            .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), elem_ty))
+            .peekable(),
+        container_ty: set_ty,
+        to_key: |x| x,
+        ctx: &ctx_cell,
+    }
+    .collect::<Result<_, TcError>>()
+}
+
+fn typecheck_map<'a, V>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+    value_mapper: fn(TypedValue<'a>) -> V,
+) -> Result<BTreeMap<TypedValue<'a>, V>, TcError> {
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+    let ctx_cell = std::cell::RefCell::new(ctx);
+    let tc_elt = |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+        match v {
+            Micheline::App(Prim::Elt, [k, v], _) => {
+                let k = typecheck_value(k, ctx, key_type)?;
+                let v = typecheck_value(v, ctx, value_type)?;
+                Ok((k, value_mapper(v)))
+            }
+            _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), map_ty.clone())),
+        }
+    };
+    // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
+    // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
+    // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
+    // too much overhead.
+    OrderValidatingIterator {
+        it: vs
+            .iter()
+            .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
+            .peekable(),
+        container_ty: map_ty,
+        to_key: |(k, _)| k,
+        ctx: &ctx_cell,
+    }
+    .collect::<Result<_, TcError>>()
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
