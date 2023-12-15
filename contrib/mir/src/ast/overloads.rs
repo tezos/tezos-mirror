@@ -51,6 +51,7 @@ pub enum Not {
 pub enum Mem {
     Set,
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

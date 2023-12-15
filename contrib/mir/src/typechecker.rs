@@ -1321,9 +1321,16 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.as_ref().0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
+        }
+        (App(MEM, [], _), [.., T::BigMap(..), _]) => {
+            let kty_ = pop!();
+            let map_tys = pop!(T::BigMap);
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            stack.push(T::Bool);
+            I::Mem(overloads::Mem::BigMap)
         }
         (App(MEM, [], _), [.., _, _]) => no_overload!(MEM),
         (App(MEM, [], _), [] | [_]) => no_overload!(MEM, len 2),
@@ -4071,6 +4078,16 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
             Ok(Mem(overloads::Mem::Map))
+        );
+        assert_eq!(stack, tc_stk![Type::Bool]);
+    }
+
+    #[test]
+    fn mem_big_map() {
+        let mut stack = tc_stk![Type::new_big_map(Type::Int, Type::String), Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Mem(overloads::Mem::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::Bool]);
     }

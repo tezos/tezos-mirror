@@ -828,6 +828,15 @@ fn interpret_one<'a>(
                 let result = map.contains_key(&key);
                 stack.push(V::Bool(result));
             }
+            overloads::Mem::BigMap => {
+                let key = pop!();
+                let map = pop!(V::BigMap);
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_mem(&key, map.overlay.len())?)?;
+                let result = map.mem(&key, ctx.big_map_storage.as_ref())?;
+                stack.push(V::Bool(result));
+            }
         },
         I::Get(overload) => match overload {
             overloads::Get::Map => {
@@ -1246,7 +1255,7 @@ mod interpreter_tests {
 
     use super::*;
     use super::{Lambda, Or};
-    use crate::ast::big_map::InMemoryLazyStorage;
+    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
     use crate::bls;
     use crate::gas::Gas;
@@ -2606,6 +2615,46 @@ mod interpreter_tests {
             Gas::default().milligas()
                 - interpret_cost::map_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn mem_big_map() {
+        let mut ctx = Ctx::default();
+        let big_map_id = ctx
+            .big_map_storage
+            .big_map_new(&Type::Int, &Type::String)
+            .unwrap();
+        ctx.big_map_storage
+            .big_map_bulk_update(
+                &big_map_id,
+                [
+                    (
+                        TypedValue::int(1),
+                        Some(TypedValue::String("foo".to_owned())),
+                    ),
+                    (
+                        TypedValue::int(2),
+                        Some(TypedValue::String("bar".to_owned())),
+                    ),
+                ],
+            )
+            .unwrap();
+        let big_map = BigMap {
+            id: Some(big_map_id),
+            overlay: BTreeMap::new(),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut stack = stk![TypedValue::BigMap(big_map), TypedValue::int(1)];
+        assert_eq!(
+            interpret_one(&Mem(overloads::Mem::BigMap), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(true)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_mem(&TypedValue::int(1), 0).unwrap()
         );
     }
 
