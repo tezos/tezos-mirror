@@ -14,6 +14,7 @@ Where <action> can be:
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
+* --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --help: display this and return 0.
 EOF
 }
@@ -35,6 +36,11 @@ say () {
 declare -a source_directories
 
 source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
+# Set of newline-separated basic regular expressions to exclude from --check-licenses-git-new.
+license_check_exclude=$(
+    cat <<'EOF'
+EOF
+)
 
 update_all_dot_ocamlformats () {
     if ! type ocamlformat > /dev/null 2>&-; then
@@ -198,20 +204,37 @@ check_licenses_git_new () {
         echo
         echo "  CHECK_LICENSES_DIFF_BASE=\$(git merge-base HEAD origin/master) $0 --check-licenses-git-new"
         return 1
+    elif ! git cat-file -t "${CHECK_LICENSES_DIFF_BASE:-}" > /dev/null 2>&1; then
+        echo "The commit specified in CHECK_LICENSES_DIFF_BASE ('$CHECK_LICENSES_DIFF_BASE') could not be found."
+        echo 'Consider running:'
+        echo
+        echo "  git fetch origin $CHECK_LICENSES_DIFF_BASE"
+        return 1
+    fi
+
+    diff=$(mktemp)
+    git diff-tree --no-commit-id --name-only -r --diff-filter=A \
+        "${CHECK_LICENSES_DIFF_BASE:-}" HEAD -- "${source_directories[@]}" > "$diff"
+    if [ -n "$license_check_exclude" ]; then
+       diff2=$(mktemp)
+       grep -v "$license_check_exclude" "$diff" > "$diff2"
+       mv "$diff2" "$diff"
     fi
 
     # Check that new ml(i) files have a valid license header.
-    if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
-         "${CHECK_LICENSES_DIFF_BASE:-}" HEAD |
-            grep '\.ml\(i\|\)$' |
-            xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
+    if ! grep '\.mli\?$' "$diff" | xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
 
         echo "/!\\ Some files .ml(i) does not have a correct license header /!\\" ;
         echo "/!\\ See https://tezos.gitlab.io/developer/guidelines.html#license /!\\" ;
-        exit 1 ;
+
+        res=1
     else
         echo "OCaml file license headers OK!"
+        res=0
     fi
+
+    rm -f "$diff"
+    return $res
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
