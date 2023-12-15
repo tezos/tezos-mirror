@@ -36,6 +36,10 @@ let blocks_preservation_cycles c =
   let constants = Raw_context.constants c in
   constants.blocks_preservation_cycles
 
+let delegate_parameters_activation_delay c =
+  let constants = Raw_context.constants c in
+  constants.delegate_parameters_activation_delay
+
 let blocks_per_cycle c =
   let constants = Raw_context.constants c in
   constants.blocks_per_cycle
