@@ -4429,6 +4429,53 @@ let test_l2_ether_wallet =
   let* () = check_tx_succeeded ~endpoint ~tx:tx2 in
   unit
 
+let test_keep_alive =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["keep_alive"; "proxy"]
+    ~title:"Proxy mode keep alive argument"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+      ])
+    (fun protocol ->
+      let* {sc_rollup_node; sc_rollup_address; evm_node; endpoint = _; _} =
+        setup_evm_kernel ~admin:None protocol
+      in
+      (* Stop the EVM and rollup nodes. *)
+      let* () = Evm_node.terminate evm_node in
+      let* () = Sc_rollup_node.terminate sc_rollup_node in
+      (* Restart the evm node without keep alive, expected to fail. *)
+      let process = Evm_node.spawn_run evm_node in
+      let* () =
+        Process.check_error ~msg:(rex "the communication was lost") process
+      in
+      (* Restart with keep alive. The EVM node is waiting for the connection. *)
+      let* () =
+        Evm_node.run ~wait:false ~extra_arguments:["--keep-alive"] evm_node
+      in
+      let* () =
+        Evm_node.wait_for evm_node "evm_node_retrying_connect.v0"
+        @@ fun _json -> Some ()
+      in
+      (* Restart the rollup node to restore the connection. *)
+      let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+      let* () = Evm_node.wait_for_ready evm_node in
+      (* The EVM node should respond to RPCs. *)
+      let*@ _block_number = Rpc.block_number evm_node in
+      (* Stop the rollup node, the EVM node no longer properly respond to RPCs. *)
+      let* () = Sc_rollup_node.terminate sc_rollup_node in
+      let*@? error = Rpc.block_number evm_node in
+      Check.(error.message =~ rex "the communication was lost")
+        ~error_msg:
+          "The RPC was supposed to failed because of lost communication" ;
+      (* Restart the EVM node, do the same RPC. *)
+      let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+      let*@ _block_number = Rpc.block_number evm_node in
+      unit)
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4499,7 +4546,8 @@ let register_evm_node ~protocols =
   test_l2_revert_returns_unused_gas protocols ;
   test_l2_create_collision protocols ;
   test_l2_intermediate_OOG_call protocols ;
-  test_l2_ether_wallet protocols
+  test_l2_ether_wallet protocols ;
+  test_keep_alive protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
