@@ -79,6 +79,12 @@ function shellcheck_script () {
     shellcheck --external-sources "$1"
 }
 
+
+function shfmt_script() {
+  # following google style guide for sh formatting
+  shfmt -i 2 -sr -d "$1"
+}
+
 check_scripts () {
     # Gather scripts
     scripts=$(find "${source_directories[@]}" scripts/ docs/ -name "*.sh" -type f -print)
@@ -120,6 +126,10 @@ check_scripts () {
             say "$script shellcheck FAILED ❌"
             exit_code=1
           fi
+        fi
+        if ! shfmt_script "${script}"; then
+          say "$script shfmt FAILED ❌"
+          exit_code=1
         fi
     done
     # Check that shellcheck_skips doesn't contain a deprecated value
