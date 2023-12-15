@@ -25,14 +25,13 @@
 
 open Protocol
 open Alpha_context
-open Context_wrapper.Irmin
 module Inbox = Sc_rollup.Inbox
 open Pvm_plugin_sig
 
 module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
   type fuel = F.t
 
-  type pvm_state = Irmin_context.tree
+  type pvm_state = Context.pvmstate
 
   let get_reveal ~dac_client ~data_dir ~pvm_kind reveal_map hash =
     let open Lwt_result_syntax in
@@ -202,10 +201,12 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             return (state, executed_ticks, failing_ticks')
       | _ -> normal_eval state
     in
-    let abort state fuel current_tick =
+    let abort (state : PVM.tree) fuel current_tick =
+      let state = PVM.Ctxt_wrapper.to_node_pvmstate state in
       return (Aborted {state; fuel; current_tick})
     in
-    let complete state fuel current_tick failing_ticks =
+    let complete (state : PVM.tree) fuel current_tick failing_ticks =
+      let state = PVM.Ctxt_wrapper.to_node_pvmstate state in
       return (Completed {state; fuel; current_tick; failing_ticks})
     in
     let rec go (fuel : fuel) current_tick failing_ticks state =
@@ -273,7 +274,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Initial | First_after _ ->
           complete state fuel current_tick failing_ticks
     in
-    go fuel start_tick failing_ticks state
+    go fuel start_tick failing_ticks (PVM.Ctxt_wrapper.of_node_pvmstate state)
 
   (** [mutate input] corrupts the payload of [input] for testing purposes. *)
   let mutate input =
@@ -332,7 +333,12 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                   else return (input, failing_ticks)
               | [] -> return (input, failing_ticks)
             in
-            let*! state = PVM.set_input (Inbox_message input) state in
+            let*! state =
+              PVM.set_input
+                (Inbox_message input)
+                (PVM.Ctxt_wrapper.of_node_pvmstate state)
+            in
+            let state = PVM.Ctxt_wrapper.to_node_pvmstate state in
             let>* res =
               eval_until_input
                 node_ctxt
@@ -413,10 +419,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       fuel eval_result Node_context.delayed_write tzresult Lwt.t =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+    let open (val Pvm.of_kind node_ctxt.kind) in
     (* Obtain inbox and its messages for this block. *)
     let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
-    let*! initial_tick = PVM.get_tick (of_node_pvmstate state) in
+    let*! initial_tick = get_tick (Ctxt_wrapper.of_node_pvmstate state) in
     (* Evaluate all the messages for this level. *)
     let>* state, remaining_fuel, num_messages, remaining_messages =
       eval_messages
@@ -424,16 +430,17 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         ~fuel
         node_ctxt
         ~message_counter_offset:0
-        (of_node_pvmstate state)
+        state
         inbox_level
         messages
     in
-    let*! final_tick = PVM.get_tick state in
-    let*! state_hash = PVM.state_hash state in
+    let pvm_state = Ctxt_wrapper.of_node_pvmstate state in
+    let*! final_tick = get_tick pvm_state in
+    let*! state_hash = state_hash pvm_state in
     let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
     let eval_state =
       {
-        state = to_node_pvmstate state;
+        state;
         state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         tick = Sc_rollup.Tick.to_z final_tick;
         inbox_level;
@@ -456,7 +463,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       } =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let>* state, remaining_fuel, num_messages, remaining_messages =
       match messages with
       | [] ->
@@ -477,7 +483,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               ~fuel
               0L
               failing_ticks
-              (of_node_pvmstate state)
+              state
           in
           let state, remaining_fuel =
             match res with
@@ -491,17 +497,19 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             ~fuel
             node_ctxt
             ~message_counter_offset
-            (of_node_pvmstate state)
+            state
             inbox_level
             messages
     in
-    let*! final_tick = PVM.get_tick state in
+    let open (val Pvm.of_kind node_ctxt.kind) in
+    let pvm_state = Ctxt_wrapper.of_node_pvmstate state in
+    let*! final_tick = get_tick pvm_state in
     let final_tick = Sc_rollup.Tick.to_z final_tick in
-    let*! state_hash = PVM.state_hash state in
+    let*! state_hash = state_hash pvm_state in
     let num_ticks = Z.sub final_tick initial_tick in
     let eval_state =
       {
-        state = to_node_pvmstate state;
+        state;
         state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         tick = final_tick;
         inbox_level;

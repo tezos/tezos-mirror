@@ -27,7 +27,6 @@
 
 open Protocol
 open Alpha_context
-open Context_wrapper.Irmin
 
 (** This function computes the inclusion/membership proof of the page
       identified by [page_id] in the slot whose data are provided in
@@ -70,7 +69,6 @@ let page_membership_proof params page_index slot_data =
 let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
     ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
@@ -83,7 +81,12 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
            activation level. *)
         fun ~current_block_level:_ _ -> true
   in
-  let*! input_request = PVM.is_input_state ~is_reveal_enabled start_state in
+  let*! input_request =
+    let open (val Pvm.of_kind node_ctxt.kind) in
+    is_input_state
+      ~is_reveal_enabled
+      (Ctxt_wrapper.of_node_pvmstate start_state)
+  in
   match input_request with
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
       let Dal.Page.{slot_id; page_index} = page_id in
@@ -172,14 +175,14 @@ let generate_proof (node_ctxt : _ Node_context.t)
       ~inbox_level:game.inbox_level
       node_ctxt
       dal_parameters
-      (of_node_pvmstate start_state)
+      start_state
   in
   let module P = struct
     include PVM
 
-    let context : context = (of_node_context context).index
+    let context : context = (Ctxt_wrapper.of_node_context context).index
 
-    let state = of_node_pvmstate start_state
+    let state = Ctxt_wrapper.of_node_pvmstate start_state
 
     let reveal hash =
       let open Lwt_syntax in
@@ -242,7 +245,9 @@ let generate_proof (node_ctxt : _ Node_context.t)
     end
   end in
   let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick (of_node_pvmstate start_state) in
+  let*! start_tick =
+    PVM.get_tick (PVM.Ctxt_wrapper.of_node_pvmstate start_state)
+  in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->

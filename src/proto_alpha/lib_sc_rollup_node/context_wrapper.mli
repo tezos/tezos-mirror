@@ -23,37 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This modules offers functions to translate from node-context and
-    node-pvmstate representation to those used in the PVM *)
-open Context_sigs
+val err_implementation_mismatch : got:string -> 'a
 
-(* Context *)
-val of_node_context :
-  ('repo, 'tree) equality_witness ->
-  [`Read | `Write] Context.t ->
-  ([`Read | `Write], 'repo, 'tree) Context_sigs.t
+(** Context wrappers translate from/to node-context and node-pvmstate
+    PVMs internal representation to those used in the PVM. Each
+    different PVM context will imply a dedicated wrapper.*)
+module type S = sig
+  type repo
 
-val to_node_context :
-  (module Context_sigs.S with type tree = 'tree and type repo = 'repo) ->
-  ('a, 'repo, 'tree) Context_sigs.t ->
-  'a Context.t
+  type tree
 
-(* PVMState *)
-val of_node_pvmstate :
-  ('repo, 'tree) equality_witness -> Context.pvmstate -> 'tree
+  val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
 
-val to_node_pvmstate :
-  (module Context_sigs.S with type tree = 'tree) -> 'tree -> Context.pvmstate
+  val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
 
-(** Specialized module to handle translation to/from Irmin_context *)
-module Irmin : sig
-  val of_node_context :
-    'a Context.t -> ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t
+  val of_node_pvmstate : Context.pvmstate -> tree
 
-  val to_node_context :
-    ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t -> 'a Context.t
-
-  val of_node_pvmstate : Context.pvmstate -> Irmin_context.tree
-
-  val to_node_pvmstate : Irmin_context.tree -> Context.pvmstate
+  val to_node_pvmstate : tree -> Context.pvmstate
 end
+
+(** Specialized module to handle translation to/from Irmin_context.
+    Directly used in Arith, Wasm_2_0_0 and RISC-V PVM *)
+module Irmin :
+  S with type repo = Irmin_context.repo and type tree = Irmin_context.tree
