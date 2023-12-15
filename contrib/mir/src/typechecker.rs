@@ -137,14 +137,14 @@ pub struct TypesNotEqual(Type, Type);
 
 pub type Entrypoints = HashMap<Entrypoint, Type>;
 
-impl Micheline<'_> {
+impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
     /// Validates the type.
     pub fn typecheck_value(
         &self,
         ctx: &mut Ctx,
         value_type: &Micheline,
-    ) -> Result<TypedValue, TcError> {
+    ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx, value_type)?;
         typecheck_value(self, ctx, &ty)
     }
@@ -161,7 +161,7 @@ impl Micheline<'_> {
         ctx: &mut Ctx,
         self_type: Option<&Micheline>,
         stack: &[Micheline],
-    ) -> Result<Instruction, TcError> {
+    ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
                 let (entrypoints, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
@@ -191,7 +191,7 @@ impl Micheline<'_> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
-    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript, TcError> {
+    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
@@ -334,6 +334,9 @@ fn parse_ty_with_entrypoints(
         App(list, [t], _) => Type::new_list(parse_ty(ctx, t)?),
         App(list, ..) => unexpected()?,
 
+        App(lambda, [ty1, ty2], _) => Type::new_lambda(parse_ty(ctx, ty1)?, parse_ty(ctx, ty2)?),
+        App(lambda, ..) => unexpected()?,
+
         App(contract, [t], _) => {
             let t = parse_ty(ctx, t)?;
             // NB: despite `contract` type being duplicable and packable, its
@@ -421,12 +424,12 @@ fn parse_parameter_ty_with_entrypoints(
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-fn typecheck(
-    ast: &[Micheline],
+fn typecheck<'a>(
+    ast: &[Micheline<'a>],
     ctx: &mut Ctx,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<Vec<Instruction>, TcError> {
+) -> Result<Vec<Instruction<'a>>, TcError> {
     ast.iter()
         .map(|i| typecheck_instruction(i, ctx, self_entrypoints, opt_stack))
         .collect()
@@ -449,12 +452,12 @@ macro_rules! nothing_to_none {
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-pub(crate) fn typecheck_instruction(
-    i: &Micheline,
+pub(crate) fn typecheck_instruction<'a>(
+    i: &Micheline<'a>,
     ctx: &mut Ctx,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
-) -> Result<Instruction, TcError> {
+) -> Result<Instruction<'a>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
     use Type as T;
@@ -1112,11 +1115,11 @@ pub(crate) fn typecheck_instruction(
 
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
-pub(crate) fn typecheck_value(
-    v: &Micheline,
+pub(crate) fn typecheck_value<'a>(
+    v: &Micheline<'a>,
     ctx: &mut Ctx,
     t: &Type,
-) -> Result<TypedValue, TcError> {
+) -> Result<TypedValue<'a>, TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
@@ -1180,7 +1183,7 @@ pub(crate) fn typecheck_value(
                 .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
             let ctx_cell = std::cell::RefCell::new(ctx);
             let tc_elt =
-                |v: &Micheline, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
+                |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
                     match v {
                         Micheline::App(Prim::Elt, [k, v], _) => {
                             let k = typecheck_value(k, ctx, tk)?;
@@ -1283,7 +1286,49 @@ pub(crate) fn typecheck_value(
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
         }
+        (
+            T::Lambda(tys),
+            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
+        ) => {
+            let (in_ty, out_ty) = tys.as_ref();
+            TV::Lambda(typecheck_lambda(
+                instrs,
+                ctx,
+                in_ty.clone(),
+                out_ty.clone(),
+                matches!(raw, V::App(Prim::Lambda_rec, ..)),
+            )?)
+        }
         (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+    })
+}
+
+fn typecheck_lambda<'a>(
+    instrs: &'a [Micheline<'a>],
+    ctx: &mut Ctx,
+    in_ty: Type,
+    out_ty: Type,
+    recursive: bool,
+) -> Result<Lambda<'a>, TcError> {
+    let stk = &mut if recursive {
+        let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
+        tc_stk![self_ty, in_ty]
+    } else {
+        tc_stk![in_ty]
+    };
+    let code = typecheck(instrs, ctx, None, stk)?;
+    unify_stacks(ctx, stk, tc_stk![out_ty])?;
+    let micheline_code = Micheline::Seq(instrs);
+    Ok(if recursive {
+        Lambda::LambdaRec {
+            micheline_code,
+            code,
+        }
+    } else {
+        Lambda::Lambda {
+            micheline_code,
+            code,
+        }
     })
 }
 
@@ -1413,11 +1458,11 @@ mod typecheck_tests {
     use Option::None;
 
     /// hack to simplify syntax in tests
-    fn typecheck_instruction(
-        i: &Micheline,
+    fn typecheck_instruction<'a>(
+        i: &Micheline<'a>,
         ctx: &mut Ctx,
         opt_stack: &mut FailingTypeStack,
-    ) -> Result<Instruction, TcError> {
+    ) -> Result<Instruction<'a>, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
     }
 
@@ -4097,6 +4142,121 @@ mod typecheck_tests {
                 instr: Prim::SLICE,
                 stack: stk![Type::Bool, Type::Nat, Type::Nat],
                 reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn push_lambda_wrong_type() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) Unit")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::InvalidValueForType(
+                "App(Unit, [], [])".to_owned(),
+                Type::new_lambda(Type::Unit, Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn push_lambda() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Lambda(Lambda::Lambda {
+                micheline_code: seq! { app!(DROP); app!(UNIT) },
+                code: vec![Drop(None), Unit]
+            })))
+        );
+    }
+
+    #[test]
+    fn push_lambda_bad_result() {
+        assert_eq!(
+            parse("PUSH (lambda unit int) { DROP ; UNIT }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::Unit],
+                stk![Type::Int],
+                TypesNotEqual(Type::Unit, Type::Int).into()
+            ))
+        );
+    }
+
+    #[test]
+    fn push_lambda_bad_input() {
+        assert_eq!(
+            parse("PUSH (lambda int unit) { IF { UNIT } { UNIT } }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
+            })
+        );
+    }
+
+    #[test]
+    fn push_lambda_with_self() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) { SELF }")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_with_self() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { SELF })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+            Err(TcError::SelfForbidden)
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { DIP { DROP } })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Ok(Push(TypedValue::Lambda(Lambda::LambdaRec {
+                micheline_code: seq! { app!(DIP[seq! { app!(DROP) } ]) },
+                code: vec![Dip(None, vec![Drop(None)])]
+            })))
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_bad_result() {
+        assert_eq!(
+            parse("PUSH (lambda unit unit) (Lambda_rec { DROP })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::StacksNotEqual(
+                stk![Type::new_lambda(Type::Unit, Type::Unit)],
+                stk![Type::Unit],
+                TypesNotEqual(Type::new_lambda(Type::Unit, Type::Unit), Type::Unit).into()
+            ))
+        );
+    }
+
+    #[test]
+    fn push_lambda_rec_bad_input() {
+        assert_eq!(
+            parse("PUSH (lambda int unit) (Lambda_rec { IF { UNIT } { UNIT }; DIP { DROP } })")
+                .unwrap()
+                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IF,
+                stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
+                reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
             })
         );
     }

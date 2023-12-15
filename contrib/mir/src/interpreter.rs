@@ -9,47 +9,51 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::{Signed, Zero};
 use typed_arena::Arena;
 
-use crate::ast::annotations::NO_ANNS;
 use crate::ast::*;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
-use crate::lexer::Prim;
 use crate::stack::*;
 use crate::typechecker::typecheck_value;
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-pub enum InterpretError {
+pub enum InterpretError<'a> {
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
     #[error("mutez overflow")]
     MutezOverflow,
     #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, TypedValue),
+    FailedWith(Type, TypedValue<'a>),
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ContractInterpretError {
+pub enum ContractInterpretError<'a> {
     #[error("failed typechecking input: {0}")]
     TcError(#[from] crate::typechecker::TcError),
     #[error("runtime failure while running the contract: {0}")]
-    InterpretError(#[from] crate::interpreter::InterpretError),
+    InterpretError(InterpretError<'a>),
 }
 
-impl ContractScript {
+impl<'a> From<InterpretError<'a>> for ContractInterpretError<'a> {
+    fn from(x: InterpretError<'a>) -> Self {
+        Self::InterpretError(x)
+    }
+}
+
+impl<'a> ContractScript<'a> {
     /// Interpret a typechecked contract script using the provided parameter and
     /// storage. Parameter and storage are given as `Micheline`, as this
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
         ctx: &mut crate::context::Ctx,
-        parameter: Micheline,
-        storage: Micheline,
-    ) -> Result<(impl Iterator<Item = OperationInfo>, TypedValue), ContractInterpretError> {
-        let in_ty = Type::new_pair(self.parameter.clone(), self.storage.clone());
-        let in_val = &[parameter, storage];
-        let in_val = Micheline::App(Prim::Pair, in_val, NO_ANNS);
-        let tc_val = typecheck_value(&in_val, ctx, &in_ty)?;
+        parameter: Micheline<'a>,
+        storage: Micheline<'a>,
+    ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
+    {
+        let parameter = typecheck_value(&parameter, ctx, &self.parameter)?;
+        let storage = typecheck_value(&storage, ctx, &self.storage)?;
+        let tc_val = TypedValue::new_pair(parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, &mut stack)?;
         use TypedValue as V;
@@ -67,7 +71,7 @@ impl ContractScript {
     }
 }
 
-impl Instruction {
+impl<'a> Instruction<'a> {
     /// Interpret the instruction with the given `Ctx` and input stack. Note the
     /// interpreter assumes the instruction can execute on the provided stack,
     /// otherwise this function will panic.
@@ -75,16 +79,20 @@ impl Instruction {
     /// # Panics
     ///
     /// When the instruction can't be executed on the provided stack.
-    pub fn interpret(&self, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+    pub fn interpret(
+        &self,
+        ctx: &mut Ctx,
+        stack: &mut IStack<'a>,
+    ) -> Result<(), InterpretError<'a>> {
         interpret_one(self, ctx, stack)
     }
 }
 
-fn interpret(
-    ast: &Vec<Instruction>,
+fn interpret<'a>(
+    ast: &Vec<Instruction<'a>>,
     ctx: &mut Ctx,
-    stack: &mut IStack,
-) -> Result<(), InterpretError> {
+    stack: &mut IStack<'a>,
+) -> Result<(), InterpretError<'a>> {
     for i in ast {
         i.interpret(ctx, stack)?;
     }
@@ -99,7 +107,11 @@ fn unreachable_state() -> ! {
     panic!("Unreachable state reached during interpreting, possibly broken typechecking!")
 }
 
-fn interpret_one(i: &Instruction, ctx: &mut Ctx, stack: &mut IStack) -> Result<(), InterpretError> {
+fn interpret_one<'a>(
+    i: &Instruction<'a>,
+    ctx: &mut Ctx,
+    stack: &mut IStack<'a>,
+) -> Result<(), InterpretError<'a>> {
     use Instruction as I;
     use TypedValue as V;
 

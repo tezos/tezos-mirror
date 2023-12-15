@@ -215,9 +215,11 @@ mod tests {
 
     #[test]
     fn vote_contract() {
-        use crate::ast::micheline::test_helpers::*;
         let ctx = &mut Ctx::default();
         ctx.amount = 5_000_000;
+        let arena = typed_arena::Arena::new();
+        use crate::lexer::Prim;
+        use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
             .typecheck_script(ctx)
@@ -225,7 +227,14 @@ mod tests {
             .interpret(
                 ctx,
                 "foo".into(),
-                seq! {app!(Elt["bar", 0]); app!(Elt["baz", 0]); app!(Elt["foo", 0])},
+                M::seq(
+                    &arena,
+                    [
+                        M::prim2(&arena, Prim::Elt, "bar".into(), 0.into()),
+                        M::prim2(&arena, Prim::Elt, "baz".into(), 0.into()),
+                        M::prim2(&arena, Prim::Elt, "foo".into(), 0.into()),
+                    ],
+                ),
             );
         use TypedValue as TV;
         match interp_res.unwrap() {
@@ -233,7 +242,7 @@ mod tests {
                 assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::int(1))
             }
             _ => panic!("unexpected contract output"),
-        }
+        };
     }
 
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
@@ -286,10 +295,10 @@ mod tests {
 
 #[cfg(test)]
 mod multisig_tests {
-    use crate::ast::micheline::test_helpers::*;
     use crate::ast::*;
     use crate::context::Ctx;
     use crate::interpreter::{ContractInterpretError, InterpretError};
+    use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
     use num_bigint::BigUint;
     use Type as T;
@@ -327,6 +336,35 @@ mod multisig_tests {
         BigUint::from(111u32)
     }
 
+    fn arena() -> &'static typed_arena::Arena<Micheline<'static>> {
+        // this is generally terrible and will leak memory in some
+        // (multi-threaded) workloads, but it's fine for these tests
+        thread_local! {
+            static BX: &'static typed_arena::Arena<Micheline<'static>> =
+                Box::leak(Box::new(typed_arena::Arena::new()));
+        }
+        BX.with(|a| *a)
+    }
+
+    fn pair(
+        x: impl Into<Micheline<'static>>,
+        y: impl Into<Micheline<'static>>,
+    ) -> Micheline<'static> {
+        Micheline::prim2(arena(), Prim::Pair, x.into(), y.into())
+    }
+    fn right(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
+        Micheline::prim1(arena(), Prim::Right, x.into())
+    }
+    fn left(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
+        Micheline::prim1(arena(), Prim::Left, x.into())
+    }
+    fn some(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
+        Micheline::prim1(arena(), Prim::Some, x.into())
+    }
+    fn seq(xs: impl IntoIterator<Item = impl Into<Micheline<'static>>>) -> Micheline<'static> {
+        Micheline::seq(arena(), xs.into_iter().map(Into::into))
+    }
+
     #[test]
     fn multisig_transfer() {
         let mut ctx = make_ctx();
@@ -355,20 +393,23 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
-                app!(Pair[
+                pair(
                     // :payload
-                    app!(Pair[
+                    pair(
                         anti_replay_counter(),
-                        app!(Left[
+                        left(
                             // :transfer
-                            app!(Pair[transfer_amount as i128,transfer_destination])
-                        ])
-                    ]),
+                            pair(transfer_amount as i128, transfer_destination),
+                        ),
+                    ),
                     // %sigs
-                    seq!{ app!(Some[signature]) }
-                ]),
+                    seq([some(signature)]),
+                ),
                 // make_initial_storage(),
-                app!(Pair[anti_replay_counter(), threshold.clone(), seq!{ PUBLIC_KEY }]),
+                pair(
+                    anti_replay_counter(),
+                    pair(threshold.clone(), seq([PUBLIC_KEY])),
+                ),
             );
 
         assert_eq!(
@@ -422,19 +463,22 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
-                app!(Pair[
+                pair(
                     // :payload
-                    app!(Pair[
+                    pair(
                         anti_replay_counter(),
-                        app!(Right[ app!(Left[
+                        right(left(
                             // %delegate
-                            app!(Some[new_delegate])
-                        ])])
-                    ]),
+                            some(new_delegate),
+                        )),
+                    ),
                     // %sigs
-                    seq!{ app!(Some[signature]) }
-                ]),
-                app!(Pair[anti_replay_counter(), threshold.clone(), seq!{ PUBLIC_KEY }]),
+                    seq([some(signature)]),
+                ),
+                pair(
+                    anti_replay_counter(),
+                    pair(threshold.clone(), seq([PUBLIC_KEY])),
+                ),
             );
 
         assert_eq!(
@@ -472,19 +516,19 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
-                app!(Pair[
+                pair(
                     // :payload
-                    app!(Pair[
+                    pair(
                         anti_replay_counter(),
-                        app!(Right[ app!(Left[
+                        right(left(
                             // %delegate
-                            app!(Some[new_delegate])
-                        ])])
-                    ]),
+                            some(new_delegate),
+                        )),
+                    ),
                     // %sigs
-                    seq!{ app!(Some[invalid_signature]) }
-                ]),
-                app!(Pair[anti_replay_counter(), threshold, seq!{ PUBLIC_KEY }]),
+                    seq([some(invalid_signature)]),
+                ),
+                pair(anti_replay_counter(), pair(threshold, seq([PUBLIC_KEY]))),
             );
 
         assert_eq!(
@@ -498,9 +542,12 @@ mod multisig_tests {
     // The interpretation result contains an iterator of operations,
     // which does not implement `Eq` and therefore cannot be used with `assert_eq!`.
     // This function collects the iterator into a vector so we can use `assert_eq!`.
-    fn collect_ops(
-        result: Result<(impl Iterator<Item = OperationInfo>, TypedValue), ContractInterpretError>,
-    ) -> Result<(Vec<OperationInfo>, TypedValue), ContractInterpretError> {
+    fn collect_ops<'a>(
+        result: Result<
+            (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
+            ContractInterpretError<'a>,
+        >,
+    ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>> {
         result.map(|(ops, val)| (ops.collect(), val))
     }
 

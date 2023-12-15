@@ -11,7 +11,7 @@ use std::slice::SliceIndex;
 use crate::ast::*;
 
 pub type TypeStack = Stack<Type>;
-pub type IStack = Stack<TypedValue>;
+pub type IStack<'a> = Stack<TypedValue<'a>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
 /// always-failing instructions. A failed stack can be unified (in terms of

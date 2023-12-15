@@ -40,6 +40,13 @@ impl<'a> Micheline<'a> {
     ) -> Self {
         Micheline::App(prim, arena.alloc_extend([arg1, arg2]), NO_ANNS)
     }
+
+    pub fn seq(
+        arena: &'a Arena<Micheline<'a>>,
+        args: impl IntoIterator<Item = Micheline<'a>>,
+    ) -> Self {
+        Micheline::Seq(arena.alloc_extend(args))
+    }
 }
 
 impl<'a> From<i128> for Micheline<'a> {
