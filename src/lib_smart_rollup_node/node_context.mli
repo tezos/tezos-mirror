@@ -200,6 +200,10 @@ type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** {2 Abstraction over store} *)
 
+(** [get_history_mode t] returns the current history mode for the rollup
+    node. *)
+val get_history_mode : _ t -> Configuration.history_mode tzresult Lwt.t
+
 (** {3 Layer 2 blocks} *)
 
 (** [is_processed store hash] returns [true] if the block with [hash] has

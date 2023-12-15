@@ -218,6 +218,11 @@ module Lwt_result_option_syntax = struct
     match a with None -> return_none | Some a -> f a
 end
 
+let get_history_mode {store; _} =
+  let open Lwt_result_syntax in
+  let+ mode = Store.History_mode.read store.history_mode in
+  Option.value mode ~default:Configuration.default_history_mode
+
 let hash_of_level_opt {store; cctxt; _} level =
   let open Lwt_result_syntax in
   let* hash = Store.Levels_to_hashes.find store.levels_to_hashes level in
