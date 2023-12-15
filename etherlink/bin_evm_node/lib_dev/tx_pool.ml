@@ -378,7 +378,7 @@ let handle_request_error rq =
 let make_streamed_call ~rollup_node_endpoint =
   let open Lwt_syntax in
   let stream, push = Lwt_stream.create () in
-  let on_chunk _v = push (Some ()) and on_close () = push None in
+  let on_chunk v = push (Some v) and on_close () = push None in
   let* _spill_all =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.json]
@@ -396,7 +396,7 @@ let rec subscribe_l2_block ~stream_l2 worker =
   let open Lwt_syntax in
   let* new_head = Lwt_stream.get stream_l2 in
   match new_head with
-  | Some () ->
+  | Some _block ->
       let* _pushed =
         Worker.Queue.push_request
           worker
