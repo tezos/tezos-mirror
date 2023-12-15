@@ -20,7 +20,8 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    is_sequencer, read_admin, read_base_fee_per_gas, read_chain_id, read_kernel_version,
+    is_sequencer, read_admin, read_base_fee_per_gas, read_chain_id,
+    read_delayed_transaction_bridge, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
     read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
     store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
@@ -91,6 +92,7 @@ pub fn stage_one<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
+    delayed_bridge: Option<ContractKt1Hash>,
     is_sequencer: bool,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage one.");
@@ -101,7 +103,15 @@ pub fn stage_one<Host: Runtime>(
         ticketer,
         admin
     );
-    fetch(host, smart_rollup_address, ticketer, admin, is_sequencer)
+
+    fetch(
+        host,
+        smart_rollup_address,
+        ticketer,
+        admin,
+        delayed_bridge,
+        is_sequencer,
+    )
 }
 
 fn produce_and_upgrade<Host: KernelRuntime>(
@@ -239,6 +249,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed to retrieve smart rollup address")?;
     let ticketer = read_ticketer(host);
     let admin = read_admin(host);
+    let delayed_bridge = read_delayed_transaction_bridge(host);
     let is_sequencer = is_sequencer(host)?;
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
 
@@ -246,8 +257,15 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
-        .context("Failed during stage 1")?;
+    stage_one(
+        host,
+        smart_rollup_address,
+        ticketer,
+        admin,
+        delayed_bridge,
+        is_sequencer,
+    )
+    .context("Failed during stage 1")?;
 
     // Start processing blueprints
     stage_two(host, chain_id, base_fee_per_gas).context("Failed during stage 2")
