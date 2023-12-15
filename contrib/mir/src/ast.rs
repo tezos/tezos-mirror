@@ -477,6 +477,7 @@ pub enum Instruction<'a> {
     Amount,
     Nil,
     EmptySet,
+    EmptyBigMap(Type, Type),
     Mem(overloads::Mem),
     Get(overloads::Get),
     Update(overloads::Update),

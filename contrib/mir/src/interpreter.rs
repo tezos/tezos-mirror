@@ -12,6 +12,7 @@ use num_traits::{Signed, Zero};
 use std::rc::Rc;
 use typed_arena::Arena;
 
+use crate::ast::big_map::BigMap;
 use crate::ast::*;
 use crate::bls;
 use crate::context::Ctx;
@@ -799,6 +800,16 @@ fn interpret_one<'a>(
             use std::collections::BTreeSet;
             ctx.gas.consume(interpret_cost::EMPTY_SET)?;
             stack.push(V::Set(BTreeSet::new()))
+        }
+        I::EmptyBigMap(kty, vty) => {
+            use std::collections::BTreeMap;
+            ctx.gas.consume(interpret_cost::EMPTY_BIG_MAP)?;
+            stack.push(V::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::new(),
+                key_type: kty.clone(),
+                value_type: vty.clone(),
+            }))
         }
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
@@ -2597,6 +2608,29 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn empty_big_map() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![];
+        assert_eq!(
+            interpret_one(&EmptyBigMap(Type::Int, Type::Unit), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::new(),
+                key_type: Type::Int,
+                value_type: Type::Unit,
+            })]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::EMPTY_BIG_MAP
         );
     }
 

@@ -209,7 +209,6 @@ macro_rules! micheline_unsupported_instructions {
             | Prim::CREATE_CONTRACT
             | Prim::EMIT
             | Prim::EMPTY_MAP
-            | Prim::EMPTY_BIG_MAP
             | Prim::GET_AND_UPDATE
             | Prim::MAP
             | Prim::SAPLING_EMPTY_STATE

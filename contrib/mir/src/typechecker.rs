@@ -1301,6 +1301,16 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
+            let kty = parse_ty(ctx, kty)?;
+            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(ctx, vty)?;
+            vty.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            stack.push(T::new_big_map(kty.clone(), vty.clone()));
+            I::EmptyBigMap(kty, vty)
+        }
+        (App(EMPTY_BIG_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
@@ -3969,6 +3979,20 @@ mod typecheck_tests {
             Ok(EmptySet)
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
+    }
+
+    #[test]
+    fn empty_big_map() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_BIG_MAP int unit").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(EmptyBigMap(Type::Int, Type::Unit))
+        );
+        assert_eq!(stack, tc_stk![Type::new_big_map(Type::Int, Type::Unit)]);
     }
 
     #[test]
