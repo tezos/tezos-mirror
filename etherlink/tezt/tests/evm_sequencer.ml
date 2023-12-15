@@ -440,6 +440,136 @@ let test_rpc_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
+let wait_for_event ?(levels = 10) event_watcher ~evm_node ~sc_rollup_node ~node
+    ~client ~error_msg =
+  let event_value = ref None in
+  let _ =
+    let* return_value = event_watcher in
+    event_value := Some return_value ;
+    unit
+  in
+  let rec rollup_node_loop n =
+    if n = 0 then Test.fail error_msg
+    else
+      let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+      let* _ = Rpc.produce_block evm_node in
+      match !event_value with
+      | Some value -> return value
+      | None -> rollup_node_loop (n - 1)
+  in
+  Lwt.pick [rollup_node_loop levels]
+
+let wait_for_delayed_inbox_add_tx_and_injected ~evm_node ~sc_rollup_node ~node
+    ~client =
+  let event_watcher =
+    let added =
+      Evm_node.wait_for evm_node "evm_node_dev_delayed_inbox_add_transaction.v0"
+      @@ fun json ->
+      let hash = JSON.(json |-> "hash" |> as_string) in
+      Some hash
+    in
+    let injected =
+      Evm_node.wait_for evm_node "evm_node_dev_tx_pool_transaction_injected.v0"
+      @@ fun json ->
+      let hash = JSON.(json |> as_string) in
+      Some hash
+    in
+    let* added_hash, injected_hash = Lwt.both added injected in
+    Check.((added_hash = injected_hash) string)
+      ~error_msg:"Injected hash %R is not the expected one %L" ;
+    Lwt.return_unit
+  in
+  wait_for_event
+    event_watcher
+    ~evm_node
+    ~sc_rollup_node
+    ~node
+    ~client
+    ~error_msg:
+      "Timed out while waiting for transaction to be added to the delayed \
+       inbox and injected"
+
+let wait_for_delayed_inbox_fetch ~evm_node ~sc_rollup_node ~node ~client =
+  let event_watcher =
+    Evm_node.wait_for evm_node "evm_node_dev_delayed_inbox_fetch_succeeded.v0"
+    @@ fun json ->
+    let nb = JSON.(json |-> "nb" |> as_int) in
+    Some nb
+  in
+  wait_for_event
+    event_watcher
+    ~evm_node
+    ~sc_rollup_node
+    ~node
+    ~client
+    ~error_msg:"Timed out while waiting for delayed inbox to be fetched"
+
+let wait_until_delayed_inbox_is_empty ~evm_node ~sc_rollup_node ~node ~client =
+  let levels = 10 in
+  let rec go n =
+    if n = 0 then
+      Test.fail "Timed out waiting for the delayed inbox to be empty"
+    else
+      let* nb =
+        wait_for_delayed_inbox_fetch ~evm_node ~sc_rollup_node ~node ~client
+      in
+      if nb = 0 then Lwt.return_unit else go (n - 1)
+  in
+  go levels
+
+let test_delayed_transfer_is_included =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
+    ~title:"Delayed transaction is included"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {client; node; l1_contracts; sc_rollup_address; sc_rollup_node; evm_node}
+      =
+    setup_sequencer protocol
+  in
+  let endpoint = Evm_node.endpoint evm_node in
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let raw_transfer =
+    "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let sender = Eth_account.bootstrap_accounts.(0).address in
+  let receiver = Eth_account.bootstrap_accounts.(1).address in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~node
+      raw_transfer
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+  in
+  let* () =
+    wait_until_delayed_inbox_is_empty ~evm_node ~sc_rollup_node ~node ~client
+  in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((sender_balance_prev > sender_balance_next) Wei.typ)
+    ~error_msg:"Expected a smaller balance" ;
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+  unit
+
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
@@ -447,4 +577,5 @@ let () =
   test_can_fetch_blueprint [Alpha] ;
   test_send_transaction_to_delayed_inbox [Alpha] ;
   test_send_deposit_to_delayed_inbox [Alpha] ;
-  test_rpc_produceBlock [Alpha]
+  test_rpc_produceBlock [Alpha] ;
+  test_delayed_transfer_is_included [Alpha]
