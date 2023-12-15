@@ -835,7 +835,7 @@ mod multisig_tests {
         $ CHAIN_ID='0xf3d48554'
         $ ANTI_REPLAY_COUNTER='111'
     */
-    fn make_ctx() -> Ctx {
+    fn make_ctx() -> Ctx<'static> {
         let mut ctx = Ctx::default();
         ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
         ctx.chain_id = tezos_crypto_rs::hash::ChainId(hex::decode("f3d48554").unwrap());

@@ -1982,14 +1982,14 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
 /// (where you specify a getter to obtain the key from an element).
 ///
 /// Also charges gas for this check.
-struct OrderValidatingIterator<'a, T: Iterator<Item = Result<I, TcError>>, I> {
+struct OrderValidatingIterator<'a, 'b, T: Iterator<Item = Result<I, TcError>>, I> {
     it: std::iter::Peekable<T>,
     to_key: fn(&I) -> &TypedValue,
     container_ty: &'a Type,
-    ctx: &'a std::cell::RefCell<&'a mut Ctx>,
+    ctx: &'a std::cell::RefCell<&'a mut Ctx<'b>>,
 }
 
-impl<T, I> Iterator for OrderValidatingIterator<'_, T, I>
+impl<T, I> Iterator for OrderValidatingIterator<'_, '_, T, I>
 where
     T: Iterator<Item = Result<I, TcError>>,
 {
