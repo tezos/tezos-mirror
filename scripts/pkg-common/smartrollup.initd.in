@@ -29,9 +29,9 @@ fi
 # Defaults
 user=tezos
 group=tezos
-nodedir=/var/tezos/node
-clientdir=~tezos/.tezos-client
-rollupdatadir=~tezos/.tezos-smart-rollup-node
+nodedir=/var/tezos/.tezos-node
+clientdir=/var/tezos/.tezos-client
+rollupdatadir=/var/tezos/.tezos-smart-rollup-node
 logdir=/var/log/tezos
 rotateonstart=yes
 nodeaddr=127.0.0.1
