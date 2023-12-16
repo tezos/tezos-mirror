@@ -3,4 +3,5 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez Smart Rollup daemons
-Depends: @DPKG@-client (>=@VERSION@), @DEPENDS@
+Recommends: @DPKG@-client (>=@VERSION@)
+Depends: adduser, @DEPENDS@
