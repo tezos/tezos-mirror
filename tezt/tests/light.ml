@@ -68,7 +68,7 @@ let test_no_endpoint () =
   Test.register
     ~__FILE__
     ~title:"mode light no endpoint"
-    ~tags:["client"; "light"; "cli"]
+    ~tags:[Tag.layer1; "client"; "light"; "cli"]
     ~uses_node:false
   @@ fun () ->
   let min_agreement = 1.0 in
@@ -95,7 +95,7 @@ let test_endpoint_not_in_sources () =
   Test.register
     ~__FILE__
     ~title:"mode light endpoint not in sources"
-    ~tags:["client"; "light"; "cli"]
+    ~tags:[Tag.layer1; "client"; "light"; "cli"]
   @@ fun () ->
   let min_agreement = 1.0 in
   let mk_node_endpoint rpc_port = Client.Node (Node.create ~rpc_port []) in
@@ -136,7 +136,7 @@ let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) transfer"
-    ~tags:["light"; "client"; "transfer"]
+    ~tags:[Tag.layer1; "light"; "client"; "transfer"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   do_transfer client
@@ -145,7 +145,7 @@ let test_bake =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) bake"
-    ~tags:["light"; "client"; "bake"]
+    ~tags:[Tag.layer1; "light"; "client"; "bake"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
@@ -216,7 +216,7 @@ module NoUselessRpc = struct
     Protocol.register_test
       ~__FILE__
       ~title:"(Light) No useless RPC call"
-      ~tags:["light"; "rpc"; "get"]
+      ~tags:[Tag.layer1; "light"; "rpc"; "get"]
     @@ fun protocol ->
     let* _, client = init_light ~protocol in
     let paths =
@@ -257,7 +257,7 @@ let test_wrong_proto =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) Wrong proto"
-    ~tags:["light"; "proto"]
+    ~tags:[Tag.layer1; "light"; "proto"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   Proxy.wrong_proto protocol client
