@@ -3,7 +3,6 @@ include: .gitlab/ci/jobs/build/common.yml
 docker:amd64:
   extends:
     - .build_docker_release_template
-    - .tags_template__no_gcp
   stage: manual
   needs: []
   when: manual
