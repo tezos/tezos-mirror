@@ -25,7 +25,6 @@ init_sandboxed_client() {
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_sc_rollup_node="$local_alpha_sc_rollup_node -base-dir $client_dir -endpoint https://$host:$rpc"
-        alpha_sc_rollup_client="$local_alpha_sc_rollup_client -base-dir $client_dir -endpoint https://$host:$rpc"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -endpoint http://$host:$rpc"
@@ -33,7 +32,6 @@ init_sandboxed_client() {
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_sc_rollup_node="$local_alpha_sc_rollup_node -base-dir $client_dir -endpoint http://$host:$rpc"
-        alpha_sc_rollup_client="$local_alpha_sc_rollup_client -base-dir $client_dir -endpoint http://$host:$rpc"
         compiler="$local_compiler"
     fi
 }
@@ -179,18 +177,15 @@ main () {
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
         local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
-        local_sc_rollup_client="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_client/main_sc_rollup_client_$protocol_underscore.exe"
 
         if [ -n "$USE_TLS" ]; then
             baker="$local_baker -base-dir $client_dir -endpoint https://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
             sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint https://$host:$rpc"
-            sc_rollup_client="$local_sc_rollup_client -base-dir $client_dir -endpoint https://$host:$rpc"
         else
             baker="$local_baker -base-dir $client_dir -endpoint http://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
             sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint http://$host:$rpc"
-            sc_rollup_client="$local_sc_rollup_client -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
         echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol_without_number
@@ -203,7 +198,6 @@ main () {
         chmod +x $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
 
         echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
-        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
         chmod +x $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
 
         echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number

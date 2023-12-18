@@ -192,10 +192,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?regression
     ~__FILE__
     ~tags
-    ~uses:(fun protocol ->
-      Constant.octez_smart_rollup_node
-      :: Protocol.sc_rollup_client protocol
-      :: uses protocol)
+    ~uses:(fun protocol -> Constant.octez_smart_rollup_node :: uses protocol)
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =

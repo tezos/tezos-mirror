@@ -746,12 +746,6 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
-# Ignoring unreleased package octez-smart-rollup-client-Proxford.
-
-# Ignoring unreleased package octez-smart-rollup-client-PtNairob.
-
-# Ignoring unreleased package octez-smart-rollup-client-alpha.
-
 opam:octez-smart-rollup-node:
   extends:
     - .opam_template

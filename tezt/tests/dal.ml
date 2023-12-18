@@ -2826,8 +2826,7 @@ let register_end_to_end_tests ~protocols =
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags:["e2e"; network]
-        ~uses:(fun protocol ->
-          [Protocol.baker protocol; Protocol.sc_rollup_client protocol])
+        ~uses:(fun protocol -> [Protocol.baker protocol])
         title
         (e2e_test_script
            ~number_of_dal_slots
@@ -3818,7 +3817,7 @@ module Tx_kernel_e2e = struct
       in
       bake_until cond client sc_rollup_node
 
-  (** [get_ticket_balance sc_rollup_client ~pvm_name ~pkh ~ticket_index] returns
+  (** [get_ticket_balance  ~pvm_name ~pkh ~ticket_index] returns
       the L2 balance of the account with [pkh] for the ticket with [ticket_index] *)
   let get_ticket_balance sc_rollup_node ~pvm_name ~pkh ~ticket_index =
     Sc_rollup_node.RPC.call sc_rollup_node
@@ -4250,25 +4249,21 @@ let register ~protocols =
   (* Tests with all nodes *)
   scenario_with_all_nodes
     "rollup_node_downloads_slots"
-    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     rollup_node_stores_dal_slots
     protocols ;
   scenario_with_all_nodes
     "rollup_node_applies_dal_pages"
-    ~uses:(fun protocol -> [Protocol.sc_rollup_client protocol])
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
     "test reveal_dal_page in fast exec wasm pvm"
-    ~uses:(fun protocol ->
-      [Protocol.sc_rollup_client protocol; Constant.smart_rollup_installer])
+    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
     ~pvm_name:"wasm_2_0_0"
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
     "test tx_kernel"
-    ~uses:(fun protocol ->
-      [Protocol.sc_rollup_client protocol; Constant.smart_rollup_installer])
+    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
     ~pvm_name:"wasm_2_0_0"
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
