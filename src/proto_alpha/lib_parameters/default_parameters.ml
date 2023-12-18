@@ -130,7 +130,7 @@ let constants_mainnet =
   {
     Constants.Parametric.preserved_cycles = 5;
     consensus_rights_delay = 5;
-    blocks_preservation_cycles = 5;
+    blocks_preservation_cycles = 1;
     delegate_parameters_activation_delay = 5;
     blocks_per_cycle = 16384l;
     blocks_per_commitment = 128l;
@@ -322,7 +322,7 @@ let constants_sandbox =
         };
     issuance_weights;
     Constants.Parametric.preserved_cycles = 2;
-    blocks_preservation_cycles = 2;
+    blocks_preservation_cycles = 1;
     consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 2;
     blocks_per_cycle = 8l;
@@ -361,7 +361,7 @@ let constants_test =
     Constants.Parametric.preserved_cycles = 3;
     consensus_rights_delay = 3;
     delegate_parameters_activation_delay = 3;
-    blocks_preservation_cycles = 3;
+    blocks_preservation_cycles = 1;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
     nonce_revelation_threshold = 4l;
