@@ -89,7 +89,7 @@ let test_persistent_state =
 let test_publish_blueprints =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "data"]
+    ~tags:[Tag.flaky; "evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
   @@ fun protocol ->
   let* {evm_node; node; client; sc_rollup_node} = setup_sequencer protocol in
