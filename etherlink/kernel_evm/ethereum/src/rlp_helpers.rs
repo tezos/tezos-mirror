@@ -178,6 +178,21 @@ pub fn append_u64_le<'a>(stream: &'a mut RlpStream, v: &u64) -> &'a mut RlpStrea
     stream.append(&v.to_le_bytes().to_vec())
 }
 
+pub fn decode_field_u16_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<u16, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    let bytes_array: [u8; 2] = bytes
+        .try_into()
+        .map_err(|_| DecoderError::Custom("Field is not 2 bytes"))?;
+    Ok(u16::from_le_bytes(bytes_array))
+}
+
+pub fn append_u16_le<'a>(stream: &'a mut RlpStream, v: &u16) -> &'a mut RlpStream {
+    stream.append(&v.to_le_bytes().to_vec())
+}
+
 pub fn decode_transaction_hash(
     decoder: &Rlp<'_>,
 ) -> Result<TransactionHash, DecoderError> {
