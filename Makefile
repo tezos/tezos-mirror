@@ -175,15 +175,12 @@ clean-old-names:
 	@rm -f tezos-baker-013-PtJakart
 	@rm -f tezos-accuser-013-PtJakart
 	@rm -f tezos-tx-rollup-node-013-PtJakart
-	@rm -f tezos-tx-rollup-client-013-PtJakart
 	@rm -f tezos-baker-015-PtLimaPt
 	@rm -f tezos-accuser-015-PtLimaPt
 	@rm -f tezos-tx-rollup-node-015-PtLimaPt
-	@rm -f tezos-tx-rollup-client-015-PtLimaPt
 	@rm -f tezos-baker-alpha
 	@rm -f tezos-accuser-alpha
 	@rm -f tezos-smart-rollup-node-alpha
-	@rm -f tezos-smart-rollup-client-alpha
 	@rm -f tezos-snoop
 	@rm -f tezos-dal-node
 # octez-validator should stay in this list for Octez 16.0 because we
@@ -194,11 +191,9 @@ clean-old-names:
 	@rm -f octez-baker-013-PtJakart
 	@rm -f octez-accuser-013-PtJakart
 	@rm -f octez-tx-rollup-node-013-PtJakart
-	@rm -f octez-tx-rollup-client-013-PtJakart
 	@rm -f octez-baker-015-PtLimaPt
 	@rm -f octez-accuser-015-PtLimaPt
 	@rm -f octez-tx-rollup-node-015-PtLimaPt
-	@rm -f octez-tx-rollup-client-015-PtLimaPt
 	@rm -f octez-smart-rollup-node-PtMumbai
 	@rm -f octez-smart-rollup-node-PtNairob
 	@rm -f octez-smart-rollup-node-Proxford
