@@ -37,6 +37,14 @@ pub enum Xor {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Not {
+    Bool,
+    Nat,
+    Int,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Mem {
     Set,
     Map,
