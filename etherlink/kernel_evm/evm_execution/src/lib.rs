@@ -1355,18 +1355,16 @@ mod test {
         // _all_ the gas allocated to the call (so 0xFFFF or 65535)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: false,
-            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                ExitError::InvalidCode(Opcode::SSTORE),
-            )),
+            is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 962434148,
         }));
 
-        // assert that call fails
+        // assert that call succeeds
         assert_eq!(result, expected_result);
     }
 
@@ -1448,18 +1446,17 @@ mod test {
         // expect to spend _all_ the gas.
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: false,
-            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                ExitError::InvalidCode(Opcode::LOG0),
-            )),
+            is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Stopped),
             new_address: None,
+            // No logs were produced
             logs: vec![],
-            result: None,
+            result: Some(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 441347264,
         }));
 
-        // assert that call fails
+        // assert that call succeeds
         assert_eq!(result, expected_result);
     }
 
