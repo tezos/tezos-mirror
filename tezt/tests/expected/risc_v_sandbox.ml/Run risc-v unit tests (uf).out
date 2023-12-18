@@ -44,67 +44,67 @@ Received request to exit with code 0
 rv64uf-p-recoding: success
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fadd --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fclass --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fclass: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fcmp --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fcmp: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fcvt --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fcvt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fcvt_w --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fcvt_w: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fdiv --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fdiv: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fmadd --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fmadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-fmin --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-fmin: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-ldst --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-ldst: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-move --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-move: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uf-v-recoding --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uf-v-recoding: fail

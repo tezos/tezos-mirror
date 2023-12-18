@@ -4,5 +4,81 @@
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World
 [09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
-Kernel panic Some("Abort") at Some(Location { file: "src/main.rs", line: 9, col: 5 })
+Internal(
+    StartOfLevel,
+)
+Internal(
+    InfoPerLevel(
+        InfoPerLevel {
+            predecessor_timestamp: [TIMESTAMP],
+            predecessor: BlockHash(
+                "[BLOCK_HASH]",
+            ),
+        },
+    ),
+)
+External(
+    [
+        1,
+        2,
+        3,
+        4,
+    ],
+)
+External(
+    [
+        1,
+        4,
+        3,
+        2,
+    ],
+)
+Internal(
+    EndOfLevel,
+)
+Internal(
+    StartOfLevel,
+)
+Internal(
+    InfoPerLevel(
+        InfoPerLevel {
+            predecessor_timestamp: [TIMESTAMP],
+            predecessor: BlockHash(
+                "[BLOCK_HASH]",
+            ),
+        },
+    ),
+)
+External(
+    [
+        1,
+        1,
+    ],
+)
+Internal(
+    EndOfLevel,
+)
+Internal(
+    StartOfLevel,
+)
+Internal(
+    InfoPerLevel(
+        InfoPerLevel {
+            predecessor_timestamp: [TIMESTAMP],
+            predecessor: BlockHash(
+                "[BLOCK_HASH]",
+            ),
+        },
+    ),
+)
+External(
+    [
+        1,
+        2,
+    ],
+)
+Internal(
+    EndOfLevel,
+)
+Kernel panic Some("Abort") at Some(Location { file: "src/main.rs", line: 17, col: 5 })
 Received SBI shutdown request
