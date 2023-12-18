@@ -5,14 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~timestamp ~smart_rollup_address ~number ~transactions]
-    creates a sequencer blueprint at [timestamp] with a given [number]
-    containing [transactions].  Returns valid payload of external
-    messages inputs to put in the inbox.
-*)
-val create :
-  timestamp:Time.Protocol.t ->
-  smart_rollup_address:string ->
-  number:Ethereum_types.quantity ->
-  transactions:string list ->
-  [> `External of string] list
+(** [now ()] returns the current time. *)
+val now : unit -> Time.Protocol.t
+
+(** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
+    compatible with the kernel. *)
+val timestamp_to_bytes : Time.Protocol.t -> bytes

@@ -331,7 +331,7 @@ let rec main_sequencer () =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let*! () = Lwt_unix.sleep 5. in
-  let* () = Tx_pool.produce_block () in
+  let* () = Tx_pool.produce_block ~timestamp:(Helpers.now ()) in
   main_sequencer ()
 
 let sequencer_command =

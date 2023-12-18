@@ -31,6 +31,6 @@ val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t
     if no transactions are in the pool. *)
 val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
-(** [produce_block ()] takes the transactions in the tx pool and produces a block
-    from it. *)
-val produce_block : unit -> unit tzresult Lwt.t
+(** [produce_block ~timestamp] takes the transactions in the tx pool
+    and produces a block from it. *)
+val produce_block : timestamp:Time.Protocol.t -> unit tzresult Lwt.t
