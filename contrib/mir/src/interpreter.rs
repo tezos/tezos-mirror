@@ -272,6 +272,30 @@ fn interpret_one<'a>(
                 }
             }
         },
+        I::Not(overload) => match overload {
+            overloads::Not::Bool => {
+                let o = irrefutable_match!(&mut stack[0]; V::Bool);
+                ctx.gas.consume(interpret_cost::NOT_BOOL)?;
+                *o = !*o;
+            }
+            overloads::Not::Int => {
+                let o = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::not_num(&o)?)?;
+                stack.push(V::Int(!o));
+            }
+            overloads::Not::Nat => {
+                let o = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::not_num(&o)?)?;
+                stack.push(V::Int(!BigInt::from(o)))
+            }
+            overloads::Not::Bytes => {
+                let o = irrefutable_match!(&mut stack[0]; V::Bytes);
+                ctx.gas.consume(interpret_cost::not_bytes(o)?)?;
+                for b in o.iter_mut() {
+                    *b = !*b
+                }
+            }
+        },
         I::Dip(opt_height, nested) => {
             ctx.gas.consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
@@ -1018,6 +1042,42 @@ mod interpreter_tests {
                 mk_0x("f01dc4"),
             );
         }
+    }
+
+    #[test]
+    fn test_not() {
+        #[track_caller]
+        fn check(instr: overloads::Not, inp: TypedValue, expected: TypedValue) {
+            let mut stack = stk![inp];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Not(instr), &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, stk![expected]);
+        }
+
+        use overloads::Not as on;
+
+        check(on::Bool, V::Bool(false), V::Bool(true));
+        check(on::Bool, V::Bool(true), V::Bool(false));
+
+        check(on::Int, V::int(0), V::int(-1));
+        check(on::Int, V::int(5), V::int(-6));
+        check(on::Int, V::int(-1), V::int(0));
+        check(
+            on::Int,
+            V::Int(BigInt::parse_bytes(b"123456789123456789123456789123456789", 10).unwrap()),
+            V::Int(BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10).unwrap()),
+        );
+
+        check(on::Nat, V::nat(0), V::int(-1));
+        check(on::Nat, V::nat(5), V::int(-6));
+        check(
+            on::Nat,
+            V::Nat(BigUint::parse_bytes(b"123456789123456789123456789123456789", 10).unwrap()),
+            V::Int(BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10).unwrap()),
+        );
+
+        check(on::Bytes, mk_0x(""), mk_0x(""));
+        check(on::Bytes, mk_0x("1234"), mk_0x("edcb"));
     }
 
     #[test]

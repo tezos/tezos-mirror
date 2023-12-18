@@ -223,6 +223,7 @@ pub mod interpret_cost {
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;
     pub const XOR_BOOL: u32 = 15;
+    pub const NOT_BOOL: u32 = 10;
     pub const CAR: u32 = 10;
     pub const CDR: u32 = 10;
     pub const PAIR: u32 = 10;
@@ -333,6 +334,16 @@ pub mod interpret_cost {
     pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
         let sz = Checked::from(Ord::min(b1.len(), b2.len()));
         (40 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(n.byte_size());
+        (25 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn not_bytes(b: &Vec<u8>) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(b.len());
+        (30 + (sz >> 1)).as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {

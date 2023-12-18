@@ -647,6 +647,17 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(prim @ (AND | OR | XOR), [], _), [_] | []) => no_overload!(*prim, len 2),
         (App(AND | OR | XOR, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NOT, [], _), [.., T::Bool]) => I::Not(overloads::Not::Bool),
+        (App(NOT, [], _), [.., T::Int]) => I::Not(overloads::Not::Int),
+        (App(NOT, [], _), [.., T::Nat]) => {
+            stack[0] = T::Int;
+            I::Not(overloads::Not::Nat)
+        }
+        (App(NOT, [], _), [.., T::Bytes]) => I::Not(overloads::Not::Bytes),
+        (App(NOT, [], _), [.., _]) => no_overload!(NOT),
+        (App(NOT, [], _), []) => no_overload!(NOT, len 1),
+        (App(NOT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(DIP, args, _), ..) => {
             let (opt_height, nested) = match args {
                 [Int(height), Seq(nested)] => (Option::Some(validate_u10(height)?), nested),
@@ -1848,6 +1859,51 @@ mod typecheck_tests {
             Err(TcError::NoMatchingOverload {
                 instr: Prim::XOR,
                 stack: stk![Type::String, Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_not() {
+        for ty in &[Type::Bool, Type::Nat, Type::Int, Type::Bytes] {
+            let mut stack = tc_stk![ty.clone()];
+            let mut res_ty = ty.clone();
+            if matches!(ty, Type::Nat) {
+                res_ty = Type::Int
+            };
+            let expected_stack = tc_stk![res_ty];
+
+            let expected_overload = match ty {
+                Type::Bool => overloads::Not::Bool,
+                Type::Int => overloads::Not::Int,
+                Type::Nat => overloads::Not::Nat,
+                Type::Bytes => overloads::Not::Bytes,
+                _ => panic!("Bad test parameters"),
+            };
+            let mut ctx = Ctx::default();
+            assert_eq!(
+                typecheck_instruction(&app!(NOT), &mut ctx, &mut stack),
+                Ok(Not(expected_overload))
+            );
+            assert_eq!(stack, expected_stack);
+        }
+    }
+
+    #[test]
+    fn test_not_short() {
+        too_short_test(&app!(NOT), Prim::NOT, 1);
+    }
+
+    #[test]
+    fn test_not_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(NOT), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::NOT,
+                stack: stk![Type::String],
                 reason: None
             })
         );

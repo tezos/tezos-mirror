@@ -679,6 +679,9 @@ Files do not follow naming convention.
 - [not_bytes_00.tzt](not_bytes_00.tzt)
 - [not_bytes_01.tzt](not_bytes_01.tzt)
 - [not_bytes_02.tzt](not_bytes_02.tzt)
+- [not_bytes_03.tzt](not_bytes_03.tzt)
+- [not_bytes_04.tzt](not_bytes_04.tzt)
+- [not_bytes_05.tzt](not_bytes_05.tzt)
 
 ### `OR bool:bool`
 
