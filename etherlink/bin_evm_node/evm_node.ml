@@ -153,6 +153,9 @@ module Params = struct
     Tezos_clic.parameter (fun _ s ->
         let list = String.split ',' s in
         Lwt.return_ok list)
+
+  let float =
+    Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Float.of_string s))
 end
 
 let rpc_addr_arg =
@@ -255,6 +258,13 @@ let preimages_arg =
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
+let time_between_blocks_arg =
+  Tezos_clic.arg
+    ~long:"time-between-blocks"
+    ~doc:"Interval at which the sequencer creates an empty block by default."
+    ~placeholder:"10."
+    Params.float
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -327,19 +337,20 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
-let rec main_sequencer () =
+let rec main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
+ fun config ->
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
-  let*! () = Lwt_unix.sleep 5. in
+  let*! () = Lwt_unix.sleep config.mode.time_between_blocks in
   let* () = Tx_pool.produce_block ~timestamp:(Helpers.now ()) in
-  main_sequencer ()
+  main_sequencer config
 
 let sequencer_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args8
+    (args9
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -347,7 +358,8 @@ let sequencer_command =
        cors_allowed_headers_arg
        verbose_arg
        kernel_arg
-       preimages_arg)
+       preimages_arg
+       time_between_blocks_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
     (fun ( data_dir,
@@ -357,7 +369,8 @@ let sequencer_command =
            cors_headers,
            verbose,
            kernel,
-           preimages )
+           preimages,
+           time_between_blocks )
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -374,6 +387,7 @@ let sequencer_command =
           ~verbose
           ?kernel
           ?preimages
+          ?time_between_blocks
           ()
       in
       let* () = Configuration.save_sequencer ~force:true ~data_dir config in
@@ -412,7 +426,7 @@ let sequencer_command =
       in
       let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in
-      let* () = main_sequencer () in
+      let* () = main_sequencer config in
       return_unit)
 
 let make_prod_messages ~smart_rollup_address s =
