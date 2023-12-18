@@ -219,6 +219,30 @@ impl<T> IndexMut<usize> for Stack<T> {
     }
 }
 
+pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<T> IntoIterator for Stack<T> {
+    type IntoIter = IntoIter<T>;
+
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.0.into_iter().rev())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
