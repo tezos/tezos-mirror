@@ -65,3 +65,11 @@ pub enum Slice {
     String,
     Bytes,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Concat {
+    TwoStrings,
+    TwoBytes,
+    ListOfStrings,
+    ListOfBytes,
+}

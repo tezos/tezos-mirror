@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 
+use checked::Checked;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{Signed, Zero};
 use std::rc::Rc;
@@ -468,6 +469,64 @@ fn interpret_one<'a>(
             lst.cons(elt);
             stack.push(V::List(lst));
         }
+        I::Concat(overload) => match overload {
+            overloads::Concat::TwoStrings => {
+                let mut s1 = pop!(V::String);
+                let s2 = pop!(V::String);
+                ctx.gas
+                    .consume(interpret_cost::concat_string_pair(s1.len(), s2.len())?)?;
+                s1.push_str(&s2);
+                stack.push(V::String(s1));
+            }
+            overloads::Concat::TwoBytes => {
+                let mut bs1 = pop!(V::Bytes);
+                let bs2 = pop!(V::Bytes);
+                ctx.gas
+                    .consume(interpret_cost::concat_bytes_pair(bs1.len(), bs2.len())?)?;
+                bs1.extend_from_slice(&bs2);
+                stack.push(V::Bytes(bs1))
+            }
+            overloads::Concat::ListOfStrings => {
+                let list = pop!(V::List);
+                ctx.gas
+                    .consume(interpret_cost::concat_list_precheck(list.len())?)?;
+
+                let mut total_len = Checked::zero();
+                for val in &list {
+                    let s = irrefutable_match!(val; V::String);
+                    total_len += s.len()
+                }
+                ctx.gas
+                    .consume(interpret_cost::concat_string_list(total_len)?)?;
+
+                let mut result = String::with_capacity(total_len.ok_or(OutOfGas)?);
+                for val in list {
+                    let s = irrefutable_match!(val; V::String);
+                    result.push_str(&s);
+                }
+                stack.push(V::String(result))
+            }
+            overloads::Concat::ListOfBytes => {
+                let list = pop!(V::List);
+                ctx.gas
+                    .consume(interpret_cost::concat_list_precheck(list.len())?)?;
+
+                let mut total_len = Checked::zero();
+                for val in &list {
+                    let bs = irrefutable_match!(val; V::Bytes);
+                    total_len += bs.len()
+                }
+                ctx.gas
+                    .consume(interpret_cost::concat_bytes_list(total_len)?)?;
+
+                let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
+                for val in &list {
+                    let bs = irrefutable_match!(val; V::Bytes);
+                    result.extend_from_slice(bs);
+                }
+                stack.push(V::Bytes(result))
+            }
+        },
         I::EmptySet => {
             use std::collections::BTreeSet;
             ctx.gas.consume(interpret_cost::EMPTY_SET)?;
@@ -2027,6 +2086,126 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![V::int(-747)]);
+    }
+
+    #[test]
+    fn concat_two_string() {
+        let mut stack = stk![
+            TypedValue::String("def".into()),
+            TypedValue::String("abc".into()),
+        ];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::TwoStrings)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::String("abcdef".into())]);
+    }
+
+    #[test]
+    fn concat_two_bytes() {
+        let mut stack = stk![
+            TypedValue::Bytes(b"def".to_vec()),
+            TypedValue::Bytes(b"abc".to_vec()),
+        ];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::TwoBytes)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bytes(b"abcdef".to_vec())]);
+    }
+
+    #[test]
+    fn concat_list_of_3_strings() {
+        let mut stack = stk![TypedValue::List(
+            vec![
+                TypedValue::String("a".into()),
+                TypedValue::String("b".into()),
+                TypedValue::String("c".into()),
+            ]
+            .into()
+        )];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::String("abc".into())]);
+    }
+
+    #[test]
+    fn concat_list_of_1_strings() {
+        let mut stack = stk![TypedValue::List(
+            vec![TypedValue::String("x".into()),].into()
+        ),];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::String("x".into())]);
+    }
+
+    #[test]
+    fn concat_list_of_0_strings() {
+        let mut stack = stk![TypedValue::List(vec![].into()),];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::String("".into())]);
+    }
+
+    #[test]
+    fn concat_list_of_3_bytes() {
+        let mut stack = stk![TypedValue::List(
+            vec![
+                TypedValue::Bytes(b"a".to_vec()),
+                TypedValue::Bytes(b"b".to_vec()),
+                TypedValue::Bytes(b"c".to_vec()),
+            ]
+            .into()
+        )];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::ListOfBytes)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bytes(b"abc".to_vec())]);
+    }
+
+    #[test]
+    fn concat_list_of_0_bytes() {
+        let mut stack = stk![TypedValue::List(vec![].into())];
+        assert_eq!(
+            interpret(
+                &vec![Concat(overloads::Concat::ListOfBytes)],
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bytes(b"".to_vec())]);
     }
 
     #[test]

@@ -26,6 +26,11 @@ impl<T> MichelsonList<T> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn iter(&self) -> Iter<'_, T> {
+        // delegate to `impl IntoIterator for &MichelsonList`
+        self.into_iter()
+    }
 }
 
 impl<T> Default for MichelsonList<T> {
@@ -43,11 +48,28 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
+pub struct Iter<'a, T>(std::iter::Rev<core::slice::Iter<'a, T>>);
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
 impl<T> IntoIterator for MichelsonList<T> {
     type IntoIter = IntoIter<T>;
     type Item = T;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter().rev())
+    }
+}
+
+impl<'a, T> IntoIterator for &'a MichelsonList<T> {
+    type IntoIter = Iter<'a, T>;
+    type Item = &'a T;
+    fn into_iter(self) -> Self::IntoIter {
+        Iter(self.0.iter().rev())
     }
 }
 

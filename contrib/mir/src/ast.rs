@@ -291,6 +291,7 @@ pub enum Instruction<'a> {
     Mem(overloads::Mem),
     Get(overloads::Get),
     Update(overloads::Update),
+    Concat(overloads::Concat),
     Seq(Vec<Self>),
     Unpair,
     Cons,
