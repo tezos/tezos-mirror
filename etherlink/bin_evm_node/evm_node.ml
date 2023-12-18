@@ -327,6 +327,13 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
+let rec main_sequencer () =
+  let open Lwt_result_syntax in
+  let open Evm_node_lib_dev in
+  let*! () = Lwt_unix.sleep 5. in
+  let* () = Tx_pool.produce_block () in
+  main_sequencer ()
+
 let sequencer_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -397,7 +404,7 @@ let sequencer_command =
           {
             rollup_node = (module Sequencer);
             smart_rollup_address;
-            mode = Sequencer {time_between_blocks = 5.};
+            mode = Sequencer;
           }
       in
       let* directory =
@@ -405,8 +412,7 @@ let sequencer_command =
       in
       let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in
-      let wait, _resolve = Lwt.wait () in
-      let* () = wait in
+      let* () = main_sequencer () in
       return_unit)
 
 let make_prod_messages ~smart_rollup_address s =
