@@ -39,12 +39,21 @@ let make_blueprint_chunks ~transactions =
   let timestamp = Value (now_bytes ()) in
   List [messages; timestamp] |> encode
 
+let encode_u16_le i =
+  let bytes = Bytes.make 2 '\000' in
+  Bytes.set_uint16_le bytes 0 i ;
+  bytes
+
 let create ~smart_rollup_address ~number ~transactions =
   let open Rlp in
   let number = Value (encode_u256_le number) in
   let chunk = make_blueprint_chunks ~transactions in
+  (* TODO: to be calculated properly in a future commit *)
+  let nb_chunks = Rlp.Value (encode_u16_le 1) in
+  let chunk_index = Rlp.Value (encode_u16_le 0) in
   let rlp_sequencer_blueprint =
-    List [Value chunk; number] |> encode |> Bytes.to_string
+    List [Value chunk; number; nb_chunks; chunk_index]
+    |> encode |> Bytes.to_string
   in
   [
     `External

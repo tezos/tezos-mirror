@@ -173,6 +173,10 @@ let encode_u256_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
   pad_to_n_bytes_le bits 32
 
+let encode_u16_le (Qty n) =
+  let bits = Z.to_bits n |> Bytes.of_string in
+  pad_to_n_bytes_le bits 2
+
 type transaction_log = {
   address : address;
   topics : hash list;
