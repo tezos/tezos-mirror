@@ -22,6 +22,8 @@ pub mod tzt;
 
 #[cfg(test)]
 mod tests {
+    use typed_arena::Arena;
+
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::*;
     use crate::context::Ctx;
@@ -46,7 +48,10 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::nat(10)];
-        assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
+        let temp = Arena::new();
+        assert!(ast
+            .interpret(&mut Ctx::default(), &temp, &mut istack)
+            .is_ok());
         assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
     }
 
@@ -56,7 +61,8 @@ mod tests {
         let mut ctx = Ctx::default();
         let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
         let mut istack = stk![];
-        assert!(ast.interpret(&mut ctx, &mut istack).is_ok());
+        let temp = Arena::new();
+        assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
     }
 
@@ -68,8 +74,9 @@ mod tests {
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
         let mut ctx = Ctx::default();
+        let temp = Arena::new();
         report_gas(&mut ctx, |ctx| {
-            assert!(ast.interpret(ctx, &mut istack).is_ok());
+            assert!(ast.interpret(ctx, &temp, &mut istack).is_ok());
         });
         assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1287);
     }
@@ -83,8 +90,9 @@ mod tests {
         let mut istack = stk![TypedValue::nat(5)];
         let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1);
+        let temp = Arena::new();
         assert_eq!(
-            ast.interpret(ctx, &mut istack),
+            ast.interpret(ctx, &temp, &mut istack),
             Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
         );
     }
@@ -96,7 +104,10 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(option[app!(nat)])])
             .unwrap();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
-        assert!(ast.interpret(&mut Ctx::default(), &mut istack).is_ok());
+        let temp = Arena::new();
+        assert!(ast
+            .interpret(&mut Ctx::default(), &temp, &mut istack)
+            .is_ok());
         assert_eq!(istack, stk![TypedValue::nat(6)]);
     }
 
@@ -221,12 +232,14 @@ mod tests {
         let arena = typed_arena::Arena::new();
         use crate::lexer::Prim;
         use Micheline as M;
+        let temp = Arena::new();
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
             .typecheck_script(ctx)
             .unwrap()
             .interpret(
                 ctx,
+                &temp,
                 "foo".into(),
                 M::seq(
                     &arena,
@@ -251,15 +264,19 @@ mod tests {
     use std::collections::HashMap;
 
     #[track_caller]
-    fn run_e2e_test<'a>(
-        instr: &'a str,
+    fn run_e2e_test(
+        instr: &str,
         input_type_stack: TypeStack,
         output_type_stack: TypeStack,
-        mut input_stack: Stack<TypedValue<'a>>,
-        output_stack: Stack<TypedValue<'a>>,
+        input_stack: Stack<TypedValue>,
+        output_stack: Stack<TypedValue>,
         mut ctx: Ctx,
     ) {
-        let ast = parse(instr).unwrap();
+        let instr = instr.to_owned();
+        let temp = Arena::new();
+        // NB: required to appease the borrow checker
+        let mut input_stack = input_stack;
+        let ast = parse(&instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
             typecheck_instruction(&ast, &mut ctx, None, &mut input_failing_type_stack).unwrap();
@@ -267,7 +284,7 @@ mod tests {
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
         );
-        assert!(ast.interpret(&mut ctx, &mut input_stack).is_ok());
+        assert!(ast.interpret(&mut ctx, &temp, &mut input_stack).is_ok());
         assert_eq!(input_stack, output_stack);
     }
 
@@ -869,6 +886,7 @@ mod multisig_tests {
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
     use num_bigint::BigUint;
+    use typed_arena::Arena;
     use Type as T;
     use TypedValue as TV;
 
@@ -954,6 +972,7 @@ mod multisig_tests {
         let transfer_amount = 123;
         let transfer_destination = "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j";
         let signature = "edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v";
+        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
@@ -961,6 +980,7 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
+                &temp,
                 pair(
                     // :payload
                     pair(
@@ -1024,6 +1044,7 @@ mod multisig_tests {
         */
         let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
         let signature = "edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST";
+        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
@@ -1031,6 +1052,7 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
+                &temp,
                 pair(
                     // :payload
                     pair(
@@ -1077,6 +1099,7 @@ mod multisig_tests {
         let threshold = 1;
         let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
         let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
+        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
@@ -1084,6 +1107,7 @@ mod multisig_tests {
             .unwrap()
             .interpret(
                 &mut ctx,
+                &temp,
                 pair(
                     // :payload
                     pair(

@@ -131,12 +131,14 @@ mod tests {
     #[test]
     fn apply_micheline() {
         let parser = Parser::new();
+        let arena = Arena::new();
         let code = parser.parse("{ LAMBDA (pair int nat unit) unit { DROP; UNIT }; PUSH int 1; APPLY; PUSH nat 2; APPLY }").unwrap();
         let code = code
             .typecheck_instruction(&mut Ctx::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
-        code.interpret(&mut Ctx::default(), &mut stack).unwrap();
+        code.interpret(&mut Ctx::default(), &arena, &mut stack)
+            .unwrap();
         let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
         let arena = Arena::new();
         assert_eq!(
@@ -161,12 +163,14 @@ mod tests {
     #[test]
     fn apply_micheline_rec() {
         let parser = Parser::new();
+        let arena = Arena::new();
         let code = parser.parse("{ LAMBDA_REC (pair int nat unit) unit { DROP 2; UNIT }; PUSH int 1; APPLY; PUSH nat 2; APPLY }").unwrap();
         let code = code
             .typecheck_instruction(&mut Ctx::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
-        code.interpret(&mut Ctx::default(), &mut stack).unwrap();
+        code.interpret(&mut Ctx::default(), &arena, &mut stack)
+            .unwrap();
         let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
         let arena = Arena::new();
         assert_eq!(
@@ -200,6 +204,7 @@ mod tests {
         // PACK always encodes pair values as right-combs, and always encodes
         // pair types as a flat sequence. Test we're doing the same.
         let parser = Parser::new();
+        let arena = Arena::new();
         let code = parser
             .parse(
                 r#"
@@ -217,7 +222,8 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
-        code.interpret(&mut Ctx::default(), &mut stack).unwrap();
+        code.interpret(&mut Ctx::default(), &arena, &mut stack)
+            .unwrap();
         let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
         let arena = Arena::new();
         assert_eq!(
