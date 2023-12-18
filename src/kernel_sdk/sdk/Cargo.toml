@@ -60,6 +60,8 @@ version = "=0.5.2"
 optional = true
 
 [target.'cfg(target_os = "hermit")'.dependencies.hermit]
+# TODO: remove pin once patched version of hermit is published
+git = "https://github.com/hermit-os/hermit-rs.git"
 version = "0.7.2"
 default-features = false
 
