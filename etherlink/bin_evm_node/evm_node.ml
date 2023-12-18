@@ -337,13 +337,25 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
-let rec main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
+let main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
  fun config ->
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
-  let*! () = Lwt_unix.sleep config.mode.time_between_blocks in
-  let* _nb_transactions = Tx_pool.produce_block ~timestamp:(Helpers.now ()) in
-  main_sequencer config
+  let time_between_blocks = config.mode.time_between_blocks in
+  let rec loop last_produced_block =
+    let now = Helpers.now () in
+    (* We force if the last produced block is older than [time_between_blocks]. *)
+    let force =
+      let diff = Time.Protocol.(diff now last_produced_block) in
+      diff >= Int64.of_float time_between_blocks
+    in
+    let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
+    let*! () = Lwt_unix.sleep 0.5 in
+    if nb_transactions > 0 || force then loop now else loop last_produced_block
+  in
+  let now = Helpers.now () in
+  let* _nb_transactions = Tx_pool.produce_block ~force:true ~timestamp:now in
+  loop now
 
 let sequencer_command =
   let open Tezos_clic in
