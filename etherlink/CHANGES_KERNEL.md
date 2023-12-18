@@ -14,6 +14,7 @@ deployed. (!11225)
 ### Bug fixes
 
 - Prevent fatal errors when an intermediate call/transaction runs out of gas during an execution. (!11290)
+- Completely remove fatal error promotion between intermediate call/transactions. (!11334)
 
 ### Breaking changes
 
