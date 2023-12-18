@@ -77,28 +77,41 @@ pub struct TztTest<'a> {
     pub chain_id: Option<ChainId>,
     pub parameter: Option<Entrypoints>,
     pub self_addr: Option<AddressHash>,
+    pub other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
+}
+
+fn populate_ctx_with_known_contracts(
+    ctx: &mut Ctx,
+    self_param: Option<(AddressHash, Option<Entrypoints>)>,
+    m_other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
+) {
+    // If other_contracts is not provided, then initialize with empty map,
+    // or else initialize with the provided list of known contracts.
+    let mut known_contracts = m_other_contracts.unwrap_or(HashMap::new());
+
+    // If self address is provided, include that to the list of known contracts as well.
+    // Use a default type of Unit, if parameter type is not provided.
+    match self_param {
+        None => {}
+        Some((ah, eps)) => {
+            known_contracts.insert(
+                ah,
+                eps.unwrap_or(HashMap::from([(Entrypoint::default(), Type::Unit)])),
+            );
+        }
+    }
+
+    // Set known contracts in context.
+    ctx.set_known_contracts(known_contracts);
 }
 
 fn typecheck_stack<'a>(
     stk: Vec<(Micheline<'a>, Micheline<'a>)>,
     self_param: Option<(AddressHash, Option<Entrypoints>)>,
+    m_other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
 ) -> Result<Vec<(Type, TypedValue<'a>)>, TcError> {
     let mut ctx = Ctx::default();
-    match self_param {
-        None => {}
-        Some((ah, eps)) => {
-            ctx.lookup_contract = Box::new(move |x| {
-                if *x == ah {
-                    Some(
-                        eps.clone()
-                            .unwrap_or(HashMap::from([(Entrypoint::default(), Type::Unit)])),
-                    )
-                } else {
-                    None
-                }
-            });
-        }
-    }
+    populate_ctx_with_known_contracts(&mut ctx, self_param, m_other_contracts);
 
     stk.into_iter()
         .map(|(t, v)| {
@@ -143,6 +156,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_chain_id: Option<Micheline> = None;
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
+        let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -153,13 +167,16 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         for e in tzt {
             match e {
                 Code(ib) => set_tzt_field("code", &mut m_code, ib)?,
-                Input(stk) => set_tzt_field("input", &mut m_input, typecheck_stack(stk, None)?)?,
+                Input(stk) => {
+                    set_tzt_field("input", &mut m_input, typecheck_stack(stk, None, None)?)?
+                }
                 Output(tzt_output) => set_tzt_field("output", &mut m_output_inter, tzt_output)?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
                 Balance(m) => set_tzt_field("balance", &mut m_balance, m)?,
                 ChainId(id) => set_tzt_field("chain_id", &mut m_chain_id, id)?,
                 Parameter(ty) => set_tzt_field("parameter", &mut m_parameter, ty)?,
                 SelfAddr(v) => set_tzt_field("self", &mut m_self, v)?,
+                OtherContracts(v) => set_tzt_field("other_contracts", &mut m_other_contracts, v)?,
             }
         }
 
@@ -181,6 +198,29 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let other_contracts = match m_other_contracts {
+            Some(oc) => {
+                let mut a = HashMap::new();
+                for (ahm, ctm) in oc {
+                    let address_hash = irrefutable_match!(
+                        typecheck_value(&ahm, &mut Ctx::default(), &Type::Address)?;
+                        TypedValue::Address)
+                    .hash;
+                    let entrypoints = ctm.get_entrypoints(&mut Ctx::default()).unwrap();
+                    match a.get(&address_hash) {
+                        None => {
+                            a.insert(address_hash, entrypoints);
+                        }
+                        Some(_) => {
+                            return Err("Address cannot repeat in 'other_contracts'".into());
+                        }
+                    }
+                }
+                Some(a)
+            }
+            None => None,
+        };
+
         // Once we have self_addr and parameter, we typecheck the output stack
         // after populating the context's known_contracts with the self address.
         // Later we may add the Tzt specs `other_contracts` fields. At that point
@@ -190,6 +230,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 TztSuccess(stk) => Some(ExpectSuccess(typecheck_stack(
                     stk,
                     self_addr.clone().map(|x| (x, parameter.clone())),
+                    other_contracts.clone(),
                 )?)),
                 TztError(error_exp) => Some(ExpectError(error_exp)),
             },
@@ -212,6 +253,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 .transpose()?,
             parameter,
             self_addr,
+            other_contracts,
         })
     }
 }
@@ -286,6 +328,7 @@ pub enum TztEntity<'a> {
     ChainId(Micheline<'a>),
     Parameter(Micheline<'a>),
     SelfAddr(Micheline<'a>),
+    OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test
@@ -329,7 +372,17 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
     ctx.amount = test.amount.unwrap_or_default();
     ctx.balance = test.balance.unwrap_or_default();
     ctx.chain_id = test.chain_id.unwrap_or(Ctx::default().chain_id);
-    ctx.self_address = test.self_addr.unwrap_or(Ctx::default().self_address);
+    ctx.self_address = test
+        .self_addr
+        .clone()
+        .unwrap_or(Ctx::default().self_address);
+
+    populate_ctx_with_known_contracts(
+        &mut ctx,
+        test.self_addr.clone().map(|x| (x, test.parameter.clone())),
+        test.other_contracts.clone(),
+    );
+
     let execution_result = execute_tzt_test_code(test.code, &mut ctx, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
 }
