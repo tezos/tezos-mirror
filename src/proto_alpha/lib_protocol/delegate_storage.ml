@@ -25,6 +25,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(*
+  Some invariants:
+
+  A contract is a delegate <=>
+    - it is registered (i.e. in the set {!Storage.Delegates.mem}), and
+    - its full staking balance is initialized.
+
+  If a contract is a delegate then :
+    - it has no stake in another account, though it may (still) have unstake
+        requests from another contract.
+
+  If a contract is not a delegate then:
+    - it has no *own* frozen stake (a.k.a. frozen deposits),
+    - it has no consensus key.
+
+  Once a contract has become a delegate, it is so forever. There are no ways
+  to unregister.
+*)
+
 type error +=
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
@@ -129,7 +148,11 @@ module Contract = struct
       in
       let* c = Contract_delegate_storage.set c contract delegate in
       let* c =
-        Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+        (* Initializes the full staking balance of [delegate]. *)
+        Stake_storage.initialize_delegate
+          c
+          delegate
+          ~delegated:balance_and_frozen_bonds
       in
       let*! c = Storage.Delegates.add c delegate in
       let* c = Delegate_consensus_key.init c delegate pk in

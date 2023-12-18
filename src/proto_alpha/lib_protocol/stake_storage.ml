@@ -73,20 +73,7 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
-let get_full_staking_balance ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ staking_balance_opt = Storage.Stake.Staking_balance.find ctxt delegate in
-  Option.value staking_balance_opt ~default:Full_staking_balance_repr.zero
-
-let get_initialized_stake ctxt delegate =
-  let open Lwt_result_syntax in
-  let* balance_opt = Storage.Stake.Staking_balance.find ctxt delegate in
-  match balance_opt with
-  | Some staking_balance -> return (staking_balance, ctxt)
-  | None ->
-      let balance = Full_staking_balance_repr.zero in
-      let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
-      return (balance, ctxt)
+let get_full_staking_balance = Storage.Stake.Staking_balance.get
 
 let has_minimal_stake ctxt
     {Full_staking_balance_repr.own_frozen; staked_frozen; delegated} =
@@ -108,9 +95,25 @@ let has_minimal_stake_and_frozen_stake ctxt
   Tez_repr.(own_frozen >= minimal_frozen_stake)
   && has_minimal_stake ctxt full_staking_balance
 
+let initialize_delegate ctxt delegate ~delegated =
+  let open Lwt_result_syntax in
+  let balance =
+    Full_staking_balance_repr.make
+      ~own_frozen:Tez_repr.zero
+      ~staked_frozen:Tez_repr.zero
+      ~delegated
+  in
+  let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
+  if has_minimal_stake ctxt balance then
+    let*! ctxt =
+      Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
+    in
+    return ctxt
+  else return ctxt
+
 let update_stake ~f ctxt delegate =
   let open Lwt_result_syntax in
-  let* staking_balance_before, ctxt = get_initialized_stake ctxt delegate in
+  let* staking_balance_before = get_full_staking_balance ctxt delegate in
   let*? staking_balance = f staking_balance_before in
   let* ctxt =
     Storage.Stake.Staking_balance.update ctxt delegate staking_balance
@@ -209,7 +212,7 @@ let set_active ctxt delegate =
   let* ctxt, inactive = Delegate_activation_storage.set_active ctxt delegate in
   if not inactive then return ctxt
   else
-    let* staking_balance, ctxt = get_initialized_stake ctxt delegate in
+    let* staking_balance = get_full_staking_balance ctxt delegate in
     if has_minimal_stake ctxt staking_balance then
       let*! ctxt =
         Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()

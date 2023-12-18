@@ -14,8 +14,6 @@ type t = private {
 val make :
   own_frozen:Tez_repr.t -> staked_frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
 
-val zero : t
-
 val encoding : t Data_encoding.t
 
 (** The weight of a delegate used for voting rights. *)
