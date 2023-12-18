@@ -141,7 +141,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Inject_transactions : Time.Protocol.t -> (unit, tztrace) t
+    | Inject_transactions : Time.Protocol.t -> (int, tztrace) t
 
   type view = View : _ t -> view
 
@@ -279,30 +279,34 @@ let inject_transactions ~timestamp ~smart_rollup_address rollup_node pool =
       ~smart_rollup_address
       ~transactions:txs
   in
-  (match hashes with
-  | Error _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-      Format.printf "[tx-pool] Error when sending transaction.\n%!"
-  | Ok hashes ->
-      List.iter
-        (fun hash ->
-          Format.printf
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-            "[tx-pool] Transaction %s sent to the rollup.\n%!"
-            (Ethereum_types.hash_to_string hash))
-        hashes) ;
-  return pool
+  let nb_transactions =
+    match hashes with
+    | Error _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+        Format.printf "[tx-pool] Error when sending transaction.\n%!" ;
+        0
+    | Ok hashes ->
+        List.iter
+          (fun hash ->
+            Format.printf
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+              "[tx-pool] Transaction %s sent to the rollup.\n%!"
+              (Ethereum_types.hash_to_string hash))
+          hashes ;
+        List.length hashes
+  in
+  return (pool, nb_transactions)
 
 let on_head ~timestamp state =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node; smart_rollup_address; pool; _} = state in
-  let* pool =
+  let* pool, nb_transactions =
     inject_transactions ~timestamp ~smart_rollup_address rollup_node pool
   in
   (* update the pool *)
   state.pool <- pool ;
-  return_unit
+  return nb_transactions
 
 module Handlers = struct
   type self = worker

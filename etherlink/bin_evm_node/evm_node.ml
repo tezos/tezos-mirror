@@ -342,7 +342,7 @@ let rec main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let*! () = Lwt_unix.sleep config.mode.time_between_blocks in
-  let* () = Tx_pool.produce_block ~timestamp:(Helpers.now ()) in
+  let* _nb_transactions = Tx_pool.produce_block ~timestamp:(Helpers.now ()) in
   main_sequencer config
 
 let sequencer_command =
