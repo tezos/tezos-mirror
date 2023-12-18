@@ -19,8 +19,8 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
     ?variant ?(tags = []) ?(timeout = 10) ?(commitment_period = 10) ~kind
     ~migrate_from ~migrate_to ~scenario_prior ~scenario_after ~description () =
   let tags =
-    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "migration"
-    :: tags
+    Tag.etherlink :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    :: kind :: "migration" :: tags
   in
   Test.register
     ~__FILE__
@@ -429,8 +429,8 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
     ?challenge_window ?timeout ?variant ?(tags = []) ~kind ~migrate_from
     ~migrate_to ~scenario_prior ~scenario_after ~description () =
   let tags =
-    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "l2"
-    :: "migration" :: tags
+    Tag.etherlink :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    :: kind :: "l2" :: "migration" :: tags
   in
   Test.register
     ~__FILE__
@@ -725,8 +725,8 @@ let test_l2_migration_scenario_event ?parameters_ty
     ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~migration_on_event
     ~description scenario =
   let tags =
-    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "l2"
-    :: "migration" :: tags
+    Tag.etherlink :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    :: kind :: "l2" :: "migration" :: tags
   in
   Test.register
     ~__FILE__
