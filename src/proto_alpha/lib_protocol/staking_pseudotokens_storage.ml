@@ -156,17 +156,13 @@ type delegator_balances = {
     deposits, in tez, of the delegate's stakers. *)
 let get_frozen_deposits_staked_tez ctxt ~delegate =
   let open Lwt_result_syntax in
-  let+ {staked_frozen; delegated = _; own_frozen = _} =
-    Stake_storage.get_full_staking_balance ctxt delegate
-  in
-  staked_frozen
+  let+ staking_balance = Stake_storage.get_full_staking_balance ctxt delegate in
+  Full_staking_balance_repr.staked_frozen staking_balance
 
 let get_own_frozen_deposits ctxt ~delegate =
   let open Lwt_result_syntax in
-  let+ {own_frozen; delegated = _; staked_frozen = _} =
-    Stake_storage.get_full_staking_balance ctxt delegate
-  in
-  own_frozen
+  let+ staking_balance = Stake_storage.get_full_staking_balance ctxt delegate in
+  Full_staking_balance_repr.own_frozen staking_balance
 
 (** [get_frozen_deposits_pseudotokens ctxt ~delegate] returns the total
     number of pseudotokens in circulation for the given

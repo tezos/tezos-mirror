@@ -43,3 +43,5 @@ val ( +? ) : t -> t -> t tzresult
 val staking_weight : t -> int64
 
 val compare : t -> t -> int
+
+val has_minimal_stake_to_participate : minimal_stake:Tez_repr.t -> t -> bool

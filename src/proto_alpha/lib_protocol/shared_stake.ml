@@ -9,25 +9,15 @@ type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
 
 let share ~rounding ~full_staking_balance amount =
   let open Result_syntax in
-  let Full_staking_balance_repr.{own_frozen; staked_frozen; delegated = _} =
-    full_staking_balance
-  in
-  if Tez_repr.(staked_frozen = zero) then
-    return {baker_part = amount; stakers_part = Tez_repr.zero}
-  else
-    let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
-    let* baker_part =
-      let rounding =
-        match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
-      in
-      Tez_repr.mul_ratio
-        ~rounding
-        amount
-        ~num:(Tez_repr.to_mutez own_frozen)
-        ~den:(Tez_repr.to_mutez total_frozen)
+  let num, den = Full_staking_balance_repr.own_ratio full_staking_balance in
+  let* baker_part =
+    let rounding =
+      match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
     in
-    let* stakers_part = Tez_repr.(amount -? baker_part) in
-    return {baker_part; stakers_part}
+    Tez_repr.mul_ratio ~rounding amount ~num ~den
+  in
+  let* stakers_part = Tez_repr.(amount -? baker_part) in
+  return {baker_part; stakers_part}
 
 type reward_distrib = {
   to_baker_from_staking : Tez_repr.t;

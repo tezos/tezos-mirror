@@ -51,3 +51,9 @@ let staking_weight {frozen; weighted_delegated} =
   Int64.add frozen weighted_delegated
 
 let compare s1 s2 = Int64.compare (staking_weight s1) (staking_weight s2)
+
+let has_minimal_stake_to_participate ~minimal_stake {frozen; weighted_delegated}
+    =
+  match Tez_repr.(frozen +? weighted_delegated) with
+  | Error _total_overflows -> true
+  | Ok total -> Tez_repr.(total >= minimal_stake)

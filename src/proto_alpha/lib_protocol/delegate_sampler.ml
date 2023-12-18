@@ -168,24 +168,36 @@ let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
 
 let get_stakes_for_selected_index ctxt ~slashings index =
   let open Lwt_result_syntax in
+  let minimal_frozen_stake = Constants_storage.minimal_frozen_stake ctxt in
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
   Stake_storage.fold_snapshot
     ctxt
     ~index
-    ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
+    ~f:(fun (delegate, staking_balance) acc ->
       let staking_balance =
         match Signature.Public_key_hash.Map.find delegate slashings with
         | None -> staking_balance
         | Some percentage ->
             Full_staking_balance_repr.apply_slashing ~percentage staking_balance
       in
-      let* stake_for_cycle =
-        get_delegate_stake_from_staking_balance ctxt delegate staking_balance
-      in
-      if Stake_storage.has_minimal_stake_and_frozen_stake ctxt staking_balance
+      if
+        Full_staking_balance_repr.has_minimal_frozen_stake
+          ~minimal_frozen_stake
+          staking_balance
       then
-        let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
-        return ((delegate, stake_for_cycle) :: acc, total_stake)
-      else return (acc, total_stake))
+        let* stake_for_cycle =
+          get_delegate_stake_from_staking_balance ctxt delegate staking_balance
+        in
+        if
+          Stake_repr.has_minimal_stake_to_participate
+            ~minimal_stake
+            stake_for_cycle
+        then
+          let stakes, total_stake = acc in
+          let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
+          return ((delegate, stake_for_cycle) :: stakes, total_stake)
+        else return acc
+      else return acc)
     ~init:([], Stake_repr.zero)
 
 let compute_snapshot_index_for_seed ~max_snapshot_index seed =

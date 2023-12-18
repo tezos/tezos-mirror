@@ -126,9 +126,11 @@ let adjust_frozen_stakes ctxt ~deactivated_delegates :
       ~order:`Undefined
       ~init:(ctxt, [])
       ~f:(fun delegate (ctxt, balance_updates) ->
-        let* ({own_frozen; _} as full_staking_balance :
-               Full_staking_balance_repr.t) =
+        let* full_staking_balance =
           Stake_storage.get_full_staking_balance ctxt delegate
+        in
+        let own_frozen =
+          Full_staking_balance_repr.own_frozen full_staking_balance
         in
         let*? optimal_frozen =
           Stake_context.optimal_frozen_wrt_delegated_without_ai
