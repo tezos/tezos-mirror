@@ -43,16 +43,23 @@ let pp_snapshot_history_mode fmt v =
     | Node.Rolling_history -> "rolling"
     | Node.Full_history -> "full")
 
-let get_constants client =
+let get_constants ~protocol client =
   let* constants =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
-  let preserved_cycles = JSON.(constants |-> "preserved_cycles" |> as_int) in
+  let blocks_preservation_cycles =
+    let v =
+      if Protocol.number protocol > Protocol.number Protocol.Oxford then
+        "blocks_preservation_cycles"
+      else "preserved_cycles"
+    in
+    JSON.(constants |-> v |> as_int)
+  in
   let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
   let max_op_ttl =
     JSON.(constants |-> "max_operations_time_to_live" |> as_int)
   in
-  return (preserved_cycles, blocks_per_cycle, max_op_ttl)
+  return (blocks_preservation_cycles, blocks_per_cycle, max_op_ttl)
 
 let export_snapshot node ~export_level ~snapshot_dir ~history_mode
     ~export_format =
@@ -277,11 +284,13 @@ let test_export_import_snapshots =
   let* () = Cluster.start ~public:true cluster in
   let* client = Client.init ~endpoint:(Node archive_node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* preserved_cycles, blocks_per_cycle, max_op_ttl = get_constants client in
+  let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
+    get_constants ~protocol client
+  in
   (* Bake enough blocks so that the rolling node caboose is not at the
      genesis anymore. To do so, we need to bake at least 3 cycles,
      after activating the protocol, i.e 3*8 = 24 blocks. *)
-  let blocks_to_bake = (preserved_cycles + 1) * blocks_per_cycle in
+  let blocks_to_bake = (blocks_preservation_cycles + 1) * blocks_per_cycle in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
   let* archive_level = Node.get_level archive_node in
   let* () = sync_all_nodes cluster archive_level in
@@ -351,7 +360,9 @@ let test_drag_after_rolling_import =
   let* () = Cluster.start ~public:true cluster in
   let* client = Client.init ~endpoint:(Node archive_node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* preserved_cycles, blocks_per_cycle, max_op_ttl = get_constants client in
+  let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
+    get_constants ~protocol client
+  in
   Log.info "Baking a few blocks"
   (* Baking enough blocks so that the caboose is not the genesis
      anymore (depending on the max_op_ttl)*) ;
@@ -393,7 +404,7 @@ let test_drag_after_rolling_import =
      deterministic and avoids missing the trigger of a merge as the
      previous one might not be finished yet. *)
   let blocks_to_bake =
-    ((preserved_cycles + additional_cycles) * blocks_per_cycle) - 1
+    ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle) - 1
   in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     (export_level, export_level, max 0 (export_level - max_op_ttl))
@@ -429,7 +440,7 @@ let test_drag_after_rolling_import =
      store's invariants. *)
   let wait_for_merge_at_checkpoint =
     let expected_checkpoint =
-      final_head - (preserved_cycles * blocks_per_cycle)
+      final_head - (blocks_preservation_cycles * blocks_per_cycle)
     in
     wait_for_complete_merge fresh_node expected_checkpoint
   in
@@ -443,10 +454,12 @@ let test_drag_after_rolling_import =
     match history_mode with
     | Node.Full_history -> Test.fail "testing only rolling mode"
     | Node.Rolling_history ->
-        let checkpoint = final_head - (preserved_cycles * blocks_per_cycle) in
+        let checkpoint =
+          final_head - (blocks_preservation_cycles * blocks_per_cycle)
+        in
         let savepoint =
           final_head
-          - ((preserved_cycles + additional_cycles) * blocks_per_cycle)
+          - ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle)
         in
         (checkpoint, savepoint, min savepoint (checkpoint - max_op_ttl))
   in

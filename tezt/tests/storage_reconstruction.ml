@@ -41,12 +41,17 @@ let pp_snapshot_history_mode fmt v =
        | Node.Rolling_history -> "rolling" | Node.Full_history -> "full")
        v)
 
-let get_constants client =
+let get_constants ~protocol client =
   let* constants =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
-  let* preserved_cycles =
-    return JSON.(constants |-> "preserved_cycles" |> as_int)
+  let blocks_preservation_cycles =
+    let v =
+      if Protocol.number protocol > Protocol.number Protocol.Oxford then
+        "blocks_preservation_cycles"
+      else "preserved_cycles"
+    in
+    JSON.(constants |-> v |> as_int)
   in
   let* blocks_per_cycle =
     return JSON.(constants |-> "blocks_per_cycle" |> as_int)
@@ -54,7 +59,7 @@ let get_constants client =
   let* max_op_ttl =
     return JSON.(constants |-> "max_operations_time_to_live" |> as_int)
   in
-  return (preserved_cycles, blocks_per_cycle, max_op_ttl)
+  return (blocks_preservation_cycles, blocks_per_cycle, max_op_ttl)
 
 let export_snapshot node ~export_level ~snapshot_dir ~history_mode
     ~export_format =
@@ -142,9 +147,11 @@ let test_storage_reconstruction =
       `Client
       ()
   in
-  let* preserved_cycles, blocks_per_cycle, max_op_ttl = get_constants client in
+  let* blocks_preservation_cycles, blocks_per_cycle, max_op_ttl =
+    get_constants ~protocol client
+  in
   Log.info "Baking a few blocks so that the savepoint is still at genesis." ;
-  let blocks_to_bake_1 = preserved_cycles * blocks_per_cycle in
+  let blocks_to_bake_1 = blocks_preservation_cycles * blocks_per_cycle in
   let* () = bake_blocks node client ~blocks_to_bake:blocks_to_bake_1 in
   Log.info "Terminate the node and start a reconstruction." ;
   let* () = Node.terminate node in
