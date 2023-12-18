@@ -1480,6 +1480,33 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     vec![],
                 ));
             }
+        } else if let Ok((ExitReason::Error(ExitError::OutOfGas), _, _)) =
+            execution_result
+        {
+            // Internal call failed: it runned out of gas. [rollback_inter_transaction]
+            // will consume the gas with [refund_gas = false] and revert all subsequent
+            // side-effect and continue the execution.
+
+            if let Err(err) = self.rollback_inter_transaction(false) {
+                log!(
+                    self.host,
+                    Debug,
+                    "Rolling back intermediate transaction caused an error: {:?}",
+                    err
+                );
+
+                return Capture::Exit((
+                    ethereum_error_to_exit_reason(&err),
+                    None,
+                    vec![],
+                ));
+            }
+
+            return Capture::Exit((
+                ExitReason::Succeed(ExitSucceed::Returned),
+                None,
+                vec![],
+            ));
         } else if let Err(err) = self.rollback_inter_transaction(false) {
             log!(
                 self.host,
