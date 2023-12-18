@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::borrow::Cow;
+
 use logos::Logos;
 pub mod errors;
 pub mod macros;
@@ -141,10 +143,21 @@ pub enum Noun {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Annotation<'a> {
-    Special(&'a str),
-    Field(&'a str),
-    Variable(&'a str),
-    Type(&'a str),
+    Special(Cow<'a, str>),
+    Field(Cow<'a, str>),
+    Variable(Cow<'a, str>),
+    Type(Cow<'a, str>),
+}
+
+impl Annotation<'_> {
+    pub fn into_owned(self) -> Annotation<'static> {
+        match self {
+            Annotation::Special(s) => Annotation::Special(Cow::Owned(s.into_owned())),
+            Annotation::Field(s) => Annotation::Field(Cow::Owned(s.into_owned())),
+            Annotation::Variable(s) => Annotation::Variable(Cow::Owned(s.into_owned())),
+            Annotation::Type(s) => Annotation::Type(Cow::Owned(s.into_owned())),
+        }
+    }
 }
 
 impl std::fmt::Display for Annotation<'_> {
@@ -292,14 +305,14 @@ fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
 
 fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
     match lex.slice() {
-        s @ ("@%" | "@%%" | "%@") => Annotation::Special(s),
+        s @ ("@%" | "@%%" | "%@") => Annotation::Special(Cow::Borrowed(s)),
         s => {
             if let Some(s) = s.strip_prefix('@') {
-                Annotation::Variable(s)
+                Annotation::Variable(Cow::Borrowed(s))
             } else if let Some(s) = s.strip_prefix('%') {
-                Annotation::Field(s)
+                Annotation::Field(Cow::Borrowed(s))
             } else if let Some(s) = s.strip_prefix(':') {
-                Annotation::Type(s)
+                Annotation::Type(Cow::Borrowed(s))
             } else {
                 unreachable!("regex for Annotation ensures it's either one of three")
             }

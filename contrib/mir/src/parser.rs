@@ -95,7 +95,7 @@ mod tests {
         assert_eq!(parse("EQ").unwrap(), app!(EQ));
         assert_eq!(
             parse("EQ @a").unwrap(),
-            Micheline::App(Prim::EQ, &[], [Annotation::Variable("a")].into())
+            Micheline::App(Prim::EQ, &[], [Annotation::Variable("a".into())].into())
         );
     }
 
@@ -182,7 +182,7 @@ mod tests {
             Ok(Micheline::App(
                 Prim::int,
                 &[],
-                [Annotation::Type("p")].into()
+                [Annotation::Type("p".into())].into()
             ))
         );
         assert_eq!(
@@ -190,10 +190,10 @@ mod tests {
             Ok(Micheline::App(
                 Prim::pair,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Type("x_pos")].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Type("y_pos")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Type("x_pos".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Type("y_pos".into())].into()),
                 ],
-                [Annotation::Type("point")].into()
+                [Annotation::Type("point".into())].into()
             ))
         );
         assert_eq!(
@@ -201,7 +201,7 @@ mod tests {
             Ok(Micheline::App(
                 Prim::string,
                 &[],
-                [Annotation::Field("foo")].into()
+                [Annotation::Field("foo".into())].into()
             ))
         );
         assert_eq!(
@@ -210,9 +210,9 @@ mod tests {
                 Prim::string,
                 &[],
                 [
-                    Annotation::Field("foo"),
-                    Annotation::Type("bar"),
-                    Annotation::Variable("baz")
+                    Annotation::Field("foo".into()),
+                    Annotation::Type("bar".into()),
+                    Annotation::Variable("baz".into())
                 ]
                 .into()
             ))
@@ -222,7 +222,7 @@ mod tests {
             Ok(Micheline::App(
                 Prim::string,
                 &[],
-                [Annotation::Variable("foo")].into()
+                [Annotation::Variable("foo".into())].into()
             ))
         );
         assert_eq!(
@@ -230,10 +230,10 @@ mod tests {
             Ok(Micheline::App(
                 Prim::pair,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Field("b")].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Field("c")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
                 ],
-                [Annotation::Field("a")].into()
+                [Annotation::Field("a".into())].into()
             ))
         );
         assert_eq!(
@@ -241,10 +241,10 @@ mod tests {
             Ok(Micheline::App(
                 Prim::or,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Field("b")].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Field("c")].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
+                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
                 ],
-                [Annotation::Field("a")].into()
+                [Annotation::Field("a".into())].into()
             ))
         );
         assert_eq!(
@@ -267,9 +267,9 @@ mod tests {
                 Prim::PUSH,
                 &[app!(int), 1.into()],
                 [
-                    Annotation::Variable("var"),
-                    Annotation::Type("ty"),
-                    Annotation::Field("field")
+                    Annotation::Variable("var".into()),
+                    Annotation::Type("ty".into()),
+                    Annotation::Field("field".into())
                 ]
                 .into()
             ),
@@ -280,12 +280,12 @@ mod tests {
                 Prim::CAR,
                 &[],
                 [
-                    Annotation::Variable("var"),
-                    Annotation::Type("ty"),
-                    Annotation::Field("field"),
-                    Annotation::Type("ty.2"),
-                    Annotation::Variable("var.2"),
-                    Annotation::Field("field.2"),
+                    Annotation::Variable("var".into()),
+                    Annotation::Type("ty".into()),
+                    Annotation::Field("field".into()),
+                    Annotation::Type("ty.2".into()),
+                    Annotation::Variable("var.2".into()),
+                    Annotation::Field("field.2".into()),
                 ]
                 .into()
             ),
@@ -342,7 +342,7 @@ mod tests {
                 Micheline::App(
                     Prim::contract,
                     &[app!(unit)],
-                    [Annotation::Type("ct"), Annotation::Field("foo")].into(),
+                    [Annotation::Type("ct".into()), Annotation::Field("foo".into())].into(),
                 ),
                 app!(Unit)
             ])
