@@ -35,15 +35,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         emu.cpu
             .execute()
             .map(|_| ())
-            .or_else(|exception| match exception {
-                Exception::EnvironmentCallFromUMode => syscall::handle(&mut emu),
+            .or_else(|exception| -> Result<(), Box<dyn Error>> {
+                match exception {
+                    Exception::EnvironmentCallFromUMode => {
+                        syscall::handle(&mut emu)?;
 
-                _ => {
-                    let trap = exception.take_trap(&mut emu.cpu);
+                        // We need to update the program counter ourselves now.
+                        // This is a recent change in behaviour in RVEmu.
+                        emu.cpu.pc += 4;
 
-                    // Don't bother handling other exceptions. For now they're
-                    // all fatal.
-                    panic!("Exception {:?} at {:#x}: {:?}", exception, prev_pc, trap)
+                        Ok(())
+                    }
+
+                    _ => {
+                        let trap = exception.take_trap(&mut emu.cpu);
+
+                        // Don't bother handling other exceptions. For now they're
+                        // all fatal.
+                        panic!("Exception {:?} at {:#x}: {:?}", exception, prev_pc, trap)
+                    }
                 }
             })?;
 
