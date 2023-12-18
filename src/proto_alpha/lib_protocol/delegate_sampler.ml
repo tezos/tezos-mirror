@@ -188,7 +188,11 @@ let get_stakes_for_selected_index ctxt ~slashings index =
         let* stake_for_cycle =
           get_delegate_stake_from_staking_balance ctxt delegate staking_balance
         in
-        if Stake_repr.has_minimal_stake ~minimal_stake stake_for_cycle then
+        if
+          Stake_repr.has_minimal_stake_to_participate
+            ~minimal_stake
+            stake_for_cycle
+        then
           let stakes, total_stake = acc in
           let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
           return ((delegate, stake_for_cycle) :: stakes, total_stake)
