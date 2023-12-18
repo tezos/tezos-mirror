@@ -1,7 +1,9 @@
+use kernel_loader::Memory;
 use rvemu::{cpu::Mode, emulator::Emulator, exception::Exception};
 use std::error::Error;
 
 mod cli;
+mod devicetree;
 mod input;
 mod syscall;
 
@@ -18,7 +20,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Load the ELF binary into the emulator.
     let contents = std::fs::read(&cli.input)?;
-    input::configure_emulator(&contents, &mut emu)?;
+    let dtb_addr = input::configure_emulator(&contents, &mut emu)?;
+
+    // Generate and load the flattened device tree.
+    let dtb = devicetree::generate(None)?;
+    emu.cpu.bus.write_bytes(dtb_addr, dtb.as_slice())?;
 
     let mut prev_pc = emu.cpu.pc;
     loop {
