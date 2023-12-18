@@ -532,9 +532,41 @@ impl CSRegister {
     pub fn transform_warl_fields(self, new_value: CSRValue) -> CSRValue {
         match self {
             CSRegister::misa => CSRegister::WARL_MISA_VALUE,
+            CSRegister::medeleg => new_value & CSRegister::WARL_MASK_MEDELEG,
+            CSRegister::mideleg => new_value & CSRegister::WARL_MASK_MIDELEG,
             _ => new_value,
         }
     }
+
+    /// See section 3.1.8 and table 3.6
+    ///
+    /// Exception codes to delegate.
+    /// If an exception can't be thrown from a lower privilege mode, set it here read-only 0
+    // TODO: Add TEST
+    const WARL_MASK_MEDELEG: CSRValue = !(
+        ones(1) << 10 // reserved
+        | ones(1) << 11 // environment call from M-mode
+        | ones(1) << 14 // reserved
+        | ones(CSRegister::MXLEN - 16) << 16
+        // reserved & custom use
+    );
+
+    /// See section 3.1.8 and table 3.6
+    ///
+    /// Interrupt codes to delegate.
+    /// If an interrupt can't be thrown from a lower privilege mode, set it here read-only 0
+    // TODO: Add TEST
+    const WARL_MASK_MIDELEG: CSRValue = !(
+        ones(1) << 0    // reserved
+        | ones(1) << 2  // reserved
+        | ones(1) << 4  // reserved
+        | ones(1) << 6  // reserved
+        | ones(1) << 8  // reserved
+        | ones(1) << 10 // reserved
+        | ones(4) << 12 // reserved
+        | ones(CSRegister::MXLEN - 16) << 16
+        // custom use
+    );
 }
 
 /// Value in a CSR
