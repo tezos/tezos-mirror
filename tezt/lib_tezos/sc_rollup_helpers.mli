@@ -171,7 +171,7 @@ type bootstrap_smart_rollup_setup = {
   smart_rollup_node_data_dir : string;
       (** The data dir to use for the smart rollup node, where the smart
           rollup preimages are available. *)
-  smart_rollup_node_extra_args : string list;
+  smart_rollup_node_extra_args : Sc_rollup_node.argument list;
       (** The extra arguments needed by the smart rollup node when the smart
           rollup is a bootstrap smart rollup. *)
 }

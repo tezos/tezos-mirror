@@ -54,6 +54,15 @@ type mode =
 
 type history_mode = Archive | Full
 
+(** Octez smart rollup node command-line arguments. *)
+type argument =
+  | Log_kernel_debug
+  | Log_kernel_debug_file of string
+  | Metrics_addr of string
+  | Injector_attempts of int
+  | Boot_sector_file of string
+  | Dac_observer of Dac_node.t
+
 type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
@@ -192,7 +201,7 @@ val run :
   ?password_file:string ->
   t ->
   string ->
-  string list ->
+  argument list ->
   unit Lwt.t
 
 (** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
@@ -205,7 +214,7 @@ val spawn_run :
   ?history_mode:history_mode ->
   t ->
   string ->
-  string list ->
+  argument list ->
   Process.t
 
 (** Wait until a node terminates and return its status. If the node is not

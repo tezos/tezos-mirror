@@ -2149,7 +2149,7 @@ module Tx_kernel_e2e = struct
       Sc_rollup_node.run
         sc_rollup_node
         sc_rollup_address
-        ["--dac-observer"; Dac_node.endpoint observer_node]
+        [Dac_observer observer_node]
     in
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level

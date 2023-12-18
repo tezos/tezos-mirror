@@ -48,6 +48,24 @@ type mode =
 
 type history_mode = Archive | Full
 
+type argument =
+  | Log_kernel_debug
+  | Log_kernel_debug_file of string
+  | Metrics_addr of string
+  | Injector_attempts of int
+  | Boot_sector_file of string
+  | Dac_observer of Dac_node.t
+
+let make_argument = function
+  | Log_kernel_debug -> ["--log-kernel-debug"]
+  | Log_kernel_debug_file file -> ["--log-kernel-debug-file"; file]
+  | Metrics_addr addr -> ["--metrics-addr"; addr]
+  | Injector_attempts n -> ["--injector-attempts"; string_of_int n]
+  | Boot_sector_file file -> ["--boot-sector-file"; file]
+  | Dac_observer dac_node -> ["--dac-observer"; Dac_node.endpoint dac_node]
+
+let make_arguments arguments = List.flatten (List.map make_argument arguments)
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
@@ -195,7 +213,7 @@ let operators_params rollup_node =
     (Option.to_list rollup_node.persistent_state.default_operator)
     rollup_node.persistent_state.operators
 
-let make_arguments node =
+let make_command_arguments node =
   [
     "--endpoint";
     Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
@@ -209,7 +227,8 @@ let spawn_command sc_node args =
     ~name:sc_node.name
     ~color:sc_node.color
     sc_node.path
-  @@ make_arguments sc_node @ args
+  @@ make_command_arguments sc_node
+  @ args
 
 let common_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
     sc_node =
@@ -479,7 +498,7 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_arguments node @ arguments in
+  let arguments = make_command_arguments node @ arguments in
   run
     ?runner:node.persistent_state.runner
     ?event_level
@@ -504,7 +523,8 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
           node
           rollup_address
       in
-      ["run"] @ args @ extra_arguments
+      ["run"] @ args
+      @ make_arguments extra_arguments
       @ [
           "--metrics-addr";
           Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
@@ -525,7 +545,8 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
         match mode with Some m -> string_of_mode m | None -> default_mode
       in
       Cli_arg.optional_arg "password-filename" Fun.id password_file
-      @ ["run"; final_mode] @ args @ extra_arguments
+      @ ["run"; final_mode] @ args
+      @ make_arguments extra_arguments
       @ [
           "--metrics-addr";
           Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
@@ -571,7 +592,7 @@ let spawn_run ?loser_mode ?(allow_degraded = false)
       ~history_mode:(Some history_mode)
       rollup_address
   in
-  spawn_command node (["run"; mode] @ args @ extra_arguments)
+  spawn_command node (["run"; mode] @ args @ make_arguments extra_arguments)
 
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in

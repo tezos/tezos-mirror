@@ -4649,7 +4649,7 @@ let test_injector_auto_discard =
       ~event_level:`Debug
       sc_rollup_node
       sc_rollup
-      ["--injector-attempts"; string_of_int nb_attempts]
+      [Injector_attempts nb_attempts]
   in
   let monitor_injector_queue =
     Sc_rollup_node.wait_for
@@ -4712,7 +4712,7 @@ let test_arg_boot_sector_file ~kind =
     Sc_rollup_node.spawn_run
       rollup_node
       rollup
-      ["--boot-sector-file"; invalid_boot_sector_file]
+      [Boot_sector_file invalid_boot_sector_file]
   in
   let* () = Client.bake_for_and_wait client in
   let* err = Process.check_and_read_stderr ~expect_failure:true process in
@@ -4728,7 +4728,7 @@ let test_arg_boot_sector_file ~kind =
     Sc_rollup_node.run
       rollup_node
       rollup
-      ["--boot-sector-file"; valid_boot_sector_file]
+      [Boot_sector_file valid_boot_sector_file]
   in
   let* () = Client.bake_for_and_wait client in
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
