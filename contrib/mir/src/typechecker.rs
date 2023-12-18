@@ -744,7 +744,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let ty = pop!(T::Option);
             // Clone the some_stack as we need to push a type on top of it
             let mut some_stack: TypeStack = stack.clone();
-            some_stack.push(*ty);
+            some_stack.push(ty.as_ref().clone());
             let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
             let when_none = typecheck(when_none, ctx, self_entrypoints, opt_stack)?;
             let when_some = typecheck(when_some, ctx, self_entrypoints, &mut some_opt_stack)?;
@@ -764,7 +764,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // get the list element type
             let ty = pop!(T::List);
             // push it to the cons stack
-            cons_stack.push(*ty);
+            cons_stack.push(ty.as_ref().clone());
             let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
             let when_cons = typecheck(when_cons, ctx, self_entrypoints, &mut cons_opt_stack)?;
             let when_nil = typecheck(when_nil, ctx, self_entrypoints, opt_stack)?;
@@ -780,7 +780,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(IF_LEFT, [Seq(when_left), Seq(when_right)], _), [.., T::Or(..)]) => {
             // get the list element type
-            let (tl, tr) = *pop!(T::Or);
+            let (tl, tr) = pop!(T::Or).as_ref().clone();
             // use main stack as left branch, cloned stack as right
             let mut right_stack = stack.clone();
             stack.push(tl);
@@ -827,11 +827,11 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(ITER, [Seq(nested)], ..), [.., T::List(..)]) => {
             // get the list element type
-            let ty = *pop!(T::List);
+            let ty = pop!(T::List);
             // clone the rest of the stack
             let mut inner_stack = stack.clone();
             // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(ty);
+            inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
             let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans list) and result stack unify, all is good.
@@ -844,7 +844,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // clone the rest of the stack
             let mut inner_stack = stack.clone();
             // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(*ty);
+            inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
             let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans set) and result stack unify, all is good.
@@ -916,7 +916,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNIT, ..), _) => unexpected_micheline!(),
 
         (App(CAR, [], _), [.., T::Pair(..)]) => {
-            let (l, _) = *pop!(T::Pair);
+            let l = pop!(T::Pair).0.clone();
             stack.push(l);
             I::Car
         }
@@ -925,7 +925,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CAR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(CDR, [], _), [.., T::Pair(..)]) => {
-            let (_, r) = *pop!(T::Pair);
+            let r = pop!(T::Pair).1.clone();
             stack.push(r);
             I::Cdr
         }
@@ -942,7 +942,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PAIR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UNPAIR, [], _), [.., T::Pair(..)]) => {
-            let (l, r) = *pop!(T::Pair);
+            let (l, r) = pop!(T::Pair).as_ref().clone();
             stack.push(r);
             stack.push(l);
             I::Unpair
@@ -1037,15 +1037,15 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
-            let ty = *pop!(T::Set);
+            let ty = pop!(T::Set);
             ensure_ty_eq(ctx, &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
-            let (kty, _) = *pop!(T::Map);
-            ensure_ty_eq(ctx, &kty, &kty_)?;
+            let map_tys = pop!(T::Map);
+            ensure_ty_eq(ctx, &map_tys.as_ref().0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
@@ -1055,9 +1055,9 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
-            let (kty, vty) = *pop!(T::Map);
-            ensure_ty_eq(ctx, &kty, &kty_)?;
-            stack.push(T::new_option(vty));
+            let map_tys = pop!(T::Map);
+            ensure_ty_eq(ctx, &map_tys.0, &kty_)?;
+            stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
         (App(GET, [], _), [.., _, _]) => no_overload!(GET),
@@ -1193,9 +1193,9 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
-            let (in_ty, out_ty) = *pop!(T::Lambda);
-            ensure_ty_eq(ctx, &in_ty, &ty)?;
-            stack.push(out_ty);
+            let lam_tys = pop!(T::Lambda);
+            ensure_ty_eq(ctx, &lam_tys.0, &ty)?;
+            stack.push(lam_tys.1.clone());
             I::Exec
         }
         (App(EXEC, [], _), [.., _, _]) => no_overload!(EXEC),
@@ -1214,19 +1214,19 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(APPLY, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
-            let (in_ty, out_ty) = *pop!(T::Lambda);
-            let (p1, p2) = match in_ty {
-                T::Pair(p) => *p,
+            let lam_ty = pop!(T::Lambda);
+            let pair_ty = match &lam_ty.0 {
+                T::Pair(p) => p,
                 t => {
                     return Err(TcError::NoMatchingOverload {
                         instr: APPLY,
                         stack: stack.clone(),
-                        reason: Option::Some(NMOR::ExpectedPair(t)),
+                        reason: Option::Some(NMOR::ExpectedPair(t.clone())),
                     })
                 }
             };
-            ensure_ty_eq(ctx, &p1, &ty)?;
-            stack.push(T::new_lambda(p2, out_ty));
+            ensure_ty_eq(ctx, &pair_ty.0, &ty)?;
+            stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
         (App(APPLY, [], _), [.., _, _]) => no_overload!(APPLY),
