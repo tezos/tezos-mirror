@@ -436,3 +436,9 @@ let nonce pkey =
     | Some current_nonce -> Pool.next_nonce pkey current_nonce pool
   in
   return next_nonce
+
+let produce_block () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Inject_transactions
+  |> handle_request_error
