@@ -143,28 +143,28 @@ fn interpret_one<'a>(
             overloads::Add::IntInt => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Nat(sum));
             }
             overloads::Add::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + BigInt::from(o2);
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatInt => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_int(&o1, &o2)?)?;
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = BigInt::from(o1) + o2;
                 stack.push(V::Int(sum));
             }
@@ -174,6 +174,101 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::ADD_TEZ)?;
                 let sum = o1.checked_add(o2).ok_or(InterpretError::MutezOverflow)?;
                 stack.push(V::Mutez(sum));
+            }
+        },
+        I::And(overload) => match overload {
+            overloads::And::Bool => {
+                let o1 = pop!(V::Bool);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                ctx.gas.consume(interpret_cost::AND_BOOL)?;
+                *o2 &= o1;
+            }
+            overloads::And::NatNat => {
+                let o1 = pop!(V::Nat);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                ctx.gas.consume(interpret_cost::and_num(&o1, o2)?)?;
+                *o2 &= o1;
+            }
+            overloads::And::IntNat => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::and_num(&o1, &o2)?)?;
+                let res = BigUint::try_from(o1 & BigInt::from(o2))
+                    // safe, `neg` & `pos` = `pos`
+                    .unwrap();
+                stack.push(V::Nat(res));
+            }
+            overloads::And::Bytes => {
+                let mut o1 = pop!(V::Bytes);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+                ctx.gas.consume(interpret_cost::and_bytes(&o1, o2)?)?;
+
+                // The resulting vector length is the smallest length among the
+                // operands, so to reuse memory we put the smallest vector to
+                // the result (`o2`).
+                if o1.len() < o2.len() {
+                    std::mem::swap(&mut o1, o2)
+                }
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                    *b2 &= b1;
+                }
+            }
+        },
+        I::Or(overload) => match overload {
+            overloads::Or::Bool => {
+                let o1 = pop!(V::Bool);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                ctx.gas.consume(interpret_cost::OR_BOOL)?;
+                *o2 |= o1;
+            }
+            overloads::Or::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                ctx.gas.consume(interpret_cost::or_num(&o1, o2)?)?;
+                *o2 |= o1;
+            }
+            overloads::Or::Bytes => {
+                let mut o1 = pop!(V::Bytes);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+                ctx.gas.consume(interpret_cost::or_bytes(&o1, o2)?)?;
+
+                // The resulting vector length is the largest length among the
+                // operands, so to reuse memory we put the largest vector to
+                // the result (`o2`).
+                if o1.len() > o2.len() {
+                    std::mem::swap(&mut o1, o2)
+                }
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                    *b2 |= b1;
+                }
+            }
+        },
+        I::Xor(overloads) => match overloads {
+            overloads::Xor::Bool => {
+                let o1 = pop!(V::Bool);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                ctx.gas.consume(interpret_cost::XOR_BOOL)?;
+                *o2 ^= o1;
+            }
+            overloads::Xor::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                ctx.gas.consume(interpret_cost::xor_nat(&o1, o2)?)?;
+                *o2 ^= o1;
+            }
+            overloads::Xor::Bytes => {
+                let mut o1 = pop!(V::Bytes);
+                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+
+                // The resulting vector length is the largest length among the
+                // operands, so to reuse memory we put the largest vector to
+                // the result (`o2`).
+                if o1.len() > o2.len() {
+                    std::mem::swap(&mut o1, o2)
+                }
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                    *b2 ^= b1;
+                }
             }
         },
         I::Dip(opt_height, nested) => {
@@ -585,6 +680,11 @@ mod interpreter_tests {
     use Option::None;
     use TypedValue as V;
 
+    #[track_caller]
+    fn mk_0x(hex: &str) -> TypedValue {
+        V::Bytes(hex::decode(hex).unwrap_or_else(|e| panic!("Invalid hex: {e}")))
+    }
+
     #[test]
     fn test_add() {
         let mut stack = stk![V::nat(10), V::nat(20)];
@@ -631,6 +731,203 @@ mod interpreter_tests {
             ),
             Err(InterpretError::MutezOverflow)
         );
+    }
+
+    mod logic {
+        use super::*;
+
+        #[track_caller]
+        fn check(instr: Instruction, val1: TypedValue, val2: TypedValue, expected: TypedValue) {
+            let mut stack = stk![val2, val1];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, stk![expected]);
+        }
+
+        #[test]
+        fn and() {
+            use overloads as o;
+
+            check(
+                And(o::And::Bool),
+                V::Bool(false),
+                V::Bool(false),
+                V::Bool(false),
+            );
+            check(
+                And(o::And::Bool),
+                V::Bool(false),
+                V::Bool(true),
+                V::Bool(false),
+            );
+            check(
+                And(o::And::Bool),
+                V::Bool(true),
+                V::Bool(false),
+                V::Bool(false),
+            );
+            check(
+                And(o::And::Bool),
+                V::Bool(true),
+                V::Bool(true),
+                V::Bool(true),
+            );
+
+            // 101 & 110 = 100
+            check(And(o::And::NatNat), V::nat(5), V::nat(6), V::nat(4));
+            // same
+            check(And(o::And::IntNat), V::int(5), V::nat(6), V::nat(4));
+            // 1100 & 1111 = 1100
+            check(And(o::And::IntNat), V::int(-4), V::nat(15), V::nat(12));
+            // 1011 & 0110 = 0010
+            check(And(o::And::IntNat), V::int(-5), V::nat(6), V::nat(2));
+            // small neg int & large nat
+            check(And(o::And::IntNat), V::int(-8), V::nat(1003), V::nat(1000));
+            // large neg int & small nat
+            check(And(o::And::IntNat), V::int(-1001), V::nat(12), V::nat(4));
+            // large nats (several "digits" in BigUint)
+            check(
+                And(o::And::NatNat),
+                V::Nat("123456789123456789123456789123456789".parse().unwrap()),
+                V::Nat("234567891234567890123456789123456789".parse().unwrap()),
+                V::Nat("26042851674400450614930174457700117".parse().unwrap()),
+            );
+            // large int & nat (several "digits" in big number)
+            check(
+                And(o::And::IntNat),
+                V::Int("-123456789123456789123456789123456789".parse().unwrap()),
+                V::Nat("234567891234567890123456789123456789".parse().unwrap()),
+                V::Nat("208525039560167439508526614665756673".parse().unwrap()),
+            );
+
+            check(And(o::And::Bytes), mk_0x("05"), mk_0x("06"), mk_0x("04"));
+            check(And(o::And::Bytes), mk_0x(""), mk_0x("f00f"), mk_0x(""));
+            check(
+                And(o::And::Bytes),
+                mk_0x("f00f"),
+                mk_0x("1234"),
+                mk_0x("1004"),
+            );
+            check(And(o::And::Bytes), mk_0x("f0"), mk_0x("1234"), mk_0x("30"));
+            check(
+                And(o::And::Bytes),
+                mk_0x("f00ff0"),
+                mk_0x("1234"),
+                mk_0x("0230"),
+            );
+        }
+
+        #[test]
+        fn or() {
+            use overloads as o;
+
+            check(
+                Or(o::Or::Bool),
+                V::Bool(false),
+                V::Bool(false),
+                V::Bool(false),
+            );
+            check(
+                Or(o::Or::Bool),
+                V::Bool(false),
+                V::Bool(true),
+                V::Bool(true),
+            );
+            check(
+                Or(o::Or::Bool),
+                V::Bool(true),
+                V::Bool(false),
+                V::Bool(true),
+            );
+            check(Or(o::Or::Bool), V::Bool(true), V::Bool(true), V::Bool(true));
+
+            // 101 & 110 = 111
+            check(Or(o::Or::Nat), V::nat(5), V::nat(6), V::nat(7));
+            // large numbers (several "digits" in BigInt)
+            check(
+                Or(o::Or::Nat),
+                V::Nat("123456789123456789123456789123456789".parse().unwrap()),
+                V::Nat("234567891234567890123456789123456789".parse().unwrap()),
+                V::Nat("331981828683624228631983403789213461".parse().unwrap()),
+            );
+
+            check(Or(o::Or::Bytes), mk_0x("05"), mk_0x("06"), mk_0x("07"));
+            check(Or(o::Or::Bytes), mk_0x(""), mk_0x("f00f"), mk_0x("f00f"));
+            check(
+                Or(o::Or::Bytes),
+                mk_0x("f00f"),
+                mk_0x("1234"),
+                mk_0x("f23f"),
+            );
+            check(Or(o::Or::Bytes), mk_0x("f0"), mk_0x("1234"), mk_0x("12f4"));
+            check(
+                Or(o::Or::Bytes),
+                mk_0x("f00ff0"),
+                mk_0x("1234"),
+                mk_0x("f01ff4"),
+            );
+        }
+
+        #[test]
+        fn xor() {
+            use overloads as o;
+
+            check(
+                Xor(o::Xor::Bool),
+                V::Bool(false),
+                V::Bool(false),
+                V::Bool(false),
+            );
+            check(
+                Xor(o::Xor::Bool),
+                V::Bool(false),
+                V::Bool(true),
+                V::Bool(true),
+            );
+            check(
+                Xor(o::Xor::Bool),
+                V::Bool(true),
+                V::Bool(false),
+                V::Bool(true),
+            );
+            check(
+                Xor(o::Xor::Bool),
+                V::Bool(true),
+                V::Bool(true),
+                V::Bool(false),
+            );
+
+            // 101 & 110 = 011
+            check(Xor(o::Xor::Nat), V::nat(5), V::nat(6), V::nat(3));
+            // large numbers (several "digits" in BigInt)
+            check(
+                Xor(o::Xor::Nat),
+                V::Nat("123456789123456789123456789123456789".parse().unwrap()),
+                V::Nat("234567891234567890123456789123456789".parse().unwrap()),
+                V::Nat("305938977009223778017053229331513344".parse().unwrap()),
+            );
+
+            check(Xor(o::Xor::Bytes), mk_0x("05"), mk_0x("06"), mk_0x("03"));
+            check(Xor(o::Xor::Bytes), mk_0x(""), mk_0x("f00f"), mk_0x("f00f"));
+            check(
+                Xor(o::Xor::Bytes),
+                mk_0x("f00f"),
+                mk_0x("1234"),
+                mk_0x("e23b"),
+            );
+            check(
+                Xor(o::Xor::Bytes),
+                mk_0x("f0"),
+                mk_0x("1234"),
+                mk_0x("12c4"),
+            );
+            check(
+                Xor(o::Xor::Bytes),
+                mk_0x("f00ff0"),
+                mk_0x("1234"),
+                mk_0x("f01dc4"),
+            );
+        }
     }
 
     #[test]
@@ -1210,7 +1507,7 @@ mod interpreter_tests {
     #[test]
     fn if_left_left() {
         let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
-        let mut stack = stk![V::new_or(Or::Left(V::int(1)))];
+        let mut stack = stk![V::new_or(or::Or::Left(V::int(1)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(1)]);
@@ -1223,7 +1520,7 @@ mod interpreter_tests {
     #[test]
     fn if_left_right() {
         let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
-        let mut stack = stk![V::new_or(Or::Right(V::Unit))];
+        let mut stack = stk![V::new_or(or::Or::Right(V::Unit))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
@@ -1957,7 +2254,7 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret(&[Instruction::Left], &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_or(Or::Left(V::nat(10)))]);
+        assert_eq!(stack, stk![V::new_or(or::Or::Left(V::nat(10)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::LEFT - interpret_cost::INTERPRET_RET
@@ -1969,7 +2266,7 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(10)];
         let mut ctx = Ctx::default();
         assert!(interpret(&[Instruction::Right], &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, stk![V::new_or(Or::Right(V::nat(10)))]);
+        assert_eq!(stack, stk![V::new_or(or::Or::Right(V::nat(10)))]);
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET

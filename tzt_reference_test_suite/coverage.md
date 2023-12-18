@@ -646,6 +646,9 @@ Missing edge cases:
 - [and_bytes-bytes_01.tzt](and_bytes-bytes_01.tzt)
 - [and_bytes-bytes_02.tzt](and_bytes-bytes_02.tzt)
 - [and_bytes-bytes_03.tzt](and_bytes-bytes_03.tzt)
+- [and_bytes-bytes_04.tzt](and_bytes-bytes_04.tzt)
+- [and_bytes-bytes_05.tzt](and_bytes-bytes_05.tzt)
+- [and_bytes-bytes_06.tzt](and_bytes-bytes_06.tzt)
 
 ### `NOT: bool`
 
@@ -698,6 +701,9 @@ Files do not follow naming convention.
 - [or_bytes-bytes_01.tzt](or_bytes-bytes_01.tzt)
 - [or_bytes-bytes_02.tzt](or_bytes-bytes_02.tzt)
 - [or_bytes-bytes_03.tzt](or_bytes-bytes_03.tzt)
+- [or_bytes-bytes_04.tzt](or_bytes-bytes_04.tzt)
+- [or_bytes-bytes_05.tzt](or_bytes-bytes_05.tzt)
+- [or_bytes-bytes_06.tzt](or_bytes-bytes_06.tzt)
 
 ### `XOR: bool:bool`
 
@@ -722,6 +728,9 @@ Files do not follow naming convention.
 - [xor_bytes-bytes_01.tzt](xor_bytes-bytes_01.tzt)
 - [xor_bytes-bytes_02.tzt](xor_bytes-bytes_02.tzt)
 - [xor_bytes-bytes_03.tzt](xor_bytes-bytes_03.tzt)
+- [xor_bytes-bytes_04.tzt](xor_bytes-bytes_04.tzt)
+- [xor_bytes-bytes_05.tzt](xor_bytes-bytes_05.tzt)
+- [xor_bytes-bytes_06.tzt](xor_bytes-bytes_06.tzt)
 
 ## Data structure manipulation
 

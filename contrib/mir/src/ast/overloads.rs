@@ -15,6 +15,28 @@ pub enum Add {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum And {
+    Bool,
+    NatNat,
+    IntNat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Or {
+    Bool,
+    Nat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Xor {
+    Bool,
+    Nat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Mem {
     Set,
     Map,

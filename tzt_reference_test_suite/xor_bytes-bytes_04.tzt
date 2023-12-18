@@ -1,0 +1,3 @@
+code { XOR } ;
+input { Stack_elt bytes 0x05 ; Stack_elt bytes 0x06 } ;
+output { Stack_elt bytes 0x03 }
