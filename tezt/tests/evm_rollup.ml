@@ -2139,8 +2139,8 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~sc_rollup_node
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   unit
 
-let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
-    ~evm_node ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address ~node ~client
+let withdraw protocol ~commitment_period ~challenge_window ~amount_wei ~sender
+    ~receiver ~evm_node ~sc_rollup_node ~sc_rollup_address ~node ~client
     ~endpoint =
   let* withdrawal_level = Client.level client in
 
@@ -2200,26 +2200,31 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
     aux level
   in
   let* outbox, withdrawal_level = find_outbox withdrawal_level in
-
   let outbox_message =
     JSON.(outbox |=> 0 |-> "message" |-> "transactions" |=> 0)
   in
   let parameters_json = JSON.(outbox_message |-> "parameters") in
-  let* parameters =
-    Client.convert_data
-      ~data:(JSON.encode parameters_json)
-      ~src_format:`Json
-      ~dst_format:`Michelson
-      client
+  let batch =
+    {
+      destination = JSON.(outbox_message |-> "destination" |> as_string);
+      entrypoint = Some JSON.(outbox_message |-> "entrypoint" |> as_string);
+      parameters = JSON.unannotate parameters_json;
+      parameters_ty = None;
+    }
+  in
+  let message_json = Sc_rollup_helpers.json_of_output_tx_batch [batch] in
+  let* message =
+    Codec.encode
+      ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
+      message_json
   in
   let* outbox_proof =
-    Sc_rollup_client.outbox_proof_single
-      sc_rollup_client
-      ~message_index:0
-      ~outbox_level:withdrawal_level
-      ~destination:JSON.(outbox_message |-> "destination" |> as_string)
-      ~parameters
-      ~entrypoint:JSON.(outbox_message |-> "entrypoint" |> as_string)
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.outbox_proof_single
+         ~message_index:0
+         ~outbox_level:withdrawal_level
+         ~message
+         ()
   in
   let Sc_rollup_rpc.{proof; commitment_hash} =
     match outbox_proof with
@@ -2266,7 +2271,6 @@ let test_deposit_and_withdraw =
          sc_rollup_address;
          l1_contracts;
          sc_rollup_node;
-         sc_rollup_client;
          node;
          endpoint;
          evm_node;
@@ -2321,9 +2325,9 @@ let test_deposit_and_withdraw =
   let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
   let* _tx =
     withdraw
+      protocol
       ~evm_node
       ~sc_rollup_address
-      ~sc_rollup_client
       ~commitment_period
       ~challenge_window
       ~amount_wei

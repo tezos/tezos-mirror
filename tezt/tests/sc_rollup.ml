@@ -3939,7 +3939,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
              outbox_parameters_ty_s);
       description = "output exec";
     }
-  @@ fun protocol rollup_node sc_client sc_rollup _node client ->
+  @@ fun protocol rollup_node _sc_client sc_rollup _node client ->
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
@@ -4020,7 +4020,6 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   in
   let trigger_outbox_message_execution ?expected_l1_error address =
     let outbox_level = 5 in
-    let destination = address in
     let parameters = "37" in
     let message_index = 0 in
     let check_expected_outbox () =
@@ -4029,7 +4028,6 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
         @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level ()
       in
       Log.info "Outbox is %s" (JSON.encode outbox) ;
-
       match expected_error with
       | None ->
           let expected =
@@ -4065,16 +4063,35 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           in
           Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;
+          let parameters_json = `O [("int", `String parameters)] in
+          let batch =
+            {
+              destination = address;
+              entrypoint;
+              parameters = parameters_json;
+              parameters_ty =
+                (match outbox_parameters_ty with
+                | Some json_value -> Some (`O [("prim", `String json_value)])
+                | None -> None);
+            }
+          in
+          let message_json =
+            Sc_rollup_helpers.json_of_output_tx_batch [batch]
+          in
+          let* message =
+            Codec.encode
+              ~name:
+                (Protocol.encoding_prefix protocol
+                ^ ".smart_rollup.outbox.message")
+              message_json
+          in
           let* proof =
-            Sc_rollup_client.outbox_proof_single
-              sc_client
-              ?expected_error
-              ~message_index
-              ~outbox_level
-              ~destination
-              ?entrypoint
-              ~parameters
-              ?parameters_ty:outbox_parameters_ty
+            Sc_rollup_node.RPC.call rollup_node
+            @@ Sc_rollup_rpc.outbox_proof_single
+                 ~message_index
+                 ~outbox_level
+                 ~message
+                 ()
           in
           let* proof' =
             Sc_rollup_node.RPC.call rollup_node
@@ -4166,13 +4183,17 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     | "wasm_2_0_0" ->
         let bootsector = read_kernel "echo" in
         let input_message protocol contract_address =
+          let parameters_json = `O [("int", `String outbox_parameters)] in
           let transaction =
             Sc_rollup_helpers.
               {
                 destination = contract_address;
                 entrypoint;
-                parameters = outbox_parameters;
-                parameters_ty = outbox_parameters_ty;
+                parameters = parameters_json;
+                parameters_ty =
+                  (match outbox_parameters_ty with
+                  | Some json_value -> Some (`O [("prim", `String json_value)])
+                  | None -> None);
               }
           in
           let* answer =
