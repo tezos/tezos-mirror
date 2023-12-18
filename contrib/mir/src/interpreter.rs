@@ -2127,7 +2127,7 @@ mod interpreter_tests {
         ];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::TwoStrings)],
+                &[Concat(overloads::Concat::TwoStrings)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2144,7 +2144,7 @@ mod interpreter_tests {
         ];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::TwoBytes)],
+                &[Concat(overloads::Concat::TwoBytes)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2165,7 +2165,7 @@ mod interpreter_tests {
         )];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &[Concat(overloads::Concat::ListOfStrings)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2181,7 +2181,7 @@ mod interpreter_tests {
         ),];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &[Concat(overloads::Concat::ListOfStrings)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2195,7 +2195,7 @@ mod interpreter_tests {
         let mut stack = stk![TypedValue::List(vec![].into()),];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::ListOfStrings)],
+                &[Concat(overloads::Concat::ListOfStrings)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2216,7 +2216,7 @@ mod interpreter_tests {
         )];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::ListOfBytes)],
+                &[Concat(overloads::Concat::ListOfBytes)],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -2230,7 +2230,7 @@ mod interpreter_tests {
         let mut stack = stk![TypedValue::List(vec![].into())];
         assert_eq!(
             interpret(
-                &vec![Concat(overloads::Concat::ListOfBytes)],
+                &[Concat(overloads::Concat::ListOfBytes)],
                 &mut Ctx::default(),
                 &mut stack
             ),
