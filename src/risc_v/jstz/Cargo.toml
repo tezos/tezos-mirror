@@ -1,0 +1,33 @@
+[package]
+name = "jstz"
+version = "0.0.0"
+edition = "2021"
+
+[patch.crates-io]
+tezos-smart-rollup = { path = "../../kernel_sdk/sdk" }
+tezos-smart-rollup-host = { path = "../../kernel_sdk/host" }
+tezos-smart-rollup-core = { path = "../../kernel_sdk/core" }
+tezos-smart-rollup-mock = { path = "../../kernel_sdk/mock" }
+tezos-smart-rollup-encoding = { path = "../../kernel_sdk/encoding" }
+tezos-smart-rollup-entrypoint = { path = "../../kernel_sdk/entrypoint" }
+tezos-smart-rollup-debug = { path = "../../kernel_sdk/debug" }
+tezos-smart-rollup-panic-hook = { path = "../../kernel_sdk/panic-hook" }
+tezos-smart-rollup-storage = { path = "../../kernel_sdk/storage" }
+tezos-smart-rollup-installer-config = { path = "../../kernel_sdk/installer-config" }
+# Patches from the jstz repo are dropped, copying them here
+boa_ast = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_engine = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_gc = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_interner = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_macros = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_parser = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "ajob410@create-realm-with-default-globals" }
+
+[dependencies.tezos-smart-rollup]
+version = "0.2.2"
+default-features = false
+features = ["std", "crypto", "panic-hook", "data-encoding", "storage", "proto-alpha"]
+
+[dependencies.jstz_kernel]
+git = "https://github.com/victor-dumitrescu/jstz.git"
+rev = "8783f9076396776380de5a4e1152d82648c7654c"
