@@ -53,6 +53,15 @@ module Simple = struct
       ("process_time", Time.System.Span.encoding)
       ~pp3:Ptime.Span.pp
 
+  let new_head_degraded =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_daemon_new_head_degraded"
+      ~msg:"[DEGRADED MODE] Seen layer 1 head {hash} at level {level}"
+      ~level:Error
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+
   let processing_heads_iteration =
     declare_3
       ~section
@@ -160,6 +169,8 @@ let head_processing hash level = Simple.(emit head_processing (hash, level))
 
 let new_head_processed hash level process_time =
   Simple.(emit new_head_processed (hash, level, process_time))
+
+let new_head_degraded hash level = Simple.(emit new_head_degraded (hash, level))
 
 let new_heads_iteration event = function
   | oldest :: rest ->
