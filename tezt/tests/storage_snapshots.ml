@@ -373,8 +373,6 @@ let test_drag_after_rolling_import =
   let* export_level = Node.get_level archive_node in
   let snapshot_dir = Temp.dir "snapshots_exports" in
   let history_mode = Node.Rolling_history in
-  (* Kill the rolling node as it is not useful anymore. *)
-  let* () = Node.terminate rolling_node in
   Log.info "Exporting snapshot at level %d" export_level ;
   let* filename =
     export_snapshot
@@ -384,6 +382,8 @@ let test_drag_after_rolling_import =
       ~history_mode
       ~export_format:Node.Tar
   in
+  (* Kill the rolling node as it is not useful anymore. *)
+  let* () = Node.terminate rolling_node in
   let fresh_node_name =
     Format.asprintf
       "%a_node_from_%s"
