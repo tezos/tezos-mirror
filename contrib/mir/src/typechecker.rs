@@ -492,10 +492,10 @@ pub(crate) fn typecheck_instruction<'a>(
     // no_overload!(instr, <expr>) -- otherwise, where <expr> is Into<NoMatchingOverloadReason>,
     // and is optional.
     macro_rules! no_overload {
-        ($instr:ident, len $expected_len:expr) => {
+        ($instr:expr, len $expected_len:expr) => {
             {
                 return Err(TcError::NoMatchingOverload {
-                    instr: Prim::$instr,
+                    instr: $instr,
                     stack: stack.clone(),
                     reason: Option::Some(NoMatchingOverloadReason::StackTooShort {
                         expected: $expected_len
@@ -503,10 +503,10 @@ pub(crate) fn typecheck_instruction<'a>(
                 })
             }
         };
-        ($instr:ident$(, $reason:expr)?) => {
+        ($instr:expr$(, $reason:expr)?) => {
             {
                 return Err(TcError::NoMatchingOverload {
-                    instr: Prim::$instr,
+                    instr: $instr,
                     stack: stack.clone(),
                     reason: nothing_to_none!($($reason.into())?)
                 })
@@ -602,6 +602,50 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ADD, [], _), [.., _, _]) => no_overload!(ADD),
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(AND, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::And(overloads::And::NatNat)
+        }
+        (App(AND, [], _), [.., T::Nat, T::Int]) => {
+            pop!();
+            I::And(overloads::And::IntNat)
+        }
+        (App(AND, [], _), [.., T::Bool, T::Bool]) => {
+            pop!();
+            I::And(overloads::And::Bool)
+        }
+        (App(AND, [], _), [.., T::Bytes, T::Bytes]) => {
+            pop!();
+            I::And(overloads::And::Bytes)
+        }
+        (App(OR, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Or(overloads::Or::Nat)
+        }
+        (App(OR, [], _), [.., T::Bool, T::Bool]) => {
+            pop!();
+            I::Or(overloads::Or::Bool)
+        }
+        (App(OR, [], _), [.., T::Bytes, T::Bytes]) => {
+            pop!();
+            I::Or(overloads::Or::Bytes)
+        }
+        (App(XOR, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Xor(overloads::Xor::Nat)
+        }
+        (App(XOR, [], _), [.., T::Bool, T::Bool]) => {
+            pop!();
+            I::Xor(overloads::Xor::Bool)
+        }
+        (App(XOR, [], _), [.., T::Bytes, T::Bytes]) => {
+            pop!();
+            I::Xor(overloads::Xor::Bytes)
+        }
+        (App(prim @ (AND | OR | XOR), [], _), [.., _, _]) => no_overload!(*prim),
+        (App(prim @ (AND | OR | XOR), [], _), [_] | []) => no_overload!(*prim, len 2),
+        (App(AND | OR | XOR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(DIP, args, _), ..) => {
             let (opt_height, nested) = match args {
@@ -1653,6 +1697,108 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_binary_bitwise_operators() {
+        for ty in &[Type::Bool, Type::Nat, Type::Bytes] {
+            for prim in &[Prim::AND, Prim::OR, Prim::XOR] {
+                let mut stack = tc_stk![ty.clone(), ty.clone()];
+                let expected_stack = tc_stk![ty.clone()];
+                let expected_instr = match (prim, ty) {
+                    (Prim::AND, Type::Bool) => And(overloads::And::Bool),
+                    (Prim::AND, Type::Nat) => And(overloads::And::NatNat),
+                    (Prim::AND, Type::Bytes) => And(overloads::And::Bytes),
+                    (Prim::OR, Type::Bool) => Or(overloads::Or::Bool),
+                    (Prim::OR, Type::Nat) => Or(overloads::Or::Nat),
+                    (Prim::OR, Type::Bytes) => Or(overloads::Or::Bytes),
+                    (Prim::XOR, Type::Bool) => Xor(overloads::Xor::Bool),
+                    (Prim::XOR, Type::Nat) => Xor(overloads::Xor::Nat),
+                    (Prim::XOR, Type::Bytes) => Xor(overloads::Xor::Bytes),
+                    _ => panic!("Bad test parameters"),
+                };
+                let mut ctx = Ctx::default();
+                assert_eq!(
+                    typecheck_instruction(
+                        &Micheline::App(*prim, &[], NO_ANNS),
+                        &mut ctx,
+                        &mut stack
+                    ),
+                    Ok(expected_instr)
+                );
+                assert_eq!(stack, expected_stack);
+            }
+        }
+    }
+
+    #[test]
+    fn test_and_int_nat() {
+        let mut stack = tc_stk![Type::Nat, Type::Int];
+        let expected_stack = tc_stk![Type::Nat];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(AND), &mut ctx, &mut stack),
+            Ok(And(overloads::And::IntNat))
+        );
+        assert_eq!(stack, expected_stack);
+        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+    }
+
+    #[test]
+    fn test_and_short() {
+        too_short_test(&app!(AND), Prim::AND, 2);
+    }
+
+    #[test]
+    fn test_or_short() {
+        too_short_test(&app!(OR), Prim::OR, 2);
+    }
+
+    #[test]
+    fn test_xor_short() {
+        too_short_test(&app!(XOR), Prim::XOR, 2);
+    }
+
+    #[test]
+    fn test_and_mismatch() {
+        let mut stack = tc_stk![Type::String, Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(AND), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::AND,
+                stack: stk![Type::String, Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_or_mismatch() {
+        let mut stack = tc_stk![Type::String, Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(OR), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::OR,
+                stack: stk![Type::String, Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn test_xor_mismatch() {
+        let mut stack = tc_stk![Type::String, Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&app!(XOR), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::XOR,
+                stack: stk![Type::String, Type::String],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
     fn test_loop() {
         let mut stack = tc_stk![Type::Int, Type::Bool];
         let expected_stack = tc_stk![Type::Int];
@@ -1945,7 +2091,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_or(Or::Left(TypedValue::int(1)))))
+            Ok(Push(TypedValue::new_or(or::Or::Left(TypedValue::int(1)))))
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
     }
@@ -1959,7 +2105,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_or(Or::Right(TypedValue::Bool(false)))))
+            Ok(Push(TypedValue::new_or(or::Or::Right(TypedValue::Bool(
+                false
+            )))))
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
     }

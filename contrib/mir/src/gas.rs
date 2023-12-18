@@ -198,6 +198,7 @@ impl BigIntByteSize for BigUint {
 
 pub mod interpret_cost {
     use checked::Checked;
+    use num_bigint::BigUint;
 
     use super::{AsGasCost, BigIntByteSize, OutOfGas};
     use crate::ast::{Key, KeyHash, Micheline, Or, TypedValue};
@@ -219,6 +220,9 @@ pub mod interpret_cost {
     pub const PUSH: u32 = 10;
     pub const ADD_TEZ: u32 = 20;
     pub const UNIT: u32 = 10;
+    pub const AND_BOOL: u32 = 10;
+    pub const OR_BOOL: u32 = 10;
+    pub const XOR_BOOL: u32 = 15;
     pub const CAR: u32 = 10;
     pub const CDR: u32 = 10;
     pub const PAIR: u32 = 10;
@@ -285,11 +289,45 @@ pub mod interpret_cost {
         mb_n.map_or(Ok(DUP), dupn)
     }
 
-    pub fn add_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn add_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    /// Cost for `AND` on numbers and bytearrays
+    pub fn and_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn and_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn or_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+        // NB: Tezos takes maximum of the sizes, but in our implementation only
+        // touches bytes in two vectors intersection. So taking the same formula
+        // as in [and_bytes].
+        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
+    pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
+        (40 + (sz >> 1)).as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
