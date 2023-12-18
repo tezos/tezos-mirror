@@ -104,9 +104,7 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
-type mode =
-  | Proxy of {rollup_node_endpoint : Uri.t}
-  | Sequencer of {time_between_blocks : float}
+type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -383,16 +381,6 @@ let rec subscribe_l2_block ~stream_l2 worker =
       let* () = Lwt_unix.sleep 1. in
       subscribe_l2_block ~stream_l2 worker
 
-let rec sequencer_produce_block ~time_between_blocks worker =
-  let open Lwt_syntax in
-  let* () = Lwt_unix.sleep time_between_blocks in
-  let state = Worker.state worker in
-  let (Types.{rollup_node = (module Rollup_node_rpc); _} : Types.state) =
-    state
-  in
-  let* _pushed = Worker.Queue.push_request worker Request.Inject_transactions in
-  sequencer_produce_block ~time_between_blocks worker
-
 let start ({mode; _} as parameters) =
   let open Lwt_result_syntax in
   let+ worker = Worker.launch table () parameters (module Handlers) in
@@ -403,8 +391,7 @@ let start ({mode; _} as parameters) =
         | Proxy {rollup_node_endpoint} ->
             let*! stream_l2 = make_streamed_call ~rollup_node_endpoint in
             subscribe_l2_block ~stream_l2 worker
-        | Sequencer {time_between_blocks} ->
-            sequencer_produce_block ~time_between_blocks worker)
+        | Sequencer -> Lwt.return_unit)
       (fun _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
         Format.printf "[tx-pool] Pool has been stopped.\n%!")

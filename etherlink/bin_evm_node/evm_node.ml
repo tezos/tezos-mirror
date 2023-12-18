@@ -397,7 +397,7 @@ let sequencer_command =
           {
             rollup_node = (module Sequencer);
             smart_rollup_address;
-            mode = Sequencer {time_between_blocks = 5.};
+            mode = Sequencer;
           }
       in
       let* directory =

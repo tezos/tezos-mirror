@@ -8,14 +8,12 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6672
    It should be created by the configuration, or at least using values of
    the configuration. *)
-type mode =
-  | Proxy of {rollup_node_endpoint : Uri.t}
-  | Sequencer of {time_between_blocks : float}
+type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
   smart_rollup_address : string;  (** The address of the smart rollup. *)
-  mode : mode;  (** The mode of the node. *)
+  mode : mode;
 }
 
 (** [start parameters] starts the tx-pool *)
