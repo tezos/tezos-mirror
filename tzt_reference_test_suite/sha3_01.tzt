@@ -1,0 +1,3 @@
+code SHA3;
+input { Stack_elt bytes 0xdeadbeef };
+output { Stack_elt bytes 0x352b82608dad6c7ac3dd665bc2666e5d97803cb13f23a1109e2105e93f42c448 }

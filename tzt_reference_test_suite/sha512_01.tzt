@@ -1,0 +1,3 @@
+code SHA512;
+input { Stack_elt bytes 0xdeadbeef };
+output { Stack_elt bytes 0x1284b2d521535196f22175d5f558104220a6ad7680e78b49fa6f20e57ea7b185d71ec1edb137e70eba528dedb141f5d2f8bb53149d262932b27cf41fed96aa7f }
