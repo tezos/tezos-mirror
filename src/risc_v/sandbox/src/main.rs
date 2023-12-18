@@ -1,6 +1,6 @@
 use kernel_loader::Memory;
 use rvemu::{cpu::Mode, emulator::Emulator, exception::Exception};
-use std::error::Error;
+use std::{error::Error, fs};
 
 mod cli;
 mod devicetree;
@@ -20,10 +20,29 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Load the ELF binary into the emulator.
     let contents = std::fs::read(&cli.input)?;
-    let dtb_addr = input::configure_emulator(&contents, &mut emu)?;
+    let initrd_addr = input::configure_emulator(&contents, &mut emu)?;
+
+    // Load the initial ramdisk to memory.
+    let initrd_info = cli
+        .initrd
+        .map(|initrd_path| -> Result<_, Box<dyn Error>> {
+            let initrd = fs::read(initrd_path)?;
+            emu.cpu
+                .bus
+                .write_bytes(initrd_addr as u64, initrd.as_slice())?;
+            Ok(devicetree::InitialRamDisk {
+                start: initrd_addr,
+                length: initrd.len() as u64,
+            })
+        })
+        .transpose()?;
 
     // Generate and load the flattened device tree.
-    let dtb = devicetree::generate(None)?;
+    let dtb_addr = initrd_info
+        .as_ref()
+        .map(|info| info.start + info.length)
+        .unwrap_or(initrd_addr);
+    let dtb = devicetree::generate(initrd_info)?;
     emu.cpu.bus.write_bytes(dtb_addr, dtb.as_slice())?;
 
     let mut prev_pc = emu.cpu.pc;
