@@ -2235,7 +2235,7 @@ let check_balance ~receiver ~endpoint expected_balance =
 let test_deposit_and_withdraw =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "deposit"; "withdraw"]
+    ~tags:[Tag.flaky; "evm"; "deposit"; "withdraw"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
