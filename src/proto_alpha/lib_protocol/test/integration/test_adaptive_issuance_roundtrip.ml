@@ -2101,7 +2101,8 @@ module Roundtrip = struct
     --> set_delegate_params "delegate" no_costake_params
     (* The changes are not immediate *)
     --> stake "staker" amount
-    (* The parameters change is applied exactly [preserved_cycles + 1] after the request *)
+    (* The parameters change is applied exactly
+       [delegate_parameters_activation_delay + 1] after the request *)
     --> wait_n_cycles (default_param_wait - 1)
     (* Not yet... *)
     --> stake "staker" amount
