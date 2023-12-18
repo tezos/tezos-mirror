@@ -41,6 +41,16 @@ impl<'a> Micheline<'a> {
         Micheline::App(prim, arena.alloc_extend([arg1, arg2]), NO_ANNS)
     }
 
+    pub fn prim3(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        arg1: Micheline<'a>,
+        arg2: Micheline<'a>,
+        arg3: Micheline<'a>,
+    ) -> Self {
+        Micheline::App(prim, arena.alloc_extend([arg1, arg2, arg3]), NO_ANNS)
+    }
+
     pub fn seq(
         arena: &'a Arena<Micheline<'a>>,
         args: impl IntoIterator<Item = Micheline<'a>>,
@@ -95,6 +105,21 @@ impl<'a> From<&str> for Micheline<'a> {
     fn from(s: &str) -> Self {
         Micheline::from(s.to_owned())
     }
+}
+
+pub trait IntoMicheline<'a> {
+    /// Untypes a value using optimized representation in legacy mode.
+    ///
+    /// This differs from plain optimized representation in that it always
+    /// represents tuples as nested binary pairs (right combs). This is, for
+    /// instance, what `PACK` uses.
+    ///
+    /// However, note that a right-comb `pair` type is represented as a
+    /// sequence, for consistency with `PACK`.
+    fn into_micheline_optimized_legacy(
+        self,
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+    ) -> Micheline<'a>;
 }
 
 /// Pattern synonym matching all type primitive applications. Useful for total

@@ -24,13 +24,14 @@ use std::collections::{BTreeMap, BTreeSet};
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
-use crate::lexer::Prim;
+use crate::{ast::annotations::NO_ANNS, lexer::Prim};
 
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
+pub use micheline::IntoMicheline;
 pub use michelson_address::*;
 pub use michelson_key::Key;
 pub use michelson_key_hash::KeyHash;
-pub use michelson_lambda::Lambda;
+pub use michelson_lambda::{Closure, Lambda};
 pub use michelson_list::MichelsonList;
 pub use michelson_signature::Signature;
 pub use or::Or;
@@ -129,6 +130,88 @@ impl Type {
     }
 }
 
+impl<'a> IntoMicheline<'a> for &'_ Type {
+    fn into_micheline_optimized_legacy(self, arena: &'a Arena<Micheline<'a>>) -> Micheline<'a> {
+        use Type::*;
+
+        struct LinearizePairIter<'a>(std::option::Option<&'a Type>);
+
+        impl<'a> std::iter::Iterator for LinearizePairIter<'a> {
+            type Item = &'a Type;
+            fn next(&mut self) -> std::option::Option<Self::Item> {
+                match self.0 {
+                    Some(Type::Pair(x)) => {
+                        self.0 = Some(&x.1);
+                        Some(&x.0)
+                    }
+                    ty => {
+                        self.0 = None;
+                        ty
+                    }
+                }
+            }
+        }
+
+        match self {
+            Nat => Micheline::prim0(Prim::nat),
+            Int => Micheline::prim0(Prim::int),
+            Bool => Micheline::prim0(Prim::bool),
+            Mutez => Micheline::prim0(Prim::mutez),
+            String => Micheline::prim0(Prim::string),
+            Unit => Micheline::prim0(Prim::unit),
+            Operation => Micheline::prim0(Prim::operation),
+            Address => Micheline::prim0(Prim::address),
+            ChainId => Micheline::prim0(Prim::chain_id),
+            Bytes => Micheline::prim0(Prim::bytes),
+            Key => Micheline::prim0(Prim::key),
+            Signature => Micheline::prim0(Prim::signature),
+            KeyHash => Micheline::prim0(Prim::key_hash),
+            Never => Micheline::prim0(Prim::never),
+
+            Option(x) => Micheline::prim1(
+                arena,
+                Prim::option,
+                x.into_micheline_optimized_legacy(arena),
+            ),
+            List(x) => {
+                Micheline::prim1(arena, Prim::list, x.into_micheline_optimized_legacy(arena))
+            }
+            Set(x) => Micheline::prim1(arena, Prim::set, x.into_micheline_optimized_legacy(arena)),
+            Contract(x) => Micheline::prim1(
+                arena,
+                Prim::contract,
+                x.into_micheline_optimized_legacy(arena),
+            ),
+
+            Pair(_) => Micheline::App(
+                Prim::pair,
+                arena.alloc_extend(
+                    LinearizePairIter(Some(self)).map(|x| x.into_micheline_optimized_legacy(arena)),
+                ),
+                NO_ANNS,
+            ),
+            Map(x) => Micheline::prim2(
+                arena,
+                Prim::map,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+            Or(x) => Micheline::prim2(
+                arena,
+                Prim::or,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+            Lambda(x) => Micheline::prim2(
+                arena,
+                Prim::lambda,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypedValue<'a> {
     Int(BigInt),
@@ -149,81 +232,70 @@ pub enum TypedValue<'a> {
     Bytes(Vec<u8>),
     Key(Key),
     Signature(Signature),
-    Lambda(Lambda<'a>),
+    Lambda(Closure<'a>),
     KeyHash(KeyHash),
     Operation(Box<OperationInfo<'a>>),
 }
 
-/// Untypes a value using optimized representation in legacy mode.
-///
-/// This differs from plain optimized representation in that it always
-/// represents tuples as nested binary pairs (right combs). This is, for
-/// instance, what `PACK` uses.
-pub fn typed_value_to_value_optimized_legacy<'a>(
-    arena: &'a Arena<Micheline<'a>>,
-    tv: TypedValue<'a>,
-) -> Micheline<'a> {
-    use Micheline as V;
-    use TypedValue as TV;
-    let go = |x| typed_value_to_value_optimized_legacy(arena, x);
-    match tv {
-        TV::Int(i) => V::Int(i),
-        TV::Nat(u) => V::Int(u.try_into().unwrap()),
-        TV::Mutez(u) => V::Int(u.try_into().unwrap()),
-        TV::Bool(true) => V::prim0(Prim::True),
-        TV::Bool(false) => V::prim0(Prim::False),
-        TV::String(s) => V::String(s),
-        TV::Unit => V::prim0(Prim::Unit),
-        // This transformation for pairs deviates from the optimized representation of the
-        // reference implementation, because reference implementation optimizes the size of combs
-        // and uses an untyped representation that is the shortest.
-        TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
-        TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
-        TV::Set(s) => V::Seq(arena.alloc_extend(s.into_iter().map(go))),
-        TV::Map(m) => V::Seq(
-            arena.alloc_extend(
-                m.into_iter()
-                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+impl<'a> IntoMicheline<'a> for TypedValue<'a> {
+    fn into_micheline_optimized_legacy(self, arena: &'a Arena<Micheline<'a>>) -> Micheline<'a> {
+        use Micheline as V;
+        use TypedValue as TV;
+        let go = |x: Self| x.into_micheline_optimized_legacy(arena);
+        match self {
+            TV::Int(i) => V::Int(i),
+            TV::Nat(u) => V::Int(u.try_into().unwrap()),
+            TV::Mutez(u) => V::Int(u.try_into().unwrap()),
+            TV::Bool(true) => V::prim0(Prim::True),
+            TV::Bool(false) => V::prim0(Prim::False),
+            TV::String(s) => V::String(s),
+            TV::Unit => V::prim0(Prim::Unit),
+            // This transformation for pairs deviates from the optimized representation of the
+            // reference implementation, because reference implementation optimizes the size of combs
+            // and uses an untyped representation that is the shortest.
+            TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
+            TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
+            TV::Set(s) => V::Seq(arena.alloc_extend(s.into_iter().map(go))),
+            TV::Map(m) => V::Seq(
+                arena.alloc_extend(
+                    m.into_iter()
+                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+                ),
             ),
-        ),
-        TV::Option(None) => V::prim0(Prim::None),
-        TV::Option(Some(x)) => V::prim1(arena, Prim::Some, go(*x)),
-        TV::Or(or) => match *or {
-            Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
-            Or::Right(x) => V::prim1(arena, Prim::Right, go(x)),
-        },
-        TV::Address(x) => V::Bytes(x.to_bytes_vec()),
-        TV::ChainId(x) => V::Bytes(x.into()),
-        TV::Bytes(x) => V::Bytes(x),
-        TV::Key(k) => V::Bytes(k.to_bytes_vec()),
-        TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
-        TV::Lambda(lam) => match lam {
-            Lambda::Lambda { micheline_code, .. } => micheline_code,
-            Lambda::LambdaRec { micheline_code, .. } => {
-                V::prim1(arena, Prim::Lambda_rec, micheline_code)
-            }
-        },
-        TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
-        TV::Contract(x) => go(TV::Address(x)),
-        TV::Operation(operation_info) => match operation_info.operation {
-            Operation::TransferTokens(tt) => Micheline::App(
-                Prim::Transfer_tokens,
-                arena.alloc_extend([
-                    go(tt.param),
-                    go(TV::Address(tt.destination_address)),
-                    go(TV::Mutez(tt.amount)),
-                ]),
-                annotations::NO_ANNS,
-            ),
-            Operation::SetDelegate(sd) => Micheline::App(
-                Prim::Set_delegate,
-                arena.alloc_extend([match sd.0 {
-                    Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh))),
-                    None => V::prim0(Prim::None),
-                }]),
-                annotations::NO_ANNS,
-            ),
-        },
+            TV::Option(None) => V::prim0(Prim::None),
+            TV::Option(Some(x)) => V::prim1(arena, Prim::Some, go(*x)),
+            TV::Or(or) => match *or {
+                Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
+                Or::Right(x) => V::prim1(arena, Prim::Right, go(x)),
+            },
+            TV::Address(x) => V::Bytes(x.to_bytes_vec()),
+            TV::ChainId(x) => V::Bytes(x.into()),
+            TV::Bytes(x) => V::Bytes(x),
+            TV::Key(k) => V::Bytes(k.to_bytes_vec()),
+            TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
+            TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Contract(x) => go(TV::Address(x)),
+            TV::Operation(operation_info) => match operation_info.operation {
+                Operation::TransferTokens(tt) => Micheline::App(
+                    Prim::Transfer_tokens,
+                    arena.alloc_extend([
+                        go(tt.param),
+                        go(TV::Address(tt.destination_address)),
+                        go(TV::Mutez(tt.amount)),
+                    ]),
+                    annotations::NO_ANNS,
+                ),
+                Operation::SetDelegate(sd) => Micheline::App(
+                    Prim::Set_delegate,
+                    arena.alloc_extend([match sd.0 {
+                        Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh))),
+                        None => V::prim0(Prim::None),
+                    }]),
+                    annotations::NO_ANNS,
+                ),
+            },
+        }
     }
 }
 
@@ -315,6 +387,9 @@ pub enum Instruction<'a> {
     Lambda(Lambda<'a>),
     Exec,
     HashKey,
+    Apply {
+        arg_ty: Type,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
