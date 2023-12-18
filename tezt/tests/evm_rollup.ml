@@ -43,7 +43,6 @@ type full_evm_setup = {
   node : Node.t;
   client : Client.t;
   sc_rollup_node : Sc_rollup_node.t;
-  sc_rollup_client : Sc_rollup_client.t;
   sc_rollup_address : string;
   originator_key : string;
   rollup_operator_key : string;
@@ -343,7 +342,6 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   (* EVM Kernel installation level. *)
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
@@ -372,7 +370,6 @@ let setup_evm_kernel ?config ?kernel_installee
       node;
       client;
       sc_rollup_node;
-      sc_rollup_client;
       sc_rollup_address;
       originator_key;
       rollup_operator_key;
@@ -4161,8 +4158,7 @@ let test_l2_nested_create =
     ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
     ~title:"Check L2 nested create"
   @@ fun protocol ->
-  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
-       evm_setup) =
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4240,8 +4236,7 @@ let test_l2_revert_returns_unused_gas =
     ~tags:["evm"]
     ~title:"Check L2 revert returns unused gas"
   @@ fun protocol ->
-  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
-       evm_setup) =
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4286,8 +4281,7 @@ let test_l2_create_collision =
     ~tags:["evm"; "l2_create"; "collision"]
     ~title:"Check L2 create collision"
   @@ fun protocol ->
-  let* ({evm_node; sc_rollup_client = _; sc_rollup_node; node; client; _} as
-       evm_setup) =
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
     setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in

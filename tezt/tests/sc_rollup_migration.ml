@@ -447,9 +447,8 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout migrate_from
   in
-  let* rollup_node, rollup_client, sc_rollup =
+  let* rollup_node, sc_rollup =
     setup_rollup
-      ~protocol:migrate_from
       ?parameters_ty
       ~kind
       ~mode
@@ -460,12 +459,7 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   in
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* prior_res =
-    scenario_prior
-      ~sc_rollup
-      ~rollup_node
-      ~rollup_client
-      tezos_node
-      tezos_client
+    scenario_prior ~sc_rollup ~rollup_node tezos_node tezos_client
   in
   let* current_level = Node.get_level tezos_node in
   let migration_level = current_level + 1 in
@@ -491,8 +485,7 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
   let description = "node can read data after store migration" in
   let commitment_period = 5 in
   let challenge_window = 5 in
-  let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
-      tezos_client =
+  let scenario_prior ~sc_rollup:_ ~rollup_node _tezos_node tezos_client =
     let* () = Sc_rollup_helpers.send_messages commitment_period tezos_client in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     unit
@@ -543,8 +536,7 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
   let description = "node can catch up on protocol migration" in
   let commitment_period = 10 in
   let challenge_window = 10 in
-  let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
-      tezos_client =
+  let scenario_prior ~sc_rollup:_ ~rollup_node _tezos_node tezos_client =
     let* () = Sc_rollup_helpers.send_messages 1 tezos_client in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     Log.info "Stopping rollup node before protocol migration." ;
@@ -756,9 +748,8 @@ let test_l2_migration_scenario_event ?parameters_ty
       ?timeout
       migrate_from
   in
-  let* rollup_node, rollup_client, sc_rollup =
+  let* rollup_node, sc_rollup =
     setup_rollup
-      ~protocol:migrate_from
       ?parameters_ty
       ~kind
       ~mode
@@ -788,13 +779,7 @@ let test_l2_migration_scenario_event ?parameters_ty
     let* () = Node.wait_for_ready tezos_node in
     Client.bake_for_and_wait tezos_client
   in
-  scenario
-    migrate_from
-    rollup_node
-    rollup_client
-    sc_rollup
-    tezos_node
-    tezos_client
+  scenario migrate_from rollup_node sc_rollup tezos_node tezos_client
 
 let test_refutation_migration_scenario ?(flaky = false) ?commitment_period
     ?challenge_window ~variant ~mode ~kind scenario ~migrate_from ~migrate_to
