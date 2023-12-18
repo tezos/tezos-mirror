@@ -722,6 +722,11 @@ fn interpret_one<'a>(
             };
             stack.push(res_stk.pop().unwrap_or_else(|| unreachable_state()));
         }
+        I::HashKey => {
+            ctx.gas.consume(interpret_cost::HASH_KEY)?;
+            let key = pop!(V::Key);
+            stack.push(TypedValue::KeyHash(key.hash()))
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -2526,5 +2531,29 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(5)]);
+    }
+
+    #[test]
+    fn hash_key() {
+        // specific key-to-hash correspondence is checked in michelson_key
+        // tests, here we only want to check interpreter works, so testing only
+        // one particular key
+        let mut stack = stk![V::Key(
+            "edpktxDQJUF9AqUegbhhD9zJWBCPRJ3PtewuwiuAxrnaQbRmdi2tW1"
+                .try_into()
+                .unwrap()
+        )];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&HashKey, ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::KeyHash(
+                "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap()
+            )]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Ctx::default().gas.milligas() - interpret_cost::HASH_KEY
+        );
     }
 }

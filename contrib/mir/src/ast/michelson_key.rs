@@ -5,11 +5,15 @@
 /*                                                                            */
 /******************************************************************************/
 
-use tezos_crypto_rs::hash::{
-    Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1,
+use tezos_crypto_rs::{
+    hash::{Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
+    PublicKeyWithHash,
 };
 
-use super::byte_repr_trait::{ByteReprError, ByteReprTrait};
+use super::{
+    byte_repr_trait::{ByteReprError, ByteReprTrait},
+    KeyHash,
+};
 
 macro_rules! key_type_and_impls {
     ($($con:ident($ty:ident)),* $(,)*) => {
@@ -83,6 +87,18 @@ impl Key {
     /// Smallest key size
     pub const MIN_BASE58_SIZE: usize = 54;
     pub const MIN_BYTE_SIZE: usize = 32;
+
+    pub fn hash(&self) -> KeyHash {
+        use Key::*;
+        // unwrap because errors should be literally impossible, any bytestring
+        // can be hashed, and hash size is constant.
+        match self {
+            Ed25519(hash) => KeyHash::Tz1(hash.pk_hash().unwrap()),
+            Secp256k1(hash) => KeyHash::Tz2(hash.pk_hash().unwrap()),
+            P256(hash) => KeyHash::Tz3(hash.pk_hash().unwrap()),
+            Bls(hash) => KeyHash::Tz4(hash.pk_hash().unwrap()),
+        }
+    }
 }
 
 impl ByteReprTrait for Key {
@@ -150,10 +166,20 @@ mod tests {
 
     #[test]
     fn test_base58_to_bin() {
-        for (b58, hex) in FIXTURES {
+        for (b58, hex, _) in FIXTURES {
             assert_eq!(
                 hex::encode(Key::from_base58_check(b58).unwrap().to_bytes_vec()),
                 hex,
+            );
+        }
+    }
+
+    #[test]
+    fn test_hash() {
+        for (b58, _, hash) in FIXTURES {
+            assert_eq!(
+                Key::from_base58_check(b58).unwrap().hash(),
+                KeyHash::from_base58_check(hash).unwrap(),
             );
         }
     }
@@ -169,7 +195,7 @@ mod tests {
             Err(ByteReprError::UnknownPrefix("0xff".to_owned())),
         );
 
-        for (b58, hex) in FIXTURES {
+        for (b58, hex, _) in FIXTURES {
             assert_eq!(
                 Key::from_bytes(&hex::decode(hex).unwrap())
                     .unwrap()
@@ -179,41 +205,55 @@ mod tests {
         }
     }
 
+    // Triples of key_base58, key_binary, key_hash_base58.
+    //
     // binary representation produced by running
     //
     // `octez-client --mode mockup normalize data ... of type key --unparsing-mode Optimized`
-    const FIXTURES: [(&str, &str); 8] = [
+    //
+    // address hashes are produced by running
+    //
+    // octez-client --mode mockup run michelson code '{ HASH_KEY }' on stack '{Stack_elt key "..."}'
+    const FIXTURES: [(&str, &str, &str); 8] = [
         (
             "edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu",
             "009c0f7c35a4352c2eb5e3ad30bf3ea9ecabb8b65b40ccfeea3d58bea08a36c286",
+            "tz1eq8SApJE7gK2wufuutpaqZjy6wFJaBWkp",
         ),
         (
             "edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH",
             "009a85e0f3f47852869ae667adc3b03a20fa9f324d046174dff6834e7d1fab0e8d",
+            "tz1NaZzLvdDBLfV2LWC6F4SJfNV2jHdZJXkJ",
         ),
         (
             "edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V",
             "00aad3f16293766169f7db278c5e0e9db4fb82ffe1cbcc35258059617dc0fec082",
+            "tz1Yz3VPaCNB5FjhdEVnSoN8Xv3ZM8g2LYhw",
         ),
         (
             "sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR",
             "0103b524d0184276467c848ac13557fb0ff8bec5907960f72683f22af430503edfc1",
+            "tz2EfqCbLmpfv7mNiLcMmhxAwdgHtPTcwR4W",
         ),
         (
             "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD",
             "01022c380cd1ff286a0a1a7c3aad6e891d237fa82e2a7cdeec08ccb55e90fdef995f",
+            "tz2Darj3LyQzekU98ZK8diHvuyn1YYjcHpc6",
         ),
         (
             "p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB",
             "020368afbb09255d849813712108a4144237dc1fdd5bb74e68335f4c68c12c1e5723",
+            "tz3S7wbUwQV581kroR81fYbgDBskFicZ6czW",
         ),
         (
             "p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk",
             "0203dcb1916c475902f2b1083212e1b4e6f8ce1531710218c7d34340439f47040e7c",
+            "tz3QEbmdCdsMcnUo2rNjXdbKwg5tyack3goN",
         ),
         (
             "BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G",
             "03b6cf94b6a59d102044d1ff16ebe3eccc5cd554965bb66ac80fb2728c18715817e185fb5ac9437908c9e609a742610177",
+            "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN",
         ),
     ];
 }

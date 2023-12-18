@@ -1202,6 +1202,16 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [] | [_]) => no_overload!(EXEC, len 2),
         (App(EXEC, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(HASH_KEY, [], _), [.., T::Key]) => {
+            stack[0] = T::KeyHash;
+            I::HashKey
+        }
+        (App(HASH_KEY, [], _), [.., t]) => {
+            no_overload!(HASH_KEY, TypesNotEqual(T::Key, t.clone()))
+        }
+        (App(HASH_KEY, [], _), []) => no_overload!(HASH_KEY, len 1),
+        (App(HASH_KEY, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -4554,5 +4564,34 @@ mod typecheck_tests {
                 reason: Some(TypesNotEqual(Type::Bool, Type::Int).into())
             })
         );
+    }
+
+    #[test]
+    fn hash_key() {
+        let stk = &mut tc_stk![Type::Key];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("HASH_KEY").unwrap(), ctx, stk),
+            Ok(HashKey)
+        )
+    }
+
+    #[test]
+    fn hash_key_bad_arg() {
+        let stk = &mut tc_stk![Type::Bytes];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("HASH_KEY").unwrap(), ctx, stk),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::HASH_KEY,
+                stack: stk![Type::Bytes],
+                reason: Some(TypesNotEqual(Type::Key, Type::Bytes).into()),
+            })
+        )
+    }
+
+    #[test]
+    fn hash_key_too_short() {
+        too_short_test(&app!(HASH_KEY), Prim::HASH_KEY, 1);
     }
 }

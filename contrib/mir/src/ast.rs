@@ -314,6 +314,7 @@ pub enum Instruction<'a> {
     Right,
     Lambda(Lambda<'a>),
     Exec,
+    HashKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
