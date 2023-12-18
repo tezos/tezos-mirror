@@ -331,6 +331,7 @@ let degraded_refutation_mode state =
   let*! () = message "Shutting down Commitment Publisher@." in
   let*! () = Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
+  let*! () = Daemon_event.new_head_degraded head.hash head.level in
   let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
   let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
