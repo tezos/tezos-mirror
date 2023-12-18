@@ -36,7 +36,7 @@ val own_ratio : t -> Int64.t * Int64.t
 
 val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 
-val has_minimal_stake : minimal_stake:Tez_repr.t -> t -> bool
+val has_minimal_stake_to_be_considered : minimal_stake:Tez_repr.t -> t -> bool
 
 val remove_delegated : amount:Tez_repr.t -> t -> t tzresult
 

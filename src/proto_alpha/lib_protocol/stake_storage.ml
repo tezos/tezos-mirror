@@ -77,7 +77,9 @@ let get_full_staking_balance = Storage.Stake.Staking_balance.get
 
 let has_minimal_stake ctxt staking_balance =
   let minimal_stake = Constants_storage.minimal_stake ctxt in
-  Full_staking_balance_repr.has_minimal_stake ~minimal_stake staking_balance
+  Full_staking_balance_repr.has_minimal_stake_to_be_considered
+    ~minimal_stake
+    staking_balance
 
 let initialize_delegate ctxt delegate ~delegated =
   let open Lwt_result_syntax in

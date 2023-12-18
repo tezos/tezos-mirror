@@ -68,7 +68,7 @@ let has_minimal_frozen_stake ~minimal_frozen_stake
     {own_frozen; staked_frozen = _; delegated = _} =
   Tez_repr.(own_frozen >= minimal_frozen_stake)
 
-let has_minimal_stake ~minimal_stake full_staking_balance =
+let has_minimal_stake_to_be_considered ~minimal_stake full_staking_balance =
   match total full_staking_balance with
   | Error _total_overflows ->
       true
