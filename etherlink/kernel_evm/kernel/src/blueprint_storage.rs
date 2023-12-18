@@ -16,6 +16,8 @@ use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/blueprints");
 
+const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
+
 /// Number of the last (as in, with larger number) blueprint stored.
 /// This is only used for proxy mode, where the kernel guarantees that
 /// blueprints are added incrementally.
@@ -118,17 +120,51 @@ fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
     concat(&EVM_BLUEPRINTS, &number_subkey).map_err(StorageError::from)
 }
 
+fn blueprint_chunk_path(
+    blueprint_path: &OwnedPath,
+    chunk_index: u16,
+) -> Result<OwnedPath, StorageError> {
+    let chunk_index_as_path: Vec<u8> = format!("/{}", chunk_index).into();
+    let chunk_index_subkey = RefPath::assert_from(&chunk_index_as_path);
+    concat(blueprint_path, &chunk_index_subkey).map_err(StorageError::from)
+}
+
+fn blueprint_nb_chunks_path(
+    blueprint_path: &OwnedPath,
+) -> Result<OwnedPath, StorageError> {
+    concat(blueprint_path, &EVM_BLUEPRINT_NB_CHUNKS).map_err(StorageError::from)
+}
+
+fn read_blueprint_nb_chunks<Host: Runtime>(
+    host: &Host,
+    blueprint_path: &OwnedPath,
+) -> Result<u16, Error> {
+    let path = blueprint_nb_chunks_path(blueprint_path)?;
+    let mut buffer = [0u8; 2];
+    store_read_slice(host, &path, &mut buffer, 2)?;
+    Ok(u16::from_le_bytes(buffer))
+}
+
+fn store_blueprint_nb_chunks<Host: Runtime>(
+    host: &mut Host,
+    blueprint_path: &OwnedPath,
+    nb_chunks: u16,
+) -> Result<(), Error> {
+    let path = blueprint_nb_chunks_path(blueprint_path)?;
+    let bytes = nb_chunks.to_le_bytes();
+    host.store_write_all(&path, &bytes).map_err(Error::from)
+}
+
 pub fn store_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: SequencerBlueprint,
-    number: U256,
 ) -> Result<(), Error> {
-    // Note: when the chunking mechanism is implemented, the sequencer
-    // blueprint will have additional information (nb of chunks, chunk
-    // index) that will be used to enrich the blueprint path.
-    let blueprint_path = blueprint_path(number)?;
+    let blueprint_path = blueprint_path(blueprint.number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
+    let blueprint_chunk_path =
+        blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
     let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
-    store_rlp(&store_blueprint, host, &blueprint_path)
+    store_rlp(&store_blueprint, host, &blueprint_chunk_path)
 }
 
 pub fn store_inbox_blueprint<Host: Runtime>(
@@ -138,10 +174,12 @@ pub fn store_inbox_blueprint<Host: Runtime>(
     let number = read_last_blueprint_number(host)?;
     // We overflow, as the default is the max U256
     let (number, _) = number.overflowing_add(U256::one());
-    store_last_blueprint_number(host, number)?;
     let blueprint_path = blueprint_path(number)?;
+    store_last_blueprint_number(host, number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &blueprint_path)
+    store_rlp(&store_blueprint, host, &chunk_path)
 }
 
 fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
@@ -151,23 +189,44 @@ fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     }
 }
 
+fn read_all_chunks<Host: Runtime>(
+    host: &Host,
+    blueprint_path: &OwnedPath,
+    nb_chunks: u16,
+) -> Result<Blueprint, Error> {
+    let mut chunks = vec![];
+    for i in 0..nb_chunks {
+        let path = blueprint_chunk_path(blueprint_path, i)?;
+        let stored_chunk: StoreBlueprint = read_rlp(host, &path)?;
+        match stored_chunk {
+            StoreBlueprint::InboxBlueprint(blueprint) => {
+                // Special case when there's an inbox blueprint stored.
+                // There must be only one chunk in this case.
+                return Ok(blueprint);
+            }
+            StoreBlueprint::SequencerChunk(chunk) => chunks.push(chunk),
+        }
+    }
+    let blueprint = rlp::decode(&chunks.concat())?;
+    Ok(blueprint)
+}
+
 pub fn read_next_blueprint<Host: Runtime>(
     host: &Host,
 ) -> Result<Option<Blueprint>, Error> {
     let number = read_next_blueprint_number(host)?;
-    let path = blueprint_path(number)?;
-    let exists = host.store_has(&path)?.is_some();
+    let blueprint_path = blueprint_path(number)?;
+    let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
-        // Note: this is where the de-chunking/parsing of sequencer
-        // blueprints will be implemented.
-        // For now, we assume the bytes correspond to the only chunk.
-        let stored_blueprint: StoreBlueprint = read_rlp(host, &path)?;
-        match stored_blueprint {
-            StoreBlueprint::InboxBlueprint(blueprint) => Ok(Some(blueprint)),
-            StoreBlueprint::SequencerChunk(chunk) => {
-                let blueprint = rlp::decode(&chunk)?;
-                Ok(Some(blueprint))
-            }
+        let nb_chunks = read_blueprint_nb_chunks(host, &blueprint_path)?;
+        let n_subkeys = host.store_count_subkeys(&blueprint_path)?;
+        let available_chunks = n_subkeys as u16 - 1;
+        if available_chunks == nb_chunks {
+            // All chunks are available
+            let blueprint = read_all_chunks(host, &blueprint_path, nb_chunks)?;
+            Ok(Some(blueprint))
+        } else {
+            Ok(None)
         }
     } else {
         Ok(None)
@@ -175,7 +234,6 @@ pub fn read_next_blueprint<Host: Runtime>(
 }
 
 // Removes from the storage the blueprint at index CURRENT_BLOCK_NUMBER
-#[allow(dead_code)]
 pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let number = read_current_block_number(host)?;
     let path = blueprint_path(number)?;

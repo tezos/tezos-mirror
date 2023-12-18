@@ -4,19 +4,25 @@
 
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_ethereum::rlp_helpers::{self, append_u256_le, decode_field_u256_le};
+use tezos_ethereum::rlp_helpers::{
+    self, append_u16_le, append_u256_le, decode_field_u16_le, decode_field_u256_le,
+};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct SequencerBlueprint {
     pub chunk: Vec<u8>,
     pub number: U256,
+    pub nb_chunks: u16,
+    pub chunk_index: u16,
 }
 
 impl Encodable for SequencerBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
+        stream.begin_list(4);
         stream.append(&self.chunk);
         append_u256_le(stream, &self.number);
+        append_u16_le(stream, &self.nb_chunks);
+        append_u16_le(stream, &self.chunk_index);
     }
 }
 
@@ -25,13 +31,21 @@ impl Decodable for SequencerBlueprint {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 2 {
+        if decoder.item_count()? != 4 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let mut it = decoder.iter();
         let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
         let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
-        Ok(Self { chunk, number })
+        let nb_chunks = decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+        let chunk_index =
+            decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+        Ok(Self {
+            chunk,
+            number,
+            nb_chunks,
+            chunk_index,
+        })
     }
 }
 
@@ -95,6 +109,8 @@ mod tests {
         SequencerBlueprint {
             chunk: chunk.into(),
             number: U256::from(42),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
         }
     }
 
