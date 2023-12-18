@@ -16,8 +16,7 @@ depends: [
   "tezos-dal-node-lib"
   "tezos-dal-node-services"
   "octez-l2-libs"
-  "irmin-pack" { >= "3.8.0" & < "3.9.0" }
-  "irmin" { >= "3.8.0" & < "3.9.0" }
+  "octez-internal-libs"
   "prometheus-app" { >= "1.2" }
   "prometheus" { >= "1.2" }
   "octez-protocol-017-PtNairob-libs"

@@ -8,9 +8,9 @@
  (libraries
   index
   octez-libs.base
-  irmin-pack
-  irmin-pack.unix
-  irmin
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
   aches-lwt
   octez-libs.stdlib-unix
   octez-libs.tezos-context.encoding)

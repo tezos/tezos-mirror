@@ -1,0 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name irmin_pack)
+ (public_name octez-internal-libs.irmin_pack)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  fmt
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin.data
+  logs
+  lwt
+  optint)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (flags
+  (:standard)
+  -w -66))

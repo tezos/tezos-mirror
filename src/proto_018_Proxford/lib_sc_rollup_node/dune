@@ -34,9 +34,9 @@
   octez-crawler
   octez-libs.tree-encoding
   data-encoding
-  irmin-pack
-  irmin-pack.unix
-  irmin
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
   aches
   aches-lwt
   octez-injector

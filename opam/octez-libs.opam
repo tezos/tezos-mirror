@@ -55,8 +55,7 @@ depends: [
   "uutf"
   "ringo" { >= "1.0.0" }
   "qcheck-core" {with-test}
-  "irmin" { >= "3.8.0" & < "3.9.0" }
-  "irmin-pack" { >= "3.8.0" & < "3.9.0" }
+  "octez-internal-libs"
   "conf-rust"
   "integers"
   "integers_stubs_js"

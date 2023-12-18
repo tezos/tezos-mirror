@@ -529,6 +529,13 @@ opam:octez-injector:
 
 # Ignoring unreleased package octez-injector-server.
 
+opam:octez-internal-libs:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: octez-internal-libs
+
 opam:octez-l2-libs:
   extends:
     - .opam_template
