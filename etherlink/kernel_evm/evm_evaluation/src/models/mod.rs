@@ -37,6 +37,7 @@ impl SpecName {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
+    #[serde(deserialize_with = "deserialize_str_as_u256")]
     pub balance: U256,
     #[serde(deserialize_with = "deserialize_str_as_bytes")]
     pub code: Bytes,
@@ -96,6 +97,9 @@ pub struct FillerResultIndexes {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoFiller {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_opt_str_as_u256")]
     pub balance: Option<U256>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
