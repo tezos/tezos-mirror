@@ -1513,9 +1513,7 @@ let test_chunked_transaction =
   in
   let title = "Check L2 chunked transfers are applied" in
   let tags = ["evm"; "l2_transfer"; "chunked"] in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6692
-     Large chunked transaction doesn't work without large blueprints. *)
-  register_test ~setup_mode:(Setup_proxy {devmode = true}) ~title ~tags test_f
+  register_both ~title ~tags test_f
 
 let test_rpc_txpool_content =
   Protocol.register_test
