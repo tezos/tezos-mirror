@@ -60,6 +60,8 @@ version = "=0.5.2"
 optional = true
 
 [target.'cfg(target_os = "hermit")'.dependencies.hermit]
+# TODO: remove pin once patched version of hermit is published
+git = "https://github.com/hermit-os/hermit-rs.git"
 version = "0.7.2"
 default-features = false
 
@@ -71,7 +73,7 @@ debug_alloc = ["tezos-smart-rollup-debug/alloc"]
 alloc = ["tezos-smart-rollup-entrypoint/alloc"]
 dlmalloc = ["tezos-smart-rollup-entrypoint/dlmalloc"]
 panic-hook = ["tezos-smart-rollup-entrypoint/default"]
-data-encoding = ["tezos_data_encoding", "tezos-smart-rollup-encoding/default"]
+data-encoding = ["tezos_data_encoding", "tezos-smart-rollup-encoding/alloc", "tezos-smart-rollup-encoding/tezos-encoding", "tezos-smart-rollup-encoding/crypto"]
 storage = ["tezos-smart-rollup-storage"]
 std = ["alloc", "debug_alloc", "tezos-smart-rollup-entrypoint/std"]
 testing = ["crypto", "tezos-smart-rollup-mock"]
