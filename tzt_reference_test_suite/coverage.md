@@ -1071,23 +1071,29 @@ Tested only with conjunction with `PACK`
 
 ## Ticket manipulation
 
-Not covered
-
 ### `JOIN_TICKETS`
 
-***None***
+- [join_tickets_00.tzt](join_tickets_00.tzt)
+- [join_tickets_01.tzt](join_tickets_01.tzt)
+- [join_tickets_02.tzt](join_tickets_02.tzt)
+- [join_tickets_03.tzt](join_tickets_03.tzt)
 
 ### `READ_TICKET`
 
-***None***
+- [read_ticket_00.tzt](read_ticket_00.tzt)
 
 ### `SPLIT_TICKET`
 
-***None***
+- [split_ticket_00.tzt](split_ticket_00.tzt)
+- [split_ticket_01.tzt](split_ticket_01.tzt)
+- [split_ticket_02.tzt](split_ticket_02.tzt)
+- [split_ticket_03.tzt](split_ticket_03.tzt)
+- [split_ticket_04.tzt](split_ticket_04.tzt)
 
 ### `TICKET`
 
-***None***
+- [ticket_00.tzt](ticket_00.tzt)
+- [ticket_01.tzt](ticket_01.tzt)
 
 ## Cryptographic operations
 

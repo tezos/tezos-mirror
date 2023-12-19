@@ -43,6 +43,13 @@ impl Type {
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Never | Address | ChainId | Bytes | Key
             | Signature | KeyHash => (),
+            Ticket(_) => match prop {
+                TypeProperty::Comparable
+                | TypeProperty::Pushable
+                | TypeProperty::Duplicable
+                | TypeProperty::Packable => return invalid_type_prop(),
+                TypeProperty::Passable | TypeProperty::Storable | TypeProperty::BigMapValue => (),
+            },
             Operation => match prop {
                 TypeProperty::Comparable
                 | TypeProperty::Passable

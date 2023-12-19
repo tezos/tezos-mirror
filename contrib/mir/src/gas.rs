@@ -201,7 +201,7 @@ pub mod interpret_cost {
     use num_bigint::BigUint;
 
     use super::{AsGasCost, BigIntByteSize, OutOfGas};
-    use crate::ast::{Key, KeyHash, Micheline, Or, TypedValue};
+    use crate::ast::{Key, KeyHash, Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -251,10 +251,23 @@ pub mod interpret_cost {
     // depending on whether a lambda is recursive; here this distinction doesn't
     // make a lot of sense.
     pub const APPLY: u32 = 140;
+    pub const TICKET: u32 = 10;
+    pub const READ_TICKET: u32 = 10;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
+
+    pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
+        compare(&t1.content, &t2.content)?;
+        add_num(&t1.amount, &t2.amount)
+    }
+
+    pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, OutOfGas> {
+        use std::mem::size_of_val;
+        let sz = Checked::from(std::cmp::max(size_of_val(amount1), size_of_val(amount2)));
+        (40 + (sz >> 1)).as_gas_cost()
+    }
 
     fn dropn(n: u16) -> Result<u32, OutOfGas> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
@@ -433,6 +446,7 @@ pub mod interpret_cost {
                 | V::Map(..)
                 | V::Contract(_)
                 | V::Operation(_)
+                | V::Ticket(_)
                 | V::Lambda(_),
                 _,
             ) => incomparable(),

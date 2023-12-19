@@ -12,8 +12,8 @@ use crate::lexer::{LexerError, Tok};
 use crate::syntax;
 use lalrpop_util::ParseError;
 use logos::Logos;
-use typed_arena::Arena;
 use macros::MacroError;
+use typed_arena::Arena;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
@@ -97,6 +97,11 @@ mod tests {
             parse("EQ @a").unwrap(),
             Micheline::App(Prim::EQ, &[], [Annotation::Variable("a")].into())
         );
+    }
+
+    #[test]
+    fn types() {
+        assert_eq!(parse("ticket").unwrap(), app!(ticket));
     }
 
     #[test]
