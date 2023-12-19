@@ -215,7 +215,7 @@ pub trait Backend: BackendManagement + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{bus, registers};
+    use crate::{bus, mode, registers};
 
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
@@ -229,6 +229,7 @@ pub mod tests {
         region::tests::test_backend(factory);
         registers::tests::test_backend(factory);
         bus::main_memory::tests::test_backend(factory);
+        mode::tests::test_mode(factory);
         test_example(factory);
     }
 

@@ -3,13 +3,15 @@
 // SPDX-License-Identifier: MIT
 
 use crate::backend::{self, Region};
+use crate::mode::Mode;
 
 /// Privilege required to access a CSR
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Privilege {
-    Unprivileged,
-    Supervisor,
-    Hypervisor,
-    Machine,
+    Unprivileged = 0,
+    Supervisor = 1,
+    Hypervisor = 2,
+    Machine = 3,
 }
 
 /// CSR index
@@ -352,6 +354,28 @@ impl CSRegister {
 /// Value in a CSR
 type CSRValue = u64;
 
+/// RISC-V exceptions
+#[derive(PartialEq, Eq)]
+pub enum Exception {
+    IllegalInstruction,
+}
+
+/// Return type of read/write operations
+pub type Result<R> = core::result::Result<R, Exception>;
+
+/// Checks that `mode` can access the register `reg`.
+///
+/// Throws [`Exception::IllegalInstruction`] in case of insufficient privilege.
+/// Section 2.1 - privileged spec
+#[inline(always)]
+pub fn check_privilege(reg: CSRegister, mode: Mode) -> Result<()> {
+    if mode.privilege() < reg.privilege() {
+        return Err(Exception::IllegalInstruction);
+    }
+
+    Ok(())
+}
+
 /// CSRs
 pub struct CSRegisters<M: backend::Manager> {
     registers: M::Region<CSRValue, 4096>,
@@ -363,12 +387,14 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        self.registers.write(reg as usize, value)
+        self.registers.write(reg as usize, value);
     }
 
     /// Read from a CSR.
     #[inline(always)]
     pub fn read(&mut self, reg: CSRegister) -> CSRValue {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
+        // Respect field specifications (e.g. WPRI, WLRL, WARL)
         self.registers.read(reg as usize)
     }
 
@@ -410,5 +436,36 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.
     pub fn new_in(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self { registers: space }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::{csregisters::Exception, mode::Mode};
+
+    #[test]
+    pub fn test_privilege_access() {
+        use crate::csregisters::check_privilege as check;
+        use crate::csregisters::CSRegister as csreg;
+
+        let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
+
+        // Access Machine registers
+        assert!(check(csreg::mie, Mode::Debug).is_ok());
+        assert!(check(csreg::mstatus, Mode::Machine).is_ok());
+        assert!(check(csreg::medeleg, Mode::Supervisor).is_err_and(is_illegal_instr));
+        assert!(check(csreg::mcause, Mode::User).is_err_and(is_illegal_instr));
+
+        // Access Supervisor registers
+        assert!(check(csreg::sstatus, Mode::Debug).is_ok());
+        assert!(check(csreg::sip, Mode::Machine).is_ok());
+        assert!(check(csreg::scontext, Mode::Supervisor).is_ok());
+        assert!(check(csreg::stval, Mode::User).is_err_and(is_illegal_instr));
+
+        // Access User registers
+        assert!(check(csreg::fflags, Mode::Debug).is_ok());
+        assert!(check(csreg::cycle, Mode::Machine).is_ok());
+        assert!(check(csreg::frm, Mode::Supervisor).is_ok());
+        assert!(check(csreg::fcsr, Mode::User).is_ok());
     }
 }
