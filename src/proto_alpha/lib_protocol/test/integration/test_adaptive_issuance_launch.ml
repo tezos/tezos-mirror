@@ -469,7 +469,7 @@ let tests =
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
-         59l);
+         88l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance launches (realistic threshold, vote enabled)"
@@ -477,7 +477,7 @@ let tests =
       (test_launch
          Default_parameters.constants_test.adaptive_issuance
            .launch_ema_threshold
-         187259l
+         280894l
          (* This vote duration is consistent with the result of the
             unit test for this EMA in
             ../unit/test_adaptive_issuance_ema.ml*));
@@ -487,7 +487,7 @@ let tests =
       `Quick
       (test_does_not_launch_without_feature_flag
          1000000l (* This means that the threshold is set at 0.05% *)
-         59l);
+         88l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance does not launch (realistic threshold, vote disabled)"
@@ -495,7 +495,7 @@ let tests =
       (test_does_not_launch_without_feature_flag
          Default_parameters.constants_test.adaptive_issuance
            .launch_ema_threshold
-         187259l
+         280894l
          (* This vote duration is consistent with the result of the
             unit test for this EMA in
             ../unit/test_adaptive_issuance_ema.ml*));
