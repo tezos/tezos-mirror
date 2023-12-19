@@ -19,7 +19,7 @@ use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::stack::*;
-use crate::typechecker::typecheck_value;
+use crate::typechecker::{typecheck_contract_address, typecheck_value};
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError<'a> {
@@ -907,6 +907,15 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::BALANCE)?;
             stack.push(V::Mutez(ctx.balance));
         }
+        I::Contract(typ, ep) => {
+            ctx.gas.consume(interpret_cost::CONTRACT)?;
+            let address = pop!(V::Address);
+            stack.push(TypedValue::new_option(
+                typecheck_contract_address(ctx, address, ep.clone(), typ)
+                    .ok()
+                    .map(TypedValue::Contract),
+            ));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -914,7 +923,7 @@ fn interpret_one<'a>(
 
 #[cfg(test)]
 mod interpreter_tests {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::{BTreeMap, BTreeSet, HashMap};
 
     use super::*;
     use super::{Lambda, Or};
@@ -3239,6 +3248,235 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::BALANCE + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn contract() {
+        use crate::ast::michelson_address::Address;
+        use crate::gas::tc_cost;
+
+        #[track_caller]
+        fn run_contract_test<'a>(
+            address: Address,
+            opt_entrypoints: Option<&[(Entrypoint, Type)]>,
+            mut start_stack: IStack<'a>,
+            stack_expect: IStack<'a>,
+            instr: Instruction<'a>,
+            opt_exp_gas: Option<u32>,
+        ) {
+            use crate::ast::michelson_address::entrypoint::Entrypoints;
+            let mut ctx = Ctx::default();
+            if let Some(e) = opt_entrypoints {
+                ctx.set_known_contracts({
+                    let mut x: HashMap<AddressHash, Entrypoints> = HashMap::new();
+                    x.insert(address.hash, HashMap::from_iter(Vec::from(e)));
+                    x
+                })
+            }
+
+            let start_milligas = ctx.gas.milligas();
+            assert_eq!(interpret(&[instr], &mut ctx, &mut start_stack), Ok(()));
+            assert_eq!(start_stack, stack_expect);
+            if let Some(exp_gas) = opt_exp_gas {
+                assert_eq!(start_milligas - ctx.gas.milligas(), exp_gas);
+            }
+        }
+
+        // Contract calls default entrypoint of type Unit
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::default(), Type::Unit)]),
+            stk![V::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(V::Contract(addr)))],
+            Contract(Type::Unit, Entrypoint::default()),
+            Some(
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                    + interpret_cost::CONTRACT
+                    + interpret_cost::INTERPRET_RET,
+            ),
+        );
+
+        // Contract calls default entrypoint of type other than Unit
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::default(), Type::Int)]),
+            stk![V::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(V::Contract(addr)))],
+            Contract(Type::Int, Entrypoint::default()),
+            Some(
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                    + interpret_cost::CONTRACT
+                    + interpret_cost::INTERPRET_RET,
+            ),
+        );
+
+        // When there is entrypoint embedded in address but not specified
+        // in instruction.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::try_from("foo").unwrap(), Type::Int)]),
+            stk![V::Address(addr.clone())],
+            stk![TypedValue::new_option(Some(V::Contract(addr)))],
+            Contract(Type::Int, Entrypoint::default()),
+            Some(
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                    + interpret_cost::CONTRACT
+                    + interpret_cost::INTERPRET_RET,
+            ),
+        );
+
+        // When there is no entrypoint embedded in address but one was specified
+        // in instruction.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let expected_address: Address = Address {
+            entrypoint: Entrypoint::try_from("foo").unwrap(),
+            ..addr.clone()
+        };
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::try_from("foo").unwrap(), Type::Int)]),
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
+            Contract(Type::Int, Entrypoint::try_from("foo").unwrap()),
+            Some(
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                    + interpret_cost::CONTRACT
+                    + interpret_cost::INTERPRET_RET,
+            ),
+        );
+
+        // When there is entrypoint embedded in address and also one was specified
+        // in instruction and they does not match.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::try_from("foo").unwrap(), Type::Int)]),
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Int, Entrypoint::try_from("foo").unwrap()),
+            None,
+        );
+
+        // When there is no contract at the address.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar").unwrap();
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Int, Entrypoint::default()),
+            None,
+        );
+
+        // When there is a contract at the address but the parameter type is different.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[(Entrypoint::default(), Type::String)]),
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Int, Entrypoint::default()),
+            None,
+        );
+
+        // When there is a contract at the address but the parameter type of the entrypoint is different.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        run_contract_test(
+            addr.clone(),
+            Some(&[
+                (Entrypoint::try_from("bar").unwrap(), Type::Int),
+                (Entrypoint::try_from("foo").unwrap(), Type::String),
+            ]),
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Int, Entrypoint::try_from("foo").unwrap()),
+            None,
+        );
+
+        // When there is a contract at the address and the parameter type of the entrypoint is
+        // correct.
+        let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let expected_address: Address = Address {
+            entrypoint: Entrypoint::try_from("foo").unwrap(),
+            ..addr.clone()
+        };
+        run_contract_test(
+            addr.clone(),
+            Some(&[
+                (Entrypoint::try_from("bar").unwrap(), Type::String),
+                (Entrypoint::try_from("foo").unwrap(), Type::Int),
+            ]),
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
+            Contract(Type::Int, Entrypoint::try_from("foo").unwrap()),
+            None,
+        );
+
+        // When the address is implicit.
+        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let expected_address: Address = Address {
+            entrypoint: Entrypoint::default(),
+            ..addr.clone()
+        };
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
+            Contract(Type::Unit, Entrypoint::default()),
+            None,
+        );
+
+        // When the address is implicit.and contract type is Ticket
+        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let expected_address: Address = Address {
+            entrypoint: Entrypoint::default(),
+            ..addr.clone()
+        };
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
+            Contract(Type::new_ticket(Type::Unit), Entrypoint::default()),
+            None,
+        );
+
+        // When the address is implicit and the Contract calls type is something other then unit
+        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Int, Entrypoint::default()),
+            None,
+        );
+
+        // When the address is implicit and contains an entrypoint
+        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Unit, Entrypoint::default()),
+            None,
+        );
+
+        // When the address is implicit and contract call contains an entrypoint
+        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
+        run_contract_test(
+            addr.clone(),
+            None,
+            stk![V::Address(addr)],
+            stk![TypedValue::new_option(None)],
+            Contract(Type::Unit, Entrypoint::try_from("foo").unwrap()),
+            None,
         );
     }
 }

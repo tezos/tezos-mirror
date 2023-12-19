@@ -128,6 +128,8 @@ defprim! {
     self_,
     #[token("_")]
     Underscore,
+    other_contracts,
+    Contract,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

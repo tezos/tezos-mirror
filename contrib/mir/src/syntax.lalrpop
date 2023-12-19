@@ -30,6 +30,7 @@ extern {
 
     enum Tok<'a> {
         "stack_elt" => Tok::Noun(TztPrim(TzP::Stack_elt)),
+        "contract" => Tok::Noun(TztPrim(TzP::Contract)),
         "input" => Tok::Noun(TztPrim(TzP::input)),
         "output" => Tok::Noun(TztPrim(TzP::output)),
         "failed" => Tok::Noun(TztPrim(TzP::Failed)),
@@ -39,6 +40,7 @@ extern {
         "amount" => Tok::Noun(TztPrim(TzP::amount)),
         "balance" => Tok::Noun(TztPrim(TzP::balance)),
         "self" => Tok::Noun(TztPrim(TzP::self_)),
+        "other_contracts" => Tok::Noun(TztPrim(TzP::other_contracts)),
         number => Tok::Number(<BigInt>),
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
@@ -129,6 +131,16 @@ tztStackElt : (Micheline<'a>, Micheline<'a>) = {
   "stack_elt" <t:Micheline> <v:Micheline> => (t, v)
 }
 
+otherContractsElt : (Micheline<'a>, Micheline<'a>) = {
+  "contract" <t:Micheline> <v:Micheline> => (t, v)
+}
+
+otherContractsSeq = semicolonSepSeq<otherContractsElt>;
+
+otherContracts : Vec<(Micheline<'a>, Micheline<'a>)> = {
+  "{" <s:otherContractsSeq> "}" => s
+}
+
 tztStackEltSeq = semicolonSepSeq<tztStackElt>;
 
 tztStack : Vec<(Micheline<'a>, Micheline<'a>)> = {
@@ -155,6 +167,7 @@ tztEntity : TztEntity<'a> = {
   "chain_id" <Micheline> => TztEntity::ChainId(<>),
   "parameter" <Micheline> => TztEntity::Parameter(<>),
   "self" <Micheline> => TztEntity::SelfAddr(<>),
+  "other_contracts" <otherContracts> => TztEntity::OtherContracts(<>),
 }
 
 pub tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;

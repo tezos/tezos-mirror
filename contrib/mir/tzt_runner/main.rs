@@ -154,6 +154,18 @@ mod tztrunner_tests {
     }
 
     #[test]
+    fn test_runner_other_contracts() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_OTHER_CONTRACTS).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
+    }
+
+    #[test]
+    fn test_runner_self_is_known() {
+        let tzt_test = parse_tzt_test(TZT_SAMPLE_SELF_IS_KNOWN).unwrap();
+        assert_eq!(run_tzt_test(tzt_test), Ok(()));
+    }
+
+    #[test]
     fn test_runner_chain_id() {
         assert_eq!(
             run_tzt_test(
@@ -260,6 +272,21 @@ mod tztrunner_tests {
     const TZT_SAMPLE_IMPLICIT_PARAMETER: &str = r#"
       code SELF;
       input {};
+      self "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
       output { Stack_elt (contract unit) "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" }
+    "#;
+
+    const TZT_SAMPLE_OTHER_CONTRACTS: &str = r#"
+      code { CONTRACT unit } ;
+      input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+      output { Stack_elt (option (contract unit)) (Some "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d") } ;
+      other_contracts { Contract "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit }
+    "#;
+
+    const TZT_SAMPLE_SELF_IS_KNOWN: &str = r#"
+      code { CONTRACT unit } ;
+      input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+      output { Stack_elt (option (contract unit)) (Some "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d") } ;
+      self "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
     "#;
 }
