@@ -24,6 +24,7 @@ COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
+COPY --chown=tezos:nogroup irmin tezos/irmin
 COPY --chown=tezos:nogroup etherlink tezos/etherlink
 COPY --chown=tezos:nogroup tezt tezos/tezt
 COPY --chown=tezos:nogroup opam tezos/opam
