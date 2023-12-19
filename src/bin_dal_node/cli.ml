@@ -47,7 +47,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some file) None
+      & opt (some string) None
       & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
 
   let rpc_addr =

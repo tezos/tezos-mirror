@@ -31,7 +31,7 @@ let starting_node =
   declare_0
     ~section
     ~name:"starting_dal_node"
-    ~msg:"Starting the DAL node"
+    ~msg:"starting the DAL node"
     ~level:Notice
     ()
 
@@ -64,7 +64,7 @@ let data_dir_not_found =
     ~section
     ~name:"dal_node_no_data_dir"
     ~msg:
-      "the DAL node data directory {path} doesn't exist. Creating one in {path}"
+      "the DAL node configuration file does not exist in {path}, creating one"
     ~level:Warning
     ("path", Data_encoding.(string))
 
