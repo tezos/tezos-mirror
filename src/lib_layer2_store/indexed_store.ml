@@ -58,10 +58,6 @@ let read_int8 str offset =
 
 (* Functors to build stores on indexes *)
 
-type ('key, 'value) gc_iterator =
-  | Retain of 'key list
-  | Iterator of {first : 'key; next : 'key -> 'value -> 'key option Lwt.t}
-
 module type NAME = sig
   val name : string
 end
@@ -156,7 +152,7 @@ module type INDEXED_FILE = sig
   val gc :
     ?async:bool ->
     rw t ->
-    (key, value * header) gc_iterator ->
+    (key -> header -> value -> bool tzresult Lwt.t) ->
     unit tzresult Lwt.t
 
   val wait_gc_completion : 'a t -> unit Lwt.t
@@ -248,16 +244,6 @@ end) : INDEX_KEY with type t = E.t = struct
       Data_encoding.Json.pp
       (Data_encoding.Json.construct E.encoding k)
 end
-
-let gc_reachable_of_iter =
-  let open Lwt_syntax in
-  function
-  | Iterator {first; next} -> (
-      (Some first, fun k -> function Some v -> next k v | None -> return_none))
-  | Retain keys ->
-      let dispenser = Seq.to_dispenser (List.to_seq keys) in
-      let first = dispenser () in
-      (first, fun _k _v -> return (dispenser ()))
 
 module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
@@ -1063,23 +1049,6 @@ struct
         | Ok () -> ()
         | Error _e -> (* ignore error when reverting *) ())
 
-  (** Copy item associated to [k] from the [store] stale stores to
-      [tmp_store]. *)
-  let unsafe_retain_one_item store tmp_store key =
-    let open Lwt_result_syntax in
-    let* v = unsafe_read_from_disk_opt ~only_stale:true store key in
-    let* () =
-      match v with
-      | None ->
-          let*! () =
-            Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp key)
-          in
-          return_unit
-      | Some (value, header) ->
-          unsafe_append_internal tmp_store ~key ~header ~value
-    in
-    return v
-
   (** When the gc operation finishes, i.e. we have copied all elements to retain
       to the temporary store, we can replace all the stale stores by the
       temporary one. *)
@@ -1096,25 +1065,43 @@ struct
     let*! () = Store_events.finished_gc N.name in
     return_unit
 
-  (** The background task for a gc operation consists in copying all items
-      reachable by [gc_iter] from the stale stores to the temporary one. While
-      this is happening, the stale stores can still be queried and new bindings
-      can still be added to the store because only the fresh store is
-      modified. *)
-  let gc_background_task store tmp_store gc_iter resolve =
+  (** Returns the elements of an index in an unspecified order. NOTE: the elements
+      are stored in memory.  *)
+  let index_header_bindings i =
+    let acc = ref [] in
+    Header_index.iter (fun k v -> acc := (k, v) :: !acc) i ;
+    !acc
+
+  (** The background task for a gc operation consists in copying all items from
+      the stale stores of [store] that satisfy [filter] to the temporary one
+      [tmp_store]. While this is happening, the stale stores can still be
+      queried and new bindings can still be added to the store because only the
+      fresh store is modified. *)
+  let gc_background_task store tmp_store filter resolve =
     let open Lwt_result_syntax in
     Lwt.dont_wait
       (fun () ->
         let*! res =
           trace (Gc_failed N.name) @@ protect
           @@ fun () ->
-          let first, next = gc_reachable_of_iter gc_iter in
-          let rec copy elt =
-            let* value = unsafe_retain_one_item store tmp_store elt in
-            let*! next = next elt value in
-            match next with None -> return_unit | Some elt -> copy elt
+          let process_key_header internal_store (key, {IHeader.offset; header})
+              =
+            let* value, _ofs =
+              Values_file.pread_value internal_store.fd ~file_offset:offset
+            in
+            let* keep = filter key header value in
+            if keep then unsafe_append_internal tmp_store ~key ~header ~value
+            else return_unit
           in
-          let* () = Option.iter_es copy first in
+          let process_internal_store internal_store =
+            List.iter_es
+              (process_key_header internal_store)
+              (index_header_bindings internal_store.index)
+          in
+          let stale_internal_stores =
+            internal_stores ~only_stale:true store |> List.rev
+          in
+          let* () = List.iter_es process_internal_store stale_internal_stores in
           finalize_gc store tmp_store
         in
         let*! () =
@@ -1133,7 +1120,7 @@ struct
           N.name
           (Printexc.to_string exn))
 
-  let gc_internal ~async store gc_iter =
+  let gc_internal ~async store filter =
     let open Lwt_result_syntax in
     match store.gc_status with
     | Ongoing _ ->
@@ -1141,7 +1128,7 @@ struct
         return_unit
     | No_gc ->
         let* tmp_store, promise, resolve = initiate_gc store in
-        gc_background_task store tmp_store gc_iter resolve ;
+        gc_background_task store tmp_store filter resolve ;
         if async then return_unit
         else
           Lwt.catch
@@ -1150,8 +1137,8 @@ struct
               return_unit)
             (function Lwt.Canceled -> return_unit | e -> raise e)
 
-  let gc ?(async = true) store gc_iter =
-    trace (Gc_failed N.name) @@ gc_internal ~async store gc_iter
+  let gc ?(async = true) store filter =
+    trace (Gc_failed N.name) @@ gc_internal ~async store filter
 
   let wait_gc_completion store =
     match store.gc_status with
