@@ -330,6 +330,10 @@ let get_ai_expected_issuance ctxt =
 let get_denunciations ctxt =
   Alpha_services.Denunciations.denunciations rpc_ctxt ctxt
 
+module Dal = struct
+  let shards ctxt = Plugin.RPC.Dal.dal_shards rpc_ctxt ctxt
+end
+
 (* Voting *)
 
 module Vote = struct
