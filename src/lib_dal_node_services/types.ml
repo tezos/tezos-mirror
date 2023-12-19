@@ -454,6 +454,24 @@ let header_status_arg =
   let construct = Data_encoding.Binary.to_string_exn header_status_encoding in
   Tezos_rpc.Arg.make ~name:"header_status" ~destruct ~construct ()
 
+let char =
+  Resto.Arg.make
+    ~name:"char"
+    ~destruct:(fun str ->
+      if String.length str = 1 then Ok (String.get str 0)
+      else Error "A single character string is expected")
+    ~construct:(fun c -> String.make 1 c)
+    ()
+
+let slot_query =
+  let open Tezos_rpc.Query in
+  query (fun padding ->
+      object
+        method padding = padding
+      end)
+  |+ field "padding" char '\x00' (fun obj -> obj#padding)
+  |> seal
+
 let wait_query =
   let open Tezos_rpc.Query in
   query (fun wait ->
