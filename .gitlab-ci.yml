@@ -28,6 +28,11 @@ build:
   before_script:
     - sudo apt update
   script:
+    # Temporary fix: v18.1 uses caqti < 2 while master is using >= 2
+    - '[[ "${OCTEZ_BRANCH}" == "v18.1" ]] || for I in 2 3 4 ; do find ./server/ -type f -name "*.ml*" -print0 | xargs -0 sed -i s/tup${I}/t${I}/g ; done;'
+    - '[[ "${OCTEZ_BRANCH}" == "v18.1" ]] || find ./server/ -type f -name "*.ml*" -print0 | xargs -0 sed -i s/Caqti_lwt.Pool/Caqti_lwt_unix.Pool/g'
+    - '[[ "${OCTEZ_BRANCH}" == "v18.1" ]] || find ./server/ -type f -name "*.ml*" -print0 | xargs -0 sed -i s/Caqti_lwt.connect_pool/Caqti_lwt_unix.connect_pool/g'
+    - '[[ "${OCTEZ_BRANCH}" == "v18.1" ]] || find . -type f -name "dune" -print0 | xargs -0 sed -i s/caqti-lwt/caqti-lwt.unix/g'
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
     - opam-2.1 install -y caqti-lwt caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass --criteria="-changed,-removed"
