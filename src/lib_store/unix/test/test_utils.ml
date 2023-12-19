@@ -392,7 +392,7 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
         constants.blocks_per_cycle
         (Compare.Int32.max
            0l
-           (sub current_cycle (of_int constants.preserved_cycles))))
+           (sub current_cycle (of_int constants.blocks_preservation_cycles))))
   in
   let last_allowed_fork_level =
     match min_lafl with

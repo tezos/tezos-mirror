@@ -197,7 +197,10 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
   let*! imported_head = Store.Chain.current_head imported_chain_store in
-  let* {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} =
+  let* {
+         Constants.parametric = {blocks_per_cycle; blocks_preservation_cycles; _};
+         _;
+       } =
     Alpha_utils.get_constants imported_chain_store imported_head
   in
   let imported_history_mode = Store.Chain.history_mode imported_chain_store in
@@ -212,7 +215,8 @@ let check_baking_continuity ~test_descr ~exported_chain_store
     let min_nb_blocks_to_bake =
       Int32.(
         of_int
-          (to_int blocks_per_cycle * (preserved_cycles + imported_offset + 2)))
+          (to_int blocks_per_cycle
+          * (blocks_preservation_cycles + imported_offset + 2)))
     in
     Compare.Int32.(
       max
@@ -387,7 +391,11 @@ let make_tests speed genesis_parameters =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
   let {
     Parameters.constants =
-      {Constants.Parametric.blocks_per_cycle; preserved_cycles; _};
+      {
+        Constants.Parametric.blocks_per_cycle;
+        blocks_preservation_cycles = preserved_cycles;
+        _;
+      };
     _;
   } =
     genesis_parameters

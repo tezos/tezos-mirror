@@ -62,7 +62,7 @@ val levels_in_current_cycle :
 val levels_with_commitments_in_cycle :
   Raw_context.t -> Cycle_repr.t -> Level_repr.t list
 
-val last_allowed_fork_level : Raw_context.t -> Raw_level_repr.t
+val last_preserved_block_level : Raw_context.t -> Raw_level_repr.t
 
 (** Returns [Some cycle] if the current level represents the last
    level of [cycle] and [None] if the level is not the last level of a

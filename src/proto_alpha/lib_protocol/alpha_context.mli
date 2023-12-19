@@ -1207,7 +1207,7 @@ module Level : sig
 
   val levels_in_current_cycle : context -> ?offset:int32 -> unit -> level list
 
-  val last_allowed_fork_level : context -> Raw_level.t
+  val last_preserved_block_level : context -> Raw_level.t
 
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
