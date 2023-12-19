@@ -61,6 +61,34 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+(* We use a custom [bake_for], which by default bakes with all delegates, unlike
+   [Client.bake_for], to highlight the following: baking in the past with all
+   delegates ensures that the baked block has round 0, which is the default
+   round used when injecting DAL attestation operations. Note that it is
+   normally not necessary to bake with a particular delegate, therefore there is
+   no downside to set the case [`All] as the default. *)
+let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
+  let keys =
+    match delegates with
+    | `All ->
+        (* The argument ~keys:[] allows to bake with all available delegates. *)
+        []
+    | `For keys -> keys
+  in
+  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
+
+module Client = struct
+  include Client
+
+  let msg =
+    "Please use 'bake_for' for DAL tests and not 'Client.bake_for' to be sure \
+     to read the comment about the 'keys' argument."
+
+  let bake_for _client = Test.fail "%s" msg
+
+  let bake_for_and_wait _client = Test.fail "%s" msg
+end
+
 let next_level node =
   let* current_level = Node.get_level node in
   return (current_level + 1)
@@ -215,8 +243,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:bootstrap1_key
   in
-  (* Argument ~keys:[] allows to bake with all available delegates. *)
-  let* () = Client.bake_for_and_wait tezos_client ~keys:[] in
+  let* () = bake_for tezos_client in
   f rollup_address sc_rollup_node
 
 let make_dal_node ?peers ?attester_profiles ?producer_profiles
@@ -493,7 +520,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     (mempool = expected_mempool)
       Mempool.classified_typ
       ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* block_metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
   if block_metadata.dal_attestation <> None then
     Test.fail "Did not expect to find \"dal_attestation\"" ;
@@ -655,7 +682,7 @@ let check_dal_raw_context node =
 let test_slot_management_logic _protocol parameters cryptobox node client
     _bootstrap_key =
   let*! () = Client.reveal ~src:"bootstrap6" client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   Log.info "Inject some valid slot headers" ;
   let* (`OpHash oph1) =
     publish_dummy_slot
@@ -720,7 +747,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     (mempool = expected_mempool)
       Mempool.classified_typ
       ~error_msg:"Expected all the operations to be applied. Got %L") ;
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* bytes =
     Client.RPC.call client @@ RPC.get_chain_block_context_raw_bytes ()
   in
@@ -749,7 +776,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   check_manager_operation_status operations_result Applied oph2 ;
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
   let lag = parameters.attestation_lag in
-  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat (lag - 1) (fun () -> bake_for client) in
   let* _ =
     inject_dal_attestations
       ~nb_slots
@@ -764,7 +791,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       [1]
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
   let attestation =
     match metadata.dal_attestation with
@@ -831,7 +858,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     |> return
   in
   (* Just bake some blocks before starting publishing. *)
-  let* () = repeat (2 * lag) (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat (2 * lag) (fun () -> bake_for client) in
 
   (* Part A.
      - No header published yet, just play with attestations with various levels;
@@ -860,7 +887,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
       ~__LOC__
       Mempool.{empty with outdated; validated = [h3]; branch_delayed = [h4]}
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   Log.info "expected mempool: outdated: h1, h2, validated: h4 = %s" h4 ;
   let* () =
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated = [h4]}
@@ -887,7 +914,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let* () =
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated = [h4; h5]}
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* now = Node.get_level node in
   let level = now + lag - 1 in
   let* attestation_ops =
@@ -904,14 +931,14 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     lag ;
   let branch_delayed = attestation_ops in
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated; branch_delayed} in
-  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat (lag - 1) (fun () -> bake_for client) in
   let* () =
     mempool_is
       ~__LOC__
       Mempool.{empty with outdated; validated = attestation_ops}
   in
   let* () = check_slots_availability ~__LOC__ ~attested:[] in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   Log.info "expected mempool: outdated: h1, h2" ;
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
   check_slots_availability ~__LOC__ ~attested:[10]
@@ -958,19 +985,17 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let num_cycles = 2 + preserved_cycles in
   Log.info
     "Bake for %d cycles for %s to be a baker"
     num_cycles
     new_account.alias ;
-  let* () =
-    Client.bake_for_and_wait ~count:(num_cycles * blocks_per_cycle) client
-  in
+  let* () = bake_for ~count:(num_cycles * blocks_per_cycle) client in
   (* We iterate until we find a level for which the new account has no assigned
      shard. Recall that the probability to not be assigned a shard is around
      3/4, we so a level is found quickly. *)
@@ -994,7 +1019,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
       Log.info
         "Bake another %d blocks to change the DAL committee"
         blocks_per_epoch ;
-      let* () = Client.bake_for_and_wait ~count:blocks_per_epoch client in
+      let* () = bake_for ~count:blocks_per_epoch client in
       iter ())
     else
       let* (`OpHash _oph) =
@@ -1077,13 +1102,11 @@ let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client
       ~index
       content
   in
-  let* () =
-    repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
-  in
+  let* () = repeat attestation_lag (fun () -> bake_for client) in
   let* _op_hashes =
     inject_dal_attestations ~nb_slots:number_of_slots [index] client
   in
-  Client.bake_for_and_wait client
+  bake_for client
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
@@ -1206,7 +1229,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let wait_block_processing1 =
     wait_for_layer1_block_processing dal_node pub_level
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () = wait_block_processing1 in
 
   Log.info
@@ -1224,7 +1247,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let wait_block_processing2 =
     wait_for_layer1_block_processing dal_node final_pub_level
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () = wait_block_processing2 in
 
   Log.info
@@ -1279,7 +1302,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let attested = [slot0; slot2_b] in
   let unattested = [slot1] in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
-  let* () = repeat (lag - 2) (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat (lag - 2) (fun () -> bake_for client) in
   let* _op_hash =
     inject_dal_attestations ~nb_slots (List.map fst attested) client
   in
@@ -1287,7 +1310,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     let final_attested_level = final_pub_level + lag in
     wait_for_layer1_block_processing dal_node final_attested_level
   in
-  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat 2 (fun () -> bake_for client) in
   let* () = wait_block_processing3 in
 
   let* () =
@@ -1372,7 +1395,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     publish Constant.bootstrap1 ~index:0
     @@ Helpers.make_slot ~slot_size slot_content
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* _level = Node.wait_for_level node 1 in
   let number_of_shards =
     (crypto_params.number_of_shards / crypto_params.redundancy_factor) - 1
@@ -1569,7 +1592,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
       client
   in
   let* level = Node.get_level node in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* export_level = Node.wait_for_level node (level + 1) in
   let file = Temp.file "snapshot" in
   let* () = Node.snapshot_export ~export_level node file in
@@ -1656,7 +1679,7 @@ let test_dal_node_startup =
       [
         Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun _ ->
             Some ());
-        Client.bake_for_and_wait client;
+        bake_for client;
       ]
   in
   let* () = Dal_node.terminate dal_node in
@@ -1669,7 +1692,7 @@ let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
     @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
   in
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  if bake then Client.bake_for_and_wait client else unit
+  if bake then bake_for client else unit
 
 let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     sc_rollup_node sc_rollup_address _node client _pvm_name =
@@ -1777,7 +1800,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   in
 
   Log.info "Step 5: check that the slot headers are fetched by the rollup node" ;
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 2)
   in
@@ -1796,13 +1819,11 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
 
   Log.info "Step 6: attest only slots 1 and 2" ;
-  let* () =
-    repeat (attestation_lag - 1) (fun () -> Client.bake_for_and_wait client)
-  in
+  let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
   let* _ops_hashes =
     inject_dal_attestations ~nb_slots:number_of_slots [2; 1] client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level
       sc_rollup_node
@@ -1834,9 +1855,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   Log.info
     "Step 8: bake attestation_lag blocks so that the rollup node interprets \
      the previously published & attested slot(s)" ;
-  let* () =
-    repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
-  in
+  let* () = repeat attestation_lag (fun () -> bake_for client) in
 
   let* level =
     Sc_rollup_node.wait_for_level
@@ -1945,7 +1964,7 @@ let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
   let expected_value = 502 in
   (* The code should be adapted if the current level changes. *)
   let* () = send_messages client [" 99 3 "; " + + value"] in
-  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
+  let* () = repeat 2 (fun () -> bake_for client) in
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
@@ -1999,7 +2018,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm _protocol parameters dal_node
       ~parameters_ty:"unit"
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
@@ -2141,8 +2160,8 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   in
   (* bake two blocks: at [level + 1] the commitments are published, at [level +
      2] the commitments become final *)
-  let* () = Client.bake_for_and_wait client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
+  let* () = bake_for client in
   let* () = wait_block_processing in
   Log.info "Check attestability of slots." ;
   let attested_level = level + parameters.attestation_lag in
@@ -2241,7 +2260,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
       else
         let* () = publish_and_store level in
         (* bake (and attest) with all available delegates to go faster *)
-        let* () = Client.bake_for_and_wait ~keys:[] ~dal_node_endpoint client in
+        let* () = bake_for ~dal_node_endpoint client in
         let* _ = Node.wait_for_level node level in
         iter (level + 1)
     in
@@ -2422,7 +2441,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       else
         let* () = publish_and_store level in
         let* () =
-          Client.bake_for_and_wait ~keys:delegates ~dal_node_endpoint client
+          bake_for ~delegates:(`For delegates) ~dal_node_endpoint client
         in
         let* _ = Node.wait_for_level node level in
         iter (level + 1)
@@ -2668,8 +2687,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     in
     send_messages ~bake:false l1_client [config]
   in
-  (* Argument ~keys:[] allows to bake with all available delegates. *)
-  let* () = Client.bake_for_and_wait l1_client ~keys:[] in
+  let* () = bake_for l1_client in
   Log.info "[e2e.pvm] PVM Arith configured@." ;
 
   Log.info
@@ -3360,8 +3378,8 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
 
   (* We bake a block that includes a [slot_header] operation. And then another
      block so that this operation is final. *)
-  let* () = Client.bake_for_and_wait client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
+  let* () = bake_for client in
   let* () = Lwt.join waiter_publish_list
   and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
@@ -3502,7 +3520,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   in
 
   (* We bake a block and wait for the prune events. *)
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () = event_waiter_prune in
 
   (* Now, we'll inject a new slot for the next published_level in
@@ -3557,7 +3575,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       ~expected_slot:slot_index
       ~expected_peer:peer_id1
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
   let* () = iwant_events_waiter and* () = ihave_events_waiter in
   unit
 
@@ -3618,8 +3636,8 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
   in
   let* () = List.map (Dal_node.run ~wait_ready:true) nodes |> Lwt.join in
   Log.info "Bake two times to finalize a block." ;
-  let* () = Client.bake_for_and_wait client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = bake_for client in
+  let* () = bake_for client in
   Log.info "Wait for dal_node2 and dal_node3 to find each other." ;
 
   let* () =
@@ -3813,14 +3831,12 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     in
 
     Log.info "Bake %d blocks" blocks_till_migration ;
-    let* () =
-      repeat blocks_till_migration (fun () -> Client.bake_for_and_wait client)
-    in
+    let* () = repeat blocks_till_migration (fun () -> bake_for client) in
 
     Log.info "Migrated to %s" (Protocol.name migrate_to) ;
     (* The plugin will change after the following block, as the migration block
        is not yet finalized. *)
-    let* () = Client.bake_for_and_wait client in
+    let* () = bake_for client in
     wait_for_plugin
   in
   test_l1_migration_scenario
@@ -3858,7 +3874,7 @@ module Tx_kernel_e2e = struct
     let* stop = cond client in
     if stop then unit
     else
-      let* () = Client.bake_for_and_wait client in
+      let* () = bake_for client in
       let* current_level = Client.level client in
       let* _ =
         Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
@@ -3912,7 +3928,7 @@ module Tx_kernel_e2e = struct
         ~parameters_ty:"pair string (ticket string)"
         client
     in
-    let* () = Client.bake_for_and_wait client in
+    let* () = bake_for client in
     Log.info "Run the rollup node and ensure origination succeeds." ;
     let* genesis_info =
       Client.RPC.call client
@@ -4091,7 +4107,7 @@ module Tx_kernel_e2e = struct
         ~parameters_ty:"unit"
         client
     in
-    let* () = Client.bake_for_and_wait client in
+    let* () = bake_for client in
     let* () =
       Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
     in
@@ -4149,6 +4165,7 @@ end
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
+    ~event_sections_levels:[(Protocol.name Alpha ^ ".baker", `Debug)]
     ~additional_bootstrap_accounts:1
     "dal basic logic"
     test_slot_management_logic
