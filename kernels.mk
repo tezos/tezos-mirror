@@ -134,8 +134,12 @@ risc-v-tests:
 .PHONY: build
 build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk risc-v-sandbox risc-v-interpreter risc-v-tests
 
+.PHONY: clang-supports-wasm
+clang-supports-wasm:
+	./scripts/kernels_check_clang.sh
+
 .PHONY: build-dev-deps
-build-dev-deps: build-deps
+build-dev-deps: clang-supports-wasm build-deps
 	@make -C ${SDK_DIR} build-dev-deps
 	@make -C ${EVM_DIR} build-dev-deps
 	@make -C ${SEQUENCER_DIR} build-dev-deps
