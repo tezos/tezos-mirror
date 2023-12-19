@@ -280,6 +280,19 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Message_with_header {message; topic; message_id} ->
       Message_with_header {message; topic; message_id}
 
+let try_connect_point ?expected_peer_id p2p_layer point =
+  let open Lwt_syntax in
+  match P2p.pool p2p_layer with
+  | None -> return_unit
+  | Some pool ->
+      if Option.is_some @@ P2p_pool.Connection.find_by_point pool point then
+        return_unit (* already connected. *)
+      else
+        let* (_ : _ P2p.connection tzresult) =
+          P2p.connect ?expected_peer_id p2p_layer point
+        in
+        return_unit
+
 let try_connect p2p_layer px_cache ~px_peer ~origin =
   let open Lwt_syntax in
   (* If there is some [point] associated to [px_peer] and advertised by [origin]
@@ -306,9 +319,7 @@ let try_connect p2p_layer px_cache ~px_peer ~origin =
          This implementation will be hardened once we add the notion of "signed
          records" found, e.g., in Rust version, to check that the advertised
          (peer, point) pair alongside a timestamp are not faked. *)
-      let* (_ : _ P2p.connection tzresult) =
-        P2p.connect ~expected_peer_id:px_peer p2p_layer point
-      in
+      let* () = try_connect_point ~expected_peer_id:px_peer p2p_layer point in
       (match origin with
       | Trusted -> () (* Don't drop trusted points. *)
       | PX _ -> PX_cache.drop px_cache ~px_peer ~origin) ;
@@ -351,6 +362,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin} ->
           try_connect p2p_layer px_cache ~px_peer:peer ~origin
+      | Connect_point {point} -> try_connect_point p2p_layer point
       | Forget {peer; origin} ->
           PX_cache.drop px_cache ~px_peer:peer ~origin:(PX origin) ;
           return_unit

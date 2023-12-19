@@ -118,6 +118,23 @@ module Peer : sig
   module Map : Map.S with type key = t
 end
 
+(** A point is made of an IP address and a port. Only the worker knows about
+    the notion. The automaton only sees peers (i.e. cryptographic identities of
+    nodes). *)
+module Point : sig
+  type t = P2p_point.Id.t
+
+  include PRINTABLE with type t := t
+
+  include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+end
+
 module Span : sig
   type t = Ptime.Span.t
 

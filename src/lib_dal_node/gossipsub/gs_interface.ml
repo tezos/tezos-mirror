@@ -86,9 +86,11 @@ module Worker_config :
      and type GS.Peer.t = Types.Peer.t
      and type GS.Span.t = Types.Span.t
      and type GS.Time.t = Types.Time.t
-     and type 'a Monad.t = 'a Lwt.t = struct
+     and type 'a Monad.t = 'a Lwt.t
+     and type Point.t = Types.Point.t = struct
   module GS = Tezos_gossipsub.Automaton (Automaton_config)
   module Monad = Monad
+  module Point = Types.Point
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596
 
