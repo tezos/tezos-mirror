@@ -444,6 +444,10 @@ let make_batch_test_block_one_origination name contract gas_sampler =
       ("both lists and single operations", test_mixed_operations);
     ]
 
+let hard_gas_limit_per_operation = 1_040_000
+
+let hard_gas_limit_per_block = 1_733_333
+
 (** Tests the consumption of all gas in a block, should pass *)
 let test_consume_exactly_all_block_gas () =
   let open Lwt_result_syntax in
@@ -451,14 +455,17 @@ let test_consume_exactly_all_block_gas () =
   let* block, src_list, dst =
     block_with_one_origination number_of_ops nil_contract
   in
-  (* assumptions:
-     hard gas limit per operation = 1_040_000
-     hard gas limit per block = 2_600_000
-  *)
   let lld =
-    List.map
-      (fun src ->
-        [(src, dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
+    List.mapi
+      (fun i src ->
+        [
+          ( src,
+            dst,
+            Alpha_context.Gas.Arith.integral_of_int_exn
+              (if i = number_of_ops - 1 then
+               hard_gas_limit_per_block - hard_gas_limit_per_operation
+              else hard_gas_limit_per_operation) );
+        ])
       src_list
   in
   let* _, _, _ = bake_operations_with_gas block lld in
@@ -468,14 +475,10 @@ let test_consume_exactly_all_block_gas () =
     operations, should fail *)
 let test_malformed_block_max_limit_reached () =
   let open Lwt_result_syntax in
-  let number_of_ops = 6 in
+  let number_of_ops = 2 in
   let* block, src_list, dst =
     block_with_one_origination number_of_ops nil_contract
   in
-  (* assumptions:
-     hard gas limit per operation = 1040000
-     hard gas limit per block = 5200000
-  *)
   let lld =
     List.mapi
       (fun i src ->
@@ -483,7 +486,9 @@ let test_malformed_block_max_limit_reached () =
           ( src,
             dst,
             Alpha_context.Gas.Arith.integral_of_int_exn
-              (if i = number_of_ops - 1 then 1 else 1040000) );
+              (if i = number_of_ops - 1 then
+               hard_gas_limit_per_block - hard_gas_limit_per_operation + 1
+              else hard_gas_limit_per_operation) );
         ])
       src_list
   in
@@ -500,14 +505,10 @@ let test_malformed_block_max_limit_reached () =
     operation list, should fail *)
 let test_malformed_block_max_limit_reached' () =
   let open Lwt_result_syntax in
-  let number_of_ops = 6 in
+  let number_of_ops = 2 in
   let* block, src_list, dst =
     block_with_one_origination number_of_ops nil_contract
   in
-  (* assumptions:
-     hard gas limit per operation = 1040000
-     hard gas limit per block = 5200000
-  *)
   let lld =
     List.mapi
       (fun i src ->
@@ -515,7 +516,9 @@ let test_malformed_block_max_limit_reached' () =
           ( src,
             dst,
             Alpha_context.Gas.Arith.integral_of_int_exn
-              (if i = number_of_ops - 1 then 1 else 1040000) );
+              (if i = number_of_ops - 1 then
+               hard_gas_limit_per_block - hard_gas_limit_per_operation + 1
+              else hard_gas_limit_per_operation) );
         ])
       src_list
   in
