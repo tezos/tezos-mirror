@@ -9,7 +9,7 @@ rv64ud-p-fmin: fail
 rv64ud-p-ldst: fail
 rv64ud-p-move: fail
 rv64ud-p-recoding: fail
-rv64ud-p-structural: fail
+rv64ud-p-structural: success
 rv64ud-v-fadd: fail
 rv64ud-v-fclass: fail
 rv64ud-v-fcmp: fail
