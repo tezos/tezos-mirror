@@ -26,6 +26,23 @@
 open Context
 open Context_sigs
 
+let err_implementation_mismatch ~got =
+  Format.kasprintf invalid_arg "PVM Context implementation mismatch: got %s" got
+
+module type S = sig
+  type repo
+
+  type tree
+
+  val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
+
+  val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
+
+  val of_node_pvmstate : Context.pvmstate -> tree
+
+  val to_node_pvmstate : tree -> Context.pvmstate
+end
+
 (* Context *)
 let of_node_context :
     type repo tree.
@@ -71,20 +88,23 @@ let to_node_pvmstate :
     ~pvmstate
     ~pvm_context_impl:(module C)
     ~equality_witness:C.equality_witness
-    ~impl_name:"Irmin"
+    ~impl_name:C.impl_name
 
 module Irmin = struct
   module I = Irmin_context
 
-  let of_node_context : 'a Context.t -> ('a, I.repo, I.tree) Context_sigs.t =
+  type repo = I.repo
+
+  type tree = I.tree
+
+  let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
    fun ctxt -> of_node_context I.equality_witness ctxt
 
-  let to_node_context : ('a, I.repo, I.tree) Context_sigs.t -> 'a Context.t =
+  let to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t =
    fun ctxt -> to_node_context (module I) ctxt
 
-  let of_node_pvmstate : Context.pvmstate -> I.tree =
+  let of_node_pvmstate : Context.pvmstate -> tree =
    fun c -> of_node_pvmstate I.equality_witness c
 
-  let to_node_pvmstate : I.tree -> Context.pvmstate =
-    to_node_pvmstate (module I)
+  let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module I)
 end

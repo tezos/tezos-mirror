@@ -25,27 +25,27 @@
 (*****************************************************************************)
 open Protocol
 open Alpha_context
-open Context_wrapper.Irmin
+open Context_wrapper
 
 let context = Pvm.context
 
 let get_tick kind state =
   let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let+ tick = PVM.get_tick (of_node_pvmstate state) in
+  let open (val Pvm.of_kind kind) in
+  let+ tick = get_tick (Ctxt_wrapper.of_node_pvmstate state) in
   Sc_rollup.Tick.to_z tick
 
 let state_hash kind state =
   let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let+ hash = PVM.state_hash (of_node_pvmstate state) in
+  let open (val Pvm.of_kind kind) in
+  let+ hash = state_hash (Ctxt_wrapper.of_node_pvmstate state) in
   Sc_rollup_proto_types.State_hash.to_octez hash
 
 let initial_state kind =
   let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let+ state = PVM.initial_state ~empty:(PVM.State.empty ()) in
-  to_node_pvmstate state
+  let open (val Pvm.of_kind kind) in
+  let+ state = initial_state ~empty:(State.empty ()) in
+  Ctxt_wrapper.to_node_pvmstate state
 
 let parse_boot_sector kind =
   let module PVM = (val Pvm.of_kind kind) in
@@ -53,20 +53,24 @@ let parse_boot_sector kind =
 
 let install_boot_sector kind state boot_sector =
   let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let+ state = PVM.install_boot_sector (of_node_pvmstate state) boot_sector in
-  to_node_pvmstate state
+  let open (val Pvm.of_kind kind) in
+  let+ state =
+    install_boot_sector (Ctxt_wrapper.of_node_pvmstate state) boot_sector
+  in
+  Ctxt_wrapper.to_node_pvmstate state
 
 let get_current_level kind state =
   let open Lwt_option_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let+ current_level = PVM.get_current_level (of_node_pvmstate state) in
+  let open (val Pvm.of_kind kind) in
+  let+ current_level =
+    get_current_level (Ctxt_wrapper.of_node_pvmstate state)
+  in
   Raw_level.to_int32 current_level
 
 let get_status (node_ctxt : _ Node_context.t) state =
   let open Lwt_result_syntax in
-  let state = of_node_pvmstate state in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+  let state = PVM.Ctxt_wrapper.of_node_pvmstate state in
   let*! current_level = PVM.get_current_level state in
   let* constants =
     match current_level with
@@ -106,9 +110,9 @@ let info_per_level_serialized ~predecessor ~predecessor_timestamp =
 
 let find_whitelist_update_output_index node_ctxt state ~outbox_level =
   let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
   let outbox_level = Raw_level.of_int32_exn outbox_level in
-  let* outbox = PVM.get_outbox outbox_level (of_node_pvmstate state) in
+  let open (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let* outbox = get_outbox outbox_level (Ctxt_wrapper.of_node_pvmstate state) in
   let rec aux i = function
     | [] -> None
     | Sc_rollup.{message = Whitelist_update _; _} :: _rest -> Some i
@@ -121,8 +125,8 @@ let find_whitelist_update_output_index node_ctxt state ~outbox_level =
 let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
     =
   let open Lwt_result_syntax in
-  let state = of_node_pvmstate state in
   let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let state = PVM.Ctxt_wrapper.of_node_pvmstate state in
   let outbox_level = Raw_level.of_int32_exn outbox_level in
   let*! outbox = PVM.get_outbox outbox_level state in
   let output = List.nth outbox message_index in
@@ -131,7 +135,7 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
   | Some output -> (
       let*! proof =
         PVM.produce_output_proof
-          (of_node_context node_ctxt.context).index
+          (PVM.Ctxt_wrapper.of_node_context node_ctxt.context).index
           state
           output
       in
@@ -148,6 +152,9 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
             err)
 
 module Wasm_2_0_0 = struct
+  (* We can use Irmin directly here as the Wasm PVM uses only Irmin *)
+  open Irmin
+
   let decode_durable_state enc tree =
     Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
       enc

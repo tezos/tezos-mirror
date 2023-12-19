@@ -39,6 +39,8 @@ type 'fuel eval_state = {
       (** Messages of the inbox that remain to be evaluated.  *)
 }
 
+(** Evaluation result for the PVM which contains the evaluation state and
+      additional information.  *)
 type 'fuel eval_result = {
   state : 'fuel eval_state;
   num_ticks : Z.t;
@@ -47,9 +49,6 @@ type 'fuel eval_result = {
 
 module type FUELED_PVM = sig
   type fuel
-
-  (** Evaluation result for the PVM which contains the evaluation state and
-      additional information.  *)
 
   (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
       [messages] for the [inbox] in the given [state] of the PVM and returns the

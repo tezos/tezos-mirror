@@ -131,6 +131,12 @@ module Impl : Pvm_sig.S = struct
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
 
+  type repo = Irmin_context.repo
+
+  type tree = Irmin_context.tree
+
+  module Ctxt_wrapper = Context_wrapper.Irmin
+
   let kind = Sc_rollup.Kind.Wasm_2_0_0
 
   let new_dissection = Game_helpers.Wasm.new_dissection

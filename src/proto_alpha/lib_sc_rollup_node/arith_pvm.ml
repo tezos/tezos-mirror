@@ -48,6 +48,12 @@ module Impl : Pvm_sig.S = struct
   module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
   include PVM
 
+  type repo = Irmin_context.repo
+
+  type tree = Irmin_context.tree
+
+  module Ctxt_wrapper = Context_wrapper.Irmin
+
   let kind = Sc_rollup.Kind.Example_arith
 
   module State = Irmin_context.PVMState

@@ -9,6 +9,12 @@ open Protocol
 open Alpha_context
 module Context = Irmin_context
 
+type repo = Context.repo
+
+type tree = Context.tree
+
+module Ctxt_wrapper = Context_wrapper.Irmin
+
 module type Serializable_state_S = sig
   type context
 

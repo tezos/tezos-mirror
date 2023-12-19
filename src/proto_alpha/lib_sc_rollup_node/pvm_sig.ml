@@ -29,11 +29,18 @@ open Alpha_context
 
 (** Desired module type of a PVM from the L2 node's perspective *)
 module type S = sig
+  type repo
+
+  type tree
+
+  module Ctxt_wrapper :
+    Context_wrapper.S with type repo = repo and type tree = tree
+
   include
     Sc_rollup.PVM.S
-      with type context = Irmin_context.rw_index
-       and type state = Irmin_context.tree
-       and type hash = Sc_rollup.State_hash.t
+      with type hash = Sc_rollup.State_hash.t
+       and type context = ([`Read | `Write], repo) Context_sigs.raw_index
+       and type state = tree
 
   (** Kind of the PVM. *)
   val kind : Sc_rollup.Kind.t
@@ -74,11 +81,13 @@ module type S = sig
 
   (** State storage for this PVM. *)
   module State : sig
+    type value = state
+
     (** [empty ()] is the empty state.  *)
     val empty : unit -> state
 
     (** [find context] returns the PVM state stored in the [context], if any. *)
-    val find : _ Irmin_context.t -> state option Lwt.t
+    val find : ('a, repo, tree) Context_sigs.t -> state option Lwt.t
 
     (** [lookup state path] returns the data stored for the path [path] in the
         PVM state [state].  *)
@@ -86,8 +95,11 @@ module type S = sig
 
     (** [set context state] saves the PVM state [state] in the context and
         returns the updated context. Note: [set] does not perform any write on
-        disk, this information must be committed using {!val:Irmin_context.commit}. *)
-    val set : 'a Irmin_context.t -> state -> 'a Irmin_context.t Lwt.t
+        disk, this information must be committed using {!val:Context.commit}. *)
+    val set :
+      ('a, repo, tree) Context_sigs.t ->
+      state ->
+      ('a, repo, tree) Context_sigs.t Lwt.t
   end
 
   (** Inspect durable state using a more specialised way of reading the
