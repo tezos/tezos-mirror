@@ -945,7 +945,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
    [List.hd] on an empty list), though care was taken to avoid this as much as
    possible, as it is a bit hard to make sure an attester is in the TB committee
    but not in the DAL committee).*)
-let test_slots_attestation_operation_dal_committee_membership_check _protocol
+let test_slots_attestation_operation_dal_committee_membership_check protocol
     parameters _cryptobox node client _bootstrap_key =
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
@@ -964,7 +964,11 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
-  let preserved_cycles = JSON.(proto_params |-> "preserved_cycles" |> as_int) in
+  let consensus_rights_delay =
+    if Protocol.number protocol > Protocol.number Protocol.Oxford then
+      JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+    else JSON.(proto_params |-> "preserved_cycles" |> as_int)
+  in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
      get roughly n / 64 = 16 TB slots on average. So the probability that it is
@@ -986,7 +990,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
-  let num_cycles = 2 + preserved_cycles in
+  let num_cycles = 2 + consensus_rights_delay in
   Log.info
     "Bake for %d cycles for %s to be a baker"
     num_cycles
