@@ -115,12 +115,15 @@ module type INDEXABLE_STORE = sig
   (** [readonly t] returns a read only version of the store [t]. *)
   val readonly : [> `Read] t -> [`Read] t
 
-  (** [gc ?async t iter] garbage collects data stored in the index [t] by
-      keeping only the ones that are reachable by [iter]. This call
-      runs the GC asynchronously unless [async] is [false]. If a GC is already
+  (** [gc ?async t filter] garbage collects data stored in the index [t] by
+      keeping only elements that satisfy the predicate [filter]. This call runs
+      the GC asynchronously unless [async] is [false]. If a GC is already
       ongoing this new request is ignored and this call is a no-op. *)
   val gc :
-    ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
+    ?async:bool ->
+    rw t ->
+    (key -> value -> bool tzresult Lwt.t) ->
+    unit tzresult Lwt.t
 
   (** [wait_gc_completion t] returns a blocking thread if a GC run is ongoing. *)
   val wait_gc_completion : 'a t -> unit Lwt.t

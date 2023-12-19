@@ -103,7 +103,10 @@ module type INDEXABLE_STORE = sig
   val readonly : [> `Read] t -> [`Read] t
 
   val gc :
-    ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
+    ?async:bool ->
+    rw t ->
+    (key -> value -> bool tzresult Lwt.t) ->
+    unit tzresult Lwt.t
 
   val wait_gc_completion : 'a t -> unit Lwt.t
 
@@ -454,21 +457,6 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
         store.gc_status <- No_gc ;
         rm_internal_index tmp_index
 
-  (** Copy item associated to [k] from the [store] stale indexes to
-      [tmp_index]. *)
-  let unsafe_retain_one_item store tmp_index filter k =
-    let open Lwt_syntax in
-    let value = unsafe_find ~only_stale:true store k in
-    let* () =
-      match value with
-      | None ->
-          Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp k)
-      | Some v ->
-          if filter v then I.replace tmp_index.index k v ;
-          return_unit
-    in
-    return value
-
   (** When the gc operation finishes, i.e. we have copied all elements to retain
       to the temporary index, we can replace all the stale indexes by the
       temporary one. *)
@@ -484,25 +472,40 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
     let*! () = Store_events.finished_gc N.name in
     return_unit
 
-  (** The background task for a gc operation consists in copying all items
-      reachable by [gc_iter] from the stale indexes to the temporary one. While
-      this is happening, the stale indexes can still be queried and new bindings
-      can still be added to the store because only the fresh index is
-      modified. *)
-  let gc_background_task store tmp_index gc_iter filter resolve =
+  (** Returns the elements of an index in an unspecified order. NOTE: the elements
+      are stored in memory. *)
+  let index_bindings i =
+    let acc = ref [] in
+    I.iter (fun k v -> acc := (k, v) :: !acc) i ;
+    !acc
+
+  (** The background task for a gc operation consists in copying all items that
+      satisfy [filter] from the stale indexes of [store] to the temporary one
+      [tmp_index]. While this is happening, the stale indexes can still be
+      queried and new bindings can still be added to the store because only the
+      fresh index is modified. *)
+  let gc_background_task store tmp_index filter resolve =
     let open Lwt_syntax in
     Lwt.dont_wait
       (fun () ->
         let* res =
           trace (Gc_failed N.name) @@ protect
           @@ fun () ->
-          let first, next = gc_reachable_of_iter gc_iter in
-          let rec copy elt =
-            let* value = unsafe_retain_one_item store tmp_index filter elt in
-            let* next = next elt value in
-            match next with None -> return_unit | Some elt -> copy elt
+          let open Lwt_result_syntax in
+          let process_key_value (k, v) =
+            let* keep = filter k v in
+            if keep then I.replace tmp_index.index k v ;
+            return_unit
           in
-          let* () = Option.iter_s copy first in
+          let process_internal_index i =
+            List.iter_es process_key_value (index_bindings i.index)
+          in
+          let stale_internal_indexes =
+            internal_indexes ~only_stale:true store |> List.rev
+          in
+          let* () =
+            List.iter_es process_internal_index stale_internal_indexes
+          in
           finalize_gc store tmp_index
         in
         let* () =
@@ -521,24 +524,24 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
           (Printexc.to_string exn))
 
   (** This function is called every time a gc operation starts. *)
-  let gc_internal ~async store gc_iter filter =
+  let gc_internal ~async store filter =
     let open Lwt_syntax in
     match store.gc_status with
     | Ongoing _ -> Store_events.ignore_gc N.name
     | No_gc ->
         let* tmp_index, promise, resolve = initiate_gc store in
-        gc_background_task store tmp_index gc_iter filter resolve ;
+        gc_background_task store tmp_index filter resolve ;
         if async then return_unit
         else
           Lwt.catch
             (fun () -> promise)
             (function Lwt.Canceled -> return_unit | e -> raise e)
 
-  let gc ?(async = true) store gc_iter =
+  let gc ?(async = true) store filter =
     let open Lwt_result_syntax in
     trace (Gc_failed N.name) @@ protect
     @@ fun () ->
-    let*! () = gc_internal ~async store gc_iter (fun _ -> true) in
+    let*! () = gc_internal ~async store filter in
     return_unit
 
   let wait_gc_completion store =
@@ -615,21 +618,14 @@ struct
       if flush then I.flush store.fresh.index ;
       return_unit)
 
-  let gc ?(async = true) store gc_iter =
+  let gc ?(async = true) store filter =
     let open Lwt_result_syntax in
     trace (Gc_failed N.name) @@ protect
     @@ fun () ->
-    let gc_iter =
-      match gc_iter with
-      | Retain keys -> Retain keys
-      | Iterator {first; next} ->
-          let next k = function
-            | None -> Lwt.return_none
-            | Some v -> next k v
-          in
-          Iterator {first; next}
-    in
-    let*! () = gc_internal ~async store gc_iter Option.is_some in
+    (* Also remove bindings that point to None, i.e. the ones that were
+       artificially removed with {!remove}. *)
+    let filter k = function None -> return_false | Some v -> filter k v in
+    let*! () = gc_internal ~async store filter in
     return_unit
 end
 

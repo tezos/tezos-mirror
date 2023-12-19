@@ -532,17 +532,9 @@ let gc_commitments commitments ~last_commitment ~level =
              else Lwt.return_some commitment.predecessor);
        })
 
-let gc_levels_to_hashes levels_to_hashes ~(head : Sc_rollup_block.t) ~level =
-  Levels_to_hashes.gc
-    levels_to_hashes
-    (Indexed_store.Iterator
-       {
-         first = head.header.level;
-         next =
-           (fun blevel _bhash ->
-             if blevel <= level then Lwt.return_none
-             else Lwt.return_some (Int32.pred blevel));
-       })
+let gc_levels_to_hashes levels_to_hashes ~level =
+  Levels_to_hashes.gc levels_to_hashes (fun block_level _block_hash ->
+      Lwt_result.return (block_level >= level))
 
 let gc_messages messages l2_blocks ~(head : Sc_rollup_block.t) ~level =
   Messages.gc
@@ -572,36 +564,15 @@ let gc_messages messages l2_blocks ~(head : Sc_rollup_block.t) ~level =
        })
 
 let gc_commitments_published_at_level commitments_published_at_level commitments
-    lpc ~level =
-  let open Lwt_result_syntax in
-  let* lpc = Lpc.read lpc in
-  match lpc with
-  | None -> return_unit
-  | Some lpc ->
-      Commitments_published_at_level.gc
-        commitments_published_at_level
-        (Indexed_store.Iterator
-           {
-             first = Commitment.hash lpc;
-             next =
-               (fun commitment_hash _ ->
-                 let open Lwt_syntax in
-                 let* commitment =
-                   Commitments.read commitments commitment_hash
-                 in
-                 match commitment with
-                 | Error e ->
-                     Fmt.failwith
-                       "Could not compute commitment published at level for \
-                        GC: %a"
-                       pp_print_trace
-                       e
-                 | Ok None -> return_none
-                 | Ok (Some (commitment, ())) ->
-                     if commitment.Commitment.inbox_level <= level then
-                       return_none
-                     else return_some commitment.predecessor);
-           })
+    ~level =
+  Commitments_published_at_level.gc
+    commitments_published_at_level
+    (fun commitment_hash _ ->
+      let open Lwt_result_syntax in
+      let* commitment = Commitments.read commitments commitment_hash in
+      match commitment with
+      | None -> return_false
+      | Some ({inbox_level; _}, ()) -> return (inbox_level >= level))
 
 let gc_inboxes inboxes ~(head : Sc_rollup_block.t) ~level =
   Inboxes.gc
@@ -627,7 +598,7 @@ let gc
        l2_head;
        last_finalized_level = _;
        lcc = _;
-       lpc;
+       lpc = _;
        levels_to_hashes;
        irmin_store = _;
        protocols = _;
@@ -648,12 +619,11 @@ let gc
           [
             gc_l2_blocks l2_blocks ~head ~level;
             gc_commitments commitments ~last_commitment ~level;
-            gc_levels_to_hashes levels_to_hashes ~head ~level;
+            gc_levels_to_hashes levels_to_hashes ~level;
             gc_messages messages l2_blocks ~head ~level;
             gc_commitments_published_at_level
               commitments_published_at_level
               commitments
-              lpc
               ~level;
             gc_inboxes inboxes ~head ~level;
           ]
