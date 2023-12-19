@@ -54,7 +54,34 @@ module Event = struct
       ~level:Notice
       ("endpoint", Data_encoding.string)
       ("delay", Data_encoding.float)
+
+  let event_shutdown_node =
+    Internal_event.Simple.declare_1
+      ~section
+      ~name:"evm_node_shutting_down"
+      ~msg:"Stopping the EVM node"
+      ~level:Notice
+      ("exit_status", Data_encoding.int8)
+
+  let event_shutdown_rpc_server ~private_ =
+    let server = if private_ then "private" else "public" in
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:("evm_node_shutting_down_" ^ server ^ "_rpc_server")
+      ~msg:("Stopping the" ^ server ^ " RPC server")
+      ~level:Notice
+      ()
+
+  let event_shutdown_tx_pool =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"evm_node_shutting_down_tx_pool"
+      ~msg:"Stopping the tx-pool"
+      ~level:Notice
+      ()
 end
+
+let emit = Internal_event.Simple.emit
 
 (** [retry_connection f] retries the connection using [f]. If an error
     happens in [f] and it is a lost connection, the connection is retried  *)
@@ -68,9 +95,7 @@ let retry_connection (f : Uri.t -> string tzresult Lwt.t) endpoint :
     | Error err
       when Evm_node_lib_dev.Rollup_node_services.is_connection_error err ->
         let*! () =
-          Internal_event.Simple.emit
-            Event.event_retrying_connect
-            (Uri.to_string endpoint, delay)
+          emit Event.event_retrying_connect (Uri.to_string endpoint, delay)
         in
         let*! () = Lwt_unix.sleep delay in
         let next_delay = delay *. 2. in
@@ -89,16 +114,29 @@ let fetch_smart_rollup_address ~keep_alive f (endpoint : Uri.t) =
 let install_finalizer_prod server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let+ () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  Format.printf "Server exited with code %d\n%!" exit_status
+  let* () = emit Event.event_shutdown_node exit_status in
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  emit (Event.event_shutdown_rpc_server ~private_:false) ()
 
 let install_finalizer_dev server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = emit Event.event_shutdown_node exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  Format.printf "Server exited with code %d\n%!" exit_status ;
-  let+ () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Format.printf "Shutting down Tx-Pool\n%!"
+  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
+  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
+  emit Event.event_shutdown_tx_pool ()
+
+let install_finalizer_seq server private_server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = Internal_event.Simple.emit Event.event_shutdown_node exit_status in
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
+  let* () = emit (Event.event_shutdown_rpc_server ~private_:true) () in
+  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
+  emit Event.event_shutdown_tx_pool ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -152,6 +190,10 @@ let dev_directory config rollup_node_config =
   let open Evm_node_lib_dev in
   return @@ Services.directory config rollup_node_config
 
+let dev_private_directory config rollup_node_config =
+  let open Evm_node_lib_dev in
+  Services.private_directory config rollup_node_config
+
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
     =
   let open Lwt_result_syntax in
@@ -188,6 +230,67 @@ let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
       return server)
     (fun _ -> return server)
 
+let seq_start
+    {
+      rpc_addr;
+      rpc_port;
+      debug;
+      cors_origins;
+      cors_headers;
+      mode = {private_rpc_port; _};
+      _;
+    } ~directory ~private_directory =
+  let open Lwt_result_syntax in
+  let open Tezos_rpc_http_server in
+  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string p2p_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.allow_all in
+  let cors =
+    Resto_cohttp.Cors.
+      {allowed_headers = cors_headers; allowed_origins = cors_origins}
+  in
+  let server =
+    RPC_server.init_server
+      ~acl
+      ~cors
+      ~media_types:Media_type.all_media_types
+      directory
+  in
+  let private_node = `TCP (`Port private_rpc_port) in
+  let private_server =
+    RPC_server.init_server
+      ~acl
+      ~cors
+      ~media_types:Media_type.all_media_types
+      private_directory
+  in
+  Lwt.catch
+    (fun () ->
+      let*! () =
+        RPC_server.launch
+          ~host
+          server
+          ~callback:
+            (if debug then callback_log server
+            else RPC_server.resto_callback server)
+          node
+      in
+      let*! () =
+        RPC_server.launch
+          ~host:Ipaddr.V4.(to_string localhost)
+          private_server
+          ~callback:
+            (if debug then callback_log private_server
+            else RPC_server.resto_callback private_server)
+          private_node
+      in
+      let*! () =
+        Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
+      in
+      return (server, private_server))
+    (fun _ -> return (server, private_server))
+
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
@@ -217,6 +320,13 @@ let rpc_port_arg =
     ~long:"rpc-port"
     ~placeholder:"PORT"
     ~doc:"The EVM node server rpc port."
+    Params.int
+
+let private_rpc_port_arg =
+  Tezos_clic.arg
+    ~long:"private-rpc-port"
+    ~placeholder:"PORT"
+    ~doc:"The EVM node private server rpc port."
     Params.int
 
 let cors_allowed_headers_arg =
@@ -422,10 +532,11 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args9
+    (args10
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
+       private_rpc_port_arg
        cors_allowed_origins_arg
        cors_allowed_headers_arg
        verbose_arg
@@ -437,6 +548,7 @@ let sequencer_command =
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
+           private_rpc_port,
            cors_origins,
            cors_headers,
            verbose,
@@ -453,6 +565,7 @@ let sequencer_command =
           ~devmode:true
           ?rpc_addr
           ?rpc_port
+          ?private_rpc_port
           ?cors_origins
           ?cors_headers
           ~rollup_node_endpoint
@@ -496,8 +609,15 @@ let sequencer_command =
       let* directory =
         dev_directory config ((module Sequencer), smart_rollup_address)
       in
-      let* server = start config ~directory in
-      let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_dev server in
+      let private_directory =
+        dev_private_directory config ((module Sequencer), smart_rollup_address)
+      in
+      let* server, private_server =
+        seq_start config ~directory ~private_directory
+      in
+      let (_ : Lwt_exit.clean_up_callback_id) =
+        install_finalizer_seq server private_server
+      in
       let* () = main_sequencer config in
       return_unit)
 
