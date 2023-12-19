@@ -1,10 +1,9 @@
 Smart rollup node
 =================
 
-:doc:`../active/smart_rollups` come with two executable programs: the Octez
-rollup node and the Octez rollup client.
+This page describes the Octez rollup node, the main executable supporting
+:doc:`../active/smart_rollups`.
 
-This page describes the rollup node, but also uses the rollup client when needed to interact with the rollup node.
 
 The Octez rollup node is used by a rollup operator to deploy a
 rollup. The rollup node is responsible for making the rollup progress
@@ -12,8 +11,7 @@ by publishing commitments and by playing refutation games.
 
 Just like the Octez node, the Octez rollup node provides an :doc:`RPC
 interface<../api/openapi>`. The services of this interface can be
-called directly with HTTP requests or indirectly using the Octez
-rollup client.
+called directly with HTTP requests.
 
 We first cover the operation of the rollup node and the corresponding workflow,
 using some predefined rollup logic (called kernel), and then we explain how the
@@ -384,20 +382,22 @@ originated a Layer 1 smart contract as follows:
 
 and that this contract is identified by an address ``${CONTRACT}``
 (a ``KT1...`` address), then one can encode an
-outbox transaction using the Octez rollup client as follows:
+outbox transaction using the ``octez-codec`` as follows:
 
 .. code:: sh
 
-    MESSAGE='[ { \
-      "destination" : "KT1...", \
-      "parameters" : "\"Hello world\"", \
-      "entrypoint" : "%default" } ]'
+    MESSAGE='{
+        "transactions": [
+          {
+            "parameters": {"int": "37"},
+            "destination": "KT1VD4SdQF2ruNNTCE1aTWErmGz9tN4Mg8F5",
+            "entrypoint": "%default"
+          }
+        ],
+        "kind": "untyped"
+      }'
 
-
-    EMESSAGE=$(octez-smart-rollup-client-${PROTO} encode outbox message "${MESSAGE}")
-
-where ``${PROTO}`` is the suffix of the executables corresponding to your protocol
-(e.g., ``-alpha``).
+    EMESSAGE=$(octez-codec encode alpha.smart_rollup.outbox.message from "${MESSAGE}")
 
 .. _triggering_execution_outbox_message:
 
@@ -415,8 +415,14 @@ populated as follows:
 
 .. code:: sh
 
-   octez-smart-rollup-client-${PROTO} rpc get \
-     /global/block/cemented/outbox/${L}/messages
+    curl -i "${ROLLUP_NODE_ENDPOINT}/global/block/cemented/outbox/${L}/messages"
+
+where:
+
+- ${ROLLUP_NODE_ENDPOINT} represents the address of the Rollup node server.
+  It can be set to a specific server address such as "http://localhost:36149".
+- ${L} denotes the block level for which one wants to retrieve information
+  from the Rollup node.
 
 Here is the output for this command:
 
@@ -425,10 +431,9 @@ Here is the output for this command:
    [ { "outbox_level": ${L}, "message_index": "0",
     "message":
       { "transactions":
-          [ { "parameters": { "string": "Hello world" },
+          [ { "parameters": { "int": "37" },
               "destination": "${CONTRACT}",
               "entrypoint": "%default" } ] } } ]
-
 
 At this point, the actual execution of a given outbox message can be
 triggered. This requires precomputing a proof that this outbox message
@@ -437,8 +442,8 @@ proof is retrieved as follows:
 
 .. code:: sh
 
-   PROOF=$(octez-smart-rollup-client-${PROTO} get proof for message 0 \
-     of outbox at level "${L}")
+  PROOF=$(curl -i "${ROLLUP_NODE_ENDPOINT}/global/block/head/helpers/\
+             proofs/outbox/${L}/messages?index=0)"
 
 Finally, the execution of the outbox message is done as follows:
 
@@ -454,10 +459,10 @@ Notice that anyone can trigger the execution of an outbox message
 (not only an operator as in this example).
 
 One can check in the receipt that the contract has indeed been called
-with the parameter ``"Hello world"`` through an internal
-operation. More complex parameters, typically containing assets
-represented as tickets, can be used as long as they match the type of
-the entrypoint of the destination smart contract.
+with the parameter ``"37"`` through an internal operation. More complex
+parameters, typically containing assets represented as tickets, can be
+used as long as they match the type of the entrypoint of the destination
+smart contract.
 
 .. _sending_internal_inbox_message:
 

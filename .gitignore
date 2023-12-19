@@ -49,8 +49,6 @@ __pycache__
 /tezos-smart-rollup-node-*
 /octez-smart-rollup-node*
 /octez-smart-rollup-sequencer-node
-/tezos-smart-rollup-client-*
-/octez-smart-rollup-client-*
 /octez-smart-rollup-wasm-*
 /octez-evm-node
 /tezos-dal-node

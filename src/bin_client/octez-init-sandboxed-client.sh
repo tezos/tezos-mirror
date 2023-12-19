@@ -197,9 +197,6 @@ main () {
         echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir"  >> $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
         chmod +x $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
-        chmod +x $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
-
         echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number
         echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol_without_number
         chmod +x $client_dir/bin/octez-accuser-$protocol_without_number
