@@ -92,6 +92,10 @@ pub enum TcError {
     DuplicateEntrypoint(Entrypoint),
     #[error("explicit default entrypoint is forbidden in: {0}")]
     ExplicitDefaultEntrypointError(Prim),
+    #[error("Unhandled instruction: {0}")]
+    TodoInstr(Prim),
+    #[error("Unhandled type: {0}")]
+    TodoType(Prim),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -409,7 +413,7 @@ fn parse_ty_with_entrypoints(
         | micheline_literals!()
         | micheline_values!() => unexpected()?,
 
-        App(other, ..) => todo!("Unhandled type {other}"),
+        App(other, ..) => Err(TcError::TodoType(*other))?,
     };
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
@@ -1498,7 +1502,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
-        (App(other, ..), _) => todo!("Unhandled instruction {other}"),
+        (App(other, ..), _) => Err(TcError::TodoInstr(*other))?,
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
