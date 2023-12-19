@@ -5,10 +5,10 @@ gitlab:release:
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false
   dependencies:
-    - build:static-x86_64-linux-binaries
-    - build:static-arm64-linux-binaries
-    - build:dpkg:amd64
-    - build:rpm:amd64
+    - oc.build:static-x86_64-linux-binaries
+    - oc.build:static-arm64-linux-binaries
+    - oc.build:dpkg:amd64
+    - oc.build:rpm:amd64
     - docker:merge_manifests
   script:
     - ./scripts/ci/gitlab-release.sh

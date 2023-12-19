@@ -1,4 +1,4 @@
-misc_checks:
+oc.misc_checks:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
@@ -9,19 +9,38 @@ misc_checks:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+  rules:
+    - changes:
+        paths:
+        - src/**/*
+        - tezt/**/*
+        - devtools/**/*
+        - scripts/**/*
+        - docs/**/*
+        - .gitlab-ci.yml
+        - .gitlab/**/*
   script:
     - ./scripts/ci/take_ownership.sh
     - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
 
+# check that ksy files are still up-to-date with octez
 kaitai_checks:
   extends:
     - .test_template
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - contrib/*kaitai*/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   # These tests are not flaky at all so we overwrite the retry value
   retry: 0
   needs: [trigger]
   needs:
-    - "build_x86_64-released"
+    - "oc.build_x86_64-released"
   before_script:
     - . ./scripts/version.sh
   script:
@@ -34,6 +53,14 @@ kaitai_e2e_checks:
   # These tests are not flaky at all so we overwrite the retry value
   retry: 0
   needs: [kaitai_checks]
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - contrib/*kaitai*/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   script:
     - . ./scripts/version.sh
     # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
@@ -48,7 +75,7 @@ kaitai_e2e_checks:
       contrib/kaitai-struct-files/files
       contrib/kaitai-struct-files/input
 
-check_lift_limits_patch:
+oc.check_lift_limits_patch:
   extends:
     - .test_template
   # These tests are not flaky at all so we overwrite the retry value
@@ -58,6 +85,8 @@ check_lift_limits_patch:
     - changes:
         - src/bin_tps_evaluation/lift_limits.patch
         - src/proto_alpha/lib_protocol/main.ml
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   script:
     # Check that the patch only modifies the

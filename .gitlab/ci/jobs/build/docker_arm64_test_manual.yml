@@ -1,12 +1,14 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-docker:arm64:
+oc.docker:arm64:
   extends:
-    - .build_docker_release_template
+    - .oc.build_docker_release_template
     - .tags_template__build_arm64
   stage: manual
   needs: []
-  when: manual
+  # override the rules inherited from .oc.build_docker_release_template:
+  rules:
+  - when: manual
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
     CI_DOCKER_HUB: "false"

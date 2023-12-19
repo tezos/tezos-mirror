@@ -1,6 +1,6 @@
 test_kernels:
   extends:
-    - .kernels_template
+    - .oc.kernels_template
   stage: test
   needs: [trigger]
   dependencies: []
@@ -14,3 +14,5 @@ test_kernels:
         - src/kernel_*/**/*
         - src/risc_v/**/*
         - etherlink/kernel_evm/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml

@@ -2,11 +2,12 @@
 # they can be built in the performance regression test framework executors.
 tezt:build-long:
   extends:
-    - .build_template
+    - .oc.build_template
+    - .rules__octez_changes
   stage: test
   # Artificial needs for ordering.
   needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
   script:
     - dune build @tezt/long_tests/check

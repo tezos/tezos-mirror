@@ -1,4 +1,4 @@
-.install_python_debian_ubuntu_template:
+.oc.install_python_debian_ubuntu_template:
   extends:
     - .default_settings_template
   stage: doc
@@ -18,14 +18,14 @@
   script:
     - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
-install_python_focal:
+oc.install_python_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
-  extends: .install_python_debian_ubuntu_template
+  extends: .oc.install_python_debian_ubuntu_template
 
-install_python_jammy:
+oc.install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
-  extends: .install_python_debian_ubuntu_template
+  extends: .oc.install_python_debian_ubuntu_template
 
-install_python_bullseye:
+oc.install_python_bullseye:
   image: debian:bullseye
-  extends: .install_python_debian_ubuntu_template
+  extends: .oc.install_python_debian_ubuntu_template

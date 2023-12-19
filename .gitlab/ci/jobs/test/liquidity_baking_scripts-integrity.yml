@@ -1,8 +1,17 @@
 include: .gitlab/ci/jobs/test/common.yml
 
-test-liquidity-baking-scripts:
+oc.test-liquidity-baking-scripts:
   extends: .test_template
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - scripts/ci/test_liquidity_baking_scripts.sh
+          - scripts/check-liquidity-baking-scripts.sh
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   dependencies:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
   script: ./scripts/ci/test_liquidity_baking_scripts.sh

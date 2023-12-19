@@ -1,7 +1,7 @@
-build_kernels:
+oc.build_kernels:
   extends:
     - .tags_template__build
-    - .kernels_template
+    - .oc.kernels_template
   stage: build
   needs: [trigger]
   script:

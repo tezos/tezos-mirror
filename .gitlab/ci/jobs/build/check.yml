@@ -1,7 +1,16 @@
 ocaml-check:
   extends:
     - .tags_template__build
-    - .build
+    - .oc.build
   needs: [trigger]
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - tezt/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+          - devtools/**/*
+      when: on_success
   script:
     - dune build @check

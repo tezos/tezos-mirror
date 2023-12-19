@@ -3,6 +3,14 @@ include: .gitlab/ci/jobs/build/common.yml
 build_get_contracts:
   extends:
     - .tags_template__build
-    - .build_template
+    - .oc.build_template
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - devtools/get_contracts/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: on_success
   script:
     - dune build @devtools/get_contracts/check

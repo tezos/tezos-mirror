@@ -1,9 +1,9 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-docker:amd64:
+oc.docker:amd64:
   extends:
     - .tags_template__build
-    - .build_docker_release_template
+    - .oc.build_docker_release_template
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "true"

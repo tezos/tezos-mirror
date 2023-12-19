@@ -1,5 +1,7 @@
-.unit_test_template:
-  extends: .test_template
+.oc.unit_test_template:
+  extends:
+    - .test_template
+    - .rules__octez_changes
   variables:
     ARCH: ""
     MAKE_TARGETS: ""
@@ -14,15 +16,15 @@
     expire_in: 1 day
     when: always
 
-.unit_test_template_x86_64:
-  extends: .unit_test_template
+.oc.unit_test_template_x86_64:
+  extends: .oc.unit_test_template
   variables:
     ARCH: "x86_64"
 
-.unit_test_template_x86_64_coverage:
+.oc.unit_test_template_x86_64_coverage:
   extends:
-    - .unit_test_template_x86_64
-    - .template__coverage_files
+    - .oc.unit_test_template_x86_64
+    - .oc.template__coverage_files
   script:
     - make $MAKE_TARGETS
     - ./scripts/ci/merge_coverage.sh
@@ -32,40 +34,40 @@
       - $BISECT_FILE
       - test_results
 
-.unit_test_template_arm64:
-  extends: .unit_test_template
+.oc.unit_test_template_arm64:
+  extends: .oc.unit_test_template
   needs:
-    - "build_arm64-released"
-    - "build_arm64-exp-dev-extra"
+    - "oc.build_arm64-released"
+    - "oc.build_arm64-exp-dev-extra"
   variables:
     ARCH: "arm64"
   tags:
     - arm64
 
-unit:non-proto-x86_64:
+oc.unit:non-proto-x86_64:
   extends:
-  - .unit_test_template_x86_64_coverage
+  - .oc.unit_test_template_x86_64_coverage
   - .tags_template__no_gcp
   # The [lib_benchmark] unit tests require Python
   - .image_template__runtime_build_test_dependencies
   variables:
     MAKE_TARGETS: test-nonproto-unit
 
-unit:other-x86_64:
+oc.unit:other-x86_64:
   extends:
-  - .unit_test_template_x86_64_coverage
+  - .oc.unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: test-other-unit
 
-unit:proto-x86_64:
+oc.unit:proto-x86_64:
   extends:
-  - .unit_test_template_x86_64_coverage
+  - .oc.unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: test-proto-unit
 
-unit:webassembly-x86_64:
+oc.unit:webassembly-x86_64:
   extends:
-  - .unit_test_template_x86_64
+  - .oc.unit_test_template_x86_64
   # The wasm tests are written in Python
   - .image_template__runtime_build_test_dependencies
   variables:
@@ -77,18 +79,18 @@ unit:webassembly-x86_64:
   # unnecessary.
   timeout: 20 min
 
-unit:non-proto-arm64:
+oc.unit:non-proto-arm64:
   extends:
-    - .unit_test_template_arm64
+    - .oc.unit_test_template_arm64
     # The [lib_benchmark] unit tests require Python
     - .image_template__runtime_build_test_dependencies
     - .tags_template__no_gcp_arm64
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
 
-unit:js_components:
+oc.unit:js_components:
   extends:
-    - .unit_test_template_x86_64
+    - .oc.unit_test_template_x86_64
     - .image_template__runtime_build_test_dependencies
   variables:
     # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
@@ -97,7 +99,7 @@ unit:js_components:
     - . ./scripts/install_build_deps.js.sh
     - make test-js
 
-unit:protocol_compiles:
-  extends: .unit_test_template_x86_64
+oc.unit:protocol_compiles:
+  extends: .oc.unit_test_template_x86_64
   script:
     - dune build @runtest_compile_protocol

@@ -10,10 +10,10 @@ include: .gitlab/ci/jobs/build/common.yml
 #   (no need to test that we pass the -static flag twice)
 # - released variants exist, that are used in release tag pipelines
 #   (they do not build experimental executables)
-build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-binaries:
   extends:
     - .tags_template__build
-    - .build_static_binaries_template
+    - .oc.build_static_binaries_template
     # Even though not many tests depend on static executables, some of those that do
     # are limiting factors in the total duration of pipelines.
     # So we start this job as early as possible, without waiting for sanity_ci.

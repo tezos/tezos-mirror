@@ -46,17 +46,18 @@ tezt:static-binaries:
     - .default_settings_template
     - .image_template__runtime_e2etest_dependencies
     - .tezt_template
+    - .rules__octez_changes
   dependencies:
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
-    # build_x86_64-exp-dev-extra
-    - build_x86_64-exp-dev-extra
+    # oc.build_x86_64-exp-dev-extra
+    - oc.build_x86_64-exp-dev-extra
     # And fetch the static executables from build:static
-    - build:static-x86_64-linux-binaries
-    - tezt:fetch-records
+    - oc.build:static-x86_64-linux-binaries
+    - oc.tezt:fetch-records
   needs:
-    - build_x86_64-exp-dev-extra
-    - build:static-x86_64-linux-binaries
-    - tezt:fetch-records
+    - oc.build_x86_64-exp-dev-extra
+    - oc.build:static-x86_64-linux-binaries
+    - oc.tezt:fetch-records
   variables:
     TESTS: "cli"
     # Disable coverage

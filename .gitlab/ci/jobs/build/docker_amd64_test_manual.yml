@@ -1,11 +1,13 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-docker:amd64:
+oc.docker:amd64:
   extends:
-    - .build_docker_release_template
+    - .oc.build_docker_release_template
   stage: manual
   needs: []
-  when: manual
+  # override the rules inherited from .oc.build_docker_release_template:
+  rules:
+  - when: manual
   variables:
     DOCKER_BUILD_TARGET: "with-evm-artifacts"
     IMAGE_ARCH_PREFIX: "amd64_"
