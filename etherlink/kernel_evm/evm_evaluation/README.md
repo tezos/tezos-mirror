@@ -56,9 +56,17 @@ $ evm-evaluation-assessor -o <output>
 Specify if you only want to output the final report:
 
 ```
-$ evm-evaluation-assessor --report-only <report-only>
+$ evm-evaluation-assessor --report-only
 # or
-$ evm-evaluation-assessor -r <report-only>
+$ evm-evaluation-assessor -r
+```
+
+Overwrite the target file and start the report from scratch:
+
+```
+$ evm-evaluation-assessor --from-scratch
+# or
+$ evm-evaluation-assessor -h
 ```
 
 Multiple options can be combined:
