@@ -47,7 +47,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some file) None
+      & opt (some string) None
       & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
 
   let rpc_addr =
@@ -55,13 +55,14 @@ module Term = struct
     let default_port = Configuration_file.default.rpc_addr |> snd in
     let doc =
       Format.asprintf
-        "The TCP address and port at which the RPC server of this instance can \
-         be reached."
+        "The TCP address and optionally the port at which the RPC server of \
+         this instance can be reached. The default address is 0.0.0.0. The \
+         default port is 10732."
     in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
+      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["rpc-addr"])
 
   let expected_pow =
     let open Cmdliner in
@@ -78,27 +79,29 @@ module Term = struct
     let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
-        "The TCP address and port bound by the DAL node. If --public-addr is \
-         not provided, this is also the address and port at which this \
-         instance can be reached by other P2P nodes."
+        "The TCP address and optionally the port bound by the DAL node. If \
+         --public-addr is not provided, this is also the address and port at \
+         which this instance can be reached by other P2P nodes. The default \
+         address is 0.0.0.0. The default port is 11732."
     in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["net-addr"])
 
   let public_addr =
     let open Cmdliner in
     let default_port = Configuration_file.default.public_addr |> snd in
     let doc =
       Format.asprintf
-        "The TCP address and port at which this instance can be reached by \
-         other P2P nodes."
+        "The TCP address and optionally the port at which this instance can be \
+         reached by other P2P nodes. The default address is 0.0.0.0. The \
+         default port is 11732."
     in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["public-addr"])
+      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["public-addr"])
 
   let endpoint_arg =
     let open Cmdliner in
@@ -111,11 +114,14 @@ module Term = struct
 
   let endpoint =
     let open Cmdliner in
-    let doc = "The Tezos node that the DAL node should connect to." in
+    let doc =
+      "The endpoint (an URI) of the Tezos node that the DAL node should \
+       connect to. The default endpoint is 'http://localhost:8732'."
+    in
     Arg.(
       value
       & opt (some endpoint_arg) None
-      & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
+      & info ~docs ~doc ~docv:"URI" ["endpoint"])
 
   let operator_profile_printer fmt = function
     | Types.Attester pkh ->
@@ -156,7 +162,7 @@ module Term = struct
     Arg.(
       value
       & opt (list attester_profile_arg) []
-      & info ~docs ~doc ~docv:"[PKH]" ["attester-profiles"])
+      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"])
 
   let producer_profile =
     let open Cmdliner in
@@ -164,7 +170,7 @@ module Term = struct
     Arg.(
       value
       & opt (list producer_profile_arg) []
-      & info ~docs ~doc ~docv:"[slot index]" ["producer-profiles"])
+      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["producer-profiles"])
 
   let bootstrap_profile =
     let open Cmdliner in
@@ -188,18 +194,15 @@ module Term = struct
 
   let metrics_addr =
     let open Cmdliner in
-    let doc = "The TCP address and port of the node's metrics server." in
+    let doc =
+      "The TCP address and optionally the port of the node's metrics server. \
+       The default address is 0.0.0.0. The default port is 11733."
+    in
     let default_port = Configuration_file.default.metrics_addr |> snd in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info
-          ~docs
-          ~doc
-          ~docv:
-            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is \
-             11733)"
-          ["metrics-addr"])
+      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["metrics-addr"])
 
   let term process =
     Cmdliner.Term.(
