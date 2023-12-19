@@ -872,20 +872,47 @@ let pp_delegate_slot fmt
     consensus_key_and_delegate
     attesting_power
 
+(* this type is only used below for pretty-printing *)
+type delegate_slots_for_pp = {
+  attester : consensus_key_and_delegate;
+  all_slots : Slot.t list;
+}
+
+let delegate_slots_for_pp delegate_slot_map =
+  SlotMap.fold
+    (fun slot {consensus_key_and_delegate; first_slot; attesting_power = _} acc ->
+      match SlotMap.find first_slot acc with
+      | None ->
+          SlotMap.add
+            first_slot
+            {attester = consensus_key_and_delegate; all_slots = [slot]}
+            acc
+      | Some {attester; all_slots} ->
+          SlotMap.add first_slot {attester; all_slots = slot :: all_slots} acc)
+    delegate_slot_map
+    SlotMap.empty
+  |> SlotMap.map (fun {attester; all_slots} ->
+         {attester; all_slots = List.rev all_slots})
+
 let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
   Format.fprintf
     fmt
     "@[<v>%a@]"
     Format.(
-      pp_print_list ~pp_sep:pp_print_cut (fun fmt (slot, attesting_slot) ->
+      pp_print_list
+        ~pp_sep:pp_print_cut
+        (fun fmt (_first_slot, {attester; all_slots}) ->
           Format.fprintf
             fmt
-            "slot: %a, %a"
-            Slot.pp
-            slot
-            pp_delegate_slot
-            attesting_slot))
-    (SlotMap.bindings own_delegate_slots)
+            "attester: %a, power: %d, first 10 slots: %a"
+            pp_consensus_key_and_delegate
+            attester
+            (List.length all_slots)
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
+               Slot.pp)
+            (List.filteri (fun i _ -> i < 10) all_slots)))
+    (SlotMap.bindings (delegate_slots_for_pp own_delegate_slots))
 
 let pp_next_forged_block fmt
     {delegate = consensus_key_and_delegate; block_header; _} =
@@ -918,7 +945,7 @@ let pp_level_state fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
      %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
      2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
-     next level proposed round: %a@  @next forged block: %a@]"
+     next level proposed round: %a@ next forged block: %a@]"
     current_level
     is_latest_proposal_applied
     pp_proposal
