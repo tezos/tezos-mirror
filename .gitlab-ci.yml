@@ -106,6 +106,7 @@ release:arm64:master:
 docker:
   stage: docker
   extends: .docker
+  script:
     - !reference [.docker, script]
     - docker push ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
   rules:
