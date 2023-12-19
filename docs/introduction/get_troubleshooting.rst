@@ -6,7 +6,7 @@ The different issues and their solutions are grouped per installation method, ex
 
 This page lists only the most frequent problems.
 If you don't find your problem in this page, chances are that the problem is too specific.
-Consult the :doc:`./support` sources (e.g. the Tezos Stack Exchange), to see if others have encountered a similar problem, and whether a solution is known.
+Consult the :doc:`../global/support` sources (e.g. the Tezos Stack Exchange) to see if others have encountered a similar problem, and whether a solution is known.
 
 Generic issues
 --------------

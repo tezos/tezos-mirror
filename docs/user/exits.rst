@@ -1,40 +1,13 @@
-Various
-=======
-
-.. _octez-admin-client:
-
-Admin Client
-------------
-
-The admin client enables you to interact with the peer-to-peer layer in order
-to:
-
-- check the status of the connections
-- force connections to known peers
-- ban/unban peers
-
-A useful command to debug a node that is not syncing is:
-
-::
-
-   octez-admin-client p2p stat
-
-The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
-
 .. _tezos_binaries_signals_and_exit_codes:
 
-Octez binaries: signals and exit codes
---------------------------------------
+Exit codes and signals
+======================
 
-Signals:
-Upon receiving ``SIGINT`` (e.g., via Ctrl+C in an interactive session) or
-``SIGTERM`` (e.g., via ``systemctl stop``) the process will exit (with code 64 or
-255, see details below). Note that sending the same signal a second time (after
-a one (1) second grace period) will terminate the process immediately,
-interrupting the normal clean-up functions of clean-up (in this case the exit
-code will be 255).
+This page documents the exit codes possibly returned by the Octez binaries, as well as the signals they handle.
 
-Exit codes:
+Exit codes
+----------
+
 The meaning of exit codes is presented in the following table. The action column
 indicates a recommended course of action.
 
@@ -57,3 +30,13 @@ indicates a recommended course of action.
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
 | 255         | like 127 but an error and an error occurred during exit (e.g., ``kill -9``)      | check output/logs, clean-up leftover files                       |
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+
+Signals
+-------
+
+Upon receiving ``SIGINT`` (e.g., via Ctrl+C in an interactive session) or
+``SIGTERM`` (e.g., via ``systemctl stop``) the process will exit (with code 64 or
+255, see details below). Note that sending the same signal a second time (after
+a one (1) second grace period) will terminate the process immediately,
+interrupting the normal clean-up functions of clean-up (in this case the exit
+code will be 255).

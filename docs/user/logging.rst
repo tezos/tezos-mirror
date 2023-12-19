@@ -1,5 +1,5 @@
-Logging
-=======
+Logging features
+================
 
 Logging features in Octez allow to monitor the execution of Octez binaries, informing in real
 time about events of interest, such as errors, completion of certain steps,

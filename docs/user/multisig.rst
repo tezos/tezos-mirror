@@ -1,8 +1,8 @@
-Multi-signature smart contracts
-===============================
+Built-in multisig contracts
+============================
 
 A multi-signed account, or *multisig* for short, is a way to share the
-ownership of an address (and of the associated balance) between
+ownership of an account (and its associated balance) between
 several participants.
 
 To act on a multisig, a fraction of the participants must agree on the
@@ -10,7 +10,7 @@ action by signing it with their private keys. The minimal number of
 participants that need to agree for the action to be approved is
 called the multisig *threshold*.
 
-On Tezos, a way to run a multisig is by using a smart contract. Such a
+Tezos supports developing and deploying multisig smart contracts. Such a
 multisig contract has built-in support in the ``octez-client`` and has
 been formally verified using the `Mi-Cho-Coq <https://gitlab.com/nomadic-labs/mi-cho-coq/>`_ framework.
 

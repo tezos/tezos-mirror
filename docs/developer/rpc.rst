@@ -82,4 +82,4 @@ A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
 RPC versions
 ------------
 
-See :doc:`../user/versioning` and :ref:`RPC-versioning-dev`.
+See :doc:`../introduction/versioning` and :ref:`RPC-versioning-dev`.

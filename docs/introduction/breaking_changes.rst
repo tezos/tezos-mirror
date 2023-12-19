@@ -32,7 +32,7 @@ Deprecation
 ~~~~~~~~~~~
 
 For the Oxford and Octez ``v18`` we introduced a new :doc:`version argument
-<../user/versioning>` ``?version=<n>`` for the following RPCs that can output
+<../introduction/versioning>` ``?version=<n>`` for the following RPCs that can output
 ``attestation`` (and legacy ``endorsement``):
 
 * ``POST /chains/<chain>/blocks/<block_id>/helpers/scripts/run_operation``
