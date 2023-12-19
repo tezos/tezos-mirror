@@ -1,18 +1,20 @@
 .. _tezos_community:
 
-The Community
-~~~~~~~~~~~~~
+The Tezos community
+~~~~~~~~~~~~~~~~~~~
 
 - The website of the `Tezos Foundation <https://tezos.foundation/>`_.
 - `Tezos Agora <https://www.tezosagora.org>`_ is the main meeting point for the community.
 - Several community-built block explorers are available:
 
     - https://tzstats.com
-    - https://tzkt.io (Baking focused explorer)
-    - https://arronax.io (Analytics-oriented explorer)
-    - https://mininax.io
-    - https://baking-bad.org (Baking rewards tracker)
-    - https://better-call.dev (Smart contracts explorer)
+    - https://tzkt.io (baking focused explorer)
+    - https://arronax.io (analytics-oriented explorer)
+    - https://baking-bad.org (baking rewards tracker)
+    - https://better-call.dev (smart contracts explorer)
+    - https://explorus.io/
+    - https://explorer.etherlink.com/
+    - https://tzflow.com/
 
 - A few community-run websites collect useful Tezos links:
 
