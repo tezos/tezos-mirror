@@ -1432,6 +1432,14 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(NOW, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(IMPLICIT_ACCOUNT, [], _), [.., T::KeyHash]) => {
+            stack[0] = T::new_contract(T::Unit);
+            I::ImplicitAccount
+        }
+        (App(IMPLICIT_ACCOUNT, [], _), [.., _]) => no_overload!(IMPLICIT_ACCOUNT),
+        (App(IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IMPLICIT_ACCOUNT, len 1),
+        (App(IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5407,6 +5415,48 @@ mod typecheck_tests {
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+    }
+
+    #[test]
+    fn implicit_account() {
+        let stk = &mut tc_stk![Type::KeyHash];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(ImplicitAccount)
+        );
+        assert_eq!(stk, &tc_stk![Type::new_contract(Type::Unit)]);
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IMPLICIT_ACCOUNT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IMPLICIT_ACCOUNT,
+                stack: stk![Type::Unit],
+                reason: None
+            })
         );
     }
 

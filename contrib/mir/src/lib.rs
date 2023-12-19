@@ -686,6 +686,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn implicit_account() {
+        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        run_e2e_test(
+            "IMPLICIT_ACCOUNT",
+            stk![Type::KeyHash],
+            stk![Type::new_contract(Type::Unit)],
+            stk![TypedValue::KeyHash(key_hash)],
+            stk![TypedValue::Contract(
+                Address::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap()
+            )],
+            Ctx::default(),
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
