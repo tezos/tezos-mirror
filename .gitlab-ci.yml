@@ -93,7 +93,7 @@ release:arm64:master:
     - devops
     - ${ARCH}
   variables:
-    - IMAGE: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
+    IMAGE: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
   before_script:
     - apk --no-cache add curl jq
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
