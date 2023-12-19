@@ -385,6 +385,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn balance() {
+        run_e2e_test(
+            "BALANCE",
+            stk![],
+            stk![Type::Mutez],
+            stk![],
+            stk![TypedValue::Mutez(45),],
+            {
+                let mut c = Ctx::default();
+                c.balance = 45;
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;

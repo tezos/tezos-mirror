@@ -71,6 +71,7 @@ pub struct TztTest<'a> {
     pub input: TestStack<'a>,
     pub output: TestExpectation<'a>,
     pub amount: Option<i64>,
+    pub balance: Option<i64>,
     pub chain_id: Option<ChainId>,
     pub parameter: Option<Micheline<'a>>,
     pub self_addr: Option<AddressHash>,
@@ -119,6 +120,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_input: Option<TestStack> = None;
         let mut m_output: Option<TestExpectation> = None;
         let mut m_amount: Option<i64> = None;
+        let mut m_balance: Option<i64> = None;
         let mut m_chain_id: Option<Micheline> = None;
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
@@ -136,6 +138,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     },
                 )?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
+                Balance(m) => set_tzt_field("balance", &mut m_balance, m)?,
                 ChainId(id) => set_tzt_field("chain_id", &mut m_chain_id, id)?,
                 Parameter(ty) => set_tzt_field("parameter", &mut m_parameter, ty)?,
                 SelfAddr(v) => set_tzt_field("self", &mut m_self, v)?,
@@ -147,6 +150,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             input: m_input.ok_or("input section not found in test")?,
             output: m_output.ok_or("output section not found in test")?,
             amount: m_amount,
+            balance: m_balance,
             chain_id: m_chain_id
                 .map(|v| {
                     Ok::<_, TcError>(irrefutable_match!(
@@ -237,6 +241,7 @@ pub enum TztEntity<'a> {
     Input(Vec<(Micheline<'a>, Micheline<'a>)>),
     Output(TztOutput<'a>),
     Amount(i64),
+    Balance(i64),
     ChainId(Micheline<'a>),
     Parameter(Micheline<'a>),
     SelfAddr(Micheline<'a>),
@@ -285,6 +290,7 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
     let mut ctx = Ctx::default();
     ctx.gas = crate::gas::Gas::default();
     ctx.amount = test.amount.unwrap_or_default();
+    ctx.balance = test.balance.unwrap_or_default();
     ctx.chain_id = test.chain_id.unwrap_or(Ctx::default().chain_id);
     ctx.self_address = test.self_addr.unwrap_or(Ctx::default().self_address);
     let execution_result =
