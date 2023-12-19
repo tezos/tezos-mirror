@@ -1844,7 +1844,9 @@ pub(crate) fn typecheck_value<'a>(
         (T::Mutez, V::Int(n)) if !n.is_negative() => TV::Mutez(i64::try_from(n)?),
         (T::String, V::String(s)) => TV::String(s.clone()),
         (T::Unit, V::App(Prim::Unit, [], _)) => TV::Unit,
-        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _)) if !rest.is_empty() => {
+        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _) | V::Seq([vl, rest @ ..]))
+            if !rest.is_empty() =>
+        {
             let (tl, tr) = pt.as_ref();
             let l = typecheck_value(vl, ctx, tl)?;
             let r = match rest {
