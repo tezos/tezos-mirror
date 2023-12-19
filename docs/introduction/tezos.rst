@@ -3,7 +3,7 @@
 Octez & Protocol overview
 -------------------------
 
-Octez, bundled with the Tezos protocol, are a complete implementation of the `Tezos blockchain <https://tezos.com>`__.
+Octez, bundled with the Tezos protocol, is a complete implementation of the `Tezos blockchain <https://tezos.com>`__.
 
 Tezos is a distributed consensus platform with meta-consensus
 capability. This means that Tezos not only comes to consensus about the state of its ledger,
@@ -23,8 +23,8 @@ A release candidate for the next version :doc:`../releases/version-19` is also a
 
 For installing instructions, see :doc:`./howtoget`.
 
-Tezos is backed up by a vibrant :ref:`Tezos community <tezos_community>`.
-For technical support, check the :doc:`Tezos technical support page <../global/support>`.
+Tezos is backed up by a vibrant :ref:`community <tezos_community>`.
+For technical support, check the :doc:`technical support page <../global/support>`.
 
 Mainnet & Test Networks
 ~~~~~~~~~~~~~~~~~~~~~~~
