@@ -625,6 +625,23 @@ fn interpret_one<'a>(
                 };
             }
         },
+        I::Size(overload) => {
+            macro_rules! run_size {
+                ($ctor:tt, $gas:ident) => {{
+                    let e = pop!(V::$ctor);
+                    ctx.gas.consume(interpret_cost::$gas)?;
+                    let res = e.len();
+                    stack.push(V::Nat(res.into()));
+                }};
+            }
+            match overload {
+                overloads::Size::String => run_size!(String, SIZE_STRING),
+                overloads::Size::Bytes => run_size!(Bytes, SIZE_BYTES),
+                overloads::Size::List => run_size!(List, SIZE_LIST),
+                overloads::Size::Set => run_size!(Set, SIZE_SET),
+                overloads::Size::Map => run_size!(Map, SIZE_MAP),
+            }
+        }
         I::ChainId => {
             ctx.gas.consume(interpret_cost::CHAIN_ID)?;
             stack.push(V::ChainId(ctx.chain_id.clone()));
@@ -2215,6 +2232,75 @@ mod interpreter_tests {
                 - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn size_string() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![TypedValue::String("abc".into())];
+        assert_eq!(
+            interpret(&vec![Size(overloads::Size::String)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::nat(3)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::SIZE_STRING - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn size_bytes() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![TypedValue::Bytes(b"abc".to_vec())];
+        assert_eq!(
+            interpret(&vec![Size(overloads::Size::Bytes)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::nat(3)]);
+    }
+
+    #[test]
+    fn size_list() {
+        let mut ctx = Ctx::default();
+        let list = (1..=3).map(TypedValue::nat).collect();
+        let mut stack = stk![TypedValue::List(list)];
+        assert_eq!(
+            interpret(&vec![Size(overloads::Size::List)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::nat(3)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::SIZE_LIST - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn size_set() {
+        let mut ctx = Ctx::default();
+        let set = (1..=3).map(TypedValue::nat).collect();
+        let mut stack = stk![TypedValue::Set(set)];
+        assert_eq!(
+            interpret(&vec![Size(overloads::Size::Set)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::nat(3)]);
+    }
+
+    #[test]
+    fn size_map() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([
+            (TypedValue::nat(1), TypedValue::nat(1)),
+            (TypedValue::nat(2), TypedValue::nat(2)),
+        ]);
+        let mut stack = stk![TypedValue::Map(map)];
+        assert_eq!(
+            interpret(&vec![Size(overloads::Size::Map)], &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::nat(2)]);
     }
 
     #[test]

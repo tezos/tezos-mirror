@@ -62,6 +62,15 @@ pub enum Update {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Size {
+    String,
+    Bytes,
+    List,
+    Set,
+    Map,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Iter {
     List,
     Set,
