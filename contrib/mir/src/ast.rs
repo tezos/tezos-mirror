@@ -93,6 +93,7 @@ pub enum Type {
     KeyHash,
     Lambda(Rc<(Type, Type)>),
     Ticket(Rc<Type>),
+    Timestamp,
 }
 
 impl Type {
@@ -102,7 +103,7 @@ impl Type {
         use Type::*;
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
-            | Bytes | Key | Signature | KeyHash => 1,
+            | Bytes | Key | Signature | KeyHash | Timestamp => 1,
             Pair(p) | Or(p) | Map(p) | Lambda(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
             Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => 1 + x.size_for_gas(),
         }
@@ -180,6 +181,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             Bytes => Micheline::prim0(Prim::bytes),
             Key => Micheline::prim0(Prim::key),
             Signature => Micheline::prim0(Prim::signature),
+            Timestamp => Micheline::prim0(Prim::timestamp),
             KeyHash => Micheline::prim0(Prim::key_hash),
             Never => Micheline::prim0(Prim::never),
 
@@ -256,6 +258,7 @@ pub enum TypedValue<'a> {
     KeyHash(KeyHash),
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
+    Timestamp(BigInt),
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -296,6 +299,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
             TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Timestamp(s) => V::Int(s),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
                 Operation::TransferTokens(tt) => Micheline::App(
@@ -362,6 +366,12 @@ impl<'a> TypedValue<'a> {
     /// useful in tests.
     pub fn nat(n: u32) -> Self {
         Self::Nat(n.into())
+    }
+
+    /// Helper for more easily constructing `Timestamp` variant with literals. Mostly
+    /// useful in tests.
+    pub fn timestamp(n: impl Into<BigInt>) -> Self {
+        Self::Timestamp(n.into())
     }
 
     pub fn new_ticket(t: Ticket<'a>) -> Self {
@@ -445,6 +455,7 @@ pub enum Instruction<'a> {
     SelfAddress,
     Sender,
     Source,
+    Now,
     /// Here entrypoint is not an optional value because explicit default entrypoints are forbidden
     /// in concrete syntax, so we can assume that if the entrypoint is the default entrypoint, then
     /// no explicit entrypoint was specified in the instruction.

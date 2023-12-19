@@ -650,6 +650,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn timestamp_type_and_value() {
+        run_e2e_test(
+            "PUSH timestamp 1571659294",
+            stk![],
+            stk![Type::Timestamp],
+            stk![],
+            stk![TypedValue::timestamp(1571659294)],
+            Ctx::default(),
+        );
+        run_e2e_test(
+            "PUSH timestamp \"2019-10-21T12:01:34Z\"",
+            stk![],
+            stk![Type::Timestamp],
+            stk![],
+            stk![TypedValue::timestamp(1571659294)],
+            Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn now() {
+        run_e2e_test(
+            "NOW",
+            stk![],
+            stk![Type::Timestamp],
+            stk![],
+            stk![TypedValue::timestamp(4500),],
+            {
+                let mut c = Ctx::default();
+                c.now = 4500i32.into();
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;

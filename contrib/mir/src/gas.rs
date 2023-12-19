@@ -131,6 +131,12 @@ pub mod tc_cost {
     // corresponds to cost_DECODING_CHAIN_ID in the protocol
     pub const CHAIN_ID_OPTIMIZED: u32 = 50;
 
+    pub fn timestamp_decoding(l: usize) -> Result<u32, OutOfGas> {
+        use integer_sqrt::IntegerSquareRoot;
+        let v0: Checked<usize> = Checked::from(l.integer_sqrt()) * l;
+        (105 + ((v0 >> 5) + (v0 >> 6))).as_gas_cost()
+    }
+
     fn variadic(depth: u16) -> Result<u32, OutOfGas> {
         let depth = Checked::from(depth as u32);
         (depth * 50).as_gas_cost()
@@ -265,6 +271,7 @@ pub mod interpret_cost {
     pub const SELF_ADDRESS: u32 = 10;
     pub const SENDER: u32 = 10;
     pub const SOURCE: u32 = 10;
+    pub const NOW: u32 = 10;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
@@ -399,6 +406,9 @@ pub mod interpret_cost {
 
             (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
             (V::Int(_), _) => incomparable(),
+
+            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Timestamp(_), _) => incomparable(),
 
             (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
             (V::Bool(_), _) => incomparable(),

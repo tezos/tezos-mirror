@@ -6,6 +6,7 @@
 /******************************************************************************/
 
 use crate::ast::michelson_address::entrypoint::Entrypoints;
+use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use std::collections::hash_map::Entry;
@@ -332,6 +333,9 @@ fn parse_ty_with_entrypoints(
             Type::new_ticket(t)
         }
         App(ticket, ..) => unexpected()?,
+
+        App(timestamp, [], _) => Type::Timestamp,
+        App(timestamp, ..) => unexpected()?,
 
         App(pair, [ty1, ty2, rest @ ..], _) => make_pair(ctx, (ty1, ty2, rest))?,
         App(pair, ..) => unexpected()?,
@@ -1422,6 +1426,12 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(SOURCE, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(NOW, [], _), ..) => {
+            stack.push(T::Timestamp);
+            I::Now
+        }
+        (App(NOW, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -1639,6 +1649,14 @@ pub(crate) fn typecheck_value<'a>(
         (T::KeyHash, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
+        }
+        (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
+        (T::Timestamp, V::String(n)) => {
+            ctx.gas
+                .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
+            let dt = DateTime::parse_from_rfc3339(n)
+                .map_err(|e| TcError::InvalidValueForType(e.to_string(), T::Timestamp))?;
+            TV::Timestamp(dt.timestamp().into())
         }
         (
             T::Lambda(tys),
@@ -5367,5 +5385,39 @@ mod typecheck_tests {
         );
 
         assert_eq!(stk, &tc_stk![Type::Address]);
+    }
+
+    #[test]
+    fn timestamp_value_tc() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp 1571659294").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"2019-10-21T12:01:34Z\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+    }
+
+    #[test]
+    fn now() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("NOW").unwrap(), &mut Ctx::default(), stk),
+            Ok(Now)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Timestamp]);
     }
 }
