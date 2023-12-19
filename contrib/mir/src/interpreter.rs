@@ -916,6 +916,10 @@ fn interpret_one<'a>(
                     .map(TypedValue::Contract),
             ));
         }
+        I::Level => {
+            ctx.gas.consume(interpret_cost::LEVEL)?;
+            stack.push(TypedValue::Nat(ctx.level.clone()));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3477,6 +3481,20 @@ mod interpreter_tests {
             stk![TypedValue::new_option(None)],
             Contract(Type::Unit, Entrypoint::try_from("foo").unwrap()),
             None,
+        );
+    }
+
+    #[test]
+    fn level() {
+        let mut ctx = Ctx::default();
+        ctx.level = 70u32.into();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[Level], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::nat(70),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::LEVEL + interpret_cost::INTERPRET_RET
         );
     }
 }

@@ -1392,6 +1392,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CONTRACT, [_], _), []) => no_overload!(CONTRACT, len 1),
         (App(CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(LEVEL, [], _), ..) => {
+            stack.push(T::Nat);
+            I::Level
+        }
+        (App(LEVEL, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5282,5 +5288,16 @@ mod typecheck_tests {
                 reason: None
             })
         );
+    }
+
+    #[test]
+    fn level() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("LEVEL").unwrap(), &mut Ctx::default(), stk),
+            Ok(Level)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Nat]);
     }
 }
