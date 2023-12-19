@@ -583,6 +583,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn min_block_time() {
+        run_e2e_test(
+            "MIN_BLOCK_TIME",
+            stk![],
+            stk![Type::Nat],
+            stk![],
+            stk![TypedValue::nat(45),],
+            {
+                let mut c = Ctx::default();
+                c.min_block_time = 45u32.into();
+                c
+            },
+        );
+    }
+
     const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
            IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;

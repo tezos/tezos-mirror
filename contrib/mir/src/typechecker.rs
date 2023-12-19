@@ -1398,6 +1398,12 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(LEVEL, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(MIN_BLOCK_TIME, [], _), ..) => {
+            stack.push(T::Nat);
+            I::MinBlockTime
+        }
+        (App(MIN_BLOCK_TIME, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5296,6 +5302,17 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("LEVEL").unwrap(), &mut Ctx::default(), stk),
             Ok(Level)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Nat]);
+    }
+
+    #[test]
+    fn min_block_time() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("MIN_BLOCK_TIME").unwrap(), &mut Ctx::default(), stk),
+            Ok(MinBlockTime)
         );
 
         assert_eq!(stk, &tc_stk![Type::Nat]);
