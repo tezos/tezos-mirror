@@ -951,7 +951,7 @@ let events =
     bin = kernel_inputs_path ^ "/events.bin";
   }
 
-(** The info for the "events.sol" contract.
+(** The info for the "nested_create.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/nested_create.sol] *)
 let nested_create =
   {
@@ -960,7 +960,7 @@ let nested_create =
     bin = kernel_inputs_path ^ "/nested_create.bin";
   }
 
-(** The info for the "events.sol" contract.
+(** The info for the "revert.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/revert.sol] *)
 let revert =
   {
@@ -969,7 +969,7 @@ let revert =
     bin = kernel_inputs_path ^ "/revert.bin";
   }
 
-(** The info for the "events.sol" contract.
+(** The info for the "create2.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/create2.sol] *)
 let create2 =
   {
@@ -978,7 +978,7 @@ let create2 =
     bin = kernel_inputs_path ^ "/create2.bin";
   }
 
-(** The info for the "events.sol" contract.
+(** The info for the "oog_call.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/oog_call.sol] *)
 let oog_call =
   {
@@ -987,6 +987,8 @@ let oog_call =
     bin = kernel_inputs_path ^ "/oog_call.bin";
   }
 
+(** The info for the "ether_wallet.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/ether_wallet.sol] *)
 let ether_wallet =
   {
     label = "ether_wallet";
