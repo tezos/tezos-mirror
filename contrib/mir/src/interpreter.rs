@@ -924,6 +924,27 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::MIN_BLOCK_TIME)?;
             stack.push(TypedValue::Nat(ctx.min_block_time.clone()));
         }
+        I::SelfAddress => {
+            ctx.gas.consume(interpret_cost::SELF_ADDRESS)?;
+            stack.push(TypedValue::Address(Address {
+                hash: ctx.self_address.clone(),
+                entrypoint: Entrypoint::default(),
+            }));
+        }
+        I::Sender => {
+            ctx.gas.consume(interpret_cost::SENDER)?;
+            stack.push(TypedValue::Address(Address {
+                hash: ctx.sender.clone(),
+                entrypoint: Entrypoint::default(),
+            }));
+        }
+        I::Source => {
+            ctx.gas.consume(interpret_cost::SOURCE)?;
+            stack.push(TypedValue::Address(Address {
+                hash: ctx.source.clone(),
+                entrypoint: Entrypoint::default(),
+            }));
+        }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
     Ok(())
@@ -3513,6 +3534,51 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::MIN_BLOCK_TIME + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn self_address() {
+        let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let mut ctx = Ctx::default();
+        ctx.self_address = addr.hash.clone();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[SelfAddress], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Address(addr),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::SELF_ADDRESS + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn sender() {
+        let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let mut ctx = Ctx::default();
+        ctx.sender = addr.hash.clone();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[Sender], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Address(addr),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::SENDER + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn source() {
+        let addr = super::Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let mut ctx = Ctx::default();
+        ctx.source = addr.hash.clone();
+        let mut stack = stk![];
+        let start_milligas = ctx.gas.milligas();
+        assert_eq!(interpret(&[Source], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::Address(addr),]);
+        assert_eq!(
+            start_milligas - ctx.gas.milligas(),
+            interpret_cost::SOURCE + interpret_cost::INTERPRET_RET
         );
     }
 }

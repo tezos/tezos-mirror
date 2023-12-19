@@ -442,6 +442,9 @@ pub enum Instruction<'a> {
     Balance,
     Level,
     MinBlockTime,
+    SelfAddress,
+    Sender,
+    Source,
     /// Here entrypoint is not an optional value because explicit default entrypoints are forbidden
     /// in concrete syntax, so we can assume that if the entrypoint is the default entrypoint, then
     /// no explicit entrypoint was specified in the instruction.

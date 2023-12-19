@@ -1404,6 +1404,24 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(MIN_BLOCK_TIME, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SELF_ADDRESS, [], _), ..) => {
+            stack.push(T::Address);
+            I::SelfAddress
+        }
+        (App(SELF_ADDRESS, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(SENDER, [], _), ..) => {
+            stack.push(T::Address);
+            I::Sender
+        }
+        (App(SENDER, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(SOURCE, [], _), ..) => {
+            stack.push(T::Address);
+            I::Source
+        }
+        (App(SOURCE, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5316,5 +5334,38 @@ mod typecheck_tests {
         );
 
         assert_eq!(stk, &tc_stk![Type::Nat]);
+    }
+
+    #[test]
+    fn self_address() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("SELF_ADDRESS").unwrap(), &mut Ctx::default(), stk),
+            Ok(SelfAddress)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Address]);
+    }
+
+    #[test]
+    fn sender() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("SENDER").unwrap(), &mut Ctx::default(), stk),
+            Ok(Sender)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Address]);
+    }
+
+    #[test]
+    fn source() {
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(&parse("SOURCE").unwrap(), &mut Ctx::default(), stk),
+            Ok(Source)
+        );
+
+        assert_eq!(stk, &tc_stk![Type::Address]);
     }
 }
