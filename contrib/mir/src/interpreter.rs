@@ -8,6 +8,7 @@
 #![warn(clippy::redundant_clone)]
 
 use checked::Checked;
+use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint};
 use num_traits::{Signed, Zero};
 use std::rc::Rc;
@@ -876,6 +877,31 @@ fn interpret_one<'a>(
             } else {
                 stack.push(V::new_option(None));
             }
+        }
+        I::Blake2b => {
+            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            ctx.gas.consume(interpret_cost::blake2b(msg)?)?;
+            *msg = blake2b_256(msg).to_vec();
+        }
+        I::Keccak => {
+            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            ctx.gas.consume(interpret_cost::keccak(msg)?)?;
+            *msg = keccak256(msg).to_vec();
+        }
+        I::Sha256 => {
+            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            ctx.gas.consume(interpret_cost::sha256(msg)?)?;
+            *msg = sha256(msg).to_vec();
+        }
+        I::Sha3 => {
+            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            ctx.gas.consume(interpret_cost::sha3(msg)?)?;
+            *msg = sha3_256(msg).to_vec();
+        }
+        I::Sha512 => {
+            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            ctx.gas.consume(interpret_cost::sha512(msg)?)?;
+            *msg = sha512(msg).to_vec();
         }
         I::Seq(nested) => interpret(nested, ctx, stack)?,
     }
@@ -3148,5 +3174,53 @@ mod interpreter_tests {
         let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
         assert_eq!(interpret_one(&JoinTickets, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::new_option(None),]);
+    }
+
+    mod byte_hashes {
+        use super::*;
+
+        #[track_caller]
+        fn test(i: Instruction, input: &str, expected_output: &str) {
+            let input = hex::decode(input).unwrap();
+            let mut stack = stk![V::Bytes(input)];
+            assert_eq!(interpret_one(&i, &mut Ctx::default(), &mut stack), Ok(()));
+            assert_eq!(stack.len(), 1);
+            let out = irrefutable_match!(&stack[0]; V::Bytes);
+            assert_eq!(out, &hex::decode(expected_output).unwrap());
+        }
+        macro_rules! test {
+            ($i:ident; $($input:expr => $output:expr);* $(;)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $i() {
+                    $(test(Instruction::$i, $input, $output);)*
+                }
+            };
+        }
+        test!(
+            Blake2b;
+            "00" => "03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c111314";
+            "deadbeef" => "f3e925002fed7cc0ded46842569eb5c90c910c091d8d04a1bdf96e0db719fd91";
+        );
+        test!(
+            Keccak;
+            "00" => "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a";
+            "deadbeef" => "d4fd4e189132273036449fc9e11198c739161b4c0116a9a2dccdfa1c492006f1";
+        );
+        test!(
+            Sha256;
+            "00" => "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d";
+            "deadbeef" => "5f78c33274e43fa9de5659265c1d917e25c03722dcb0b8d27db8d5feaa813953";
+        );
+        test!(
+            Sha3;
+            "00" => "5d53469f20fef4f8eab52b88044ede69c77a6a68a60728609fc4a65ff531e7d0";
+            "deadbeef" => "352b82608dad6c7ac3dd665bc2666e5d97803cb13f23a1109e2105e93f42c448";
+        );
+        test!(
+            Sha512;
+            "00" => "b8244d028981d693af7b456af8efa4cad63d282e19ff14942c246e50d9351d22704a802a71c3580b6370de4ceb293c324a8423342557d4e5c38438f0e36910ee";
+            "deadbeef" => "1284b2d521535196f22175d5f558104220a6ad7680e78b49fa6f20e57ea7b185d71ec1edb137e70eba528dedb141f5d2f8bb53149d262932b27cf41fed96aa7f";
+        );
     }
 }

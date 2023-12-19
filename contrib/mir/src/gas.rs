@@ -615,6 +615,36 @@ pub mod interpret_cost {
         // In practice, they both have the same cost.
         ((Checked::from(length) >> 1) + 25).as_gas_cost()
     }
+
+    pub fn blake2b(msg: &[u8]) -> Result<u32, OutOfGas> {
+        /* fun size -> (430. + (1.125 * size)) */
+        let size = Checked::from(msg.len());
+        (Checked::from(430) + ((size >> 3) + size)).as_gas_cost()
+    }
+
+    pub fn keccak(msg: &[u8]) -> Result<u32, OutOfGas> {
+        /* fun size -> (1350. + (8.25 * size)) */
+        let size = Checked::from(msg.len());
+        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+    }
+
+    pub fn sha256(msg: &[u8]) -> Result<u32, OutOfGas> {
+        /* fun size -> (600. + (4.75 * size)) */
+        let size = Checked::from(msg.len());
+        (Checked::from(600) + ((size >> 2) + ((size >> 1) + (size * 4)))).as_gas_cost()
+    }
+
+    pub fn sha3(msg: &[u8]) -> Result<u32, OutOfGas> {
+        /* fun size -> (1350. + (8.25 * size)) */
+        let size = Checked::from(msg.len());
+        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+    }
+
+    pub fn sha512(msg: &[u8]) -> Result<u32, OutOfGas> {
+        /* fun size -> (680. + (3. * size)) */
+        let size = Checked::from(msg.len());
+        (Checked::from(680) + (size * 3)).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

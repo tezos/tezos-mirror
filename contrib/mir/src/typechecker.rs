@@ -1340,6 +1340,22 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(JOIN_TICKETS, [], _), []) => no_overload!(JOIN_TICKETS, len 1),
         (App(JOIN_TICKETS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        // stack type doesn't change in these instructions, so we don't touch it
+        (App(BLAKE2B, [], _), [.., T::Bytes]) => I::Blake2b,
+        (App(KECCAK, [], _), [.., T::Bytes]) => I::Keccak,
+        (App(SHA256, [], _), [.., T::Bytes]) => I::Sha256,
+        (App(SHA3, [], _), [.., T::Bytes]) => I::Sha3,
+        (App(SHA512, [], _), [.., T::Bytes]) => I::Sha512,
+        (App(prim @ (BLAKE2B | KECCAK | SHA256 | SHA3 | SHA512), [], _), [.., t]) => {
+            no_overload!(*prim, TypesNotEqual(T::Bytes, t.clone()))
+        }
+        (App(prim @ (BLAKE2B | KECCAK | SHA256 | SHA3 | SHA512), [], _), []) => {
+            no_overload!(*prim, len 1)
+        }
+        (App(BLAKE2B | KECCAK | SHA256 | SHA3 | SHA512, expect_args!(0), _), _) => {
+            unexpected_micheline!()
+        }
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -5042,5 +5058,75 @@ mod typecheck_tests {
     #[test]
     fn hash_key_too_short() {
         too_short_test(&app!(HASH_KEY), Prim::HASH_KEY, 1);
+    }
+
+    mod hash_instructions {
+        use super::*;
+
+        // hash instructions are all basically the same as far as typechecking
+        // is concerned, so instead of duplicating a bunch of tests 5 times, a
+        // macro. -- @lierdakl
+        macro_rules! test {
+            ($instr_prim:ident, $expected_instruction:expr) => {
+                #[allow(non_snake_case)]
+                mod $instr_prim {
+                    use super::*;
+
+                    #[test]
+                    fn ok() {
+                        let mut stack = tc_stk![Type::Bytes];
+                        assert_eq!(
+                            typecheck_instruction(
+                                &parse(stringify!($instr_prim)).unwrap(),
+                                &mut Ctx::default(),
+                                &mut stack,
+                            ),
+                            Ok($expected_instruction),
+                        );
+                        assert_eq!(stack, tc_stk![Type::Bytes]);
+                    }
+
+                    #[test]
+                    fn too_short() {
+                        too_short_test(&app!($instr_prim), Prim::$instr_prim, 1);
+                    }
+
+                    #[test]
+                    fn bad_input() {
+                        let mut stack = tc_stk![Type::Unit];
+                        assert_eq!(
+                            typecheck_instruction(
+                                &app!($instr_prim),
+                                &mut Ctx::default(),
+                                &mut stack,
+                            ),
+                            Err(TcError::NoMatchingOverload {
+                                instr: Prim::$instr_prim,
+                                stack: stk![Type::Unit],
+                                reason: Some(TypesNotEqual(Type::Bytes, Type::Unit).into()),
+                            }),
+                        );
+                    }
+
+                    #[test]
+                    fn bad_micheline() {
+                        assert!(matches!(
+                            typecheck_instruction(
+                                // instruction with unit argument
+                                &app!($instr_prim[app!(unit)]),
+                                &mut Ctx::default(),
+                                &mut tc_stk![],
+                            ),
+                            Err(TcError::UnexpectedMicheline(_)),
+                        ));
+                    }
+                }
+            };
+        }
+        test!(BLAKE2B, Blake2b);
+        test!(KECCAK, Keccak);
+        test!(SHA256, Sha256);
+        test!(SHA3, Sha3);
+        test!(SHA512, Sha512);
     }
 }
