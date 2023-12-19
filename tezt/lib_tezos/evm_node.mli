@@ -34,6 +34,7 @@ type mode =
       kernel : string;  (** Path to the kernel used by the sequencer. *)
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
+      private_rpc_port : int;  (** Port for private RPC server*)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 
@@ -71,9 +72,8 @@ val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
 (** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
 val wait_for_ready : t -> unit Lwt.t
 
-(** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    rollup_node_endpoint] creates an EVM node server with {!create}
-    and runs it with {!run}. *)
+(** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node_endpoint]
+    creates an EVM node server with {!create} and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
   ?mode:mode ->
@@ -95,20 +95,25 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** [endpoint evm_node] returns the endpoint to communicate with the
-    [evm_node]. *)
-val endpoint : t -> string
+(** [endpoint ?private_ evm_node] returns the endpoint to communicate with the
+    [evm_node]. If [private_] is true, the endpoint for the private
+    RPC server is returned. *)
+val endpoint : ?private_:bool -> t -> string
 
 (** JSON-RPC request. *)
 type request = {method_ : string; parameters : JSON.u}
 
-(** [call_evm_rpc evm_node ~request] sends a JSON-RPC request to the
-    [evm_node], for the given [request]. *)
-val call_evm_rpc : t -> request -> JSON.t Lwt.t
+(** [call_evm_rpc ?private_ evm_node ~request] sends a JSON-RPC request to
+    the [evm_node], for the given [request].
+    If [private_] is true, the request is sent to the private RPC
+    server. *)
+val call_evm_rpc : ?private_:bool -> t -> request -> JSON.t Lwt.t
 
-(** [batch_evm_rpc evm_node ~requests] sends multiple JSON-RPC requests to the
-    [evm_node], for the given [requests]. *)
-val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
+(** [batch_evm_rpc ?private_ evm_node ~requests] sends multiple JSON-RPC requests
+    to the [evm_node], for the given [requests].
+    If [private_] is true, the requests are sent to the private RPC
+    server. *)
+val batch_evm_rpc : ?private_:bool -> t -> request list -> JSON.t Lwt.t
 
 (** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
 val extract_result : JSON.t -> JSON.t

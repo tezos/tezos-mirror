@@ -356,8 +356,10 @@ let setup_evm_kernel ?config ?kernel_installee
             ?config
             "evm_kernel"
         in
+        let private_rpc_port = Port.fresh () in
         return
-          (Evm_node.Sequencer {kernel = output; preimage_dir = preimages_dir})
+          (Evm_node.Sequencer
+             {kernel = output; preimage_dir = preimages_dir; private_rpc_port})
   in
   let* evm_node =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
