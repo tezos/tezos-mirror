@@ -432,6 +432,7 @@ pub enum Instruction<'a> {
     ReadTicket,
     SplitTicket,
     JoinTickets,
+    LoopLeft(Vec<Self>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

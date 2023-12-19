@@ -394,6 +394,23 @@ fn interpret_one<'a>(
                 }
             }
         }
+        I::LoopLeft(nested) => {
+            ctx.gas.consume(interpret_cost::LOOP_LEFT_ENTER)?;
+            loop {
+                ctx.gas.consume(interpret_cost::LOOP)?;
+                match *pop!(V::Or) {
+                    Or::Left(x) => {
+                        stack.push(x);
+                        interpret(nested, ctx, stack)?;
+                    }
+                    Or::Right(x) => {
+                        stack.push(x);
+                        ctx.gas.consume(interpret_cost::LOOP_EXIT)?;
+                        break;
+                    }
+                }
+            }
+        }
         I::Iter(overload, nested) => {
             ctx.gas.consume(interpret_cost::ITER)?;
             match overload {
@@ -852,8 +869,8 @@ fn interpret_one<'a>(
 mod interpreter_tests {
     use std::collections::{BTreeMap, BTreeSet};
 
-    use super::Lambda;
     use super::*;
+    use super::{Lambda, Or};
     use crate::ast::michelson_address as addr;
     use crate::gas::Gas;
     use Instruction::*;
@@ -1359,6 +1376,36 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, expected_stack);
     }
+
+    #[test]
+    fn loop_left_0() {
+        let mut stack = stk![V::new_or(Or::Right(V::nat(0)))];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            interpret_one(&LoopLeft(vec![Failwith(Type::Nat)]), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![V::nat(0)])
+    }
+
+    #[test]
+    fn loop_left_1() {
+        let mut stack = stk![V::new_or(Or::Left(V::nat(0)))];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            interpret_one(
+                &LoopLeft(vec![Drop(None), Push(V::new_or(Or::Right(V::int(1))))]),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![V::int(1)])
+    }
+
+    // TODO: the current branch doesn't have LEFT and RIGHT instructions, so
+    // adding a testcase for LOOP_LEFT with more than one iteration is
+    // unnecessarily complicated. Left for future work.
 
     #[test]
     fn test_iter_list_many() {
