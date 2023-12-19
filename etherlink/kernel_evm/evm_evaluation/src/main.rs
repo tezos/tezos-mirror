@@ -72,6 +72,12 @@ pub struct Opt {
         about = "Output only the final report."
     )]
     report_only: bool,
+    #[structopt(
+        short = "h",
+        long = "from-scratch",
+        about = "Overwrite the target file where the logs will be outputed."
+    )]
+    from_scratch: bool,
 }
 
 fn generate_final_report(
@@ -236,8 +242,8 @@ fn generate_final_report(
 pub fn main() {
     let opt = Opt::from_args();
     let mut output_file = OpenOptions::new()
-        .append(true)
-        .truncate(false)
+        .write(true)
+        .append(!opt.from_scratch)
         .create(true)
         .open(&opt.output)
         .unwrap();
