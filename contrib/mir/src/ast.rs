@@ -227,7 +227,8 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
             Pair(_) => Micheline::App(
                 Prim::pair,
-                arena.alloc_extend(
+                micheline_seq(
+                    arena,
                     LinearizePairIter(Some(self)).map(|x| x.into_micheline_optimized_legacy(arena)),
                 ),
                 NO_ANNS,
@@ -292,6 +293,17 @@ pub enum TypedValue<'a> {
     Bls12381G2(Box<bls::G2>),
 }
 
+/// Arena has an unfortunate pothole related to alloc_extend: if the iterator
+/// itself tries to allocate in the arena, it will panic. Thus, the argument is
+/// first collected into a `Vec`. This has performance implications, and should
+/// be addressed eventually.
+fn micheline_seq<'a>(
+    arena: &'a Arena<Micheline<'a>>,
+    iter: impl IntoIterator<Item = Micheline<'a>>,
+) -> &'a [Micheline<'a>] {
+    arena.alloc_extend(iter.into_iter().collect::<Vec<_>>())
+}
+
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
     fn into_micheline_optimized_legacy(self, arena: &'a Arena<Micheline<'a>>) -> Micheline<'a> {
         use Micheline as V;
@@ -313,21 +325,22 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             // reference implementation, because reference implementation optimizes the size of combs
             // and uses an untyped representation that is the shortest.
             TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
-            TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
-            TV::Set(s) => V::Seq(arena.alloc_extend(s.into_iter().map(go))),
-            TV::Map(m) => V::Seq(
-                arena.alloc_extend(
-                    m.into_iter()
-                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
-                ),
-            ),
+            TV::List(l) => V::Seq(micheline_seq(arena, l.into_iter().map(go))),
+            TV::Set(s) => V::Seq(micheline_seq(arena, s.into_iter().map(go))),
+            TV::Map(m) => V::Seq(micheline_seq(
+                arena,
+                m.into_iter()
+                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+            )),
             TV::BigMap(m) => {
                 let id_part = m.id.map(|i| V::Int(i.0));
                 let overlay_empty = m.overlay.is_empty();
-                let map_part =
-                    V::Seq(arena.alloc_extend(m.overlay.into_iter().map(|(key, val)| {
+                let map_part = V::Seq(micheline_seq(
+                    arena,
+                    m.overlay.into_iter().map(|(key, val)| {
                         V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
-                    })));
+                    }),
+                ));
                 match id_part {
                     Some(id_part) if overlay_empty => id_part,
                     Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
@@ -352,22 +365,20 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Bls12381G2(x) => V::Bytes(x.to_bytes().to_vec()),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
-                Operation::TransferTokens(tt) => Micheline::App(
+                Operation::TransferTokens(tt) => Micheline::prim3(
+                    arena,
                     Prim::Transfer_tokens,
-                    arena.alloc_extend([
-                        go(tt.param),
-                        go(TV::Address(tt.destination_address)),
-                        go(TV::Mutez(tt.amount)),
-                    ]),
-                    annotations::NO_ANNS,
+                    go(tt.param),
+                    go(TV::Address(tt.destination_address)),
+                    go(TV::Mutez(tt.amount)),
                 ),
-                Operation::SetDelegate(sd) => Micheline::App(
+                Operation::SetDelegate(sd) => Micheline::prim1(
+                    arena,
                     Prim::Set_delegate,
-                    arena.alloc_extend([match sd.0 {
+                    match sd.0 {
                         Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh))),
                         None => V::prim0(Prim::None),
-                    }]),
-                    annotations::NO_ANNS,
+                    },
                 ),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
