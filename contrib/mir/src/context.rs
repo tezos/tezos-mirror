@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
+use crate::ast::michelson_key_hash::KeyHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
@@ -16,7 +17,9 @@ pub struct Ctx {
     pub chain_id: tezos_crypto_rs::hash::ChainId,
     pub self_address: AddressHash,
     pub lookup_contract: Box<dyn FnMut(&AddressHash) -> Option<Entrypoints>>,
+    pub voting_powers: Box<dyn Fn(&KeyHash) -> BigUint>,
     pub now: BigInt,
+    pub total_voting_power: BigUint,
     operation_counter: u128,
 }
 
@@ -33,6 +36,12 @@ impl Ctx {
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
         self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
+    }
+
+    pub fn set_voting_powers(&mut self, v: impl Into<HashMap<KeyHash, BigUint>>) {
+        let map: HashMap<KeyHash, BigUint> = v.into();
+        self.total_voting_power = map.values().sum();
+        self.voting_powers = Box::new(move |x| map.get(x).unwrap_or(&0u32.into()).clone());
     }
 }
 
@@ -51,6 +60,8 @@ impl Default for Ctx {
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
             lookup_contract: Box::new(|_| None),
+            voting_powers: Box::new(|_| 0u32.into()),
+            total_voting_power: 0u32.into(),
             operation_counter: 0,
         }
     }
