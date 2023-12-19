@@ -78,8 +78,7 @@ release:arm64:master:
   variables:
     ARCHIVE: "binaries-arm64-master.zip"
 
-docker:
-  stage: docker
+.docker:
   image: docker
   parallel:
     matrix:
@@ -93,13 +92,21 @@ docker:
   tags:
     - devops
     - ${ARCH}
+  variables:
+    - IMAGE: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
   before_script:
     - apk --no-cache add curl jq
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - 'PARENT_JOB_ID=`curl -L ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs\?job_token=${CI_JOB_TOKEN}\&scope=success | jq ".[] | select(.name == \"build: [${ARCH}, ${OCTEZ_BRANCH}]\") | .id"`'
     - curl -L -o artifacts.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${PARENT_JOB_ID}/artifacts\?job_token=${CI_JOB_TOKEN} && unzip artifacts.zip && rm artifacts.zip
+    - echo "IMAGE = ${IMAGE}"
     - docker build -t ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG} -f Dockerfile.${TARGET} .
+
+docker:
+  stage: docker
+  extends: .docker
+    - !reference [.docker, script]
     - docker push ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
