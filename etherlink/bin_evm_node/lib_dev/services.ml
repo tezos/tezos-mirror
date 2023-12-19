@@ -479,7 +479,7 @@ let dispatch_request (config : 'a Configuration.t)
 
 let dispatch_private_request (_config : 'a Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
-    ({method_; parameters = _; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+    ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
   let* value =
     match map_method_name method_ with
@@ -501,6 +501,17 @@ let dispatch_private_request (_config : 'a Configuration.t)
                  message = "Method not supported";
                  data = Some (`String method_);
                })
+    | Method (Produce_block.Method, module_) ->
+        let f (_ : unit option) =
+          let open Lwt_result_syntax in
+          let* nb_transactions =
+            Tx_pool.produce_block ~force:true ~timestamp:(Helpers.now ())
+          in
+          return
+            (Either.Left
+               (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions))
+        in
+        build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   return JSONRPC.{value; id}
