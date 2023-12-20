@@ -32,6 +32,10 @@ pub mod blocks {
         /// comparing to stored current block number
         #[error("Non sequential block levels. Current: {0}, new one: {1}")]
         NonSequentialBlockLevels(U256, U256),
+
+        /// Some blockhash in storage has wrong number of bytes
+        #[error("Malformed blockhash. Number of bytes: {0}")]
+        MalformedBlockHash(usize),
     }
 
     impl From<RuntimeError> for EvmBlockStorageError {
@@ -117,8 +121,12 @@ pub mod blocks {
     ) -> Result<H256, EvmBlockStorageError> {
         let block_path = to_block_hash_path(block_number)?;
         let block_hash = host.store_read(&block_path, 0, 32)?;
-        // TODO consider more accurately
-        Ok(H256::from_slice(&block_hash[..]))
+
+        if block_hash.len() == 32 {
+            Ok(H256::from_slice(&block_hash[..]))
+        } else {
+            Err(EvmBlockStorageError::MalformedBlockHash(block_hash.len()))
+        }
     }
 
     fn to_block_hash_path(block_number: U256) -> Result<OwnedPath, EvmBlockStorageError> {
