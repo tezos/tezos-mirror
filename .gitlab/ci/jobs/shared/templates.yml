@@ -35,6 +35,8 @@
           - tezt/**/*
           - .gitlab/**/*
           - .gitlab-ci.yml
+          - michelson_test_scripts/**/*
+          - tzt_reference_test_suite/**/*
       when: on_success
 
 # Only if octez source code has changed or Marge Bot is the trigger
@@ -47,6 +49,8 @@
           - tezt/**/*
           - .gitlab/**/*
           - .gitlab-ci.yml
+          - michelson_test_scripts/**/*
+          - tzt_reference_test_suite/**/*
       when: on_success
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: on_success
