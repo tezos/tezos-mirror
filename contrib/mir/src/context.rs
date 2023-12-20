@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::michelson_key_hash::KeyHash;
@@ -6,7 +7,7 @@ use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
 
-pub struct Ctx {
+pub struct Ctx<'a> {
     pub gas: Gas,
     pub amount: i64,
     pub balance: i64,
@@ -20,10 +21,14 @@ pub struct Ctx {
     pub voting_powers: Box<dyn Fn(&KeyHash) -> BigUint>,
     pub now: BigInt,
     pub total_voting_power: BigUint,
+    // NB: lifetime is mandatory if we want to use types implementing with
+    // references inside for LazyStorage, and we do due to how Runtime is passed
+    // as &mut
+    pub big_map_storage: Box<dyn LazyStorage<'a> + 'a>,
     operation_counter: u128,
 }
 
-impl Ctx {
+impl Ctx<'_> {
     pub fn operation_counter(&mut self) -> u128 {
         self.operation_counter += 1;
         self.operation_counter
@@ -45,7 +50,7 @@ impl Ctx {
     }
 }
 
-impl Default for Ctx {
+impl Default for Ctx<'_> {
     fn default() -> Self {
         Ctx {
             gas: Gas::default(),
@@ -62,6 +67,7 @@ impl Default for Ctx {
             lookup_contract: Box::new(|_| None),
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),
+            big_map_storage: Box::new(InMemoryLazyStorage::new()),
             operation_counter: 0,
         }
     }

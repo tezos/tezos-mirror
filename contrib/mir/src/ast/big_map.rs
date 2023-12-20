@@ -17,7 +17,7 @@ use super::{Micheline, Type, TypedValue};
 
 /// Id of big map in the lazy storage.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BigMapId(BigInt);
+pub struct BigMapId(pub BigInt);
 
 impl Display for BigMapId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -35,7 +35,7 @@ pub struct BigMap<'a> {
     ///
     /// Big map can be backed by no map in the lazy storage and yet stay fully
     /// in memory, in such case this field is `None`.
-    id: Option<BigMapId>,
+    pub id: Option<BigMapId>,
 
     /// In-memory part, carries the diff that is to be applied to the map in the
     /// storage.
@@ -44,10 +44,10 @@ pub struct BigMap<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    overlay: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    pub overlay: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
 
-    key_type: Type,
-    value_type: Type,
+    pub key_type: Type,
+    pub value_type: Type,
 }
 
 impl<'a> BigMap<'a> {
@@ -153,26 +153,10 @@ pub trait LazyStorage<'a> {
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError>;
 
-    /// Update big map with multiple changes, generalizes
-    /// [LazyStorage::big_map_update].
-    ///
-    /// The specified big map id must point to a valid map in the lazy storage.
-    /// Key and value types must match the type of key of the stored map.
-    fn big_map_bulk_update(
-        &mut self,
-        id: &BigMapId,
-        entries_iter: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-    ) -> Result<(), LazyStorageError> {
-        for (k, v) in entries_iter {
-            self.big_map_update(id, k, v)?
-        }
-        Ok(())
-    }
-
     /// Get key and value types of the map.
     ///
-    /// The specified big map id must point to a valid map in the lazy storage.
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<(&Type, &Type), LazyStorageError>;
+    /// This returns None if the map with such ID is not present in the storage.
+    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError>;
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -193,6 +177,26 @@ pub trait LazyStorage<'a> {
     /// storage.
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError>;
 }
+
+pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
+    /// Update big map with multiple changes, generalizes
+    /// [LazyStorage::big_map_update].
+    ///
+    /// The specified big map id must point to a valid map in the lazy storage.
+    /// Key and value types must match the type of key of the stored map.
+    fn big_map_bulk_update(
+        &mut self,
+        id: &BigMapId,
+        entries_iter: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+    ) -> Result<(), LazyStorageError> {
+        for (k, v) in entries_iter {
+            self.big_map_update(id, k, v)?
+        }
+        Ok(())
+    }
+}
+
+impl<'a, T: LazyStorage<'a>> LazyStorageBulkUpdate<'a> for T {}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MapInfo<'a> {
@@ -277,9 +281,11 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(())
     }
 
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<(&Type, &Type), LazyStorageError> {
-        let info = self.access_big_map(id)?;
-        Ok((&info.key_type, &info.value_type))
+    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError> {
+        Ok(self
+            .big_maps
+            .get(id)
+            .map(|info| (&info.key_type, &info.value_type)))
     }
 
     fn big_map_new(
@@ -465,14 +471,13 @@ impl<'a> TypedValue<'a> {
                 // Key is comparable as so has no big map, skipping it
                 v.collect_big_maps(put_res)
             }),
+            BigMap(m) => put_res(m),
             Ticket(_) => {
                 // Value is comparable, has no big map
             }
             Lambda(_) => {
                 // Can contain only pushable values, thus no big maps
             }
-            // TODO: next merge request
-            // actually take some big maps once they are present in TypedValue
             Operation(op) => match &mut op.as_mut().operation {
                 crate::ast::Operation::TransferTokens(t) => t.param.collect_big_maps(put_res),
                 crate::ast::Operation::SetDelegate(_) => {}

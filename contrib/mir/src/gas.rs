@@ -522,6 +522,7 @@ pub mod interpret_cost {
                 V::List(..)
                 | V::Set(..)
                 | V::Map(..)
+                | V::BigMap(..)
                 | V::Contract(_)
                 | V::Operation(_)
                 | V::Ticket(_)

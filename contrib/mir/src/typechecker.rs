@@ -19,14 +19,15 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
+use crate::ast::big_map::{BigMap, BigMapId, LazyStorageError};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
-use crate::gas;
 use crate::gas::OutOfGas;
+use crate::gas::{self, Gas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -97,6 +98,10 @@ pub enum TcError {
     TodoInstr(Prim),
     #[error("Unhandled type: {0}")]
     TodoType(Prim),
+    #[error("big map with ID {0} not found in the lazy storage")]
+    BigMapNotFound(BigInt),
+    #[error("lazy storage error: {0:?}")]
+    LazyStorageError(LazyStorageError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -386,6 +391,15 @@ fn parse_ty_with_entrypoints(
             Type::new_map(k, v)
         }
         App(map, ..) => unexpected()?,
+
+        App(big_map, [k, v], _) => {
+            let k = parse_ty(ctx, k)?;
+            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let v = parse_ty(ctx, v)?;
+            v.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            Type::new_big_map(k, v)
+        }
+        App(big_map, ..) => unexpected()?,
 
         App(bytes, [], _) => Type::Bytes,
         App(bytes, ..) => unexpected()?,
@@ -1193,7 +1207,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(COMPARE, [], _), [.., u, t]) => {
-            ensure_ty_eq(ctx, t, u).map_err(|e| match e {
+            ensure_ty_eq(&mut ctx.gas, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -1223,7 +1237,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NIL, ..), _) => unexpected_micheline!(),
 
         (App(CONS, [], _), [.., T::List(ty1), ty2]) => {
-            ensure_ty_eq(ctx, ty1, ty2)?;
+            ensure_ty_eq(&mut ctx.gas, ty1, ty2)?;
             pop!();
             I::Cons
         }
@@ -1264,14 +1278,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
-            ensure_ty_eq(ctx, &ty, &ty_)?;
+            ensure_ty_eq(&mut ctx.gas, &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx, &map_tys.as_ref().0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.as_ref().0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
@@ -1282,7 +1296,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx, &map_tys.0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
@@ -1291,14 +1305,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
-            ensure_ty_eq(ctx, ty, ty_)?;
+            ensure_ty_eq(&mut ctx.gas, ty, ty_)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx, kty, kty_)?;
-            ensure_ty_eq(ctx, vty, vty_new)?;
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
@@ -1373,7 +1387,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PACK, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
-            ensure_ty_eq(ctx, ct, arg_t)?;
+            ensure_ty_eq(&mut ctx.gas, ct, arg_t)?;
             stack.drop_top(3);
             stack.push(T::Operation);
             I::TransferTokens
@@ -1444,7 +1458,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
             let lam_tys = pop!(T::Lambda);
-            ensure_ty_eq(ctx, &lam_tys.0, &ty)?;
+            ensure_ty_eq(&mut ctx.gas, &lam_tys.0, &ty)?;
             stack.push(lam_tys.1.clone());
             I::Exec
         }
@@ -1475,7 +1489,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     })
                 }
             };
-            ensure_ty_eq(ctx, &pair_ty.0, &ty)?;
+            ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -1519,7 +1533,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let lt = irrefutable_match!(&tickets.0; Type::Ticket);
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
-            ensure_ty_eq(ctx, lt, rt)?;
+            ensure_ty_eq(&mut ctx.gas, lt, rt)?;
             stack[0] = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
@@ -1705,7 +1719,7 @@ pub(crate) fn typecheck_contract_address(
 
             // if the entrypoint is present, check that it is of the required
             // type.
-            ensure_ty_eq(ctx, typ, contract_entrypoint_type)?;
+            ensure_ty_eq(&mut ctx.gas, typ, contract_entrypoint_type)?;
 
             Ok(Address {
                 entrypoint,
@@ -1726,6 +1740,11 @@ pub(crate) fn typecheck_value<'a>(
     use Type as T;
     use TypedValue as TV;
     ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
+    macro_rules! invalid_value_for_type {
+        () => {
+            TcError::InvalidValueForType(format!("{v:?}"), t.clone())
+        };
+    }
     Ok(match (t, v) {
         (T::Nat, V::Int(n)) => TV::Nat(BigUint::try_from(n)?),
         (T::Int, V::Int(n)) => TV::Int(n.clone()),
@@ -1762,54 +1781,49 @@ pub(crate) fn typecheck_value<'a>(
                 .map(|v| typecheck_value(v, ctx, ty))
                 .collect::<Result<_, TcError>>()?,
         ),
-        (set_ty @ T::Set(ty), V::Seq(vs)) => {
-            ctx.gas
-                .consume(gas::tc_cost::construct_set(ty.size_for_gas(), vs.len())?)?;
-            let ctx_cell = std::cell::RefCell::new(ctx);
-            // See the same concern about constructing from ordered sequence as in Map
-            let set: BTreeSet<TypedValue> = OrderValidatingIterator {
-                it: vs
-                    .iter()
-                    .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), ty))
-                    .peekable(),
-                container_ty: set_ty,
-                to_key: |x| x,
-                ctx: &ctx_cell,
-            }
-            .collect::<Result<_, TcError>>()?;
-            TV::Set(set)
-        }
-        (map_ty @ T::Map(m), V::Seq(vs)) => {
+        (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
+        (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            ctx.gas
-                .consume(gas::tc_cost::construct_map(tk.size_for_gas(), vs.len())?)?;
-            let ctx_cell = std::cell::RefCell::new(ctx);
-            let tc_elt =
-                |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue, TypedValue), TcError> {
-                    match v {
-                        Micheline::App(Prim::Elt, [k, v], _) => {
-                            let k = typecheck_value(k, ctx, tk)?;
-                            let v = typecheck_value(v, ctx, tv)?;
-                            Ok((k, v))
-                        }
-                        _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), t.clone())),
-                    }
-                };
-            // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
-            // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
-            // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
-            // too much overhead.
-            let map: BTreeMap<TypedValue, TypedValue> = OrderValidatingIterator {
-                it: vs
-                    .iter()
-                    .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
-                    .peekable(),
-                container_ty: map_ty,
-                to_key: |(k, _)| k,
-                ctx: &ctx_cell,
-            }
-            .collect::<Result<_, TcError>>()?;
-            TV::Map(map)
+            TV::Map(typecheck_map(ctx, t, tk, tv, vs, |v| v)?)
+        }
+        (T::BigMap(m), v) => {
+            let (id_opt, vs_opt) = match v {
+                // All valid instantiations of big map are mentioned in
+                // https://tezos.gitlab.io/michelson-reference/#type-big_map
+                V::Int(i) => (Some(i.clone()), None),
+                V::Seq(vs) => (None, Some(vs)),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs)),
+                _ => return Err(invalid_value_for_type!()),
+            };
+
+            let (tk, tv) = m.as_ref();
+
+            let big_map_id = if let Some(id) = id_opt {
+                let big_map_id = BigMapId(id.clone());
+                let (key_type, value_type) = ctx
+                    .big_map_storage
+                    .big_map_get_type(&big_map_id)
+                    .map_err(TcError::LazyStorageError)?
+                    .ok_or(TcError::BigMapNotFound(id))?;
+
+                ensure_ty_eq(&mut ctx.gas, key_type, tk)?;
+                ensure_ty_eq(&mut ctx.gas, value_type, tv)?;
+                Some(big_map_id)
+            } else {
+                None
+            };
+
+            let overlay = if let Some(vs) = vs_opt {
+                typecheck_map(ctx, t, tk, tv, vs, Some)?
+            } else {
+                BTreeMap::default()
+            };
+            TV::BigMap(BigMap {
+                id: big_map_id,
+                overlay,
+                key_type: tk.clone(),
+                value_type: tv.clone(),
+            })
         }
         (T::Address, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
@@ -1907,7 +1921,7 @@ pub(crate) fn typecheck_value<'a>(
                         amount: irrefutable_match!(c.1; TV::Nat),
                     })
                 }
-                _ => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+                _ => return Err(invalid_value_for_type!()),
             }
         }
         (T::Bls12381Fr, V::Int(i)) => {
@@ -1916,26 +1930,17 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(
-                bls::Fr::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G1)?;
-            TV::new_bls12381_g1(
-                bls::G1::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G2)?;
-            TV::new_bls12381_g2(
-                bls::G2::from_bytes(bs)
-                    .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
-            )
+            TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
-        (t, v) => return Err(TcError::InvalidValueForType(format!("{v:?}"), t.clone())),
+        (_, _) => return Err(invalid_value_for_type!()),
     })
 }
 
@@ -1982,14 +1987,14 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
 /// (where you specify a getter to obtain the key from an element).
 ///
 /// Also charges gas for this check.
-struct OrderValidatingIterator<'a, T: Iterator<Item = Result<I, TcError>>, I> {
+struct OrderValidatingIterator<'a, 'b, T: Iterator<Item = Result<I, TcError>>, I> {
     it: std::iter::Peekable<T>,
     to_key: fn(&I) -> &TypedValue,
     container_ty: &'a Type,
-    ctx: &'a std::cell::RefCell<&'a mut Ctx>,
+    ctx: &'a std::cell::RefCell<&'a mut Ctx<'b>>,
 }
 
-impl<T, I> Iterator for OrderValidatingIterator<'_, T, I>
+impl<T, I> Iterator for OrderValidatingIterator<'_, '_, T, I>
 where
     T: Iterator<Item = Result<I, TcError>>,
 {
@@ -2020,6 +2025,69 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+}
+
+fn typecheck_set<'a>(
+    ctx: &mut Ctx,
+    set_ty: &Type,
+    elem_ty: &Type,
+    vs: &[Micheline<'a>],
+) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
+    ctx.gas.consume(gas::tc_cost::construct_set(
+        elem_ty.size_for_gas(),
+        vs.len(),
+    )?)?;
+    let ctx_cell = std::cell::RefCell::new(ctx);
+    // See the same concern about constructing from ordered sequence as in [typecheck_map]
+    OrderValidatingIterator {
+        it: vs
+            .iter()
+            .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), elem_ty))
+            .peekable(),
+        container_ty: set_ty,
+        to_key: |x| x,
+        ctx: &ctx_cell,
+    }
+    .collect::<Result<_, TcError>>()
+}
+
+fn typecheck_map<'a, V>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+    value_mapper: fn(TypedValue<'a>) -> V,
+) -> Result<BTreeMap<TypedValue<'a>, V>, TcError> {
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+    let ctx_cell = std::cell::RefCell::new(ctx);
+    let tc_elt = |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+        match v {
+            Micheline::App(Prim::Elt, [k, v], _) => {
+                let k = typecheck_value(k, ctx, key_type)?;
+                let v = typecheck_value(v, ctx, value_type)?;
+                Ok((k, value_mapper(v)))
+            }
+            _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), map_ty.clone())),
+        }
+    };
+    // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
+    // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
+    // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
+    // too much overhead.
+    OrderValidatingIterator {
+        it: vs
+            .iter()
+            .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
+            .peekable(),
+        container_ty: map_ty,
+        to_key: |(k, _)| k,
+        ctx: &ctx_cell,
+    }
+    .collect::<Result<_, TcError>>()
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -2058,7 +2126,7 @@ fn unify_stacks(
                     ));
                 }
                 for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-                    ensure_ty_eq(ctx, ty1, ty2).map_err(|e| match e {
+                    ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
                         TcError::TypesNotEqual(e) => {
                             TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
                         }
@@ -2075,9 +2143,8 @@ fn unify_stacks(
     Ok(())
 }
 
-fn ensure_ty_eq(ctx: &mut Ctx, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
-    ctx.gas
-        .consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
+fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
+    gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
         Err(TypesNotEqual(ty1.clone(), ty2.clone()).into())
     } else {
@@ -4520,6 +4587,158 @@ mod typecheck_tests {
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
             ))
+        );
+    }
+
+    #[test]
+    fn test_invalid_big_map_key_type() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (big_map (list unit) unit);",
+                "storage nat;",
+                "code FAILWITH;",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_invalid_big_map_value_type() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter (big_map int (contract unit));",
+                "storage nat;",
+                "code { UNIT; FAILWITH };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::BigMapValue,
+                Type::new_contract(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    // Test that the empty sequence cannot be given the type `big_map (list unit) unit`
+    // because `list unit` is not comparable and therefore `big_map (list unit) unit` is
+    // not well formed.
+    fn test_invalid_big_map_value() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            Micheline::Seq(&[])
+                .typecheck_value(&mut ctx, &app!(big_map[app!(list[app!(unit)]), app!(unit)])),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Unit)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parsing_big_map_value() {
+        let mut ctx = Ctx::default();
+        let storage = &mut ctx.big_map_storage;
+        let id0 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&id0, TypedValue::int(5), Some(TypedValue::int(5)))
+            .unwrap();
+
+        // Only ID - ok case
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0.clone()),
+                overlay: BTreeMap::new(),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // Only ID - non-existing big map
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(5.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Err(TcError::BigMapNotFound(5.into()))
+        );
+
+        // Only ID - key mismatch
+        // NB: Octez implementation just says that big map does not exists,
+        // but this difference seems fine.
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Nat, Type::Int)
+            ),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
+        );
+
+        // Only ID - value mismatch
+        assert_eq!(
+            typecheck_value(
+                &Micheline::Int(0.into()),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Nat)
+            ),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
+        );
+
+        // Only overlay - ok case
+        assert_eq!(
+            typecheck_value(
+                &seq!(app!(Elt[7, 8])),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // Only overlay - key type mismatch case
+        assert_eq!(
+            typecheck_value(
+                &seq!(app!(Elt["a", 8])),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"a\")".into(),
+                Type::Int
+            ))
+        );
+
+        // ID and overlay - ok case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, 8]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0),
+                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
         );
     }
 

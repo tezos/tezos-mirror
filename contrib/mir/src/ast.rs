@@ -43,6 +43,8 @@ pub use michelson_list::MichelsonList;
 pub use michelson_signature::Signature;
 pub use or::Or;
 
+use self::big_map::BigMap;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TransferTokens<'a> {
     pub param: TypedValue<'a>,
@@ -87,6 +89,7 @@ pub enum Type {
     Operation,
     Set(Rc<Type>),
     Map(Rc<(Type, Type)>),
+    BigMap(Rc<(Type, Type)>),
     Or(Rc<(Type, Type)>),
     Contract(Rc<Type>),
     Address,
@@ -112,7 +115,9 @@ impl Type {
             Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
             | Bytes | Key | Signature | KeyHash | Timestamp | Bls12381Fr | Bls12381G1
             | Bls12381G2 => 1,
-            Pair(p) | Or(p) | Map(p) | Lambda(p) => 1 + p.0.size_for_gas() + p.1.size_for_gas(),
+            Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
+                1 + p.0.size_for_gas() + p.1.size_for_gas()
+            }
             Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => 1 + x.size_for_gas(),
         }
     }
@@ -135,6 +140,10 @@ impl Type {
 
     pub fn new_map(k: Self, v: Self) -> Self {
         Self::Map(Rc::new((k, v)))
+    }
+
+    pub fn new_big_map(k: Self, v: Self) -> Self {
+        Self::BigMap(Rc::new((k, v)))
     }
 
     pub fn new_or(l: Self, r: Self) -> Self {
@@ -229,6 +238,12 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
                 x.0.into_micheline_optimized_legacy(arena),
                 x.1.into_micheline_optimized_legacy(arena),
             ),
+            BigMap(x) => Micheline::prim2(
+                arena,
+                Prim::big_map,
+                x.0.into_micheline_optimized_legacy(arena),
+                x.1.into_micheline_optimized_legacy(arena),
+            ),
             Or(x) => Micheline::prim2(
                 arena,
                 Prim::or,
@@ -258,6 +273,7 @@ pub enum TypedValue<'a> {
     List(MichelsonList<Self>),
     Set(BTreeSet<Self>),
     Map(BTreeMap<Self, Self>),
+    BigMap(BigMap<'a>),
     Or(Box<Or<Self, Self>>),
     Address(Address),
     ChainId(ChainId),
@@ -281,6 +297,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         use Micheline as V;
         use TypedValue as TV;
         let go = |x: Self| x.into_micheline_optimized_legacy(arena);
+        let option_into_micheline = |x: Option<Self>| match x {
+            None => V::prim0(Prim::None),
+            Some(x) => V::prim1(arena, Prim::Some, go(x)),
+        };
         match self {
             TV::Int(i) => V::Int(i),
             TV::Nat(u) => V::Int(u.try_into().unwrap()),
@@ -301,8 +321,20 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
                 ),
             ),
-            TV::Option(None) => V::prim0(Prim::None),
-            TV::Option(Some(x)) => V::prim1(arena, Prim::Some, go(*x)),
+            TV::BigMap(m) => {
+                let id_part = m.id.map(|i| V::Int(i.0));
+                let overlay_empty = m.overlay.is_empty();
+                let map_part =
+                    V::Seq(arena.alloc_extend(m.overlay.into_iter().map(|(key, val)| {
+                        V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
+                    })));
+                match id_part {
+                    Some(id_part) if overlay_empty => id_part,
+                    Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
+                    None => map_part,
+                }
+            }
+            TV::Option(x) => option_into_micheline(x.map(|v| *v)),
             TV::Or(or) => match *or {
                 Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
                 Or::Right(x) => V::prim1(arena, Prim::Right, go(x)),
