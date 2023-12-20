@@ -5,11 +5,9 @@
 /*                                                                            */
 /******************************************************************************/
 
-#![warn(clippy::redundant_clone)]
-
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
-use num_bigint::{BigInt, BigUint};
+use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{Signed, Zero};
 use std::rc::Rc;
 use typed_arena::Arena;
@@ -200,6 +198,48 @@ fn interpret_one<'a>(
             }
         },
         I::Mul(overload) => match overload {
+            overloads::Mul::NatNat => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * x2;
+                stack.push(V::Nat(res));
+            }
+            overloads::Mul::NatInt => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = BigInt::from(x1) * x2;
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::IntNat => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * BigInt::from(x2);
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::IntInt => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                let res = x1 * x2;
+                stack.push(V::Int(res));
+            }
+            overloads::Mul::MutezNat => {
+                ctx.gas.consume(interpret_cost::MUL_TEZ_NAT)?;
+                let x1 = pop!(V::Mutez);
+                let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
+                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                stack.push(V::Mutez(res));
+            }
+            overloads::Mul::NatMutez => {
+                ctx.gas.consume(interpret_cost::MUL_NAT_TEZ)?;
+                let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
+                let x2 = pop!(V::Mutez);
+                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                stack.push(V::Mutez(res));
+            }
             overloads::Mul::Bls12381G1Bls12381Fr => {
                 ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
                 let x1 = pop!(V::Bls12381G1);
@@ -248,6 +288,16 @@ fn interpret_one<'a>(
             }
         },
         I::Neg(overload) => match overload {
+            overloads::Neg::Nat => {
+                let v = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                stack.push(V::Int(BigInt::from_biguint(Sign::Minus, v)));
+            }
+            overloads::Neg::Int => {
+                let v = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                stack.push(V::Int(-v));
+            }
             overloads::Neg::Bls12381G1 => {
                 ctx.gas.consume(interpret_cost::NEG_G1)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
@@ -264,6 +314,16 @@ fn interpret_one<'a>(
                 *v = -(v as &bls::Fr);
             }
         },
+        I::SubMutez => {
+            ctx.gas.consume(interpret_cost::SUB_MUTEZ)?;
+            let v1 = pop!(V::Mutez);
+            let v2 = pop!(V::Mutez);
+            if v1 >= v2 {
+                stack.push(V::new_option(Some(V::Mutez(v1 - v2))));
+            } else {
+                stack.push(V::Option(None));
+            }
+        }
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
@@ -406,15 +466,30 @@ fn interpret_one<'a>(
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_positive()));
         }
+        I::Ge => {
+            ctx.gas.consume(interpret_cost::GE)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(!i.is_negative()));
+        }
         I::Eq => {
             ctx.gas.consume(interpret_cost::EQ)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_zero()));
         }
+        I::Neq => {
+            ctx.gas.consume(interpret_cost::NEQ)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(!i.is_zero()));
+        }
         I::Le => {
             ctx.gas.consume(interpret_cost::LE)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(!i.is_positive()));
+        }
+        I::Lt => {
+            ctx.gas.consume(interpret_cost::LT)?;
+            let i = pop!(V::Int);
+            stack.push(V::Bool(i.is_negative()));
         }
         I::If(nested_t, nested_f) => {
             ctx.gas.consume(interpret_cost::IF)?;
@@ -462,6 +537,16 @@ fn interpret_one<'a>(
                 }
             }
         }
+        I::Abs => {
+            let i = pop!(V::Int);
+            ctx.gas.consume(interpret_cost::abs(&i)?)?;
+            stack.push(V::Nat(i.into_parts().1));
+        }
+        I::IsNat => {
+            let i = pop!(V::Int);
+            ctx.gas.consume(interpret_cost::ISNAT)?;
+            stack.push(V::new_option(i.try_into().ok().map(V::Nat)));
+        }
         I::Int(overload) => match overload {
             overloads::Int::Nat => {
                 let i = pop!(V::Nat);
@@ -472,6 +557,36 @@ fn interpret_one<'a>(
                 let i = pop!(V::Bls12381Fr);
                 ctx.gas.consume(interpret_cost::INT_BLS_FR)?;
                 stack.push(V::Int(i.to_big_int()))
+            }
+            overloads::Int::Bytes => {
+                let i = pop!(V::Bytes);
+                ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+                stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
+            }
+        },
+        I::Nat => {
+            let i = pop!(V::Bytes);
+            ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+            stack.push(V::Nat(BigUint::from_bytes_be(&i)))
+        }
+        I::Bytes(overload) => match overload {
+            overloads::Bytes::Nat => {
+                let i = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::bytes_nat(&i)?)?;
+                stack.push(V::Bytes(if i.is_zero() {
+                    Vec::new() // empty
+                } else {
+                    i.to_bytes_be()
+                }));
+            }
+            overloads::Bytes::Int => {
+                let i = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::bytes_int(&i)?)?;
+                stack.push(V::Bytes(if i.is_zero() {
+                    Vec::new() // empty
+                } else {
+                    i.to_signed_bytes_be()
+                }));
             }
         },
         I::Loop(nested) => {
@@ -1085,6 +1200,7 @@ mod interpreter_tests {
     use crate::ast::michelson_address as addr;
     use crate::bls;
     use crate::gas::Gas;
+    use num_bigint::BigUint;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
@@ -1470,58 +1586,60 @@ mod interpreter_tests {
         assert_eq!(stack, expected_stack);
     }
 
-    #[test]
-    fn test_gt() {
-        let mut stack = stk![V::int(20), V::int(10)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+    mod int_comparison {
+        use super::*;
 
-    #[test]
-    fn test_gt_false() {
-        let mut stack = stk![V::int(20), V::int(-10)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Gt, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[track_caller]
+        fn test_comp(instr: Instruction, arg: impl Into<BigInt>, result: bool) {
+            let mut stack = stk![V::int(20), V::int(arg.into())];
+            let expected_stack = stk![V::int(20), V::Bool(result)];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
 
-    #[test]
-    fn test_eq() {
-        let mut stack = stk![V::int(20), V::int(0)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn gt() {
+            test_comp(Gt, 10, true);
+            test_comp(Gt, 0, false);
+            test_comp(Gt, -10, false);
+        }
 
-    #[test]
-    fn test_eq_false() {
-        let mut stack = stk![V::int(20), V::int(1)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Eq, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn ge() {
+            test_comp(Ge, 10, true);
+            test_comp(Ge, 0, true);
+            test_comp(Ge, -10, false);
+        }
 
-    #[test]
-    fn test_le() {
-        let mut stack = stk![V::int(20), V::int(-1)];
-        let expected_stack = stk![V::int(20), V::Bool(true)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
-    }
+        #[test]
+        fn eq() {
+            test_comp(Eq, 10, false);
+            test_comp(Eq, 0, true);
+            test_comp(Eq, -10, false);
+        }
 
-    #[test]
-    fn test_le_false() {
-        let mut stack = stk![V::int(20), V::int(1)];
-        let expected_stack = stk![V::int(20), V::Bool(false)];
-        let mut ctx = Ctx::default();
-        assert!(interpret_one(&Le, &mut ctx, &mut stack).is_ok());
-        assert_eq!(stack, expected_stack);
+        #[test]
+        fn neq() {
+            test_comp(Neq, 10, true);
+            test_comp(Neq, 0, false);
+            test_comp(Neq, -10, true);
+        }
+
+        #[test]
+        fn le() {
+            test_comp(Le, 10, false);
+            test_comp(Le, 0, true);
+            test_comp(Le, -10, true);
+        }
+
+        #[test]
+        fn lt() {
+            test_comp(Lt, 10, false);
+            test_comp(Lt, 0, false);
+            test_comp(Lt, -10, true);
+        }
     }
 
     #[test]
@@ -1553,6 +1671,38 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn test_abs() {
+        #[track_caller]
+        fn test(arg: impl Into<BigInt>, res: impl Into<BigUint>) {
+            let mut stack = stk![V::nat(20), V::Int(arg.into())];
+            let expected_stack = stk![V::nat(20), V::Nat(res.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Abs, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
+        test(0, 0u32);
+        test(10, 10u32);
+        test(-10, 10u32);
+    }
+
+    #[test]
+    fn test_is_nat() {
+        #[track_caller]
+        fn test(arg: impl Into<BigInt>, res: Option<impl Into<BigUint>>) {
+            let mut stack = stk![V::nat(20), V::Int(arg.into())];
+            let expected_stack = stk![V::nat(20), V::new_option(res.map(|x| V::Nat(x.into())))];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&IsNat, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        }
+        test(0, Some(0u32));
+        test(10, Some(10u32));
+        test(-10, None::<u32>);
+    }
+
+    #[test]
     fn test_int_nat() {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::int(10)];
@@ -1568,6 +1718,101 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Int(overloads::Int::Bls12381Fr), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_int_bytes() {
+        fn test(input: &str, result: impl Into<BigInt>) {
+            let mut stack = stk![V::Bytes(hex::decode(input).unwrap())];
+            let expected_stack = stk![V::Int(result.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Int(overloads::Int::Bytes), &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+        }
+        // checked against octez-client
+        test("", 0);
+        test("00", 0);
+        test("0000", 0);
+        test("01", 1);
+        test("0001", 1);
+        test("000001", 1);
+        test("0100", 256);
+        test("1000", 4096);
+        test("f000", -4096);
+        test("00f000", 61440);
+        test("ff", -1);
+        test("ff00", -256);
+        test("00ff00", 65280);
+    }
+
+    #[test]
+    fn test_nat_bytes() {
+        fn test(input: &str, result: impl Into<BigUint>) {
+            let mut stack = stk![V::Bytes(hex::decode(input).unwrap())];
+            let expected_stack = stk![V::Nat(result.into())];
+            let mut ctx = Ctx::default();
+            assert!(interpret_one(&Nat, &mut ctx, &mut stack).is_ok());
+            assert_eq!(stack, expected_stack);
+        }
+        // checked against octez-client
+        test("", 0u32);
+        test("00", 0u32);
+        test("0000", 0u32);
+        test("01", 1u32);
+        test("0001", 1u32);
+        test("000001", 1u32);
+        test("0100", 256u32);
+        test("1000", 4096u32);
+        test("f000", 61440u32);
+        test("ff", 255u32);
+        test("ff00", 65280u32);
+        test("00ff00", 65280u32);
+    }
+
+    mod bytes {
+        use super::*;
+
+        #[test]
+        fn nat() {
+            #[track_caller]
+            fn test(result: &str, input: impl Into<BigUint>) {
+                let mut stack = stk![V::Nat(input.into())];
+                let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
+                let mut ctx = Ctx::default();
+                assert!(interpret_one(&Bytes(overloads::Bytes::Nat), &mut ctx, &mut stack).is_ok());
+                assert_eq!(stack, expected_stack);
+            }
+            // checked against octez-client
+            test("", 0u32);
+            test("01", 1u32);
+            test("0100", 256u32);
+            test("1000", 4096u32);
+            test("f000", 61440u32);
+            test("ff", 255u32);
+            test("ff00", 65280u32);
+        }
+
+        #[test]
+        fn int() {
+            #[track_caller]
+            fn test(result: &str, input: impl Into<BigInt>) {
+                let mut stack = stk![V::Int(input.into())];
+                let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
+                let mut ctx = Ctx::default();
+                assert!(interpret_one(&Bytes(overloads::Bytes::Int), &mut ctx, &mut stack).is_ok());
+                assert_eq!(stack, expected_stack);
+            }
+            // checked against octez-client
+            test("", 0);
+            test("01", 1);
+            test("0100", 256);
+            test("1000", 4096);
+            test("f000", -4096);
+            test("00f000", 61440);
+            test("ff", -1);
+            test("ff00", -256);
+            test("00ff00", 65280);
+        }
     }
 
     #[test]
@@ -2916,7 +3161,7 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_string() {
-        fn test(str: &str, offset: u32, length: u32, expected: Option<&str>) {
+        fn test(str: &str, offset: u64, length: u64, expected: Option<&str>) {
             let stk = &mut stk![V::String(str.to_string()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|str| V::String(str.to_string()));
@@ -2938,7 +3183,7 @@ mod interpreter_tests {
 
     #[test]
     fn slice_instr_bytes() {
-        fn test(bytes: &[u8], offset: u32, length: u32, expected: Option<&[u8]>) {
+        fn test(bytes: &[u8], offset: u64, length: u64, expected: Option<&[u8]>) {
             let stk = &mut stk![V::Bytes(bytes.to_vec()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|bytes| V::Bytes(bytes.to_vec()));
@@ -3936,6 +4181,115 @@ mod interpreter_tests {
             V::Int(1.into()),
             V::Bls12381Fr(Fr::one()),
         );
+
+        macro_rules! test_nats {
+            ($overload:ident, $con1:expr, $con2:expr, $con3:expr) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(0),
+                        $con2(0),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(0),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(0),
+                        $con2(1),
+                        $con3(0u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(1),
+                        $con3(1u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(100500),
+                        $con2(1),
+                        $con3(100500u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(1),
+                        $con2(100500),
+                        $con3(100500u32.into()),
+                    );
+                    test_mul(
+                        overloads::Mul::$overload,
+                        $con1(100500),
+                        $con2(100500),
+                        $con3(10100250000i64.try_into().unwrap()),
+                    );
+                }
+            };
+        }
+
+        mod naturals {
+            use super::*;
+            test_nats!(NatNat, V::nat, V::nat, V::nat);
+            test_nats!(NatInt, V::nat, V::int, V::Int);
+            test_nats!(IntNat, V::int, V::nat, V::Int);
+            test_nats!(IntInt, V::int, V::int, V::Int);
+            test_nats!(MutezNat, V::Mutez, V::nat, V::Mutez);
+            test_nats!(NatMutez, V::nat, V::Mutez, V::Mutez);
+        }
+        mod negatives {
+            use super::*;
+
+            #[test]
+            fn int_int() {
+                use overloads::Mul::*;
+                test_mul(IntInt, V::int(-1), V::int(0), V::int(0));
+                test_mul(IntInt, V::int(0), V::int(-1), V::int(0));
+                test_mul(IntInt, V::int(-1), V::int(-1), V::int(1));
+                test_mul(IntInt, V::int(-100500), V::int(-1), V::int(100500));
+                test_mul(IntInt, V::int(-1), V::int(-100500), V::int(100500));
+                test_mul(
+                    IntInt,
+                    V::int(-100500),
+                    V::int(-100500),
+                    V::int(10100250000i64),
+                );
+            }
+
+            #[test]
+            fn nat_int() {
+                use overloads::Mul::*;
+                test_mul(NatInt, V::nat(0), V::int(-1), V::int(0));
+                test_mul(NatInt, V::nat(1), V::int(-1), V::int(-1));
+                test_mul(NatInt, V::nat(100500), V::int(-1), V::int(-100500));
+                test_mul(NatInt, V::nat(1), V::int(-100500), V::int(-100500));
+                test_mul(
+                    NatInt,
+                    V::nat(100500),
+                    V::int(-100500),
+                    V::int(-10100250000i64),
+                );
+            }
+            #[test]
+            fn int_nat() {
+                use overloads::Mul::*;
+                test_mul(IntNat, V::int(-0), V::nat(1), V::int(0));
+                test_mul(IntNat, V::int(-1), V::nat(1), V::int(-1));
+                test_mul(IntNat, V::int(-100500), V::nat(1), V::int(-100500));
+                test_mul(IntNat, V::int(-1), V::nat(100500), V::int(-100500));
+                test_mul(
+                    IntNat,
+                    V::int(-100500),
+                    V::nat(100500),
+                    V::int(-10100250000i64),
+                );
+            }
+        }
     }
 
     mod neg {
@@ -3984,5 +4338,42 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
             V::Bls12381Fr(-Fr::one()),
         );
+
+        mod positive {
+            use super::*;
+            test!(Int, V::int(100500), V::int(-100500));
+            test!(Nat, V::nat(100500), V::int(-100500));
+        }
+
+        mod negative {
+            use super::*;
+            test!(Int, V::int(-100500), V::int(100500));
+        }
+
+        mod zero {
+            use super::*;
+            test!(Int, V::int(0), V::int(0));
+            test!(Nat, V::nat(0), V::int(0));
+        }
+    }
+
+    #[test]
+    fn test_sub_mutez() {
+        fn test(v1: i64, v2: i64, res: Option<i64>) {
+            let mut stack = stk![V::Mutez(v2), V::Mutez(v1)];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&SubMutez, ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![V::new_option(res.map(V::Mutez))]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+        test(0, 0, Some(0));
+        test(0, 1, None);
+        test(1, 0, Some(1));
+        test(1, 1, Some(0));
+        test(1, 2, None);
+        test(100500, 100, Some(100400));
+        test(100500, 100500, Some(0));
+        test(100500, 100500700, None);
     }
 }

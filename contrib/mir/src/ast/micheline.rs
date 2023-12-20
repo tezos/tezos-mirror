@@ -206,16 +206,8 @@ macro_rules! micheline_unsupported_instructions {
         Prim::UNPACK
             | Prim::DIG
             | Prim::DUG
-            | Prim::ABS
-            | Prim::ISNAT
-            | Prim::NAT
-            | Prim::BYTES
             | Prim::SUB
-            | Prim::SUB_MUTEZ
             | Prim::EDIV
-            | Prim::GE
-            | Prim::LT
-            | Prim::NEQ
             | Prim::LSL
             | Prim::LSR
             | Prim::CREATE_CONTRACT

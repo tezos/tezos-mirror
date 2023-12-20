@@ -381,7 +381,7 @@ impl<'a> TypedValue<'a> {
 
     /// Helper for more easily constructing `Nat` variant with literals. Mostly
     /// useful in tests.
-    pub fn nat(n: u32) -> Self {
+    pub fn nat(n: u64) -> Self {
         Self::Nat(n.into())
     }
 
@@ -409,15 +409,23 @@ pub enum Instruction<'a> {
     Add(overloads::Add),
     Mul(overloads::Mul),
     Neg(overloads::Neg),
+    SubMutez,
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),
     Gt,
+    Ge,
     Eq,
+    Neq,
+    Lt,
     Le,
     If(Vec<Self>, Vec<Self>),
     IfNone(Vec<Self>, Vec<Self>),
     Int(overloads::Int),
+    Nat,
+    Bytes(overloads::Bytes),
+    Abs,
+    IsNat,
     Loop(Vec<Self>),
     Push(TypedValue<'a>),
     Swap,
