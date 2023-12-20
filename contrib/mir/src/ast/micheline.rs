@@ -122,6 +122,23 @@ pub trait IntoMicheline<'a> {
     ) -> Micheline<'a>;
 }
 
+/// Pattern synonym matching all types which are not yet
+/// supported. Useful for total match in the typechecker.
+macro_rules! micheline_unsupported_types {
+    () => {
+        Prim::big_map
+            | Prim::bls12_381_fr
+            | Prim::bls12_381_g1
+            | Prim::bls12_381_g2
+            | Prim::chest
+            | Prim::chest_key
+            | Prim::tx_rollup_l2_address
+            | Prim::sapling_state
+            | Prim::sapling_transaction
+            | Prim::sapling_transaction_deprecated
+    };
+}
+
 /// Pattern synonym matching all type primitive applications. Useful for total
 /// matches.
 macro_rules! micheline_types {
@@ -366,7 +383,7 @@ macro_rules! micheline_values {
 
 pub(crate) use {
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
-    micheline_unsupported_instructions, micheline_values,
+    micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 
 #[cfg(test)]

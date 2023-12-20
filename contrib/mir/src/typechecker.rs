@@ -21,7 +21,7 @@ use type_props::TypeProperty;
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
-    micheline_unsupported_instructions, micheline_values,
+    micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
@@ -414,7 +414,7 @@ fn parse_ty_with_entrypoints(
         | micheline_literals!()
         | micheline_values!() => unexpected()?,
 
-        App(other, ..) => Err(TcError::TodoType(*other))?,
+        App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
     };
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
