@@ -7,6 +7,7 @@
 #![warn(clippy::redundant_clone)]
 
 pub mod ast;
+pub mod bls;
 pub mod context;
 pub mod gas;
 pub mod interpreter;

@@ -21,6 +21,7 @@ num-bigint = "0.3"
 num-traits = "0.2"
 chrono = "0.4"
 integer-sqrt = "0.1"
+blst = "0.3"
 
 [[bin]]
 name = "tzt_runner"

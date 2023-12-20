@@ -50,6 +50,15 @@ impl Type {
                 | TypeProperty::Packable => return invalid_type_prop(),
                 TypeProperty::Passable | TypeProperty::Storable | TypeProperty::BigMapValue => (),
             },
+            Bls12381Fr | Bls12381G1 | Bls12381G2 => match prop {
+                TypeProperty::Comparable => return invalid_type_prop(),
+                TypeProperty::Passable
+                | TypeProperty::Storable
+                | TypeProperty::Pushable
+                | TypeProperty::Packable
+                | TypeProperty::BigMapValue
+                | TypeProperty::Duplicable => (),
+            },
             Operation => match prop {
                 TypeProperty::Comparable
                 | TypeProperty::Passable
