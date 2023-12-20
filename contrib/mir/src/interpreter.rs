@@ -1292,7 +1292,7 @@ fn interpret_one<'a>(
             let res = bls::pairing::pairing_check(it);
             stack.push(V::Bool(res));
         }
-        I::CreateContract(cs) => {
+        I::CreateContract(cs, micheline) => {
             ctx.gas.consume(interpret_cost::CREATE_CONTRACT)?;
             let counter: u128 = ctx.operation_counter();
             let opt_keyhash = pop!(V::Option)
@@ -1310,8 +1310,8 @@ fn interpret_one<'a>(
                     delegate: opt_keyhash,
                     amount,
                     storage,
-                    code: cs.clone(),
-                    // This clone is cheap since it is an Rc.
+                    code: cs.clone(), // This clone is cheap since it is an Rc.
+                    micheline_code: micheline,
                 }),
                 counter,
             ))
@@ -4938,20 +4938,20 @@ mod interpreter_tests {
     #[test]
     fn create_contract() {
         use crate::parser::test_helpers::parse;
+
+        let cs_mich =
+            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
+                .unwrap();
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
-
-        let cs =
-            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
-                .unwrap()
-                .typecheck_script(&mut ctx)
-                .unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
                 amount: 100,
                 storage: TypedValue::Unit,
                 code: Rc::new(cs.clone()),
+                micheline_code: &cs_mich,
             }),
             101,
         );
@@ -4965,7 +4965,11 @@ mod interpreter_tests {
         ];
         let start_milligas = ctx.gas.milligas();
         assert_eq!(
-            interpret(&[CreateContract(Rc::new(cs))], &mut ctx, &mut stack),
+            interpret(
+                &[CreateContract(Rc::new(cs), &cs_mich)],
+                &mut ctx,
+                &mut stack
+            ),
             Ok(())
         );
         assert_eq!(stack, stk![expected_addr, expected_op]);

@@ -925,17 +925,17 @@ mod tests {
     fn create_contract() {
         use tezos_crypto_rs::hash::OperationListHash;
         let mut ctx = Ctx::default();
-        let cs =
+        let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
-                .unwrap()
-                .typecheck_script(&mut ctx)
                 .unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
                 delegate: None,
                 amount: 100,
                 storage: TypedValue::Unit,
                 code: Rc::new(cs),
+                micheline_code: &cs_mich,
             }),
             101,
         );

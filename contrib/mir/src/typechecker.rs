@@ -1801,7 +1801,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.drop_top(3);
             stack.push(Type::Address);
             stack.push(Type::Operation);
-            I::CreateContract(Rc::new(contract_script))
+            I::CreateContract(Rc::new(contract_script), cs)
         }
         (App(CREATE_CONTRACT, [_], _), [.., _, _, _]) => {
             no_overload!(CREATE_CONTRACT)
@@ -7056,18 +7056,17 @@ mod typecheck_tests {
         let stk = &mut tc_stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)];
         let mut ctx = Ctx::default();
         let create_contract_src = "CREATE_CONTRACT { parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}";
-        let cs =
+        let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
-                .unwrap()
-                .typecheck_script(&mut ctx)
                 .unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
                 &mut Ctx::default(),
                 stk
             ),
-            Ok(CreateContract(Rc::new(cs)))
+            Ok(CreateContract(Rc::new(cs), &cs_mich))
         );
         assert_eq!(stk, &tc_stk![Type::Address, Type::Operation]);
 

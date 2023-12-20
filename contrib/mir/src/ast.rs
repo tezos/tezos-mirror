@@ -75,6 +75,7 @@ pub struct CreateContract<'a> {
     pub amount: i64,
     pub storage: TypedValue<'a>,
     pub code: Rc<ContractScript<'a>>,
+    pub micheline_code: &'a Micheline<'a>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -422,7 +423,24 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         None => annotations::NO_ANNS,
                     },
                 ),
-                Operation::CreateContract(_) => todo!(),
+                Operation::CreateContract(cc) => Micheline::App(
+                    Prim::Create_contract,
+                    Micheline::alloc_seq(
+                        arena,
+                        [
+                            cc.micheline_code.clone(),
+                            go(TypedValue::new_option(cc.delegate.map(|x| {
+                                TypedValue::Address(Address {
+                                    hash: AddressHash::from(x),
+                                    entrypoint: Entrypoint::default(),
+                                })
+                            }))),
+                            go(TypedValue::Mutez(cc.amount)),
+                            go(cc.storage),
+                        ],
+                    ),
+                    annotations::NO_ANNS,
+                ),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
         }
@@ -595,7 +613,7 @@ pub enum Instruction<'a> {
         tag: Option<FieldAnnotation<'a>>,
         arg_ty: Or<Type, Micheline<'a>>,
     },
-    CreateContract(Rc<ContractScript<'a>>),
+    CreateContract(Rc<ContractScript<'a>>, &'a Micheline<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

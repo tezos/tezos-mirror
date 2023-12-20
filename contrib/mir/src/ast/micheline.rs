@@ -388,6 +388,7 @@ macro_rules! micheline_values {
                 | Prim::Lambda_rec
                 | Prim::Transfer_tokens
                 | Prim::Emit
+                | Prim::Create_contract
                 | Prim::Set_delegate,
             ..,
         )
