@@ -10,14 +10,14 @@ pub enum Error {
 }
 
 /// Prepare the emulator in a way that it can start executing
-pub fn configure_emulator(contents: &[u8], emu: &mut Emulator) -> Result<(), Error> {
+pub fn configure_emulator(contents: &[u8], emu: &mut Emulator) -> Result<u64, Error> {
     let LoadResult {
         entry,
-        last_written: _,
+        last_written,
     } = kernel_loader::load_elf(&mut emu.cpu.bus, contents)?;
 
     // Setting the program counter (PC) tells the emulator where to start executing.
     emu.initialize_pc(entry);
 
-    Ok(())
+    Ok(last_written)
 }
