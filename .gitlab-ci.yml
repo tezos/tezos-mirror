@@ -97,15 +97,13 @@ release:arm64:master:
   tags:
     - devops
     - ${ARCH}
-  variables:
-    IMAGE: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
   before_script:
+    - echo "Current image: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}"
     - apk --no-cache add curl jq
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - 'PARENT_JOB_ID=`curl -L ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs\?job_token=${CI_JOB_TOKEN}\&scope=success | jq ".[] | select(.name == \"build: [${ARCH}, ${OCTEZ_BRANCH}]\") | .id"`'
     - curl -L -o artifacts.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${PARENT_JOB_ID}/artifacts\?job_token=${CI_JOB_TOKEN} && unzip artifacts.zip && rm artifacts.zip
-    - echo "IMAGE = ${IMAGE}"
     - docker build -t ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} -f Dockerfile.${TARGET} .
 
 docker:
@@ -122,6 +120,20 @@ docker:
     - if: $CI_REGISTRY_IMAGE
       when: manual
       allow_failure: true
+
+docker-test:
+  stage: docker
+  extends: .docker
+  script:
+    - !reference [.docker, script]
+    - docker save -o ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
+  artifacts:
+    name: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar
+    expire_in: 1 week
+    paths:
+      - ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 manifest:
   stage: manifest
