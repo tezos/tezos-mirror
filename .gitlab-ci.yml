@@ -98,7 +98,7 @@ release:arm64:master:
     - devops
     - ${ARCH}
   before_script:
-    - echo "Current image: ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}"
+    - echo ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
     - apk --no-cache add curl jq
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
