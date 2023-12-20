@@ -31,9 +31,6 @@ oc.script:snapshot_alpha_and_link:
         - scripts/snapshot_alpha.sh
         - scripts/user_activated_upgrade.sh
       when: on_success
-    # For safety, we also run it when margebot triggers the pipeline.
-    - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
-      when: on_success
 
 oc.script:test-gen-genesis:
   extends:
