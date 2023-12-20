@@ -122,6 +122,23 @@ pub trait IntoMicheline<'a> {
     ) -> Micheline<'a>;
 }
 
+/// Pattern synonym matching all types which are not yet
+/// supported. Useful for total match in the typechecker.
+macro_rules! micheline_unsupported_types {
+    () => {
+        Prim::big_map
+            | Prim::bls12_381_fr
+            | Prim::bls12_381_g1
+            | Prim::bls12_381_g2
+            | Prim::chest
+            | Prim::chest_key
+            | Prim::tx_rollup_l2_address
+            | Prim::sapling_state
+            | Prim::sapling_transaction
+            | Prim::sapling_transaction_deprecated
+    };
+}
+
 /// Pattern synonym matching all type primitive applications. Useful for total
 /// matches.
 macro_rules! micheline_types {
@@ -182,6 +199,45 @@ macro_rules! micheline_fields {
             Prim::parameter | Prim::storage | Prim::code | Prim::view | Prim::constant,
             ..,
         )
+    };
+}
+
+/// Pattern synonym matching all instruction which are not yet
+/// supported. Useful for total match in the typechecker.
+macro_rules! micheline_unsupported_instructions {
+    () => {
+        Prim::UNPACK
+            | Prim::DIG
+            | Prim::DUG
+            | Prim::ABS
+            | Prim::ISNAT
+            | Prim::NAT
+            | Prim::BYTES
+            | Prim::SUB
+            | Prim::SUB_MUTEZ
+            | Prim::MUL
+            | Prim::NEG
+            | Prim::EDIV
+            | Prim::GE
+            | Prim::LT
+            | Prim::NEQ
+            | Prim::LSL
+            | Prim::LSR
+            | Prim::CREATE_CONTRACT
+            | Prim::EMIT
+            | Prim::EMPTY_MAP
+            | Prim::EMPTY_BIG_MAP
+            | Prim::GET_AND_UPDATE
+            | Prim::MAP
+            | Prim::SAPLING_EMPTY_STATE
+            | Prim::SAPLING_VERIFY_UPDATE
+            | Prim::OPEN_CHEST
+            | Prim::VIEW
+            | Prim::CREATE_ACCOUNT
+            | Prim::STEPS_TO_QUOTA
+            | Prim::TICKET_DEPRECATED
+            | Prim::CAST
+            | Prim::RENAME
     };
 }
 
@@ -326,7 +382,8 @@ macro_rules! micheline_values {
 }
 
 pub(crate) use {
-    micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
+    micheline_fields, micheline_instructions, micheline_literals, micheline_types,
+    micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 
 #[cfg(test)]

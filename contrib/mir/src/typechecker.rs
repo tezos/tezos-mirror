@@ -20,7 +20,8 @@ use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
 use crate::ast::micheline::{
-    micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
+    micheline_fields, micheline_instructions, micheline_literals, micheline_types,
+    micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
@@ -92,6 +93,10 @@ pub enum TcError {
     DuplicateEntrypoint(Entrypoint),
     #[error("explicit default entrypoint is forbidden in: {0}")]
     ExplicitDefaultEntrypointError(Prim),
+    #[error("Unhandled instruction: {0}")]
+    TodoInstr(Prim),
+    #[error("Unhandled type: {0}")]
+    TodoType(Prim),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -409,7 +414,7 @@ fn parse_ty_with_entrypoints(
         | micheline_literals!()
         | micheline_values!() => unexpected()?,
 
-        App(other, ..) => todo!("Unhandled type {other}"),
+        App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
     };
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
@@ -604,6 +609,9 @@ pub(crate) fn typecheck_instruction<'a>(
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
         ) => unexpected_micheline!(),
+        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
+            Err(TcError::TodoInstr(*prim))?
+        }
 
         (App(ADD, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
@@ -1497,8 +1505,6 @@ pub(crate) fn typecheck_instruction<'a>(
         ),
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
-
-        (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
