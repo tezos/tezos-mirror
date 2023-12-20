@@ -72,8 +72,8 @@ let setup_l1_contracts client =
   let* () = Client.bake_for_and_wait client in
   return {delayed_transaction_bridge; exchanger; bridge}
 
-let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    protocol =
+let setup_sequencer ?time_between_blocks
+    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) protocol =
   let* node, client = setup_l1 protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -112,7 +112,12 @@ let setup_sequencer ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
   let private_rpc_port = Port.fresh () in
   let mode =
     Evm_node.Sequencer
-      {kernel = output; preimage_dir = preimages_dir; private_rpc_port}
+      {
+        kernel = output;
+        preimage_dir = preimages_dir;
+        private_rpc_port;
+        time_between_blocks;
+      }
   in
   let* evm_node =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
