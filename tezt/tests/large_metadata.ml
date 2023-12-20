@@ -157,7 +157,7 @@ let check_default_limit_metadata =
   Protocol.register_test
     ~__FILE__
     ~title:"Large metadata with default limit"
-    ~tags:["large_metadata"; "default"]
+    ~tags:[Tag.layer1; "large_metadata"; "default"]
   @@ fun protocol ->
   let* contract_id, client, _node = setup_node ~limit:None protocol in
   let small_exponent = 23 in
@@ -207,7 +207,7 @@ let check_limit_metadata =
   Protocol.register_test
     ~__FILE__
     ~title:"Large metadata with a small limit"
-    ~tags:["large_metadata"; "limit"]
+    ~tags:[Tag.layer1; "large_metadata"; "limit"]
   @@ fun protocol ->
   let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
@@ -258,7 +258,7 @@ let check_unlimited_metadata =
   Protocol.register_test
     ~__FILE__
     ~title:"Large metadata without limit"
-    ~tags:["large_metadata"; "unlimited"]
+    ~tags:[Tag.layer1; "large_metadata"; "unlimited"]
   @@ fun protocol ->
   let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit None)) protocol
@@ -288,7 +288,7 @@ let check_metadata_query_string =
   Protocol.register_test
     ~__FILE__
     ~title:"Check recomputation and pruning of metadata"
-    ~tags:["large_metadata"; "query"]
+    ~tags:[Tag.layer1; "large_metadata"; "query"]
   @@ fun protocol ->
   let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
