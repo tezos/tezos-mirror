@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use bytes::Bytes;
-use primitive_types::{H160, H256};
+use primitive_types::{H160, H256, U256};
 use serde::{
     de::{self, Error},
     Deserialize,
@@ -41,6 +41,37 @@ where
 {
     #[derive(Debug, Deserialize)]
     struct WrappedValue(#[serde(deserialize_with = "deserialize_str_as_u64")] u64);
+
+    Option::<WrappedValue>::deserialize(deserializer).map(
+        |opt_wrapped: Option<WrappedValue>| {
+            opt_wrapped.map(|wrapped: WrappedValue| wrapped.0)
+        },
+    )
+}
+
+pub fn deserialize_str_as_u256<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let string = String::deserialize(deserializer)?;
+
+    let output = if let Some(stripped) = string.strip_prefix("0x") {
+        U256::from_str_radix(stripped, 16).unwrap()
+    } else {
+        U256::from_dec_str(&string).unwrap()
+    };
+
+    Ok(output)
+}
+
+pub fn deserialize_opt_str_as_u256<'de, D>(
+    deserializer: D,
+) -> Result<Option<U256>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    #[derive(Debug, Deserialize)]
+    struct WrappedValue(#[serde(deserialize_with = "deserialize_str_as_u256")] U256);
 
     Option::<WrappedValue>::deserialize(deserializer).map(
         |opt_wrapped: Option<WrappedValue>| {
