@@ -15,6 +15,7 @@ deployed. (!11225)
 
 - Prevent fatal errors when an intermediate call/transaction runs out of gas during an execution. (!11290)
 - Completely remove fatal error promotion between intermediate call/transactions. (!11334)
+- Prevent fatal errors on transfers in connection with calls. (!11365)
 
 ### Breaking changes
 
