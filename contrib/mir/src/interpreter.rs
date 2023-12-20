@@ -2479,7 +2479,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = stk![TypedValue::String("abc".into())];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::String)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::String)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2494,7 +2494,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = stk![TypedValue::Bytes(b"abc".to_vec())];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Bytes)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Bytes)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2506,7 +2506,7 @@ mod interpreter_tests {
         let list = (1..=3).map(TypedValue::nat).collect();
         let mut stack = stk![TypedValue::List(list)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::List)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::List)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2522,7 +2522,7 @@ mod interpreter_tests {
         let set = (1..=3).map(TypedValue::nat).collect();
         let mut stack = stk![TypedValue::Set(set)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Set)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Set)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2537,7 +2537,7 @@ mod interpreter_tests {
         ]);
         let mut stack = stk![TypedValue::Map(map)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Map)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Map)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(2)]);
@@ -3444,7 +3444,7 @@ mod interpreter_tests {
         ctx.balance = 70;
         let mut stack = stk![];
         let start_milligas = ctx.gas.milligas();
-        assert_eq!(interpret(&vec![Balance], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(interpret(&[Balance], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(70),]);
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
