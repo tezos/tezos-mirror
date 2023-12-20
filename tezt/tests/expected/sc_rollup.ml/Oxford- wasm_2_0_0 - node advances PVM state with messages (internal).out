@@ -37,3 +37,83 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+

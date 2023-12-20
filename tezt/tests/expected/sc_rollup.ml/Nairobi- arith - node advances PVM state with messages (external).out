@@ -37,6 +37,10 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 ./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -65,6 +69,14 @@ This sequence of operations was run:
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000007"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -95,6 +107,14 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "0000000a"
 
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -123,6 +143,14 @@ This sequence of operations was run:
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "0000000d"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -153,6 +181,14 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000010"
 
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -181,6 +217,14 @@ This sequence of operations was run:
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000013"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -211,6 +255,14 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000016"
 
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -239,6 +291,14 @@ This sequence of operations was run:
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000019"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -269,6 +329,14 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "0000001c"
 
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -298,6 +366,14 @@ GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "0000001f"
 
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -326,4 +402,8 @@ This sequence of operations was run:
 GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
 200 OK
 "00000022"
+
+GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
