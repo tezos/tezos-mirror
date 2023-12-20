@@ -10,19 +10,11 @@
 use std::mem::size_of;
 use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 
+use super::constants::*;
 use crate::{
     ast::{annotations::Annotations, Micheline},
     lexer::{Annotation, Prim},
 };
-
-/// Prefix denoting an encoded number.
-const NUMBER_TAG: u8 = 0x00;
-/// Prefix denoting an encoded string.
-const STRING_TAG: u8 = 0x01;
-/// Prefix denoting an encoded sequence.
-const SEQ_TAG: u8 = 0x02;
-/// Prefix denoting an encoded bytes sequence.
-const BYTES_TAG: u8 = 0x0a;
 
 trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
     const NO_ANNOTS_TAG: u8;
@@ -44,23 +36,23 @@ trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
 }
 
 impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 0] {
-    const NO_ANNOTS_TAG: u8 = 0x03;
-    const WITH_ANNOTS_TAG: u8 = 0x04;
+    const NO_ANNOTS_TAG: u8 = APP_NO_ARGS_NO_ANNOTS_TAG;
+    const WITH_ANNOTS_TAG: u8 = APP_NO_ARGS_WITH_ANNOTS_TAG;
 }
 
 impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 1] {
-    const NO_ANNOTS_TAG: u8 = 0x05;
-    const WITH_ANNOTS_TAG: u8 = 0x06;
+    const NO_ANNOTS_TAG: u8 = APP_ONE_ARG_NO_ANNOTS_TAG;
+    const WITH_ANNOTS_TAG: u8 = APP_ONE_ARG_WITH_ANNOTS_TAG;
 }
 
 impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 2] {
-    const NO_ANNOTS_TAG: u8 = 0x07;
-    const WITH_ANNOTS_TAG: u8 = 0x08;
+    const NO_ANNOTS_TAG: u8 = APP_TWO_ARGS_NO_ANNOTS_TAG;
+    const WITH_ANNOTS_TAG: u8 = APP_TWO_ARGS_WITH_ANNOTS_TAG;
 }
 
 impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
-    const NO_ANNOTS_TAG: u8 = 0x09;
-    const WITH_ANNOTS_TAG: u8 = 0x09;
+    const NO_ANNOTS_TAG: u8 = APP_GENERIC;
+    const WITH_ANNOTS_TAG: u8 = APP_GENERIC;
     fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) {
         match args {
             [] => AppEncoder::encode(prim, [], annots, out),

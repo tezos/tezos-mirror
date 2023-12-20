@@ -8,6 +8,7 @@
 
 //! Micheline deserialization.
 
+use super::constants::*;
 use bitvec::{order::Lsb0, vec::BitVec, view::BitView};
 use num_bigint::{BigInt, Sign};
 use smallvec::{smallvec, SmallVec};
@@ -39,24 +40,6 @@ pub enum DecodeError {
     #[error("could not decode annotation")]
     BadAnnotation,
 }
-
-/// Prefix denoting an encoded number.
-const NUMBER_TAG: u8 = 0x00;
-/// Prefix denoting an encoded string.
-const STRING_TAG: u8 = 0x01;
-/// Prefix denoting an encoded sequence.
-const SEQ_TAG: u8 = 0x02;
-/// Prefix denoting an encoded bytes sequence.
-const BYTES_TAG: u8 = 0x0a;
-
-// Tags for [Michelson::App].
-const APP_NO_ARGS_NO_ANNOTS_TAG: u8 = 0x03;
-const APP_NO_ARGS_WITH_ANNOTS_TAG: u8 = 0x04;
-const APP_ONE_ARG_NO_ANNOTS_TAG: u8 = 0x05;
-const APP_ONE_ARG_WITH_ANNOTS_TAG: u8 = 0x06;
-const APP_TWO_ARGS_NO_ANNOTS_TAG: u8 = 0x07;
-const APP_TWO_ARGS_WITH_ANNOTS_TAG: u8 = 0x08;
-const APP_GENERIC: u8 = 0x09;
 
 /// If the number of arguments is small, an allocation-avoiding optimization is
 /// used. This constant specifies the upper bound for the number of arguments
