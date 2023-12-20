@@ -534,6 +534,7 @@ impl CSRegister {
             CSRegister::misa => CSRegister::WARL_MISA_VALUE,
             CSRegister::medeleg => new_value & CSRegister::WARL_MASK_MEDELEG,
             CSRegister::mideleg => new_value & CSRegister::WARL_MASK_MIDELEG,
+            CSRegister::mtvec | CSRegister::stvec => new_value & CSRegister::WARL_MASK_XTVEC,
             _ => new_value,
         }
     }
@@ -565,6 +566,13 @@ impl CSRegister {
         | ones(CSRegister::MXLEN - 16) << 16
         // custom use
     );
+
+    /// `mtvec.MODE = mtvec[1:0]`.
+    /// Only `0` and `1` values are allowed for `MODE`, so we treat `MODE[1]` as read-only 0
+    ///
+    /// `mtvec.BASE = mtvec[MXLEN-1:2] << 2` (since it has to be 4-byte aligned).
+    /// The same applies for stvec. Sections 3.1.7 & 4.1.2
+    const WARL_MASK_XTVEC: CSRValue = !(ones(1) << 1);
 }
 
 /// Value in a CSR
