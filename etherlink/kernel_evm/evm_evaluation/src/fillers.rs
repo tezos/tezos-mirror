@@ -71,11 +71,23 @@ fn check_should_not_exist(
     hex_address: &str,
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
-        if account.balance(host).is_ok() {
+        let balance_is_zero = if let Ok(balance) = account.balance(host) {
+            balance == U256::zero()
+        } else {
+            false
+        };
+
+        let no_code = if let Ok(code_size) = account.code_size(host) {
+            code_size == U256::zero()
+        } else {
+            false
+        };
+
+        if balance_is_zero && no_code {
+            write_host!(host, "Account {} rightfully do not exist.", hex_address);
+        } else {
             write_host!(host, "Account {} should not exist.", hex_address);
             *invalid_state = true;
-        } else {
-            write_host!(host, "Account {} rightfully do not exist.", hex_address);
         }
     }
 }
