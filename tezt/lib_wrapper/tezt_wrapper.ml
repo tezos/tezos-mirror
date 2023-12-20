@@ -53,6 +53,30 @@ module Uses = struct
   let octez_client = make ~tag:"client" ~path:"./octez-client"
 
   let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
+
+  (* The following test generates:
+
+       tezt/lib_wrapper/expected/tezt_wrapper.ml/runtime-dependency-tags.out
+
+     This file can be used by the manifest to deduce which tests to run.
+     By having this be a regression test, we guarantee that this list is always up-to-date
+     and that there is only one source of truth.
+
+     To regenerate the file, run:
+
+       dune exec tezt/tests/main.exe -- \
+         --reset-regressions -t 'meta: list runtime dependencies'
+  *)
+  let () =
+    Regression.register
+      ~__FILE__
+      ~title:"meta: list runtime dependencies"
+      ~file:"runtime-dependency-tags"
+      ~tags:["meta"; "uses"]
+    @@ fun () ->
+    ( Fun.flip String_map.iter !known_paths @@ fun path {tag; _} ->
+      Regression.capture @@ sf "%s: %s" tag path ) ;
+    unit
 end
 
 let error mode =
