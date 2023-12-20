@@ -1818,14 +1818,14 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G1)?;
-            TV::Bls12381G1(
+            TV::new_bls12381_g1(
                 bls::G1::from_bytes(bs)
                     .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
             )
         }
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G2)?;
-            TV::Bls12381G2(
+            TV::new_bls12381_g2(
                 bls::G2::from_bytes(bs)
                     .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
             )
@@ -2710,7 +2710,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381G1(
+            Ok(Push(TypedValue::new_bls12381_g1(
                 bls::G1::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
             )))
         );
@@ -2760,7 +2760,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381G2(
+            Ok(Push(TypedValue::new_bls12381_g2(
                 bls::G2::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
             )))
         );
