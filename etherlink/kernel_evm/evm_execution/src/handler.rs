@@ -626,9 +626,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     value
                 );
 
-                Ok(ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                    ExitError::OutOfFund,
-                )))
+                Ok(ExitReason::Error(ExitError::OutOfFund))
             }
         } else {
             log!(self.host, Debug, "'from' account {:?} is empty", from);
@@ -2552,11 +2550,8 @@ mod test {
 
         match result {
             Ok(result) => {
-                let expected_result = (
-                    ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfFund)),
-                    None,
-                    vec![],
-                );
+                let expected_result =
+                    (ExitReason::Error(ExitError::OutOfFund), None, vec![]);
                 assert_eq!(result, expected_result);
                 assert_eq!(get_balance(&mut handler, &caller), U256::from(99_u32));
                 assert_eq!(get_balance(&mut handler, &address), U256::zero());
