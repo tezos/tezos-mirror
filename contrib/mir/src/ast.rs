@@ -6,6 +6,7 @@
 /******************************************************************************/
 
 pub mod annotations;
+pub mod big_map;
 pub mod byte_repr_trait;
 pub mod comparable;
 pub mod micheline;
