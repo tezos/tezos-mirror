@@ -16,8 +16,7 @@ let uses _protocol =
     Constant.smart_rollup_installer;
   ]
 
-(** Renaming the helper to avoid confusion on its behavior. *)
-let next_rollup_node_level = Helpers.next_evm_level
+open Helpers
 
 type l1_contracts = {
   delayed_transaction_bridge : string;
