@@ -127,9 +127,6 @@ pub trait IntoMicheline<'a> {
 macro_rules! micheline_unsupported_types {
     () => {
         Prim::big_map
-            | Prim::bls12_381_fr
-            | Prim::bls12_381_g1
-            | Prim::bls12_381_g2
             | Prim::chest
             | Prim::chest_key
             | Prim::tx_rollup_l2_address
@@ -215,8 +212,6 @@ macro_rules! micheline_unsupported_instructions {
             | Prim::BYTES
             | Prim::SUB
             | Prim::SUB_MUTEZ
-            | Prim::MUL
-            | Prim::NEG
             | Prim::EDIV
             | Prim::GE
             | Prim::LT
