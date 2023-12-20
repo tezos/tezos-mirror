@@ -43,3 +43,12 @@ module Syntax = struct
     | Ok _ -> Test.fail "'let*@?' expected an error but got a valid response"
     | Error err -> f err
 end
+
+let produce_block_request =
+  Evm_node.{method_ = "produceBlock"; parameters = `Null}
+
+let produce_block evm_node =
+  let* json =
+    Evm_node.call_evm_rpc ~private_:true evm_node produce_block_request
+  in
+  return JSON.(json |-> "result" |> as_string |> Int32.of_string)

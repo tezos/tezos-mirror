@@ -15,3 +15,6 @@ module Syntax : sig
 
   val ( let*@? ) : ('a, error) result Lwt.t -> (error -> 'c Lwt.t) -> 'c Lwt.t
 end
+
+(** [produce_block evm_node] calls the private RPC [produceBlock]. *)
+val produce_block : Evm_node.t -> int32 Lwt.t

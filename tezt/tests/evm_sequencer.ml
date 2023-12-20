@@ -169,8 +169,8 @@ let test_persistent_state =
     ~uses
   @@ fun protocol ->
   let* {evm_node; _} = setup_sequencer protocol in
-  (* Sleep to let the sequencer produce some blocks. *)
-  let* () = Lwt_unix.sleep 20. in
+  (* Force the sequencer to produce a block. *)
+  let* _ = Rpc.produce_block evm_node in
   (* Ask for the current block. *)
   let*@ block_number = Rpc.block_number evm_node in
   Check.is_true
@@ -200,8 +200,8 @@ let test_publish_blueprints =
     ~uses
   @@ fun protocol ->
   let* {evm_node; node; client; sc_rollup_node; _} = setup_sequencer protocol in
-  (* Sleep to let the sequencer produce some blocks. *)
-  let* () = Lwt_unix.sleep 20. in
+  (* Force the sequencer to produce a block. *)
+  let* _ = Rpc.produce_block evm_node in
   (* Ask for the current block. *)
   let*@ sequencer_head = Rpc.block_number evm_node in
   (* Stop the EVM node. *)
@@ -323,8 +323,26 @@ let test_send_deposit_to_delayed_inbox =
     ~error_msg:"the deposit is not present in the delayed inbox" ;
   unit
 
+let test_rpc_produceBlock =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "produce_block"]
+    ~title:"RPC method produceBlock"
+    ~uses
+  @@ fun protocol ->
+  (* Set a large [time_between_blocks] to make sure the block production is
+     triggered by the RPC call. *)
+  let* {evm_node; _} = setup_sequencer ~time_between_blocks:10000. protocol in
+  let*@ start_block_number = Rpc.block_number evm_node in
+  let* _ = Rpc.produce_block evm_node in
+  let*@ new_block_number = Rpc.block_number evm_node in
+  Check.((Int32.succ start_block_number = new_block_number) int32)
+    ~error_msg:"Expected new block number to be %L, but got: %R" ;
+  unit
+
 let register ~protocols =
   test_persistent_state protocols ;
   test_publish_blueprints protocols ;
   test_send_transaction_to_delayed_inbox protocols ;
-  test_send_deposit_to_delayed_inbox protocols
+  test_send_deposit_to_delayed_inbox protocols ;
+  test_rpc_produceBlock protocols
