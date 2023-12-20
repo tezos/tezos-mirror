@@ -446,6 +446,8 @@ pub enum Instruction<'a> {
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),
+    Dig(u16),
+    Dug(u16),
     Gt,
     Ge,
     Eq,

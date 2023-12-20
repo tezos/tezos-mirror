@@ -76,6 +76,25 @@ impl<T> Stack<T> {
         len.checked_sub(i + 1).expect("out of bounds stack access")
     }
 
+    pub fn remove(&mut self, i: usize) -> T {
+        self.0.remove(self.vec_index(i))
+    }
+
+    /// Insert an element at i'th stack index, such that after the call there are `i` number of
+    /// elements before the newly inserted element.
+    pub fn insert(&mut self, i: usize, e: T) {
+        if i > 0 {
+            // We subtract one from the index because since our stack is inverted, the insertion
+            // point is to the right of the index, instead of the left of it, as considered by the
+            // `insert` method of the `Vec`. So, we have to use an index that is one element further
+            // to the right, which in terms of stack index, means substracting one from the input
+            // index.
+            self.0.insert(self.vec_index(i - 1), e)
+        } else {
+            self.push(e)
+        }
+    }
+
     /// Push an element onto the top of the stack.
     pub fn push(&mut self, elt: T) {
         self.0.push(elt)
@@ -322,6 +341,34 @@ mod tests {
         assert_eq!(stk.pop(), Some(2));
         assert_eq!(stk.pop(), Some(1));
         assert_eq!(stk.pop(), None);
+    }
+
+    #[test]
+    fn remove() {
+        let mut stk = stk![1, 2, 3, 4];
+        stk.remove(1);
+        assert_eq!(stk, stk![1, 2, 4]);
+
+        stk.remove(2);
+        assert_eq!(stk, stk![2, 4]);
+
+        stk.remove(0);
+        assert_eq!(stk, stk![2]);
+    }
+
+    #[test]
+    fn insert() {
+        let mut stk = stk![1, 2, 3];
+        stk.insert(2, 10);
+        assert_eq!(stk, stk![1, 10, 2, 3]);
+
+        let mut stk = stk![];
+        stk.insert(0, 10);
+        assert_eq!(stk, stk![10]);
+
+        let mut stk = stk![1, 2, 3];
+        stk.insert(3, 10);
+        assert_eq!(stk, stk![10, 1, 2, 3]);
     }
 
     #[test]

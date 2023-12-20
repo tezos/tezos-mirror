@@ -164,6 +164,16 @@ pub mod tc_cost {
         (depth * 50).as_gas_cost()
     }
 
+    pub fn dig_n(depth: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(depth) * 50).as_gas_cost()
+    }
+
+    pub fn dug_n(depth: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(depth) * 50).as_gas_cost()
+    }
+
     pub fn drop_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
         depth.map_or(Ok(0), variadic)
     }
@@ -366,6 +376,16 @@ pub mod interpret_cost {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
         (20 + n + (n >> 2)).as_gas_cost()
+    }
+
+    pub fn dig(n: u16) -> Result<u32, OutOfGas> {
+        let n = Checked::from(n as u32);
+        (30 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
+    }
+
+    pub fn dug(n: u16) -> Result<u32, OutOfGas> {
+        let n = Checked::from(n as u32);
+        (35 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
     }
 
     pub fn dup(mb_n: Option<u16>) -> Result<u32, OutOfGas> {

@@ -850,6 +850,32 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Dup(opt_height)
         }
 
+        (App(DIG, [Int(height)], _), ..) => {
+            let dig_height = validate_u10(height)?;
+            ensure_stack_len(Prim::DIG, stack, dig_height as usize)?;
+            ctx.gas.consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
+            if dig_height > 0 {
+                let e = stack.remove(dig_height as usize);
+                stack.push(e);
+            }
+            I::Dig(dig_height)
+        }
+        (App(DIG, [_], _), ..) => unexpected_micheline!(),
+        (App(DIG, expect_args!(1), _), _) => unexpected_micheline!(),
+
+        (App(DUG, [Int(height)], _), ..) => {
+            let dug_height = validate_u10(height)?;
+            ctx.gas.consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
+            if dug_height > 0 {
+                ensure_stack_len(Prim::DUG, stack, dug_height as usize)?;
+                let e = pop!();
+                stack.insert(dug_height as usize, e);
+            }
+            I::Dug(dug_height)
+        }
+        (App(DUG, [_], _), ..) => unexpected_micheline!(),
+        (App(DUG, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(GT, [], _), [.., T::Int]) => {
             stack[0] = T::Bool;
             I::Gt
@@ -6520,5 +6546,81 @@ mod typecheck_tests {
         );
 
         assert_eq!(stk, &tc_stk![Type::Nat]);
+    }
+
+    #[test]
+    fn dig() {
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DIG 3").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dig(3))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Int, Type::Nat, Type::String, Type::Unit]
+        );
+
+        // DIG 0
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DIG 0").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dig(0))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String]
+        );
+
+        // DIG 1
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DIG 1").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dig(1))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Unit, Type::Int, Type::String, Type::Nat]
+        );
+    }
+
+    #[test]
+    fn dug() {
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DUG 2").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dug(2))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Unit, Type::String, Type::Int, Type::Nat,]
+        );
+
+        // DUG 0
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DUG 0").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dug(0))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String]
+        );
+
+        // DUG 1
+        let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
+        assert_eq!(
+            typecheck_instruction(&parse("DUG 1").unwrap(), &mut Ctx::default(), stk),
+            Ok(Dug(1))
+        );
+
+        assert_eq!(
+            stk,
+            &tc_stk![Type::Unit, Type::Int, Type::String, Type::Nat]
+        );
     }
 }

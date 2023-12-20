@@ -203,8 +203,6 @@ macro_rules! micheline_fields {
 macro_rules! micheline_unsupported_instructions {
     () => {
         Prim::UNPACK
-            | Prim::DIG
-            | Prim::DUG
             | Prim::SUB
             | Prim::EDIV
             | Prim::LSL
