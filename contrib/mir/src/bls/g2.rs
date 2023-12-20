@@ -133,7 +133,7 @@ impl Neg for G2 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::str::FromStr;
 
     use num_bigint::BigInt;
@@ -145,7 +145,7 @@ mod tests {
         G2::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
 
-    fn some_val() -> G2 {
+    pub fn some_val() -> G2 {
         let s = "14e9b22683a66543ec447b7aa76e4404424709728507581d0b3f60a8062c3f7c7d3365197c59f7c961fa9731084f5be60d0a936e93d556bdef2032cdcae2fa9902dcbe105e01d7ab7126d83486d882c4efd2fc1ac55044157333be19acf0cb7a10bc41c8081c9babd8d5b41b645badd4a679b3d4e1b3ea2c0e1f53b39c00b3889a40306c9b9ee2da5831e90148334d91016474d07e0f4e36d2d51b5ca11b633b9a940b9c126aebf4a2537c18fdc6967fb677824bfa902157e53cb499a021e57b";
         G2::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
@@ -155,7 +155,7 @@ mod tests {
         G2::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }
 
-    fn neg_some_val() -> G2 {
+    pub fn neg_some_val() -> G2 {
         let s = "14e9b22683a66543ec447b7aa76e4404424709728507581d0b3f60a8062c3f7c7d3365197c59f7c961fa9731084f5be60d0a936e93d556bdef2032cdcae2fa9902dcbe105e01d7ab7126d83486d882c4efd2fc1ac55044157333be19acf0cb7a0944d02231634aee7245f39adeefff02bdfd97b011d1289359117eed5ab0429b846bcf9215b51d2561cd16feb7cc5d1a189c9d19bb70986378468c59a230499bc9e33fe8e11a26cac4dd5687f8ea5fa468347db2b6c3dea7d4c24b665fddc530";
         G2::from_bytes(&hex::decode(s).unwrap()).unwrap()
     }

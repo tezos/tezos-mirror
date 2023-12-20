@@ -1479,6 +1479,25 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(VOTING_POWER, [], _), []) => no_overload!(VOTING_POWER, len 1),
         (App(VOTING_POWER, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(PAIRING_CHECK, [], _), [.., T::List(ty)])
+            if match ty.as_ref() {
+                T::Pair(p) => matches!(p.as_ref(), (T::Bls12381G1, T::Bls12381G2)),
+                _ => false,
+            } =>
+        {
+            stack[0] = T::Bool;
+            I::PairingCheck
+        }
+        (App(PAIRING_CHECK, [], _), [.., t]) => no_overload!(
+            PAIRING_CHECK,
+            TypesNotEqual(
+                T::new_list(T::new_pair(T::Bls12381G1, T::Bls12381G2)),
+                t.clone()
+            )
+        ),
+        (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
+        (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(other, ..), _) => todo!("Unhandled instruction {other}"),
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
@@ -4960,6 +4979,52 @@ mod typecheck_tests {
     #[test]
     fn check_signature_too_short() {
         too_short_test(&app!(CHECK_SIGNATURE), Prim::CHECK_SIGNATURE, 3)
+    }
+
+    #[test]
+    fn pairing_check() {
+        assert_eq!(
+            parse("PAIRING_CHECK").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[app!(
+                    list[app!(pair[app!(bls12_381_g1), app!(bls12_381_g2)])]
+                )]
+            ),
+            Ok(PairingCheck)
+        );
+    }
+
+    #[test]
+    fn pairing_check_wrong_type() {
+        assert_eq!(
+            parse("PAIRING_CHECK").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[app!(
+                    list[app!(pair[app!(bls12_381_g1), app!(bls12_381_g1)])]
+                )]
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::PAIRING_CHECK,
+                stack: stk![Type::new_list(Type::new_pair(
+                    Type::Bls12381G1,
+                    Type::Bls12381G1
+                ))],
+                reason: Some(
+                    TypesNotEqual(
+                        Type::new_list(Type::new_pair(Type::Bls12381G1, Type::Bls12381G2)),
+                        Type::new_list(Type::new_pair(Type::Bls12381G1, Type::Bls12381G1))
+                    )
+                    .into()
+                )
+            })
+        );
+    }
+
+    #[test]
+    fn pairing_check_too_short() {
+        too_short_test(&app!(PAIRING_CHECK), Prim::PAIRING_CHECK, 1)
     }
 
     #[test]

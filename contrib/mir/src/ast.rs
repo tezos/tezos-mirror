@@ -479,6 +479,7 @@ pub enum Instruction<'a> {
     /// in concrete syntax, so we can assume that if the entrypoint is the default entrypoint, then
     /// no explicit entrypoint was specified in the instruction.
     Contract(Type, Entrypoint),
+    PairingCheck,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

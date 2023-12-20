@@ -681,6 +681,10 @@ pub mod interpret_cost {
         let size = Checked::from(msg.len());
         (Checked::from(680) + (size * 3)).as_gas_cost()
     }
+
+    pub fn pairing_check(size: usize) -> Result<u32, OutOfGas> {
+        (450_000 + 342_500 * Checked::from(size)).as_gas_cost()
+    }
 }
 
 #[cfg(test)]
