@@ -2,7 +2,6 @@ test_kernels:
   extends:
     - .oc.kernels_template
   stage: test
-  needs: [trigger]
   dependencies: []
   script:
     - make -f kernels.mk check
@@ -16,3 +15,7 @@ test_kernels:
         - etherlink/kernel_evm/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
+  cache:
+    - key: kernels
+      paths:
+        - cargo/

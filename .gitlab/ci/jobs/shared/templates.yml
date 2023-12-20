@@ -90,16 +90,11 @@
     - .default_settings_template
     - .image_template__rust_toolchain
     - .rules__octez_changes
-  stage: build
   needs: [trigger]
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
-  cache:
-    - key: kernels
-      paths:
-        - cargo/
 
 .docker_auth_template:
   extends:
