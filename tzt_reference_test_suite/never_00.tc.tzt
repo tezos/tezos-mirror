@@ -1,0 +1,3 @@
+code { NEVER } ;
+input { Stack_elt unit Unit } ;
+output (StaticError _);
