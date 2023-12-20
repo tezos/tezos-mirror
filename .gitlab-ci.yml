@@ -140,8 +140,8 @@ manifest:
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker manifest create ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG} `for i in ${ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/${TARGET}-$i:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}" ; done`
-    - docker manifest push ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
+    - docker manifest create ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in ${ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/${TARGET}-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
+    - docker manifest push ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_TAG
