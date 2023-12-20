@@ -1439,7 +1439,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn end_inter_transaction<T>(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
-        promote_error: bool,
     ) -> Capture<CreateOutcome, T> {
         if let Ok((ref _r @ ExitReason::Succeed(_), _, _)) = execution_result {
             log!(
@@ -1480,11 +1479,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     vec![],
                 ));
             }
-        } else if let Ok((ExitReason::Error(ExitError::OutOfGas), _, _)) =
-            execution_result
-        {
-            // Internal call failed: it runned out of gas. [rollback_inter_transaction]
-            // will consume the gas with [refund_gas = false] and revert all subsequent
+        } else if let Ok((ExitReason::Error(_), _, _)) = execution_result {
+            // Internal call failed. [rollback_inter_transaction] will consume
+            // the gas with [refund_gas = false] and revert all sub-context
             // side-effect and continue the execution.
 
             if let Err(err) = self.rollback_inter_transaction(false) {
@@ -1501,12 +1498,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     vec![],
                 ));
             }
-
-            return Capture::Exit((
-                ExitReason::Succeed(ExitSucceed::Returned),
-                None,
-                vec![],
-            ));
         } else if let Err(err) = self.rollback_inter_transaction(false) {
             log!(
                 self.host,
@@ -1519,17 +1510,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         match execution_result {
-            Ok((ExitReason::Error(err), _, _)) => {
-                if promote_error {
-                    Capture::Exit((
-                        ExitReason::Fatal(ExitFatal::CallErrorAsFatal(err)),
-                        None,
-                        vec![],
-                    ))
-                } else {
-                    Capture::Exit((ExitReason::Error(err), None, vec![]))
-                }
-            }
             Ok(res) => Capture::Exit(res),
             Err(err) => {
                 Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
@@ -1759,7 +1739,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         } else {
             let result = self.execute_create(caller, scheme, value, init_code, true);
 
-            self.end_inter_transaction(result, false)
+            self.end_inter_transaction(result)
         }
     }
 
@@ -1801,7 +1781,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             TransactionContext::from_context(context),
         );
 
-        match self.end_inter_transaction(result, true) {
+        match self.end_inter_transaction(result) {
             Capture::Exit((reason, _, value)) => {
                 log!(self.host, Debug, "Call ended with reason: {:?}", reason);
                 Capture::Exit((reason, value))
