@@ -609,9 +609,6 @@ pub(crate) fn typecheck_instruction<'a>(
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
         ) => unexpected_micheline!(),
-        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
-            Err(TcError::TodoInstr(*prim))?
-        }
 
         (App(ADD, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
@@ -1549,6 +1546,10 @@ pub(crate) fn typecheck_instruction<'a>(
         ),
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
+            Err(TcError::TodoInstr(*prim))?
+        }
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
