@@ -9,7 +9,6 @@ use crate::blueprint_storage::{drop_head_blueprint, read_next_blueprint};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
-use crate::reboot_context::RebootContext;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::init_account_index;
@@ -134,7 +133,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    constants: &BlockConstants,
+    current_constants: &BlockConstants,
     tick_counter: &TickCounter,
 ) -> Result<Option<BlockInProgress>, anyhow::Error> {
     match read_next_blueprint(host)? {
@@ -143,7 +142,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 blueprint,
                 current_block_number,
                 current_block_parent_hash,
-                constants,
+                current_constants,
                 tick_counter.c,
             );
             Ok(Some(bip))
@@ -152,41 +151,58 @@ fn next_bip_from_blueprints<Host: Runtime>(
     }
 }
 
-fn next_bip<Host: Runtime>(
+#[allow(clippy::too_many_arguments)]
+fn compute_bip<Host: KernelRuntime>(
     host: &mut Host,
-    reboot_context: &RebootContext,
-    current_block_number: U256,
-    current_block_parent_hash: H256,
-    current_constants: &BlockConstants,
-    tick_counter: &TickCounter,
-    first_bip_of_run: &mut bool,
-) -> Result<Option<BlockInProgress>, anyhow::Error> {
-    if *first_bip_of_run {
-        *first_bip_of_run = false;
-        match &reboot_context.bip {
-            Some(bip) => Ok(Some(bip.clone())),
-            None => next_bip_from_blueprints(
+    mut block_in_progress: BlockInProgress,
+    current_constants: &mut BlockConstants,
+    current_block_number: &mut U256,
+    current_block_parent_hash: &mut H256,
+    precompiles: &PrecompileBTreeMap<Host>,
+    evm_account_storage: &mut EthereumAccountStorage,
+    accounts_index: &mut IndexableStorage,
+    tick_counter: &mut TickCounter,
+) -> anyhow::Result<ComputationResult> {
+    let result = compute(
+        host,
+        &mut block_in_progress,
+        current_constants,
+        precompiles,
+        evm_account_storage,
+        accounts_index,
+    )?;
+    match result {
+        ComputationResult::RebootNeeded => {
+            log!(
                 host,
-                current_block_number,
-                current_block_parent_hash,
-                current_constants,
-                tick_counter,
-            ),
+                Info,
+                "Ask for reboot. Estimated ticks: {}",
+                &block_in_progress.estimated_ticks
+            );
+            storage::store_block_in_progress(host, &block_in_progress)?;
+            storage::add_reboot_flag(host)?;
+            host.mark_for_reboot()?
         }
-    } else {
-        next_bip_from_blueprints(
-            host,
-            current_block_number,
-            current_block_parent_hash,
-            current_constants,
-            tick_counter,
-        )
+        ComputationResult::Finished => {
+            *tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
+            let new_block = block_in_progress
+                .finalize_and_store(host)
+                .context("Failed to finalize the block in progress")?;
+            *current_block_number = new_block.number + 1;
+            *current_block_parent_hash = new_block.hash;
+            *current_constants = new_block.constants(
+                current_constants.chain_id,
+                current_constants.base_fee_per_gas,
+            );
+            // Drop the processed blueprint from the storage
+            drop_head_blueprint(host)?
+        }
     }
+    Ok(result)
 }
 
 pub fn produce<Host: KernelRuntime>(
     host: &mut Host,
-    reboot_context: RebootContext,
     chain_id: U256,
     base_fee_per_gas: U256,
 ) -> Result<ComputationResult, anyhow::Error> {
@@ -212,51 +228,50 @@ pub fn produce<Host: KernelRuntime>(
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
     let mut tick_counter = TickCounter::new(0u64);
-    let mut first_bip_of_run = true;
 
-    while let Some(mut block_in_progress) = next_bip(
+    // Check if there's a BIP in storage to resume its execution
+    match storage::read_block_in_progress(host)? {
+        None => (),
+        Some(block_in_progress) => match compute_bip(
+            host,
+            block_in_progress,
+            &mut current_constants,
+            &mut current_block_number,
+            &mut current_block_parent_hash,
+            &precompiles,
+            &mut evm_account_storage,
+            &mut accounts_index,
+            &mut tick_counter,
+        )? {
+            ComputationResult::Finished => storage::delete_block_in_progress(host)?,
+            ComputationResult::RebootNeeded => {
+                return Ok(ComputationResult::RebootNeeded)
+            }
+        },
+    }
+
+    // Execute stored blueprints
+    while let Some(block_in_progress) = next_bip_from_blueprints(
         host,
-        &reboot_context,
         current_block_number,
         current_block_parent_hash,
         &current_constants,
         &tick_counter,
-        &mut first_bip_of_run,
     )? {
-        match compute(
+        match compute_bip(
             host,
-            &mut block_in_progress,
-            &current_constants,
+            block_in_progress,
+            &mut current_constants,
+            &mut current_block_number,
+            &mut current_block_parent_hash,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
+            &mut tick_counter,
         )? {
+            ComputationResult::Finished => (),
             ComputationResult::RebootNeeded => {
-                log!(
-                    host,
-                    Info,
-                    "Ask for reboot. Estimated ticks: {}",
-                    &block_in_progress.estimated_ticks
-                );
-                let reboot_context = RebootContext {
-                    bip: Some(block_in_progress),
-                    ..reboot_context
-                };
-                storage::store_reboot_context(host, &reboot_context)?;
-                storage::add_reboot_flag(host)?;
-                host.mark_for_reboot()?;
-                return Ok(ComputationResult::RebootNeeded);
-            }
-            ComputationResult::Finished => {
-                tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
-                let new_block = block_in_progress
-                    .finalize_and_store(host)
-                    .context("Failed to finalize the block in progress")?;
-                current_block_number = new_block.number + 1;
-                current_block_parent_hash = new_block.hash;
-                current_constants = new_block.constants(chain_id, base_fee_per_gas);
-                // Drop the processed blueprint from the storage
-                drop_head_blueprint(host)?
+                return Ok(ComputationResult::RebootNeeded)
             }
         }
     }
@@ -277,6 +292,7 @@ mod tests {
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
+    use crate::storage::read_block_in_progress;
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::tick_model;
     use crate::{retrieve_base_fee_per_gas, retrieve_chain_id};
@@ -467,10 +483,6 @@ mod tests {
             },
         ];
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
@@ -481,13 +493,8 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(
-            host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
     }
 
     fn assert_current_block_reading_validity<Host: KernelRuntime>(host: &mut Host) {
@@ -517,10 +524,6 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -531,13 +534,8 @@ mod tests {
             &sender,
             U256::from(30000u64),
         );
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         assert!(
             read_transaction_receipt_status(&mut host, &tx_hash).is_err(),
@@ -563,10 +561,6 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
@@ -578,13 +572,8 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
             .expect("Should have found receipt");
@@ -613,10 +602,6 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -628,13 +613,8 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
@@ -692,10 +672,6 @@ mod tests {
             content: Ethereum(dummy_eth_transaction_one()),
         }];
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(
             &mut host,
             vec![blueprint(transaction_0), blueprint(transaction_1)],
@@ -710,13 +686,8 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -751,10 +722,6 @@ mod tests {
             },
         ];
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
@@ -766,13 +733,8 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
             .expect("should have found receipt");
         let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
@@ -819,10 +781,6 @@ mod tests {
         };
 
         let transactions = vec![tx.clone(), tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(
             &mut host,
             vec![blueprint(transactions.clone()), blueprint(transactions)],
@@ -837,13 +795,8 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -873,10 +826,6 @@ mod tests {
         };
 
         let transactions = vec![tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let indexed_accounts = accounts_index.length(&host).unwrap();
@@ -889,13 +838,8 @@ mod tests {
             &sender,
             U256::from(5000000000000000u64),
         );
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
 
@@ -926,30 +870,16 @@ mod tests {
         };
 
         let transactions = vec![tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions.clone())]);
 
-        produce(
-            &mut host,
-            reboot_context.clone(),
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let indexed_accounts = accounts_index.length(&host).unwrap();
         // Next blueprint
         store_blueprints(&mut host, vec![blueprint(transactions)]);
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
 
@@ -980,10 +910,6 @@ mod tests {
         };
 
         let transactions = vec![tx];
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
@@ -998,13 +924,8 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let new_number_of_transactions_indexed =
@@ -1165,20 +1086,11 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         };
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(vec![transaction])]);
 
         // Apply the transaction
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("The block production failed.");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("The block production failed.");
         assert!(
             read_transaction_receipt(&mut host, &tx_hash).is_err(),
             "Transaction is invalid, so should not have a receipt"
@@ -1219,45 +1131,25 @@ mod tests {
             internal: &mut internal,
         };
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
-
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(
-            &mut host,
-            reboot_context.clone(),
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("Empty block should have been produced");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
 
         // second block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(
-            &mut host,
-            reboot_context.clone(),
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("Empty block should have been produced");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
 
         // third block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("Empty block should have been produced");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
     }
 
@@ -1337,21 +1229,12 @@ mod tests {
             transactions.push(dummy_transaction(n));
         }
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         host.reboot_left().expect("should be some reboot left");
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("Should have produced");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1403,19 +1286,10 @@ mod tests {
             }
         }
 
-        let reboot_context = RebootContext {
-            bip: None,
-            kernel_upgrade: None,
-        };
         store_blueprints(&mut host, proposals);
 
-        produce(
-            &mut host,
-            reboot_context,
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .expect("Should have produced");
+        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
+            .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1431,11 +1305,8 @@ mod tests {
             "Flag should be set"
         );
 
-        let reboot_context = storage::read_reboot_context(&host)
-            .expect("There should be a reboot context in storage");
-
-        let bip = reboot_context
-            .bip
+        let bip = read_block_in_progress(&host)
+            .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 
         assert!(
