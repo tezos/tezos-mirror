@@ -104,3 +104,29 @@ module Regression : sig
     (unit -> unit Lwt.t) ->
     unit
 end
+
+(** Error modes.
+
+    - [Ignore]: do not warn, do not fail.
+    - [Warn]: warn, but do not fail.
+    - [Fail]: output an error and fail the test. *)
+type error_mode = Ignore | Warn | Fail
+
+(** What to do if a test uses something without having it declared in its [~uses].
+
+    Recommended setting for tests that are intended to run in the CI is [Fail],
+    which is the default. *)
+val error_mode_for_missing_use : error_mode ref
+
+(** What to do if a test declares something in its [~uses] and does not use it.
+
+    Recommended setting for tests that are intended to run in the CI is [Warn],
+    which is the default.
+
+    Using [Fail] is possible but:
+    - if a test is non-deterministic and only sometimes uses something,
+      one needs to make sure [Uses.path] is always called anyway;
+    - if a test actually uses something but not through [Uses.path],
+      the wrapper will not be able to detect it, so one will have to call
+      [Uses.path] just to suppress the error. *)
+val error_mode_for_useless_use : error_mode ref

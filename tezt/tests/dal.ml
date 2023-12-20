@@ -4317,6 +4317,7 @@ let register ~protocols =
     protocols ;
   scenario_with_all_nodes
     "test echo_kernel"
+    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
     ~pvm_name:"wasm_2_0_0"
     ~slot_size:2048
     ~page_size:256

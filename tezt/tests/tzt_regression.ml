@@ -42,6 +42,7 @@ let test_tzt protocols =
     ~__FILE__
     ~title:(sf "Run TZT")
     ~tags:["client"; "michelson"; "tzt"]
+    ~uses_node:false
     ~supports:(Protocol.From_protocol 019)
     (fun protocol ->
       let tests =

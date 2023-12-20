@@ -99,6 +99,8 @@ let test_experimental_versions () =
     ~title:"Experimental binaries: report consistent version"
     ~tags:["binaries"; "experimental"; "version"]
     ~uses:executables
+    ~uses_client:false
+    ~uses_admin_client:false
   @@ fun () -> test_versions executables
 
 let register_protocol_independent () =

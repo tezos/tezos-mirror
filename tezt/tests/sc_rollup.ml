@@ -3902,6 +3902,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
              outbox_parameters_ty_s);
       description = "output exec";
     }
+    ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol rollup_node sc_rollup _node client ->
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let src = Constant.bootstrap1.public_key_hash in
@@ -4937,6 +4938,7 @@ let test_rollup_whitelist_update ~kind =
       tags = ["private"; "whitelist"; "update"];
       description = "kernel update whitelist";
     }
+    ~uses:(fun _protocol -> [Constant.octez_codec])
     ~kind
     ~whitelist_enable:true
     ~whitelist
@@ -5077,6 +5079,7 @@ let test_rollup_whitelist_outdated_update ~kind =
       tags = ["whitelist"];
       description = "outdated whitelist update";
     }
+    ~uses:(fun _protocol -> [Constant.octez_codec])
     ~kind
     ~whitelist_enable:true
     ~whitelist
@@ -5312,6 +5315,7 @@ let test_multiple_batcher_key ~kind =
       tags = [Tag.flaky; "node"; "mode"; "batcher"];
       description = "multiple keys set for batcher";
     }
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
   @@ fun _protocol sc_rollup tezos_node client ->
   (* nb_of_batcher * msg_per_batch * msg_size = expected_block_size
      16 * 32 * 1000 = 512_000 = maximum size of Tezos L1 block *)
@@ -5568,6 +5572,7 @@ let start_rollup_node_with_encrypted_key ~kind =
       tags = ["rollup_node"];
       description = "start a rollup node with an encrypted key";
     }
+    ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
   @@ fun _protocol sc_rollup node client ->
   let encrypted_account =
     {

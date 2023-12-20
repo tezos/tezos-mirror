@@ -28,6 +28,9 @@
    as functions to be called here. *)
 
 let () =
+  (* Since manual tests do not run in the CI, we do not care about [~uses]. *)
+  Tezt_wrapper.error_mode_for_missing_use := Ignore ;
+  Tezt_wrapper.error_mode_for_useless_use := Ignore ;
   Stresstest_command.register ~protocols:Protocol.all ;
   Dal.register () ;
   Baker_test.register ~protocols:Protocol.all ;
