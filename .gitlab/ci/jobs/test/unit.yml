@@ -43,6 +43,14 @@
     ARCH: "arm64"
   tags:
     - arm64
+  rules:
+    - changes:
+        paths:
+          - src/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: manual
+
 
 oc.unit:non-proto-x86_64:
   extends:
