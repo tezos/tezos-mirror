@@ -3,7 +3,6 @@ oc.build_kernels:
     - .tags_template__build
     - .oc.kernels_template
   stage: build
-  needs: [trigger]
   script:
     - make -f kernels.mk build
   artifacts:

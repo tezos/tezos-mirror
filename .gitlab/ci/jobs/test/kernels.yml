@@ -2,7 +2,6 @@ test_kernels:
   extends:
     - .oc.kernels_template
   stage: test
-  needs: [trigger]
   dependencies: []
   script:
     - make -f kernels.mk check

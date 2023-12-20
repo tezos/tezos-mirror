@@ -90,7 +90,6 @@
     - .default_settings_template
     - .image_template__rust_toolchain
     - .rules__octez_changes
-  stage: build
   needs: [trigger]
   variables:
     CC: clang
