@@ -270,8 +270,9 @@ pub enum TypedValue<'a> {
     Ticket(Box<Ticket<'a>>),
     Timestamp(BigInt),
     Bls12381Fr(bls::Fr),
-    Bls12381G1(bls::G1),
-    Bls12381G2(bls::G2),
+    // G1 and G2 are a bit too large to lug them about on-stack
+    Bls12381G1(Box<bls::G1>),
+    Bls12381G2(Box<bls::G2>),
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -393,11 +394,21 @@ impl<'a> TypedValue<'a> {
     pub fn new_ticket(t: Ticket<'a>) -> Self {
         Self::Ticket(Box::new(t))
     }
+
+    pub fn new_bls12381_g1(x: bls::G1) -> Self {
+        Self::Bls12381G1(Box::new(x))
+    }
+
+    pub fn new_bls12381_g2(x: bls::G2) -> Self {
+        Self::Bls12381G2(Box::new(x))
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Instruction<'a> {
     Add(overloads::Add),
+    Mul(overloads::Mul),
+    Neg(overloads::Neg),
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
     Dup(Option<u16>),

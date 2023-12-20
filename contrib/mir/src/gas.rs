@@ -238,6 +238,12 @@ pub mod interpret_cost {
     pub const ADD_BLS_FR: u32 = 30;
     pub const ADD_BLS_G1: u32 = 900;
     pub const ADD_BLS_G2: u32 = 2470;
+    pub const MUL_BLS_G1: u32 = 103000;
+    pub const MUL_BLS_G2: u32 = 220000;
+    pub const MUL_BLS_FR: u32 = 45;
+    pub const NEG_FR: u32 = 30;
+    pub const NEG_G1: u32 = 50;
+    pub const NEG_G2: u32 = 70;
     pub const UNIT: u32 = 10;
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;
@@ -684,6 +690,15 @@ pub mod interpret_cost {
 
     pub fn pairing_check(size: usize) -> Result<u32, OutOfGas> {
         (450_000 + 342_500 * Checked::from(size)).as_gas_cost()
+    }
+
+    pub fn mul_bls_fr_big_int(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        // 265. + 1.0625 * size
+        // NB: cost_N_IMul_bls12_381_fr_z and
+        // cost_N_IMul_bls12_381_z_fr ar distinct in the protocol, but they're the
+        // same exact operation, so we opted to use one function.
+        let size = Checked::from(int.byte_size());
+        (265 + ((size >> 4) + size)).as_gas_cost()
     }
 }
 

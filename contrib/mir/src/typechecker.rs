@@ -609,9 +609,6 @@ pub(crate) fn typecheck_instruction<'a>(
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
         ) => unexpected_micheline!(),
-        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
-            Err(TcError::TodoInstr(*prim))?
-        }
 
         (App(ADD, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
@@ -649,6 +646,50 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ADD, [], _), [.., _, _]) => no_overload!(ADD),
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G1]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381G1);
+            I::Mul(overloads::Mul::Bls12381G1Bls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G2]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381G2);
+            I::Mul(overloads::Mul::Bls12381G2Bls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381Fr]) => {
+            pop!();
+            I::Mul(overloads::Mul::Bls12381FrBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Nat]) => {
+            pop!();
+            I::Mul(overloads::Mul::NatBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Bls12381Fr, T::Int]) => {
+            pop!();
+            I::Mul(overloads::Mul::IntBls12381Fr)
+        }
+        (App(MUL, [], _), [.., T::Nat, T::Bls12381Fr]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381Fr);
+            I::Mul(overloads::Mul::Bls12381FrNat)
+        }
+        (App(MUL, [], _), [.., T::Int, T::Bls12381Fr]) => {
+            stack.drop_top(2);
+            stack.push(T::Bls12381Fr);
+            I::Mul(overloads::Mul::Bls12381FrInt)
+        }
+        (App(MUL, [], _), [.., _, _]) => no_overload!(MUL),
+        (App(MUL, [], _), [_] | []) => no_overload!(MUL, len 2),
+        (App(MUL, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        // NB: stack type doesn't change in these NEG overloads
+        (App(NEG, [], _), [.., T::Bls12381G1]) => I::Neg(overloads::Neg::Bls12381G1),
+        (App(NEG, [], _), [.., T::Bls12381G2]) => I::Neg(overloads::Neg::Bls12381G2),
+        (App(NEG, [], _), [.., T::Bls12381Fr]) => I::Neg(overloads::Neg::Bls12381Fr),
+        (App(NEG, [], _), [.., _]) => no_overload!(NEG),
+        (App(NEG, [], _), []) => no_overload!(NEG, len 1),
+        (App(NEG, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(AND, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
@@ -1506,6 +1547,10 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
+            Err(TcError::TodoInstr(*prim))?
+        }
+
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })
 }
@@ -1774,14 +1819,14 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G1)?;
-            TV::Bls12381G1(
+            TV::new_bls12381_g1(
                 bls::G1::from_bytes(bs)
                     .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
             )
         }
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G2)?;
-            TV::Bls12381G2(
+            TV::new_bls12381_g2(
                 bls::G2::from_bytes(bs)
                     .ok_or_else(|| TcError::InvalidValueForType(format!("{v:?}"), t.clone()))?,
             )
@@ -2666,7 +2711,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381G1(
+            Ok(Push(TypedValue::new_bls12381_g1(
                 bls::G1::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
             )))
         );
@@ -2716,7 +2761,7 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381G2(
+            Ok(Push(TypedValue::new_bls12381_g2(
                 bls::G2::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
             )))
         );
@@ -5031,6 +5076,131 @@ mod typecheck_tests {
     #[test]
     fn pairing_check_too_short() {
         too_short_test(&app!(PAIRING_CHECK), Prim::PAIRING_CHECK, 1)
+    }
+
+    mod mul {
+        use super::*;
+        use Type as T;
+
+        #[track_caller]
+        fn test_mul(
+            mut stack: FailingTypeStack,
+            expected_stack: FailingTypeStack,
+            overload: overloads::Mul,
+        ) {
+            assert_eq!(
+                typecheck_instruction(&parse("MUL").unwrap(), &mut Ctx::default(), &mut stack),
+                Ok(Mul(overload))
+            );
+            assert_eq!(stack, expected_stack);
+        }
+        macro_rules! test {
+            ($overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(tc_stk![$i2, $i1], tc_stk![$out], overloads::Mul::$overload);
+                }
+            };
+        }
+        test!(
+            Bls12381G1Bls12381Fr,
+            T::Bls12381G1,
+            T::Bls12381Fr,
+            T::Bls12381G1,
+        );
+        test!(
+            Bls12381G2Bls12381Fr,
+            T::Bls12381G2,
+            T::Bls12381Fr,
+            T::Bls12381G2,
+        );
+        test!(
+            Bls12381FrBls12381Fr,
+            T::Bls12381Fr,
+            T::Bls12381Fr,
+            T::Bls12381Fr,
+        );
+        test!(NatBls12381Fr, T::Nat, T::Bls12381Fr, T::Bls12381Fr);
+        test!(IntBls12381Fr, T::Int, T::Bls12381Fr, T::Bls12381Fr);
+        test!(Bls12381FrNat, T::Bls12381Fr, T::Nat, T::Bls12381Fr);
+        test!(Bls12381FrInt, T::Bls12381Fr, T::Int, T::Bls12381Fr);
+
+        #[test]
+        fn wrong_type() {
+            assert_eq!(
+                parse("MUL").unwrap().typecheck_instruction(
+                    &mut Ctx::default(),
+                    None,
+                    &[app!(unit), app!(unit)]
+                ),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::MUL,
+                    stack: stk![Type::Unit, Type::Unit],
+                    reason: None
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(MUL), Prim::MUL, 2)
+        }
+    }
+
+    mod neg {
+        use super::*;
+        use Type as T;
+
+        #[track_caller]
+        fn test_neg(
+            mut stack: FailingTypeStack,
+            expected_stack: FailingTypeStack,
+            overload: overloads::Neg,
+        ) {
+            assert_eq!(
+                typecheck_instruction(&parse("NEG").unwrap(), &mut Ctx::default(), &mut stack),
+                Ok(Neg(overload))
+            );
+            assert_eq!(stack, expected_stack)
+        }
+        macro_rules! test {
+            ($overload:ident) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_neg(
+                        tc_stk![T::$overload],
+                        tc_stk![T::$overload],
+                        overloads::Neg::$overload,
+                    );
+                }
+            };
+        }
+        test!(Bls12381G1);
+        test!(Bls12381G2);
+        test!(Bls12381Fr);
+
+        #[test]
+        fn wrong_type() {
+            assert_eq!(
+                parse("NEG").unwrap().typecheck_instruction(
+                    &mut Ctx::default(),
+                    None,
+                    &[app!(unit)]
+                ),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::NEG,
+                    stack: stk![Type::Unit],
+                    reason: None
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(NEG), Prim::NEG, 1)
+        }
     }
 
     #[test]

@@ -190,13 +190,78 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Bls12381G1);
                 let o2 = pop!(V::Bls12381G1);
                 ctx.gas.consume(interpret_cost::ADD_BLS_G1)?;
-                stack.push(V::Bls12381G1(o1 + o2));
+                stack.push(V::new_bls12381_g1(o1.as_ref() + o2.as_ref()));
             }
             overloads::Add::Bls12381G2 => {
                 let o1 = pop!(V::Bls12381G2);
                 let o2 = pop!(V::Bls12381G2);
                 ctx.gas.consume(interpret_cost::ADD_BLS_G2)?;
-                stack.push(V::Bls12381G2(o1 + o2));
+                stack.push(V::new_bls12381_g2(o1.as_ref() + o2.as_ref()));
+            }
+        },
+        I::Mul(overload) => match overload {
+            overloads::Mul::Bls12381G1Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
+                let x1 = pop!(V::Bls12381G1);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::new_bls12381_g1(x1.as_ref() * x2));
+            }
+            overloads::Mul::Bls12381G2Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_G2)?;
+                let x1 = pop!(V::Bls12381G2);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::new_bls12381_g2(x1.as_ref() * x2));
+            }
+            overloads::Mul::Bls12381FrBls12381Fr => {
+                ctx.gas.consume(interpret_cost::MUL_BLS_FR)?;
+                let x1 = pop!(V::Bls12381Fr);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::NatBls12381Fr => {
+                let nat = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                let x1 = bls::Fr::from_big_int(&nat.into());
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::IntBls12381Fr => {
+                let int = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                let x1 = bls::Fr::from_big_int(&int);
+                let x2 = pop!(V::Bls12381Fr);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::Bls12381FrNat => {
+                let x1 = pop!(V::Bls12381Fr);
+                let nat = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                let x2 = bls::Fr::from_big_int(&nat.into());
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+            overloads::Mul::Bls12381FrInt => {
+                let x1 = pop!(V::Bls12381Fr);
+                let int = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                let x2 = bls::Fr::from_big_int(&int);
+                stack.push(V::Bls12381Fr(x1 * x2));
+            }
+        },
+        I::Neg(overload) => match overload {
+            overloads::Neg::Bls12381G1 => {
+                ctx.gas.consume(interpret_cost::NEG_G1)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
+                *v = -(v as &bls::G1);
+            }
+            overloads::Neg::Bls12381G2 => {
+                ctx.gas.consume(interpret_cost::NEG_G2)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G2).as_mut();
+                *v = -(v as &bls::G2);
+            }
+            overloads::Neg::Bls12381Fr => {
+                ctx.gas.consume(interpret_cost::NEG_FR)?;
+                let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
+                *v = -(v as &bls::Fr);
             }
         },
         I::And(overload) => match overload {
@@ -999,8 +1064,8 @@ fn interpret_one<'a>(
             let it = list.iter().map(|elt| {
                 let (g1, g2) = irrefutable_match!(elt; V::Pair).as_ref();
                 (
-                    irrefutable_match!(g1; V::Bls12381G1),
-                    irrefutable_match!(g2; V::Bls12381G2),
+                    irrefutable_match!(g1; V::Bls12381G1).as_ref(),
+                    irrefutable_match!(g2; V::Bls12381G2).as_ref(),
                 )
             });
             let res = bls::pairing::pairing_check(it);
@@ -1053,10 +1118,10 @@ mod interpreter_tests {
     #[test]
     fn test_add_bls12_381_g1() {
         let mut stack = stk![
-            V::Bls12381G1(bls::G1::one()),
-            V::Bls12381G1(bls::G1::zero())
+            V::new_bls12381_g1(bls::G1::one()),
+            V::new_bls12381_g1(bls::G1::zero())
         ];
-        let expected_stack = stk![V::Bls12381G1(bls::G1::one())];
+        let expected_stack = stk![V::new_bls12381_g1(bls::G1::one())];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::Bls12381G1), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -1065,10 +1130,10 @@ mod interpreter_tests {
     #[test]
     fn test_add_bls12_381_g2() {
         let mut stack = stk![
-            V::Bls12381G2(bls::G2::one()),
-            V::Bls12381G2(bls::G2::zero())
+            V::new_bls12381_g2(bls::G2::one()),
+            V::new_bls12381_g2(bls::G2::zero())
         ];
-        let expected_stack = stk![V::Bls12381G2(bls::G2::one())];
+        let expected_stack = stk![V::new_bls12381_g2(bls::G2::one())];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::Bls12381G2), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -2414,7 +2479,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = stk![TypedValue::String("abc".into())];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::String)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::String)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2429,7 +2494,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = stk![TypedValue::Bytes(b"abc".to_vec())];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Bytes)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Bytes)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2441,7 +2506,7 @@ mod interpreter_tests {
         let list = (1..=3).map(TypedValue::nat).collect();
         let mut stack = stk![TypedValue::List(list)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::List)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::List)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2457,7 +2522,7 @@ mod interpreter_tests {
         let set = (1..=3).map(TypedValue::nat).collect();
         let mut stack = stk![TypedValue::Set(set)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Set)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Set)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
@@ -2472,7 +2537,7 @@ mod interpreter_tests {
         ]);
         let mut stack = stk![TypedValue::Map(map)];
         assert_eq!(
-            interpret(&vec![Size(overloads::Size::Map)], &mut ctx, &mut stack),
+            interpret(&[Size(overloads::Size::Map)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(2)]);
@@ -3379,7 +3444,7 @@ mod interpreter_tests {
         ctx.balance = 70;
         let mut stack = stk![];
         let start_milligas = ctx.gas.milligas();
-        assert_eq!(interpret(&vec![Balance], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(interpret(&[Balance], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(70),]);
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
@@ -3774,15 +3839,150 @@ mod interpreter_tests {
     #[test]
     fn pairing_check() {
         let mut stack = stk![V::List(MichelsonList::from(vec![
-            V::new_pair(V::Bls12381G1(bls::G1::one()), V::Bls12381G2(bls::G2::one())),
             V::new_pair(
-                V::Bls12381G1(bls::G1::one()),
-                V::Bls12381G2(bls::G2::neg_one())
+                V::new_bls12381_g1(bls::G1::one()),
+                V::new_bls12381_g2(bls::G2::one())
+            ),
+            V::new_pair(
+                V::new_bls12381_g1(bls::G1::one()),
+                V::new_bls12381_g2(bls::G2::neg_one())
             )
         ]))];
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&PairingCheck, ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Bool(true)]);
         assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+    }
+
+    mod mul {
+        use super::*;
+
+        #[track_caller]
+        fn test_mul(
+            overload: overloads::Mul,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Mul(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        use crate::bls::*;
+        use TypedValue as V;
+
+        macro_rules! test {
+            ($overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_mul(overloads::Mul::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        // NB: actual bls arithmetic is tested in the bls module, here we only
+        // need to check the interpreter works.
+
+        test!(
+            Bls12381G1Bls12381Fr,
+            V::new_bls12381_g1(G1::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::new_bls12381_g1(G1::one()),
+        );
+
+        test!(
+            Bls12381G2Bls12381Fr,
+            V::new_bls12381_g2(G2::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::new_bls12381_g2(G2::one()),
+        );
+
+        test!(
+            Bls12381FrBls12381Fr,
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            NatBls12381Fr,
+            V::Nat(1u8.into()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            IntBls12381Fr,
+            V::Int(1.into()),
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            Bls12381FrNat,
+            V::Bls12381Fr(Fr::one()),
+            V::Nat(1u8.into()),
+            V::Bls12381Fr(Fr::one()),
+        );
+
+        test!(
+            Bls12381FrInt,
+            V::Bls12381Fr(Fr::one()),
+            V::Int(1.into()),
+            V::Bls12381Fr(Fr::one()),
+        );
+    }
+
+    mod neg {
+        use super::*;
+
+        #[track_caller]
+        fn test_neg(overload: overloads::Neg, input: TypedValue, output: TypedValue) {
+            let mut stack = stk![input];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Neg(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        use crate::bls::*;
+        use TypedValue as V;
+
+        macro_rules! test {
+            ($overload:ident, $inp:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $overload() {
+                    test_neg(overloads::Neg::$overload, $inp, $out);
+                }
+            };
+        }
+
+        // NB: actual bls arithmetic is tested in the bls module, here we only
+        // need to check the interpreter works.
+
+        test!(
+            Bls12381G1,
+            V::new_bls12381_g1(G1::one()),
+            V::new_bls12381_g1(G1::neg_one()),
+        );
+
+        test!(
+            Bls12381G2,
+            V::new_bls12381_g2(G2::one()),
+            V::new_bls12381_g2(G2::neg_one()),
+        );
+
+        test!(
+            Bls12381Fr,
+            V::Bls12381Fr(Fr::one()),
+            V::Bls12381Fr(-Fr::one()),
+        );
     }
 }
