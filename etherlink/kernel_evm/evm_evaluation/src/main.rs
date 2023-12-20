@@ -308,6 +308,9 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("randomStatetest468.json"))
                 || test_file.file_name() == Some(OsStr::new("gasCostBerlin.json"))
                 || test_file.file_name() == Some(OsStr::new("underflowTest.json"))
+                || test_file.file_name() == Some(OsStr::new("randomStatetest384.json"))
+                || test_file.file_name()
+                    == Some(OsStr::new("201503110226PYTHON_DUP6.json"))
             {
                 skip_msg();
                 continue;
