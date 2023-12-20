@@ -20,7 +20,8 @@ use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
 use crate::ast::micheline::{
-    micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
+    micheline_fields, micheline_instructions, micheline_literals, micheline_types,
+    micheline_unsupported_instructions, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
@@ -608,6 +609,9 @@ pub(crate) fn typecheck_instruction<'a>(
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
         ) => unexpected_micheline!(),
+        (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
+            Err(TcError::TodoInstr(*prim))?
+        }
 
         (App(ADD, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
@@ -1501,8 +1505,6 @@ pub(crate) fn typecheck_instruction<'a>(
         ),
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
-
-        (App(other, ..), _) => Err(TcError::TodoInstr(*other))?,
 
         (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
     })

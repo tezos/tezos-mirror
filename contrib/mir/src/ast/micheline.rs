@@ -185,6 +185,45 @@ macro_rules! micheline_fields {
     };
 }
 
+/// Pattern synonym matching all instruction which are not yet
+/// supported. Useful for total match in the typechecker.
+macro_rules! micheline_unsupported_instructions {
+    () => {
+        Prim::UNPACK
+            | Prim::DIG
+            | Prim::DUG
+            | Prim::ABS
+            | Prim::ISNAT
+            | Prim::NAT
+            | Prim::BYTES
+            | Prim::SUB
+            | Prim::SUB_MUTEZ
+            | Prim::MUL
+            | Prim::NEG
+            | Prim::EDIV
+            | Prim::GE
+            | Prim::LT
+            | Prim::NEQ
+            | Prim::LSL
+            | Prim::LSR
+            | Prim::CREATE_CONTRACT
+            | Prim::EMIT
+            | Prim::EMPTY_MAP
+            | Prim::EMPTY_BIG_MAP
+            | Prim::GET_AND_UPDATE
+            | Prim::MAP
+            | Prim::SAPLING_EMPTY_STATE
+            | Prim::SAPLING_VERIFY_UPDATE
+            | Prim::OPEN_CHEST
+            | Prim::VIEW
+            | Prim::CREATE_ACCOUNT
+            | Prim::STEPS_TO_QUOTA
+            | Prim::TICKET_DEPRECATED
+            | Prim::CAST
+            | Prim::RENAME
+    };
+}
+
 /// Pattern synonym matching all instruction primitive applications. Useful for total
 /// matches.
 macro_rules! micheline_instructions {
@@ -326,7 +365,8 @@ macro_rules! micheline_values {
 }
 
 pub(crate) use {
-    micheline_fields, micheline_instructions, micheline_literals, micheline_types, micheline_values,
+    micheline_fields, micheline_instructions, micheline_literals, micheline_types,
+    micheline_unsupported_instructions, micheline_values,
 };
 
 #[cfg(test)]
