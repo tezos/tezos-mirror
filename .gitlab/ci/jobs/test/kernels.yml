@@ -15,3 +15,7 @@ test_kernels:
         - etherlink/kernel_evm/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
+  cache:
+    - key: kernels
+      paths:
+        - cargo/

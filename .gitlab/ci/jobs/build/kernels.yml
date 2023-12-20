@@ -3,6 +3,11 @@ oc.build_kernels:
     - .tags_template__build
     - .oc.kernels_template
   stage: build
+  variables:
+    # We store caches in _build because GitLab CI Cache requires that
+    # cached files are in a sub-folder of the checkout.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    RUSTC_WRAPPER: "sccache"
   script:
     - make -f kernels.mk build
   artifacts:
@@ -19,3 +24,10 @@ oc.build_kernels:
       - src/risc_v/tests/inline_asm/rv64-inline-asm-tests
     expire_in: 1 day
     when: on_success
+  cache:
+    - key: kernels
+      paths:
+        - cargo/
+    - key: kernels-sccache
+      paths:
+        - _sccache
