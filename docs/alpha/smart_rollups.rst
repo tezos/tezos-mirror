@@ -236,7 +236,7 @@ the commitment will be published with two stakes on it.
 
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
-after a commitment is published, a two-weeks refutation period
+after a commitment is published, a two-week refutation period
 starts. During the refutation period, anyone noticing that a
 commitment for a given commitment period is invalid can post a
 concurrent commitment for the same commitment period to force the

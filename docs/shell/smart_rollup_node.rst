@@ -43,7 +43,7 @@ in a terminal where ``${NETWORK}`` is of the
 form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store, by default ``~/.tezos-node``.
 
-The commands will only work when the node is completely boostrapped, and therefore the current protocol on the target network is activated.
+The commands will only work when the node is completely bootstrapped, and therefore the current protocol on the target network is activated.
 This can be checked by:
 
 .. code:: sh
@@ -217,7 +217,7 @@ In addition, a rollup node can run under different modes:
    operation when the operator is no longer staked on any commitment. If the node detects that this
    operation has been successful, it can gratefully exit.
 
-#. ``custom`` mode refers to a mode where the users individually selects which
+#. ``custom`` mode refers to a mode where the users individually select which
    kinds of operations the rollup node injects. It provides tailored control and
    flexibility customized to specific requirements, and is mostly used for tests.
 
@@ -334,7 +334,7 @@ Archive mode
 When configured in *archive* mode, a rollup node will keep all history since the
 origination of the rollup. This mode can be useful for
 applications that require to regularly access historical data before the LCC,
-i.e. for application that need more than two weeks of history.
+i.e. for applications that need more than two weeks of history.
 
 This mode can be chosen e.g. on the command line with ``--history-mode
 archive``.
@@ -365,7 +365,7 @@ representation of the message payload, one can do:
 
 to inject such an external message,  where ``${PROTO_HASH}`` is the hash of your
 protocol (e.g. ``ProtoALphaAL`` for Alpha; see :ref:`how to obtain it <octez_client_protocol>`).
-So let us focus now on producing a viable content for ``${EMESSAGE}``.
+So let us focus now on producing viable content for ``${EMESSAGE}``.
 
 The kernel used previously in our running example is a simple "echo"
 kernel that copies its input as a new message to its outbox.
@@ -521,7 +521,7 @@ Populating the reveal channel
 """""""""""""""""""""""""""""
 
 It is the responsibility of rollup node operators to get the data
-passed through the reveal data channel when the rollup requested it.
+passed through the reveal data channel when the rollup requests it.
 
 To answer a request for a page of hash ``H``, the rollup node tries to
 read the content of a file ``H`` named
@@ -646,7 +646,7 @@ The rest of the section proceeds as follows.
 
 #. First, we explain the execution environment of a WASM kernel: when
    it is parsed, executed, etc.
-#. Then, we explain in more details the API at the disposal of WASM
+#. Then, we explain in more detail the API at the disposal of WASM
    kernel developers.
 #. Finally, we demonstrate how Rust in particular can be used to
    implement a WASM kernel.
@@ -730,7 +730,7 @@ When a new block is published on Tezos, the inbox exposed to the smart
 rollup is populated with all the inputs published on Tezos in this
 block. It is important to keep in mind that all the smart rollups
 which are originated on Tezos share the same inbox. As a consequence,
-a WASM kernel has to filter the inputs that are relevant for its
+a WASM kernel has to filter the inputs that are relevant to its
 purpose from the ones it does not need to process.
 
 Once the inbox has been populated with the inputs of the Tezos block,
@@ -912,7 +912,7 @@ simple as running the following command.
 
 Rust also proposes the ``wasm64-unknown-unknown`` compilation
 target. This target is **not** compatible with Tezos smart rollups,
-which only provides a 32bit address space.
+which only provide a 32bit address space.
 
 .. note::
 
@@ -1336,7 +1336,7 @@ take care of the possible reboots asked by the kernel (through the usage of the
   Internal state: Collect
 
 To obtain more information on the execution, the command ``profile`` will also run
-the kernel on a full inbox, consumed all inputs, run until more inputs are
+the kernel on a full inbox, consume all inputs, run until more inputs are
 required, and output some information about the run.
 
 .. code::
@@ -1400,7 +1400,7 @@ Metadata are automatically filled with level ``0`` as origination level
 and the configured smart rollup address (or the default one).
 
 Note that when stepping tick by tick (using the ``step tick`` command), it is
-possible to end up in a situation were the evaluation stops on ``Waiting for
+possible to end up in a situation where the evaluation stops on ``Waiting for
 reveal``. If the expected value is a metadata, the command ``reveal metadata``
 will give the default metadata to the kernel. If the value expected is the
 preimage of a given hash, there are two possible solutions:
