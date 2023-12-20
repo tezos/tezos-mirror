@@ -402,7 +402,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   let hard_gas_limit_per_block =
     match hard_gas_limit_per_block with
     | Some gb -> gb
-    | None -> Gas.Arith.(integral_of_int_exn 5_200_000)
+    | None -> Default_parameters.constants_mainnet.hard_gas_limit_per_block
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
   let sc_rollup =
