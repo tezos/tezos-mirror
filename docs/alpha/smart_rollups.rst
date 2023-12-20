@@ -134,7 +134,7 @@ inbox.
 
 Finally, after the application of the operations of the Tezos block,
 the Layer 1 pushes one final internal message “End of
-level”. Similarly to “Start of level“, these internal messages does not
+level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
 .. _reveal_data_channel_smart_rollups_alpha:
