@@ -256,3 +256,5 @@ linkcheck_allowed_redirects = dict(
 html_domain_indices = False
 
 default_role = 'default'
+
+html_favicon = 'favicon.ico'
