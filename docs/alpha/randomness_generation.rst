@@ -90,9 +90,9 @@ time ends). To ensure liveness, we fallback to RANDAO entropy if no VDF output
 was published and verified on-chain.
 
 Concretely, the random seed for cycle ``n`` is a 256-bit long number computed
-at the end of cycle ``n-1-PRESERVED_CYCLES``. It is the VDF output (or, in its
+at the end of cycle ``n-1-CONSENSUS_RIGHTS_DELAY``. It is the VDF output (or, in its
 absence, the RANDAO output) computed from nonces to which delegates commit
-during cycle ``n-2-PRESERVED_CYCLES``.
+during cycle ``n-2-CONSENSUS_RIGHTS_DELAY``.
 
 Every ``BLOCKS_PER_COMMITMENT`` levels, the corresponding block contains a
 nonce commitment. More precisely, a block contains a commitment if and only if
@@ -103,7 +103,7 @@ commitment is simply the hash of the nonce.
 
 The committed nonce must be revealed by the original block proposer during the
 nonce revelation phase, that is during the first ``NONCE_REVELATION_THRESHOLD``
-blocks, of cycle ``n-1-PRESERVED_CYCLES`` under penalty of forfeiting all of
+blocks, of cycle ``n-1-CONSENSUS_RIGHTS_DELAY`` under penalty of forfeiting all of
 its expected attesting rewards for that cycle. The associated security deposit
 and baking rewards are not affected. The RANDAO output is then computed and
 stored on-chain as the temporary seed for cycle ``n``. The RANDAO output is the
@@ -162,5 +162,5 @@ Randomness generation parameters
    * - ``VDF_DIFFICULTY``
      - 8,000,000,000
 
-The variables ``BLOCKS_PER_CYCLE`` and ``PRESERVED_CYCLES`` are already defined
+The variables ``BLOCKS_PER_CYCLE`` and ``CONSENSUS_RIGHTS_DELAY`` are already defined
 in the :doc:`proof of stake <proof_of_stake>` page.

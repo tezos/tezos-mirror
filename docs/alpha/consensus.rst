@@ -187,21 +187,21 @@ unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``.
 When emitting such a command in cycle ``c``, it affects the automatic deposit at
 the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
-PRESERVED_CYCLES + 1``.
+CONSENSUS_RIGHTS_DELAY + 1``.
 Since the deposit will be adjusted at the end of cycle ``c``, unstaked tokens
-will be available at cycle  ``c + 1 + PRESERVED_CYCLES + MAX_SLASHING_PERIOD``.
+will be available at cycle  ``c + 1 + CONSENSUS_RIGHTS_DELAY + MAX_SLASHING_PERIOD``.
 
-The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
+The active stake is computed ``CONSENSUS_RIGHTS_DELAY`` in advance: at
+the end of cycle ``c`` for cycle ``c + 1 + CONSENSUS_RIGHTS_DELAY`` (as in Emmy*),
 before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
 
 ..
    This entails that a delegate which was participating until cycle ``c -
    1`` and is no longer participating in cycle ``c`,
    will lose its rights from cycle
-   ``c + 2 * PRESERVED_CYCLES + 2`` onwards -- at the end of cycle ``c +
-   PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
-   PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
+   ``c + 2 * CONSENSUS_RIGHTS_DELAY + 2`` onwards -- at the end of cycle ``c +
+   CONSENSUS_RIGHTS_DELAY``, the rights for cycle ``c + 2 *
+   CONSENSUS_RIGHTS_DELAY + 1`` are computed, and only then is the delegate
    declared passive. Here "participation" means *having baked a final
    block* or *having a preattestation or attestation included in a final
    block*.
@@ -276,7 +276,7 @@ behavior. Notable changes however are as follows:
 * Validators are rewarded instantaneously for baking blocks and including extra attestations, and not at the end of the cycle like in Emmy*.
 * At the end of a cycle ``c``, the following actions happen:
 
-  - the selection of the consensus committee cycle ``c + PRESERVED_CYCLES``, based on the current active stake distribution,
+  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution,
   - the distribution of attesting rewards,
   - the adjustment of frozen deposits.
 

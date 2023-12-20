@@ -36,8 +36,8 @@ as delegates.
 Any :ref:`account <def_account_alpha>` (implicit or originated) can specify a delegate
 through a delegation operation.  Any account can change or revoke its delegate
 at any time, again through a delegation operation. However, the change only
-becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <def_cycle_alpha>`.  The
-value ``PRESERVED_CYCLES`` is a :ref:`protocol constant
+becomes effective after ``CONSENSUS_RIGHTS_DELAY + 2`` :ref:`cycles <def_cycle_alpha>`.  The
+value ``CONSENSUS_RIGHTS_DELAY`` is a :ref:`protocol constant
 <protocol_constants_alpha>`.
 
 A delegate participates in consensus and in governance with a weight
@@ -83,8 +83,8 @@ A delegate is marked as active at its registration.
 
 A delegate becomes passive at the end of cycle ``n`` when it has
 failed to participate in the consensus algorithm in
-the past ``PRESERVED_CYCLES + 1`` cycles. That is, in cycles ``n``, ``n-1``,
-``n-2``, ..., ``n - PRESERVED_CYCLES``.
+the past ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. That is, in cycles ``n``, ``n-1``,
+``n-2``, ..., ``n - CONSENSUS_RIGHTS_DELAY``.
 
 Delegates' rights selection
 ---------------------------
@@ -117,9 +117,9 @@ position modulo ``BLOCKS_PER_STAKE_SNAPSHOT`` is ``BLOCKS_PER_STAKE_SNAPSHOT - 1
 Therefore, at the end of a cycle there are ``BLOCKS_PER_CYCLE /
 BLOCKS_PER_STAKE_SNAPSHOT`` stored snapshots.
 
-At the end of cycle ``n-1-PRESERVED_CYCLES``, the snapshot for cycle
+At the end of cycle ``n-1-CONSENSUS_RIGHTS_DELAY``, the snapshot for cycle
 ``n`` is randomly selected from the snapshots stored in cycle
-``n-1-PRESERVED_CYCLES``. The selection is done through a very simple
+``n-1-CONSENSUS_RIGHTS_DELAY``. The selection is done through a very simple
 PRNG having as seed the :ref:`random seed<random_seed_alpha>` for
 cycle ``n``.
 
@@ -171,7 +171,7 @@ Proof-of-stake parameters
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
      - 24576 blocks
-   * - ``PRESERVED_CYCLES``
+   * - ``CONSENSUS_RIGHTS_DELAY``
      - 5 cycles
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
