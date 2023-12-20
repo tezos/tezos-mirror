@@ -12,6 +12,9 @@ pub enum Add {
     IntNat,
     NatInt,
     MutezMutez,
+    Bls12381G1,
+    Bls12381G2,
+    Bls12381Fr,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -89,4 +92,10 @@ pub enum Concat {
     TwoBytes,
     ListOfStrings,
     ListOfBytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Int {
+    Nat,
+    Bls12381Fr,
 }

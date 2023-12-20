@@ -179,6 +179,24 @@ fn interpret_one<'a>(
                 let sum = o1.checked_add(o2).ok_or(InterpretError::MutezOverflow)?;
                 stack.push(V::Mutez(sum));
             }
+            overloads::Add::Bls12381Fr => {
+                let o1 = pop!(V::Bls12381Fr);
+                let o2 = pop!(V::Bls12381Fr);
+                ctx.gas.consume(interpret_cost::ADD_BLS_FR)?;
+                stack.push(V::Bls12381Fr(o1 + o2));
+            }
+            overloads::Add::Bls12381G1 => {
+                let o1 = pop!(V::Bls12381G1);
+                let o2 = pop!(V::Bls12381G1);
+                ctx.gas.consume(interpret_cost::ADD_BLS_G1)?;
+                stack.push(V::Bls12381G1(o1 + o2));
+            }
+            overloads::Add::Bls12381G2 => {
+                let o1 = pop!(V::Bls12381G2);
+                let o2 = pop!(V::Bls12381G2);
+                ctx.gas.consume(interpret_cost::ADD_BLS_G2)?;
+                stack.push(V::Bls12381G2(o1 + o2));
+            }
         },
         I::And(overload) => match overload {
             overloads::And::Bool => {
@@ -378,11 +396,18 @@ fn interpret_one<'a>(
                 }
             }
         }
-        I::Int => {
-            let i = pop!(V::Nat);
-            ctx.gas.consume(interpret_cost::INT_NAT)?;
-            stack.push(V::Int(i.into()));
-        }
+        I::Int(overload) => match overload {
+            overloads::Int::Nat => {
+                let i = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::INT_NAT)?;
+                stack.push(V::Int(i.into()));
+            }
+            overloads::Int::Bls12381Fr => {
+                let i = pop!(V::Bls12381Fr);
+                ctx.gas.consume(interpret_cost::INT_BLS_FR)?;
+                stack.push(V::Int(i.to_big_int()))
+            }
+        },
         I::Loop(nested) => {
             ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
             loop {
@@ -978,6 +1003,7 @@ mod interpreter_tests {
     use super::*;
     use super::{Lambda, Or};
     use crate::ast::michelson_address as addr;
+    use crate::bls;
     use crate::gas::Gas;
     use Instruction::*;
     use Option::None;
@@ -994,6 +1020,42 @@ mod interpreter_tests {
         let expected_stack = stk![V::nat(30)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_bls12_381_fr() {
+        let mut stack = stk![
+            V::Bls12381Fr(bls::Fr::one()),
+            V::Bls12381Fr(bls::Fr::zero())
+        ];
+        let expected_stack = stk![V::Bls12381Fr(bls::Fr::one())];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::Bls12381Fr), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_bls12_381_g1() {
+        let mut stack = stk![
+            V::Bls12381G1(bls::G1::one()),
+            V::Bls12381G1(bls::G1::zero())
+        ];
+        let expected_stack = stk![V::Bls12381G1(bls::G1::one())];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::Bls12381G1), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_bls12_381_g2() {
+        let mut stack = stk![
+            V::Bls12381G2(bls::G2::one()),
+            V::Bls12381G2(bls::G2::zero())
+        ];
+        let expected_stack = stk![V::Bls12381G2(bls::G2::one())];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::Bls12381G2), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -1411,11 +1473,20 @@ mod interpreter_tests {
     }
 
     #[test]
-    fn test_int() {
+    fn test_int_nat() {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::int(10)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Int, &mut ctx, &mut stack).is_ok());
+        assert!(interpret_one(&Int(overloads::Int::Nat), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_int_bls12_381_fr() {
+        let mut stack = stk![V::Bls12381Fr(bls::Fr::one())];
+        let expected_stack = stk![V::int(1)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Int(overloads::Int::Bls12381Fr), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
