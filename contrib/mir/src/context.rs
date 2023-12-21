@@ -6,6 +6,7 @@ use crate::ast::michelson_key_hash::KeyHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
+use tezos_crypto_rs::hash::OperationListHash;
 
 pub struct Ctx<'a> {
     pub gas: Gas,
@@ -21,10 +22,12 @@ pub struct Ctx<'a> {
     pub voting_powers: Box<dyn Fn(&KeyHash) -> BigUint>,
     pub now: BigInt,
     pub total_voting_power: BigUint,
+    pub operation_group_hash: [u8; 32],
     // NB: lifetime is mandatory if we want to use types implementing with
     // references inside for LazyStorage, and we do due to how Runtime is passed
     // as &mut
     pub big_map_storage: Box<dyn LazyStorage<'a> + 'a>,
+    origination_counter: u32,
     operation_counter: u128,
 }
 
@@ -48,6 +51,15 @@ impl Ctx<'_> {
         self.total_voting_power = map.values().sum();
         self.voting_powers = Box::new(move |x| map.get(x).unwrap_or(&0u32.into()).clone());
     }
+
+    pub fn origination_counter(&mut self) -> u32 {
+        self.origination_counter += 1;
+        self.origination_counter
+    }
+
+    pub fn set_origination_counter(&mut self, v: u32) {
+        self.origination_counter = v;
+    }
 }
 
 impl Default for Ctx<'_> {
@@ -69,6 +81,15 @@ impl Default for Ctx<'_> {
             total_voting_power: 0u32.into(),
             big_map_storage: Box::new(InMemoryLazyStorage::new()),
             operation_counter: 0,
+            operation_group_hash: OperationListHash::from_base58_check(
+                "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
+            )
+            .unwrap()
+            .0
+            .as_slice()
+            .try_into()
+            .unwrap(),
+            origination_counter: 0,
         }
     }
 }

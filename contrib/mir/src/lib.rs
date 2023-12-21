@@ -30,12 +30,14 @@ mod tests {
     use crate::ast::*;
     use crate::context::Ctx;
     use crate::gas::Gas;
+
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
     use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
     use crate::typechecker;
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
+    use std::rc::Rc;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
         let initial_milligas = ctx.gas.milligas();
@@ -916,6 +918,58 @@ mod tests {
                 TypedValue::nat(10),
             ],
             Ctx::default(),
+        );
+    }
+
+    #[test]
+    fn create_contract() {
+        use tezos_crypto_rs::hash::OperationListHash;
+        let mut ctx = Ctx::default();
+        let cs_mich =
+            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
+                .unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let expected_op = TypedValue::new_operation(
+            Operation::CreateContract(CreateContract {
+                delegate: None,
+                amount: 100,
+                storage: TypedValue::Unit,
+                code: Rc::new(cs),
+                micheline_code: &cs_mich,
+            }),
+            101,
+        );
+        let expected_addr =
+            TypedValue::Address(Address::try_from("KT1CvVk9uuEpf5t88frj41xMzHc5M6FHqxZw").unwrap());
+        run_e2e_test(
+            &Arena::new(),
+            r#"CREATE_CONTRACT {
+                parameter unit;
+                storage unit;
+                code { DROP; UNIT; NIL operation; PAIR; }
+            }"#,
+            stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)],
+            stk![Type::Address, Type::Operation],
+            stk![
+                TypedValue::Unit,
+                TypedValue::Mutez(100),
+                TypedValue::new_option(None)
+            ],
+            stk![expected_addr, expected_op],
+            {
+                let mut ctx = Ctx::default();
+                ctx.set_operation_counter(100);
+                ctx.set_origination_counter(0);
+                ctx.operation_group_hash = OperationListHash::from_base58_check(
+                    "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
+                )
+                .unwrap()
+                .0
+                .as_slice()
+                .try_into()
+                .unwrap();
+                ctx
+            },
         );
     }
 

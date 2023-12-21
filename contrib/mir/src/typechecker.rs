@@ -1793,6 +1793,24 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
+            if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
+        {
+            let contract_script = cs.typecheck_script(ctx)?;
+            ensure_ty_eq(&mut ctx.gas, &contract_script.storage, new_storage)?;
+            stack.drop_top(3);
+            stack.push(Type::Address);
+            stack.push(Type::Operation);
+            I::CreateContract(Rc::new(contract_script), cs)
+        }
+        (App(CREATE_CONTRACT, [_], _), [.., _, _, _]) => {
+            no_overload!(CREATE_CONTRACT)
+        }
+        (App(CREATE_CONTRACT, [_], _), [] | [_] | [_, _]) => {
+            no_overload!(CREATE_CONTRACT, len 3)
+        }
+        (App(CREATE_CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
+
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
@@ -7030,6 +7048,69 @@ mod typecheck_tests {
                 "entrypoint name must be at most 31 characters long, but it is 35 characters long"
                     .into()
             )))
+        );
+    }
+
+    #[test]
+    fn create_contract() {
+        let stk = &mut tc_stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)];
+        let mut ctx = Ctx::default();
+        let create_contract_src = "CREATE_CONTRACT { parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}";
+        let cs_mich =
+            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
+                .unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        assert_eq!(
+            typecheck_instruction(
+                &parse(create_contract_src).unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(CreateContract(Rc::new(cs), &cs_mich))
+        );
+        assert_eq!(stk, &tc_stk![Type::Address, Type::Operation]);
+
+        // Stack too short tests
+        let stk = &mut tc_stk![Type::Mutez, Type::new_option(Type::KeyHash)];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(create_contract_src).unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CREATE_CONTRACT,
+                stack: stk![Type::Mutez, Type::new_option(Type::KeyHash)],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 3 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Mutez];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(create_contract_src).unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CREATE_CONTRACT,
+                stack: stk![Type::Mutez],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 3 })
+            })
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(create_contract_src).unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CREATE_CONTRACT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 3 })
+            })
         );
     }
 }
