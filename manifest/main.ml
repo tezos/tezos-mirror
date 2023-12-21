@@ -2825,7 +2825,7 @@ let tezt_risc_v_sandbox =
     ~opam:"tezt-risc-v-sandbox"
     ~synopsis:"Test framework for RISC-V sandbox"
     ~bisect_ppx:No
-    ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"]
+    ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; tezt_tezos]
     ~release_status:Unreleased
 
 let _tezt_self_tests =

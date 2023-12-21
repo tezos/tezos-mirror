@@ -25,8 +25,8 @@
 
 let test_dummy_kernel () =
   Tezt_risc_v_sandbox.run_kernel
-    ~input:(project_root // "tezt/tests/riscv-tests/hermit-loader")
-    ~initrd:(project_root // "risc-v-dummy.elf")
+    ~input:"tezt/tests/riscv-tests/hermit-loader"
+    ~initrd:"risc-v-dummy.elf"
     ()
 
 let fold_dir_lwt ~f ~acc dirname =
@@ -52,7 +52,7 @@ let riscv_test_units =
   ["mi"; "si"; "ua"; "uc"; "ud"; "uf"; "ui"; "um"; "mzicbo"; "ssvnapot"; "uzfh"]
 
 let test_user_level_risc_v_unit_tests riscv_test_unit () =
-  let directory = project_root // "tezt/tests/riscv-tests/generated" in
+  let directory = "tezt/tests/riscv-tests/generated" in
   let is_in_unit program =
     program =~ rex (sf "rv64%s.*-?-.*" riscv_test_unit)
   in
@@ -81,16 +81,14 @@ let test_user_level_risc_v_unit_tests riscv_test_unit () =
     kernels
 
 let test_inline_asm () =
-  let input =
-    project_root // "src/risc_v/tests/inline_asm/rv64-inline-asm-tests"
-  in
+  let input = "src/risc_v/tests/inline_asm/rv64-inline-asm-tests" in
   Tezt_risc_v_sandbox.run_kernel ~posix:true ~input ()
 
 let register () =
-  Test.register
+  Regression.register
     ~__FILE__
     ~title:"Run the dummy kernel"
-    ~tags:["riscv"; "sandbox"]
+    ~tags:["riscv"; "sandbox"; "dummy"]
     ~uses:[Tezt_risc_v_sandbox.risc_v_sandbox]
     ~uses_node:false
     ~uses_client:false
@@ -108,7 +106,7 @@ let register () =
         ~uses_admin_client:false
         (test_user_level_risc_v_unit_tests test_unit))
     riscv_test_units ;
-  Test.register
+  Regression.register
     ~__FILE__
     ~title:"Run inline asm tests"
     ~tags:["riscv"; "sandbox"; "inline_asm"]
