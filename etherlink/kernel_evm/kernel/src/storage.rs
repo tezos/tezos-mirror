@@ -41,9 +41,6 @@ const ADMIN: RefPath = RefPath::assert_from(b"/admin");
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
 
-// flag denoting reboot
-const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
-
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
@@ -769,20 +766,6 @@ pub fn store_kernel_version<Host: Runtime>(
     let kernel_version = kernel_version.as_bytes();
     host.store_write_all(&KERNEL_VERSION_PATH, kernel_version)
         .map_err(Error::from)
-}
-
-pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    host.store_write(&REBOOTED, &[1], 0)
-        .context("Failed to set reboot flag")
-}
-
-pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    host.store_delete(&REBOOTED)
-        .context("Failed to delete reboot flag")
-}
-
-pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
-    Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
 }
 
 pub fn store_block_in_progress<Host: Runtime>(
