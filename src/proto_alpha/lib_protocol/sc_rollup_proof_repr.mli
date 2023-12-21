@@ -265,6 +265,30 @@ val produce :
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   serialized t tzresult Lwt.t
 
+module Dal_helpers : sig
+  (** We consider that a DAL page or slot published at a level [published_level]
+      is valid, and produce or verify a proof for it if, and only if, the level
+      is in the following boundaries:
+
+      - [published_level] > [origination_level]: this means that the slot of the
+      page was published after the rollup origination ;
+
+      - [published_level] + [dal_attestation_lag] <= [commit_inbox_level]: this
+      means that the slot of the page has been attested before or at the
+      [commit_inbox_level].
+
+      According to the definition in {!Sc_rollup_commitment_repr},
+      [commit_inbox_level] (aka inbox_level in that module) is the level
+      (included) up to which the PVM consumed all messages and DAL/DAC inputs
+      before producing the related commitment. *)
+  val valid_published_level :
+    dal_attestation_lag:int ->
+    origination_level:Raw_level_repr.t ->
+    commit_inbox_level:Raw_level_repr.t ->
+    published_level:Raw_level_repr.t ->
+    bool
+end
+
 (**/**)
 
 module Internal_for_tests : sig
