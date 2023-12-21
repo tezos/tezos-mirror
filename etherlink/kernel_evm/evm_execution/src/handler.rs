@@ -1592,11 +1592,15 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         // return 0 when block number not in valid range
         // Ref. https://www.evm.codes/#40?fork=shanghai (opcode 0x40)
 
-        if self.block.number - number > U256::from(256) {
-            return H256::zero();
+        match self.block.number.checked_sub(number) {
+            Some(block_diff)
+                if block_diff <= U256::from(256) && block_diff != U256::zero() =>
+            {
+                storage::blocks::get_block_hash(self.host, number)
+                    .unwrap_or_else(|_| H256::zero())
+            }
+            _ => H256::zero(),
         }
-        storage::blocks::get_block_hash(self.host, number)
-            .unwrap_or_else(|_| H256::zero())
     }
 
     fn block_number(&self) -> U256 {
@@ -2753,6 +2757,69 @@ mod test {
             Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![])),
             result,
             "Writing at offset 1025 in the memory doesn't work"
+        )
+    }
+
+    #[test]
+    fn dont_crash_on_blockhash_instruction() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let address = H160::from_low_u64_be(210_u64);
+        let input = vec![0_u8];
+        let transaction_context = TransactionContext::new(caller, address, U256::zero());
+        let transfer: Option<Transfer> = None;
+
+        let code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(), // push value 0x1
+            0x1,
+            Opcode::PUSH1.as_u8(), // push value 0x0
+            0x0,
+            Opcode::MSTORE.as_u8(), // a 1 at location 0
+            Opcode::PUSH4.as_u8(),  // push value 0xffffffff
+            0xff,
+            0xff,
+            0xff,
+            0xff,
+            Opcode::BLOCKHASH.as_u8(),
+            Opcode::PUSH1.as_u8(), // push value 0x0
+            0x0,
+            Opcode::MSTORE.as_u8(), // store blockhash at location 0x0
+            Opcode::PUSH1.as_u8(),  // push 32
+            32,
+            Opcode::PUSH1.as_u8(), // push 0x0
+            0x0,
+            Opcode::RETURN.as_u8(),
+        ];
+
+        set_code(&mut handler, &address, code);
+        set_balance(&mut handler, &caller, U256::from(99_u32));
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
+
+        assert_eq!(
+            Ok((
+                ExitReason::Succeed(ExitSucceed::Returned),
+                None,
+                vec![0; 32],
+            )),
+            result,
         )
     }
 }
