@@ -1625,7 +1625,7 @@ module Tx_kernel_e2e = struct
 
   let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
     let* ticks =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_total_ticks ?block ()
     in
     Check.(ticks > prev_ticks)
@@ -1832,7 +1832,7 @@ module Tx_kernel_e2e = struct
       @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
     let* prev_ticks =
-      Sc_rollup_node.RPC.call sc_rollup_node
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
       @@ Sc_rollup_rpc.get_global_block_total_ticks ()
     in
     let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
