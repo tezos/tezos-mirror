@@ -189,7 +189,7 @@ mod test {
         EthereumAccountStorage,
     };
     use evm::executor::stack::Log;
-    use evm::{ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed, Opcode};
+    use evm::{ExitError, ExitReason, ExitRevert, ExitSucceed, Opcode};
     use handler::ExecutionOutcome;
     use host::runtime::Runtime;
     use primitive_types::{H160, H256};
@@ -317,7 +317,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: false,
-            reason: ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfFund)),
+            reason: ExitReason::Error(ExitError::OutOfFund),
             new_address: None,
             logs: vec![],
             result: None,
