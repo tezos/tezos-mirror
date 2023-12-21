@@ -47,25 +47,33 @@ pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
 
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
 }
+
+impl<T> ExactSizeIterator for IntoIter<T> {}
 
 pub struct Iter<'a, T>(std::iter::Rev<core::slice::Iter<'a, T>>);
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
 }
+
+impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
 
 impl<T> IntoIterator for MichelsonList<T> {
     type IntoIter = IntoIter<T>;

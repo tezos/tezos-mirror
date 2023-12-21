@@ -169,7 +169,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
         struct LinearizePairIter<'a>(std::option::Option<&'a Type>);
 
-        impl<'a> std::iter::Iterator for LinearizePairIter<'a> {
+        impl<'a> Iterator for LinearizePairIter<'a> {
             type Item = &'a Type;
             fn next(&mut self) -> std::option::Option<Self::Item> {
                 match self.0 {
@@ -183,7 +183,19 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
                     }
                 }
             }
+
+            fn size_hint(&self) -> (usize, std::option::Option<usize>) {
+                let Some(mut ty) = self.0 else { return (0, Some(0)) };
+                let mut size: usize = 1;
+                while let Type::Pair(x) = ty {
+                    ty = &x.1;
+                    size += 1;
+                }
+                (size, Some(size))
+            }
         }
+
+        impl<'a> ExactSizeIterator for LinearizePairIter<'a> {}
 
         match self {
             Nat => Micheline::prim0(Prim::nat),

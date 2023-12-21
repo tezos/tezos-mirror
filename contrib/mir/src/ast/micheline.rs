@@ -40,17 +40,24 @@ impl<'a> Micheline<'a> {
         arena.alloc_extend(args)
     }
 
-    /// To avoid triggering a panic, the argument is collected into a `Vec`.
-    /// This has performance implications, and should be addressed eventually.
     pub(crate) fn alloc_iter(
         arena: &'a Arena<Self>,
-        iter: impl IntoIterator<Item = Self>,
+        mut iter: impl ExactSizeIterator<Item = Self>,
     ) -> &'a [Micheline<'a>] {
-        let collected: Vec<Self> = iter.into_iter().collect::<Vec<_>>();
-        // The call is safe, as the iterator is first collected into a Vec.
-        // see Note: alloc_extend
+        // preallocate the slice, filling it with Micheline::Seq(&[]), which is
+        // the simplest Micheline variant. We control the iterator here, it
+        // doesn't allocate in the arena, the call is safe.
+        // See Note: alloc_extend
         #[allow(clippy::disallowed_methods)]
-        arena.alloc_extend(collected)
+        let buf = arena.alloc_extend(std::iter::repeat(Micheline::Seq(&[])).take(iter.len()));
+        let mut actual_len: usize = 0;
+        for (dest, item) in buf.iter_mut().zip(&mut iter) {
+            *dest = item;
+            actual_len += 1;
+        }
+        assert!(iter.next().is_none());
+        assert!(buf.len() == actual_len);
+        buf
     }
 
     pub fn prim0(prim: Prim) -> Self {
