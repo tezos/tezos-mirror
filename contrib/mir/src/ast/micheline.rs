@@ -240,7 +240,6 @@ macro_rules! micheline_unsupported_instructions {
             | Prim::LSL
             | Prim::LSR
             | Prim::CREATE_CONTRACT
-            | Prim::EMIT
             | Prim::EMPTY_MAP
             | Prim::MAP
             | Prim::SAPLING_EMPTY_STATE
@@ -389,6 +388,7 @@ macro_rules! micheline_values {
                 | Prim::Right
                 | Prim::Lambda_rec
                 | Prim::Transfer_tokens
+                | Prim::Emit
                 | Prim::Set_delegate,
             ..,
         )

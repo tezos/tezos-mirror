@@ -101,7 +101,7 @@ impl TryFrom<FieldAnnotation<'_>> for Entrypoint {
     }
 }
 
-fn check_ep_name_len(ep: &[u8]) -> Result<(), ByteReprError> {
+pub(crate) fn check_ep_name_len(ep: &[u8]) -> Result<(), ByteReprError> {
     if ep.len() > MAX_EP_LEN {
         return Err(ByteReprError::WrongFormat(format!(
             "entrypoint name must be at most {} characters long, but it is {} characters long",

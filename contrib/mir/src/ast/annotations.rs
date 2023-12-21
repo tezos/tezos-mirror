@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::borrow::Cow;
+
 use crate::lexer::Annotation;
 
 #[derive(Clone, Eq, PartialEq)]
@@ -30,11 +32,21 @@ impl std::fmt::Debug for Annotations<'_> {
     }
 }
 
-pub struct FieldAnnotation<'a>(&'a str);
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FieldAnnotation<'a>(Cow<'a, str>);
 
-impl FieldAnnotation<'_> {
+impl<'a> FieldAnnotation<'a> {
     pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_cow(self) -> Cow<'a, str> {
         self.0
+    }
+
+    #[cfg(test)]
+    pub fn from_str_unchecked(s: &'a str) -> Self {
+        FieldAnnotation(Cow::Borrowed(s))
     }
 }
 
@@ -55,7 +67,7 @@ impl<'a> Annotations<'a> {
         self.0.iter()
     }
 
-    pub fn get_single_field_ann(&'a self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
+    pub fn get_single_field_ann(&self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
         use Annotation::*;
         let mut res = None;
         for i in &self.0 {
@@ -63,7 +75,7 @@ impl<'a> Annotations<'a> {
                 Special(..) | Type(..) | Variable(..) => (),
                 Field(s) => {
                     if res.is_none() {
-                        res = Option::Some(FieldAnnotation(s));
+                        res = Option::Some(FieldAnnotation(s.clone()));
                     } else {
                         return Err(AnnotationError::TooManyFieldAnns(s.to_string()));
                     }

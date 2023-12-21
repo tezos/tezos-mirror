@@ -25,14 +25,17 @@ pub mod tzt;
 mod tests {
     use typed_arena::Arena;
 
+    use crate::ast::annotations::FieldAnnotation;
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::*;
     use crate::context::Ctx;
     use crate::gas::Gas;
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
-    use crate::stack::{stk, tc_stk};
+    use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
     use crate::typechecker;
+    use crate::typechecker::typecheck_instruction;
+    use std::collections::HashMap;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
         let initial_milligas = ctx.gas.milligas();
@@ -258,10 +261,6 @@ mod tests {
             _ => panic!("unexpected contract output"),
         };
     }
-
-    use crate::stack::{FailingTypeStack, Stack, TypeStack};
-    use crate::typechecker::typecheck_instruction;
-    use std::collections::HashMap;
 
     #[track_caller]
     fn run_e2e_test<'a>(
@@ -790,6 +789,72 @@ mod tests {
                 let mut c = Ctx::default();
                 c.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
                 c
+            },
+        );
+    }
+
+    #[test]
+    fn emit() {
+        run_e2e_test(
+            &Arena::new(),
+            "EMIT %mytag nat",
+            stk![Type::Nat],
+            stk![Type::Operation],
+            stk![TypedValue::nat(10)],
+            stk![TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
+                    value: TypedValue::nat(10),
+                    arg_ty: Or::Right(parse("nat").unwrap())
+                }),
+                101
+            )],
+            {
+                let mut ctx = Ctx::default();
+                ctx.set_operation_counter(100);
+                ctx
+            },
+        );
+
+        run_e2e_test(
+            &Arena::new(),
+            "EMIT nat",
+            stk![Type::Nat],
+            stk![Type::Operation],
+            stk![TypedValue::nat(10)],
+            stk![TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag: None,
+                    value: TypedValue::nat(10),
+                    arg_ty: Or::Right(parse("nat").unwrap())
+                }),
+                101
+            )],
+            {
+                let mut ctx = Ctx::default();
+                ctx.set_operation_counter(100);
+                ctx
+            },
+        );
+
+        run_e2e_test(
+            &Arena::new(),
+            "EMIT",
+            stk![Type::Nat],
+            stk![Type::Operation],
+            stk![TypedValue::nat(10)],
+            stk![TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag: None,
+                    value: TypedValue::nat(10),
+                    arg_ty: Or::Left(Type::Nat)
+                }),
+                101
+            )],
+            {
+                let mut ctx = Ctx::default();
+                ctx.set_operation_counter(100);
+                ctx
             },
         );
     }
