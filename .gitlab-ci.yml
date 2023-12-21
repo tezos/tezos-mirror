@@ -139,28 +139,6 @@ docker:arm64:master:
     ARCH: "arm64"
     OCTEZ_BRANCH: "master"
 
-.docker-test:
-  extends: .docker
-  script:
-    - !reference [.docker, script]
-    - docker save -o server-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar ${CI_REGISTRY_IMAGE}/server-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-    - docker save -o archiver-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar ${CI_REGISTRY_IMAGE}/archiver-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-  artifacts:
-    expire_in: 1 week
-    paths:
-      - server-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar
-      - archiver-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}.tar
-  rules:
-    - if: $CI_REGISTRY_IMAGE && ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG)
-      when: never
-
-docker-test:amd64:v18.1:
-  extends: .docker-test
-  dependencies: ["build: [amd64, v18.1]"]
-  variables:
-    ARCH: "amd64"
-    OCTEZ_BRANCH: "v18.1"
-
 .manifest:
   stage: manifest
   image: docker
