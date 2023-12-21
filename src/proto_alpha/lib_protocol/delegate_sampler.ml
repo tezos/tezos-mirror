@@ -237,7 +237,7 @@ let select_distribution_for_cycle ctxt cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
-let select_new_distribution_at_cycle_end ctxt ~slashings:_ ~new_cycle =
+let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
   select_distribution_for_cycle ctxt for_cycle

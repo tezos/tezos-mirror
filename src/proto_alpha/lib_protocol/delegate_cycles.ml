@@ -190,15 +190,12 @@ let cycle_end ctxt last_cycle =
   let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
   in
-  let* ctxt, slashings, slashing_balance_updates =
+  let* ctxt, _slashings, slashing_balance_updates =
     Delegate_slashed_deposits_storage.apply_and_clear_denunciations ctxt
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
   let* ctxt =
-    Delegate_sampler.select_new_distribution_at_cycle_end
-      ctxt
-      ~slashings
-      ~new_cycle
+    Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
   in
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
   let*! ctxt =
