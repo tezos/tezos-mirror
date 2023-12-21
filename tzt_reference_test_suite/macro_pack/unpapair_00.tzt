@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda (pair unit (pair (pair unit unit) unit)) unit) { UNPAPPAIIR; DROP; DROP; DROP } } ;
+output { Stack_elt bytes 0x05020000001f0200000014037a051f0200000002037a051f0200000002037a032003200320 } ;
