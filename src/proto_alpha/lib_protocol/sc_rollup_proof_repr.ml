@@ -233,7 +233,7 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
-module Dal_proofs = struct
+module Dal_helpers = struct
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
      The current DAL refutation integration is not resilient to DAL parameters
      changes when upgrading the protocol. The code needs to be adapted. *)
@@ -336,7 +336,7 @@ let valid (type state proof output)
     | Some (Reveal_proof Metadata_proof) ->
         return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
     | Some (Reveal_proof (Dal_page_proof {proof; page_id})) ->
-        Dal_proofs.verify
+        Dal_helpers.verify
           ~metadata
           dal_parameters
           ~dal_attestation_lag
@@ -508,7 +508,7 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
             Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
     | Needs_reveal (Request_dal_page page_id) ->
         let open Dal_with_history in
-        Dal_proofs.produce
+        Dal_helpers.produce
           ~metadata
           dal_parameters
           ~dal_attestation_lag
