@@ -1101,7 +1101,8 @@ Not covered
 
 ### `BLAKE2B`
 
-***None***
+- [blake2b_00.tzt](blake2b_00.tzt)
+- [blake2b_01.tzt](blake2b_01.tzt)
 
 ### `CHECK_SIGNATURE`
 
@@ -1116,7 +1117,8 @@ Does not check different types of key.
 
 ### `KECCAK`
 
-***None***
+- [keccak_00.tzt](keccak_00.tzt)
+- [keccak_01.tzt](keccak_01.tzt)
 
 ### `PAIRING_CHECK`
 
@@ -1132,15 +1134,18 @@ Does not check different types of key.
 
 ### `SHA256`
 
-***None***
+- [sha256_00.tzt](sha256_00.tzt)
+- [sha256_01.tzt](sha256_01.tzt)
 
 ### `SHA3`
 
-***None***
+- [sha3_00.tzt](sha3_00.tzt)
+- [sha3_01.tzt](sha3_01.tzt)
 
 ### `SHA512`
 
-***None***
+- [sha512_00.tzt](sha512_00.tzt)
+- [sha512_01.tzt](sha512_01.tzt)
 
 ## Blockchain operations
 
@@ -1298,7 +1303,6 @@ Instructions with no tests:
 - `ADD: bls12_381_g1 : bls12_381_g1`
 - `ADD: bls12_381_g2 : bls12_381_g2`
 - `AND: bytes:bytes`
-- `BLAKE2B`
 - `BYTES: int`
 - `BYTES: nat`
 - `CHECK_SIGNATURE`
@@ -1323,7 +1327,6 @@ Instructions with no tests:
 - `INT: bls12_381_fr`
 - `INT: bytes`
 - `JOIN_TICKETS`
-- `KECCAK`
 - `LAMBDA_REC`
 - `LAMBDA`
 - `LEVEL`
@@ -1350,9 +1353,6 @@ Instructions with no tests:
 - `SAPLING_EMPTY_STATE ms`
 - `SAPLING_VERIFY_UPDATE`
 - `SELF_ADDRESS`
-- `SHA256`
-- `SHA3`
-- `SHA512`
 - `SPLIT_TICKET`
 - `SUB_MUTEZ`
 - `SUB: int : nat`
