@@ -114,12 +114,6 @@ val deterministic_seed : seed -> seed
     {i first} seed is created using it as the first one. *)
 val initial_seeds : ?initial_seed:State_hash.t -> int -> seed list
 
-(** {2 Predefined nonce} *)
-
-val initial_nonce_0 : nonce
-
-val initial_nonce_hash_0 : Nonce_hash.t
-
 (** {2 Serializers} *)
 
 val nonce_encoding : nonce Data_encoding.t
