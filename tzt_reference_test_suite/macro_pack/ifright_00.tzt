@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda (or unit unit) unit) { IF_RIGHT {} { DROP; UNIT } } } ;
+output { Stack_elt bytes 0x0502000000150200000010072e02000000040320034f0200000000 } ;

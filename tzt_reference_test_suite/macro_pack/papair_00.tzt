@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda unit unit) { DUP; DUP; DUP; PAPPAIIR; DROP; UNIT } } ;
+output { Stack_elt bytes 0x0502000000230321032103210200000014051f02000000020342051f0200000002034203420320034f } ;
