@@ -3042,7 +3042,7 @@ Node
 
 -  Changed signal handling and exit codes for most binaries. The codes’
    significance are detailed in `the user
-   documentation <http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes>`__.
+   documentation <http://tezos.gitlab.io/user/exits.html#tezos_binaries_signals_and_exit_codes>`__.
 
 -  Command ``octez-node --version`` now exits with exit code 0 instead
    of 1.
