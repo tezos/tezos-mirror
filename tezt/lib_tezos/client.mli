@@ -1069,6 +1069,16 @@ val set_deposits_limit :
   t ->
   string Lwt.t
 
+(* Same as [set_deposits_limit], but do not wait for the process to exit. *)
+val spawn_set_deposits_limit :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  src:string ->
+  limit:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client unset deposits limit for <src>]. *)
 val unset_deposits_limit :
   ?hooks:Process.hooks ->
@@ -3049,17 +3059,35 @@ val publish_dal_commitment :
     endpoint. *)
 val as_foreign_endpoint : endpoint -> Endpoint.t
 
+(** Run [octez-client get receipt for <operation> --check-previous <blocks>]. *)
+val get_receipt_for :
+  operation:string -> ?check_previous:int -> t -> string Lwt.t
+
 (** Run [octez-client stake <amount> for <staker>]. *)
-val stake : ?wait:string -> Tez.t -> string -> t -> unit Lwt.t
+val stake : ?wait:string -> Tez.t -> staker:string -> t -> unit Lwt.t
 
 (** Same as [stake], but do not wait for the process to exit. *)
-val spawn_stake : ?wait:string -> Tez.t -> string -> t -> Process.t
+val spawn_stake : ?wait:string -> Tez.t -> staker:string -> t -> Process.t
 
-(** Run [octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>]. *)
-val set_delegate_parameters : string -> string -> string -> t -> unit Lwt.t
+(** Run [octez-client unstake <amount> for <staker>]. *)
+val unstake : ?wait:string -> Tez.t -> staker:string -> t -> unit Lwt.t
+
+(** Same as [unstake], but do not wait for the process to exit. *)
+val spawn_unstake : ?wait:string -> Tez.t -> staker:string -> t -> Process.t
+
+(** Run [octez-client finalize_unstake for <staker>]. *)
+val finalize_unstake : ?wait:string -> staker:string -> t -> unit Lwt.t
+
+(** Same as [finalize_unstake], but do not wait for the process to exit. *)
+val spawn_finalize_unstake : ?wait:string -> staker:string -> t -> Process.t
+
+(** Run [octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <limit> --edge-of-baking-over-staking <edge>]. *)
+val set_delegate_parameters :
+  delegate:string -> limit:string -> edge:string -> t -> unit Lwt.t
 
 (** Same as [set_delegate_parameters], but do not wait for the process to exit. *)
-val spawn_set_delegate_parameters : string -> string -> string -> t -> Process.t
+val spawn_set_delegate_parameters :
+  delegate:string -> limit:string -> edge:string -> t -> Process.t
 
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)

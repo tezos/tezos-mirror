@@ -1370,12 +1370,16 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
-let set_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src ~limit client =
+let spawn_set_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src ~limit
+    client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait] @ ["set"; "deposits"; "limit"; "for"; src; "to"; limit])
+
+let set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client =
+  spawn_set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client
   |> Process.check_and_read_stdout
 
 let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
@@ -4240,29 +4244,54 @@ let as_foreign_endpoint = function
           port = Proxy_server.rpc_port ps;
         }
 
-let spawn_stake ?(wait = "none") amount dlgt client =
+let get_receipt_for ~operation ?(check_previous = 10) client =
   spawn_command client
-  @@ ["--wait"; wait; "stake"; Tez.to_string amount; "for"; dlgt]
+  @@ [
+       "get";
+       "receipt";
+       "for";
+       operation;
+       "--check-previous";
+       string_of_int check_previous;
+     ]
+  |> Process.check_and_read_stdout
 
-let stake ?wait amount dlgt client =
-  spawn_stake ?wait amount dlgt client |> Process.check
+let spawn_stake ?(wait = "none") amount ~staker client =
+  spawn_command client
+  @@ ["--wait"; wait; "stake"; Tez.to_string amount; "for"; staker]
 
-let spawn_set_delegate_parameters dlgt limit edge client =
+let stake ?wait amount ~staker client =
+  spawn_stake ?wait amount ~staker client |> Process.check
+
+let spawn_unstake ?(wait = "none") amount ~staker client =
+  spawn_command client
+  @@ ["--wait"; wait; "unstake"; Tez.to_string amount; "for"; staker]
+
+let unstake ?wait amount ~staker client =
+  spawn_unstake ?wait amount ~staker client |> Process.check
+
+let spawn_finalize_unstake ?(wait = "none") ~staker client =
+  spawn_command client @@ ["--wait"; wait; "finalize"; "unstake"; "for"; staker]
+
+let finalize_unstake ?wait ~staker client =
+  spawn_finalize_unstake ?wait ~staker client |> Process.check
+
+let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
   spawn_command client
   @@ [
        "set";
        "delegate";
        "parameters";
        "for";
-       dlgt;
+       delegate;
        "--limit-of-staking-over-baking";
        limit;
        "--edge-of-baking-over-staking";
        edge;
      ]
 
-let set_delegate_parameters dlgt limit edge client =
-  spawn_set_delegate_parameters dlgt limit edge client |> Process.check
+let set_delegate_parameters ~delegate ~limit ~edge client =
+  spawn_set_delegate_parameters ~delegate ~limit ~edge client |> Process.check
 
 module RPC = struct
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors

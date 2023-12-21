@@ -351,6 +351,11 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") ?version () =
     balance_updates;
   }
 
+let get_chain_block_metadata_raw ?(chain = "main") ?(block = "head") ?version ()
+    =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make ~query_string GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
+
 let get_chain_block_protocols ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "protocols"] Fun.id
 
@@ -726,6 +731,70 @@ let get_chain_block_context_contract_staking_numerator ?(chain = "main")
       "contracts";
       contract;
       "staking_numerator";
+    ]
+    JSON.as_int
+
+let get_chain_block_context_contract_staked_balance ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "staked_balance";
+    ]
+    JSON.as_int
+
+let get_chain_block_context_contract_unstake_requests ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "unstake_requests";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_unstaked_finalizable_balance
+    ?(chain = "main") ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "unstaked_finalizable_balance";
+    ]
+    JSON.as_int
+
+let get_chain_block_context_contract_unstaked_frozen_balance ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "unstaked_frozen_balance";
     ]
     JSON.as_int
 
@@ -1147,6 +1216,22 @@ let get_chain_block_context_delegate ?(chain = "main") ?(block = "head") pkh =
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+    Fun.id
+
+let get_chain_block_context_delegate_active_staking_parameters ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "active_staking_parameters";
+    ]
     Fun.id
 
 let get_chain_block_context_delegate_current_frozen_deposits ?(chain = "main")

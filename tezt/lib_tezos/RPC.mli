@@ -319,6 +319,13 @@ type block_metadata = {
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> ?version:string -> unit -> block_metadata t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/metadata]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_metadata_raw :
+  ?chain:string -> ?block:string -> ?version:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/protocols]
 
     [chain] defaults to ["main"].
@@ -707,6 +714,38 @@ val get_chain_block_context_contract_storage_paid_space :
 val get_chain_block_context_contract_staking_numerator :
   ?chain:string -> ?block:string -> string -> int t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/staked_balance]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_staked_balance :
+  ?chain:string -> ?block:string -> string -> int t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/unstake_requests]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_unstake_requests :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/unstaked_finalizable_balance]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_unstaked_finalizable_balance :
+  ?chain:string -> ?block:string -> string -> int t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/unstaked_frozen_balance]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_unstaked_frozen_balance :
+  ?chain:string -> ?block:string -> string -> int t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_rights]
 
     [chain] defaults to ["main"].
@@ -1006,6 +1045,13 @@ val get_chain_block_context_delegates :
 val get_chain_block_context_delegate :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/active_staking_parameters]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_active_staking_parameters :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/current_frozen_deposits]
 
     [chain] defaults to ["main"].
@@ -1030,7 +1076,8 @@ val get_chain_block_context_delegate_frozen_balance :
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_balance_by_cycle]
 
     [chain] defaults to ["main"].
-    [block] defaults to ["head"]. *)
+    [block] defaults to ["head"].
+*)
 val get_chain_block_context_delegate_frozen_balance_by_cycle :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
@@ -1182,7 +1229,6 @@ val get_chain_block_context_adaptive_issuance_launch_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/expected_issuance]
-
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_issuance_expected_issuance :
