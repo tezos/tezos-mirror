@@ -22,7 +22,7 @@ use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
+    TransactionHash, TransactionObject, TransactionReceipt,
 };
 use tezos_ethereum::wei::Wei;
 
@@ -893,8 +893,15 @@ pub fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<(
         .context("Failed to delete kernel upgrade")
 }
 
-pub(crate) mod internal_for_tests {
+pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
+    Ok(host.store_has(&SEQUENCER)?.is_some())
+}
+
+#[cfg(test)]
+mod internal_for_tests {
     use super::*;
+
+    use tezos_ethereum::transaction::TransactionStatus;
 
     /// Reads status from the receipt in storage.
     pub fn read_transaction_receipt_status<Host: Runtime>(
@@ -926,9 +933,8 @@ pub(crate) mod internal_for_tests {
     }
 }
 
-pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
-    Ok(host.store_has(&SEQUENCER)?.is_some())
-}
+#[cfg(test)]
+pub use internal_for_tests::*;
 
 #[cfg(test)]
 mod tests {
