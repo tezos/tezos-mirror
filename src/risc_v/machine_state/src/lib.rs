@@ -63,6 +63,7 @@ impl<M: backend::Manager> HartState<M> {
     ) -> csregisters::Result<()> {
         let mode = self.mode.read();
         csregisters::check_privilege(csr, mode)?;
+        csregisters::check_write(csr)?;
 
         // When `rd = x0`, we don't want to trigger any CSR read effects.
         if rd.is_zero() {
@@ -89,6 +90,8 @@ impl<M: backend::Manager> HartState<M> {
         let old = if rs1.is_zero() {
             self.csregisters.read(csr)
         } else {
+            csregisters::check_write(csr)?;
+
             let value = self.xregisters.read(rs1);
             self.csregisters.set_bits(csr, value)
         };
@@ -113,6 +116,8 @@ impl<M: backend::Manager> HartState<M> {
         let old = if imm == 0 {
             self.csregisters.read(csr)
         } else {
+            csregisters::check_write(csr)?;
+
             self.csregisters.set_bits(csr, imm)
         };
 
@@ -135,6 +140,8 @@ impl<M: backend::Manager> HartState<M> {
         let old = if rs1.is_zero() {
             self.csregisters.read(csr)
         } else {
+            csregisters::check_write(csr)?;
+
             let value = self.xregisters.read(rs1);
             self.csregisters.clear_bits(csr, value)
         };
@@ -159,6 +166,8 @@ impl<M: backend::Manager> HartState<M> {
         let old = if imm == 0 {
             self.csregisters.read(csr)
         } else {
+            csregisters::check_write(csr)?;
+
             self.csregisters.clear_bits(csr, imm)
         };
 
