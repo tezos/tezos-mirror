@@ -210,6 +210,26 @@ pub mod tc_cost {
         let log2n = (n + 1).ok_or(OutOfGas)?.log2i() as usize;
         (130 * n + key_size * n * log2n).as_gas_cost()
     }
+
+    pub fn pair_n(size: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(size) * 50).as_gas_cost()
+    }
+
+    pub fn unpair_n(size: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(size) * 50).as_gas_cost()
+    }
+
+    pub fn get_n(size: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(size) * 50).as_gas_cost()
+    }
+
+    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+        // corresponds to Cost_of.Typechecking.proof_argument in the protocol
+        (Checked::from(size) * 50).as_gas_cost()
+    }
 }
 
 pub trait BigIntByteSize {
@@ -813,6 +833,28 @@ pub mod interpret_cost {
     pub fn unpack(bytes: &[u8]) -> Result<u32, OutOfGas> {
         let size = Checked::from(bytes.len());
         (260 + (size >> 1)).as_gas_cost()
+    }
+
+    pub fn pair_n(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        let v0 = size - 2;
+        (40 + ((v0 >> 2) + (v0 * 3))).as_gas_cost()
+    }
+
+    pub fn unpair_n(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        let v0 = size - 2;
+        (30 + (v0 * 4)).as_gas_cost()
+    }
+
+    pub fn get_n(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        (20 + ((size >> 1) + (size >> 4))).as_gas_cost()
+    }
+
+    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+        let size = Checked::from(size);
+        (30 + ((size >> 5) + ((size >> 2) + size))).as_gas_cost()
     }
 }
 

@@ -702,11 +702,36 @@ fn interpret_one<'a>(
             let r = pop!();
             stack.push(V::new_pair(l, r));
         }
+        I::PairN(n) => {
+            ctx.gas.consume(interpret_cost::pair_n(*n as usize)?)?;
+            let res = stack
+                .drain_top(*n as usize)
+                .rev()
+                .reduce(|acc, e| V::new_pair(e, acc))
+                .unwrap();
+            stack.push(res);
+        }
         I::Unpair => {
             ctx.gas.consume(interpret_cost::UNPAIR)?;
             let (l, r) = *pop!(V::Pair);
             stack.push(r);
             stack.push(l);
+        }
+        I::UnpairN(n) => {
+            ctx.gas.consume(interpret_cost::unpair_n(*n as usize)?)?;
+            fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: TypedValue<'a>) {
+                if n == 0 {
+                    stack.push(p);
+                } else if let V::Pair(p) = p {
+                    fill(n - 1, stack, p.1);
+                    stack.push(p.0);
+                } else {
+                    unreachable_state();
+                }
+            }
+            let p = pop!();
+            stack.reserve(*n as usize);
+            fill(n - 1, stack, p);
         }
         I::ISome => {
             ctx.gas.consume(interpret_cost::SOME)?;
@@ -857,6 +882,12 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(result));
             }
         },
+        I::GetN(n) => {
+            ctx.gas.consume(interpret_cost::get_n(*n as usize)?)?;
+            let res = get_nth_field_ref(*n, &mut stack[0]);
+            // this is a bit hacky, but borrow rules leave few other options
+            stack[0] = std::mem::replace(res, V::Unit);
+        }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
                 let key = pop!();
@@ -932,6 +963,12 @@ fn interpret_one<'a>(
                 overloads::Size::Set => run_size!(Set, SIZE_SET),
                 overloads::Size::Map => run_size!(Map, SIZE_MAP),
             }
+        }
+        I::UpdateN(n) => {
+            ctx.gas.consume(interpret_cost::update_n(*n as usize)?)?;
+            let new_val = pop!();
+            let field = get_nth_field_ref(*n, &mut stack[0]);
+            *field = new_val;
         }
         I::ChainId => {
             ctx.gas.consume(interpret_cost::CHAIN_ID)?;
@@ -1332,6 +1369,25 @@ fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Ad
     Address {
         hash: AddressHash::Kt1(HashTrait::try_from_bytes(digest.as_slice()).unwrap()),
         entrypoint: Entrypoint::default(),
+    }
+}
+
+fn get_nth_field_ref<'a, 'b>(
+    mut m: u16,
+    mut val: &'a mut TypedValue<'b>,
+) -> &'a mut TypedValue<'b> {
+    use TypedValue as V;
+    loop {
+        match (m, val) {
+            (0, val_) => break val_,
+            (1, V::Pair(p)) => break &mut p.0,
+
+            (_, V::Pair(p)) => {
+                val = &mut p.1;
+                m -= 2;
+            }
+            _ => unreachable_state(),
+        }
     }
 }
 
@@ -2349,10 +2405,74 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn pair_n_3() {
+        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&PairN(3), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![
+                V::String("foo".into()),
+                V::new_pair(V::Bool(false), V::new_pair(V::nat(42), V::Unit))
+            ]
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+    }
+
+    #[test]
+    fn pair_n_4() {
+        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&PairN(4), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::new_pair(
+                V::Bool(false),
+                V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+            )]
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+    }
+
+    #[test]
     fn unpair() {
         let mut stack = stk![V::new_pair(V::Bool(false), V::nat(42))];
         assert!(interpret(&[Unpair], &mut Ctx::default(), &mut stack).is_ok());
         assert_eq!(stack, stk![V::nat(42), V::Bool(false)]);
+    }
+
+    #[test]
+    fn unpair_n_3() {
+        let mut stack = stk![V::new_pair(
+            V::Bool(false),
+            V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+        )];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&UnpairN(3), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![
+                V::new_pair(V::Unit, V::String("foo".into())),
+                V::nat(42),
+                V::Bool(false)
+            ],
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+    }
+
+    #[test]
+    fn unpair_n_4() {
+        let mut stack = stk![V::new_pair(
+            V::Bool(false),
+            V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
+        )];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&UnpairN(4), ctx, &mut stack), Ok(()));
+        assert_eq!(
+            stack,
+            stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)],
+        );
+        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
@@ -2682,6 +2802,106 @@ mod interpreter_tests {
                 - interpret_cost::map_get(&V::int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
+    }
+
+    mod get_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, val: TypedValue, field_val: TypedValue) {
+            let mut stack = stk![val];
+            assert_eq!(
+                interpret_one(&GetN(n), &mut Ctx::default(), &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![field_val])
+        }
+
+        #[test]
+        fn ok_0() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(0, val.clone(), val);
+        }
+
+        #[test]
+        fn ok_1() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(1, val, V::int(1));
+        }
+
+        #[test]
+        fn ok_2() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(2, val, V::new_pair(V::int(3), V::int(4)));
+        }
+
+        #[test]
+        fn ok_3() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(3, val, V::int(3));
+        }
+
+        #[test]
+        fn ok_4() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(4, val, V::int(4));
+        }
+    }
+
+    mod update_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, val: TypedValue, new_val: TypedValue) {
+            let mut stack = stk![val, TypedValue::nat(100500)];
+            assert_eq!(
+                interpret_one(&UpdateN(n), &mut Ctx::default(), &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![new_val])
+        }
+
+        #[test]
+        fn ok_0() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(0, val, V::nat(100500));
+        }
+
+        #[test]
+        fn ok_1() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                1,
+                val,
+                V::new_pair(V::nat(100500), V::new_pair(V::int(3), V::int(4))),
+            );
+        }
+
+        #[test]
+        fn ok_2() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(2, val, V::new_pair(V::int(1), V::nat(100500)));
+        }
+
+        #[test]
+        fn ok_3() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                3,
+                val,
+                V::new_pair(V::int(1), V::new_pair(V::nat(100500), V::int(4))),
+            );
+        }
+
+        #[test]
+        fn ok_4() {
+            let val = V::new_pair(V::int(1), V::new_pair(V::int(3), V::int(4)));
+            check(
+                4,
+                val,
+                V::new_pair(V::int(1), V::new_pair(V::int(3), V::nat(100500))),
+            );
+        }
     }
 
     #[test]
@@ -3056,6 +3276,92 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(2)]);
+    }
+
+    #[test]
+    fn get_and_update_map_insert() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::new();
+        let mut stack = stk![
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
+        ];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::new_option(None),
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_update() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let mut stack = stk![
+            V::Map(map),
+            V::new_option(Some(V::String("foo".to_owned()))),
+            V::int(1)
+        ];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::new_option(Some(V::String("bar".into())))
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_remove() {
+        let mut ctx = Ctx::default();
+        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let mut stack = stk![V::Map(map), V::new_option(None), V::int(1)];
+        assert_eq!(
+            interpret_one(
+                &GetAndUpdate(overloads::GetAndUpdate::Map),
+                &mut ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![
+                V::Map(BTreeMap::new()),
+                V::new_option(Some(V::String("bar".into()))),
+            ]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+        );
     }
 
     #[test]

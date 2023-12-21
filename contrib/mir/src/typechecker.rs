@@ -27,7 +27,7 @@ use crate::ast::micheline::{
 use crate::ast::michelson_address::AddressHash;
 use crate::context::Ctx;
 use crate::gas::OutOfGas;
-use crate::gas::{self, Gas};
+use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -50,6 +50,8 @@ pub enum TcError {
     TypesNotEqual(#[from] TypesNotEqual),
     #[error("DUP 0 is forbidden")]
     Dup0,
+    #[error("{0} {1} is forbidden")]
+    PairN01(Prim, u16),
     #[error("value {0} is invalid for type {1:?}")]
     InvalidValueForType(String, Type),
     #[error("value {0:?} is invalid element for container type {1:?}")]
@@ -1205,6 +1207,24 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Pair
         }
         (App(PAIR, [], _), [] | [_]) => no_overload!(PAIR, len 2),
+        (App(PAIR, [Micheline::Int(n)], _), _) => {
+            let n = validate_u10(n)?;
+            if n < 2 {
+                return Err(TcError::PairN01(PAIR, n));
+            }
+            if stack.len() < n as usize {
+                no_overload!(PAIR, len n as usize);
+            }
+            ctx.gas.consume(tc_cost::pair_n(n as usize)?)?;
+            // unwrap is fine, n is non-zero.
+            let res = stack
+                .drain_top(n as usize)
+                .rev()
+                .reduce(|acc, e| Type::new_pair(e, acc))
+                .unwrap();
+            stack.push(res);
+            I::PairN(n)
+        }
         (App(PAIR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UNPAIR, [], _), [.., T::Pair(..)]) => {
@@ -1215,6 +1235,33 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(UNPAIR, [], _), [.., ty]) => no_overload!(UNPAIR, NMOR::ExpectedPair(ty.clone())),
         (App(UNPAIR, [], _), []) => no_overload!(UNPAIR, len 1),
+        (App(UNPAIR, [Micheline::Int(n)], _), [.., _]) => {
+            let n = validate_u10(n)?;
+            if n < 2 {
+                return Err(TcError::PairN01(UNPAIR, n));
+            }
+            ctx.gas.consume(tc_cost::unpair_n(n as usize)?)?;
+            fn fill(n: u16, stack: &mut Stack<Type>, p: &Type) -> Result<(), TcError> {
+                if n == 0 {
+                    stack.push(p.clone());
+                } else if let Type::Pair(p) = p {
+                    fill(n - 1, stack, &p.1)?;
+                    stack.push(p.0.clone());
+                } else {
+                    return Err(TcError::NoMatchingOverload {
+                        instr: UNPAIR,
+                        stack: stack.clone(),
+                        reason: Option::Some(NMOR::ExpectedPair(p.clone())),
+                    });
+                }
+                Ok(())
+            }
+            stack.reserve(n as usize);
+            let p = pop!();
+            fill(n - 1, stack, &p)?;
+            I::UnpairN(n)
+        }
+        (App(UNPAIR, [Micheline::Int(_)], _), []) => no_overload!(UNPAIR, len 1),
         (App(UNPAIR, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SOME, [], _), [.., _]) => {
@@ -1352,6 +1399,23 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(GET, [], _), [.., _, _]) => no_overload!(GET),
         (App(GET, [], _), [] | [_]) => no_overload!(GET, len 2),
+
+        (App(GET, [Micheline::Int(n)], _), [.., _]) => {
+            // NB: it's important to NOT pop from the stack here, otherwise
+            // no_overload! below won't report the type on the top of the stack.
+            let ty = &mut stack[0];
+            let n = validate_u10(n)?;
+            ctx.gas.consume(tc_cost::get_n(n as usize)?)?;
+            let res = match get_nth_field_ref(n, ty) {
+                Ok(res) => res,
+                Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
+            };
+            // this is a bit hacky, but borrow rules leave few other options
+            stack[0] = std::mem::replace(res, T::Unit);
+            I::GetN(n)
+        }
+        (App(GET, [Micheline::Int(_)], _), []) => no_overload!(GET, len 1),
+
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
@@ -1375,6 +1439,23 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
+
+        (App(UPDATE, [Micheline::Int(n)], _), [.., _, _]) => {
+            let n = validate_u10(n)?;
+            let new_val = pop!();
+            let old_val = match get_nth_field_ref(n, &mut stack[0]) {
+                Ok(res) => res,
+                Err(ty) => {
+                    // restores the initial stack
+                    stack.push(new_val);
+                    no_overload!(UPDATE, NMOR::ExpectedPair(ty));
+                }
+            };
+            *old_val = new_val;
+            I::UpdateN(n)
+        }
+        (App(UPDATE, [Micheline::Int(_)], _), [] | [_]) => no_overload!(UPDATE, len 2),
+
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
@@ -1873,6 +1954,23 @@ pub(crate) fn typecheck_contract_address(
             })
         }
     }
+}
+
+fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
+    Ok(loop {
+        match (m, ty) {
+            (0, ty_) => break ty_,
+            (1, Type::Pair(p)) => break &mut Rc::make_mut(p).0,
+            (_, Type::Pair(p)) => {
+                ty = &mut Rc::make_mut(p).1;
+                m -= 2;
+            }
+            (_, ty) => {
+                let ty = ty.clone();
+                return Err(ty);
+            }
+        }
+    })
 }
 
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
@@ -3497,6 +3595,91 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn pair_n_3() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 3").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(PairN(3))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::String,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::Int, Type::Unit))
+            ]
+        );
+    }
+
+    #[test]
+    fn pair_n_4() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 4").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(PairN(4))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![Type::new_pair(
+                Type::Nat,
+                Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+            )]
+        );
+    }
+
+    #[test]
+    fn pair_n_neg() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR -1").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::ExpectedU10((-1).into()))
+        );
+    }
+
+    #[test]
+    fn pair_n_0() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 0").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(Prim::PAIR, 0))
+        );
+    }
+
+    #[test]
+    fn pair_n_1() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 1").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(Prim::PAIR, 1))
+        );
+    }
+
+    #[test]
+    fn pair_n_too_large() {
+        let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PAIR 1024").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ExpectedU10(1024.into()))
+        );
+    }
+
+    #[test]
+    fn pair_n_too_short() {
+        let mut stack = tc_stk![Type::Int, Type::Nat]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("PAIR 10").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::PAIR,
+                stack: stk![Type::Int, Type::Nat],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 10 })
+            })
+        );
+    }
+
+    #[test]
     fn unpair() {
         let mut stack = tc_stk![Type::new_pair(Type::Nat, Type::Int)];
         assert_eq!(
@@ -3504,6 +3687,111 @@ mod typecheck_tests {
             Ok(Unpair)
         );
         assert_eq!(stack, tc_stk![Type::Int, Type::Nat]);
+    }
+
+    #[test]
+    fn unpair_n_3() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("UNPAIR 3").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(UnpairN(3))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::new_pair(Type::Unit, Type::String),
+                Type::Int,
+                Type::Nat
+            ]
+        )
+    }
+
+    #[test]
+    fn unpair_n_4() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("UNPAIR 4").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(UnpairN(4))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat],
+        );
+    }
+
+    #[test]
+    fn unpair_n_neg() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("UNPAIR -1").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ExpectedU10((-1).into()))
+        );
+    }
+
+    #[test]
+    fn unpair_n_0() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("UNPAIR 0").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(Prim::UNPAIR, 0))
+        );
+    }
+
+    #[test]
+    fn unpair_n_1() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(&parse("UNPAIR 1").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::PairN01(Prim::UNPAIR, 1))
+        );
+    }
+
+    #[test]
+    fn unpair_n_too_large() {
+        let mut stack = tc_stk![Type::new_pair(
+            Type::Nat,
+            Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
+        )];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("UNPAIR 1024").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TcError::ExpectedU10(1024.into()))
+        );
+    }
+
+    #[test]
+    fn unpair_n_too_short() {
+        let mut stack = tc_stk![]; // NB: nat is top
+        assert_eq!(
+            typecheck_instruction(&parse("UNPAIR 2").unwrap(), &mut Ctx::default(), &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::UNPAIR,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
     }
 
     #[test]
@@ -4153,6 +4441,221 @@ mod typecheck_tests {
             typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
+    }
+
+    mod get_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, ty: Type, field_ty: Type) {
+            let mut stack = tc_stk![ty];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("GET {n}")).unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Ok(GetN(n))
+            );
+            assert_eq!(stack, tc_stk![field_ty])
+        }
+
+        #[test]
+        fn ok_0() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(0, ty.clone(), ty);
+        }
+
+        #[test]
+        fn ok_1() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(1, ty, Type::Unit);
+        }
+
+        #[test]
+        fn ok_2() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(
+                2,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_3() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(3, ty, Type::Nat);
+        }
+
+        #[test]
+        fn ok_4() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(4, ty, Type::new_pair(Type::String, Type::Int));
+        }
+
+        #[test]
+        fn ok_5() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(5, ty, Type::String);
+        }
+
+        #[test]
+        fn ok_6() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            check(6, ty, Type::Int);
+        }
+
+        #[test]
+        fn fail_7() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            let mut stack = tc_stk![ty.clone()];
+            assert_eq!(
+                typecheck_instruction(&parse("GET 7").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::GET,
+                    stack: stk![ty],
+                    reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Int))
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(GET[0]), Prim::GET, 1);
+        }
+
+        #[test]
+        fn too_large() {
+            let ty = Type::new_pair(
+                Type::Unit,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int)),
+            );
+            let mut stack = tc_stk![ty];
+            assert_eq!(
+                typecheck_instruction(&parse("GET 1024").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::ExpectedU10(1024.into()))
+            );
+        }
+    }
+
+    mod update_n {
+        use super::*;
+
+        #[track_caller]
+        fn check(n: u16, ty: Type, new_ty: Type) {
+            let mut stack = tc_stk![ty, Type::Unit];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("UPDATE {n}")).unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Ok(UpdateN(n))
+            );
+            assert_eq!(stack, tc_stk![new_ty])
+        }
+
+        #[test]
+        fn ok_0() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(0, ty, Type::Unit);
+        }
+
+        #[test]
+        fn ok_1() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                1,
+                ty,
+                Type::new_pair(Type::Unit, Type::new_pair(Type::String, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_2() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(2, ty, Type::new_pair(Type::Nat, Type::Unit));
+        }
+
+        #[test]
+        fn ok_3() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                3,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::Unit, Type::Int)),
+            );
+        }
+
+        #[test]
+        fn ok_4() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            check(
+                4,
+                ty,
+                Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Unit)),
+            );
+        }
+
+        #[test]
+        fn fail_5() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+
+            let mut stack = tc_stk![ty.clone(), Type::Unit];
+            assert_eq!(
+                typecheck_instruction(&parse("UPDATE 5").unwrap(), &mut Ctx::default(), &mut stack),
+                Err(TcError::NoMatchingOverload {
+                    instr: Prim::UPDATE,
+                    stack: stk![ty, Type::Unit],
+                    reason: Some(NoMatchingOverloadReason::ExpectedPair(Type::Int))
+                })
+            );
+        }
+
+        #[test]
+        fn too_short() {
+            too_short_test(&app!(UPDATE[0]), Prim::UPDATE, 2);
+        }
+
+        #[test]
+        fn too_large() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+
+            let mut stack = tc_stk![ty, Type::Unit];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse("UPDATE 1024").unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Err(TcError::ExpectedU10(1024.into()))
+            );
+        }
     }
 
     #[test]
