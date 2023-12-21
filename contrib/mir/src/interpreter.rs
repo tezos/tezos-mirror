@@ -12,6 +12,7 @@ use num_traits::{Signed, Zero};
 use std::rc::Rc;
 use typed_arena::Arena;
 
+use crate::ast::big_map::{BigMap, LazyStorageError};
 use crate::ast::*;
 use crate::bls;
 use crate::context::Ctx;
@@ -28,6 +29,8 @@ pub enum InterpretError<'a> {
     MutezOverflow,
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
+    #[error("lazy storage error: {0}")]
+    LazyStorageError(#[from] LazyStorageError),
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -50,7 +53,7 @@ impl<'a> ContractScript<'a> {
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
-        ctx: &mut crate::context::Ctx,
+        ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
         storage: Micheline<'a>,
@@ -86,7 +89,7 @@ impl<'a> Instruction<'a> {
     /// When the instruction can't be executed on the provided stack.
     pub fn interpret(
         &self,
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
@@ -96,7 +99,7 @@ impl<'a> Instruction<'a> {
 
 fn interpret<'a>(
     ast: &[Instruction<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
@@ -116,7 +119,7 @@ fn unreachable_state() -> ! {
 
 fn interpret_one<'a>(
     i: &Instruction<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
@@ -800,6 +803,16 @@ fn interpret_one<'a>(
             ctx.gas.consume(interpret_cost::EMPTY_SET)?;
             stack.push(V::Set(BTreeSet::new()))
         }
+        I::EmptyBigMap(kty, vty) => {
+            use std::collections::BTreeMap;
+            ctx.gas.consume(interpret_cost::EMPTY_BIG_MAP)?;
+            stack.push(V::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::new(),
+                key_type: kty.clone(),
+                value_type: vty.clone(),
+            }))
+        }
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
                 let key = pop!();
@@ -815,6 +828,15 @@ fn interpret_one<'a>(
                 let result = map.contains_key(&key);
                 stack.push(V::Bool(result));
             }
+            overloads::Mem::BigMap => {
+                let key = pop!();
+                let map = pop!(V::BigMap);
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_mem(&key, map.overlay.len())?)?;
+                let result = map.mem(&key, ctx.big_map_storage.as_ref())?;
+                stack.push(V::Bool(result));
+            }
         },
         I::Get(overload) => match overload {
             overloads::Get::Map => {
@@ -823,6 +845,15 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
                 stack.push(V::new_option(result.cloned()));
+            }
+            overloads::Get::BigMap => {
+                let key = pop!();
+                let map = pop!(V::BigMap);
+                // the protocol intentionally uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_get(&key, map.overlay.len())?)?;
+                let result = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                stack.push(V::new_option(result));
             }
         },
         I::Update(overload) => match overload {
@@ -848,6 +879,40 @@ fn interpret_one<'a>(
                     None => map.remove(&key),
                     Some(val) => map.insert(key, *val),
                 };
+            }
+            overloads::Update::BigMap => {
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let map = irrefutable_match!(&mut stack[0]; V::BigMap);
+                // the protocol intentionally uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_update(&key, map.overlay.len())?)?;
+                map.update(key, opt_new_val.map(|x| *x));
+            }
+        },
+        I::GetAndUpdate(overload) => match overload {
+            overloads::GetAndUpdate::Map => {
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let map = irrefutable_match!(&mut stack[0]; V::Map);
+                ctx.gas
+                    .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
+                let opt_old_val = match opt_new_val {
+                    None => map.remove(&key),
+                    Some(val) => map.insert(key, *val),
+                };
+                stack.push(V::new_option(opt_old_val));
+            }
+            overloads::GetAndUpdate::BigMap => {
+                let key = pop!();
+                let opt_new_val = pop!(V::Option);
+                let map = irrefutable_match!(&mut stack[0]; V::BigMap);
+                // the protocol intentionally uses map costs for the overlay
+                ctx.gas
+                    .consume(interpret_cost::map_get_and_update(&key, map.overlay.len())?)?;
+                let opt_old_val = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                map.update(key, opt_new_val.map(|x| *x));
+                stack.push(V::new_option(opt_old_val));
             }
         },
         I::Size(overload) => {
@@ -1224,6 +1289,7 @@ mod interpreter_tests {
 
     use super::*;
     use super::{Lambda, Or};
+    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
     use crate::bls;
     use crate::gas::Gas;
@@ -1239,7 +1305,7 @@ mod interpreter_tests {
 
     fn interpret<'a>(
         ast: &[Instruction<'a>],
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -1248,7 +1314,7 @@ mod interpreter_tests {
 
     fn interpret_one<'a>(
         i: &Instruction<'a>,
-        ctx: &mut Ctx,
+        ctx: &mut Ctx<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -2502,6 +2568,49 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn get_big_map() {
+        // overlay semantics are tested in big_map module, here we only check
+        // the interpreter works
+        let mut ctx = Ctx::default();
+        ctx.big_map_storage = Box::new(InMemoryLazyStorage::new());
+        let big_map_id = ctx
+            .big_map_storage
+            .big_map_new(&Type::Int, &Type::String)
+            .unwrap();
+        ctx.big_map_storage
+            .big_map_update(
+                &big_map_id,
+                TypedValue::int(1),
+                Some(TypedValue::String("foo".to_owned())),
+            )
+            .unwrap();
+        let big_map = BigMap {
+            id: Some(big_map_id),
+            overlay: BTreeMap::from([(
+                TypedValue::int(2),
+                Some(TypedValue::String("bar".to_owned())),
+            )]),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut stack = stk![TypedValue::BigMap(big_map), TypedValue::int(1)];
+        assert_eq!(
+            interpret_one(&Get(overloads::Get::BigMap), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::new_option(Some(TypedValue::String(
+                "foo".to_owned()
+            )))]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_get(&TypedValue::int(1), 1).unwrap()
+        );
+    }
+
+    #[test]
     fn get_map_none() {
         let mut ctx = Ctx::default();
         let map = BTreeMap::from([
@@ -2540,6 +2649,46 @@ mod interpreter_tests {
             Gas::default().milligas()
                 - interpret_cost::map_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn mem_big_map() {
+        let mut ctx = Ctx::default();
+        let big_map_id = ctx
+            .big_map_storage
+            .big_map_new(&Type::Int, &Type::String)
+            .unwrap();
+        ctx.big_map_storage
+            .big_map_bulk_update(
+                &big_map_id,
+                [
+                    (
+                        TypedValue::int(1),
+                        Some(TypedValue::String("foo".to_owned())),
+                    ),
+                    (
+                        TypedValue::int(2),
+                        Some(TypedValue::String("bar".to_owned())),
+                    ),
+                ],
+            )
+            .unwrap();
+        let big_map = BigMap {
+            id: Some(big_map_id),
+            overlay: BTreeMap::new(),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut stack = stk![TypedValue::BigMap(big_map), TypedValue::int(1)];
+        assert_eq!(
+            interpret_one(&Mem(overloads::Mem::BigMap), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![TypedValue::Bool(true)]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::map_mem(&TypedValue::int(1), 0).unwrap()
         );
     }
 
@@ -2597,6 +2746,29 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn empty_big_map() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![];
+        assert_eq!(
+            interpret_one(&EmptyBigMap(Type::Int, Type::Unit), &mut ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![TypedValue::BigMap(BigMap {
+                id: None,
+                overlay: BTreeMap::new(),
+                key_type: Type::Int,
+                value_type: Type::Unit,
+            })]
+        );
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::EMPTY_BIG_MAP
         );
     }
 
@@ -2831,6 +3003,179 @@ mod interpreter_tests {
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(2)]);
+    }
+
+    #[test]
+    fn update_big_map() {
+        fn check<'a>(
+            content: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            overlay: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            new_value: Option<TypedValue<'a>>,
+            result: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+        ) {
+            let mut ctx = Ctx::default();
+            let id = ctx
+                .big_map_storage
+                .big_map_new(&Type::Int, &Type::String)
+                .unwrap();
+            ctx.big_map_storage
+                .big_map_bulk_update(&id, content)
+                .unwrap();
+            let big_map = BigMap {
+                id: Some(id.clone()),
+                overlay: overlay.into_iter().collect(),
+                key_type: Type::Int,
+                value_type: Type::String,
+            };
+            let mut stack = stk![
+                TypedValue::BigMap(big_map),
+                TypedValue::new_option(new_value),
+                TypedValue::int(1)
+            ];
+            assert_eq!(
+                interpret_one(&Update(overloads::Update::BigMap), &mut ctx, &mut stack),
+                Ok(())
+            );
+            assert_eq!(
+                stack,
+                stk![TypedValue::BigMap(BigMap {
+                    id: Some(id),
+                    overlay: result.into_iter().collect(),
+                    key_type: Type::Int,
+                    value_type: Type::String,
+                })]
+            );
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        // insert
+        check(
+            [],
+            [],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // remove in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            None,
+            [(TypedValue::int(1), None)],
+        );
+        // remove in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            None,
+            [(TypedValue::int(1), None)],
+        );
+    }
+
+    #[test]
+    fn get_and_update_big_map() {
+        fn check<'a>(
+            content: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            overlay: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+            old_value: Option<TypedValue<'a>>,
+            new_value: Option<TypedValue<'a>>,
+            result: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+        ) {
+            let mut ctx = Ctx::default();
+            let id = ctx
+                .big_map_storage
+                .big_map_new(&Type::Int, &Type::String)
+                .unwrap();
+            ctx.big_map_storage
+                .big_map_bulk_update(&id, content)
+                .unwrap();
+            let big_map = BigMap {
+                id: Some(id.clone()),
+                overlay: overlay.into_iter().collect(),
+                key_type: Type::Int,
+                value_type: Type::String,
+            };
+            let mut stack = stk![
+                TypedValue::BigMap(big_map),
+                TypedValue::new_option(new_value),
+                TypedValue::int(1)
+            ];
+            assert_eq!(
+                interpret_one(
+                    &GetAndUpdate(overloads::GetAndUpdate::BigMap),
+                    &mut ctx,
+                    &mut stack
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                stack,
+                stk![
+                    TypedValue::BigMap(BigMap {
+                        id: Some(id),
+                        overlay: result.into_iter().collect(),
+                        key_type: Type::Int,
+                        value_type: Type::String,
+                    }),
+                    TypedValue::new_option(old_value),
+                ]
+            );
+            assert!(ctx.gas.milligas() < Gas::default().milligas());
+        }
+
+        // insert
+        check(
+            [],
+            [],
+            None,
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            Some(TypedValue::String("bar".into())),
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // update in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            Some(TypedValue::String("bar".into())),
+            Some(TypedValue::String("foo".into())),
+            [(TypedValue::int(1), Some(TypedValue::String("foo".into())))],
+        );
+        // remove in content
+        check(
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            [],
+            Some(TypedValue::String("bar".into())),
+            None,
+            [(TypedValue::int(1), None)],
+        );
+        // remove in overlay
+        check(
+            [],
+            [(TypedValue::int(1), Some(TypedValue::String("bar".into())))],
+            Some(TypedValue::String("bar".into())),
+            None,
+            [(TypedValue::int(1), None)],
+        );
     }
 
     #[test]

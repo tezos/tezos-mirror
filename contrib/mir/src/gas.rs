@@ -296,6 +296,7 @@ pub mod interpret_cost {
     pub const SIZE_LIST: u32 = 10;
     pub const SIZE_SET: u32 = 10;
     pub const SIZE_MAP: u32 = 10;
+    pub const EMPTY_BIG_MAP: u32 = 300;
     pub const CHAIN_ID: u32 = 15;
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
@@ -631,6 +632,22 @@ pub mod interpret_cost {
         // coefficient larger than in case of Map looks suspicious, something
         // to benchmark later
         (130 + 2 * lookup_cost).as_gas_cost()
+    }
+
+    pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+        // NB: same considerations as for map_get
+        let compare_cost = compare(k, k)?;
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
+        let lookup_cost = Checked::from(compare_cost) * size_log;
+        // NB: 3 factor copied from Tezos protocol, in principle it should
+        // reflect update vs get overhead, but it seems like an overestimation,
+        // get_and_update should cost almost exactly the same as update, any
+        // observable difference would be in the constant term.
+        //
+        // However, note that this function is also reused for big_map version
+        // of GET_AND_UPDATE, wherein it's more justified. That is to say, take
+        // care when updating this.
+        (80 + 3 * lookup_cost).as_gas_cost()
     }
 
     /// Measures size of Michelson using several metrics.

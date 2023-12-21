@@ -1301,6 +1301,16 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
+            let kty = parse_ty(ctx, kty)?;
+            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(ctx, vty)?;
+            vty.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            stack.push(T::new_big_map(kty.clone(), vty.clone()));
+            I::EmptyBigMap(kty, vty)
+        }
+        (App(EMPTY_BIG_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
@@ -1311,9 +1321,16 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.as_ref().0, &kty_)?;
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
+        }
+        (App(MEM, [], _), [.., T::BigMap(..), _]) => {
+            let kty_ = pop!();
+            let map_tys = pop!(T::BigMap);
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            stack.push(T::Bool);
+            I::Mem(overloads::Mem::BigMap)
         }
         (App(MEM, [], _), [.., _, _]) => no_overload!(MEM),
         (App(MEM, [], _), [] | [_]) => no_overload!(MEM, len 2),
@@ -1325,6 +1342,13 @@ pub(crate) fn typecheck_instruction<'a>(
             ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
+        }
+        (App(GET, [], _), [.., T::BigMap(..), _]) => {
+            let kty_ = pop!();
+            let map_tys = pop!(T::BigMap);
+            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            stack.push(T::new_option(map_tys.1.clone()));
+            I::Get(overloads::Get::BigMap)
         }
         (App(GET, [], _), [.., _, _]) => no_overload!(GET),
         (App(GET, [], _), [] | [_]) => no_overload!(GET, len 2),
@@ -1342,9 +1366,34 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
+        (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            stack.drop_top(2);
+            I::Update(overloads::Update::BigMap)
+        }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
         (App(UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            pop!();
+            I::GetAndUpdate(overloads::GetAndUpdate::Map)
+        }
+        (App(GET_AND_UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
+            let (kty, vty) = m.as_ref();
+            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
+            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            pop!();
+            I::GetAndUpdate(overloads::GetAndUpdate::BigMap)
+        }
+        (App(GET_AND_UPDATE, [], _), [.., _, _, _]) => no_overload!(GET_AND_UPDATE),
+        (App(GET_AND_UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(GET_AND_UPDATE, len 3),
+        (App(GET_AND_UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SIZE, [], _), [.., T::String]) => {
             stack[0] = T::Nat;
@@ -3972,6 +4021,20 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn empty_big_map() {
+        let mut stack = tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("EMPTY_BIG_MAP int unit").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(EmptyBigMap(Type::Int, Type::Unit))
+        );
+        assert_eq!(stack, tc_stk![Type::new_big_map(Type::Int, Type::Unit)]);
+    }
+
+    #[test]
     fn empty_set_incomparable() {
         let mut stack = tc_stk![];
         assert_eq!(
@@ -3993,6 +4056,16 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
             Ok(Get(overloads::Get::Map))
+        );
+        assert_eq!(stack, tc_stk![Type::new_option(Type::String)]);
+    }
+
+    #[test]
+    fn get_big_map() {
+        let mut stack = tc_stk![Type::new_big_map(Type::Int, Type::String), Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Get(overloads::Get::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::String)]);
     }
@@ -4030,6 +4103,16 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
             Ok(Mem(overloads::Mem::Map))
+        );
+        assert_eq!(stack, tc_stk![Type::Bool]);
+    }
+
+    #[test]
+    fn mem_big_map() {
+        let mut stack = tc_stk![Type::new_big_map(Type::Int, Type::String), Type::Int];
+        assert_eq!(
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Mem(overloads::Mem::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::Bool]);
     }
@@ -4133,6 +4216,20 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn update_big_map() {
+        let mut stack = tc_stk![
+            Type::new_big_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            Ok(Update(overloads::Update::BigMap))
+        );
+        assert_eq!(stack, tc_stk![Type::new_big_map(Type::Int, Type::String)]);
+    }
+
+    #[test]
     fn update_map_wrong_ty() {
         let mut stack = tc_stk![
             Type::new_map(Type::Int, Type::String),
@@ -4162,6 +4259,95 @@ mod typecheck_tests {
                 Type::new_list(Type::Int)
             ))
         );
+    }
+
+    #[test]
+    fn get_and_update_map() {
+        let mut stack = tc_stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(GetAndUpdate(overloads::GetAndUpdate::Map))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::new_map(Type::Int, Type::String),
+                Type::new_option(Type::String)
+            ]
+        );
+    }
+
+    #[test]
+    fn get_and_update_big_map() {
+        let mut stack = tc_stk![
+            Type::new_big_map(Type::Int, Type::String),
+            Type::new_option(Type::String),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(GetAndUpdate(overloads::GetAndUpdate::BigMap))
+        );
+        assert_eq!(
+            stack,
+            tc_stk![
+                Type::new_big_map(Type::Int, Type::String),
+                Type::new_option(Type::String)
+            ]
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_wrong_ty() {
+        let mut stack = tc_stk![
+            Type::new_map(Type::Int, Type::String),
+            Type::new_option(Type::Nat),
+            Type::Int
+        ];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("GET_AND_UPDATE").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Err(TypesNotEqual(Type::String, Type::Nat).into())
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_incomparable() {
+        assert_eq!(
+            parse("GET_AND_UPDATE").unwrap().typecheck_instruction(
+                &mut Ctx::default(),
+                None,
+                &[
+                    app!(map[app!(list[app!(int)]), app!(string)]),
+                    app!(option[app!(string)]),
+                    app!(list[app!(int)]),
+                ]
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_list(Type::Int)
+            ))
+        );
+    }
+
+    #[test]
+    fn get_and_update_map_too_short() {
+        too_short_test(&app!(GET_AND_UPDATE), Prim::GET_AND_UPDATE, 3)
     }
 
     #[test]

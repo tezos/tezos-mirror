@@ -51,6 +51,7 @@ pub enum Not {
 pub enum Mem {
     Set,
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -82,12 +83,20 @@ pub enum Neg {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Update {
     Set,
     Map,
+    BigMap,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum GetAndUpdate {
+    Map,
+    BigMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

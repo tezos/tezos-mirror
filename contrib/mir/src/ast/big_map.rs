@@ -56,7 +56,7 @@ impl<'a> BigMap<'a> {
         &self,
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
-        storage: &impl LazyStorage<'a>,
+        storage: &(impl LazyStorage<'a> + ?Sized),
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         Ok(match self.overlay.get(key) {
             // If the key is mentioned in the overlay, the associated value is
@@ -74,7 +74,7 @@ impl<'a> BigMap<'a> {
     pub fn mem(
         &self,
         key: &TypedValue,
-        storage: &impl LazyStorage<'a>,
+        storage: &(impl LazyStorage<'a> + ?Sized),
     ) -> Result<bool, LazyStorageError> {
         Ok(match self.overlay.get(key) {
             // If the key is mentioned in the overlay, the associated value is
@@ -196,7 +196,7 @@ pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
     }
 }
 
-impl<'a, T: LazyStorage<'a>> LazyStorageBulkUpdate<'a> for T {}
+impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MapInfo<'a> {

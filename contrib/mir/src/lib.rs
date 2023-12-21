@@ -33,7 +33,7 @@ mod tests {
     use crate::stack::{stk, tc_stk};
     use crate::typechecker;
 
-    fn report_gas<R, F: FnOnce(&mut Ctx) -> R>(ctx: &mut Ctx, f: F) -> R {
+    fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
         let initial_milligas = ctx.gas.milligas();
         let r = f(ctx);
         let gas_diff = initial_milligas - ctx.gas.milligas();
@@ -58,10 +58,10 @@ mod tests {
     #[test]
     fn interpret_mutez_push_add() {
         let ast = parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
+        let temp = Arena::new();
         let mut ctx = Ctx::default();
         let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
         let mut istack = stk![];
-        let temp = Arena::new();
         assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
     }
@@ -73,8 +73,8 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
-        let mut ctx = Ctx::default();
         let temp = Arena::new();
+        let mut ctx = Ctx::default();
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &temp, &mut istack).is_ok());
         });
@@ -88,9 +88,9 @@ mod tests {
             .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
+        let temp = Arena::new();
         let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1);
-        let temp = Arena::new();
         assert_eq!(
             ast.interpret(ctx, &temp, &mut istack),
             Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
@@ -227,19 +227,18 @@ mod tests {
 
     #[test]
     fn vote_contract() {
+        let arena = typed_arena::Arena::new();
         let ctx = &mut Ctx::default();
         ctx.amount = 5_000_000;
-        let arena = typed_arena::Arena::new();
         use crate::lexer::Prim;
         use Micheline as M;
-        let temp = Arena::new();
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
             .typecheck_script(ctx)
             .unwrap()
             .interpret(
                 ctx,
-                &temp,
+                &arena,
                 "foo".into(),
                 M::seq(
                     &arena,
@@ -264,19 +263,16 @@ mod tests {
     use std::collections::HashMap;
 
     #[track_caller]
-    fn run_e2e_test(
-        instr: &str,
+    fn run_e2e_test<'a>(
+        arena: &'a Arena<Micheline<'a>>,
+        instr: &'a str,
         input_type_stack: TypeStack,
         output_type_stack: TypeStack,
-        input_stack: Stack<TypedValue>,
-        output_stack: Stack<TypedValue>,
-        mut ctx: Ctx,
+        mut input_stack: Stack<TypedValue<'a>>,
+        output_stack: Stack<TypedValue<'a>>,
+        mut ctx: Ctx<'a>,
     ) {
-        let instr = instr.to_owned();
-        let temp = Arena::new();
-        // NB: required to appease the borrow checker
-        let mut input_stack = input_stack;
-        let ast = parse(&instr).unwrap();
+        let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
             typecheck_instruction(&ast, &mut ctx, None, &mut input_failing_type_stack).unwrap();
@@ -284,7 +280,7 @@ mod tests {
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
         );
-        assert!(ast.interpret(&mut ctx, &temp, &mut input_stack).is_ok());
+        assert!(ast.interpret(&mut ctx, arena, &mut input_stack).is_ok());
         assert_eq!(input_stack, output_stack);
     }
 
@@ -292,6 +288,7 @@ mod tests {
     fn ticket_instr() {
         let ctx = Ctx::default();
         run_e2e_test(
+            &Arena::new(),
             "TICKET",
             stk![Type::Nat, Type::Int],
             stk![Type::new_option(Type::new_ticket(Type::Int))],
@@ -321,6 +318,7 @@ mod tests {
             content: TypedValue::int(20),
         };
         run_e2e_test(
+            &Arena::new(),
             "READ_TICKET",
             stk![Type::new_ticket(Type::Int)],
             stk![
@@ -348,6 +346,7 @@ mod tests {
             content: TypedValue::int(20),
         };
         run_e2e_test(
+            &Arena::new(),
             "SPLIT_TICKET",
             stk![
                 Type::new_pair(Type::Nat, Type::Nat),
@@ -384,6 +383,7 @@ mod tests {
             content: TypedValue::int(20),
         };
         run_e2e_test(
+            &Arena::new(),
             "JOIN_TICKETS",
             stk![Type::new_pair(
                 Type::new_ticket(Type::Int),
@@ -408,6 +408,7 @@ mod tests {
     #[test]
     fn balance() {
         run_e2e_test(
+            &Arena::new(),
             "BALANCE",
             stk![],
             stk![Type::Mutez],
@@ -426,6 +427,7 @@ mod tests {
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         // When contract for the address does not exist.
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT int",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Int))],
@@ -441,6 +443,7 @@ mod tests {
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         // When contract is implicit
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT unit",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Unit))],
@@ -456,6 +459,7 @@ mod tests {
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         // When contract is implicit and contract type is Ticket
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT (ticket unit)",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::new_ticket(
@@ -473,6 +477,7 @@ mod tests {
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         // When contract is implicit and contract type is some other type
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT int",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Int))],
@@ -487,6 +492,7 @@ mod tests {
 
         // When contract for the address does exist and is of expected type.
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT unit",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Unit))],
@@ -511,6 +517,7 @@ mod tests {
         // When the address has an entrypoint.
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT unit",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Unit))],
@@ -535,6 +542,7 @@ mod tests {
         // When the instruction has an entrypoint.
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT %foo unit",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Unit))],
@@ -562,6 +570,7 @@ mod tests {
         // When the instruction has an entrypoint and address has an entrypoint.
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%bar").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "CONTRACT %foo unit",
             stk![Type::Address],
             stk![Type::new_option(Type::new_contract(Type::Unit))],
@@ -588,6 +597,7 @@ mod tests {
     #[test]
     fn level() {
         run_e2e_test(
+            &Arena::new(),
             "LEVEL",
             stk![],
             stk![Type::Nat],
@@ -604,6 +614,7 @@ mod tests {
     #[test]
     fn min_block_time() {
         run_e2e_test(
+            &Arena::new(),
             "MIN_BLOCK_TIME",
             stk![],
             stk![Type::Nat],
@@ -621,6 +632,7 @@ mod tests {
     fn self_address() {
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "SELF_ADDRESS",
             stk![],
             stk![Type::Address],
@@ -638,6 +650,7 @@ mod tests {
     fn sender() {
         let addr = Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "SENDER",
             stk![],
             stk![Type::Address],
@@ -655,6 +668,7 @@ mod tests {
     fn source() {
         let addr = Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "SOURCE",
             stk![],
             stk![Type::Address],
@@ -671,6 +685,7 @@ mod tests {
     #[test]
     fn timestamp_type_and_value() {
         run_e2e_test(
+            &Arena::new(),
             "PUSH timestamp 1571659294",
             stk![],
             stk![Type::Timestamp],
@@ -679,6 +694,7 @@ mod tests {
             Ctx::default(),
         );
         run_e2e_test(
+            &Arena::new(),
             "PUSH timestamp \"2019-10-21T12:01:34Z\"",
             stk![],
             stk![Type::Timestamp],
@@ -691,6 +707,7 @@ mod tests {
     #[test]
     fn now() {
         run_e2e_test(
+            &Arena::new(),
             "NOW",
             stk![],
             stk![Type::Timestamp],
@@ -708,6 +725,7 @@ mod tests {
     fn implicit_account() {
         let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "IMPLICIT_ACCOUNT",
             stk![Type::KeyHash],
             stk![Type::new_contract(Type::Unit)],
@@ -725,6 +743,7 @@ mod tests {
         let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "VOTING_POWER",
             stk![Type::KeyHash],
             stk![Type::Nat],
@@ -741,6 +760,7 @@ mod tests {
         );
 
         run_e2e_test(
+            &Arena::new(),
             "VOTING_POWER",
             stk![Type::KeyHash],
             stk![Type::Nat],
@@ -759,6 +779,7 @@ mod tests {
         let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         run_e2e_test(
+            &Arena::new(),
             "TOTAL_VOTING_POWER",
             stk![],
             stk![Type::Nat],
@@ -775,6 +796,7 @@ mod tests {
     #[test]
     fn dig() {
         run_e2e_test(
+            &Arena::new(),
             "DIG 3",
             stk![Type::Unit, Type::Nat, Type::Int, Type::String],
             stk![Type::Nat, Type::Int, Type::String, Type::Unit],
@@ -797,6 +819,7 @@ mod tests {
     #[test]
     fn dug() {
         run_e2e_test(
+            &Arena::new(),
             "DUG 2",
             stk![
                 Type::Unit,
@@ -911,7 +934,7 @@ mod multisig_tests {
         $ CHAIN_ID='0xf3d48554'
         $ ANTI_REPLAY_COUNTER='111'
     */
-    fn make_ctx() -> Ctx<'static> {
+    fn make_ctx<'a>() -> Ctx<'a> {
         let mut ctx = Ctx::default();
         ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
         ctx.chain_id = tezos_crypto_rs::hash::ChainId(hex::decode("f3d48554").unwrap());
@@ -953,6 +976,7 @@ mod multisig_tests {
 
     #[test]
     fn multisig_transfer() {
+        let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = BigUint::from(1u32);
 
@@ -972,7 +996,6 @@ mod multisig_tests {
         let transfer_amount = 123;
         let transfer_destination = "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j";
         let signature = "edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v";
-        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
@@ -1026,6 +1049,7 @@ mod multisig_tests {
 
     #[test]
     fn multisig_set_delegate() {
+        let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = BigUint::from(1u32);
 
@@ -1044,7 +1068,6 @@ mod multisig_tests {
         */
         let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
         let signature = "edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST";
-        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
@@ -1095,11 +1118,11 @@ mod multisig_tests {
 
     #[test]
     fn invalid_signature() {
+        let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = 1;
         let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
         let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
-        let temp = Arena::new();
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
