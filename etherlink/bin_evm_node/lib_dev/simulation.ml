@@ -122,13 +122,15 @@ let encode_tx tx =
 module Encodings = struct
   open Data_encoding
 
+  type insights = {result : bytes option; success : bool option}
+
   type eval_result = {
     state_hash : string;
     status : string;
     output : unit;
     inbox_level : unit;
     num_ticks : Z.t;
-    insights : bytes option list;
+    insights : insights;
         (** The simulation can ask to look at values on the state after
           the simulation. *)
   }
@@ -193,6 +195,39 @@ module Encodings = struct
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
 
+  let bool_as_bytes =
+    let bytes_to_bool b =
+      b |> Data_encoding.Binary.of_bytes Data_encoding.bool |> Result.to_option
+    in
+
+    let bool_to_bytes b =
+      b |> Data_encoding.Binary.to_bytes Data_encoding.bool |> Result.to_option
+    in
+    conv
+      (fun b -> Option.bind b bool_to_bytes)
+      (fun b -> Option.bind b bytes_to_bool)
+      (option bytes)
+
+  let insights =
+    conv
+      (fun {result; success} -> (result, success))
+      (fun (result, success) -> {result; success})
+      (tup2 (option bytes) bool_as_bytes)
+
+  let insights_from_list l =
+    match l with
+    | [result; success] ->
+        Some
+          {
+            result;
+            success =
+              Option.bind success (fun s ->
+                  s
+                  |> Data_encoding.Binary.of_bytes Data_encoding.bool
+                  |> Result.to_option);
+          }
+    | _ -> None
+
   let eval_result =
     conv
       (fun {state_hash; status; output; inbox_level; num_ticks; insights} ->
@@ -221,24 +256,28 @@ module Encodings = struct
             ~description:"Ticks taken by the PVM for evaluating the messages")
          (req
             "insights"
-            (list (option bytes))
+            insights
             ~description:"PVM state values requested after the simulation")
 end
 
-let call_result bytes =
+let call_result {Encodings.result; success} =
   let open Lwt_result_syntax in
-  match bytes with
-  | Some b :: _ ->
+  match (result, success) with
+  | Some b, _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      return (Hash (Hex v))
-  | _ -> failwith "Insights of 'call_result' is not Some _ :: _"
+      return (Ok (Hash (Hex v)))
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6752
+     better propagate errors and reverts messages from kernel to help the
+     user debug their call *)
+  | None, Some false -> return (Error ())
+  | _ -> failwith "Insights of 'call_result' cannot be parsed"
 
-let gas_estimation bytes =
+let gas_estimation {Encodings.result; _} =
   let open Lwt_result_syntax in
   let* simulated_amount =
-    match bytes with
-    | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> return
-    | _ -> failwith "Insights of 'gas_estimation' is not Some _ :: _"
+    match result with
+    | Some b -> b |> Bytes.to_string |> Z.of_bits |> return
+    | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
   in
   (* See EIP2200 for reference. But the tl;dr is: we cannot do the
      opcode SSTORE if we have less than 2300 gas available, even if we don't
@@ -250,14 +289,11 @@ let gas_estimation bytes =
   let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
   return (quantity_of_z simulated_amount)
 
-let is_tx_valid bytes =
+let is_tx_valid {Encodings.result; success} =
   let open Lwt_result_syntax in
-  match bytes with
-  | [Some b; Some payload] ->
-      let is_valid =
-        b |> Data_encoding.Binary.of_bytes_exn Data_encoding.bool
-      in
-      if is_valid then
+  match (result, success) with
+  | Some payload, Some success ->
+      if success then
         let address = Ethereum_types.decode_address payload in
         return (Ok address)
       else

@@ -406,9 +406,11 @@ let dispatch_request (config : 'a Configuration.t)
           let open Lwt_result_syntax in
           match input with
           | None -> return missing_parameter
-          | Some (call, _) ->
+          | Some (call, _) -> (
               let* call_result = Backend_rpc.simulate_call call in
-              return (Either.Left call_result)
+              match call_result with
+              | Ok result -> return (Either.Left result)
+              | Error () -> return (Either.Right "Call simulation failed"))
         in
         build ~f module_ parameters
     | Method (Get_estimate_gas.Method, module_) ->
