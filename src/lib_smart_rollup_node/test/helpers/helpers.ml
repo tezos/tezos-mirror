@@ -25,11 +25,17 @@
 
 let uid = ref 0
 
-let block_hash_of_level level =
-  let s = Z.of_int32 level |> Z.to_bits in
-  let len = String.length s in
+(* Create a block hash that depends deterministically on the level and messages
+   content. *)
+let make_block_hash level messages =
+  let h_msgs = Hashtbl.hash messages in
+  (* Rudimentary hash for level and messages. *)
+  let hash_string = Z.of_int (Int32.to_int level + (7 * h_msgs)) |> Z.to_bits in
+  let len = String.length hash_string in
+  (* Left pad hash_string with null bytes *)
   let s =
-    String.init Block_hash.size (fun i -> if i >= len then '\000' else s.[i])
+    String.init Block_hash.size (fun i ->
+        if i >= len then '\000' else hash_string.[i])
   in
   Block_hash.of_string_exn s
 
@@ -173,8 +179,8 @@ let with_node_context ?constants kind protocol ~boot_sector f =
   let* _ = Node_context_loader.close node_ctxt in
   return_unit
 
-let head_of_level ~predecessor level =
-  let hash = block_hash_of_level level in
+let make_header ~predecessor level messages =
+  let hash = make_block_hash level messages in
   let timestamp = Time.Protocol.of_seconds (Int64.of_int32 level) in
   let header : Block_header.shell_header =
     {
@@ -191,25 +197,45 @@ let head_of_level ~predecessor level =
   in
   {Layer1.hash; level; header}
 
-let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
-    messages =
+let header_of_block (block : Sc_rollup_block.t) =
+  let hash = block.header.block_hash in
+  let level = block.header.level in
+  let timestamp = Time.Protocol.of_seconds (Int64.of_int32 level) in
+  let header : Block_header.shell_header =
+    {
+      level;
+      predecessor = block.header.predecessor;
+      timestamp;
+      (* dummy values below *)
+      proto_level = 0;
+      validation_passes = 3;
+      operations_hash = Tezos_crypto.Hashed.Operation_list_list_hash.zero;
+      fitness = [];
+      context = Tezos_crypto.Hashed.Context_hash.zero;
+    }
+  in
+  {Layer1.hash; level; header}
+
+let add_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
+    ~(predecessor_l2_block : Sc_rollup_block.t) messages =
   let open Lwt_result_syntax in
-  let* predecessor_l2_block = Node_context.last_processed_head_opt node_ctxt in
-  let* predecessor_l2_block =
-    match predecessor_l2_block with
-    | Some b -> return b
-    | None ->
-        failwith "No genesis block, please add one with add_l2_genesis_block"
+  let* () =
+    Node_context.save_level
+      node_ctxt
+      {
+        Layer1.hash = predecessor_l2_block.header.block_hash;
+        level = predecessor_l2_block.header.level;
+      }
   in
+  let* () = Node_context.set_l2_head node_ctxt predecessor_l2_block in
   let pred_level = predecessor_l2_block.header.level in
-  let predecessor =
-    head_of_level
-      ~predecessor:predecessor_l2_block.header.predecessor
-      pred_level
-  in
   let head =
-    head_of_level ~predecessor:predecessor.hash (Int32.succ pred_level)
+    make_header
+      ~predecessor:predecessor_l2_block.header.block_hash
+      (Int32.succ pred_level)
+      messages
   in
+  let predecessor = header_of_block predecessor_l2_block in
   let*? plugin =
     Protocol_plugins.proto_plugin_for_protocol node_ctxt.current_protocol.hash
   in
@@ -220,6 +246,18 @@ let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
     ~predecessor
     head
     messages
+
+let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
+    messages =
+  let open Lwt_result_syntax in
+  let* predecessor_l2_block = Node_context.last_processed_head_opt node_ctxt in
+  let* predecessor_l2_block =
+    match predecessor_l2_block with
+    | Some b -> return b
+    | None ->
+        failwith "No genesis block, please add one with add_l2_genesis_block"
+  in
+  add_l2_block node_ctxt ~is_first_block ~predecessor_l2_block messages
 
 let append_l2_blocks node_ctxt message_batches =
   List.map_es (append_l2_block node_ctxt) message_batches

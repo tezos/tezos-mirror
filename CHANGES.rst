@@ -85,6 +85,9 @@ Smart Rollup node
 - Register in ``octez-codec`` some of the protocol smart rollup
   related encodings. (MRs :gl:`!10174`, :gl:`!11200`)
 
+- Fix a critical bug that could lead to data loss when chain
+  reorganizations happen while a GC is running. (MR :gl:`!11358`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

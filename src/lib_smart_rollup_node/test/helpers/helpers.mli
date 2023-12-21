@@ -84,6 +84,17 @@ val append_dummy_l2_chain :
   length:int ->
   Sc_rollup_block.t list tzresult Lwt.t
 
+(** [add_l2_block node_ctxt ?is_first_block ~predecessor_l2_block messages]
+    creates and append an L2 block containing the [messages] given in
+    argument. The block is added on top [predecessor_l2_block], set as the new
+    head of the chain and it is returned. *)
+val add_l2_block :
+  [`Read | `Write] Node_context.t ->
+  ?is_first_block:bool ->
+  predecessor_l2_block:Sc_rollup_block.t ->
+  string list ->
+  Sc_rollup_block.t tzresult Lwt.t
+
 (** {2 Assertions} *)
 
 module Assert : sig
