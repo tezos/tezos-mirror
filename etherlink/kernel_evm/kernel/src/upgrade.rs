@@ -22,6 +22,11 @@ pub fn upgrade_kernel<Host: Runtime>(
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
+    // Mark for reboot, the upgrade/migration will happen at next
+    // kernel run, it doesn't matter if it is within the Tezos level
+    // or not.
+    host.mark_for_reboot()?;
+
     log!(host, Info, "Kernel is ready to be upgraded.");
     Ok(())
 }
