@@ -14,6 +14,11 @@ pub enum Privilege {
     Machine = 3,
 }
 
+/// Get the bitmask formed of `n` ones.
+const fn ones(n: u64) -> u64 {
+    !0 >> (64 - n)
+}
+
 /// CSR index
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -301,6 +306,10 @@ pub enum CSRegister {
 }
 
 impl CSRegister {
+    // Since read-only misa.MXL = 0b10, we have MXLEN = 64 from table 3.1
+    const MXLEN: u64 = 64;
+    const SXLEN: u64 = CSRegister::MXLEN;
+
     /// Determine the priviledge level required to access this CSR.
     #[inline(always)]
     pub fn privilege(self) -> Privilege {
@@ -357,6 +366,47 @@ impl CSRegister {
         // Rules & Table of read-write / read-only ranges are in section 2.1 & table 2.1
         (self as usize >> 10) & 0b11 == 0b11
     }
+
+    const WPRI_MASK_EMPTY: CSRValue = CSRValue::MAX;
+
+    const WPRI_MASK_MSTATUS: CSRValue =
+        !(ones(1) << 0 | ones(1) << 2 | ones(1) << 4 | ones(9) << 23 | ones(25) << 38);
+
+    const WPRI_MASK_MENVCFG: CSRValue = !(ones(3) << 1 | ones(54) << 8);
+
+    const WPRI_MASK_MSECCFG: CSRValue = !(ones(5) << 3 | ones(CSRegister::MXLEN - 10) << 10);
+
+    const WPRI_MASK_SSTATUS: CSRValue = !(ones(1) << 0
+        | ones(3) << 2
+        | ones(1) << 7
+        | ones(2) << 11
+        | ones(1) << 17
+        | ones(12) << 20
+        | ones(29) << 34);
+
+    const WPRI_MASK_SENVCFG: CSRValue = !(ones(3) << 1 | ones(CSRegister::SXLEN - 8) << 8);
+
+    /// Return the mask of non reserved bits, (WPRI bits are 0)
+    /// Relevant section 2.3 - privileged spec
+    #[inline(always)]
+    pub fn wpri_mask(self) -> CSRValue {
+        match self {
+            CSRegister::mstatus => CSRegister::WPRI_MASK_MSTATUS,
+            CSRegister::menvcfg => CSRegister::WPRI_MASK_MENVCFG,
+            CSRegister::mseccfg => CSRegister::WPRI_MASK_MSECCFG,
+            CSRegister::sstatus => CSRegister::WPRI_MASK_SSTATUS,
+            CSRegister::senvcfg => CSRegister::WPRI_MASK_SENVCFG,
+            _ => CSRegister::WPRI_MASK_EMPTY,
+        }
+    }
+
+    /// Ensures that WPRI fields are kept read-only zero.
+    ///
+    /// Conforming to Section 2.3 - privileged spec
+    #[inline(always)]
+    pub fn clear_wpri_fields(self, new_value: CSRValue) -> CSRValue {
+        new_value & self.wpri_mask()
+    }
 }
 
 /// Value in a CSR
@@ -408,6 +458,8 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
+        let value = reg.clear_wpri_fields(value);
+
         self.registers.write(reg as usize, value);
     }
 
@@ -424,6 +476,8 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn replace(&mut self, reg: CSRegister, value: CSRValue) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
+        let value = reg.clear_wpri_fields(value);
+
         self.registers.replace(reg as usize, value)
     }
 
@@ -512,5 +566,23 @@ pub mod tests {
         assert!(check(csreg::fcsr).is_ok());
         assert!(check(csreg::instret).is_err_and(is_illegal_instr));
         assert!(check(csreg::cycle).is_err_and(is_illegal_instr));
+    }
+
+    #[test]
+    fn test_wpri() {
+        use crate::csregisters::CSRegister as csreg;
+
+        let check = |reg: csreg, value| reg.clear_wpri_fields(value);
+
+        // Machine registers
+        assert!(check(csreg::menvcfg, 0) == 0);
+        assert!(check(csreg::mstatus, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_003F_007F_FFEA);
+
+        // Supervisor registers
+        assert!(check(csreg::senvcfg, 0b1010_0101_1010_0101) == 0b0000_0000_1010_0001);
+        assert!(
+            check(csreg::sstatus, 0b1100_0011_0101_1010_0110_1001)
+                == 0b0000_0001_0100_0010_0110_0000
+        );
     }
 }
