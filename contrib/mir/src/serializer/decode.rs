@@ -231,7 +231,10 @@ fn decode_seq<'a>(
     arena: &'a Arena<Micheline<'a>>,
     bytes: &mut BytesIt,
 ) -> Result<Micheline<'a>, DecodeError> {
-    let buf = decode_seq_raw::<EXPECTED_MAX_SEQ_ELTS>(arena, bytes)?;
+    let buf: SmallVec<_> = decode_seq_raw::<EXPECTED_MAX_SEQ_ELTS>(arena, bytes)?;
+    // this call to alloc_extend is safe, the iterable is a SmallVec, which
+    // doesn't touch the arena. See Note: alloc_extend
+    #[allow(clippy::disallowed_methods)]
     let res = Micheline::Seq(arena.alloc_extend(buf));
     Ok(res)
 }
@@ -290,6 +293,9 @@ fn decode_app<'a>(
     } else {
         NO_ANNS
     };
+    // this call to alloc_extend is safe, the iterable is a SmallVec, which
+    // doesn't touch the arena. See Note: alloc_extend
+    #[allow(clippy::disallowed_methods)]
     Ok(Micheline::App(prim, arena.alloc_extend(args), anns))
 }
 

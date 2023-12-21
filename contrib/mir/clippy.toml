@@ -1,0 +1,4 @@
+disallowed-methods = [
+    # there's a pothole in alloc_extend causing panics, be careful when using it
+    { path = "typed_arena::Arena::alloc_extend", reason = "alloc_extend can panic, see Note: alloc_extend" },
+]

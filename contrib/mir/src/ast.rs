@@ -227,7 +227,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
             Pair(_) => Micheline::App(
                 Prim::pair,
-                micheline_seq(
+                Micheline::alloc_iter(
                     arena,
                     LinearizePairIter(Some(self)).map(|x| x.into_micheline_optimized_legacy(arena)),
                 ),
@@ -293,17 +293,6 @@ pub enum TypedValue<'a> {
     Bls12381G2(Box<bls::G2>),
 }
 
-/// Arena has an unfortunate pothole related to alloc_extend: if the iterator
-/// itself tries to allocate in the arena, it will panic. Thus, the argument is
-/// first collected into a `Vec`. This has performance implications, and should
-/// be addressed eventually.
-fn micheline_seq<'a>(
-    arena: &'a Arena<Micheline<'a>>,
-    iter: impl IntoIterator<Item = Micheline<'a>>,
-) -> &'a [Micheline<'a>] {
-    arena.alloc_extend(iter.into_iter().collect::<Vec<_>>())
-}
-
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
     fn into_micheline_optimized_legacy(self, arena: &'a Arena<Micheline<'a>>) -> Micheline<'a> {
         use Micheline as V;
@@ -325,9 +314,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             // reference implementation, because reference implementation optimizes the size of combs
             // and uses an untyped representation that is the shortest.
             TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
-            TV::List(l) => V::Seq(micheline_seq(arena, l.into_iter().map(go))),
-            TV::Set(s) => V::Seq(micheline_seq(arena, s.into_iter().map(go))),
-            TV::Map(m) => V::Seq(micheline_seq(
+            TV::List(l) => V::Seq(V::alloc_iter(arena, l.into_iter().map(go))),
+            TV::Set(s) => V::Seq(V::alloc_iter(arena, s.into_iter().map(go))),
+            TV::Map(m) => V::Seq(V::alloc_iter(
                 arena,
                 m.into_iter()
                     .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
@@ -335,7 +324,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::BigMap(m) => {
                 let id_part = m.id.map(|i| V::Int(i.0));
                 let overlay_empty = m.overlay.is_empty();
-                let map_part = V::Seq(micheline_seq(
+                let map_part = V::Seq(V::alloc_iter(
                     arena,
                     m.overlay.into_iter().map(|(key, val)| {
                         V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
