@@ -6375,6 +6375,7 @@ let hash = Protocol.hash
             octez_context_ops |> if_ N.(number >= 011) |> open_;
             octez_rpc;
             octez_rpc_http |> open_;
+            octez_crypto_dal |> open_;
             octez_dal_node_services |> if_ N.(number >= 017);
             lwt_canceler;
             lwt_exit;

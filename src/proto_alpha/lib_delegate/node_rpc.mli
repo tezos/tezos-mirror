@@ -83,6 +83,9 @@ val await_protocol_activation :
   unit ->
   unit tzresult Lwt.t
 
+val fetch_dal_config :
+  #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
+
 (** [get_attestable_slots ctxt pkh ~level] calls the DAL node RPC
     GET /profiles/<pkh>/attested_levels/<level>/attestable_slots *)
 val get_attestable_slots :

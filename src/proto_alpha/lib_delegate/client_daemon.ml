@@ -132,6 +132,13 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
+      let* () =
+        let find_srs_files () =
+          Tezos_base.Dal_srs.find_trusted_setup_files ()
+        in
+        let* dal_config = Node_rpc.fetch_dal_config cctxt in
+        Cryptobox.Config.init_dal ~find_srs_files dal_config
+      in
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates
     in
     let* () =
