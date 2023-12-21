@@ -23,13 +23,49 @@ pub enum Micheline<'a> {
     Seq(&'a [Micheline<'a>]),
 }
 
+/* *** Note: alloc_extend ***
+
+Arena has an unfortunate pothole related to alloc_extend: if the iterator
+itself tries to allocate in the arena, it will panic.
+
+To avoid triggering it accidentally, the mehtod has an error attached via
+clippy. When it's known to be safe, `allow` directive is added on the call.
+*/
+
 impl<'a> Micheline<'a> {
+    pub(crate) fn alloc_seq<const N: usize>(arena: &'a Arena<Self>, args: [Self; N]) -> &'a [Self] {
+        // The call is safe, the iterable, being an array, doesn't allocate in
+        // the arena during iteration. See Note: alloc_extend
+        #[allow(clippy::disallowed_methods)]
+        arena.alloc_extend(args)
+    }
+
+    pub(crate) fn alloc_iter(
+        arena: &'a Arena<Self>,
+        mut iter: impl ExactSizeIterator<Item = Self>,
+    ) -> &'a [Micheline<'a>] {
+        // preallocate the slice, filling it with Micheline::Seq(&[]), which is
+        // the simplest Micheline variant. We control the iterator here, it
+        // doesn't allocate in the arena, the call is safe.
+        // See Note: alloc_extend
+        #[allow(clippy::disallowed_methods)]
+        let buf = arena.alloc_extend(std::iter::repeat(Micheline::Seq(&[])).take(iter.len()));
+        let mut actual_len: usize = 0;
+        for (dest, item) in buf.iter_mut().zip(&mut iter) {
+            *dest = item;
+            actual_len += 1;
+        }
+        assert!(iter.next().is_none());
+        assert!(buf.len() == actual_len);
+        buf
+    }
+
     pub fn prim0(prim: Prim) -> Self {
         Micheline::App(prim, &[], NO_ANNS)
     }
 
     pub fn prim1(arena: &'a Arena<Micheline<'a>>, prim: Prim, arg: Micheline<'a>) -> Self {
-        Micheline::App(prim, arena.alloc_extend([arg]), NO_ANNS)
+        Micheline::App(prim, Self::alloc_seq(arena, [arg]), NO_ANNS)
     }
 
     pub fn prim2(
@@ -38,7 +74,7 @@ impl<'a> Micheline<'a> {
         arg1: Micheline<'a>,
         arg2: Micheline<'a>,
     ) -> Self {
-        Micheline::App(prim, arena.alloc_extend([arg1, arg2]), NO_ANNS)
+        Micheline::App(prim, Self::alloc_seq(arena, [arg1, arg2]), NO_ANNS)
     }
 
     pub fn prim3(
@@ -48,14 +84,11 @@ impl<'a> Micheline<'a> {
         arg2: Micheline<'a>,
         arg3: Micheline<'a>,
     ) -> Self {
-        Micheline::App(prim, arena.alloc_extend([arg1, arg2, arg3]), NO_ANNS)
+        Micheline::App(prim, Self::alloc_seq(arena, [arg1, arg2, arg3]), NO_ANNS)
     }
 
-    pub fn seq(
-        arena: &'a Arena<Micheline<'a>>,
-        args: impl IntoIterator<Item = Micheline<'a>>,
-    ) -> Self {
-        Micheline::Seq(arena.alloc_extend(args))
+    pub fn seq<const N: usize>(arena: &'a Arena<Micheline<'a>>, args: [Micheline<'a>; N]) -> Self {
+        Micheline::Seq(Self::alloc_seq(arena, args))
     }
 }
 

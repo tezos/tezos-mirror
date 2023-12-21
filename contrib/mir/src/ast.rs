@@ -169,7 +169,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
         struct LinearizePairIter<'a>(std::option::Option<&'a Type>);
 
-        impl<'a> std::iter::Iterator for LinearizePairIter<'a> {
+        impl<'a> Iterator for LinearizePairIter<'a> {
             type Item = &'a Type;
             fn next(&mut self) -> std::option::Option<Self::Item> {
                 match self.0 {
@@ -183,7 +183,19 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
                     }
                 }
             }
+
+            fn size_hint(&self) -> (usize, std::option::Option<usize>) {
+                let Some(mut ty) = self.0 else { return (0, Some(0)) };
+                let mut size: usize = 1;
+                while let Type::Pair(x) = ty {
+                    ty = &x.1;
+                    size += 1;
+                }
+                (size, Some(size))
+            }
         }
+
+        impl<'a> ExactSizeIterator for LinearizePairIter<'a> {}
 
         match self {
             Nat => Micheline::prim0(Prim::nat),
@@ -227,7 +239,8 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
             Pair(_) => Micheline::App(
                 Prim::pair,
-                arena.alloc_extend(
+                Micheline::alloc_iter(
+                    arena,
                     LinearizePairIter(Some(self)).map(|x| x.into_micheline_optimized_legacy(arena)),
                 ),
                 NO_ANNS,
@@ -313,21 +326,22 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             // reference implementation, because reference implementation optimizes the size of combs
             // and uses an untyped representation that is the shortest.
             TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
-            TV::List(l) => V::Seq(arena.alloc_extend(l.into_iter().map(go))),
-            TV::Set(s) => V::Seq(arena.alloc_extend(s.into_iter().map(go))),
-            TV::Map(m) => V::Seq(
-                arena.alloc_extend(
-                    m.into_iter()
-                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
-                ),
-            ),
+            TV::List(l) => V::Seq(V::alloc_iter(arena, l.into_iter().map(go))),
+            TV::Set(s) => V::Seq(V::alloc_iter(arena, s.into_iter().map(go))),
+            TV::Map(m) => V::Seq(V::alloc_iter(
+                arena,
+                m.into_iter()
+                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+            )),
             TV::BigMap(m) => {
                 let id_part = m.id.map(|i| V::Int(i.0));
                 let overlay_empty = m.overlay.is_empty();
-                let map_part =
-                    V::Seq(arena.alloc_extend(m.overlay.into_iter().map(|(key, val)| {
+                let map_part = V::Seq(V::alloc_iter(
+                    arena,
+                    m.overlay.into_iter().map(|(key, val)| {
                         V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
-                    })));
+                    }),
+                ));
                 match id_part {
                     Some(id_part) if overlay_empty => id_part,
                     Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
@@ -352,22 +366,20 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Bls12381G2(x) => V::Bytes(x.to_bytes().to_vec()),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
-                Operation::TransferTokens(tt) => Micheline::App(
+                Operation::TransferTokens(tt) => Micheline::prim3(
+                    arena,
                     Prim::Transfer_tokens,
-                    arena.alloc_extend([
-                        go(tt.param),
-                        go(TV::Address(tt.destination_address)),
-                        go(TV::Mutez(tt.amount)),
-                    ]),
-                    annotations::NO_ANNS,
+                    go(tt.param),
+                    go(TV::Address(tt.destination_address)),
+                    go(TV::Mutez(tt.amount)),
                 ),
-                Operation::SetDelegate(sd) => Micheline::App(
+                Operation::SetDelegate(sd) => Micheline::prim1(
+                    arena,
                     Prim::Set_delegate,
-                    arena.alloc_extend([match sd.0 {
+                    match sd.0 {
                         Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh))),
                         None => V::prim0(Prim::None),
-                    }]),
-                    annotations::NO_ANNS,
+                    },
                 ),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),

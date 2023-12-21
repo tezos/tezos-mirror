@@ -5,6 +5,7 @@
 /*                                                                            */
 /******************************************************************************/
 #![warn(clippy::redundant_clone)]
+#![deny(clippy::disallowed_methods)]
 
 pub mod ast;
 pub mod bls;
@@ -970,8 +971,8 @@ mod multisig_tests {
     fn some(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
         Micheline::prim1(arena(), Prim::Some, x.into())
     }
-    fn seq(xs: impl IntoIterator<Item = impl Into<Micheline<'static>>>) -> Micheline<'static> {
-        Micheline::seq(arena(), xs.into_iter().map(Into::into))
+    fn seq<const N: usize>(xs: [Micheline<'static>; N]) -> Micheline<'static> {
+        Micheline::seq(arena(), xs)
     }
 
     #[test]
@@ -1019,7 +1020,7 @@ mod multisig_tests {
                 // make_initial_storage(),
                 pair(
                     anti_replay_counter(),
-                    pair(threshold.clone(), seq([PUBLIC_KEY])),
+                    pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
             );
 
@@ -1090,7 +1091,7 @@ mod multisig_tests {
                 ),
                 pair(
                     anti_replay_counter(),
-                    pair(threshold.clone(), seq([PUBLIC_KEY])),
+                    pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
             );
 
@@ -1143,7 +1144,10 @@ mod multisig_tests {
                     // %sigs
                     seq([some(invalid_signature)]),
                 ),
-                pair(anti_replay_counter(), pair(threshold, seq([PUBLIC_KEY]))),
+                pair(
+                    anti_replay_counter(),
+                    pair(threshold, seq([PUBLIC_KEY.into()])),
+                ),
             );
 
         assert_eq!(

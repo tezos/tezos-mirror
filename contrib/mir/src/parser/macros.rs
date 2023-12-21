@@ -29,64 +29,77 @@ pub fn expand_macro<'a>(
     use Prim::*;
     let unex_arg_err: ParserError = UnexpectedArgumentCount(m.clone()).into();
     match (m, args) {
-        (CMPEQ, NoArgs) => Ok(Seq(arena.alloc_extend([M::prim0(COMPARE), M::prim0(EQ)]))),
+        (CMPEQ, NoArgs) => Ok(M::seq(arena, [M::prim0(COMPARE), M::prim0(EQ)])),
         (CMPEQ, _) => Err(unex_arg_err),
 
-        (CMPLE, NoArgs) => Ok(Seq(arena.alloc_extend([M::prim0(COMPARE), M::prim0(LE)]))),
+        (CMPLE, NoArgs) => Ok(M::seq(arena, [M::prim0(COMPARE), M::prim0(LE)])),
         (CMPLE, _) => Err(unex_arg_err),
 
-        (IF_SOME, TwoArgs(ib1, ib2)) => {
-            Ok(Seq(arena.alloc_extend([M::prim2(arena, IF_NONE, ib2, ib1)])))
-        }
+        (IF_SOME, TwoArgs(ib1, ib2)) => Ok(M::seq(arena, [M::prim2(arena, IF_NONE, ib2, ib1)])),
         (IF_SOME, _) => Err(unex_arg_err),
 
-        (IFCMPEQ, TwoArgs(ib1, ib2)) => Ok(Seq(arena.alloc_extend([
-            M::prim0(COMPARE),
-            M::prim0(EQ),
-            M::prim2(arena, IF, ib1, ib2),
-        ]))),
+        (IFCMPEQ, TwoArgs(ib1, ib2)) => Ok(M::seq(
+            arena,
+            [
+                M::prim0(COMPARE),
+                M::prim0(EQ),
+                M::prim2(arena, IF, ib1, ib2),
+            ],
+        )),
         (IFCMPEQ, _) => Err(unex_arg_err),
 
-        (IFCMPLE, TwoArgs(ib1, ib2)) => Ok(Seq(arena.alloc_extend([
-            M::prim0(COMPARE),
-            M::prim0(LE),
-            M::prim2(arena, IF, ib1, ib2),
-        ]))),
+        (IFCMPLE, TwoArgs(ib1, ib2)) => Ok(M::seq(
+            arena,
+            [
+                M::prim0(COMPARE),
+                M::prim0(LE),
+                M::prim2(arena, IF, ib1, ib2),
+            ],
+        )),
         (IFCMPLE, _) => Err(unex_arg_err),
 
-        (ASSERT, NoArgs) => Ok(Seq(arena.alloc_extend([M::prim2(
+        (ASSERT, NoArgs) => Ok(M::seq(
             arena,
-            IF,
-            Seq(&[]),
-            Seq(arena.alloc_extend([expand_macro(arena, &FAIL, NoArgs)?])),
-        )]))),
+            [M::prim2(
+                arena,
+                IF,
+                Seq(&[]),
+                M::seq(arena, [expand_macro(arena, &FAIL, NoArgs)?]),
+            )],
+        )),
         (ASSERT, _) => Err(unex_arg_err),
 
         // The following might seem a bit less straight forward than it could be. But the reference
         // implementation wraps the first two instructions in a seq, so we are doing the same.
-        (ASSERT_CMPEQ, NoArgs) => Ok(Seq(arena.alloc_extend([
-            expand_macro(arena, &CMPEQ, NoArgs)?,
-            M::prim2(
-                arena,
-                IF,
-                Seq(&[]),
-                Seq(arena.alloc_extend([expand_macro(arena, &FAIL, NoArgs)?])),
-            ),
-        ]))),
+        (ASSERT_CMPEQ, NoArgs) => Ok(M::seq(
+            arena,
+            [
+                expand_macro(arena, &CMPEQ, NoArgs)?,
+                M::prim2(
+                    arena,
+                    IF,
+                    Seq(&[]),
+                    M::seq(arena, [expand_macro(arena, &FAIL, NoArgs)?]),
+                ),
+            ],
+        )),
         (ASSERT_CMPEQ, _) => Err(unex_arg_err),
 
-        (ASSERT_CMPLE, NoArgs) => Ok(Seq(arena.alloc_extend([
-            expand_macro(arena, &CMPLE, NoArgs)?,
-            M::prim2(
-                arena,
-                IF,
-                Seq(&[]),
-                Seq(arena.alloc_extend([expand_macro(arena, &FAIL, NoArgs)?])),
-            ),
-        ]))),
+        (ASSERT_CMPLE, NoArgs) => Ok(M::seq(
+            arena,
+            [
+                expand_macro(arena, &CMPLE, NoArgs)?,
+                M::prim2(
+                    arena,
+                    IF,
+                    Seq(&[]),
+                    M::seq(arena, [expand_macro(arena, &FAIL, NoArgs)?]),
+                ),
+            ],
+        )),
         (ASSERT_CMPLE, _) => Err(unex_arg_err),
 
-        (FAIL, NoArgs) => Ok(Seq(arena.alloc_extend([M::prim0(UNIT), M::prim0(FAILWITH)]))),
+        (FAIL, NoArgs) => Ok(M::seq(arena, [M::prim0(UNIT), M::prim0(FAILWITH)])),
         (FAIL, _) => Err(unex_arg_err),
 
         // Do not wrap expansion of DII+P and DUU+P in a Seq to
