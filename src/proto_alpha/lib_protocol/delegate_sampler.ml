@@ -211,7 +211,7 @@ let compute_snapshot_index ctxt cycle ~max_snapshot_index =
   let* seed = Seed_storage.for_cycle ctxt cycle in
   compute_snapshot_index_for_seed ~max_snapshot_index seed
 
-let select_distribution_for_cycle ctxt ~slashings:_ cycle =
+let select_distribution_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let* seed = Seed_storage.raw_for_cycle ctxt cycle in
   let* stakes, total_stake = get_stakes ctxt in
@@ -237,10 +237,10 @@ let select_distribution_for_cycle ctxt ~slashings:_ cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
-let select_new_distribution_at_cycle_end ctxt ~slashings ~new_cycle =
+let select_new_distribution_at_cycle_end ctxt ~slashings:_ ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
-  select_distribution_for_cycle ctxt ~slashings for_cycle
+  select_distribution_for_cycle ctxt for_cycle
 
 let clear_outdated_sampling_data ctxt ~new_cycle =
   let open Lwt_result_syntax in

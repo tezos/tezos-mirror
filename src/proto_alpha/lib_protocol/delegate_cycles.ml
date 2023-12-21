@@ -234,9 +234,6 @@ let init_first_cycles ctxt =
       let* ctxt = Stake_storage.snapshot ctxt in
       (* NB: we need to take several snapshots because
          select_distribution_for_cycle deletes the snapshots *)
-      Delegate_sampler.select_distribution_for_cycle
-        ctxt
-        ~slashings:Signature.Public_key_hash.Map.empty
-        cycle)
+      Delegate_sampler.select_distribution_for_cycle ctxt cycle)
     ctxt
     Misc.(0 --> preserved)
