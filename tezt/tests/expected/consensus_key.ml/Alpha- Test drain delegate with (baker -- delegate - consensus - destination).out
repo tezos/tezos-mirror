@@ -96,7 +96,7 @@ This sequence of operations was run:
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "238000509096", "current_frozen_deposits": "200000164892",
-  "frozen_deposits": "200000040756", "staking_balance": "238000509096",
+  "frozen_deposits": "200000067317", "staking_balance": "238000509096",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 4,
   "total_delegated_stake": "0", "staking_denominator": "0",
