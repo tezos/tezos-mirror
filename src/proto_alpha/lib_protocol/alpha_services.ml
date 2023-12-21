@@ -150,21 +150,6 @@ module Nonce = struct
   let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
 
-type error += No_available_snapshots of {min_cycle : int32}
-
-let () =
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"no_available_snapshots"
-    ~title:"No available snapshots"
-    ~description:"No available snapshots"
-    ~pp:(fun ppf min_cycle ->
-      Format.fprintf ppf "No available snapshots until cycle %ld" min_cycle)
-    Data_encoding.(obj1 (req "min_cycle" int32))
-    (function
-      | No_available_snapshots {min_cycle} -> Some min_cycle | _ -> None)
-    (fun min_cycle -> No_available_snapshots {min_cycle})
-
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
