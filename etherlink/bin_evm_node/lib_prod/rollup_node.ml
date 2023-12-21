@@ -487,8 +487,8 @@ let is_tx_valid base (Hex tx_raw) =
   let*? messages = Simulation.encode_tx tx_raw in
   let insight_requests =
     [
-      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
       Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+      Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
     ]
   in
   let* r =
@@ -567,7 +567,8 @@ module type S = sig
 
   val kernel_version : unit -> string tzresult Lwt.t
 
-  val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
+  val simulate_call :
+    Ethereum_types.call -> (Ethereum_types.hash, unit) result tzresult Lwt.t
 
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
