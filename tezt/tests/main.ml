@@ -223,6 +223,7 @@ let register_protocol_tests_that_use_supports_correctly () =
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
+  Adaptive_issuance.register ~protocols:[Alpha] ;
   Dal.register ~protocols:[Alpha] ;
   Evm_rollup.register ~protocols:[Alpha] ;
   Evm_sequencer.register ~protocols:[Alpha] ;

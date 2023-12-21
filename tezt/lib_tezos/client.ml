@@ -76,6 +76,10 @@ type stresstest_contract_parameters = {
   invocation_gas_limit : int;
 }
 
+type ai_vote = On | Off | Pass
+
+let ai_vote_to_string = function On -> "on" | Off -> "off" | Pass -> "pass"
+
 let name t = t.name
 
 let base_dir t = t.base_dir
@@ -762,7 +766,8 @@ let empty_mempool_file ?(filename = "mempool.json") () =
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
-    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
+    ?force ?context_path ?dal_node_endpoint ?ai_vote ?(state_recorder = false)
+    client =
   spawn_command
     ?endpoint
     client
@@ -784,12 +789,13 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
     @ optional_arg "dal-node" Fun.id dal_node_endpoint
+    @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
-    ?state_recorder ?expect_failure client =
+    ?ai_vote ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -804,6 +810,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     ?dal_node_endpoint
+    ?ai_vote
     ?state_recorder
     client
   |> Process.check ?expect_failure
@@ -811,7 +818,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?state_recorder client =
+    ?node ?dal_node_endpoint ?ai_vote ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -842,6 +849,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
       ?force
       ?context_path
       ?dal_node_endpoint
+      ?ai_vote
       ?state_recorder
       client
   in
@@ -850,7 +858,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint client =
+    ?node ?dal_node_endpoint ?ai_vote client =
   let* (_level : int) =
     bake_for_and_wait_level
       ?endpoint
@@ -868,6 +876,7 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
       ?level_before
       ?node
       ?dal_node_endpoint
+      ?ai_vote
       client
   in
   unit
@@ -4224,6 +4233,39 @@ let as_foreign_endpoint = function
           host = Proxy_server.rpc_host;
           port = Proxy_server.rpc_port ps;
         }
+
+let spawn_stake ?(wait = "none") amount dlgt client =
+  spawn_command client
+  @@ [
+       "--wait";
+       wait;
+       "stake";
+       Tez.to_string amount;
+       "for";
+       dlgt;
+       "--gas-limit";
+       "5000";
+     ]
+
+let stake ?wait amount dlgt client =
+  spawn_stake ?wait amount dlgt client |> Process.check
+
+let spawn_set_delegate_parameters dlgt limit edge client =
+  spawn_command client
+  @@ [
+       "set";
+       "delegate";
+       "parameters";
+       "for";
+       dlgt;
+       "--limit-of-staking-over-baking";
+       limit;
+       "--edge-of-baking-over-staking";
+       edge;
+     ]
+
+let set_delegate_parameters dlgt limit edge client =
+  spawn_set_delegate_parameters dlgt limit edge client |> Process.check
 
 module RPC = struct
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
