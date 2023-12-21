@@ -21,22 +21,24 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
 ) -> Result<(), anyhow::Error> {
-    let InboxContent {
+    if let Some(InboxContent {
         kernel_upgrade,
         transactions,
         sequencer_blueprints: _,
-    } = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    let timestamp = current_timestamp(host);
-    let blueprint = Blueprint {
-        transactions,
-        timestamp,
-    };
-    // Store the blueprint.
-    store_inbox_blueprint(host, blueprint)?;
-    // Store kernel upgrade.
-    if let Some(kernel_upgrade) = kernel_upgrade {
-        store_kernel_upgrade(host, &kernel_upgrade)?;
-    };
+    }) = read_inbox(host, smart_rollup_address, ticketer, admin)?
+    {
+        let timestamp = current_timestamp(host);
+        let blueprint = Blueprint {
+            transactions,
+            timestamp,
+        };
+        // Store the blueprint.
+        store_inbox_blueprint(host, blueprint)?;
+        // Store kernel upgrade.
+        if let Some(kernel_upgrade) = kernel_upgrade {
+            store_kernel_upgrade(host, &kernel_upgrade)?;
+        };
+    }
     Ok(())
 }
 
@@ -46,27 +48,29 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
 ) -> Result<(), anyhow::Error> {
-    let InboxContent {
+    if let Some(InboxContent {
         kernel_upgrade,
         transactions: _,
         sequencer_blueprints,
-    } = read_inbox(host, smart_rollup_address, ticketer, admin)?;
-    // TODO: store delayed inbox messages (transactions).
-    // Store the blueprints.
-    for seq_blueprint in sequencer_blueprints {
-        log!(
-            host,
-            Debug,
-            "Storing chunk {} of sequencer blueprint number {}",
-            seq_blueprint.chunk_index,
-            seq_blueprint.number
-        );
-        store_sequencer_blueprint(host, seq_blueprint)?
+    }) = read_inbox(host, smart_rollup_address, ticketer, admin)?
+    {
+        // TODO: store delayed inbox messages (transactions).
+        // Store the blueprints.
+        for seq_blueprint in sequencer_blueprints {
+            log!(
+                host,
+                Debug,
+                "Storing chunk {} of sequencer blueprint number {}",
+                seq_blueprint.chunk_index,
+                seq_blueprint.number
+            );
+            store_sequencer_blueprint(host, seq_blueprint)?
+        }
+        // Store kernel upgrade.
+        if let Some(kernel_upgrade) = kernel_upgrade {
+            store_kernel_upgrade(host, &kernel_upgrade)?;
+        };
     }
-    // Store kernel upgrade.
-    if let Some(kernel_upgrade) = kernel_upgrade {
-        store_kernel_upgrade(host, &kernel_upgrade)?;
-    };
     Ok(())
 }
 
