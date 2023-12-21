@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+use std::borrow::Cow;
+
 use logos::Logos;
 pub mod errors;
 pub mod macros;
@@ -12,6 +14,7 @@ pub mod macros;
 pub use errors::*;
 use macros::*;
 use num_bigint::BigInt;
+use strum_macros::EnumCount;
 
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
@@ -28,7 +31,7 @@ macro_rules! coalesce {
 /// representation of the identifiers.
 macro_rules! defprim {
     ($ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount)]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[repr(u8)]
         pub enum $ty {
@@ -141,10 +144,21 @@ pub enum Noun {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Annotation<'a> {
-    Special(&'a str),
-    Field(&'a str),
-    Variable(&'a str),
-    Type(&'a str),
+    Special(Cow<'a, str>),
+    Field(Cow<'a, str>),
+    Variable(Cow<'a, str>),
+    Type(Cow<'a, str>),
+}
+
+impl Annotation<'_> {
+    pub fn into_owned(self) -> Annotation<'static> {
+        match self {
+            Annotation::Special(s) => Annotation::Special(Cow::Owned(s.into_owned())),
+            Annotation::Field(s) => Annotation::Field(Cow::Owned(s.into_owned())),
+            Annotation::Variable(s) => Annotation::Variable(Cow::Owned(s.into_owned())),
+            Annotation::Type(s) => Annotation::Type(Cow::Owned(s.into_owned())),
+        }
+    }
 }
 
 impl std::fmt::Display for Annotation<'_> {
@@ -155,6 +169,18 @@ impl std::fmt::Display for Annotation<'_> {
             Annotation::Variable(s) => write!(f, "@{s}"),
             Annotation::Type(s) => write!(f, ":{s}"),
         }
+    }
+}
+
+pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {
+    match value {
+        s @ ("@%" | "@%%" | "%@") => Some(Annotation::Special(Cow::Borrowed(s))),
+        s => match s.as_bytes()[0] {
+            b'@' => Some(Annotation::Variable(Cow::Borrowed(&s[1..]))),
+            b'%' => Some(Annotation::Field(Cow::Borrowed(&s[1..]))),
+            b':' => Some(Annotation::Type(Cow::Borrowed(&s[1..]))),
+            _ => None,
+        },
     }
 }
 
@@ -291,20 +317,7 @@ fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
 }
 
 fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
-    match lex.slice() {
-        s @ ("@%" | "@%%" | "%@") => Annotation::Special(s),
-        s => {
-            if let Some(s) = s.strip_prefix('@') {
-                Annotation::Variable(s)
-            } else if let Some(s) = s.strip_prefix('%') {
-                Annotation::Field(s)
-            } else if let Some(s) = s.strip_prefix(':') {
-                Annotation::Type(s)
-            } else {
-                unreachable!("regex for Annotation ensures it's either one of three")
-            }
-        }
-    }
+    try_ann_from_str(lex.slice()).expect("regex from annotation ensures it's valid")
 }
 
 #[cfg(test)]

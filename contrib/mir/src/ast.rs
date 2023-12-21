@@ -496,6 +496,7 @@ pub enum Instruction<'a> {
     /// `ISelf` because `Self` is a reserved keyword
     ISelf(Entrypoint),
     Pack,
+    Unpack(Type),
     CheckSignature,
     TransferTokens,
     SetDelegate,

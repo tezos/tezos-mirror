@@ -10,6 +10,7 @@ use std::fs::read_to_string;
 
 use mir::parser::Parser;
 use mir::tzt::*;
+use typed_arena::Arena;
 
 fn run_test(file: &str) -> Result<(), String> {
     let contents = read_to_string(file).map_err(|e| e.to_string())?;
@@ -18,7 +19,8 @@ fn run_test(file: &str) -> Result<(), String> {
         .parse_tzt_test(&contents)
         .map_err(|e| e.to_string())?;
 
-    run_tzt_test(tzt_test).map_err(|e| format!("{}", e))
+    let arena = Arena::new();
+    run_tzt_test(tzt_test, &arena).map_err(|e| format!("{}", e))
 }
 
 fn main() {
@@ -53,6 +55,11 @@ mod tztrunner_tests {
     fn parse_tzt_test(s: &'static str) -> Result<TztTest, Box<dyn Error>> {
         let parser = Box::leak(Box::new(Parser::new()));
         parser.parse_tzt_test(s)
+    }
+
+    pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
+        let temp = Box::leak(Box::default());
+        mir::tzt::run_tzt_test(test, temp)
     }
 
     #[test]

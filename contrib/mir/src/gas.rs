@@ -790,6 +790,11 @@ pub mod interpret_cost {
         let size = Checked::from(int.byte_size());
         (75 + (size * 3)).as_gas_cost()
     }
+
+    pub fn unpack(bytes: &[u8]) -> Result<u32, OutOfGas> {
+        let size = Checked::from(bytes.len());
+        (260 + (size >> 1)).as_gas_cost()
+    }
 }
 
 #[cfg(test)]

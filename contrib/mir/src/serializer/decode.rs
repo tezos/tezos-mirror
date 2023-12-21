@@ -2,211 +2,328 @@
 /*                                                                            */
 /* SPDX-License-Identifier: MIT                                               */
 /* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
+/* Copyright (c) [2022-2023] TriliTech <contact@trili.tech>                   */
 /*                                                                            */
 /******************************************************************************/
 
-//! Micheline serialization.
-
-use std::mem::size_of;
-use tezos_data_encoding::{enc::BinWriter, types::Zarith};
+//! Micheline deserialization.
 
 use super::constants::*;
+use bitvec::{order::Lsb0, vec::BitVec, view::BitView};
+use num_bigint::{BigInt, Sign};
+use smallvec::{smallvec, SmallVec};
+use strum::EnumCount;
+use typed_arena::Arena;
+
 use crate::{
-    ast::{annotations::Annotations, Micheline},
-    lexer::{Annotation, Prim},
+    ast::{
+        annotations::{Annotations, NO_ANNS},
+        Micheline,
+    },
+    lexer::{try_ann_from_str, Annotation, Prim},
 };
 
-trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
-    const NO_ANNOTS_TAG: u8;
-    const WITH_ANNOTS_TAG: u8;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) {
-        if annots.is_empty() {
-            out.push(Self::NO_ANNOTS_TAG);
-        } else {
-            out.push(Self::WITH_ANNOTS_TAG);
-        }
-        prim.encode(out);
-        for arg in args {
-            encode_micheline(arg, out)
-        }
-        if !annots.is_empty() {
-            annots.encode_bytes(out)
-        }
-    }
+#[derive(PartialEq, Debug, Clone, Copy, thiserror::Error)]
+pub enum DecodeError {
+    #[error("trailing bytes after decoding the value")]
+    TrailingBytes,
+    #[error("PACK tag 0x05 not found")]
+    NoPackTag,
+    #[error("expected more data, but got EOF")]
+    UnexpectedEOF,
+    #[error("unknown tag: {0}")]
+    UnknownTag(u8),
+    #[error("forbidden character in string")]
+    ForbiddenStringCharacter,
+    #[error("unknown primitive tag: {0}")]
+    UnknownPrim(u8),
+    #[error("could not decode annotation")]
+    BadAnnotation,
 }
 
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 0] {
-    const NO_ANNOTS_TAG: u8 = APP_NO_ARGS_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_NO_ARGS_WITH_ANNOTS_TAG;
-}
+/// If the number of arguments is small, an allocation-avoiding optimization is
+/// used. This constant specifies the upper bound for the number of arguments
+/// where it triggers.
+/// At most we expect primitives with 3 arguments.
+const EXPECTED_MAX_APP_ARGS: usize = 3;
 
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 1] {
-    const NO_ANNOTS_TAG: u8 = APP_ONE_ARG_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_ONE_ARG_WITH_ANNOTS_TAG;
-}
-
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 2] {
-    const NO_ANNOTS_TAG: u8 = APP_TWO_ARGS_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_TWO_ARGS_WITH_ANNOTS_TAG;
-}
-
-impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
-    const NO_ANNOTS_TAG: u8 = APP_GENERIC;
-    const WITH_ANNOTS_TAG: u8 = APP_GENERIC;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) {
-        match args {
-            [] => AppEncoder::encode(prim, [], annots, out),
-            [arg] => AppEncoder::encode(prim, [arg], annots, out),
-            [arg1, arg2] => AppEncoder::encode(prim, [arg1, arg2], annots, out),
-            _ => {
-                out.push(Self::WITH_ANNOTS_TAG);
-                prim.encode(out);
-                with_patchback_len(out, |out| {
-                    for arg in args {
-                        encode_micheline(arg, out)
-                    }
-                });
-                annots.encode_bytes(out)
-            }
-        }
-    }
-}
-
-impl Annotation<'_> {
-    pub fn encode_bytes(&self, out: &mut Vec<u8>) {
-        match self {
-            Annotation::Special(s) => out.extend_from_slice(s.as_bytes()),
-            Annotation::Field(s) => {
-                out.push(b'%');
-                out.extend_from_slice(s.as_bytes());
-            }
-            Annotation::Variable(s) => {
-                out.push(b'@');
-                out.extend_from_slice(s.as_bytes());
-            }
-            Annotation::Type(s) => {
-                out.push(b':');
-                out.extend_from_slice(s.as_bytes());
-            }
-        }
-    }
-}
-
-impl Annotations<'_> {
-    pub fn encode_bytes(&self, out: &mut Vec<u8>) {
-        with_patchback_len(out, |out| {
-            // Add them space-separated
-            let mut is_first = true;
-            for ann in self.iter() {
-                if !is_first {
-                    out.push(b' ')
-                }
-                is_first = false;
-                ann.encode_bytes(out);
-            }
-        })
-    }
-}
-
-/// Length of some container, usually stored as fixed-length number.
-type Len = u32;
-
-/// Put length of something.
-fn put_len(len: Len, out: &mut Vec<u8>) {
-    out.extend_from_slice(&len.to_be_bytes())
-}
-
-/// Put bytestring (with its length).
-fn put_bytes(bs: &[u8], out: &mut Vec<u8>) {
-    out.push(BYTES_TAG);
-    put_len(bs.len() as Len, out);
-    out.extend_from_slice(bs)
-}
-
-/// Put a Michelson string.
-fn put_string(s: &str, out: &mut Vec<u8>) {
-    out.push(STRING_TAG);
-    put_len(s.len() as Len, out);
-    out.extend_from_slice(s.as_bytes())
-}
-
-fn with_patchback_len(out: &mut Vec<u8>, f: impl FnOnce(&mut Vec<u8>)) {
-    put_len(0, out); // don't know the right length in advance
-    let i = out.len();
-    let len_place = (i - size_of::<Len>())..i; // to fill length later
-    f(out);
-    let len_of_written = (out.len() - i) as Len;
-    out[len_place].copy_from_slice(&len_of_written.to_be_bytes())
-}
-
-/// Put a container.
-fn put_seq<V>(list: &[V], out: &mut Vec<u8>, encoder: fn(&V, &mut Vec<u8>)) {
-    out.push(SEQ_TAG);
-    with_patchback_len(out, |out| {
-        for val in list {
-            encoder(val, out)
-        }
-    });
-}
-
-/// Recursive encoding function for [Value].
-fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
-    use Micheline::*;
-    match mich {
-        Int(n) => {
-            let z = Zarith(n.clone());
-            out.push(NUMBER_TAG);
-            z.bin_write(out)
-                .unwrap_or_else(|err| panic!("Encoding zarith number unexpectedly failed: {err}"))
-        }
-        String(s) => put_string(s, out),
-        Bytes(b) => put_bytes(b, out),
-        Seq(s) => put_seq(s, out, encode_micheline),
-        App(prim, args, anns) => AppEncoder::encode(prim, *args, anns, out),
-    }
-}
+/// If the number of arguments is small, an allocation-avoiding optimization is
+/// used. This constant specifies the upper bound for the number of sequence
+/// elements where it triggers.
+/// 3 elements doesn't waste too much stack space and seems like a reasonable
+/// optimization for small sequences.
+const EXPECTED_MAX_SEQ_ELTS: usize = 3;
 
 impl<'a> Micheline<'a> {
-    /// Serialize a value.
-    pub fn encode(&self) -> Vec<u8> {
-        self.encode_starting_with(&[])
+    /// Decode raw binary data. Same as `decode_packed`, but doesn't expect the
+    /// first byte to be `0x05` tag.
+    pub fn decode_raw(
+        arena: &'a Arena<Micheline<'a>>,
+        bytes: &[u8],
+    ) -> Result<Micheline<'a>, DecodeError> {
+        let mut it = bytes.into();
+        let res = decode_micheline(arena, &mut it)?;
+        if it.peek().is_some() {
+            // didn't consume bytes entirely, fail
+            return Err(DecodeError::TrailingBytes);
+        }
+        Ok(res)
     }
 
-    /// Serialize a value like PACK does.
-    pub fn encode_for_pack(&self) -> Vec<u8> {
-        self.encode_starting_with(&[0x05])
-    }
-
-    /// Like [Value::encode], but allows specifying a prefix, useful for
-    /// `PACK` implementation.
-    pub(crate) fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
-        let mut out = Vec::from(start_bytes);
-        encode_micheline(self, &mut out);
-        out
+    /// Decode data that was previously `PACK`ed. Checks for `0x05` tag as the
+    /// first byte and strips it.
+    pub fn decode_packed(
+        arena: &'a Arena<Micheline<'a>>,
+        bytes: &[u8],
+    ) -> Result<Micheline<'a>, DecodeError> {
+        // PACK marker
+        if bytes.first() != Some(&0x05) {
+            return Err(DecodeError::NoPackTag);
+        }
+        Micheline::decode_raw(arena, &bytes[1..])
     }
 }
 
-impl<'a> BinWriter for Micheline<'a> {
-    fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
-        encode_micheline(self, out);
-        Ok(())
+struct BytesIt<'a>(&'a [u8]);
+
+impl<'a> BytesIt<'a> {
+    fn take(&mut self, num: usize) -> Option<&'a [u8]> {
+        if self.0.len() < num {
+            return None;
+        }
+        let (cur, rest) = self.0.split_at(num);
+        self.0 = rest;
+        Some(cur)
     }
+
+    fn take_const<const N: usize>(&mut self) -> Option<&'a [u8; N]> {
+        self.take(N).map(|x| x.try_into().unwrap())
+    }
+
+    fn next(&mut self) -> Option<u8> {
+        self.next_ref().copied()
+    }
+
+    fn next_ref(&mut self) -> Option<&u8> {
+        if self.0.is_empty() {
+            return None;
+        }
+        let res = &self.0[0];
+        self.0 = &self.0[1..];
+        Some(res)
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.0.first().copied()
+    }
+}
+
+impl<'a> From<&'a [u8]> for BytesIt<'a> {
+    fn from(value: &'a [u8]) -> Self {
+        BytesIt(value)
+    }
+}
+
+enum NumArgs {
+    Zero,
+    One,
+    Two,
+    Many,
+}
+
+fn decode_micheline<'a>(
+    arena: &'a Arena<Micheline<'a>>,
+    bytes: &mut BytesIt,
+) -> Result<Micheline<'a>, DecodeError> {
+    match bytes.next() {
+        None => Err(DecodeError::UnexpectedEOF),
+        Some(b) => match b {
+            NUMBER_TAG => decode_int(bytes),
+            STRING_TAG => decode_string(bytes),
+            SEQ_TAG => decode_seq(arena, bytes),
+            BYTES_TAG => decode_bytes(bytes),
+            APP_NO_ARGS_NO_ANNOTS_TAG => decode_app(NumArgs::Zero, false, arena, bytes),
+            APP_NO_ARGS_WITH_ANNOTS_TAG => decode_app(NumArgs::Zero, true, arena, bytes),
+            APP_ONE_ARG_NO_ANNOTS_TAG => decode_app(NumArgs::One, false, arena, bytes),
+            APP_ONE_ARG_WITH_ANNOTS_TAG => decode_app(NumArgs::One, true, arena, bytes),
+            APP_TWO_ARGS_NO_ANNOTS_TAG => decode_app(NumArgs::Two, false, arena, bytes),
+            APP_TWO_ARGS_WITH_ANNOTS_TAG => decode_app(NumArgs::Two, true, arena, bytes),
+            APP_GENERIC => decode_app(NumArgs::Many, true, arena, bytes),
+            b => Err(DecodeError::UnknownTag(b)),
+        },
+    }
+}
+
+fn get_len(bytes: &mut BytesIt) -> Result<u32, DecodeError> {
+    Ok(u32::from_be_bytes(
+        *bytes.take_const::<4>().ok_or(DecodeError::UnexpectedEOF)?,
+    ))
+}
+
+fn decode_int(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
+    let mut bitvec: BitVec<u8, Lsb0> = BitVec::new();
+    let mut sign = Sign::Plus;
+    let mut first = true;
+    loop {
+        let bits = bytes
+            .next_ref()
+            .ok_or(DecodeError::UnexpectedEOF)?
+            .view_bits::<Lsb0>();
+        let data_len = if first {
+            sign = if bits[6] { Sign::Minus } else { Sign::Plus };
+            first = false;
+            6
+        } else {
+            7
+        };
+        bitvec.extend_from_bitslice(&bits[..data_len]);
+        if !bits[7] {
+            break;
+        }
+    }
+    bitvec.set_uninitialized(false);
+    return Ok(Micheline::Int(BigInt::from_bytes_le(
+        sign,
+        &bitvec.into_vec(),
+    )));
+}
+
+fn get_bytes<'a>(bytes: &mut BytesIt<'a>) -> Result<&'a [u8], DecodeError> {
+    let len = get_len(bytes)? as usize;
+    bytes.take(len).ok_or(DecodeError::UnexpectedEOF)
+}
+
+fn validate_str(bytes: &[u8]) -> Result<&str, DecodeError> {
+    // check if all characters are printable ASCII
+    if !bytes
+        .iter()
+        .all(|c| matches!(c, b' '..=b'~' | b'\n' | b'\r'))
+    {
+        return Err(DecodeError::ForbiddenStringCharacter);
+    }
+    // SAFETY: we just checked all characters are ASCII.
+    Ok(unsafe { std::str::from_utf8_unchecked(bytes) })
+}
+
+fn decode_string(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
+    Ok(Micheline::String(
+        validate_str(get_bytes(bytes)?)?.to_owned(),
+    ))
+}
+
+fn decode_bytes(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
+    Ok(Micheline::Bytes(get_bytes(bytes)?.to_vec()))
+}
+
+fn decode_seq_raw<'a, const EXPECTED_MAX_ELTS: usize>(
+    arena: &'a Arena<Micheline<'a>>,
+    bytes: &mut BytesIt,
+) -> Result<SmallVec<[Micheline<'a>; EXPECTED_MAX_ELTS]>, DecodeError> {
+    let mut bytes: BytesIt = get_bytes(bytes)?.into();
+    let mut buf = SmallVec::new();
+    while bytes.peek().is_some() {
+        buf.push(decode_micheline(arena, &mut bytes)?);
+    }
+    Ok(buf)
+}
+
+fn decode_seq<'a>(
+    arena: &'a Arena<Micheline<'a>>,
+    bytes: &mut BytesIt,
+) -> Result<Micheline<'a>, DecodeError> {
+    let buf = decode_seq_raw::<EXPECTED_MAX_SEQ_ELTS>(arena, bytes)?;
+    let res = Micheline::Seq(arena.alloc_extend(buf));
+    Ok(res)
+}
+
+fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
+    // @%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
+    macro_rules! alpha_num {
+      () => {
+        b'_' | b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z'
+      }
+    }
+    match bytes {
+        b"@%" | b"@%%" | b"%@" => {}
+        [b'@' | b':' | b'%', alpha_num!(), rest @ ..]
+            if rest
+                .iter()
+                .all(|c| matches!(c, alpha_num!() | b'.' | b'%' | b'@')) => {}
+        _ => return Err(DecodeError::BadAnnotation),
+    }
+    // SAFETY: we just checked all bytes are ASCII
+    let str = unsafe { std::str::from_utf8_unchecked(bytes) };
+    // unwrap is fine, we effectively validated against a regex
+    Ok(try_ann_from_str(str).unwrap().into_owned())
+}
+
+fn decode_app<'a>(
+    num_args: NumArgs,
+    annotations: bool,
+    arena: &'a Arena<Micheline<'a>>,
+    bytes: &mut BytesIt,
+) -> Result<Micheline<'a>, DecodeError> {
+    let prim = bytes.next().ok_or(DecodeError::UnexpectedEOF)?;
+    if prim as usize >= Prim::COUNT {
+        return Err(DecodeError::UnknownPrim(prim));
+    }
+    // SAFETY: Prim is repr(u8), and we checked it's within bounds.
+    let prim: Prim = unsafe { std::mem::transmute(prim) };
+    let args: SmallVec<[_; EXPECTED_MAX_APP_ARGS]> = match num_args {
+        NumArgs::Zero => SmallVec::new(),
+        NumArgs::One => smallvec![decode_micheline(arena, bytes)?],
+        NumArgs::Two => smallvec![
+            decode_micheline(arena, bytes)?,
+            decode_micheline(arena, bytes)?,
+        ],
+        NumArgs::Many => decode_seq_raw(arena, bytes)?,
+    };
+    let anns = if annotations {
+        let str = get_bytes(bytes)?;
+        if str.is_empty() {
+            NO_ANNS
+        } else {
+            str.split(|c| c == &b' ')
+                .map(validate_ann)
+                .collect::<Result<Annotations, DecodeError>>()?
+        }
+    } else {
+        NO_ANNS
+    };
+    Ok(Micheline::App(prim, arena.alloc_extend(args), anns))
 }
 
 #[cfg(test)]
-mod test_encoding {
+mod test {
     use super::*;
 
     #[track_caller]
     fn check<'a>(v: impl Into<Micheline<'a>>, hex_bytes: &str) {
+        let arena = Arena::new();
         let hex_bytes: &str = hex_bytes
             .strip_prefix("0x")
-            .unwrap_or_else(|| panic!("The `expected` argument must start from 0x"));
+            .expect("The `expected` argument must start from 0x");
         assert_eq!(
-            v.into().encode(),
-            hex::decode(hex_bytes)
-                .unwrap_or_else(|_| panic!("Bad hex string in `expected` argument"))
-        )
+            Micheline::decode_raw(
+                &arena,
+                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument")
+            ),
+            Ok(v.into())
+        );
+    }
+
+    fn check_err(hex_bytes: &str, err: DecodeError) {
+        let arena = Arena::new();
+        let hex_bytes: &str = hex_bytes
+            .strip_prefix("0x")
+            .expect("The `expected` argument must start from 0x");
+        assert_eq!(
+            Micheline::decode_raw(
+                &arena,
+                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument")
+            ),
+            Err(err)
+        );
     }
     // To figure out the expected bytes, use
     // octez-client convert data 'VALUE' from michelson to binary
@@ -221,6 +338,18 @@ mod test_encoding {
             check((), "0x030b");
             check(true, "0x030a");
             check(false, "0x0303");
+        }
+
+        #[test]
+        fn errors() {
+            check_err("0x030b00", DecodeError::TrailingBytes);
+            check_err("0x", DecodeError::UnexpectedEOF);
+            check_err("0x03", DecodeError::UnexpectedEOF);
+            check_err("0x02", DecodeError::UnexpectedEOF);
+            check_err("0x09", DecodeError::UnexpectedEOF);
+            check_err("0xff", DecodeError::UnknownTag(0xff));
+            check_err("0x03ff", DecodeError::UnknownPrim(0xff));
+            check_err("0x010000000100", DecodeError::ForbiddenStringCharacter);
         }
 
         mod number {
@@ -328,6 +457,14 @@ mod test_encoding {
         }
 
         #[test]
+        fn list_with_applications() {
+            check(
+                seq! {app!(Pair[3, 4]); app!(Pair[5, 6])},
+                "0x020000000c070700030004070700050006",
+            )
+        }
+
+        #[test]
         fn very_long_list() {
             // Using "{ $(printf 'Unit;%.0s' {1..1000}) }" as a value
             // Verifies that length is encoded as a fixed-length number, not as zarith
@@ -379,6 +516,12 @@ mod test_encoding {
                 parse("LAMBDA (int %a %b %c %d) int {}").unwrap(),
                 "0x093100000018045b0000000b2561202562202563202564035b020000000000000000",
             );
+        }
+
+        #[test]
+        fn bad_annotations() {
+            check_err("0x045b00000002257f", DecodeError::BadAnnotation);
+            check_err("0x045b000000026161", DecodeError::BadAnnotation);
         }
     }
 }

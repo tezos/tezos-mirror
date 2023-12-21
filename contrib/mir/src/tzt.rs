@@ -7,10 +7,10 @@
 
 mod expectation;
 
-use std::fmt;
-
 use num_bigint::BigInt;
 use std::collections::HashMap;
+use std::fmt;
+use typed_arena::Arena;
 
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
@@ -340,6 +340,7 @@ pub enum TztOutput<'a> {
 fn execute_tzt_test_code<'a>(
     code: Micheline<'a>,
     ctx: &mut Ctx,
+    arena: &'a Arena<Micheline<'a>>,
     m_parameter: Option<Entrypoints>,
     input: Vec<(Type, TypedValue<'a>)>,
 ) -> Result<(FailingTypeStack, IStack<'a>), TestError<'a>> {
@@ -359,11 +360,14 @@ fn execute_tzt_test_code<'a>(
     // the test was a success or a fail.
     let typechecked_code = typecheck_instruction(&code, ctx, Some(&parameter), &mut t_stack)?;
     let mut i_stack: IStack = TopIsFirst::from(vals).0;
-    typechecked_code.interpret(ctx, &mut i_stack)?;
+    typechecked_code.interpret(ctx, arena, &mut i_stack)?;
     Ok((t_stack, i_stack))
 }
 
-pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
+pub fn run_tzt_test<'a>(
+    test: TztTest<'a>,
+    arena: &'a Arena<Micheline<'a>>,
+) -> Result<(), TztTestError<'a>> {
     // Here we compare the outcome of the interpreting with the
     // expectation from the test, and declare the result of the test
     // accordingly.
@@ -383,6 +387,7 @@ pub fn run_tzt_test(test: TztTest) -> Result<(), TztTestError> {
         test.other_contracts.clone(),
     );
 
-    let execution_result = execute_tzt_test_code(test.code, &mut ctx, test.parameter, test.input);
+    let execution_result =
+        execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
 }
