@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
-#![allow(dead_code)]
 
 use crate::block_in_progress::BlockInProgress;
 use crate::inbox::KernelUpgrade;
@@ -74,7 +73,6 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
 
-pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where all indexes are stored.
@@ -89,14 +87,6 @@ const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
-/// The size of an address. Size in bytes.
-const ADDRESS_SIZE: usize = 20;
-/// The size of a 256 bit hash. Size in bytes.
-const HASH_MAX_SIZE: usize = 32;
-/// The size of status. Size in bytes.
-const TRANSACTION_RECEIPT_STATUS_SIZE: usize = 1;
-/// The size of type of the transaction. Size in bytes.
-const TRANSACTION_RECEIPT_TYPE_SIZE: usize = 1;
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
@@ -104,24 +94,6 @@ const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
 // Path to the flag denoting whether the kernel is in sequencer mode or not.
 const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
-
-// This function should be used when it makes sense that the value
-// stored under [path] can be empty.
-fn store_read_empty_safe<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-    offset: usize,
-    max_bytes: usize,
-) -> Result<Vec<u8>, Error> {
-    let stored_value_size = host.store_value_size(path)?;
-
-    if stored_value_size == 0 {
-        Ok(vec![])
-    } else {
-        host.store_read(path, offset, max_bytes)
-            .map_err(Error::from)
-    }
-}
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,
@@ -160,12 +132,6 @@ pub fn store_smart_rollup_address<Host: Runtime>(
 fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
-}
-
-/// Read a single address value from storage at the path given.
-fn read_address(host: &impl Runtime, path: &OwnedPath) -> Result<H160, Error> {
-    let bytes = host.store_read(path, 0, ADDRESS_SIZE)?;
-    Ok(H160::from_slice(&bytes))
 }
 
 pub fn write_u256(
@@ -674,14 +640,6 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-pub fn store_kernel_upgrade_nonce<Host: Runtime>(
-    host: &mut Host,
-    upgrade_nonce: u16,
-) -> Result<(), Error> {
-    host.store_write_all(&KERNEL_UPGRADE_NONCE, &upgrade_nonce.to_le_bytes())
-        .map_err(Error::from)
-}
-
 /// Get the index of accounts.
 pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
     let path = concat(&EVM_INDEXES, &ACCOUNTS_INDEX)?;
@@ -910,15 +868,6 @@ mod internal_for_tests {
     ) -> Result<TransactionStatus, Error> {
         let receipt = read_transaction_receipt(host, tx_hash)?;
         Ok(receipt.status)
-    }
-
-    /// Reads cumulative gas used from the receipt in storage.
-    pub fn read_transaction_receipt_cumulative_gas_used<Host: Runtime>(
-        host: &mut Host,
-        tx_hash: &TransactionHash,
-    ) -> Result<U256, Error> {
-        let receipt = read_transaction_receipt(host, tx_hash)?;
-        Ok(receipt.cumulative_gas_used)
     }
 
     /// Reads a transaction receipt from storage.
