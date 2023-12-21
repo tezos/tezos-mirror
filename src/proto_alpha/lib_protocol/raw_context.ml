@@ -935,6 +935,63 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
+let update_block_time_related_constants (c : Constants_parametric_repr.t) =
+  let divide_period p =
+    Period_repr.of_seconds_exn
+      Int64.(div (mul (Period_repr.to_seconds p) 2L) 3L)
+  in
+  let minimal_block_delay = divide_period c.minimal_block_delay in
+  let delay_increment_per_round = divide_period c.delay_increment_per_round in
+  let hard_gas_limit_per_block =
+    let two = Z.(succ one) in
+    let three = Z.(succ two) in
+    Gas_limit_repr.Arith.(
+      integral_exn
+        (Z.div (Z.mul (integral_to_z c.hard_gas_limit_per_block) two) three))
+  in
+  let half_more x = Int32.(div (mul 3l x) 2l) in
+  let blocks_per_cycle = half_more c.blocks_per_cycle in
+  let blocks_per_commitment = half_more c.blocks_per_commitment in
+  let nonce_revelation_threshold = half_more c.nonce_revelation_threshold in
+  let blocks_per_stake_snapshot = half_more c.blocks_per_stake_snapshot in
+  let max_operations_time_to_live = 3 * c.max_operations_time_to_live / 2 in
+  {
+    c with
+    blocks_per_cycle;
+    blocks_per_commitment;
+    nonce_revelation_threshold;
+    blocks_per_stake_snapshot;
+    max_operations_time_to_live;
+    minimal_block_delay;
+    delay_increment_per_round;
+    hard_gas_limit_per_block;
+  }
+
+let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
+    ~blocks_per_commitment =
+  let open Lwt_result_syntax in
+  let* cycle_eras = get_cycle_eras ctxt in
+  let current_era = Level_repr.current_era cycle_eras in
+  let current_cycle =
+    let level_position =
+      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
+    in
+    Cycle_repr.add
+      current_era.first_cycle
+      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
+  in
+  let new_cycle_era =
+    Level_repr.
+      {
+        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
+        first_cycle = Cycle_repr.succ current_cycle;
+        blocks_per_cycle;
+        blocks_per_commitment;
+      }
+  in
+  let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
+  set_cycle_eras ctxt new_cycle_eras
+
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
    constants is modified, is changed from the previous protocol, then
@@ -1172,6 +1229,28 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               adaptive_issuance;
               direct_ticket_spending_enable;
             }
+        in
+        let block_time_is_at_least_8s =
+          (* This check is used to trigger the constants changes at migration on
+             this protocol for network that have block time strictly greater
+             than 7s such as mainnet and ghostnet *)
+          Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay >= 8L)
+        in
+        let* ctxt, constants =
+          if block_time_is_at_least_8s then
+            let new_constants : Constants_parametric_repr.t =
+              update_block_time_related_constants constants
+            in
+            let* ctxt =
+              update_cycle_eras
+                ctxt
+                level
+                ~prev_blocks_per_cycle:constants.blocks_per_cycle
+                ~blocks_per_cycle:new_constants.blocks_per_cycle
+                ~blocks_per_commitment:new_constants.blocks_per_commitment
+            in
+            return (ctxt, new_constants)
+          else return (ctxt, constants)
         in
         let*! ctxt = add_constants ctxt constants in
         return ctxt

@@ -5392,6 +5392,7 @@ end = struct
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
+              parameters |> if_some |> if_ N.(number >= 019) |> open_;
               plugin |> if_some |> open_;
             ]
       in

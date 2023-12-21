@@ -105,11 +105,11 @@ module Adaptive_issuance_launch_EMA = Votes_EMA_repr.Make (struct
 
      baker_contrib = (1/2) * ema_max * (1 - 2^(-1/k))
 
-     where k is the number of blocks in 2 weeks (which is 80640).
+     where k is the number of blocks in 2 weeks (which is 120960).
 
      Because of a small accumulation of rounding errors, two more
      blocks are actually needed. *)
-  let baker_contribution = Z.of_int 8595
+  let baker_contribution = Z.of_int 5730
 
   let ema_max = 2_000_000_000l
 end)

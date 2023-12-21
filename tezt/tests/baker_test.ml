@@ -30,6 +30,38 @@
    Subject:      Run the baker while performing a lot of transfers
 *)
 
+let hooks = Tezos_regression.hooks
+
+let baker_reward_test =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Baker rewards"
+    ~tags:["baker"; "rewards"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+    (fun protocol ->
+      let* parameter_file =
+        Protocol.write_parameter_file
+          ~base:(Either.Right (protocol, Some Constants_mainnet))
+          []
+      in
+      let* node, client =
+        Client.init_with_protocol
+          `Client
+          ~protocol
+          ~timestamp:Now
+          ~parameter_file
+          ()
+      in
+      let level_2_promise = Node.wait_for_level node 2 in
+      let* baker = Baker.init ~protocol node client in
+      Log.info "Wait for new head." ;
+      Baker.log_events baker ;
+      let* _ = level_2_promise in
+      let* _ =
+        Client.RPC.call ~hooks client @@ RPC.get_chain_block_metadata ()
+      in
+      unit)
+
 let baker_test ?force_apply protocol ~keys =
   let* parameter_file =
     Protocol.write_parameter_file
@@ -156,6 +188,7 @@ let baker_remote_test =
 
 let register ~protocols =
   baker_simple_test protocols ;
+  baker_reward_test protocols ;
   baker_stresstest protocols ;
   baker_stresstest_apply protocols ;
   baker_bls_test protocols ;

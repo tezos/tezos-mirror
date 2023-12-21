@@ -1371,7 +1371,7 @@ module Stake = struct
      That is, the increment is done every [blocks_per_stake_snaphot]
      blocks and reset at the end of cycles. So, it goes up to
      [blocks_per_cycle / blocks_per_stake_snaphot], which is currently
-     16 (= 8192/512 -- the concrete values can be found in
+     16 (= 24576/1536 -- the concrete values can be found in
      {!val:Default_parameters.constants_mainnet}), then comes back to
      0, so that a UInt16 is big enough.
 

@@ -54,6 +54,57 @@ Protocol parameters
 Bug Fixes
 ---------
 
+10s Blocks Time (MR :gl:`!11288`)
+---------------------------------
+
+Blocks time have been reduced from 15 seconds to 10 seconds. That is, a block
+can be produced with a delay of 10 seconds with respect to the previous block,
+if both blocks have round 0. This change comes with updating many related
+protocol parameters in order to match the reduced blocks time. In particular,
+the following quantities are kept the same:
+
+- the minimal time period of a cycle (namely, 2 days, 20 hours, and 16 minutes),
+- the length of the nonce revelation period (namely, around 2 hours and 8 minutes)
+- the number of nonce commitments per cycle (namely, 128),
+- the number of stake snapshots per cycle (namely, 16),
+- the maximum rewards per minute (namely 80 tez), and therefore roughly the same inflation,
+- the minimal "time to live" of an operation (namely, 1 hour),
+- the block gas limit per minute (namely 10400000 gas),
+- the ratio between the liquidity baking subsidy and the maximum rewards per block (namely, 1/16).
+
+.. list-table:: Changes to protocol parameters
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Parameter (unit)
+     - Old (oxford) value
+     - New value
+   * - ``minimal_block_delay`` (seconds)
+     - ``15``
+     - ``10``
+   * - ``delay_increment_per_round`` (seconds)
+     - ``8``
+     - ``5``
+   * - ``blocks_per_cycle`` (blocks)
+     - ``16384``
+     - ``24576``
+   * - ``blocks_per_commitment`` (blocks)
+     - ``128``
+     - ``192``
+   * - ``nonce_revelation_threshold`` (blocks)
+     - ``512``
+     - ``768``
+   * - ``blocks_per_stake_snapshot`` (blocks)
+     - ``1024``
+     - ``1536``
+   * - ``max_operations_time_to_live`` (blocks)
+     - ``240``
+     - ``360``
+   * - ``hard_gas_limit_per_block`` (gas unit)
+     - ``2600000``
+     - ``1733333``
+
+
 Minor Changes
 -------------
 

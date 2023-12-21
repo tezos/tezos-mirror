@@ -2782,7 +2782,7 @@ let e2e_tests =
     {
       constants = Protocol.Constants_mainnet;
       attestation_lag = 2;
-      block_delay = 15;
+      block_delay = 10;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
       num_extra_nodes = 1;
