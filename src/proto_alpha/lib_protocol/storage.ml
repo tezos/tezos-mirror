@@ -289,16 +289,6 @@ module Contract = struct
       end)
       (Signature.Public_key)
 
-  (* TODO: remove this in P *)
-  module Pending_consensus_keys_up_to_Nairobi =
-    Make_indexed_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["consensus_key"; "pendings"]
-         end))
-         (Make_index (Cycle_repr.Index))
-      (Signature.Public_key)
-
   module Staking_parameters =
     Indexed_context.Make_map
       (Registered)
@@ -444,15 +434,6 @@ module Contract = struct
         let name = ["used_bytes"]
       end)
       (Encoding.Z)
-
-  (* Remove me in P. *)
-  module Frozen_deposits_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Registered)
-      (struct
-        let name = ["frozen_deposits"]
-      end)
-      (Deposits_repr)
 
   module Unstaked_frozen_deposits =
     Indexed_context.Make_map
@@ -1145,24 +1126,6 @@ module Cycle = struct
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
       (Slashed_level)
 
-  (* Remove me in P. *)
-  module Selected_stake_distribution_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Ghost)
-      (struct
-        let name = ["selected_stake_distribution"]
-      end)
-      (struct
-        type t = (Signature.Public_key_hash.t * Tez_repr.t) list
-
-        let encoding =
-          Data_encoding.(
-            Variable.list
-              (obj2
-                 (req "baker" Signature.Public_key_hash.encoding)
-                 (req "active_stake" Tez_repr.encoding)))
-      end)
-
   module Selected_stake_distribution =
     Indexed_context.Make_map
       (Registered)
@@ -1179,15 +1142,6 @@ module Cycle = struct
                  (req "baker" Signature.Public_key_hash.encoding)
                  (req "active_stake" Stake_repr.encoding)))
       end)
-
-  (* Remove me in P. *)
-  module Total_active_stake_up_to_Nairobi =
-    Indexed_context.Make_map
-      (Ghost)
-      (struct
-        let name = ["total_active_stake"]
-      end)
-      (Tez_repr)
 
   module Total_active_stake =
     Indexed_context.Make_map
@@ -1317,16 +1271,6 @@ module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct
-  module Staking_balance_up_to_Nairobi =
-    Make_indexed_data_snapshotable_storage
-      (Make_subcontext (Ghost) (Raw_context)
-         (struct
-           let name = ["staking_balance"]
-         end))
-         (Int31_index)
-      (Public_key_hash_index)
-      (Tez_repr)
-
   module Staking_balance =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
@@ -1353,11 +1297,7 @@ module Stake = struct
         let encoding = Data_encoding.unit
       end)
 
-  module Selected_distribution_for_cycle_up_to_Nairobi =
-    Cycle.Selected_stake_distribution_up_to_Nairobi
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
-  module Total_active_stake_up_to_Nairobi =
-    Cycle.Total_active_stake_up_to_Nairobi
   module Total_active_stake = Cycle.Total_active_stake
 
   (* This is an index that is set to 0 by calls to

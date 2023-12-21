@@ -151,13 +151,6 @@ module Contract : sig
        and type value = Signature.Public_key.t
        and type t := Raw_context.t
 
-  (** The pending consensus key of a delegate *)
-  module Pending_consensus_keys_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Signature.Public_key.t
-       and type t := Raw_context.t * Contract_repr.t
-
   (** The delegate of a contract, if any. *)
   module Delegate :
     Indexed_data_storage
@@ -176,17 +169,6 @@ module Contract : sig
     Data_set_storage
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
-
-  (** The part of a delegate balance that can't be used. The total
-     balance is frozen_deposits.current_amount + balance. It also stores
-     the initial frozen balance in frozen_deposits.initial_amount. We
-     have current_amount <= initial_amount and current_amount <
-     initial_amount iff the delegate was slashed. *)
-  module Frozen_deposits_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Contract_repr.t
-       and type value = Deposits_repr.t
-       and type t := Raw_context.t
 
   (** Tez that were part of frozen deposits (either [own_frozen] or
       [staked_frozen] in {!Staking_balance}) but have been requested to be
@@ -510,16 +492,6 @@ module Pending_staking_parameters :
      and type value = Staking_parameters_repr.t
 
 module Stake : sig
-  (** The map of all the staking balances of all delegates, including
-     those with less than
-     {!Constants_parametric_repr.minimal_stake}. It might be large *)
-  module Staking_balance_up_to_Nairobi :
-    Indexed_data_snapshotable_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Tez_repr.t
-       and type snapshot = int
-       and type t := Raw_context.t
-
   (** The map of all the stake of all delegates, including those with
       less than {!Constants_parametric_repr.minimal_stake}. It might
       be large. *)
@@ -543,25 +515,11 @@ module Stake : sig
   module Last_snapshot :
     Single_data_storage with type value = int and type t := Raw_context.t
 
-  (* Remove me in P. *)
-  module Selected_distribution_for_cycle_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
-       and type t := Raw_context.t
-
   (** List of active stake *)
   module Selected_distribution_for_cycle :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
-       and type t := Raw_context.t
-
-  (* Remove me in P. *)
-  module Total_active_stake_up_to_Nairobi :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with
