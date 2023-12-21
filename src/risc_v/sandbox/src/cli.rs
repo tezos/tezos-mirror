@@ -10,6 +10,10 @@ pub struct Cli {
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<String>,
+
+    /// Support some POSIX-style system calls
+    #[arg(long)]
+    pub posix: bool,
 }
 
 /// Parse the command-line arguments.

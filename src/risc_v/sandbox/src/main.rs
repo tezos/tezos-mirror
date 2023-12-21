@@ -1,10 +1,12 @@
 use kernel_loader::Memory;
-use rvemu::{cpu::Mode, emulator::Emulator, exception::Exception};
+use rvemu::{emulator::Emulator, exception::Exception};
 use std::{error::Error, fs};
 
+mod boot;
 mod cli;
 mod devicetree;
 mod input;
+mod rv;
 mod syscall;
 
 /// Convert a RISC-V exception into an error.
@@ -16,7 +18,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = cli::parse();
 
     let mut emu = Emulator::new();
-    emu.cpu.mode = Mode::User;
 
     // Load the ELF binary into the emulator.
     let contents = std::fs::read(&cli.input)?;
@@ -45,6 +46,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dtb = devicetree::generate(initrd_info)?;
     emu.cpu.bus.write_bytes(dtb_addr, dtb.as_slice())?;
 
+    // Prepare the boot procedure
+    boot::configure(&mut emu, dtb_addr);
+
+    let handle_syscall = if cli.posix {
+        syscall::handle_posix
+    } else {
+        syscall::handle_sbi
+    };
+
     let mut prev_pc = emu.cpu.pc;
     loop {
         emu.cpu.devices_increment();
@@ -62,8 +72,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|_| ())
             .or_else(|exception| -> Result<(), Box<dyn Error>> {
                 match exception {
-                    Exception::EnvironmentCallFromUMode => {
-                        syscall::handle(&mut emu)?;
+                    Exception::EnvironmentCallFromSMode | Exception::EnvironmentCallFromUMode => {
+                        handle_syscall(&mut emu).map_err(|err| -> Box<dyn Error> {
+                            format!("Failed to handle environment call at {prev_pc:x}: {}", err)
+                                .as_str()
+                                .into()
+                        })?;
 
                         // We need to update the program counter ourselves now.
                         // This is a recent change in behaviour in RVEmu.
