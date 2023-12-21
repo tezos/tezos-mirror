@@ -257,21 +257,6 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
 module For_RPC = struct
-  let delegate_baking_power_for_cycle ctxt cycle delegate =
-    let open Lwt_result_syntax in
-    let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
-    let* seed = Seed_storage.raw_for_cycle ctxt cycle in
-    let* selected_index =
-      compute_snapshot_index_for_seed ~max_snapshot_index seed
-    in
-    let* stake =
-      Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
-    in
-    let* staking_parameters =
-      Delegate_staking_parameters.of_delegate ctxt delegate
-    in
-    Lwt.return @@ Stake_context.baking_weight ctxt staking_parameters stake
-
   let delegate_current_baking_power ctxt delegate =
     let open Lwt_result_syntax in
     let* stake = Storage.Stake.Staking_balance.get ctxt delegate in
