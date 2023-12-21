@@ -1,0 +1,3 @@
+code { PACK } ;
+input { Stack_elt (lambda int bool) { DUP; CMPNEQ } } ;
+output { Stack_elt bytes 0x05020000000b032102000000040319033c } ;
