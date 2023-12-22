@@ -34,6 +34,9 @@ val stopping : name:string -> unit Lwt.t
 (** Emits the event that the connection to the Tezos node has been lost. *)
 val connection_lost : name:string -> unit Lwt.t
 
+(** Emits the event that the connection to the Tezos node has timeouted. *)
+val connection_timeout : name:string -> timeout:float -> unit Lwt.t
+
 (** [cannot_connect ~count error] emits the event that the rollup node cannot
     connect to the Tezos node because of [error] for the [count]'s time. *)
 val cannot_connect : name:string -> count:int -> tztrace -> unit Lwt.t

@@ -98,6 +98,7 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_rpc_timeout : float;
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
@@ -163,6 +164,9 @@ val default_l1_blocks_cache_size : int
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
 val default_l2_blocks_cache_size : int
+
+(** Default timeout for RPCs to the L1 node. *)
+val default_l1_rpc_timeout : float
 
 val default_gc_parameters : gc_parameters
 

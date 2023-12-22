@@ -108,6 +108,13 @@ val get_tezos_reorg_for_new_head :
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t
 
+(** [client_context_with_timeout ctxt timeout] creates a client context where
+    RPCs will be made with timeout [timeout] seconds. Calls that timeout will
+    resolve with an error [RPC_timeout] which will trigger a reconnection in
+    {!iter_heads}.  *)
+val client_context_with_timeout :
+  #Client_context.full -> float -> Client_context.full
+
 (**/**)
 
 module Internal_for_tests : sig

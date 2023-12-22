@@ -219,6 +219,7 @@ module Internal_for_tests = struct
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let index_buffer_size = Configuration.default_index_buffer_size in
     let irmin_cache_size = Configuration.default_irmin_cache_size in
+    let l1_rpc_timeout = Configuration.default_l1_rpc_timeout in
     let config =
       Configuration.
         {
@@ -242,6 +243,7 @@ module Internal_for_tests = struct
           index_buffer_size = Some index_buffer_size;
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
+          l1_rpc_timeout;
           log_kernel_debug = false;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;

@@ -66,6 +66,7 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_rpc_timeout : float;
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
@@ -207,6 +208,8 @@ let max_injector_retention_period =
 let default_l1_blocks_cache_size = 64
 
 let default_l2_blocks_cache_size = 64
+
+let default_l1_rpc_timeout = 60. (* seconds *)
 
 let default_gc_parameters =
   {
@@ -415,6 +418,7 @@ let encoding : t Data_encoding.t =
            l1_blocks_cache_size;
            l2_blocks_cache_size;
            prefetch_blocks;
+           l1_rpc_timeout;
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
@@ -441,7 +445,8 @@ let encoding : t Data_encoding.t =
             l1_blocks_cache_size,
             l2_blocks_cache_size,
             prefetch_blocks ),
-          ( index_buffer_size,
+          ( l1_rpc_timeout,
+            index_buffer_size,
             irmin_cache_size,
             log_kernel_debug,
             no_degraded,
@@ -466,7 +471,8 @@ let encoding : t Data_encoding.t =
                l1_blocks_cache_size,
                l2_blocks_cache_size,
                prefetch_blocks ),
-             ( index_buffer_size,
+             ( l1_rpc_timeout,
+               index_buffer_size,
                irmin_cache_size,
                log_kernel_debug,
                no_degraded,
@@ -492,6 +498,7 @@ let encoding : t Data_encoding.t =
         l1_blocks_cache_size;
         l2_blocks_cache_size;
         prefetch_blocks;
+        l1_rpc_timeout;
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
@@ -549,7 +556,8 @@ let encoding : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj7
+          (obj8
+             (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
              (opt "index_buffer_size" int31)
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
@@ -693,6 +701,7 @@ module Cli = struct
       l1_blocks_cache_size = default_l1_blocks_cache_size;
       l2_blocks_cache_size = default_l2_blocks_cache_size;
       prefetch_blocks = None;
+      l1_rpc_timeout = default_l1_rpc_timeout;
       index_buffer_size;
       irmin_cache_size;
       log_kernel_debug;
