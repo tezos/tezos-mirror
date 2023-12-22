@@ -47,6 +47,7 @@ let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
     Sc_rollup_node.create
       ?runner
       ?name
+      ?loser_mode
       ~base_dir:(Client.base_dir client)
       ?default_operator:operator
       ?metrics_port
@@ -64,7 +65,7 @@ let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
         in
         unit
   in
-  let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup in
+  let* _ = Sc_rollup_node.config_init rollup_node rollup in
   Log.info "Starting a smart rollup node to track %s" rollup ;
   let* () =
     Sc_rollup_node.run

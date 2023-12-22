@@ -270,7 +270,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
 let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string") ?(src = Constant.bootstrap1.alias)
     ?operator ?operators ?data_dir ?rollup_node_name ?whitelist ?sc_rollup
-    tezos_node tezos_client =
+    ?allow_degraded tezos_node tezos_client =
   let* sc_rollup =
     match sc_rollup with
     | Some sc_rollup -> return sc_rollup
@@ -294,6 +294,7 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       ?default_operator:operator
       ?operators
       ?name:rollup_node_name
+      ?allow_degraded
   in
   return (sc_rollup_node, sc_rollup)
 
@@ -855,7 +856,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       reset_honest_on;
       bad_reveal_at;
       priority;
-      allow_degraded;
+      allow_degraded : _;
     } protocol sc_rollup_node sc_rollup_address node client =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let loser_keys =
@@ -928,12 +929,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     if priority = `Priority_honest then
       prioritize_refute_operations sc_rollup_node ;
     let* () =
-      Sc_rollup_node.run
-        ~event_level:`Debug
-        ~allow_degraded
-        sc_rollup_node
-        sc_rollup_address
-        []
+      Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
     in
     return
       [
@@ -947,7 +943,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
   let loser_sc_rollup_nodes =
     let i = ref 0 in
     List.map2
-      (fun default_operator _ ->
+      (fun default_operator loser_mode ->
         incr i ;
         let rollup_node_name = "loser" ^ string_of_int !i in
         Sc_rollup_node.create
@@ -955,28 +951,23 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
           node
           ~base_dir:(Client.base_dir client)
           ~default_operator
-          ~name:rollup_node_name)
+          ~name:rollup_node_name
+          ~loser_mode
+          ~allow_degraded)
       loser_keys
       loser_modes
   in
   let* gather_promises = run_honest_node sc_rollup_node
   and* () =
-    Lwt_list.iter_p (fun (loser_mode, loser_sc_rollup_node) ->
+    Lwt_list.iter_p
+      (fun loser_sc_rollup_node ->
         let* _ =
-          Sc_rollup_node.config_init
-            ~loser_mode
-            loser_sc_rollup_node
-            sc_rollup_address
+          Sc_rollup_node.config_init loser_sc_rollup_node sc_rollup_address
         in
         if priority = `Priority_loser then
           prioritize_refute_operations loser_sc_rollup_node ;
-        Sc_rollup_node.run
-          loser_sc_rollup_node
-          ~loser_mode
-          ~allow_degraded
-          sc_rollup_address
-          [])
-    @@ List.combine loser_modes loser_sc_rollup_nodes
+        Sc_rollup_node.run loser_sc_rollup_node sc_rollup_address [])
+      loser_sc_rollup_nodes
   in
 
   let restart_promise =

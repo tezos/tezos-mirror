@@ -80,6 +80,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
       ?name:rollup_node_name
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator.Account.alias
+      ?loser_mode
       config.mode
       node
   in
@@ -113,7 +114,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
         in
         return rollup_address
   in
-  let* _ = Sc_rollup_node.config_init ?loser_mode rollup_node rollup_address in
+  let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
   let* () =
     match preexisting_rollup with
     | Some {current_preimages_dir; _} ->

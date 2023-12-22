@@ -37,72 +37,6 @@ type operation_kind =
   | Recover
   | Execute_outbox_message
 
-type mode =
-  | Batcher
-  | Custom of operation_kind list
-  | Maintenance
-  | Observer
-  | Operator
-  | Accuser
-  | Bailout
-
-type history_mode = Archive | Full
-
-type argument =
-  | Log_kernel_debug
-  | Log_kernel_debug_file of string
-  | Metrics_addr of string
-  | Injector_attempts of int
-  | Boot_sector_file of string
-  | Dac_observer of Dac_node.t
-
-let make_argument = function
-  | Log_kernel_debug -> ["--log-kernel-debug"]
-  | Log_kernel_debug_file file -> ["--log-kernel-debug-file"; file]
-  | Metrics_addr addr -> ["--metrics-addr"; addr]
-  | Injector_attempts n -> ["--injector-attempts"; string_of_int n]
-  | Boot_sector_file file -> ["--boot-sector-file"; file]
-  | Dac_observer dac_node -> ["--dac-observer"; Dac_node.endpoint dac_node]
-
-let make_arguments arguments = List.flatten (List.map make_argument arguments)
-
-module Parameters = struct
-  type persistent_state = {
-    data_dir : string;
-    base_dir : string;
-    operators : (purpose * string) list;
-    default_operator : string option;
-    metrics_addr : string option;
-    metrics_port : int;
-    rpc_host : string;
-    rpc_port : int;
-    mode : mode;
-    dal_node : Dal_node.t option;
-    mutable endpoint : Client.endpoint;
-    mutable pending_ready : unit option Lwt.u list;
-    mutable pending_level : (int * int option Lwt.u) list;
-    runner : Runner.t option;
-  }
-
-  type session_state = {mutable ready : bool; mutable level : int known}
-
-  let base_default_name = "sc-rollup-node"
-
-  let default_colors = Log.Color.[|FG.magenta; FG.green; FG.yellow; FG.cyan|]
-end
-
-open Parameters
-include Daemon.Make (Parameters)
-
-let string_of_operation_kind = function
-  | Publish -> "publish"
-  | Add_messages -> "add_messages"
-  | Cement -> "cement"
-  | Timeout -> "timeout"
-  | Refute -> "refute"
-  | Recover -> "recover"
-  | Execute_outbox_message -> "execute_outbox_message"
-
 let operation_kind_of_string = function
   | "publish" -> Some Publish
   | "add_messages" -> Some Add_messages
@@ -118,6 +52,24 @@ let operation_kind_of_string_exn s =
   | Some p -> p
   | None -> invalid_arg ("operation_kind_of_string " ^ s)
 
+let string_of_operation_kind = function
+  | Publish -> "publish"
+  | Add_messages -> "add_messages"
+  | Cement -> "cement"
+  | Timeout -> "timeout"
+  | Refute -> "refute"
+  | Recover -> "recover"
+  | Execute_outbox_message -> "execute_outbox_message"
+
+type mode =
+  | Batcher
+  | Custom of operation_kind list
+  | Maintenance
+  | Observer
+  | Operator
+  | Accuser
+  | Bailout
+
 let string_of_mode = function
   | Observer -> "observer"
   | Batcher -> "batcher"
@@ -130,6 +82,133 @@ let string_of_mode = function
         ^ String.concat "," (List.map string_of_operation_kind op_kinds)
   | Accuser -> "accuser"
   | Bailout -> "bailout"
+
+type history_mode = Archive | Full
+
+let string_of_history_mode = function Archive -> "archive" | Full -> "full"
+
+type argument =
+  | Data_dir of string
+  | Rpc_addr of string
+  | Rpc_port of int
+  | Log_kernel_debug
+  | Log_kernel_debug_file of string
+  | Metrics_addr of string
+  | Injector_attempts of int
+  | Boot_sector_file of string
+  | Dac_observer of Dac_node.t
+  | Loser_mode of string
+  | No_degraded
+  | Gc_frequency of int
+  | History_mode of history_mode
+  | Dal_node of Dal_node.t
+  | Mode of mode
+  | Rollup of string
+
+let make_argument = function
+  | Data_dir dir -> ["--data-dir"; dir]
+  | Rpc_addr host -> ["--rpc-addr"; host]
+  | Rpc_port port -> ["--rpc-port"; string_of_int port]
+  | Log_kernel_debug -> ["--log-kernel-debug"]
+  | Log_kernel_debug_file file -> ["--log-kernel-debug-file"; file]
+  | Metrics_addr addr -> ["--metrics-addr"; addr]
+  | Injector_attempts n -> ["--injector-attempts"; string_of_int n]
+  | Boot_sector_file file -> ["--boot-sector-file"; file]
+  | Dac_observer dac_node -> ["--dac-observer"; Dac_node.endpoint dac_node]
+  | Loser_mode loser -> ["--loser-mode"; loser]
+  | No_degraded -> ["--no-degraded"]
+  | Gc_frequency freq -> ["--gc-frequency"; string_of_int freq]
+  | History_mode mode -> ["--history-mode"; string_of_history_mode mode]
+  | Dal_node dal_node -> ["--dal-node"; Dal_node.rpc_endpoint dal_node]
+  | Mode mode -> ["--mode"; string_of_mode mode]
+  | Rollup addr -> ["--rollup"; addr]
+
+let is_redundant = function
+  | Data_dir _, Data_dir _
+  | Rpc_addr _, Rpc_addr _
+  | Rpc_port _, Rpc_port _
+  | Log_kernel_debug, Log_kernel_debug
+  | Log_kernel_debug_file _, Log_kernel_debug_file _
+  | Injector_attempts _, Injector_attempts _
+  | Boot_sector_file _, Boot_sector_file _
+  | Dac_observer _, Dac_observer _
+  | Loser_mode _, Loser_mode _
+  | No_degraded, No_degraded
+  | Gc_frequency _, Gc_frequency _
+  | History_mode _, History_mode _
+  | Dal_node _, Dal_node _
+  | Mode _, Mode _
+  | Rollup _, Rollup _ ->
+      true
+  | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
+  | Metrics_addr _, _
+  | Data_dir _, _
+  | Rpc_addr _, _
+  | Rpc_port _, _
+  | Log_kernel_debug, _
+  | Log_kernel_debug_file _, _
+  | Injector_attempts _, _
+  | Boot_sector_file _, _
+  | Dac_observer _, _
+  | Loser_mode _, _
+  | No_degraded, _
+  | Gc_frequency _, _
+  | History_mode _, _
+  | Dal_node _, _
+  | Mode _, _
+  | Rollup _, _ ->
+      false
+
+let make_arguments arguments = List.flatten (List.map make_argument arguments)
+
+let add_missing_argument arguments argument =
+  if List.exists (fun arg -> is_redundant (arg, argument)) arguments then
+    arguments
+  else argument :: arguments
+
+(** join both list, if one argument exists in both list, then the one
+    of [extra_arguments] is used. This is so arguments added in
+    [~extra_arguments] for {!run} like function takes precedent from
+    default arguments. *)
+let add_missing_arguments ~extra_arguments ~arguments =
+  List.fold_left add_missing_argument extra_arguments arguments
+
+let optional_switch arg switch = if switch then [arg] else []
+
+let optional_arg const = function None -> [] | Some x -> [const x]
+
+module Parameters = struct
+  type persistent_state = {
+    data_dir : string;
+    base_dir : string;
+    operators : (purpose * string) list;
+    default_operator : string option;
+    metrics_addr : string option;
+    metrics_port : int;
+    rpc_host : string;
+    rpc_port : int;
+    mode : mode;
+    dal_node : Dal_node.t option;
+    loser_mode : string option;
+    allow_degraded : bool;
+    gc_frequency : int;
+    history_mode : history_mode;
+    password_file : string option;
+    mutable endpoint : Client.endpoint;
+    mutable pending_ready : unit option Lwt.u list;
+    mutable pending_level : (int * int option Lwt.u) list;
+    runner : Runner.t option;
+  }
+
+  type session_state = {mutable ready : bool; mutable level : int known}
+
+  let base_default_name = "sc-rollup-node"
+
+  let default_colors = Log.Color.[|FG.magenta; FG.green; FG.yellow; FG.cyan|]
+end
+
+open Parameters
+include Daemon.Make (Parameters)
 
 let mode_of_string s =
   match String.split_on_char ':' s with
@@ -213,13 +292,14 @@ let operators_params rollup_node =
     (Option.to_list rollup_node.persistent_state.default_operator)
     rollup_node.persistent_state.operators
 
-let make_command_arguments node =
+let make_command_arguments ?password_file node =
   [
     "--endpoint";
     Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
     "--base-dir";
     base_dir node;
   ]
+  @ Cli_arg.optional_arg "password-filename" Fun.id password_file
 
 let spawn_command sc_node args =
   Process.spawn
@@ -230,78 +310,38 @@ let spawn_command sc_node args =
   @@ make_command_arguments sc_node
   @ args
 
-let common_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
-    sc_node =
+let runlike_argument rollup_node =
+  let rollup_node_state = rollup_node.persistent_state in
   [
-    "--data-dir";
-    data_dir sc_node;
-    "--rpc-addr";
-    rpc_host sc_node;
-    "--rpc-port";
-    string_of_int @@ rpc_port sc_node;
+    Data_dir (data_dir rollup_node);
+    (let metrics_addr, metrics_port = metrics rollup_node in
+     Metrics_addr (metrics_addr ^ ":" ^ string_of_int metrics_port));
+    Rpc_addr (rpc_host rollup_node);
+    Rpc_port (rpc_port rollup_node);
+    History_mode rollup_node_state.history_mode;
+    Gc_frequency rollup_node_state.gc_frequency;
   ]
-  @ Cli_arg.optional_arg "loser-mode" Fun.id loser_mode
-  @ Cli_arg.optional_switch "no-degraded" (not allow_degraded)
-  @ Cli_arg.optional_arg "gc-frequency" Int.to_string gc_frequency
-  @ Cli_arg.optional_arg "history-mode" string_of_history_mode history_mode
-  @ Cli_arg.optional_arg
-      "dal-node"
-      (fun dal_node ->
-        sf
-          "http://%s:%d"
-          (Dal_node.rpc_host dal_node)
-          (Dal_node.rpc_port dal_node))
-      sc_node.persistent_state.dal_node
+  @ optional_arg (fun s -> Loser_mode s) rollup_node_state.loser_mode
+  @ optional_switch No_degraded (not rollup_node_state.allow_degraded)
+  @ optional_arg (fun n -> Dal_node n) rollup_node_state.dal_node
 
-let node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode sc_node
-    rollup_address =
-  let mode = string_of_mode sc_node.persistent_state.mode in
+let node_args rollup_node rollup_address =
+  let mode = string_of_mode rollup_node.persistent_state.mode in
   ( mode,
-    ["for"; rollup_address; "with"; "operators"]
-    @ operators_params sc_node
-    @ common_node_args
-        ~loser_mode
-        ~allow_degraded
-        ~gc_frequency
-        ~history_mode
-        sc_node )
+    ["for"; rollup_address; "with"; "operators"] @ operators_params rollup_node,
+    runlike_argument rollup_node )
 
-let legacy_node_args ~loser_mode ~allow_degraded ~gc_frequency ~history_mode
-    sc_node rollup_address =
-  let mode = string_of_mode sc_node.persistent_state.mode in
-  ["--mode"; mode; "--rollup"; rollup_address]
-  @ common_node_args
-      ~loser_mode
-      ~allow_degraded
-      ~gc_frequency
-      ~history_mode
-      sc_node
+let legacy_node_args rollup_node rollup_address =
+  Mode rollup_node.persistent_state.mode :: Rollup rollup_address
+  :: runlike_argument rollup_node
 
-let spawn_config_init sc_node ?(force = false) ?loser_mode ?gc_frequency
-    ?(history_mode = Full) rollup_address =
-  let mode, args =
-    node_args
-      ~loser_mode
-      ~allow_degraded:true
-      ~gc_frequency
-      ~history_mode:(Some history_mode)
-      sc_node
-      rollup_address
-  in
-  spawn_command sc_node @@ ["init"; mode; "config"] @ args
-  @ if force then ["--force"] else []
+let spawn_config_init ?(force = false) sc_node rollup_address =
+  let mode, cmd, args = node_args sc_node rollup_address in
+  spawn_command sc_node @@ ["init"; mode; "config"] @ cmd @ make_arguments args
+  @ Cli_arg.optional_switch "force" force
 
-let config_init sc_node ?force ?loser_mode ?gc_frequency ?history_mode
-    rollup_address =
-  let process =
-    spawn_config_init
-      sc_node
-      ?force
-      ?loser_mode
-      ?gc_frequency
-      ?history_mode
-      rollup_address
-  in
+let config_init ?force sc_node rollup_address =
+  let process = spawn_config_init ?force sc_node rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
     output =~* rex "Smart rollup node configuration written in ([^\n]*)"
@@ -428,8 +468,9 @@ let handle_event sc_node {name; value; timestamp = _} =
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
     ?event_pipe ?metrics_addr ?metrics_port ?(rpc_host = "127.0.0.1") ?rpc_port
-    ?(operators = []) ?default_operator ?(dal_node : Dal_node.t option) mode
-    endpoint =
+    ?(operators = []) ?default_operator ?(dal_node : Dal_node.t option)
+    ?loser_mode ?(allow_degraded = false) ?(gc_frequency = 1)
+    ?(history_mode = Full) ?password_file mode endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -462,6 +503,11 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
         mode;
         endpoint;
         dal_node;
+        loser_mode;
+        allow_degraded;
+        gc_frequency;
+        history_mode;
+        password_file;
         pending_ready = [];
         pending_level = [];
         runner;
@@ -472,7 +518,8 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
 
 let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators ?default_operator
-    ?dal_node mode (node : Node.t) =
+    ?dal_node ?loser_mode ?allow_degraded ?gc_frequency ?history_mode
+    ?password_file mode (node : Node.t) =
   create_with_endpoint
     ?runner
     ?path
@@ -488,17 +535,23 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     ?operators
     ?default_operator
     ?dal_node
+    ?loser_mode
+    ?allow_degraded
+    ?gc_frequency
+    ?history_mode
+    ?password_file
     mode
     (Node node)
 
-let do_runlike_command ?event_level ?event_sections_levels node arguments =
+let do_runlike_command ?event_level ?event_sections_levels ?password_file node
+    arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
   let on_terminate _status =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_command_arguments node @ arguments in
+  let arguments = make_command_arguments ?password_file node @ arguments in
   run
     ?runner:node.persistent_state.runner
     ?event_level
@@ -509,58 +562,25 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     ~on_terminate
 
 let run ?(legacy = false) ?(restart = false) ?mode ?event_level
-    ?event_sections_levels ?password_file ~loser_mode ~allow_degraded
-    ~gc_frequency ~history_mode node rollup_address extra_arguments =
+    ?event_sections_levels node rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
   let cmd =
     if legacy then
-      let args =
-        legacy_node_args
-          ~loser_mode
-          ~allow_degraded
-          ~gc_frequency
-          ~history_mode
-          node
-          rollup_address
-      in
-      ["run"] @ args
-      @ make_arguments extra_arguments
-      @ [
-          "--metrics-addr";
-          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
-          ^ ":"
-          ^ string_of_int node.persistent_state.metrics_port;
-        ]
+      let arguments = legacy_node_args node rollup_address in
+      let arguments = add_missing_arguments ~arguments ~extra_arguments in
+      ["run"] @ make_arguments arguments
     else
-      let default_mode, args =
-        node_args
-          ~loser_mode
-          ~allow_degraded
-          ~gc_frequency
-          ~history_mode
-          node
-          rollup_address
-      in
+      let default_mode, cmd, arguments = node_args node rollup_address in
+      let arguments = add_missing_arguments ~arguments ~extra_arguments in
       let final_mode =
         match mode with Some m -> string_of_mode m | None -> default_mode
       in
-      Cli_arg.optional_arg "password-filename" Fun.id password_file
-      @ ["run"; final_mode] @ args
-      @ make_arguments extra_arguments
-      @ [
-          "--metrics-addr";
-          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
-          ^ ":"
-          ^ string_of_int node.persistent_state.metrics_port;
-        ]
+      ["run"; final_mode] @ cmd @ make_arguments arguments
   in
   do_runlike_command ?event_level ?event_sections_levels node cmd
 
-let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
-    ?(allow_degraded = false)
-    ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
-    ?(history_mode = Full) ?(wait_ready = true) ?password_file node
-    rollup_address arguments =
+let run ?legacy ?restart ?mode ?event_level ?event_sections_levels
+    ?(wait_ready = true) node rollup_address arguments =
   let* () =
     run
       ?legacy
@@ -568,11 +588,6 @@ let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
       ?mode
       ?event_level
       ?event_sections_levels
-      ?password_file
-      ~loser_mode
-      ~allow_degraded
-      ~gc_frequency:(Some gc_frequency)
-      ~history_mode:(Some history_mode)
       node
       rollup_address
       arguments
