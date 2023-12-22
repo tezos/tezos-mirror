@@ -10,6 +10,12 @@ command to build the project.
 
 `cargo build`
 
+To build using `wasm` target, just extend the previous command:
+
+`cargo build --target wasm32-unknown-unknown`
+
+Note that `clang`, `llvm`, and `wabt` are required for this target. See [src/kernel_sdk/sdk/README.md](../../src/kernel_sdk/sdk/README.md) for installation instructions.
+
 #### Testing
 
 You can run the included tests by the following command.
