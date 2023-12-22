@@ -10,7 +10,6 @@ RISC_V_SANDBOX_DIR=src/risc_v/sandbox
 RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
 RISC_V_KERNELS_DIR=src/risc_v
 RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
-RISC_V_DUMMY_BM_DIR=src/risc_v/dummy_kernel_bm
 RISC_V_JSTZ_DIR=src/risc_v/jstz
 RISC_V_TESTS_DIR=src/risc_v/tests
 EVM_DIR=etherlink/kernel_evm
@@ -117,8 +116,8 @@ dal_echo_kernel.wasm:
 
 .PHONY: risc-v-dummy.elf
 risc-v-dummy.elf:
-	@make -C ${RISC_V_DUMMY_BM_DIR} build
-	@ln -f ${RISC_V_DUMMY_BM_DIR}/target/riscv64gc-unknown-none-elf/release/risc-v-dummy-bm $@
+	@make -C ${RISC_V_DUMMY_DIR} build
+	@ln -f ${RISC_V_DUMMY_DIR}/target/riscv64gc-unknown-hermit/release/risc-v-dummy $@
 
 .PHONY: risc-v-dummy
 risc-v-dummy:
@@ -149,7 +148,6 @@ build-deps:
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
-	@make -C ${RISC_V_DUMMY_BM_DIR} build-deps
 	@make -C ${RISC_V_KERNELS_DIR} build-deps
 
 	# Iterate through all the toolchains. 'rustup show' will install the
@@ -161,7 +159,6 @@ test:
 	@make -C ${SDK_DIR} test
 	@make -C ${RISC_V_SANDBOX_DIR} test
 	@make -C ${RISC_V_INTERPRETER_DIR} test
-	@make -C ${RISC_V_DUMMY_BM_DIR} test
 	@make -C ${RISC_V_KERNELS_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
@@ -172,7 +169,6 @@ check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_SANDBOX_DIR} check
 	@make -C ${RISC_V_INTERPRETER_DIR} check
-	@make -C ${RISC_V_DUMMY_BM_DIR} check
 	@make -C ${RISC_V_KERNELS_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
@@ -196,7 +192,6 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${RISC_V_SANDBOX_DIR} clean
 	@make -C ${RISC_V_INTERPRETER_DIR} clean
-	@make -C ${RISC_V_DUMMY_BM_DIR} clean
 	@make -C ${RISC_V_KERNELS_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
