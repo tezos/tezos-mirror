@@ -408,8 +408,16 @@ let wait_for_stored_slot dal_node slot_header =
       if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
       else None)
 
-let wait_for_layer1_block_processing dal_node level =
+(* Wait for 'new_head' event. Note that the DAL node processes a new head with a
+   delay of one level. Also, this event is emitted before block processing. *)
+let wait_for_layer1_head dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
+(* Wait for 'new_final_block' event. This event is emitted after processing a
+   final block. *)
+let wait_for_layer1_final_block dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 let inject_dal_attestation ?level ?(round = 0) ?force ?error ?request ~signer
@@ -1275,9 +1283,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
 
-  let wait_block_processing1 =
-    wait_for_layer1_block_processing dal_node pub_level
-  in
+  let wait_block_processing1 = wait_for_layer1_head dal_node pub_level in
   let* () = bake_for client in
   let* () = wait_block_processing1 in
 
@@ -1292,10 +1298,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
 
-  let final_pub_level = pub_level + 1 in
-  let wait_block_processing2 =
-    wait_for_layer1_block_processing dal_node final_pub_level
-  in
+  let wait_block_processing2 = wait_for_layer1_final_block dal_node pub_level in
   let* () = bake_for client in
   let* () = wait_block_processing2 in
 
@@ -1356,8 +1359,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     inject_dal_attestations ~nb_slots (List.map fst attested) client
   in
   let wait_block_processing3 =
-    let final_attested_level = final_pub_level + lag in
-    wait_for_layer1_block_processing dal_node final_attested_level
+    let attested_level = pub_level + lag in
+    wait_for_layer1_final_block dal_node attested_level
   in
   let* () = repeat 2 (fun () -> bake_for client) in
   let* () = wait_block_processing3 in
@@ -2209,9 +2212,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   in
   let* () = publish Constant.bootstrap1 ~index:0 slot1_content in
   let* () = publish Constant.bootstrap2 ~index:2 slot2_content in
-  let wait_block_processing =
-    wait_for_layer1_block_processing dal_node (level + 1)
-  in
+  let wait_block_processing = wait_for_layer1_final_block dal_node level in
   (* bake two blocks: at [level + 1] the commitments are published, at [level +
      2] the commitments become final *)
   let* () = bake_for client in
@@ -2356,9 +2357,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
     ~error_msg:
       "attestation_lag (%L) should be higher than [max_level - first_level] \
        (which is %R)" ;
-  let wait_block_processing =
-    wait_for_layer1_block_processing dal_node max_level
-  in
+  let wait_block_processing = wait_for_layer1_head dal_node max_level in
   let* () = publish_and_bake ~init_level:first_level ~target_level:max_level in
   let* () = wait_block_processing in
   let last_level_of_first_baker =
@@ -2502,9 +2501,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     iter from_level
   in
-  let wait_block_processing =
-    wait_for_layer1_block_processing dal_node last_level
-  in
+  let wait_block_processing = wait_for_layer1_head dal_node last_level in
 
   let* () =
     publish_and_bake
