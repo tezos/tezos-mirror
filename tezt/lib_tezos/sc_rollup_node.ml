@@ -580,20 +580,6 @@ let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
   let* () = if wait_ready then wait_for_ready node else unit in
   return ()
 
-let spawn_run ?loser_mode ?(allow_degraded = false)
-    ?(gc_frequency = 1 (* Make GC run more frequently for tests *))
-    ?(history_mode = Full) node rollup_address extra_arguments =
-  let mode, args =
-    node_args
-      ~loser_mode
-      ~allow_degraded
-      node
-      ~gc_frequency:(Some gc_frequency)
-      ~history_mode:(Some history_mode)
-      rollup_address
-  in
-  spawn_command node (["run"; mode] @ args @ make_arguments extra_arguments)
-
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in
   sc_rollup_node.persistent_state.endpoint <- Node node ;
