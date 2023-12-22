@@ -669,6 +669,48 @@ fn interpret_one<'a>(
                 }
             }
         }
+        I::Map(overload, nested) => match overload {
+            overloads::Map::List => {
+                ctx.gas.consume(interpret_cost::MAP_LIST)?;
+                let list = pop!(V::List);
+                let result = list
+                    .into_iter()
+                    .map(|elem| {
+                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        stack.push(elem);
+                        interpret(nested, ctx, arena, stack)?;
+                        Ok(pop!())
+                    })
+                    .collect::<Result<_, InterpretError>>()?;
+                stack.push(V::List(result));
+            }
+            overloads::Map::Option => {
+                ctx.gas.consume(interpret_cost::MAP_OPTION)?;
+                let option = pop!(V::Option);
+                let result = match option {
+                    Some(elem) => {
+                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        stack.push(*elem);
+                        interpret(nested, ctx, arena, stack)?;
+                        Some(pop!())
+                    }
+                    None => None,
+                };
+                stack.push(V::new_option(result));
+            }
+            overloads::Map::Map => {
+                ctx.gas.consume(interpret_cost::MAP_MAP)?;
+                let mut map = pop!(V::Map);
+                for (key, val) in map.iter_mut() {
+                    ctx.gas.consume(interpret_cost::PUSH)?;
+                    let val_temp = std::mem::replace(val, V::Unit);
+                    stack.push(V::new_pair(key.clone(), val_temp));
+                    interpret(nested, ctx, arena, stack)?;
+                    *val = pop!();
+                }
+                stack.push(V::Map(map));
+            }
+        },
         I::Push(v) => {
             ctx.gas.consume(interpret_cost::PUSH)?;
             stack.push(v.clone());
@@ -2243,6 +2285,192 @@ mod interpreter_tests {
         )
         .is_ok());
         assert_eq!(stack, stk![V::int(0)]);
+    }
+
+    #[test]
+    fn test_map() {
+        fn test(
+            overload: overloads::Map,
+            collection_length: u32,
+            mut input_stack: Stack<TypedValue<'_>>,
+            expected_stack: Stack<TypedValue<'_>>,
+            expected_map_gas_cost: u32,
+        ) {
+            let mut ctx = Ctx::default();
+
+            assert!(
+                interpret_one(&Map(overload, vec![ISome]), &mut ctx, &mut input_stack,).is_ok()
+            );
+
+            assert_eq!(input_stack, expected_stack);
+
+            assert_eq!(
+                ctx.gas.milligas(),
+                Gas::default().milligas()
+                    - expected_map_gas_cost
+                    - interpret_cost::PUSH * collection_length
+                    - interpret_cost::SOME * collection_length
+                    - interpret_cost::INTERPRET_RET * collection_length
+            );
+        }
+
+        test(
+            overloads::Map::List,
+            3,
+            stk![V::List((1..=3).map(V::int).collect())],
+            stk![V::List(
+                (1..=3).map(|i| V::new_option(Some(V::int(i)))).collect()
+            )],
+            interpret_cost::MAP_LIST,
+        );
+
+        test(
+            overloads::Map::Option,
+            1,
+            stk![V::new_option(Some(V::int(1)))],
+            stk![V::new_option(Some(V::new_option(Some(V::int(1)))))],
+            interpret_cost::MAP_OPTION,
+        );
+
+        test(
+            overloads::Map::Map,
+            2,
+            stk![V::Map(
+                vec![
+                    (V::int(1), V::String("a".into())),
+                    (V::int(2), V::String("b".into()))
+                ]
+                .into_iter()
+                .collect()
+            )],
+            stk![V::Map(
+                vec![
+                    (
+                        V::int(1),
+                        V::new_option(Some(V::new_pair(V::int(1), V::String("a".into()))))
+                    ),
+                    (
+                        V::int(2),
+                        V::new_option(Some(V::new_pair(V::int(2), V::String("b".into()))))
+                    )
+                ]
+                .into_iter()
+                .collect()
+            )],
+            interpret_cost::MAP_MAP,
+        );
+    }
+
+    #[test]
+    fn test_map_empty_collection() {
+        fn test(overload: overloads::Map, mut stack: Stack<TypedValue<'_>>) {
+            let expected_stack = stack.clone();
+            assert!(
+                interpret_one(&Map(overload, vec![ISome]), &mut Ctx::default(), &mut stack,)
+                    .is_ok()
+            );
+            assert_eq!(stack, expected_stack);
+        }
+
+        test(overloads::Map::List, stk![V::List(MichelsonList::new())]);
+        test(overloads::Map::Option, stk![V::new_option(None)]);
+        test(overloads::Map::Map, stk![V::Map(BTreeMap::new())]);
+    }
+
+    #[test]
+    fn test_map_in_order() {
+        fn test(
+            overload: overloads::Map,
+            mut input_stack: Stack<TypedValue<'_>>,
+            expected_stack: Stack<TypedValue<'_>>,
+        ) {
+            assert!(interpret_one(
+                &Map(overload, vec![Cons, Unit]),
+                &mut Ctx::default(),
+                &mut input_stack,
+            )
+            .is_ok());
+            assert_eq!(input_stack, expected_stack);
+        }
+
+        // Lists are expected to be iterated from head to tail.
+        test(
+            overloads::Map::List,
+            stk![
+                V::List(vec![].into()),
+                V::List(vec![V::int(1), V::int(2)].into())
+            ],
+            stk![
+                V::List(vec![V::int(2), V::int(1)].into()),
+                V::List(vec![V::Unit, V::Unit].into())
+            ],
+        );
+
+        // Maps are expected to be iterated in increasing order of keys.
+        test(
+            overloads::Map::Map,
+            stk![
+                V::List(vec![].into()),
+                V::Map(
+                    vec![
+                        (V::int(1), V::String("a".into())),
+                        (V::int(2), V::String("b".into()))
+                    ]
+                    .into_iter()
+                    .collect()
+                )
+            ],
+            stk![
+                V::List(
+                    vec![
+                        V::new_pair(V::int(2), V::String("b".into())),
+                        V::new_pair(V::int(1), V::String("a".into()))
+                    ]
+                    .into()
+                ),
+                V::Map(
+                    vec![(V::int(1), V::Unit), (V::int(2), V::Unit)]
+                        .into_iter()
+                        .collect()
+                )
+            ],
+        );
+    }
+
+    #[test]
+    fn test_map_can_modify_underlying_stack() {
+        let mut stack = stk![V::Bool(true), V::List(vec![V::Unit].into())];
+        let expected_stack = stk![V::Bool(false), V::List(vec![V::Unit].into())];
+        assert!(interpret_one(
+            &Map(
+                overloads::Map::List,
+                vec![Dip(None, vec![Not(overloads::Not::Bool)])]
+            ),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_map_carry_over() {
+        // At the end of each iteration, the current stack is expected to carry over to the next iteration.
+        //
+        // In other words: each iteration does not run on a clone of the original stack;
+        // it runs on the stack from the previous iteration.
+        let mut stack = stk![V::int(0), V::List(vec![V::int(1), V::int(2)].into())];
+        let expected_stack = stk![V::int(3), V::List(vec![V::Unit, V::Unit].into())];
+        assert!(interpret_one(
+            &Map(
+                overloads::Map::List,
+                vec![Add(overloads::Add::IntInt), Unit]
+            ),
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]

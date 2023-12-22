@@ -104,6 +104,10 @@ pub enum TcError {
     BigMapNotFound(BigInt),
     #[error("lazy storage error: {0:?}")]
     LazyStorageError(LazyStorageError),
+    #[error("MAP block returned an empty stack")]
+    MapBlockEmptyStack,
+    #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
+    MapBlockFail,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -1135,6 +1139,48 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ITER, [Seq(_)], _), [.., _]) => no_overload!(ITER),
         (App(ITER, [Seq(_)], _), []) => no_overload!(ITER, len 1),
         (App(ITER, expect_args!(1 seq), _), _) => unexpected_micheline!(),
+
+        (App(MAP, [Seq(nested_instrs)], ..), [.., T::List(..)]) => {
+            // Get the element type
+            let ty1 = pop!(T::List).as_ref().clone();
+
+            // Typecheck the nested instructions.
+            let (nested_instrs, ty2) =
+                typecheck_map_block(nested_instrs, ty1, ctx, self_entrypoints, stack)?;
+
+            stack.push(Type::new_list(ty2));
+            I::Map(overloads::Map::List, nested_instrs)
+        }
+        (App(MAP, [Seq(nested_instrs)], ..), [.., T::Option(..)]) => {
+            // Get the element type
+            let ty1 = pop!(T::Option).as_ref().clone();
+
+            // Typecheck the nested instructions.
+            let (nested_instrs, ty2) =
+                typecheck_map_block(nested_instrs, ty1, ctx, self_entrypoints, stack)?;
+
+            stack.push(Type::new_option(ty2));
+            I::Map(overloads::Map::Option, nested_instrs)
+        }
+        (App(MAP, [Seq(nested_instrs)], ..), [.., T::Map(..)]) => {
+            // Get the element type
+            let (kty, ty1) = pop!(T::Map).as_ref().clone();
+
+            // Typecheck the nested instructions.
+            let (nested_instrs, ty2) = typecheck_map_block(
+                nested_instrs,
+                T::new_pair(kty.clone(), ty1),
+                ctx,
+                self_entrypoints,
+                stack,
+            )?;
+
+            stack.push(Type::new_map(kty, ty2));
+            I::Map(overloads::Map::Map, nested_instrs)
+        }
+        (App(MAP, [Seq(_)], _), [.., _]) => no_overload!(MAP),
+        (App(MAP, [Seq(_)], _), []) => no_overload!(MAP, len 1),
+        (App(MAP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(PUSH, [t, v], _), ..) => {
             let t = parse_ty(ctx, t)?;
@@ -2221,6 +2267,39 @@ fn typecheck_lambda<'a>(
     })
 }
 
+/// Typechecks the instruction block for a `MAP` instruction.
+///
+/// Given a `ty1` and a stack of type `A`,
+/// the instruction block is expected to have the type `ty1 : A => ty2 : A` for some type `ty2`.
+///
+/// Returns the typechecked instructions and the inferred type `ty2`
+fn typecheck_map_block<'a>(
+    nested: &[Micheline<'a>],
+    ty1: Type,
+    ctx: &mut Ctx,
+    self_entrypoints: Option<&Entrypoints>,
+    stack: &TypeStack,
+) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
+    let mut nested_stack = stack.clone();
+    nested_stack.push(ty1);
+    let mut opt_nested_stack = FailingTypeStack::Ok(nested_stack);
+
+    // Types:
+    //   stack :: A
+    //   opt_nested_stack :: ty1 : A
+
+    // Typecheck the nested instructions.
+    let nested: Vec<Instruction<'a>> =
+        typecheck(nested, ctx, self_entrypoints, &mut opt_nested_stack)?;
+
+    // Assert that the `opt_nested_stack` now has the type `ty2 : A`, for some `ty2`.
+    // NB: the nested instruction block cannot fail, otherwise we cannot infer `ty2`.
+    let nested_stack = opt_nested_stack.access_mut(TcError::MapBlockFail)?;
+    let ty2 = nested_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
+    ensure_stacks_eq(ctx, stack, nested_stack)?;
+    Ok((nested, ty2))
+}
+
 fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
     let res = u16::try_from(n).map_err(|_| TcError::ExpectedU10(n.clone()))?;
     if res >= 1024 {
@@ -2364,27 +2443,32 @@ fn unify_stacks(
     match &dest {
         FailingTypeStack::Ok(stack1) => {
             if let FailingTypeStack::Ok(stack2) = aux {
-                if stack1.len() != stack2.len() {
-                    return Err(TcError::StacksNotEqual(
-                        stack1.clone(),
-                        stack2.clone(),
-                        StacksNotEqualReason::LengthsDiffer(stack1.len(), stack2.len()),
-                    ));
-                }
-                for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-                    ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
-                        TcError::TypesNotEqual(e) => {
-                            TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
-                        }
-                        err => err,
-                    })?;
-                }
+                ensure_stacks_eq(ctx, stack1, &stack2)?;
             }
         }
         FailingTypeStack::Failed => {
             // if main stack is failing, assign aux to main, as aux may be OK
             *dest = aux;
         }
+    }
+    Ok(())
+}
+
+fn ensure_stacks_eq(ctx: &mut Ctx, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
+    if stack1.len() != stack2.len() {
+        return Err(TcError::StacksNotEqual(
+            stack1.clone(),
+            stack2.clone(),
+            StacksNotEqualReason::LengthsDiffer(stack1.len(), stack2.len()),
+        ));
+    }
+    for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
+        ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
+            TcError::TypesNotEqual(e) => {
+                TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
+            }
+            err => err,
+        })?;
     }
     Ok(())
 }
@@ -3189,6 +3273,164 @@ mod typecheck_tests {
             Ok(Iter(overloads::Iter::List, vec![Failwith(Type::Int)]))
         );
         assert_eq!(stack, tc_stk![])
+    }
+
+    #[test]
+    fn test_map() {
+        fn test(input: Type, expected_output: Type, expected_overload: overloads::Map) {
+            let mut stack = tc_stk![input];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse("MAP { SOME }").unwrap(),
+                    &mut Ctx::default(),
+                    &mut stack
+                ),
+                Ok(Map(expected_overload, vec![ISome]))
+            );
+            assert_eq!(stack, tc_stk![expected_output]);
+        }
+        test(
+            Type::new_list(Type::Int),
+            Type::new_list(Type::new_option(Type::Int)),
+            overloads::Map::List,
+        );
+        test(
+            Type::new_option(Type::Int),
+            Type::new_option(Type::new_option(Type::Int)),
+            overloads::Map::Option,
+        );
+        test(
+            Type::new_map(Type::String, Type::Int),
+            Type::new_map(
+                Type::String,
+                Type::new_option(Type::new_pair(Type::String, Type::Int)),
+            ),
+            overloads::Map::Map,
+        );
+    }
+
+    #[test]
+    fn test_map_must_return_new_element() {
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { DROP; }").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::new_list(Type::Int)]
+            ),
+            Err(TcError::MapBlockEmptyStack)
+        );
+    }
+
+    #[test]
+    fn test_map_can_access_underlying_stack() {
+        // The MAP block should be able to access elements deeper in the stack.
+        let mut stack = tc_stk![Type::String, Type::new_list(Type::Nat)];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { DROP; DUP; }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Map(overloads::Map::List, vec![Drop(None), Dup(None)]))
+        );
+        assert_eq!(stack, tc_stk![Type::String, Type::new_list(Type::String)]);
+    }
+
+    #[test]
+    fn test_map_cannot_modify_type_of_underlying_stack() {
+        // Given a stack of type `x : A`, the MAP block cannot modify the type
+        // of the underlying stack, `A`.
+        //
+        // In this test, the MAP block attempts to change the stack
+        // from `string : int` to `string : bool`
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { DIP { EQ }; }").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::Int, Type::new_list(Type::String)]
+            ),
+            Err(TcError::StacksNotEqual(
+                stk![Type::Int],
+                stk![Type::Bool],
+                StacksNotEqualReason::TypesNotEqual(TypesNotEqual(Type::Int, Type::Bool))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_map_block_fail() {
+        // Typechecking fails if all branches of a MAP block fail.
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { FAILWITH; }").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::new_list(Type::Int)]
+            ),
+            Err(TcError::MapBlockFail)
+        );
+
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { PUSH bool True; IF {FAILWITH} {FAILWITH}; }").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::new_list(Type::Int)]
+            ),
+            Err(TcError::MapBlockFail)
+        );
+
+        // Typechecking succeeds if at least one branch of a MAP block does NOT fail.
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { PUSH bool True; IF {SOME} {FAILWITH}; }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Map(
+                overloads::Map::List,
+                vec![
+                    Push(TypedValue::Bool(true)),
+                    If(vec![ISome], vec![Failwith(Type::Int)])
+                ]
+            ))
+        );
+        assert_eq!(stack, tc_stk![Type::new_list(Type::new_option(Type::Int))]);
+
+        let mut stack = tc_stk![Type::new_list(Type::Int)];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("MAP { PUSH bool True; IF {FAILWITH} {SOME}; }").unwrap(),
+                &mut Ctx::default(),
+                &mut stack
+            ),
+            Ok(Map(
+                overloads::Map::List,
+                vec![
+                    Push(TypedValue::Bool(true)),
+                    If(vec![Failwith(Type::Int)], vec![ISome])
+                ]
+            ))
+        );
+        assert_eq!(stack, tc_stk![Type::new_list(Type::new_option(Type::Int))]);
+    }
+
+    #[test]
+    fn test_map_too_short() {
+        too_short_test(&app!(MAP[Micheline::Seq(&[])]), Prim::MAP, 1)
+    }
+
+    #[test]
+    fn test_map_arg_mismatch() {
+        let mut stack = tc_stk![Type::String];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            typecheck_instruction(&parse("MAP { }").unwrap(), &mut ctx, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::MAP,
+                stack: stk![Type::String],
+                reason: None
+            })
+        );
     }
 
     #[test]

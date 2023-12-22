@@ -324,6 +324,15 @@ pub mod interpret_cost {
     pub const LEFT: u32 = 10;
     pub const RIGHT: u32 = 10;
 
+    // See `cost_N_IOpt_map` in the Tezos protocol
+    pub const MAP_OPTION: u32 = 10;
+    // See `cost_N_IList_map` in the Tezos protocol
+    pub const MAP_LIST: u32 = 10;
+    // In the Tezos protocol, the cost of `MAP` over a `map k v` is a function of its size (see `cost_N_IMap_map`)
+    // because it needs to fold the map into a list of key-value pairs first.
+    // We don't do that in this interpreter, therefore the cost here is a constant and not a function.
+    pub const MAP_MAP: u32 = 20;
+
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 60;
     pub const SET_DELEGATE: u32 = 60;
