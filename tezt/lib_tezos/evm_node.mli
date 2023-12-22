@@ -61,10 +61,15 @@ val create :
   string ->
   t
 
-(** [run ?extra_arguments evm_node] launches the EVM node server with
-    the arguments given during {!create}, additiona arguments can be
-    passed via [extra_arguments]. *)
-val run : ?extra_arguments:string list -> t -> unit Lwt.t
+(** [run ?wait ?extra_arguments evm_node] launches the EVM node server with
+    the arguments given during {!create}, additional arguments can be
+    passed via [extra_arguments].
+    [wait] defaults to true, if it is set to false, the evm node is ran but we
+    do not wait for it to be ready. *)
+val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
+
+(** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
+val wait_for_ready : t -> unit Lwt.t
 
 (** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
@@ -86,6 +91,9 @@ val spawn_run : ?extra_arguments:string list -> t -> Process.t
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
 val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** [endpoint evm_node] returns the endpoint to communicate with the
     [evm_node]. *)

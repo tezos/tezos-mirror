@@ -157,11 +157,11 @@ let run_args evm_node =
   in
   mode_args @ shared_args
 
-let run ?(extra_arguments = []) evm_node =
+let run ?(wait = true) ?(extra_arguments = []) evm_node =
   let* () =
     run evm_node {ready = false} (run_args evm_node @ extra_arguments)
   in
-  let* () = wait_for_ready evm_node in
+  let* () = if wait then wait_for_ready evm_node else unit in
   unit
 
 let spawn_command evm_node args =
