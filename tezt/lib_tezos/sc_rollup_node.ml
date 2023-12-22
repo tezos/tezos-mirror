@@ -562,7 +562,8 @@ let do_runlike_command ?event_level ?event_sections_levels ?password_file node
     ~on_terminate
 
 let run ?(legacy = false) ?(restart = false) ?mode ?event_level
-    ?event_sections_levels node rollup_address extra_arguments =
+    ?event_sections_levels ?(wait_ready = true) ?password_file node
+    rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
   let cmd =
     if legacy then
@@ -577,23 +578,15 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
       in
       ["run"; final_mode] @ cmd @ make_arguments arguments
   in
-  do_runlike_command ?event_level ?event_sections_levels node cmd
-
-let run ?legacy ?restart ?mode ?event_level ?event_sections_levels
-    ?(wait_ready = true) node rollup_address arguments =
   let* () =
-    run
-      ?legacy
-      ?restart
-      ?mode
+    do_runlike_command
       ?event_level
       ?event_sections_levels
+      ?password_file
       node
-      rollup_address
-      arguments
+      cmd
   in
-  let* () = if wait_ready then wait_for_ready node else unit in
-  return ()
+  if wait_ready then wait_for_ready node else unit
 
 let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in
