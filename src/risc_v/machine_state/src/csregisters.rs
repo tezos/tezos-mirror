@@ -763,4 +763,18 @@ pub mod tests {
         assert!(!check(csreg::scause, 0x0000_0F00_0000_F0F0));
         assert!(!check(csreg::scause, 0x000A));
     }
+
+    #[test]
+    fn test_warl() {
+        use crate::csregisters::CSRegister as csreg;
+
+        let check = |reg: csreg, value| reg.transform_warl_fields(value);
+
+        // misa field
+        assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
+        assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_112D);
+
+        // non warl register
+        assert!(check(csreg::instret, 0x42) == 0x42);
+    }
 }
