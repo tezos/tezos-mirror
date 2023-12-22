@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let maybe_with_metrics = Sql_requests.maybe_with_metrics
+
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
 module Int32Map = Map.Make (Int32)
@@ -118,7 +120,7 @@ let select_cycles db_pool boundaries =
         [])
     db_pool
 
-let select_blocks db_pool boundaries =
+let select_blocks conf db_pool boundaries =
   let block_request =
     Caqti_request.Infix.(
       Caqti_type.(tup2 int32 int32)
@@ -137,7 +139,7 @@ let select_blocks db_pool boundaries =
   let* blocks =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Teztale_lib.Metrics.sql "select_blocks" @@ fun () ->
+        maybe_with_metrics conf "select_blocks" @@ fun () ->
         Db.fold block_request parse_block_row boundaries Int32Map.empty)
       db_pool
   in
@@ -159,7 +161,7 @@ let select_blocks db_pool boundaries =
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Teztale_lib.Metrics.sql "select_blocks_reception" @@ fun () ->
+      maybe_with_metrics conf "select_blocks_reception" @@ fun () ->
       Db.fold reception_request parse_block_reception_row boundaries blocks)
     db_pool
 
@@ -193,7 +195,7 @@ let kind_of_bool = function
   | false -> Teztale_lib.Consensus_ops.Preendorsement
   | true -> Teztale_lib.Consensus_ops.Endorsement
 
-let select_ops db_pool boundaries =
+let select_ops conf db_pool boundaries =
   (* We make 3 queries:
      - one to detect "missing" ops (not included, not received)
      - one to detect included ops
@@ -316,20 +318,20 @@ let select_ops db_pool boundaries =
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Teztale_lib.Metrics.sql "select_operations_rights" @@ fun () ->
+        maybe_with_metrics conf "select_operations_rights" @@ fun () ->
         Db.fold q_rights cb_rights boundaries Int32Map.empty)
       db_pool
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Teztale_lib.Metrics.sql "select_operations_inclusion" @@ fun () ->
+        maybe_with_metrics conf "select_operations_inclusion" @@ fun () ->
         Db.fold q_included cb_included boundaries out)
       db_pool
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Teztale_lib.Metrics.sql "select_operations_reception" @@ fun () ->
+      maybe_with_metrics conf "select_operations_reception" @@ fun () ->
       Db.fold q_received cb_received boundaries out)
     db_pool
 
@@ -393,7 +395,7 @@ let anomalies level ops =
     ops
     []
 
-let data_at_level_range db_pool boundaries =
+let data_at_level_range conf db_pool boundaries =
   let cycles =
     (* FIXME: do better than a list *)
     let low, high = boundaries in
@@ -406,8 +408,8 @@ let data_at_level_range db_pool boundaries =
         (select_single_cycle_info db_pool high)
     else Lwt_result.map (List.sort compare) (select_cycles db_pool boundaries)
   in
-  let blocks = select_blocks db_pool boundaries in
-  let* delegate_operations = select_ops db_pool boundaries in
+  let blocks = select_blocks conf db_pool boundaries in
+  let* delegate_operations = select_ops conf db_pool boundaries in
   let* blocks in
   let* cycles in
   let delegate_operations = translate_ops delegate_operations in
@@ -459,7 +461,7 @@ let data_at_level_range db_pool boundaries =
   in
   return result
 
-let anomalies_at_level db_pool level =
-  let* ops = select_ops db_pool (level, level) in
+let anomalies_at_level conf db_pool level =
+  let* ops = select_ops conf db_pool (level, level) in
   let ops = Int32Map.find level ops in
   return (anomalies level ops)

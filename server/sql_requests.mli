@@ -120,3 +120,5 @@ val insert_received_block :
     unit,
     [`Zero] )
   Caqti_request.t
+
+val maybe_with_metrics : Config.t -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t

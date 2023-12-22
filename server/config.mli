@@ -37,6 +37,7 @@ type t = {
   users : (string * string) list;
   max_batch_size : int32;
   with_transaction : opt_with_transactions;
+  with_metrics : bool;
   verbosity : Teztale_lib.Log.level;
 }
 

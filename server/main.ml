@@ -26,6 +26,8 @@
 let maybe_with_transaction (c : Config.t) (module D : Caqti_lwt.CONNECTION) f =
   if c.with_transaction <> NONE then D.with_transaction f else f ()
 
+let maybe_with_metrics = Sql_requests.maybe_with_metrics
+
 let method_not_allowed_respond meths =
   let headers =
     Cohttp.Header.add_multi
@@ -220,7 +222,7 @@ let get_stats ~logger db_pool =
           let body = "No registered block yet." in
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
-let get_head ~logger db_pool =
+let get_head ~logger conf db_pool =
   let query =
     Caqti_request.Infix.(Caqti_type.(unit ->? int32))
       "SELECT MAX (level) FROM blocks"
@@ -229,13 +231,13 @@ let get_head ~logger db_pool =
     ~logger
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
-         Teztale_lib.Metrics.sql "get_head" @@ fun () -> Db.find_opt query ())
+         maybe_with_metrics conf "get_head" @@ fun () -> Db.find_opt query ())
        db_pool)
     (fun head_level ->
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
 (** Fetch allowed users' logins from db. *)
-let get_users ~logger db_pool =
+let get_users ~logger conf db_pool =
   let query =
     Caqti_request.Infix.(Caqti_type.(unit ->* string))
       "SELECT name FROM nodes WHERE password IS NOT NULL"
@@ -244,7 +246,7 @@ let get_users ~logger db_pool =
     ~logger
     (Caqti_lwt.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
-         Teztale_lib.Metrics.sql "get_users" @@ fun () ->
+         maybe_with_metrics conf "get_users" @@ fun () ->
          Db.collect_list query ())
        db_pool)
     (fun users -> reply_public_json Data_encoding.(list string) users)
@@ -287,7 +289,7 @@ let get_levels_at_timestamp db_pool timestamp =
     (get_levels_at_timestamp0 db_pool timestamp)
 
 (** Fetch the list of allowed logins from db and update the list ref given as parameter. *)
-let refresh_users db_pool users =
+let refresh_users conf db_pool users =
   Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
       let query =
         Caqti_request.Infix.(
@@ -298,14 +300,14 @@ let refresh_users db_pool users =
         (fun users_from_db -> users := users_from_db)
         (Caqti_lwt.Pool.use
            (fun (module Db : Caqti_lwt.CONNECTION) ->
-             Teztale_lib.Metrics.sql "refresh_users" @@ fun () ->
+             maybe_with_metrics conf "refresh_users" @@ fun () ->
              Db.collect_list query ())
            db_pool))
 
 (** Insert a new user (i.e. a teztale archiver) into the database.
     If the user already exists, password is updated.
   *)
-let upsert_user db_pool login password =
+let upsert_user conf db_pool login password =
   let query =
     Caqti_request.Infix.(
       Caqti_type.(tup2 string Sql_requests.Type.bcrypt_hash ->. unit))
@@ -314,20 +316,20 @@ let upsert_user db_pool login password =
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Teztale_lib.Metrics.sql "upsert_user" @@ fun () ->
+      maybe_with_metrics conf "upsert_user" @@ fun () ->
       Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
           Db.exec query (login, password)))
     db_pool
 
 (** Delete a user from db (i.e. removes feeder permissions) *)
-let delete_user db_pool login =
+let delete_user conf db_pool login =
   let query =
     Caqti_request.Infix.(Caqti_type.(string ->. unit))
       "UPDATE nodes SET password = NULL WHERE name = $1"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Teztale_lib.Metrics.sql "delete_user" @@ fun () -> Db.exec query login)
+      maybe_with_metrics conf "delete_user" @@ fun () -> Db.exec query login)
     db_pool
 
 let maybe_create_tables db_pool =
@@ -460,7 +462,7 @@ let endorsing_rights_callback =
            return_unit
          else
            let* () =
-             Teztale_lib.Metrics.sql "maybe_insert_endorsing_right__list"
+             maybe_with_metrics conf "maybe_insert_endorsing_right__list"
              @@ fun () ->
              Caqti_lwt.Pool.use
                (fun (module Db : Caqti_lwt.CONNECTION) ->
@@ -520,7 +522,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
           (block_hash, level) ))
       operations
   in
-  Teztale_lib.Metrics.sql "insert_included_operations" @@ fun () ->
+  maybe_with_metrics conf "insert_included_operations" @@ fun () ->
   without_cache
     Sql_requests.Mutex.operations_inclusion
     Sql_requests.insert_included_operation
@@ -567,7 +569,7 @@ let block_callback =
                else
                  let* () = may_insert_delegates (module Db) conf [delegate] in
                  let* () =
-                   Teztale_lib.Metrics.sql "maybe_insert_block" @@ fun () ->
+                   maybe_with_metrics conf "maybe_insert_block" @@ fun () ->
                    without_cache
                      Sql_requests.Mutex.blocks
                      Sql_requests.maybe_insert_block
@@ -581,7 +583,7 @@ let block_callback =
                    match cycle_info with
                    | Some Teztale_lib.Data.{cycle; cycle_position; cycle_size}
                      ->
-                       Teztale_lib.Metrics.sql "maybe_insert_cycle" @@ fun () ->
+                       maybe_with_metrics conf "maybe_insert_cycle" @@ fun () ->
                        without_cache
                          Sql_requests.Mutex.cycles
                          Sql_requests.maybe_insert_cycle
@@ -635,7 +637,7 @@ let block_callback =
                  return_unit)
           in
           let* () =
-            Teztale_lib.Metrics.sql "insert_received_block__list" @@ fun () ->
+            maybe_with_metrics conf "insert_received_block__list" @@ fun () ->
             (* This data is non-redondant: we always treat it. *)
             maybe_with_transaction conf (module Db) @@ fun () ->
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -700,7 +702,7 @@ let operations_callback ~logger conf db_pool g source operations =
         Teztale_lib.Log.debug logger (fun () ->
             Printf.sprintf "(%ld) OK Operations" level) ;
         let* () =
-          Teztale_lib.Metrics.sql "insert_received_operation__list" @@ fun () ->
+          maybe_with_metrics conf "insert_received_operation__list" @@ fun () ->
           maybe_with_transaction conf (module Db) @@ fun () ->
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun (right, ops) ->
@@ -940,12 +942,12 @@ let routes :
             let body = Cohttp.Code.string_of_status status in
             Cohttp_lwt_unix.Server.respond_string ~status ~body ()) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
-      fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~logger ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
             with_caqti_error
               ~logger
-              (Exporter.data_at_level_range db_pool (level, level))
+              (Exporter.data_at_level_range conf db_pool (level, level))
               (fun data ->
                 reply_public_json Teztale_lib.Data.encoding (List.hd data).data))
     );
@@ -973,6 +975,7 @@ let routes :
               with_caqti_error
                 ~logger
                 (Exporter.data_at_level_range
+                   conf
                    db_pool
                    (Int32.of_string min, Int32.of_string max))
                 (fun data ->
@@ -988,7 +991,7 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str "/anomalies.json";
         ],
-      fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~logger ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let first_level = int_of_string (Re.Group.get g 1) in
             let last_level = int_of_string (Re.Group.get g 2) in
@@ -1000,7 +1003,7 @@ let routes :
                    (fun i -> Int32.of_int (first_level + i))
                in
                Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.concat_map_es
-                 (Exporter.anomalies_at_level db_pool)
+                 (Exporter.anomalies_at_level conf db_pool)
                  levels)
               (fun data ->
                 let body =
@@ -1018,7 +1021,7 @@ let routes :
                   ~body
                   ())) );
     ( Re.str "/user",
-      fun _g ~logger ~conf:_ ~admins ~users db_pool header meth body ->
+      fun _g ~logger ~conf ~admins ~users db_pool header meth body ->
         let reply_ok login () =
           reply_json
             Data_encoding.(obj2 (req "status" string) (req "login" string))
@@ -1033,8 +1036,8 @@ let routes :
                     with_caqti_error
                       ~logger
                       (Lwt_result.bind
-                         (upsert_user db_pool login password)
-                         (fun () -> refresh_users db_pool users))
+                         (upsert_user conf db_pool login password)
+                         (fun () -> refresh_users conf db_pool users))
                       (reply_ok login))
             | `DELETE ->
                 with_data
@@ -1043,20 +1046,21 @@ let routes :
                   (fun login ->
                     with_caqti_error
                       ~logger
-                      (Lwt_result.bind (delete_user db_pool login) (fun () ->
-                           refresh_users db_pool users))
+                      (Lwt_result.bind
+                         (delete_user conf db_pool login)
+                         (fun () -> refresh_users conf db_pool users))
                       (reply_ok login))
             | `OPTIONS -> options_respond methods
             | _ -> method_not_allowed_respond methods) );
     ( Re.str "/users",
-      fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
-        get_only_endpoint meth (fun () -> get_users ~logger db_pool) );
+      fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
+        get_only_endpoint meth (fun () -> get_users conf ~logger db_pool) );
     ( Re.str "/stats.json",
       fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_stats ~logger db_pool );
     ( Re.str "/head.json",
-      fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
-        get_head ~logger db_pool );
+      fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
+        get_head conf ~logger db_pool );
     ( Re.str "/metrics",
       fun _g ~logger:_ ~conf:_ ~admins:_ ~users:_ _db_pool _header _meth _body ->
         Lwt.bind
@@ -1179,7 +1183,7 @@ let () =
                        (Lwt_list.map_s
                           (fun (login, password) ->
                             let password = Bcrypt.hash password in
-                            upsert_user pool login password)
+                            upsert_user conf pool login password)
                           conf.Config.users))
                     (function
                       | Some e ->
@@ -1187,7 +1191,7 @@ let () =
                             (Lwt_io.eprintl (Caqti_error.show e))
                             (fun () -> Lwt.return 1)
                       | None ->
-                          Lwt.bind (refresh_users pool users) (function
+                          Lwt.bind (refresh_users conf pool users) (function
                               | Error e ->
                                   Lwt.bind
                                     (Lwt_io.eprintl (Caqti_error.show e))

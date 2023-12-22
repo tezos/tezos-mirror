@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 val data_at_level_range :
+  Config.t ->
   ( Caqti_lwt.connection,
     ([> Caqti_error.call_or_retrieve] as 'a) )
   Caqti_lwt.Pool.t ->
@@ -31,6 +32,7 @@ val data_at_level_range :
   (Teztale_lib.Data.batch, 'a) result Lwt.t
 
 val anomalies_at_level :
+  Config.t ->
   ( Caqti_lwt.connection,
     ([> Caqti_error.call_or_retrieve] as 'a) )
   Caqti_lwt.Pool.t ->

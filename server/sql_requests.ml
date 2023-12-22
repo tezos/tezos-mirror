@@ -367,3 +367,6 @@ let insert_received_block =
      excluded.application_timestamp), validation_timestamp = \
      COALESCE(blocks_reception.validation_timestamp, \
      excluded.validation_timestamp)"
+
+let maybe_with_metrics (c : Config.t) (name : string) (f : unit -> 'a Lwt.t) =
+  if c.with_metrics then Teztale_lib.Metrics.sql name f else f ()
