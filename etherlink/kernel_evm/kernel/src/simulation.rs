@@ -240,7 +240,7 @@ impl TryFrom<&[u8]> for TxValidation {
 #[derive(Debug, PartialEq)]
 enum Message {
     Evaluation(Evaluation),
-    TxValidation(TxValidation),
+    TxValidation(Box<TxValidation>),
 }
 
 impl TryFrom<&[u8]> for Message {
@@ -252,7 +252,8 @@ impl TryFrom<&[u8]> for Message {
 
         match tag {
             EVALUATION_TAG => Evaluation::try_from(bytes).map(Message::Evaluation),
-            VALIDATION_TAG => TxValidation::try_from(bytes).map(Message::TxValidation),
+            VALIDATION_TAG => TxValidation::try_from(bytes)
+                .map(|tx| Message::TxValidation(Box::new(tx))),
             _ => Err(DecoderError::Custom("Unknown message to simulate")),
         }
     }
@@ -802,9 +803,9 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::Simple(Box::new(Message::TxValidation(TxValidation {
+            Input::Simple(Box::new(Message::TxValidation(Box::new(TxValidation {
                 transaction: expected
-            }))),
+            })))),
             parsed,
             "should have been parsed as complete tx validation"
         );
