@@ -550,6 +550,7 @@ dependencies = [
  "libsecp256k1",
  "num-traits",
  "primitive-types",
+ "proptest",
  "rlp",
  "sha3",
  "tezos-evm-logging",
