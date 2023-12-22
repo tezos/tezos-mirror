@@ -3934,19 +3934,13 @@ let generate_opam_ci opam_release_graph =
         {|@.opam:%s:
   extends:
     - .opam_template
-    - .rules_template__trigger_%s_opam_batch_%d%s
+    - .rules_template__trigger_%s_opam_batch_%d
   variables:
     package: %s
 |}
         package_name
         (if is_executable then "exec" else "all")
         batch_index
-        (* Tag below is added because the job in question does not work as is on
-           Gitlab Runner CI GCP. To remove once https://gitlab.com/tezos/tezos/-/issues/6584
-           is fixed. *)
-        (if package_name = "octez-shell-libs" then
-         "\n    - .tags_template__no_gcp"
-        else "")
         package_name
     else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
   in

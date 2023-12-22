@@ -55,7 +55,6 @@
 oc.unit:non-proto-x86_64:
   extends:
   - .oc.unit_test_template_x86_64_coverage
-  - .tags_template__no_gcp
   # The [lib_benchmark] unit tests require Python
   - .image_template__runtime_build_test_dependencies
   variables:
