@@ -34,6 +34,9 @@ type endpoint =
   | Proxy_server of Proxy_server.t  (** A proxy server *)
   | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
+(** Values that can be passed to the client's [--adaptive-issuance-vote] argument *)
+type ai_vote = On | Off | Pass
+
 (** A string representation of an endpoint suitable to be used as a CLI
     argument (e.g., [http://localhost:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
@@ -558,6 +561,7 @@ val bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   ?expect_failure:bool ->
   t ->
@@ -590,6 +594,7 @@ val bake_for_and_wait :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
+  ?ai_vote:ai_vote ->
   t ->
   unit Lwt.t
 
@@ -610,6 +615,7 @@ val bake_for_and_wait_level :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
+  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   int Lwt.t
@@ -629,6 +635,7 @@ val spawn_bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   Process.t
@@ -3034,6 +3041,18 @@ val publish_dal_commitment :
 (** Return the information stored in the given endpoint as a foreign
     endpoint. *)
 val as_foreign_endpoint : endpoint -> Endpoint.t
+
+(** Run [octez-client stake <amount> for <staker>]. *)
+val stake : ?wait:string -> Tez.t -> string -> t -> unit Lwt.t
+
+(** Same as [stake], but do not wait for the process to exit. *)
+val spawn_stake : ?wait:string -> Tez.t -> string -> t -> Process.t
+
+(** Run [octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>]. *)
+val set_delegate_parameters : string -> string -> string -> t -> unit Lwt.t
+
+(** Same as [set_delegate_parameters], but do not wait for the process to exit. *)
+val spawn_set_delegate_parameters : string -> string -> string -> t -> Process.t
 
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)
