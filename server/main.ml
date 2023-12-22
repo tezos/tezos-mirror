@@ -884,6 +884,34 @@ let import_callback ~logger conf db_pool g data =
         ~body:"Level imported"
         ())
 
+(*
+  - /<LEVEL>/rights
+      Used by archiver to send attesting rights informations for a given level.
+  - /<LEVEL>/block
+      Used by archiver to send data about a block for a given level.
+  - /<LEVEL>/mempool
+      Used by archiver to send data about consensus operations for a given level.
+  - /<LEVEL>/import
+      Use by archiver to import past data recorded locally.
+  - /timestamp/<TIMESTAMP>
+      Get the levels (if any) before and after a given timestamp.
+  - /ping
+      Only return a 200 OK response with "200 OK" body content.
+  - /<LEVEL>.json
+      Get information about rounds, blocks, (pre)attestations for a given level.
+  - /<LEVEL_MIN>-<LEVEL_MAX>.json
+      Same as <LEVEL>.json, but for a range of levels. Min and max levels are included in data.
+  - /<LEVEL_MIN>-<LEVEL_MAX>/anomalies.json
+      Return all problem detected (missed|sequestred|forgotten attestation).
+  - /users
+      Get the list of allowed archivers
+  - /stats.json
+      Get the highest level, its highest round, and corresponding timestamp.
+  - /head.json
+      Get the highest level recorded in database.
+  - /metrics
+      Some openmetrics data about OCaml GC and SQL requests execution times.
+*)
 let routes :
     (Re.re
     * (Re.Group.t ->
