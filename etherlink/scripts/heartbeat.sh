@@ -79,8 +79,8 @@ add_not_included_tx_msg() {
 
 add_good_health_msg() {
     hash="${1}"
-    hash_prefix=$(echo ${hash} | cut -c 1-18)
-    hash_suffix=$(echo ${hash} | cut -c 63-66)
+    hash_prefix=$(echo "${hash}" | cut -c 1-18)
+    hash_suffix=$(echo "${hash}" | cut -c 63-66)
     network="$2"
     network_name="${network#https://}"
     network_name="${network_name%.ghostnet.etherlink.com}"
@@ -95,8 +95,8 @@ check_tx_applied() {
     status_code=$(curl "${cmd[@]}")
     echo "${status_code}"
     if [[ "${status_code}" -ne 200 ]]; then
-	add_not_included_tx_msg "${op_hash}" "${status_code}"
-	return 1
+        add_not_included_tx_msg "${op_hash}" "${status_code}"
+        return 1
     else
         return 0
     fi
