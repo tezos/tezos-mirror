@@ -4236,16 +4236,7 @@ let as_foreign_endpoint = function
 
 let spawn_stake ?(wait = "none") amount dlgt client =
   spawn_command client
-  @@ [
-       "--wait";
-       wait;
-       "stake";
-       Tez.to_string amount;
-       "for";
-       dlgt;
-       "--gas-limit";
-       "5000";
-     ]
+  @@ ["--wait"; wait; "stake"; Tez.to_string amount; "for"; dlgt]
 
 let stake ?wait amount dlgt client =
   spawn_stake ?wait amount dlgt client |> Process.check
