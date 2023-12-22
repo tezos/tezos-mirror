@@ -139,6 +139,8 @@ module Baker = struct
         let* dal_config = Node_rpc.fetch_dal_config cctxt in
         Cryptobox.Config.init_dal ~find_srs_files dal_config
       in
+      let consumer = Protocol_logging.make_log_message_consumer () in
+      Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates
     in
     let* () =
