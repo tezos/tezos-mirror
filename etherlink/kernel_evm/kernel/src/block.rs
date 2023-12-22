@@ -289,11 +289,9 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::mock_internal::MockInternal;
     use crate::safe_storage::SafeStorage;
-    use crate::storage::internal_for_tests::{
-        read_transaction_receipt, read_transaction_receipt_status,
-    };
     use crate::storage::read_block_in_progress;
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
+    use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
     use crate::{retrieve_base_fee_per_gas, retrieve_chain_id};
     use evm_execution::account_storage::{
