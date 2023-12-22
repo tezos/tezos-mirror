@@ -1159,21 +1159,36 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-let get_headers_succeeds ~__LOC__ expected_status response =
+(* Checks that [response] contains zero or one slot header. If [expected_status]
+   is not given, the expected response is the empty list; if it is given, the
+   response should contain exactly one header, with the given status. *)
+let get_headers_succeeds ~__LOC__ ?expected_status response =
   let headers =
     JSON.(
       parse ~origin:"get_headers_succeeds" response.RPC_core.body
       |> Dal_RPC.slot_headers_of_json)
   in
-  List.iter
-    (fun header ->
+  match (headers, expected_status) with
+  | [], None -> ()
+  | _ :: _, None ->
+      Test.fail
+        ~__LOC__
+        "It was expected that there is no slot id for the given commitment, \
+         got %d."
+        (List.length headers)
+  | [header], Some expected_status ->
       Check.(header.Dal_RPC.status = expected_status)
         ~__LOC__
         Check.string
         ~error_msg:
           "The value of the fetched status should match the expected one \
-           (current = %L, expected = %R)")
-    headers
+           (current = %L, expected = %R)"
+  | _, Some _ ->
+      Test.fail
+        ~__LOC__
+        "It was expected that there is exactly one slot id for the given \
+         commitment, got %d."
+        (List.length headers)
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
@@ -1196,7 +1211,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
 
   (* slot2_a and slot3 will not be included as successful, because slot2_b has
-     better fees for slot 4, while slot3's fee is too low. slot4 is not injected
+     better fees for slot4, while slot3's fee is too low. slot4 is not injected
      into L1 or DAL nodes.
 
      We decide to have two failed slots instead of just one to better test some
@@ -1211,14 +1226,13 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     return (6, commit)
   in
 
-  Log.info
-    "Just after injecting slots and before baking, there are 6 headers, all \
-     with status Unseen_or_not_finalized" ;
+  Log.info "Just after injecting slots and before baking, there are no headers" ;
+  (* because headers are stored based on information from finalized blocks *)
   let* () =
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
+      (get_headers_succeeds ~__LOC__)
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
   let* () =
@@ -1233,13 +1247,13 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = wait_block_processing1 in
 
   Log.info
-    "After baking one block, the status is still Unseen_or_not_finalized, \
-     because the block is not final" ;
+    "After baking one block, there is still no header, because the block is \
+     not final" ;
   let* () =
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
+      (get_headers_succeeds ~__LOC__)
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
 
@@ -1284,13 +1298,13 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = check_get_commitment get_commitment_succeeds ok in
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "waiting_attestation")
+      (get_headers_succeeds ~__LOC__ ~expected_status:"waiting_attestation")
       ok
   in
   (* slot_2_a is not selected. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "not_selected")
+      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
       [slot2_a]
   in
   (* Slots not published or not included in blocks. *)
@@ -1324,7 +1338,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* Slot that were waiting for attestation and now attested. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "attested")
+      (get_headers_succeeds ~__LOC__ ~expected_status:"attested")
       attested
   in
   (* Slots not published or not included in blocks. *)
@@ -1332,32 +1346,23 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* Slot that were waiting for attestation and now unattested. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "unattested")
+      (get_headers_succeeds ~__LOC__ ~expected_status:"unattested")
       unattested
   in
-  (* slot_2_a is still not selected. *)
+  (* slot2_a is still not selected. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "not_selected")
+      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
       [slot2_a]
   in
-  (* slot_3 never finished in an L1 block, so the DAL node only saw it as
-     Unseen_or_not_finalized. *)
+  (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
-      [slot3]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot3]
   in
-  (* slot_4 is never injected in any of the nodes. So, it's not
+  (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
   let* () =
-    check_get_commitment_headers
-      (fun response ->
-        Check.(
-          (String.trim response.RPC_core.body = "[]")
-            string
-            ~error_msg:"slot4 is not expected to have a header"))
-      [slot4]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot4]
   in
   (* The number of published slots has not changed *)
   let* () =
