@@ -10,6 +10,8 @@ oc.misc_checks:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   rules:
+    # The linting job runs over the set of [source_directories]
+    # defined in [scripts/lint.sh] that must be included here:
     - changes:
         paths:
         - src/**/*
@@ -17,6 +19,8 @@ oc.misc_checks:
         - devtools/**/*
         - scripts/**/*
         - docs/**/*
+        - contrib/**/*
+        - etherlink/**/*
         - .gitlab-ci.yml
         - .gitlab/**/*
   script:
