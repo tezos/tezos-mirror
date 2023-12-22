@@ -88,7 +88,7 @@ check_scripts () {
     tab="$(printf '%b' '\t')"
     for f in $scripts ; do
         if grep -q "$tab" "$f"; then
-            say "$f has tab character(s)"
+            say "$f has tab character(s) ❌️"
             exit_code=1
         fi
     done
