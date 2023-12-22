@@ -210,7 +210,9 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             }
 
             fn size_hint(&self) -> (usize, std::option::Option<usize>) {
-                let Some(mut ty) = self.0 else { return (0, Some(0)) };
+                let Some(mut ty) = self.0 else {
+                    return (0, Some(0));
+                };
                 let mut size: usize = 1;
                 while let Type::Pair(x) = ty {
                     ty = &x.1;
@@ -626,4 +628,238 @@ pub struct ContractScript<'a> {
     pub parameter: Type,
     pub storage: Type,
     pub code: Instruction<'a>,
+}
+
+#[cfg(test)]
+pub mod test_strategies {
+    use proptest::prelude::*;
+
+    use crate::{gas::Gas, typechecker::type_props::TypeProperty};
+
+    use super::*;
+
+    /// Generates any type except lambda, big_map, contract, never and operation.
+    fn input_ty() -> impl Strategy<Value = Type> {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6755
+        // Produce all types.
+        use Type::*;
+        let prim = prop_oneof![
+            // Cases that we want to see in tests in the first place - go first
+            Just(Int),
+            Just(Nat),
+            Just(Mutez),
+            Just(Timestamp),
+            Just(String),
+            Just(Bytes),
+            Just(Unit),
+            Just(Bool),
+            Just(Address),
+            Just(ChainId),
+            Just(Key),
+            Just(Signature),
+            Just(KeyHash),
+            Just(Bls12381Fr),
+            Just(Bls12381G1),
+            Just(Bls12381G2),
+        ];
+        prim.prop_recursive(5, 16, 2, |inner| {
+            prop_oneof![
+                inner.clone().prop_map(Type::new_option),
+                inner.clone().prop_map(Type::new_list),
+                (inner.clone(), inner.clone()).prop_map(|(l, r)| Type::new_pair(l, r)),
+                (inner.clone(), inner.clone()).prop_map(|(l, r)| Type::new_or(l, r)),
+                inner
+                    .clone()
+                    .prop_filter("Elt must be comparable", |elt| elt
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(Type::new_set),
+                inner
+                    .clone()
+                    .prop_filter("Payload must be comparable", |payload| payload
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(Type::new_ticket),
+                (inner.clone(), inner.clone())
+                    .prop_filter("Key must be comparable", |(k, _)| k
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(|(k, v)| Type::new_map(k, v)),
+            ]
+        })
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct TypedValueAndType<'a> {
+        pub ty: Type,
+        pub val: TypedValue<'a>,
+    }
+
+    pub fn typed_value_and_type<'a>() -> impl Strategy<Value = TypedValueAndType<'a>> {
+        input_ty().prop_flat_map(|ty| {
+            (Just(ty.clone()), typed_value_by_type(&ty))
+                .prop_map(|(ty, val)| TypedValueAndType { ty, val })
+        })
+    }
+
+    pub fn typed_value_by_type(t: &Type) -> impl Strategy<Value = TypedValue<'static>> {
+        use Type as T;
+        use TypedValue as V;
+
+        match t {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/6755
+            // Sometimes generate really large numbers (should take at least several `u64`s)
+            T::Int => (-100..100i128).prop_map(V::int).boxed(),
+            T::Nat => (0..100u64).prop_map(V::nat).boxed(),
+            T::Mutez => (0..100i64).prop_map(V::Mutez).boxed(),
+            T::Timestamp => (-100i128..100i128).prop_map(V::timestamp).boxed(),
+            T::Bool => any::<bool>().prop_map(V::Bool).boxed(),
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/6755
+            // Allow all Michelson strings
+            T::String => "[A-Za-z0-9]".prop_map(V::String).boxed(),
+            T::Bytes => prop::collection::vec(any::<u8>(), 0..=3)
+                .prop_map(V::Bytes)
+                .boxed(),
+            T::Unit => Just(V::Unit).boxed(),
+            T::Pair(t) => {
+                let (lt, rt) = t.as_ref();
+                (typed_value_by_type(lt), typed_value_by_type(rt))
+                    .prop_map(|(l, r)| V::new_pair(l, r))
+                    .boxed()
+            }
+            T::Ticket(t) => {
+                (typed_value_by_type(t), (1u64..100u64))
+                    .prop_map(|(content, amount)| V::new_ticket(Ticket {
+                        ticketer: AddressHash::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
+                        content,
+                        amount: amount.into(),
+                    }
+                    ))
+                    .boxed()
+            }
+            T::Option(t) => prop_oneof![
+                Just(V::new_option(None)),
+                typed_value_by_type(t).prop_map(|v| V::new_option(Some(v)))
+            ]
+            .boxed(),
+            T::Or(t) => {
+                let (lt, rt) = t.as_ref();
+                prop_oneof![
+                    typed_value_by_type(lt).prop_map(|v| V::new_or(Or::Left(v))),
+                    typed_value_by_type(rt).prop_map(|v| V::new_or(Or::Right(v)))
+                ]
+                .boxed()
+            }
+            T::List(t) => prop::collection::vec(typed_value_by_type(t), 0..=3)
+                .prop_map(|x| V::List(MichelsonList::from(x)))
+                .boxed(),
+            T::Set(elt) => prop::collection::btree_set(typed_value_by_type(elt), 0..=3)
+                .prop_map(V::Set)
+                .boxed(),
+            T::Map(m) => {
+                let (key_ty, val_ty) = m.as_ref();
+                prop::collection::btree_map(
+                    typed_value_by_type(key_ty),
+                    typed_value_by_type(val_ty),
+                    0..=3,
+                )
+                .prop_map(V::Map)
+                .boxed()
+            }
+            T::Address => prop_oneof![
+                Just(V::Address(
+                    Address::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
+                )),
+                Just(V::Address(
+                    Address::from_base58_check("tz1SNL5w4RFRbCWRMB4yDWvoRQrPQxZmNzeQ").unwrap()
+                )),
+                Just(V::Address(
+                    Address::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap()
+                )),
+                Just(V::Address(
+                    Address::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo").unwrap()
+                )),
+                Just(V::Address(
+                    Address::from_base58_check("sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf").unwrap()
+                )),
+                Just(V::Address(
+                    Address::from_base58_check("sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%foo").unwrap()
+                )),
+            ]
+            .boxed(),
+            T::ChainId => prop_oneof![
+                Just(V::ChainId(
+                    ChainId::from_base58_check("NetXgtSLGNJvNye").unwrap()
+                )),
+                Just(V::ChainId(
+                    ChainId::from_base58_check("NetXjD3HPJJjmcd").unwrap()
+                )),
+            ]
+            .boxed(),
+            T::Key => prop_oneof![
+                Just(V::Key(
+                    Key::from_base58_check("edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk").unwrap()
+                )),
+                Just(V::Key(
+                    Key::from_base58_check("BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G").unwrap()
+                )),
+            ]
+                .boxed(),
+            T::Signature =>
+                Just(V::Signature( Signature::from_base58_check("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F").unwrap())).boxed(),
+            T::KeyHash =>
+                Just(V::KeyHash(
+                    KeyHash::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
+                )).boxed(),
+            T::Bls12381Fr =>
+                Just(V::Bls12381Fr(bls::fr::Fr::from_big_int(&0.into()))).boxed(),
+            T::Bls12381G1 =>
+                Just(V::Bls12381G1(Box::new(bls::g1::G1::zero()))).boxed(),
+            T::Bls12381G2 =>
+                Just(V::Bls12381G2(Box::new(bls::g2::G2::zero()))).boxed(),
+            T::Contract(_) => panic!("Cannot generate typed value for contract"),
+            T::Operation => panic!("Cannot generate typed value for operation"),
+            T::BigMap(_) => panic!("Cannot generate typed value for big_map"),
+            T::Lambda(_) => panic!("Cannot generate typed value for lambda"),
+            T::Never =>  panic!("Cannot generate typed value for never"),
+            // NOTE: if you append clauses here, you likely need to update other generators too
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_untypers {
+    use proptest::prelude::*;
+
+    use super::*;
+    use crate::{ast::test_strategies as TS, context::Ctx, typechecker::typecheck_value};
+
+    proptest! {
+        #[test]
+        fn value_typecheck_untype_roundtrip(typed in TS::typed_value_and_type()) {
+            let arena = Arena::new();
+            let mut ctx = Ctx::default();
+            let untyped = typed.val.clone().into_micheline_optimized_legacy(&arena);
+            let typed_ = typecheck_value(&untyped, &mut ctx, &typed.ty);
+            assert_eq!(typed_, Ok(typed.val))
+        }
+    }
 }
