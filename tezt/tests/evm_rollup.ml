@@ -992,6 +992,15 @@ let ether_wallet =
     bin = kernel_inputs_path ^ "/ether_wallet.bin";
   }
 
+(** The info for the "block_hash_gen.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/block_hash_gen.sol] *)
+let block_hash_gen =
+  {
+    label = "block_hash_gen";
+    abi = kernel_inputs_path ^ "/block_hash_gen.abi";
+    bin = kernel_inputs_path ^ "/block_hash_gen.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -4457,6 +4466,27 @@ let test_keep_alive =
       let*@ _block_number = Rpc.block_number evm_node in
       unit)
 
+let test_regression_block_hash_gen =
+  (* This test is created because of bug in blockConstant in simulation,
+     which caused the simulation to return a wrong estimate of gas limit,
+     leading to failed contract deployment for block_hash_gen.
+     This test checks regression for the fix *)
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+      ])
+    ~title:"Random generation based on block hash and timestamp"
+  @@ fun protocol ->
+  let* evm_setup = setup_past_genesis ~admin:None protocol in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* _address, _tx = deploy ~contract:block_hash_gen ~sender evm_setup in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4528,7 +4558,8 @@ let register_evm_node ~protocols =
   test_l2_create_collision protocols ;
   test_l2_intermediate_OOG_call protocols ;
   test_l2_ether_wallet protocols ;
-  test_keep_alive protocols
+  test_keep_alive protocols ;
+  test_regression_block_hash_gen protocols
 
 let register ~protocols =
   register_evm_node ~protocols ;
