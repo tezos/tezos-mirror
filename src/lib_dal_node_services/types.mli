@@ -212,13 +212,12 @@ type header_status =
     (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
   | `Unseen_or_not_finalized
-    (** The slot header was not seen in a *final* L1 block. For instance, this
-          could happen if the RPC `PATCH /commitments/<commitment>` was called
-          but the corresponding slot header was never included into a block; or
-          the slot header was included in a non-final (ie not agreed upon)
-          block. This means that the publish operation was not sent (yet) to L1,
-          or sent but not included (yet) in a block, or included in a not (yet)
-          final block. *)
+    (** The slot header was not seen in a *final* L1 block. This could only
+        happen if the RPC `PATCH /commitments/<commitment>` was called but the
+        corresponding slot header was not included in a final block. In turn,
+        this means that the publish operation was not sent (yet) to L1, or sent
+        but not included (yet) in a block, or included in a not (yet) final
+        block. *)
   ]
 
 (** Profiles that operate on shards/slots. *)
