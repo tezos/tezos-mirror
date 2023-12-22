@@ -1161,7 +1161,8 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level
 
 (* Checks that [response] contains zero or one slot header. If [expected_status]
    is not given, the expected response is the empty list; if it is given, the
-   response should contain exactly one header, with the given status. *)
+   response should contain exactly one header, with the given status. The
+   function [check_headers] generalizes this check to more headers. *)
 let get_headers_succeeds ~__LOC__ ?expected_status response =
   let headers =
     JSON.(
@@ -1189,6 +1190,40 @@ let get_headers_succeeds ~__LOC__ ?expected_status response =
         "It was expected that there is exactly one slot id for the given \
          commitment, got %d."
         (List.length headers)
+
+(* Similar to [get_headers_succeeds], except that it is more general, it does
+   not assume that there will be just 0 or 1 header. *)
+let check_headers ~__LOC__ expected_headers response =
+  let headers =
+    JSON.(
+      parse ~origin:"check_headers" response.RPC_core.body
+      |> Dal_RPC.slot_headers_of_json)
+  in
+  Check.(List.length headers = List.length expected_headers)
+    ~__LOC__
+    Check.int
+    ~error_msg:"check_headers: Expected %R headers, got %L." ;
+  let headers =
+    List.map (fun h -> (h.Dal_RPC.slot_level, h.slot_index, h.status)) headers
+  in
+  List.iter
+    (fun (level, index, expected_status) ->
+      let status_opt =
+        List.find_map
+          (fun (l, i, status) ->
+            if level = l && index = i then Some status else None)
+          headers
+      in
+      Check.(status_opt = Some expected_status)
+        ~__LOC__
+        Check.(option string)
+        ~error_msg:
+          (Format.asprintf
+             "Expected to find for slot level %d and slot index %d the status \
+              (%%R), found (%%L)."
+             level
+             index))
+    expected_headers
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
@@ -1551,10 +1586,24 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
     Dal_RPC.(
       call dal_node @@ patch_commitment commitment ~slot_level ~slot_index)
   in
+  let check ~__LOC__ expected_headers =
+    let* response =
+      Dal_RPC.(call_raw dal_node @@ get_commitment_headers commitment)
+    in
+    check_headers ~__LOC__ expected_headers response ;
+    unit
+  in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = check ~__LOC__ [(0, 0, "unseen")] in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = check ~__LOC__ [(0, 0, "unseen")] in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
-  patch_slot_rpc ~slot_level:(-4) ~slot_index:3
+  let* () = check ~__LOC__ [(0, 0, "unseen"); (0, 1, "unseen")] in
+  let* () = patch_slot_rpc ~slot_level:(-4) ~slot_index:3 in
+  let* () =
+    check ~__LOC__ [(0, 0, "unseen"); (0, 1, "unseen"); (-4, 3, "unseen")]
+  in
+  unit
 
 let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     _client dal_node =
