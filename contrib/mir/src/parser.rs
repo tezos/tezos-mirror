@@ -17,8 +17,6 @@ use typed_arena::Arena;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
-    #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
-    ExpectedU10(i128),
     #[error(transparent)]
     LexerError(#[from] LexerError),
     #[error(transparent)]
