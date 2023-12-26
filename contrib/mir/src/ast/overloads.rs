@@ -5,6 +5,12 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Various overloads for different instructions. The name of the enum
+//! corresponds to the name of the instruction, while the variant name
+//! corresponds to the stack types used for the particular overload.
+
+#![allow(missing_docs)]
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Add {
     IntInt,

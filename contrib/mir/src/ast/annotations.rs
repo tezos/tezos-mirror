@@ -5,17 +5,24 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Tezos annotations on a [Micheline][crate::ast::Micheline] nodes and
+//! utilities for working with them.
+
 use std::borrow::Cow;
 
 use crate::lexer::Annotation;
 
+/// A structure holding all Tezos annotations on a [Micheline][crate::ast::Micheline] node.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Annotations<'a>(Vec<Annotation<'a>>);
 
+/// Constant corresponding to no annotations.
 pub const NO_ANNS: Annotations = Annotations::new();
 
+/// Errors that can happen when working with [Annotations].
 #[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
 pub enum AnnotationError {
+    /// Expected at most one field annotation, but found multiple.
     #[error("unexpected second field annotation: {0}")]
     TooManyFieldAnns(String),
 }
@@ -32,14 +39,20 @@ impl std::fmt::Debug for Annotations<'_> {
     }
 }
 
+/// A newtype wrapping a field annotation, like `%foo`. This newtype is used to
+/// enforce some invariants on the type level. It's impossible to construct
+/// manually, except in tests.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldAnnotation<'a>(Cow<'a, str>);
 
 impl<'a> FieldAnnotation<'a> {
+    /// View the field annotation contents as a [str] slice. The leading `%` is
+    /// _not_ included.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Convert the field annotation into the inner [`Cow`]`<'a, str>`.
     pub fn into_cow(self) -> Cow<'a, str> {
         self.0
     }
@@ -51,22 +64,30 @@ impl<'a> FieldAnnotation<'a> {
 }
 
 impl<'a> Annotations<'a> {
+    /// Create a new list empty of annotations.
     pub const fn new() -> Self {
         Annotations(Vec::new())
     }
 
+    /// Check if the list of annotations is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Get the number of annotations in the list.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns an iterator over the list of annotaions.
     pub fn iter(&self) -> impl Iterator<Item = &Annotation> {
         self.0.iter()
     }
 
+    /// Get at most one field annotation from the list. If there aren't any
+    /// field annotations in the list, returns `Ok(None)`. If there is exactly
+    /// one field annotation, returns `Ok(Some(field_annotation))`. If there are
+    /// more than one, returns `Err(`[`AnnotationError::TooManyFieldAnns`]`)`
     pub fn get_single_field_ann(&self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
         use Annotation::*;
         let mut res = None;

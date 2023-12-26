@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Representation for typed Michelson `address` values.
+
 pub mod address_hash;
 pub mod entrypoint;
 
@@ -15,13 +17,20 @@ use address_hash::check_size;
 
 use super::{ByteReprError, ByteReprTrait};
 
+/// Tezos address with an entrypoint, e.g.
+/// `KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%foo`.
 #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
 pub struct Address {
+    /// The hash part of the address, i.e. the part before `%`.
     pub hash: AddressHash,
+    /// The entrypoint part of the address, i.e. the part after `%`.
     pub entrypoint: Entrypoint,
 }
 
 impl Address {
+    /// Returns `true` if the address uses the default entrypoint. Note that
+    /// addresses that don't explicitly specify the entrypoint, e.g.
+    /// `KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi`, implicitly use the default one.
     pub fn is_default_ep(&self) -> bool {
         self.entrypoint.is_default()
     }

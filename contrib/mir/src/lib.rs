@@ -5,19 +5,25 @@
 /*                                                                            */
 /******************************************************************************/
 #![warn(clippy::redundant_clone)]
+#![warn(missing_docs)]
 #![deny(clippy::disallowed_methods)]
+
+//! # M.I.R. -- Michelson in Rust
+//!
+//! Rust implementation of the typechecker and interpreter for the Michelson
+//! smart contract language.
 
 pub mod ast;
 pub mod bls;
 pub mod context;
 pub mod gas;
 pub mod interpreter;
-pub mod irrefutable_match;
+mod irrefutable_match;
 pub mod lexer;
 pub mod parser;
 pub mod serializer;
 pub mod stack;
-pub mod syntax;
+mod syntax;
 pub mod typechecker;
 pub mod tzt;
 

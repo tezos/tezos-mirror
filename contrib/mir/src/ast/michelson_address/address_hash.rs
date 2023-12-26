@@ -5,6 +5,10 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Structures for [Tezos
+//! address](https://docs.tezos.com/smart-contracts/data-types/primitive-data-types#addresses)
+//! hash part, i.e. the part without the entrypoint.
+
 use crate::ast::michelson_key_hash::KeyHash;
 
 use super::{ByteReprError, ByteReprTrait};
@@ -15,10 +19,13 @@ use tezos_crypto_rs::hash::{
 };
 
 macro_rules! address_hash_type_and_impls {
-    ($($con:ident($ty:ident)),* $(,)*) => {
+    ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
+        /// A enum representing address hashes, like
+        /// `tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw` or
+        /// `KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye`.
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
         pub enum AddressHash {
-            $($con($ty)),*
+            $($(#[$meta])* $con($ty)),*
         }
 
         $(impl From<$ty> for AddressHash {
@@ -46,8 +53,11 @@ macro_rules! address_hash_type_and_impls {
 }
 
 address_hash_type_and_impls! {
+    /// Variant for implicit addresses, `tz1...`, `tz2...`, etc.
     Implicit(KeyHash),
+    /// Variant for smart contract addresses, `KT1...`.
     Kt1(ContractKt1Hash),
+    /// Variant for smart rollup addresses, `sr1...`.
     Sr1(SmartRollupHash),
 }
 
@@ -106,11 +116,14 @@ const TAG_SR1: u8 = 3;
 const PADDING_ORIGINATED: &[u8] = &[0];
 
 impl AddressHash {
-    // all address hashes are 20 bytes in length
+    /// Byte size of a raw address hash.
+    /// All address hashes are 20 bytes in length.
     pub const HASH_SIZE: usize = 20;
-    // +2 for tags: implicit addresses use 2-byte, and KT1/sr1 add zero-byte
-    // padding to the end
+    /// Byte size for the Tezos representation of an address hash.
+    /// [Self::HASH_SIZE] + 2 for tags: implicit addresses use 2-byte tag, and
+    /// KT1/sr1 add zero-byte padding to the end
     pub const BYTE_SIZE: usize = Self::HASH_SIZE + 2;
+    /// Byte length of Base58 representation of address hashes.
     pub const BASE58_SIZE: usize = 36;
 }
 

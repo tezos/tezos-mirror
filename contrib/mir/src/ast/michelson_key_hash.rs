@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Representation for typed Michelson `key_hash` values.
+
 use tezos_crypto_rs::hash::{
     ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash, HashTrait,
 };
@@ -12,10 +14,12 @@ use tezos_crypto_rs::hash::{
 use super::{ByteReprError, ByteReprTrait};
 
 macro_rules! key_hash_type_and_impls {
-    ($($con:ident($ty:ident)),* $(,)*) => {
+    ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
+        /// Public key hash. Public key hashes are used to represent implicit
+        /// Tezos addresses.
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
         pub enum KeyHash {
-            $($con($ty)),*
+            $($(#[$meta])* $con($ty)),*
         }
 
         $(impl From<$ty> for KeyHash {
@@ -43,9 +47,13 @@ macro_rules! key_hash_type_and_impls {
 }
 
 key_hash_type_and_impls! {
+    /// A hash of a Ed25519 public key, `tz1...` in base58-check encoding.
     Tz1(ContractTz1Hash),
+    /// A hash of a SecP256k1 public key, `tz2...` in base58-check encoding.
     Tz2(ContractTz2Hash),
+    /// A hash of a P256 public key, `tz3...` in base58-check encoding.
     Tz3(ContractTz3Hash),
+    /// A hash of a BLS public key, `tz4...` in base58-check encoding.
     Tz4(ContractTz4Hash),
 }
 
@@ -80,9 +88,13 @@ const TAG_TZ3: u8 = 2;
 const TAG_TZ4: u8 = 3;
 
 impl KeyHash {
-    // all hashes are blake2b 160-bit hashes
+    /// Size of the hash in bytes.
+    /// All hashes are blake2b 160-bit hashes.
     pub const HASH_SIZE: usize = 20;
+    /// Size of the representation size in bytes.
+    /// Corresponds to [Self::HASH_SIZE] + 1, where 1 byte is used for a tag.
     pub const BYTE_SIZE: usize = Self::HASH_SIZE + 1; // hash size + tag size
+    /// Byte size of a base58-check encoded `key_hash`.
     pub const BASE58_SIZE: usize = 36;
 }
 

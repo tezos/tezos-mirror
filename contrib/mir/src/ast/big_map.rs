@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! `big_map` typed representation and utilities for working with `big_map`s.
+
 use num_bigint::BigInt;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -46,7 +48,10 @@ pub struct BigMap<'a> {
     /// if necessary, with copy of the stored map.
     pub overlay: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
 
+    /// Type of the map key.
     pub key_type: Type,
+
+    /// Type of the map value.
     pub value_type: Type,
 }
 
@@ -94,10 +99,13 @@ impl<'a> BigMap<'a> {
     }
 }
 
+/// Errors that can happen when working with lazy storage.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum LazyStorageError {
+    /// Decoding from the internal representation failed.
     #[error("decode failed {0}")]
     DecodingError(String),
+    /// Some other error happened.
     #[error("{0}")]
     OtherError(String),
 }
@@ -178,6 +186,8 @@ pub trait LazyStorage<'a> {
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError>;
 }
 
+/// Bulk-update the big_map. This trait exists mostly for convenience, and has a
+/// blanket implementation.
 pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
     /// Update big map with multiple changes, generalizes
     /// [LazyStorage::big_map_update].
@@ -198,8 +208,9 @@ pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
 
 impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 
+/// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct MapInfo<'a> {
+struct MapInfo<'a> {
     map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
     key_type: Type,
     value_type: Type,
@@ -213,6 +224,7 @@ pub struct InMemoryLazyStorage<'a> {
 }
 
 impl<'a> InMemoryLazyStorage<'a> {
+    /// Construct a new, empty, in-memory storage.
     pub fn new() -> Self {
         InMemoryLazyStorage {
             next_id: 0.into(),
@@ -489,10 +501,14 @@ impl<'a> TypedValue<'a> {
         }
     }
 
+    /// Traverses a `TypedValue` and add a mutable reference to it to the output
+    /// vector.
     pub fn view_big_maps_mut<'b>(&'b mut self, out: &mut Vec<&'b mut BigMap<'a>>) {
         self.collect_big_maps(&mut |m| out.push(m));
     }
 
+    /// Same as [TypedValue::view_big_maps_mut], but only collects `big_map`
+    /// identifiers.
     pub fn view_big_map_ids<T>(&mut self, out: &mut Vec<BigMapId>) {
         self.collect_big_maps(&mut |m| {
             if let Some(id) = &m.id {

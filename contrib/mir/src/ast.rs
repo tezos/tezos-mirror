@@ -5,10 +5,13 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! AST definitions for raw ([Micheline]) and typed representations of
+//! Michelson.
+
 pub mod annotations;
 pub mod big_map;
 pub mod byte_repr_trait;
-pub mod comparable;
+mod comparable;
 pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_key;
@@ -26,6 +29,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
+/// Reexported from [tezos_crypto_rs::hash]. Typechecked values of the Michelson
+/// type `chain_id`.
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
@@ -43,17 +48,32 @@ pub use michelson_key::Key;
 pub use michelson_key_hash::KeyHash;
 pub use michelson_lambda::{Closure, Lambda};
 pub use michelson_list::MichelsonList;
+pub use michelson_operation::{
+    CreateContract, Emit, Operation, OperationInfo, SetDelegate, TransferTokens,
+};
 pub use michelson_signature::Signature;
 pub use or::Or;
 
+/// Representation for values of the Michelson `ticket` type.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ticket<'a> {
+    /// Ticketer, the address of the contract that issued the ticket.
     pub ticketer: AddressHash,
+    /// Ticket payload.
     pub content: TypedValue<'a>,
+    /// Ticket amount.
     pub amount: BigUint,
 }
 
+/// Representation for a Michelson type. Used primarily in the typechecker. Note
+/// this representation doesn't store annotations, as annotations are mostly
+/// deprecated and ingored. For entrypoints, see
+/// [crate::ast::michelson_address::entrypoint].
+///
+/// The names of the variants correspond to the names of Michelson types, but
+/// snake_case is converted to PascalCase.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[allow(missing_docs)]
 pub enum Type {
     Nat,
     Int,
@@ -101,42 +121,52 @@ impl Type {
         }
     }
 
+    /// Convenience function to construct a new [Self::Pair]. Allocates a new [Rc].
     pub fn new_pair(l: Self, r: Self) -> Self {
         Self::Pair(Rc::new((l, r)))
     }
 
+    /// Convenience function to construct a new [Self::Option]. Allocates a new [Rc].
     pub fn new_option(x: Self) -> Self {
         Self::Option(Rc::new(x))
     }
 
+    /// Convenience function to construct a new [Self::List]. Allocates a new [Rc].
     pub fn new_list(x: Self) -> Self {
         Self::List(Rc::new(x))
     }
 
+    /// Convenience function to construct a new [Self::Set]. Allocates a new [Rc].
     pub fn new_set(v: Self) -> Self {
         Self::Set(Rc::new(v))
     }
 
+    /// Convenience function to construct a new [Self::Map]. Allocates a new [Rc].
     pub fn new_map(k: Self, v: Self) -> Self {
         Self::Map(Rc::new((k, v)))
     }
 
+    /// Convenience function to construct a new [Self::BigMap]. Allocates a new [Rc].
     pub fn new_big_map(k: Self, v: Self) -> Self {
         Self::BigMap(Rc::new((k, v)))
     }
 
+    /// Convenience function to construct a new [Self::Or]. Allocates a new [Rc].
     pub fn new_or(l: Self, r: Self) -> Self {
         Self::Or(Rc::new((l, r)))
     }
 
+    /// Convenience function to construct a new [Self::Contract]. Allocates a new [Rc].
     pub fn new_contract(ty: Self) -> Self {
         Self::Contract(Rc::new(ty))
     }
 
+    /// Convenience function to construct a new [Self::Ticket]. Allocates a new [Rc].
     pub fn new_ticket(ty: Self) -> Self {
         Self::Ticket(Rc::new(ty))
     }
 
+    /// Convenience function to construct a new [Self::Lambda]. Allocates a new [Rc].
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
         Self::Lambda(Rc::new((ty1, ty2)))
     }
@@ -254,7 +284,24 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
     }
 }
 
+/// Enum representing an arbitrary typed Michelson value. The name of the
+/// variant corresponds to the name of the type, with snake_case converted to
+/// PascalCase.
+///
+/// This is used primarily by the interpreter. It should be noted the type has a
+/// few quirks related to ordering and equality:
+///
+/// 1. Comparing two `TypedValue`s for equality is only well-defined if both are
+///    known to have the same type. `TypedValue` itself does not carry its type,
+///    so, for instance two empty lists with elements of different types will
+///    compare equal.
+/// 2. The [Ord] instance can panic if values being compared are of different
+///    types and/or are incomparable. This is fine for the interpreter, as the
+///    typechecker has verified this invariant holds. However, be mindful of
+///    this when comparing `TypedValue` in client code. [PartialOrd] is safe to
+///    use, it'll just return [None] for incomparable values.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[allow(missing_docs)]
 pub enum TypedValue<'a> {
     Int(BigInt),
     Nat(BigUint),
@@ -415,18 +462,22 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
+    /// Convenience function to construct a new [Self::Pair]. Allocates a new [Box].
     pub fn new_pair(l: Self, r: Self) -> Self {
         Self::Pair(Box::new((l, r)))
     }
 
+    /// Convenience function to construct a new [Self::Option]. Allocates a new [Box].
     pub fn new_option(x: Option<Self>) -> Self {
         Self::Option(x.map(Box::new))
     }
 
+    /// Convenience function to construct a new [Self::Or]. Allocates a new [Box].
     pub fn new_or(x: Or<Self, Self>) -> Self {
         Self::Or(Box::new(x))
     }
 
+    /// Convenience function to construct a new [Self::Operation]. Allocates a new [Box].
     pub fn new_operation(o: Operation<'a>, c: u128) -> Self {
         Self::Operation(Box::new(OperationInfo {
             operation: o,
@@ -452,20 +503,31 @@ impl<'a> TypedValue<'a> {
         Self::Timestamp(n.into())
     }
 
+    /// Convenience function to construct a new [Self::Ticket]. Allocates a new [Box].
     pub fn new_ticket(t: Ticket<'a>) -> Self {
         Self::Ticket(Box::new(t))
     }
 
+    /// Convenience function to construct a new [Self::Bls12381G1]. Allocates a new [Box].
     pub fn new_bls12381_g1(x: bls::G1) -> Self {
         Self::Bls12381G1(Box::new(x))
     }
 
+    /// Convenience function to construct a new [Self::Bls12381G2]. Allocates a new [Box].
     pub fn new_bls12381_g2(x: bls::G2) -> Self {
         Self::Bls12381G2(Box::new(x))
     }
 }
 
+/// Enum representing typechecked Michelson instructions. Some instructions may
+/// be applied to different input stacks, for those cases the variant carries a
+/// enum specifying the particular version of the instruction (here called
+/// "overload"). See [overloads].
+///
+/// The name of the variant corresponds to the name of the instruction, but with
+/// UPPER_SNAKE_CASE converted to PascalCase.
 #[derive(Debug, Eq, PartialEq, Clone)]
+#[allow(missing_docs)]
 pub enum Instruction<'a> {
     Add(overloads::Add),
     Mul(overloads::Mul),
@@ -577,10 +639,14 @@ pub enum Instruction<'a> {
     Map(overloads::Map, Vec<Self>),
 }
 
+/// A full typechecked contract script.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContractScript<'a> {
+    /// Parameter type. Corresponds to the script's `parameter` field.
     pub parameter: Type,
+    /// Storage type. Corresponds to the script's `storage` field.
     pub storage: Type,
+    /// Script code. Corresponds to the script's `code` field.
     pub code: Instruction<'a>,
 }
 
