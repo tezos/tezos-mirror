@@ -5,12 +5,17 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Utilities and types for representing a stack.
+
 use std::ops::{Index, IndexMut};
 use std::slice::SliceIndex;
 
 use crate::ast::*;
 
+/// Stack of [Type]s.
 pub type TypeStack = Stack<Type>;
+
+/// Stack of [TypedValue]s. Named `IStack` for "interpeter stack".
 pub type IStack<'a> = Stack<TypedValue<'a>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
@@ -18,7 +23,9 @@ pub type IStack<'a> = Stack<TypedValue<'a>>;
 /// typechecking) with any other stack.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FailingTypeStack {
+    /// The stack isn't failed.
     Ok(TypeStack),
+    /// The stack is failed.
     Failed,
 }
 
@@ -76,12 +83,27 @@ impl<T> Stack<T> {
         len.checked_sub(i + 1).expect("out of bounds stack access")
     }
 
+    /// Removes and returns the element at position `i` within the stack, where
+    /// 0 corresponds to the top, shifting all elements below it up. This has
+    /// worst-case complexity of O(n).
+    ///
+    /// # Panics
+    ///
+    /// When `i` is larger or equal to the length of the stack.
     pub fn remove(&mut self, i: usize) -> T {
         self.0.remove(self.vec_index(i))
     }
 
-    /// Insert an element at i'th stack index, such that after the call there are `i` number of
-    /// elements before the newly inserted element.
+    /// Insert an element at i'th stack index, such that after the call there
+    /// are `i` number of elements before the newly inserted element. `insert(0,
+    /// x)` is equivalent to `push(x)`.
+    ///
+    /// This has to move elements of the stack after insertion, so worst-case
+    /// complexity is O(n).
+    ///
+    /// # Panics
+    ///
+    /// If `i` is larger than the length of the stack.
     pub fn insert(&mut self, i: usize, e: T) {
         if i > 0 {
             // We subtract one from the index because since our stack is inverted, the insertion
@@ -135,6 +157,12 @@ impl<T> Stack<T> {
             .rev()
     }
 
+    /// Reserve additional space on the stack for at least `additional`
+    /// elements. Similar to [Vec::reserve].
+    ///
+    /// # Panics
+    ///
+    /// If the new capacity exceeds [isize::MAX] bytes.
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional)
     }
@@ -146,6 +174,8 @@ impl<T> Stack<T> {
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
+    ///
+    /// # Panics
     ///
     /// Panics if the `size` is larger than length of the stack.
     pub fn split_off(&mut self, size: usize) -> Stack<T> {
@@ -176,21 +206,21 @@ impl<T> Stack<T> {
     }
 }
 
-/// Newtype for specifying the order of elements in a `Stack` vs elements in
-/// a `Vec`/slice. Used in the `From` trait for `Stack`. _First_ element of
-/// the `Vec` will end up at the _top_ of the stack. `from()` conversion has
-/// O(n) complexity. See also `TopIsLast<T>`.
+/// Newtype for specifying the order of elements in a [Stack] vs elements in
+/// a [Vec]/slice. Used in the [From] trait for [Stack]. _First_ element of
+/// the [Vec] will end up at the _top_ of the stack. `from()` conversion has
+/// O(n) complexity. See also [TopIsLast].
 ///
 /// `from_iter()` implementation is slightly inefficient, still O(n), but
 /// the constant is a bit higher than necessary. If you're worried about
-/// efficiency, consider using `TopIsLast` with an explicit `rev()`.
+/// efficiency, consider using [TopIsLast] with an explicit `rev()`.
 pub struct TopIsFirst<T>(pub Stack<T>);
 
-/// Newtype for specifying the order of elements in a `Stack` vs elements in
-/// a `Vec`/slice. Used in the `From` trait for `Stack`. _First_ element of
-/// the `Vec` will end up at the _bottom_ of the stack. `from()` conversion
+/// Newtype for specifying the order of elements in a [Stack] vs elements in
+/// a [Vec]/slice. Used in the [From] trait for [Stack]. _First_ element of
+/// the [Vec] will end up at the _bottom_ of the stack. `from()` conversion
 /// has O(1) complexity for vectors, O(n) for slices since those have to be
-/// cloned. See also `TopIsFirst<T>`
+/// cloned. See also [TopIsFirst].
 pub struct TopIsLast<T>(pub Stack<T>);
 
 impl<T> From<Vec<T>> for TopIsFirst<T> {
@@ -256,6 +286,7 @@ impl<T> IndexMut<usize> for Stack<T> {
     }
 }
 
+/// Owning [Stack] iterator.
 pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
 
 impl<T> Iterator for IntoIter<T> {
