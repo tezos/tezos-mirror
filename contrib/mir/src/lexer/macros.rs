@@ -5,20 +5,27 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Utilities for lexing macros.
+
 use logos::*;
 
 use super::super::ast::Micheline;
 use super::errors::*;
 
+/// Arguments, to which a macro is applied.
 #[derive(Debug)]
 pub enum MacroArgs<'a> {
+    /// A macro was applied to no arguments.
     NoArgs,
+    /// A macro is applied to one argument.
     OneArg(Micheline<'a>),
+    /// A macro is applied to two arguments.
     TwoArgs(Micheline<'a>, Micheline<'a>),
 }
 
+/// Enum representing macro names.
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms, missing_docs)]
 #[logos(error = LexerError)]
 pub enum Macro {
     #[token("CMPEQ")]
@@ -39,8 +46,12 @@ pub enum Macro {
     ASSERT_CMPLE,
     #[token("FAIL")]
     FAIL,
+    /// Corresponds to `DI..IP` macro. The value carried by the variant
+    /// corresponds to the number of `I`s.
     #[regex("DII+P", lex_diip)]
     DIIP(u16),
+    /// Corresponds to `DU..UP` macro. The value carried by the variant
+    /// corresponds to the number of `U`s.
     #[regex("DUU+P", lex_duup)]
     DUUP(u16),
 }

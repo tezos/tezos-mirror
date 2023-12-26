@@ -5,6 +5,10 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson lexer. The main lexer entrypoint is defined on the [Tok] type,
+//! specifically, `Tok::lexer`. See [Logos::lexer]. Generally, you don't need to
+//! call the lexer explicitly, [crate::parser::Parser] will do that for you.
+
 use std::borrow::Cow;
 
 use logos::Logos;
@@ -30,10 +34,11 @@ macro_rules! coalesce {
 /// provided, and defines `FromStr` implementation using stringified
 /// representation of the identifiers.
 macro_rules! defprim {
-    ($ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
+    ($(#[$meta:meta])* $ty:ident; $($(#[token($str:expr)])? $prim:ident),* $(,)*) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount)]
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms, missing_docs)]
         #[repr(u8)]
+        $(#[$meta])*
         pub enum $ty {
             $($prim),*
         }
@@ -70,6 +75,7 @@ macro_rules! defprim {
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6632
 // Add a test on ordering
 defprim! {
+    /// Micheline primitives.
     Prim;
     parameter, storage, code, False, Elt, Left,
     None, Pair, Right, Some, True, Unit,
@@ -109,14 +115,17 @@ defprim! {
 }
 
 impl Prim {
-    // Our [Prim] enum has its variants in the right order, so its
-    // discriminant should match the ID.
+    /// Write the primitive identifier (as per Micheline binary encoding) into
+    /// the output vector.
     pub fn encode(&self, out: &mut Vec<u8>) {
+        // Our [Prim] enum has its variants in the right order, so its
+        // discriminant should match the ID.
         out.push(*self as u8)
     }
 }
 
 defprim! {
+    /// Additional TZT primitives.
     TztPrim;
     Stack_elt,
     input,
@@ -135,22 +144,37 @@ defprim! {
     Contract,
 }
 
+/// Either a Micheline primitive, TZT primitive, or a macro lexeme.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Noun {
+    /// Micheline primitive.
     Prim(Prim),
+    /// TZT primitive.
     TztPrim(TztPrim),
+    /// Macro lexeme.
     MacroPrim(Macro),
 }
 
+/// A single Micheline annotation. Annotations are optionally-owned, meaning
+/// they should use references when feasible, but can use owned heap-allocated
+/// values when necessary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Annotation<'a> {
+    /// Special annotation, i.e. `@%`, `@%%` or `%@` verbatim.
     Special(Cow<'a, str>),
+    /// Field annotation, e.g. `%foo`. The inner value does not contain the
+    /// leading `%`.
     Field(Cow<'a, str>),
+    /// Variable annotation, e.g. `@foo`. The inner value does not contain the
+    /// leading `@`.
     Variable(Cow<'a, str>),
+    /// Type annotation, e.g. `:foo`. The inner value does not contain the
+    /// leading `:`.
     Type(Cow<'a, str>),
 }
 
 impl Annotation<'_> {
+    /// Convert the inner value of [Annotation] to an owned [String].
     pub fn into_owned(self) -> Annotation<'static> {
         match self {
             Annotation::Special(s) => Annotation::Special(Cow::Owned(s.into_owned())),
@@ -184,33 +208,45 @@ pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {
     }
 }
 
+/// Tokens representing Michelson lexemes.
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
+    /// A primitive token: a Micheline primitive, TZT primitive, or a macro
+    /// token.
     #[regex(r"[A-Za-z_][A-Za-z_0-9]*", lex_noun)]
     Noun(Noun),
 
+    /// Number literal.
     #[regex("([+-]?)[0-9]+", lex_number)]
     Number(BigInt),
 
+    /// String literal.
     #[regex(r#""(\\.|[^\\"])*""#, lex_string)]
     String(String),
 
+    /// Bytes literal.
     #[regex(r#"0x[0-9a-fA-F]*"#, lex_bytes)]
     Bytes(Vec<u8>),
 
+    /// An annotation, see [Annotation].
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
     #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
     Annotation(Annotation<'a>),
 
+    /// Left parenthesis `(`.
     #[token("(")]
     LParen,
+    /// Right parenthesis `)`.
     #[token(")")]
     RParen,
+    /// Left brace `{`.
     #[token("{")]
     LBrace,
+    /// Right brace `}`.
     #[token("}")]
     RBrace,
+    /// Semicolon.
     #[token(";")]
     Semi,
 }
