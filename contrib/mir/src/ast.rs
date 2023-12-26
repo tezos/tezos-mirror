@@ -680,7 +680,7 @@ pub mod test_strategies {
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(Type::new_ticket),
-                (inner.clone(), inner.clone())
+                (inner.clone(), inner)
                     .prop_filter("Key must be comparable", |(k, _)| k
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
