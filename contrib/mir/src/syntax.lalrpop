@@ -170,4 +170,4 @@ tztEntity : TztEntity<'a> = {
   "other_contracts" <otherContracts> => TztEntity::OtherContracts(<>),
 }
 
-pub tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
+pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
