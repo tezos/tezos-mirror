@@ -18,9 +18,9 @@ use typed_arena::Arena;
 use crate::{
     ast::{
         annotations::{Annotations, NO_ANNS},
-        Micheline,
+        Annotation, Micheline,
     },
-    lexer::{try_ann_from_str, Annotation, Prim},
+    lexer::{try_ann_from_str, Prim},
 };
 
 /// Errors that can happen during deserialization.

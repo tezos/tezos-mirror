@@ -20,6 +20,8 @@ use macros::*;
 use num_bigint::BigInt;
 use strum_macros::EnumCount;
 
+use crate::ast::Annotation;
+
 /// Expand to the first argument if not empty; otherwise, the second argument.
 macro_rules! coalesce {
     (, $r:expr) => {
@@ -153,47 +155,6 @@ pub enum Noun {
     TztPrim(TztPrim),
     /// Macro lexeme.
     MacroPrim(Macro),
-}
-
-/// A single Micheline annotation. Annotations are optionally-owned, meaning
-/// they should use references when feasible, but can use owned heap-allocated
-/// values when necessary.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Annotation<'a> {
-    /// Special annotation, i.e. `@%`, `@%%` or `%@` verbatim.
-    Special(Cow<'a, str>),
-    /// Field annotation, e.g. `%foo`. The inner value does not contain the
-    /// leading `%`.
-    Field(Cow<'a, str>),
-    /// Variable annotation, e.g. `@foo`. The inner value does not contain the
-    /// leading `@`.
-    Variable(Cow<'a, str>),
-    /// Type annotation, e.g. `:foo`. The inner value does not contain the
-    /// leading `:`.
-    Type(Cow<'a, str>),
-}
-
-impl Annotation<'_> {
-    /// Convert the inner value of [Annotation] to an owned [String].
-    pub fn into_owned(self) -> Annotation<'static> {
-        match self {
-            Annotation::Special(s) => Annotation::Special(Cow::Owned(s.into_owned())),
-            Annotation::Field(s) => Annotation::Field(Cow::Owned(s.into_owned())),
-            Annotation::Variable(s) => Annotation::Variable(Cow::Owned(s.into_owned())),
-            Annotation::Type(s) => Annotation::Type(Cow::Owned(s.into_owned())),
-        }
-    }
-}
-
-impl std::fmt::Display for Annotation<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Annotation::Special(s) => write!(f, "{s}"),
-            Annotation::Field(s) => write!(f, "%{s}"),
-            Annotation::Variable(s) => write!(f, "@{s}"),
-            Annotation::Type(s) => write!(f, ":{s}"),
-        }
-    }
 }
 
 pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {

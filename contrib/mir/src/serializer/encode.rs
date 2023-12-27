@@ -12,8 +12,8 @@ use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 
 use super::constants::*;
 use crate::{
-    ast::{annotations::Annotations, Micheline},
-    lexer::{Annotation, Prim},
+    ast::{Annotation, Annotations, Micheline},
+    lexer::Prim,
 };
 
 trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
@@ -78,7 +78,7 @@ impl Annotation<'_> {
     /// character verbatim to the output, so, for example,
     ///
     /// ```
-    /// use mir::lexer::Annotation;
+    /// use mir::ast::Annotation;
     /// let mut out = vec![];
     /// Annotation::Field("field".into()).encode_bytes(&mut out);
     /// assert_eq!(&out, b"%field");
@@ -87,7 +87,7 @@ impl Annotation<'_> {
     /// Note that [Annotation::Special] are written to the output verbatim:
     ///
     /// ```
-    /// use mir::lexer::Annotation;
+    /// use mir::ast::Annotation;
     /// let mut out = vec![];
     /// Annotation::Special("@%".into()).encode_bytes(&mut out);
     /// assert_eq!(&out, b"@%");
@@ -118,8 +118,7 @@ impl Annotations<'_> {
     /// the output, separated by a space character `0x20`. So, for example,
     ///
     /// ```
-    /// use mir::ast::annotations::Annotations;
-    /// use mir::lexer::Annotation;
+    /// use mir::ast::{Annotations, Annotation};
     /// let mut out = vec![];
     /// Annotations::from([
     ///     Annotation::Field("field".into()),

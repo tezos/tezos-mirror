@@ -99,8 +99,8 @@ pub mod test_helpers {
 mod tests {
     use super::test_helpers::*;
     use crate::ast::micheline::test_helpers::{app, seq};
-    use crate::ast::Micheline;
-    use crate::lexer::{Annotation, Prim};
+    use crate::ast::{Annotation, Micheline};
+    use crate::lexer::Prim;
 
     #[test]
     fn instructions() {

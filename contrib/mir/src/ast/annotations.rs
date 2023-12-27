@@ -10,7 +10,46 @@
 
 use std::borrow::Cow;
 
-use crate::lexer::Annotation;
+/// A single Micheline annotation. Annotations are optionally-owned, meaning
+/// they should use references when feasible, but can use owned heap-allocated
+/// values when necessary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Annotation<'a> {
+    /// Special annotation, i.e. `@%`, `@%%` or `%@` verbatim.
+    Special(Cow<'a, str>),
+    /// Field annotation, e.g. `%foo`. The inner value does not contain the
+    /// leading `%`.
+    Field(Cow<'a, str>),
+    /// Variable annotation, e.g. `@foo`. The inner value does not contain the
+    /// leading `@`.
+    Variable(Cow<'a, str>),
+    /// Type annotation, e.g. `:foo`. The inner value does not contain the
+    /// leading `:`.
+    Type(Cow<'a, str>),
+}
+
+impl Annotation<'_> {
+    /// Convert the inner value of [Annotation] to an owned [String].
+    pub fn into_owned(self) -> Annotation<'static> {
+        match self {
+            Annotation::Special(s) => Annotation::Special(Cow::Owned(s.into_owned())),
+            Annotation::Field(s) => Annotation::Field(Cow::Owned(s.into_owned())),
+            Annotation::Variable(s) => Annotation::Variable(Cow::Owned(s.into_owned())),
+            Annotation::Type(s) => Annotation::Type(Cow::Owned(s.into_owned())),
+        }
+    }
+}
+
+impl std::fmt::Display for Annotation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Annotation::Special(s) => write!(f, "{s}"),
+            Annotation::Field(s) => write!(f, "%{s}"),
+            Annotation::Variable(s) => write!(f, "@{s}"),
+            Annotation::Type(s) => write!(f, ":{s}"),
+        }
+    }
+}
 
 /// A structure holding all Tezos annotations on a [Micheline][crate::ast::Micheline] node.
 #[derive(Clone, Eq, PartialEq)]

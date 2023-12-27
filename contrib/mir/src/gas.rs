@@ -753,7 +753,7 @@ pub mod interpret_cost {
                 }
                 for annot in annots {
                     // Annotations are accounted as simple string literals
-                    use crate::lexer::Annotation as Ann;
+                    use crate::ast::Annotation as Ann;
                     size.str_byte += match annot {
                         // Including annotation prefix into the size too
                         Ann::Field(a) => a.len() + 1,

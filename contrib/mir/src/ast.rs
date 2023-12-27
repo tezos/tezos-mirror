@@ -34,12 +34,9 @@ use std::{
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
-use crate::{
-    bls,
-    lexer::{Annotation, Prim},
-};
+use crate::{bls, lexer::Prim};
 
-pub use annotations::{FieldAnnotation, NO_ANNS};
+pub use annotations::{Annotation, Annotations, FieldAnnotation, NO_ANNS};
 pub use big_map::BigMap;
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
