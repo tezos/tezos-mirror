@@ -12,6 +12,29 @@
 //!
 //! Rust implementation of the typechecker and interpreter for the Michelson
 //! smart contract language.
+//!
+//! The library is currently incomplete. The following instructions are not
+//! supported:
+//!
+//! - `ADD: timestamp : int`
+//! - `ADD: int : timestamp`
+//! - `SUB`
+//! - `EDIV`
+//! - `LSL`
+//! - `LSR`
+//! - `EMPTY_MAP`
+//! - `SAPLING_EMPTY_STATE`
+//! - `SAPLING_VERIFY_UPDATE`
+//! - `OPEN_CHEST`
+//! - `VIEW`
+//!
+//! The following types are currently not supported:
+//!
+//! - `chest`
+//! - `chest_key`
+//! - `tx_rollup_l2_address`
+//! - `sapling_state`
+//! - `sapling_transaction`
 
 pub mod ast;
 pub mod bls;
