@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Definitions for [Fr], an element of the BLS12-381 scalar field F<sub>r</sub>
+
 use std::mem::MaybeUninit;
 
 use blst::*;
@@ -12,12 +14,17 @@ use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use std::ops::{Add, Mul, Neg};
 
+/// An element of the BLS12-381 scalar field F<sub>r</sub>
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Fr(blst_fr);
 
 impl Fr {
+    /// Size of serialized data in bytes.
     pub const BYTE_SIZE: usize = 32;
 
+    /// Construct [Fr] from a scalar represented as raw bytes. If the scalar
+    /// isn't part of the field, or if its length exceeds [Self::BYTE_SIZE], the
+    /// result is [None].
     pub fn from_bytes(bs: &[u8]) -> Option<Self> {
         if bs.len() > Self::BYTE_SIZE {
             return None;
@@ -39,6 +46,7 @@ impl Fr {
         mbfr.map(Self)
     }
 
+    /// Construct a scalar represented as raw bytes from [Fr].
     pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
         let mut out = [0; Self::BYTE_SIZE];
         let mut scalar = MaybeUninit::uninit();
@@ -64,6 +72,8 @@ impl Fr {
         })
     }
 
+    /// Construct [Fr] from a [BigInt] scalar. The scalar is taken modulo group
+    /// order.
     pub fn from_big_int(i: &BigInt) -> Self {
         // this would be likely slightly more efficient with rem_euclid, but
         // it's only added in num-bigint 0.4, and we're stuck with 0.3 for now
@@ -75,14 +85,17 @@ impl Fr {
         Self::from_bytes(&buf).unwrap()
     }
 
+    /// Construct a [BigInt] scalar from [Fr].
     pub fn to_big_int(&self) -> BigInt {
         BigInt::from_bytes_le(Sign::Plus, &self.to_bytes())
     }
 
+    /// Additive identity in the F<sub>r</sub> field.
     pub fn zero() -> Self {
         Self::from_bytes(&[]).unwrap()
     }
 
+    /// Multiplicative identity in the F<sub>r</sub> field.
     pub fn one() -> Self {
         Self::from_bytes(&[1]).unwrap()
     }

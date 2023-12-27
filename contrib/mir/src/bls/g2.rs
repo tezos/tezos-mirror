@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Definitions for [G2], a point on the BLS12-381 curve G<sub>2</sub>.
+
 use blst::*;
 use std::{
     mem::MaybeUninit,
@@ -13,12 +15,17 @@ use std::{
 
 use super::fr::Fr;
 
+/// A point on the BLS12-381 curve G<sub>2</sub>.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct G2(blst_p2);
 
 impl G2 {
-    const BYTE_SIZE: usize = 192;
+    /// Byte size of serialized data.
+    pub const BYTE_SIZE: usize = 192;
 
+    /// Construct [G2] from raw bytes representing a point on G<sub>2</sub> in
+    /// affine coordinates. If data size is not [Self::BYTE_SIZE] or the point
+    /// is not on G<sub>2</sub>, the result is [None].
     pub fn from_bytes(bs: &[u8]) -> Option<Self> {
         if bs.len() != Self::BYTE_SIZE {
             None
@@ -58,6 +65,8 @@ impl G2 {
         }
     }
 
+    /// Serialize [G2] to a byte array, representing a point on G<sub>2</sub> in
+    /// affine coordinates.
     pub fn to_bytes(&self) -> [u8; Self::BYTE_SIZE] {
         let mut out = [0; Self::BYTE_SIZE];
         unsafe {
@@ -66,6 +75,7 @@ impl G2 {
         out
     }
 
+    /// Additive identity on G<sub>2</sub>.
     pub fn zero() -> Self {
         G2::from_bytes(&[
             0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -79,10 +89,19 @@ impl G2 {
         .unwrap()
     }
 
+    /// Multiplicative identity on G<sub>2</sub>.
     pub fn one() -> Self {
         Self::from_affine(unsafe { blst::BLS12_381_G2 }).unwrap()
     }
 
+    /// Additive inverse of [`G2::one()`], such that
+    ///
+    /// ```
+    /// # use mir::bls::g2::G2;
+    /// # assert!(
+    /// G2::one() + G2::neg_one() == G2::zero()
+    /// # );
+    /// ```
     pub fn neg_one() -> Self {
         Self::from_affine(unsafe { blst::BLS12_381_NEG_G2 }).unwrap()
     }
