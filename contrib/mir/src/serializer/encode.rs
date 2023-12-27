@@ -73,6 +73,25 @@ impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
 }
 
 impl Annotation<'_> {
+    /// Serialize annotation to the output byte [Vec], using the `PACK` format.
+    /// Essentially this means write the annotation with the corresponding tag
+    /// character verbatim to the output, so, for example,
+    ///
+    /// ```
+    /// use mir::lexer::Annotation;
+    /// let mut out = vec![];
+    /// Annotation::Field("field".into()).encode_bytes(&mut out);
+    /// assert_eq!(&out, b"%field");
+    /// ```
+    ///
+    /// Note that [Annotation::Special] are written to the output verbatim:
+    ///
+    /// ```
+    /// use mir::lexer::Annotation;
+    /// let mut out = vec![];
+    /// Annotation::Special("@%".into()).encode_bytes(&mut out);
+    /// assert_eq!(&out, b"@%");
+    /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
         match self {
             Annotation::Special(s) => out.extend_from_slice(s.as_bytes()),
@@ -93,6 +112,22 @@ impl Annotation<'_> {
 }
 
 impl Annotations<'_> {
+    /// Serialize a collection of annotations to the output byte [Vec], using
+    /// the `PACK` format. Essentially this means write 4 bytes of length,
+    /// followed by annotations with the corresponding tag character verbatim to
+    /// the output, separated by a space character `0x20`. So, for example,
+    ///
+    /// ```
+    /// use mir::ast::annotations::Annotations;
+    /// use mir::lexer::Annotation;
+    /// let mut out = vec![];
+    /// Annotations::from([
+    ///     Annotation::Field("field".into()),
+    ///     Annotation::Variable("var".into()),
+    /// ])
+    /// .encode_bytes(&mut out);
+    /// assert_eq!(&out, b"\x00\x00\x00\x0B%field @var");
+    /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
         with_patchback_len(out, |out| {
             // Add them space-separated
