@@ -35,6 +35,105 @@
 //! - `tx_rollup_l2_address`
 //! - `sapling_state`
 //! - `sapling_transaction`
+//!
+//! # Usage
+//!
+//! The general pipeline is as follows: parse → typecheck → interpret →
+//! serialize result.
+//!
+//! There are essentially two parsers available, one, in [parser::Parser], which
+//! can be used to parse Michelson source code from strings. Another one is
+//! implemented as [ast::Micheline::decode_raw], which can be used to
+//! deserialize Michelson from bytes.
+//!
+//! Whether parsed from string or bytes, the result of a parse is
+//! [ast::Micheline]. Since Micheline can represent any part of a Michelson
+//! script, several associated functions exist for typechecking:
+//!
+//! - [ast::Micheline::typecheck_value] can be used to typecheck a Michelson
+//!   value, e.g. `1` or `Some "string"`.
+//! - [ast::Micheline::typecheck_instruction] can be used to typecheck a Michelson
+//!   instruction or a sequence of instructions.
+//! - [ast::Micheline::typecheck_script] can be used to typecheck a full
+//!   Michelson script, i.e. something that defines `parameter`, `storage` and
+//!   `code` fields.
+//!
+//! Any of these functions requires a reference to the external context,
+//! [context::Ctx]. Context keeps track of the used gas, and also carries
+//! information about the world outside of the interpreter. You can construct a
+//! context with reasonable defaults using [`context::Ctx::default()`]. After that, you
+//! may want to adjust some things. Refer to [context::Ctx] documentation.
+//!
+//! Once `Micheline` is typechecked, it will result in either [ast::TypedValue],
+//! [ast::Instruction], or [ast::ContractScript]. The latter two have
+//! [ast::Instruction::interpret] and [ast::ContractScript::interpret]
+//! associated functions that serve as main entry-points for the interpreter.
+//!
+//! The result of interpretation is either a [ast::TypedValue] or a stack of
+//! them. [ast::IntoMicheline::into_micheline_optimized_legacy] can be used to
+//! convert [ast::TypedValue] into [ast::Micheline], at which point,
+//! [ast::Micheline::encode] can be employed to serialize the data.
+//!
+//! Some functions require access to a [typed_arena::Arena]. [parser::Parser]
+//! already has one, so that one can be reused. If memory consumption is a
+//! concern, and depending on the workload, it may be slightly more economical
+//! to create a new `Arena` for different stages.
+//!
+//! Here's a simple example, running a Fibonacci contract:
+//!
+//! ```
+//! use mir::ast::*;
+//! use mir::context::Ctx;
+//! use mir::parser::Parser;
+//! use typed_arena::Arena;
+//! let script = r#"
+//! parameter nat;
+//! storage int;
+//! code { CAR ; INT ; PUSH int 0 ; DUP 2 ; GT ;
+//!        IF { DIP { PUSH int -1 ; ADD } ;
+//!             PUSH int 1 ;
+//!             DUP 3 ;
+//!             GT ;
+//!             LOOP { SWAP ; DUP 2 ; ADD ; DIP 2 { PUSH int -1 ; ADD } ; DUP 3 ; GT } ;
+//!             DIP { DROP 2 } }
+//!           { DIP { DROP } };
+//!         NIL operation;
+//!         PAIR }
+//! "#;
+//! let parser = Parser::new();
+//! let contract_micheline = parser.parse_top_level(script).unwrap();
+//! let mut ctx = Ctx::default();
+//! // You can change various things about the context here, see [Ctx]
+//! // documentation.
+//! let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+//! // We construct parameter and storage manually, but you'd probably
+//! // parse or deserialize them from some sort of input/storage, so we use
+//! // parser and decoder respectively.
+//! // Note that you can opt to use a new parser and/or a new arena for
+//! // parameter and storage. However, they _must_ outlive `ctx`.
+//! let parameter = parser.parse("123").unwrap();
+//! let storage = Micheline::decode_raw(&parser.arena, &[0x00, 0x00]).unwrap(); // integer 0
+//! // Note: the arena passed in here _must_ outlive `ctx`. We reuse the one
+//! // from `parser` for simplicity, you may also opt to create a new one to
+//! // potentially save a bit of memory (depends on the workload).
+//! let (operations_iter, new_storage) = contract_typechecked
+//!     .interpret(&mut ctx, &parser.arena, parameter, storage)
+//!     .unwrap();
+//! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
+//! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
+//! assert_eq!(operations_iter.collect::<Vec<_>>(), vec![]);
+//! // Arena passed in here does not need to outlive `ctx`. Could reuse the one
+//! // from `parser` again, but we create a new one to mix things up. If you're
+//! // not concerned about memory consumption, it may be faster to reuse the
+//! // same arena everywhere.
+//! let packed_new_storage = new_storage
+//!     .into_micheline_optimized_legacy(&Arena::new())
+//!     .encode();
+//! assert_eq!(
+//!     packed_new_storage,
+//!     vec![0x00, 0x82, 0x81, 0x8d, 0xe6, 0xdf, 0x96, 0x8c, 0xad, 0xa5, 0xc5, 0xb4, 0xac, 0x02]
+//! );
+//! ```
 
 pub mod ast;
 pub mod bls;
