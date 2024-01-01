@@ -132,9 +132,9 @@ Here is an example configuration file for Mainnet::
       ],
       "default_bootstrap_peers":
         [
-         "boot.tzinit.org";
-         "boot.tzboot.net";
-         "boot.tzbeta.net";
+         "boot.tzinit.org",
+         "boot.tzboot.net",
+         "boot.tzbeta.net"
        ]
     }
   }
