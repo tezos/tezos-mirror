@@ -37,14 +37,7 @@ let max_chunk_size =
   - blueprint_tag_size - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size
 
-let now_bytes () =
-  let now = Ptime_clock.now () in
-  let now = Ptime.to_rfc3339 now in
-  let timestamp = Time.Protocol.of_notation_exn now in
-  Time.Protocol.to_seconds timestamp
-  |> Z.of_int64 |> Z.to_bits |> Bytes.of_string
-
-let make_blueprint_chunks ~transactions =
+let make_blueprint_chunks ~timestamp ~transactions =
   let open Rlp in
   let messages =
     List
@@ -62,7 +55,7 @@ let make_blueprint_chunks ~transactions =
              ])
          transactions)
   in
-  let timestamp = Value (now_bytes ()) in
+  let timestamp = Value (Helpers.timestamp_to_bytes timestamp) in
   let blob = List [messages; timestamp] |> encode in
   match String.chunk_bytes max_chunk_size blob with
   | Ok chunks -> chunks
@@ -77,10 +70,10 @@ let encode_u16_le i =
   Bytes.set_uint16_le bytes 0 i ;
   bytes
 
-let create ~smart_rollup_address ~number ~transactions =
+let create ~timestamp ~smart_rollup_address ~number ~transactions =
   let open Rlp in
   let number = Value (encode_u256_le number) in
-  let chunks = make_blueprint_chunks ~transactions in
+  let chunks = make_blueprint_chunks ~timestamp ~transactions in
   let nb_chunks = Rlp.Value (encode_u16_le @@ List.length chunks) in
   let message_from_chunk chunk_index chunk =
     let chunk_index = Rlp.Value (encode_u16_le chunk_index) in

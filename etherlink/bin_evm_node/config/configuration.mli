@@ -22,6 +22,11 @@ type sequencer = {
           monitor the delayed inbox. *)
   kernel : string;  (** Path to the kernel to execute. *)
   preimages : string;  (** Path to the preimages directory. *)
+  time_between_blocks : float;
+      (** Maximum time interval between blocks. If transactions are present
+          in the tx pool, blocks will be created as soon as possible. However,
+          if there are no transactions to include, a block is produced after
+          [time_between_blocks]. *)
 }
 
 type 'a t = {
@@ -84,6 +89,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?kernel:string ->
     ?preimages:string ->
+    ?time_between_blocks:float ->
     unit ->
     sequencer t
 
@@ -114,6 +120,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?kernel:string ->
     ?preimages:string ->
+    ?time_between_blocks:float ->
     unit ->
     sequencer t tzresult Lwt.t
 end

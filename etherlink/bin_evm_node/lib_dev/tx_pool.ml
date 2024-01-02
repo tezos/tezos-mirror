@@ -141,7 +141,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Inject_transactions : (unit, tztrace) t
+    | Inject_transactions : (bool * Time.Protocol.t) -> (int, tztrace) t
 
   type view = View : _ t -> view
 
@@ -163,9 +163,16 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Inject_transactions"
-          (obj1 (req "request" (constant "new_l2_head")))
-          (function View Inject_transactions -> Some () | _ -> None)
-          (fun () -> View Inject_transactions);
+          (obj3
+             (req "request" (constant "new_l2_head"))
+             (req "force" bool)
+             (req "timestamp" Time.Protocol.encoding))
+          (function
+            | View (Inject_transactions (force, timestamp)) ->
+                Some ((), force, timestamp)
+            | _ -> None)
+          (fun ((), force, timestamp) ->
+            View (Inject_transactions (force, timestamp)));
       ]
 
   let pp ppf (View r) =
@@ -175,7 +182,13 @@ module Request = struct
           ppf
           "Add [%s] tx to tx-pool"
           (Hex.of_string transaction |> Hex.show)
-    | Inject_transactions -> Format.fprintf ppf "Inject transactions"
+    | Inject_transactions (force, timestamp) ->
+        Format.fprintf
+          ppf
+          "Inject transactions at %a (force is %b)"
+          Time.Protocol.pp
+          timestamp
+          force
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -209,7 +222,8 @@ let on_transaction state tx_raw =
       state.pool <- pool ;
       return (Ok hash)
 
-let inject_transactions ~smart_rollup_address rollup_node pool =
+let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
+    =
   let open Lwt_result_syntax in
   let (module Rollup_node : Services_backend_sig.S) = rollup_node in
   (* Get all the addresses in the tx-pool. *)
@@ -263,32 +277,46 @@ let inject_transactions ~smart_rollup_address rollup_node pool =
            Int64.compare index_a index_b)
     |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
   in
-  (* Send the txs to the rollup *)
-  let*! hashes =
-    Rollup_node.inject_raw_transactions ~smart_rollup_address ~transactions:txs
-  in
-  (match hashes with
-  | Error _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-      Format.printf "[tx-pool] Error when sending transaction.\n%!"
-  | Ok hashes ->
-      List.iter
-        (fun hash ->
-          Format.printf
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-            "[tx-pool] Transaction %s sent to the rollup.\n%!"
-            (Ethereum_types.hash_to_string hash))
-        hashes) ;
-  return pool
 
-let on_head state =
+  let n = List.length txs in
+
+  if n > 0 || force then
+    (* Send the txs to the rollup *)
+    let*! hashes =
+      Rollup_node.inject_raw_transactions
+        ~timestamp
+        ~smart_rollup_address
+        ~transactions:txs
+    in
+    let nb_transactions =
+      match hashes with
+      | Error _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+          Format.printf "[tx-pool] Error when sending transaction.\n%!" ;
+          0
+      | Ok hashes ->
+          List.iter
+            (fun hash ->
+              Format.printf
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+                "[tx-pool] Transaction %s sent to the rollup.\n%!"
+                (Ethereum_types.hash_to_string hash))
+            hashes ;
+          n
+    in
+    return (pool, nb_transactions)
+  else return (pool, 0)
+
+let on_head ~force ~timestamp state =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node; smart_rollup_address; pool; _} = state in
-  let* pool = inject_transactions ~smart_rollup_address rollup_node pool in
+  let* pool, nb_transactions =
+    inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
+  in
   (* update the pool *)
   state.pool <- pool ;
-  return_unit
+  return nb_transactions
 
 module Handlers = struct
   type self = worker
@@ -302,7 +330,8 @@ module Handlers = struct
     match request with
     | Request.Add_transaction raw_tx ->
         protect @@ fun () -> on_transaction state raw_tx
-    | Request.Inject_transactions -> protect @@ fun () -> on_head state
+    | Request.Inject_transactions (force, timestamp) ->
+        protect @@ fun () -> on_head ~force ~timestamp state
 
   type launch_error = error trace
 
@@ -371,7 +400,9 @@ let rec subscribe_l2_block ~stream_l2 worker =
   match new_head with
   | Some () ->
       let* _pushed =
-        Worker.Queue.push_request worker Request.Inject_transactions
+        Worker.Queue.push_request
+          worker
+          (Request.Inject_transactions (true, Helpers.now ()))
       in
       subscribe_l2_block ~stream_l2 worker
   | None ->
@@ -424,8 +455,10 @@ let nonce pkey =
   in
   return next_nonce
 
-let produce_block () =
+let produce_block ~force ~timestamp =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Inject_transactions
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Inject_transactions (force, timestamp))
   |> handle_request_error

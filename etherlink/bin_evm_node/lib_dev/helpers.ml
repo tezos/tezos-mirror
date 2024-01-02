@@ -5,14 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~timestamp ~smart_rollup_address ~number ~transactions]
-    creates a sequencer blueprint at [timestamp] with a given [number]
-    containing [transactions].  Returns valid payload of external
-    messages inputs to put in the inbox.
-*)
-val create :
-  timestamp:Time.Protocol.t ->
-  smart_rollup_address:string ->
-  number:Ethereum_types.quantity ->
-  transactions:string list ->
-  [> `External of string] list
+let now () =
+  let now = Ptime_clock.now () in
+  let now = Ptime.to_rfc3339 now in
+  Time.Protocol.of_notation_exn now
+
+let timestamp_to_bytes timestamp =
+  let seconds = Time.Protocol.to_seconds timestamp in
+  let buffer = Bytes.make 8 '\000' in
+  Bytes.set_int64_le buffer 0 seconds ;
+  buffer

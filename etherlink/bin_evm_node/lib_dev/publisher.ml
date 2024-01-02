@@ -16,11 +16,14 @@ end
 
 module type Publisher = sig
   val publish_messages :
-    smart_rollup_address:string -> messages:string list -> unit tzresult Lwt.t
+    timestamp:Time.Protocol.t ->
+    smart_rollup_address:string ->
+    messages:string list ->
+    unit tzresult Lwt.t
 end
 
 module Make (TxEncoder : TxEncoder) (Publisher : Publisher) = struct
-  let inject_raw_transactions ~smart_rollup_address ~transactions =
+  let inject_raw_transactions ~timestamp ~smart_rollup_address ~transactions =
     let open Lwt_result_syntax in
     let* rev_tx_hashes, to_publish =
       List.fold_left_es
@@ -35,7 +38,10 @@ module Make (TxEncoder : TxEncoder) (Publisher : Publisher) = struct
         transactions
     in
     let* () =
-      Publisher.publish_messages ~smart_rollup_address ~messages:to_publish
+      Publisher.publish_messages
+        ~timestamp
+        ~smart_rollup_address
+        ~messages:to_publish
     in
     return (List.rev rev_tx_hashes)
 end

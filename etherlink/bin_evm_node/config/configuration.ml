@@ -17,6 +17,7 @@ type sequencer = {
   rollup_node_endpoint : Uri.t;
   kernel : string;
   preimages : string;
+  time_between_blocks : float;
 }
 
 type 'a t = {
@@ -62,6 +63,7 @@ let default_sequencer =
     kernel = "sequencer.wasm";
     preimages = "_evm_installer_preimages";
     rollup_node_endpoint = Uri.empty;
+    time_between_blocks = 5.;
   }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
@@ -91,21 +93,26 @@ let encoding_proxy =
 let encoding_sequencer =
   let open Data_encoding in
   conv
-    (fun {kernel; preimages; rollup_node_endpoint} ->
-      (kernel, preimages, Uri.to_string rollup_node_endpoint))
-    (fun (kernel, preimages, rollup_node_endpoint) ->
+    (fun {kernel; preimages; rollup_node_endpoint; time_between_blocks} ->
+      ( kernel,
+        preimages,
+        Uri.to_string rollup_node_endpoint,
+        time_between_blocks ))
+    (fun (kernel, preimages, rollup_node_endpoint, time_between_blocks) ->
       {
         kernel;
         preimages;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
+        time_between_blocks;
       })
-    (obj3
+    (obj4
        (dft "kernel" string default_sequencer.kernel)
        (dft "preimages" string default_sequencer.preimages)
        (dft
           "rollup_node_endpoint"
           string
-          (Uri.to_string default_proxy.rollup_node_endpoint)))
+          (Uri.to_string default_proxy.rollup_node_endpoint))
+       (dft "time_between_blocks" float default_sequencer.time_between_blocks))
 
 let encoding ~default_mode mode_encoding =
   let open Data_encoding in
@@ -229,7 +236,7 @@ module Cli = struct
 
   let create_sequencer ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins
       ?cors_headers ?log_filter ~verbose ?rollup_node_endpoint ?kernel
-      ?preimages =
+      ?preimages ?time_between_blocks =
     let mode =
       {
         rollup_node_endpoint =
@@ -238,6 +245,10 @@ module Cli = struct
             rollup_node_endpoint;
         kernel = Option.value ~default:default_sequencer.kernel kernel;
         preimages = Option.value ~default:default_sequencer.preimages preimages;
+        time_between_blocks =
+          Option.value
+            ~default:default_sequencer.time_between_blocks
+            time_between_blocks;
       }
     in
     create
@@ -289,7 +300,8 @@ module Cli = struct
 
   let patch_sequencer_configuration_from_args ~devmode ?rpc_addr ?rpc_port
       ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
-      ?rollup_node_endpoint ?kernel ?preimages configuration =
+      ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks
+      configuration =
     let mode =
       {
         rollup_node_endpoint =
@@ -298,6 +310,10 @@ module Cli = struct
             rollup_node_endpoint;
         kernel = Option.value ~default:configuration.mode.kernel kernel;
         preimages = Option.value ~default:configuration.mode.preimages preimages;
+        time_between_blocks =
+          Option.value
+            ~default:configuration.mode.time_between_blocks
+            time_between_blocks;
       }
     in
     patch_configuration_from_args
@@ -384,7 +400,7 @@ module Cli = struct
 
   let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
       ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
-      ?rollup_node_endpoint ?kernel ?preimages () =
+      ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks () =
     create_or_read_config
       ~data_dir
       ~devmode
@@ -400,7 +416,13 @@ module Cli = struct
         (patch_sequencer_configuration_from_args
            ?rollup_node_endpoint
            ?kernel
-           ?preimages)
-      ~create:(create_sequencer ?rollup_node_endpoint ?kernel ?preimages)
+           ?preimages
+           ?time_between_blocks)
+      ~create:
+        (create_sequencer
+           ?rollup_node_endpoint
+           ?kernel
+           ?preimages
+           ?time_between_blocks)
       ()
 end

@@ -43,6 +43,7 @@ let init ~smart_rollup_address ~rollup_node_endpoint ctxt =
   (* Create the first empty block. *)
   let inputs =
     Sequencer_blueprint.create
+      ~timestamp:(Helpers.now ())
       ~smart_rollup_address
       ~transactions:[]
       ~number:Ethereum_types.(Qty Z.zero)

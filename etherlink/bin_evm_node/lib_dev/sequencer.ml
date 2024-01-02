@@ -31,13 +31,14 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module Publisher = struct
-    let publish_messages ~smart_rollup_address ~messages =
+    let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
       (* Create the blueprint with the messages. *)
       let (Ethereum_types.(Qty next) as number) = ctxt.next_blueprint_number in
       let inputs =
         Sequencer_blueprint.create
+          ~timestamp
           ~smart_rollup_address
           ~transactions:messages
           ~number
