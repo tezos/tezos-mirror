@@ -278,7 +278,7 @@ where
     /// Returns an element at a given index.
     ///
     /// Returns None if the element is not present
-    pub fn get(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
+    pub fn find(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
         let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
         storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
     }
@@ -416,12 +416,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_returns_none_when_empty() {
+    fn test_find_returns_none_when_empty() {
         let host = MockHost::default();
         let path = RefPath::assert_from(b"/list");
         let list = LinkedList::new(&path, &host).expect("list should be created");
         let hash = Hash([0; TRANSACTION_HASH_SIZE]);
-        let read: Option<u8> = list.get(&host, &hash).expect("storage should work");
+        let read: Option<u8> = list.find(&host, &hash).expect("storage should work");
         assert!(read.is_none())
     }
 
@@ -437,7 +437,7 @@ mod tests {
             .expect("storage should work");
 
         let read: u8 = list
-            .get(&host, &id)
+            .find(&host, &id)
             .expect("storage should work")
             .expect("element should be present");
 
@@ -459,7 +459,7 @@ mod tests {
         let _: Option<u8> = list.remove(&mut host, &id).expect("storage should work");
         assert_length(&host, &list, 0u64);
 
-        let read: Option<u8> = list.get(&host, &id).expect("storage should work");
+        let read: Option<u8> = list.find(&host, &id).expect("storage should work");
 
         assert!(read.is_none())
     }
@@ -496,7 +496,7 @@ mod tests {
         fn test_pushed_elements_are_present(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
             let (host, list) = fill_list(&elements);
             for (id, elt) in & elements {
-                let read: u8 = list.get(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                let read: u8 = list.find(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
                 assert_eq!(elt, &read)
             }
         }
@@ -560,7 +560,7 @@ mod tests {
             for (id, elt) in &elements {
                 let list = LinkedList::new(&path, &host).expect("list should be created");
                 let read: u8 = list
-                    .get(&host, &Hash(*id))
+                    .find(&host, &Hash(*id))
                     .expect("storage should work")
                     .expect("element should be present");
                 assert_eq!(elt, &read);
