@@ -65,7 +65,7 @@ mod tests {
     fn tx_(i: u64) -> EthereumTransactionCommon {
         EthereumTransactionCommon {
             type_: tezos_ethereum::transaction::TransactionType::Legacy,
-            chain_id: U256::one(),
+            chain_id: Some(U256::one()),
             nonce: U256::from(i),
             max_priority_fee_per_gas: U256::from(40000000u64),
             max_fee_per_gas: U256::from(40000000u64),

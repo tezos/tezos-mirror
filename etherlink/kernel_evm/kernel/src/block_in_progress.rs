@@ -433,7 +433,7 @@ mod tests {
     fn dummy_etc(i: u8) -> EthereumTransactionCommon {
         EthereumTransactionCommon {
             type_: TransactionType::Legacy,
-            chain_id: U256::from(i),
+            chain_id: Some(U256::from(i)),
             nonce: U256::from(i),
             max_fee_per_gas: U256::from(i),
             max_priority_fee_per_gas: U256::from(i),
