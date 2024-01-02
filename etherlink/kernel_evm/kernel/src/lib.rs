@@ -347,8 +347,10 @@ mod tests {
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
-    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
+    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
@@ -430,6 +432,18 @@ mod tests {
         }
     }
 
+    fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
+        const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
+        host.store_read_all(&REBOOT_PATH).is_ok()
+    }
+
+    fn assert_marked_for_reboot(host: &impl SmartRollupCore) {
+        assert!(
+            is_marked_for_reboot(host),
+            "The kernel should have been marked for reboot"
+        );
+    }
+
     #[test]
     fn test_reboot_during_block_production() {
         // init host
@@ -491,9 +505,6 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host)
     }
 }

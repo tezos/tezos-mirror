@@ -297,7 +297,9 @@ mod tests {
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_ethereum::tx_signature::TxSignature;
+    use tezos_smart_rollup_core::SmartRollupCore;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
@@ -1187,6 +1189,18 @@ mod tests {
 
     const TOO_MANY_TRANSACTIONS: u64 = 500;
 
+    fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
+        const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
+        host.store_read_all(&REBOOT_PATH).is_ok()
+    }
+
+    fn assert_marked_for_reboot(host: &impl SmartRollupCore) {
+        assert!(
+            is_marked_for_reboot(host),
+            "The kernel should have been marked for reboot"
+        );
+    }
+
     #[test]
     fn test_reboot_many_tx_one_proposal() {
         // init host
@@ -1233,10 +1247,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host)
     }
 
     #[test]
@@ -1290,10 +1301,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host);
 
         let bip = read_block_in_progress(&host)
             .expect("Should be able to read the block in progress")

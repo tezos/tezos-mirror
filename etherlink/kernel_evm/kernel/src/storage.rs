@@ -867,28 +867,3 @@ mod internal_for_tests {
 
 #[cfg(test)]
 pub use internal_for_tests::*;
-
-#[cfg(test)]
-mod tests {
-    use tezos_smart_rollup_mock::MockHost;
-
-    use super::*;
-    #[test]
-    fn test_reboot_flag() {
-        let mut host = MockHost::default();
-
-        add_reboot_flag(&mut host).expect("Should have been able to set flag");
-
-        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
-
-        delete_reboot_flag(&mut host).expect("Should have been able to delete flag");
-
-        assert!(
-            !was_rebooted(&mut host).expect("should not have failed without reboot flag")
-        );
-
-        add_reboot_flag(&mut host).expect("Should have been able to set flag");
-
-        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
-    }
-}
