@@ -197,6 +197,20 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         storage::store_rlp(self, host, &self.path(prefix)?)
             .context("cannot save pointer to storage")
     }
+
+    /// Removes the pointer and its data frm the durable storage.
+    fn remove_with_data(
+        &self,
+        host: &mut impl Runtime,
+        prefix: &impl Path,
+    ) -> Result<()> {
+        let path = hex::encode(&self.id);
+        let path: Vec<u8> = format!("/{}", path).into();
+        let path = OwnedPath::try_from(path)?;
+        let path = concat(prefix, &path)?;
+        host.store_delete(&path)
+            .context("cannot remove the pointer")
+    }
 }
 
 #[allow(dead_code)]
@@ -306,8 +320,6 @@ where
         let Some(LinkedListPointer { front, back }) = &self.pointers else {return Ok(None)};
         // Get the previous and the next pointer
         let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
-        let data_path = pointer.data_path(&self.path)?;
-        let pointer_path = pointer.path(&self.path)?;
         let previous = match pointer.previous {
             Some(ref previous) => Pointer::read(host, &self.path, previous)?,
             None => None,
@@ -320,8 +332,7 @@ where
         // retrieve the data
         let data = pointer.get_data(host, &self.path)?;
         // delete the pointer and the data
-        host.store_delete(&pointer_path)?;
-        host.store_delete(&data_path)?;
+        pointer.remove_with_data(host, &self.path)?;
         match (previous, next) {
             // This case represents the list with only one element
             (None, None) => {
