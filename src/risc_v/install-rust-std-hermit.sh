@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 version="$(rustc --version | awk '{print $2}')"
 url="https://github.com/hermit-os/rust-std-hermit/releases/download/${version}/rust-std-${version}-riscv64gc-unknown-hermit.tar.gz"
