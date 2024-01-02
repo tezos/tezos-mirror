@@ -2,6 +2,7 @@ test_kernels:
   extends:
     - .oc.kernels_template
   stage: test
+  needs: [oc.docker:rust-toolchain]
   dependencies: []
   script:
     - make -f kernels.mk check
@@ -9,6 +10,8 @@ test_kernels:
   rules:
     - changes:
         - .gitlab-ci.yml
+        # Run if the `rust-toolchain` image is updated
+        - images/**/*
         - kernels.mk
         - src/kernel_*/**/*
         - src/risc_v/**/*

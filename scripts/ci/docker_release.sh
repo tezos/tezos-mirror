@@ -6,6 +6,7 @@ set -e
 
 if [ -z "${build_deps_image_name}" ]; then echo "build_deps_image_name is unset" && exit 3; fi
 if [ -z "${build_deps_image_version}" ]; then echo "build_deps_image_version is unset" && exit 3; fi
+if [ -z "${rust_toolchain_image_name}" ]; then echo "rust_toolchain_image_name is unset" && exit 3; fi
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
@@ -30,7 +31,8 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   "${build_deps_image_version}" \
   "${OCTEZ_EXECUTABLES}" \
   "${CI_COMMIT_SHORT_SHA}" \
-  "${DOCKER_BUILD_TARGET}"
+  "${DOCKER_BUILD_TARGET}" \
+  "${rust_toolchain_image_name}"
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`

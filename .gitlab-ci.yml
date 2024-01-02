@@ -64,6 +64,9 @@ variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
   build_deps_image_version: 5d7889150ef8283a4610bfc85d5b66a159d72d2e
   build_deps_image_name: "${CI_REGISTRY}/tezos/opam-repository"
+  # This image is not automatically mirrored to AWS ECR and should be
+  # fetch from the GitLab registry, so do not use CI_REGISTRY here.
+  rust_toolchain_image_name: "registry.gitlab.com/${CI_PROJECT_PATH}/rust-toolchain"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
@@ -106,7 +109,7 @@ variables:
   image: ${build_deps_image_name}:runtime-client-libs-dependencies--${build_deps_image_version}
 
 .image_template__rust_toolchain:
-  image: ${build_deps_image_name}:rust-toolchain--${build_deps_image_version}
+  image: ${rust_toolchain_image_name}:${CI_COMMIT_SHA}
 
 # Match GitLab executors version and directly use the Docker socket
 # The Docker daemon is already configured, experimental features are enabled

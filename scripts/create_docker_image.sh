@@ -16,10 +16,10 @@ build_deps_image_version=${4:-$opam_repository_tag}
 executables=${5:-$(cat script-inputs/released-executables)}
 commit_short_sha="${6:-$(git rev-parse --short HEAD)}"
 docker_target="${7:-without-evm-artifacts}"
-rust_toolchain_image=${8:-$build_deps_image_name}
+rust_toolchain_image=${8:-registry.gitlab.com/tezos/tezos/rust-toolchain}
 rust_toolchain_image_version="${9:-}"
 if [ -z "$rust_toolchain_image_version" ]; then
-  rust_toolchain_image_version=rust-toolchain--$opam_repository_tag
+  rust_toolchain_image_version=$(git rev-parse HEAD)
 fi
 commit_datetime="${10:-$(git show -s --pretty=format:%ci HEAD)}"
 commit_tag="${11:-$(git describe --tags --always)}"

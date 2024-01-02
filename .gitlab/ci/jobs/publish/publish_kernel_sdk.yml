@@ -11,7 +11,7 @@ publish_kernel_sdk:
   rules:
   - when: manual
   allow_failure: true
-  needs: []
+  needs: [oc.docker:rust-toolchain]
   interruptible: false
   script:
     - make -f kernels.mk publish-sdk-deps
