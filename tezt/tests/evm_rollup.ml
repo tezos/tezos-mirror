@@ -2346,7 +2346,7 @@ let get_kernel_boot_wasm ~sc_rollup_node =
     {on_request; on_response}
   in
   let* kernel_boot_opt =
-    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    Sc_rollup_node.RPC.call sc_rollup_node ~log_response_body:false ~rpc_hooks
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
