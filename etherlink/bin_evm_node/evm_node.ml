@@ -26,6 +26,66 @@
 (*****************************************************************************)
 open Configuration
 
+module Event = struct
+  let section = ["evm_node"]
+
+  let event_starting =
+    Internal_event.Simple.declare_1
+      ~section
+      ~name:"evm_node_start"
+      ~msg:"starting the EVM node ({mode})"
+      ~level:Notice
+      ("mode", Data_encoding.string)
+
+  let event_is_ready =
+    Internal_event.Simple.declare_2
+      ~section
+      ~name:"evm_node_is_ready"
+      ~msg:"the EVM node is listening to {addr}:{port}"
+      ~level:Notice
+      ("addr", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+
+  let event_retrying_connect =
+    Internal_event.Simple.declare_2
+      ~section
+      ~name:"evm_node_retrying_connect"
+      ~msg:"Cannot connect to {endpoint}, retrying in {delay} seconds.."
+      ~level:Notice
+      ("endpoint", Data_encoding.string)
+      ("delay", Data_encoding.float)
+end
+
+(** [retry_connection f] retries the connection using [f]. If an error
+    happens in [f] and it is a lost connection, the connection is retried  *)
+let retry_connection (f : Uri.t -> string tzresult Lwt.t) endpoint :
+    string tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let rec retry ~delay =
+    let*! result = f endpoint in
+    match result with
+    | Ok smart_rollup_address -> return smart_rollup_address
+    | Error err
+      when Evm_node_lib_dev.Rollup_node_services.is_connection_error err ->
+        let*! () =
+          Internal_event.Simple.emit
+            Event.event_retrying_connect
+            (Uri.to_string endpoint, delay)
+        in
+        let*! () = Lwt_unix.sleep delay in
+        let next_delay = delay *. 2. in
+        let delay = Float.min next_delay 30. in
+        retry ~delay
+    | res -> Lwt.return res
+  in
+  retry ~delay:1.
+
+(** [fetch_smart_rollup_address ~keep_alive f] tries to fetch the
+    smart rollup address using [f]. If [keep_alive] is true, tries to
+    fetch until it works. *)
+let fetch_smart_rollup_address ~keep_alive f (endpoint : Uri.t) =
+  if keep_alive then retry_connection f endpoint else f endpoint
+
 let install_finalizer_prod server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
@@ -53,44 +113,31 @@ let callback_log server conn req body =
     req
     (Cohttp_lwt.Body.of_string body_str)
 
-module Event = struct
-  let section = ["evm_node"]
-
-  let event_starting =
-    Internal_event.Simple.declare_1
-      ~section
-      ~name:"start_evm_node"
-      ~msg:"starting the EVM node ({mode})"
-      ~level:Notice
-      ("mode", Data_encoding.string)
-
-  let event_is_ready =
-    Internal_event.Simple.declare_2
-      ~section
-      ~name:"evm_node_is_ready"
-      ~msg:"the EVM node is listening to {addr}:{port}"
-      ~level:Notice
-      ("addr", Data_encoding.string)
-      ("port", Data_encoding.uint16)
-end
-
-let rollup_node_config_prod ~rollup_node_endpoint =
+let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
   end) in
-  let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+  let* smart_rollup_address =
+    fetch_smart_rollup_address
+      ~keep_alive
+      (fun _endpoint -> Rollup_node_rpc.smart_rollup_address)
+      rollup_node_endpoint
+  in
   return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
 
-let rollup_node_config_dev ~rollup_node_endpoint =
+let rollup_node_config_dev ~rollup_node_endpoint ~keep_alive =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
   end) in
   let* smart_rollup_address =
-    Rollup_node_services.smart_rollup_address rollup_node_endpoint
+    fetch_smart_rollup_address
+      ~keep_alive
+      Rollup_node_services.smart_rollup_address
+      rollup_node_endpoint
   in
   return
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
@@ -265,19 +312,29 @@ let time_between_blocks_arg =
     ~placeholder:"10."
     Params.float
 
+let keep_alive_arg =
+  Tezos_clic.switch
+    ~doc:
+      "Keep the EVM node process alive even if the connection is lost with the \
+       rollup node."
+    ~short:'K'
+    ~long:"keep-alive"
+    ()
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in proxy mode"
-    (args7
+    (args8
        data_dir_arg
        devmode_arg
        rpc_addr_arg
        rpc_port_arg
        cors_allowed_origins_arg
        cors_allowed_headers_arg
-       verbose_arg)
+       verbose_arg
+       keep_alive_arg)
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
     (fun ( data_dir,
@@ -286,7 +343,8 @@ let proxy_command =
            rpc_port,
            cors_origins,
            cors_headers,
-           verbose )
+           verbose,
+           keep_alive )
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -306,7 +364,9 @@ let proxy_command =
       let* () = Configuration.save_proxy ~force:true ~data_dir config in
       let* () =
         if not config.devmode then
-          let* rollup_config = rollup_node_config_prod ~rollup_node_endpoint in
+          let* rollup_config =
+            rollup_node_config_prod ~rollup_node_endpoint ~keep_alive
+          in
           let* () = Evm_node_lib_prod.Tx_pool.start rollup_config in
           let* directory = prod_directory config rollup_config in
           let* server = start config ~directory in
@@ -316,7 +376,7 @@ let proxy_command =
           return_unit
         else
           let* ((backend_rpc, smart_rollup_address) as rollup_config) =
-            rollup_node_config_dev ~rollup_node_endpoint
+            rollup_node_config_dev ~rollup_node_endpoint ~keep_alive
           in
           let* () =
             Evm_node_lib_dev.Tx_pool.start

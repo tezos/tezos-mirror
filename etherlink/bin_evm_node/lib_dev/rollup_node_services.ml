@@ -11,6 +11,35 @@
 open Tezos_rpc
 open Path
 
+type error += Lost_connection
+
+let () =
+  let description =
+    "The EVM node is no longer able to communicate with the rollup node, the \
+     communication was lost"
+  in
+  register_error_kind
+    `Temporary
+    ~id:"evm_node_lost_connection"
+    ~title:"Lost connection with rollup node"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function Lost_connection -> Some () | _ -> None)
+    (fun () -> Lost_connection)
+
+let is_connection_error trace =
+  TzTrace.fold
+    (fun yes error ->
+      yes
+      ||
+      match error with
+      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+          true
+      | _ -> false)
+    false
+    trace
+
 let smart_rollup_address :
     ([`GET], unit, unit, unit, unit, bytes) Service.service =
   Service.get_service
@@ -80,8 +109,33 @@ let global_block_watcher :
     ~output:Data_encoding.json
     (open_root / "global" / "monitor_blocks")
 
-let call_service ~base ?(media_types = Media_type.all_media_types) =
-  Tezos_rpc_http_client_unix.RPC_client_unix.call_service media_types ~base
+let call_service ~base ?(media_types = Media_type.all_media_types) a b c d =
+  let open Lwt_result_syntax in
+  let*! res =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
+      media_types
+      ~base
+      a
+      b
+      c
+      d
+  in
+  match res with
+  | Ok res -> return res
+  | Error trace when is_connection_error trace -> fail (Lost_connection :: trace)
+  | Error trace -> fail trace
+
+let publish :
+    rollup_node_endpoint:Uri.t ->
+    [< `External of string] list ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint inputs ->
+  let open Lwt_result_syntax in
+  let inputs = List.map (function `External s -> s) inputs in
+  let* _answer =
+    call_service ~base:rollup_node_endpoint batcher_injection () () inputs
+  in
+  return_unit
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)
@@ -98,22 +152,4 @@ let smart_rollup_address base =
   in
   match answer with
   | Ok address -> return (Bytes.to_string address)
-  | Error tztrace ->
-      failwith
-        "Failed to communicate with %a, because %a"
-        Uri.pp
-        base
-        pp_print_trace
-        tztrace
-
-let publish :
-    rollup_node_endpoint:Uri.t ->
-    [< `External of string] list ->
-    unit tzresult Lwt.t =
- fun ~rollup_node_endpoint inputs ->
-  let open Lwt_result_syntax in
-  let inputs = List.map (function `External s -> s) inputs in
-  let* _answer =
-    call_service ~base:rollup_node_endpoint batcher_injection () () inputs
-  in
-  return_unit
+  | Error trace -> fail trace

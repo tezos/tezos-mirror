@@ -157,9 +157,11 @@ let run_args evm_node =
   in
   mode_args @ shared_args
 
-let run evm_node =
-  let* () = run evm_node {ready = false} (run_args evm_node) in
-  let* () = wait_for_ready evm_node in
+let run ?(wait = true) ?(extra_arguments = []) evm_node =
+  let* () =
+    run evm_node {ready = false} (run_args evm_node @ extra_arguments)
+  in
+  let* () = if wait then wait_for_ready evm_node else unit in
   unit
 
 let spawn_command evm_node args =
@@ -168,7 +170,8 @@ let spawn_command evm_node args =
     (Uses.path Constant.octez_evm_node)
   @@ args
 
-let spawn_run evm_node = spawn_command evm_node (run_args evm_node)
+let spawn_run ?(extra_arguments = []) evm_node =
+  spawn_command evm_node (run_args evm_node @ extra_arguments)
 
 let endpoint (evm_node : t) =
   Format.sprintf
