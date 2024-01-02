@@ -26,6 +26,7 @@
   octez-shell-libs.context-ops
   octez-libs.rpc
   octez-libs.rpc-http
+  octez-libs.crypto-dal
   tezos-dal-node-services
   lwt-canceler
   lwt-exit
@@ -47,7 +48,8 @@
   -open Tezos_shell_context
   -open Tezos_context
   -open Tezos_context_ops
-  -open Tezos_rpc_http)
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library

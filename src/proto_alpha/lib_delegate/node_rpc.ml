@@ -291,6 +291,13 @@ let await_protocol_activation cctxt ~chain () =
   stop () ;
   return_unit
 
+let fetch_dal_config cctxt =
+  let open Lwt_syntax in
+  let* r = Config_services.dal_config cctxt in
+  match r with
+  | Error e -> return_error e
+  | Ok dal_config -> return_ok dal_config
+
 let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
