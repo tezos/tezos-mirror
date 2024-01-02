@@ -377,37 +377,13 @@ let setup_evm_kernel ?config ?kernel_installee
       config;
     }
 
-let register_test ~title ~tags ?(admin = None) ~setup_mode f =
-  let extra_tag =
-    match setup_mode with
-    | Setup_proxy _ -> "proxy"
-    | Setup_sequencer _ -> "sequencer"
-  in
-  Protocol.register_test
-    ~__FILE__
-    ~tags:(extra_tag :: tags)
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-      ])
-    ~title:(sf "%s (%s)" title extra_tag)
-    (fun protocol ->
-      let* evm_setup = setup_evm_kernel ~admin ~setup_mode protocol in
-      f ~protocol ~evm_setup)
-
-let register_both ~title ~tags ?admin ?time_between_blocks f protocols =
-  let register = register_test ~title ~tags ?admin f protocols in
-  register ~setup_mode:(Setup_proxy {devmode = true}) ;
-  register ~setup_mode:(Setup_sequencer {time_between_blocks})
-
 let setup_past_genesis
     ?(config :
        [< `Config of Installer_kernel_config.instr list | `Path of string]
-       option) ?with_administrator ?kernel_installee ?originator_key
-    ?bootstrap_accounts ?rollup_operator_key ?timestamp ~admin protocol =
-  let* ({node; client; sc_rollup_node; _} as full_setup) =
+       option) ?commitment_period ?challenge_window ?with_administrator
+    ?kernel_installee ?originator_key ?bootstrap_accounts ?rollup_operator_key
+    ?timestamp ?setup_mode ~admin protocol =
+  let* ({node; client; sc_rollup_node; evm_node; _} as full_setup) =
     setup_evm_kernel
       ?config
       ?kernel_installee
@@ -416,12 +392,97 @@ let setup_past_genesis
       ?rollup_operator_key
       ?with_administrator
       ?timestamp
+      ?setup_mode
+      ?commitment_period
+      ?challenge_window
       ~admin
       protocol
   in
   (* Force a level to got past the genesis block *)
   let* _level = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   return full_setup
+
+let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
+    ?challenge_window ?bootstrap_accounts ?(past_genesis = false) ~setup_mode f
+    =
+  let extra_tag =
+    match setup_mode with
+    | Setup_proxy _ -> "proxy"
+    | Setup_sequencer _ -> "sequencer"
+  in
+  let uses =
+    Option.value
+      ~default:(fun _protocol ->
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.octez_evm_node;
+          Constant.smart_rollup_installer;
+        ])
+      uses
+  in
+  Protocol.register_test
+    ~__FILE__
+    ~tags:(extra_tag :: tags)
+    ~uses
+    ~title:(sf "%s (%s)" title extra_tag)
+    (fun protocol ->
+      let* evm_setup =
+        if past_genesis then
+          setup_past_genesis
+            ?config
+            ?commitment_period
+            ?challenge_window
+            ?bootstrap_accounts
+            ~admin
+            ~setup_mode
+            protocol
+        else
+          setup_evm_kernel
+            ?config
+            ?commitment_period
+            ?challenge_window
+            ?bootstrap_accounts
+            ~admin
+            ~setup_mode
+            protocol
+      in
+      f ~protocol ~evm_setup)
+
+let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
+    ?challenge_window ?bootstrap_accounts ?(past_genesis = false) f protocols =
+  register_test
+    ?config
+    ~title
+    ~tags
+    ?uses
+    ?admin
+    ?commitment_period
+    ?challenge_window
+    ?bootstrap_accounts
+    f
+    protocols
+    ~past_genesis
+    ~setup_mode:(Setup_proxy {devmode = true})
+
+let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
+    ?bootstrap_accounts ?(past_genesis = false) ?config ?time_between_blocks f
+    protocols =
+  let register =
+    register_test
+      ?config
+      ~title
+      ~tags
+      ?uses
+      ?admin
+      ?commitment_period
+      ?challenge_window
+      ?bootstrap_accounts
+      f
+      protocols
+      ~past_genesis
+  in
+  register ~setup_mode:(Setup_proxy {devmode = true}) ;
+  register ~setup_mode:(Setup_sequencer {time_between_blocks})
 
 type contract = {label : string; abi : string; bin : string}
 
