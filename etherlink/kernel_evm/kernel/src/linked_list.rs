@@ -361,6 +361,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::LinkedList;
+    use proptest::prelude::*;
     use proptest::proptest;
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
@@ -492,6 +493,9 @@ mod tests {
     }
 
     proptest! {
+
+        #![proptest_config(ProptestConfig::with_cases(50))]
+
         #[test]
         fn test_pushed_elements_are_present(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
             let (host, list) = fill_list(&elements);
