@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Usage: call this script with the patch file as first argument, its initial
 # environment number and the environments numbers on which it should be applied

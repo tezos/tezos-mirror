@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # FIXME https://gitlab.com/tezos/tezos/-/issues/6216
 #

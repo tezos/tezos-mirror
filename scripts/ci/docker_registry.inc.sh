@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 registry_uri="https://registry.gitlab.com/v2"
 auth_uri="https://gitlab.com/jwt/auth"

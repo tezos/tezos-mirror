@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 CLIENT='octez-client --mode mockup --base-dir /tmp/mockup'
 STACK='{}'
