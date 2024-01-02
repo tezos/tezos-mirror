@@ -168,6 +168,25 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         Ok(path)
     }
 
+    fn save_data(
+        &self,
+        host: &mut impl Runtime,
+        prefix: &impl Path,
+        data: &impl Encodable,
+    ) -> Result<()> {
+        let path = self.data_path(prefix)?;
+        storage::store_rlp(data, host, &path).context("cannot save the pointer's data")
+    }
+
+    fn get_data<Elt: Decodable>(
+        &self,
+        host: &impl Runtime,
+        prefix: &impl Path,
+    ) -> Result<Elt> {
+        let path = self.data_path(prefix)?;
+        storage::read_rlp(host, &path).context("cannot read the pointer's data")
+    }
+
     /// Load the pointer from the durable storage
     fn read(host: &impl Runtime, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
         storage::read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
@@ -245,8 +264,7 @@ where
                 penultimate.save(host, &self.path)?;
                 back.save(host, &self.path)?;
                 // And the save the data
-                let data_path = back.data_path(&self.path)?;
-                storage::store_rlp(elt, host, &data_path)?;
+                back.save_data(host, &self.path, elt)?;
                 // update the back pointer of the list
                 self.pointers = Some(LinkedListPointer {
                     front: front.clone(),
@@ -263,8 +281,7 @@ where
                 };
                 // Saves the pointer and its data
                 back.save(host, &self.path)?;
-                let data_path = back.data_path(&self.path)?;
-                storage::store_rlp(elt, host, &data_path)?;
+                back.save_data(host, &self.path, elt)?;
                 // update the front and back pointers of the list
                 self.pointers = Some(LinkedListPointer {
                     front: back.clone(),
@@ -292,16 +309,16 @@ where
         let data_path = pointer.data_path(&self.path)?;
         let pointer_path = pointer.path(&self.path)?;
         let previous = match pointer.previous {
-            Some(previous) => Pointer::read(host, &self.path, &previous)?,
+            Some(ref previous) => Pointer::read(host, &self.path, previous)?,
             None => None,
         };
         let next = match pointer.next {
-            Some(next) => Pointer::read(host, &self.path, &next)?,
+            Some(ref next) => Pointer::read(host, &self.path, next)?,
             None => None,
         };
 
         // retrieve the data
-        let data = storage::read_optional_rlp(host, &data_path)?;
+        let data = pointer.get_data(host, &self.path)?;
         // delete the pointer and the data
         host.store_delete(&pointer_path)?;
         host.store_delete(&data_path)?;
@@ -354,7 +371,7 @@ where
             }
         };
         self.save(host)?;
-        Ok(data)
+        Ok(Some(data))
     }
 }
 
