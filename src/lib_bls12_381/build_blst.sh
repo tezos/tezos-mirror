@@ -19,15 +19,15 @@ chmod +x build.sh
 # If the user does not want to build with assembly optimisations, regardless
 # the platform
 if [ -n "${BLST_PORTABLE}" ]; then
-    echo "(-D__BLST_PORTABLE__)" > ../c_flags_blst.sexp
-    ./build.sh -shared -Wno-missing-braces -D__BLST_PORTABLE__
+  echo "(-D__BLST_PORTABLE__)" > ../c_flags_blst.sexp
+  ./build.sh -shared -Wno-missing-braces -D__BLST_PORTABLE__
 # If the architecture is x86_64 or arm64, we build with the default flags.
 elif [ "$(uname -m)" = "x86_64" ] || [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "amd64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    echo "()" > ../c_flags_blst.sexp
-    ./build.sh -shared -Wno-missing-braces
+  echo "()" > ../c_flags_blst.sexp
+  ./build.sh -shared -Wno-missing-braces
 # By default, we build without any assembly instruction and rely on the C
 # compiler
 else
-    echo "()" > ../c_flags_blst.sexp
-    ./build.sh -shared -Wno-missing-braces -D__BLST_NO_ASM__
+  echo "()" > ../c_flags_blst.sexp
+  ./build.sh -shared -Wno-missing-braces -D__BLST_NO_ASM__
 fi

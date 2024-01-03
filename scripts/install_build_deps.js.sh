@@ -3,14 +3,14 @@
 set -e
 
 if [ -z "$recommended_node_version" ]; then
-    script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-    if [ -f "${script_dir}"/version.sh ]; then
-        #shellcheck source=scripts/version.sh
-        . "$script_dir"/version.sh;
-    else
-        echo "\$recommended_node_version is undefined, please source scripts/version.sh";
-        exit 1;
-    fi
+  script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+  if [ -f "${script_dir}"/version.sh ]; then
+    #shellcheck source=scripts/version.sh
+    . "$script_dir"/version.sh
+  else
+    echo "\$recommended_node_version is undefined, please source scripts/version.sh"
+    exit 1
+  fi
 fi
 
 # nvm is a runtime dependency now.
@@ -45,14 +45,14 @@ nvm_get_arch() {
 
   NVM_ARCH=''
   case "${HOST_ARCH}" in
-    x86_64 | amd64) NVM_ARCH="x64" ;;
-    i*86) NVM_ARCH="x86" ;;
-    aarch64) NVM_ARCH="arm64" ;;
-    *) NVM_ARCH="${HOST_ARCH}" ;;
+  x86_64 | amd64) NVM_ARCH="x64" ;;
+  i*86) NVM_ARCH="x86" ;;
+  aarch64) NVM_ARCH="arm64" ;;
+  *) NVM_ARCH="${HOST_ARCH}" ;;
   esac
   # The next three lines are used to support alpine
   if (ldd "$(which echo)" | nvm_grep -q musl); then
-  NVM_ARCH="${NVM_ARCH}-musl"
+    NVM_ARCH="${NVM_ARCH}-musl"
   fi
   nvm_echo "${NVM_ARCH}"
 }
@@ -65,8 +65,8 @@ node --version
 
 # [npm ci] is like [npm install] but will fail if [package.json] and
 # [package-lock.json] disagree. It also removes any pre-existing [node_modules] install.
-if [ -z "${CI_PROJECT_DIR}" ] ; then
-    npm install ;
+if [ -z "${CI_PROJECT_DIR}" ]; then
+  npm install
 else
-    npm ci ;
+  npm ci
 fi

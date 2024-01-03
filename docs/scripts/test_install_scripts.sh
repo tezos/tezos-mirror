@@ -20,8 +20,8 @@ UBUNTU_JAMMY=public.ecr.aws/lts/ubuntu:22.04_stable
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 DOCS_DIR="$(dirname "$SCRIPT_DIR")"
 
-usage () {
-    cat >&2 <<!EOF
+usage() {
+  cat >&2 << !EOF
 usage:
   $0 <test-name>
 where <test-name> can be:
@@ -46,66 +46,67 @@ where <test-name> can be:
 set -e
 
 if [ -z "$1" ]; then
-    usage
-    exit 1
+  usage
+  exit 1
 fi
 
 for test_case in "$@"; do
-    case "$test_case" in
-        "install-bin-focal" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh
-            ;;
-        "install-bin-jammy" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh
-            ;;
-        "install-bin-fedora37" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh
-            ;;
-        "install-bin-fedora38" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh
-            ;;
-        "install-bin-rc-focal" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh rc
-            ;;
-        "install-bin-rc-jammy" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh rc
-            ;;
-        "install-bin-rc-fedora37" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh rc
-            ;;
-        "install-bin-rc-fedora38" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh rc
-            ;;
-        "install-opam-scratch" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh
-            ;;
-        "install-opam-focal" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-20.04 /Scripts/install-opam.sh
-            ;;
-        "compile-release-sources-bullseye" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos latest-release
-            ;;
-        "compile-sources-bullseye" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos master
-            ;;
-        "install-python-focal" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_FOCAL" /Scripts/install-python-debian-ubuntu.sh
-            ;;
-        "install-python-jammy" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_JAMMY" /Scripts/install-python-debian-ubuntu.sh
-            ;;
-        "install-python-bullseye" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts debian:11 /Scripts/install-python-debian-ubuntu.sh
-            ;;
-        * )
-            echo "unknown test name: '$test_case'"
-            usage
-            exit 1 ;;
+  case "$test_case" in
+  "install-bin-focal")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh
+    ;;
+  "install-bin-jammy")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh
+    ;;
+  "install-bin-fedora37")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh
+    ;;
+  "install-bin-fedora38")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh
+    ;;
+  "install-bin-rc-focal")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh rc
+    ;;
+  "install-bin-rc-jammy")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh rc
+    ;;
+  "install-bin-rc-fedora37")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh rc
+    ;;
+  "install-bin-rc-fedora38")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh rc
+    ;;
+  "install-opam-scratch")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh
+    ;;
+  "install-opam-focal")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-20.04 /Scripts/install-opam.sh
+    ;;
+  "compile-release-sources-bullseye")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos latest-release
+    ;;
+  "compile-sources-bullseye")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos master
+    ;;
+  "install-python-focal")
+    docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_FOCAL" /Scripts/install-python-debian-ubuntu.sh
+    ;;
+  "install-python-jammy")
+    docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_JAMMY" /Scripts/install-python-debian-ubuntu.sh
+    ;;
+  "install-python-bullseye")
+    docker run --rm -i -v "$DOCS_DIR/developer":/Scripts debian:11 /Scripts/install-python-debian-ubuntu.sh
+    ;;
+  *)
+    echo "unknown test name: '$test_case'"
+    usage
+    exit 1
+    ;;
 
-    esac
+  esac
 
-    echo "test $test_case returned $?"
-    echo "*******************************************************************"
+  echo "test $test_case returned $?"
+  echo "*******************************************************************"
 done
 
 exit 0

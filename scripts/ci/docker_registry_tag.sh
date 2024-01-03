@@ -18,8 +18,8 @@ new_tag="$5"
 
 token="$(getBearerToken "${username}" "${password}" "${reponame}")"
 if [ -z "$token" ]; then
-    echo "Failed to fetch the Bearer token"
-    exit 1
+  echo "Failed to fetch the Bearer token"
+  exit 1
 fi
 
 renameTag "$token" "$reponame" "$old_tag" "$new_tag"

@@ -67,21 +67,19 @@ TOK="$(cat "$HOME"/slack_token)"
 # DISABLE_SLACK_MESSAGING to any non-empty string.
 
 slack() {
-    if [ "$DISABLE_SLACK_MESSAGING" = "" ]
-    then
-        curl -X POST -H 'Authorization: Bearer '"$TOK" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"$CHAN\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
-    else
-        echo "Message \"$1\" would be sent on Slack but Slack messaging has been disabled."
-    fi
+  if [ "$DISABLE_SLACK_MESSAGING" = "" ]; then
+    curl -X POST -H 'Authorization: Bearer '"$TOK" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"$CHAN\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
+  else
+    echo "Message \"$1\" would be sent on Slack but Slack messaging has been disabled."
+  fi
 }
 
 slack_send_file() {
-    if [ "$DISABLE_SLACK_MESSAGING" = "" ]
-    then
-        curl -F file=@"$1" -F "initial_comment=$2" -F channels="$CHAN" -F token="$TOK" https://tezos-dev.slack.com/api/files.upload
-    else
-        echo "File \"$1\" would be sent on Slack with message \"$2\" but Slack messaging has been disabled."
-    fi
+  if [ "$DISABLE_SLACK_MESSAGING" = "" ]; then
+    curl -F file=@"$1" -F "initial_comment=$2" -F channels="$CHAN" -F token="$TOK" https://tezos-dev.slack.com/api/files.upload
+  else
+    echo "File \"$1\" would be sent on Slack with message \"$2\" but Slack messaging has been disabled."
+  fi
 }
 
 OCTEZ_DIR="/data/redbull/tezos"
@@ -94,10 +92,9 @@ echo "Last known dir: $LAST_KNOWN_DIR"
 LAST_DIR="$(aws s3 ls s3://snoop-playground/mclaren/inference_csvs/snoop_results/ | grep PRE | tail -n 1 | sed 's/ *PRE //' | sed 's,/$,,')"
 echo "Last dir: $LAST_DIR"
 
-if [ "$LAST_DIR" = "$LAST_KNOWN_DIR" ]
-then
-    echo "No new results to analyse, exiting"
-    exit 0
+if [ "$LAST_DIR" = "$LAST_KNOWN_DIR" ]; then
+  echo "No new results to analyse, exiting"
+  exit 0
 fi
 
 # Check that the SUCCESS file is present. This file is the very last uploaded by
@@ -105,10 +102,9 @@ fi
 # bucket but the SUCCESS file is not, it means that the upload is in progress so
 # we stop immediately to avoid analysing incomplete data and we don't update the
 # `last_known_dir` file so that the next run of this script can retry.
-if [ "$(aws s3 ls s3://snoop-playground/mclaren/complete_results/snoop_results/"$LAST_DIR"/SUCCESS | wc -l)" = 0 ]
-then
-    echo "SUCCESS file not found. The benchmarks failed, or the benchmark machine has not finished uploading. Exiting"
-    exit 0
+if [ "$(aws s3 ls s3://snoop-playground/mclaren/complete_results/snoop_results/"$LAST_DIR"/SUCCESS | wc -l)" = 0 ]; then
+  echo "SUCCESS file not found. The benchmarks failed, or the benchmark machine has not finished uploading. Exiting"
+  exit 0
 fi
 
 # We update the file content as soon as possible so that concurrent runs of this
@@ -135,42 +131,37 @@ rm -f "$SELECTION_FILE"
 
 # All the directories before FIRST_DIR will be ignored.
 export FIRST_DIR
-if [ "$FIRST_DIR" = "" ]
-then
-    # -maxdepth 1 not to apply the find recursively.
-    # -mindepth 1 not to output the base directory $INPUT_CSV_DIR (that comes
-    # first in the result).
-    # basename to remove the path.
-    # xargs because basename expects one input, but head returns a list.
-    FIRST_DIR="$(find "$INPUT_CSV_DIR/" -maxdepth 1 -mindepth 1 | sort | head -n 1 | xargs basename)"
+if [ "$FIRST_DIR" = "" ]; then
+  # -maxdepth 1 not to apply the find recursively.
+  # -mindepth 1 not to output the base directory $INPUT_CSV_DIR (that comes
+  # first in the result).
+  # basename to remove the path.
+  # xargs because basename expects one input, but head returns a list.
+  FIRST_DIR="$(find "$INPUT_CSV_DIR/" -maxdepth 1 -mindepth 1 | sort | head -n 1 | xargs basename)"
 fi
 
 # The directories after FIRST_DIR.
 DIRS=""
-for d in "$INPUT_CSV_DIR"/*
-do
-    d=$(basename "$d")
-    if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]
-    then
-        if [ -z "$DIRS" ]
-        then
-            DIRS="$d"
-        else
-            DIRS="$DIRS $d"
-        fi
+for d in "$INPUT_CSV_DIR"/*; do
+  d=$(basename "$d")
+  if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]; then
+    if [ -z "$DIRS" ]; then
+      DIRS="$d"
+    else
+      DIRS="$DIRS $d"
     fi
+  fi
 done
 
 # REF_DIR is some reference directory that we want the current run to be
 # compared to.
 export REF_DIR
-if [ "$REF_DIR" = "" ]
-then
-    REF_DIR="$FIRST_DIR"
+if [ "$REF_DIR" = "" ]; then
+  REF_DIR="$FIRST_DIR"
 else
-    # If a reference directory is set by the user, let's add it to the list of
-    # all directories.
-    DIRS="$DIRS $REF_DIR"
+  # If a reference directory is set by the user, let's add it to the list of
+  # all directories.
+  DIRS="$DIRS $REF_DIR"
 fi
 
 DUNE="/data/redbull/tezos/_opam/bin/dune"
@@ -187,83 +178,78 @@ $DUNE exec gas_parameter_diff -- &> /dev/null
 
 PREV_DIR="$LAST_KNOWN_DIR"
 
-for f in "$INPUT_CSV_DIR/$LAST_DIR"/*
-do
-    b="$(basename "$f")"
+for f in "$INPUT_CSV_DIR/$LAST_DIR"/*; do
+  b="$(basename "$f")"
 
-    files=$(for d in $DIRS; do local="$INPUT_CSV_DIR/$d/$b"; if [ -f "$local" ]; then echo "$local"; fi; done)
+  files=$(for d in $DIRS; do
+    local="$INPUT_CSV_DIR/$d/$b"
+    if [ -f "$local" ]; then echo "$local"; fi
+  done)
 
-    # Comparing all runs from FIRST_DIR.
-    # The parameter expansion syntax ${files:+$files} is used as a trick to
-    # output $files without quoting it (because gas_parameter_diff needs a list
-    # of files, not one parameter containing all file names), and without making
-    # `shellcheck` complain.
-    $DUNE exec --no-build gas_parameter_diff -- ${files:+$files} > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+  # Comparing all runs from FIRST_DIR.
+  # The parameter expansion syntax ${files:+$files} is used as a trick to
+  # output $files without quoting it (because gas_parameter_diff needs a list
+  # of files, not one parameter containing all file names), and without making
+  # `shellcheck` complain.
+  $DUNE exec --no-build gas_parameter_diff -- ${files:+$files} > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
 
-    # Comparing with the reference and previous runs.
-    for current in reference previous
-    do
-        CURRENT_DIR=""
-        if [ "$current" = "reference" ]
-        then
-            CURRENT_DIR="$REF_DIR"
-        else
-            CURRENT_DIR="$PREV_DIR"
-        fi
-
-        $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$CURRENT_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$current"_"$b" 2> tmp
-        # The parameters with "score" or "T-value" in their name indicate how
-        # well the models fits the benchmarks. We care about their values but
-        # not much about their variations so we ignore them when looking for
-        # regressions. They are however part of the all_*.csv tables computed
-        # above.
-        grep -v "score\|T-value" tmp > tmp2
-        if [ -s tmp2 ]
-        then
-            {
-                echo
-                echo "--------------------------------"
-                echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
-                cat tmp2
-            } >> "$ALERT_FILE"
-            # Save the parameters with alerts in a file. They are in the lines
-            # with a '%'.
-            grep "%" tmp2 | sed 's/\.//g' | cut -d ' ' -f 4  >> tmp_selection
-        fi
-        rm -f tmp tmp2
-    done
-
-    # Output the lines of parameters with alerts to a dedicated file.
-    if [ -s tmp_selection ]
-    then
-        # Get the header.
-        head -n 1 "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
-        # Get the line of each parameter.
-        # A parameter can appear twice in the alerts, once when comparing with
-        # the reference, and another time when comparing with the previous run.
-        # That's why we're sorting and uniq-ing.
-        for p in $(sort tmp_selection | uniq)
-        do
-            grep "^$p," "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
-        done
+  # Comparing with the reference and previous runs.
+  for current in reference previous; do
+    CURRENT_DIR=""
+    if [ "$current" = "reference" ]; then
+      CURRENT_DIR="$REF_DIR"
+    else
+      CURRENT_DIR="$PREV_DIR"
     fi
-    rm -f tmp_selection
+
+    $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$CURRENT_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$current"_"$b" 2> tmp
+    # The parameters with "score" or "T-value" in their name indicate how
+    # well the models fits the benchmarks. We care about their values but
+    # not much about their variations so we ignore them when looking for
+    # regressions. They are however part of the all_*.csv tables computed
+    # above.
+    grep -v "score\|T-value" tmp > tmp2
+    if [ -s tmp2 ]; then
+      {
+        echo
+        echo "--------------------------------"
+        echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
+        cat tmp2
+      } >> "$ALERT_FILE"
+      # Save the parameters with alerts in a file. They are in the lines
+      # with a '%'.
+      grep "%" tmp2 | sed 's/\.//g' | cut -d ' ' -f 4 >> tmp_selection
+    fi
+    rm -f tmp tmp2
+  done
+
+  # Output the lines of parameters with alerts to a dedicated file.
+  if [ -s tmp_selection ]; then
+    # Get the header.
+    head -n 1 "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+    # Get the line of each parameter.
+    # A parameter can appear twice in the alerts, once when comparing with
+    # the reference, and another time when comparing with the previous run.
+    # That's why we're sorting and uniq-ing.
+    for p in $(sort tmp_selection | uniq); do
+      grep "^$p," "$OUTPUT_CSV_DIR"/all_"$b" >> "$SELECTION_FILE"
+    done
+  fi
+  rm -f tmp_selection
 done
 
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
 cat "$OUTPUT_CSV_DIR"/reference_*.csv > "$OUTPUT_CSV_DIR"/reference.csv
 cat "$OUTPUT_CSV_DIR"/previous_*.csv > "$OUTPUT_CSV_DIR"/previous.csv
 
-if [ -s "$ALERT_FILE" ]
-then
-    slack_send_file "$ALERT_FILE" "Some regressions were found :sadparrot:"
+if [ -s "$ALERT_FILE" ]; then
+  slack_send_file "$ALERT_FILE" "Some regressions were found :sadparrot:"
 else
-    slack "No regression :tada:"
+  slack "No regression :tada:"
 fi
 
-if [ -s "$SELECTION_FILE" ]
-then
-    slack_send_file "$SELECTION_FILE" "CSV comparing all runs on parameters with an alert"
+if [ -s "$SELECTION_FILE" ]; then
+  slack_send_file "$SELECTION_FILE" "CSV comparing all runs on parameters with an alert"
 fi
 
 slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"

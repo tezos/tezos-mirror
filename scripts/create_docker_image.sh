@@ -19,7 +19,7 @@ docker_target="${7:-without-evm-artifacts}"
 rust_toolchain_image=${8:-$build_deps_image_name}
 rust_toolchain_image_version="${9:-}"
 if [ -z "$rust_toolchain_image_version" ]; then
-    rust_toolchain_image_version=rust-toolchain--$opam_repository_tag
+  rust_toolchain_image_version=rust-toolchain--$opam_repository_tag
 fi
 commit_datetime="${10:-$(git show -s --pretty=format:%ci HEAD)}"
 commit_tag="${11:-$(git describe --tags --always)}"
@@ -28,7 +28,7 @@ build_image_name="${image_name}build"
 
 echo "Executables to include in Docker images:"
 for executable in $executables; do
-    echo "- $executable"
+  echo "- $executable"
 done
 
 echo "### Building tezos..."
@@ -76,7 +76,6 @@ docker build \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
   --target=bare \
   "$src_dir"
-
 
 echo "### Successfully built docker image: ${image_name}bare:$image_version"
 

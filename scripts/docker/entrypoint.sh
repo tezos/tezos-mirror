@@ -38,49 +38,49 @@ command=${1:-octez-node}
 shift 1
 
 case $command in
-    octez-node)
-        launch_node "$@"
-        ;;
-    octez-upgrade-storage)
-        upgrade_node_storage
-        ;;
-    octez-snapshot-import)
-        snapshot_import "$@"
-        ;;
-    octez-baker)
-        launch_baker "$@"
-        ;;
-    octez-baker-test)
-        launch_baker_test "$@"
-        ;;
-    octez-endorser)
-        launch_endorser "$@"
-        ;;
-    octez-endorser-test)
-        launch_endorser_test "$@"
-        ;;
-    octez-accuser)
-        launch_accuser "$@"
-        ;;
-    octez-accuser-test)
-        launch_accuser_test "$@"
-        ;;
-    octez-client)
-        configure_client
-        exec "$client" "$@"
-        ;;
-    octez-admin-client)
-        configure_client
-        exec "$admin_client" "$@"
-        ;;
-    octez-signer)
-        exec "$signer" "$@"
-        ;;
-    octez-smart-rollup-node)
-        launch_smart_rollup_node "$@"
-        ;;
-    *)
-        cat <<EOF
+octez-node)
+  launch_node "$@"
+  ;;
+octez-upgrade-storage)
+  upgrade_node_storage
+  ;;
+octez-snapshot-import)
+  snapshot_import "$@"
+  ;;
+octez-baker)
+  launch_baker "$@"
+  ;;
+octez-baker-test)
+  launch_baker_test "$@"
+  ;;
+octez-endorser)
+  launch_endorser "$@"
+  ;;
+octez-endorser-test)
+  launch_endorser_test "$@"
+  ;;
+octez-accuser)
+  launch_accuser "$@"
+  ;;
+octez-accuser-test)
+  launch_accuser_test "$@"
+  ;;
+octez-client)
+  configure_client
+  exec "$client" "$@"
+  ;;
+octez-admin-client)
+  configure_client
+  exec "$admin_client" "$@"
+  ;;
+octez-signer)
+  exec "$signer" "$@"
+  ;;
+octez-smart-rollup-node)
+  launch_smart_rollup_node "$@"
+  ;;
+*)
+  cat << EOF
 Available commands:
 
 The following are wrappers around the octez binaries.
@@ -117,5 +117,5 @@ Commands:
        docker run -v <yourfilename>:/snapshot tezos/tezos octez-snapshot-import
     <yourfilename> must be an absolute path.
 EOF
-        ;;
+  ;;
 esac

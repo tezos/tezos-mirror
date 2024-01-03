@@ -2,7 +2,7 @@
 
 set -e
 
-usage () {
+usage() {
   echo "usage:"
   echo "  ./scripts/check-liquidity-baking-scripts.sh COMMIT_HASH PROTOCOL_DIR"
 }
@@ -20,8 +20,8 @@ usage () {
 #
 
 if [ "$#" -ne 2 ]; then
-    usage
-    exit 1
+  usage
+  exit 1
 fi
 
 COMMIT_HASH="${1}"
@@ -37,7 +37,7 @@ cd "$TOP_DIR" || exit
 
 MOCKUP_DIR=$(mktemp -d)
 "$TOP_DIR"/octez-client --mode mockup --base-dir "$MOCKUP_DIR" create mockup \
-                      1> /tmp/create-mockup.log 2>&1
+  1> /tmp/create-mockup.log 2>&1
 
 TEZOS_CLIENT="$TOP_DIR/octez-client --base-dir $MOCKUP_DIR \
                     --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
@@ -62,7 +62,7 @@ LIGO=$(pwd)/ligo
 echo "* Step 2: Retrieve and compile the LIGO scripts"
 # ----------------------------------------------------
 
-retrieve () {
+retrieve() {
   curl --silent https://gitlab.com/dexter2tz/dexter2tz/-/raw/"$COMMIT_HASH"/"$1" --output "$2"
 }
 
@@ -76,7 +76,7 @@ retrieve lqt_fa12.mligo lqt.mligo
 echo "* Step 3: Compute the binary representations of the two Michelson scripts"
 # ------------------------------------------------------------------------------
 
-serialize () {
+serialize() {
   CONTRACT="$1"
   $TEZOS_CLIENT convert script "$CONTRACT.tz" from michelson to binary --legacy > "$CONTRACT.bin"
 }
@@ -88,23 +88,23 @@ serialize lqt
 echo "* Step 4: Compare each binary representations with the ones found in the source code"
 # ----------------------------------------------------------------------------------------
 
-source_hex () {
-    file=$1
-    line=$2
-    output=$3
-    printf '0x' > "$output"
-    sed -n "${line}"p "$file" | tr -d '"' | tr -d ' ' >> "$output"
+source_hex() {
+  file=$1
+  line=$2
+  output=$3
+  printf '0x' > "$output"
+  sed -n "${line}"p "$file" | tr -d '"' | tr -d ' ' >> "$output"
 }
 
-compare () {
+compare() {
   WHAT="$1"
   SOURCE="$2"
   BIN="$3"
   if diff -q "$SOURCE" "$BIN"; then
-      echo "  - $WHAT is correctly embedded in the source."
+    echo "  - $WHAT is correctly embedded in the source."
   else
-      echo "  - $WHAT is not correctly embedded in the source."
-      exit 1
+    echo "  - $WHAT is not correctly embedded in the source."
+    exit 1
   fi
 }
 

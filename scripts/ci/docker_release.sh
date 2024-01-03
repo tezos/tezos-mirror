@@ -13,10 +13,10 @@ cd "${CI_PROJECT_DIR}" || exit 1
 . ./scripts/ci/docker.env
 
 if [ -z "$EXECUTABLE_FILES" ]; then
-    echo "Error: environment variable EXECUTABLE_FILES is empty."
-    echo "Set it to e.g. 'script-inputs/released-executables'"
-    echo "or to 'script-inputs/released-executables script-inputs/experimental-executables'."
-    exit 1
+  echo "Error: environment variable EXECUTABLE_FILES is empty."
+  echo "Set it to e.g. 'script-inputs/released-executables'"
+  echo "or to 'script-inputs/released-executables script-inputs/experimental-executables'."
+  exit 1
 fi
 
 # shellcheck disable=SC2086

@@ -2,105 +2,100 @@
 
 set -e
 
-snapshot_protocol () {
-    f_proto_name="$1"
-    f_proto_dir="$2"
+snapshot_protocol() {
+  f_proto_name="$1"
+  f_proto_dir="$2"
 
-    # snapshot protocol alpha into new directory
-    echo "
+  # snapshot protocol alpha into new directory
+  echo "
 Calling: ./scripts/snapshot_alpha $f_proto_name."
-    ./scripts/snapshot_alpha.sh "$f_proto_name"
+  ./scripts/snapshot_alpha.sh "$f_proto_name"
 
-    # link new protocol for the shell and client
-    echo "
+  # link new protocol for the shell and client
+  echo "
 Calling: ./scripts/link_protocol.sh $f_proto_dir."
 
-    # $f_proto_dir might contain a wildcard
-    # shellcheck disable=SC2086
-    ./scripts/link_protocol.sh $f_proto_dir
+  # $f_proto_dir might contain a wildcard
+  # shellcheck disable=SC2086
+  ./scripts/link_protocol.sh $f_proto_dir
 }
 
-
-user_activated_upgrade () {
-    f_proto_dir="$1"
-    f_mig_level="$2"
-    # activate the migration at a specific level
-    echo "
+user_activated_upgrade() {
+  f_proto_dir="$1"
+  f_mig_level="$2"
+  # activate the migration at a specific level
+  echo "
 Calling: ./scripts/user_activated_upgrade.sh $f_proto_dir $f_mig_level."
-    ./scripts/user_activated_upgrade.sh "$f_proto_dir" "$f_mig_level"
+  ./scripts/user_activated_upgrade.sh "$f_proto_dir" "$f_mig_level"
 }
 
-import_snapshot () {
-    f_snapshot_path="$1"
-    f_blockhash="$2"
+import_snapshot() {
+  f_snapshot_path="$1"
+  f_blockhash="$2"
 
-    [ -n "$f_blockhash" ] && f_blockhash_opt="--block $f_blockhash"
+  [ -n "$f_blockhash" ] && f_blockhash_opt="--block $f_blockhash"
 
-    # The command ${snapshot%.(rolling|full|archive} did not worked for no
-    # found reason
-    context_dir="${f_snapshot_path%.rolling}"
-    context_dir="${context_dir%.full}"
-    context_dir="${context_dir%.archive}"
-    context_dir="$tmp_dir/tezos-node-${context_dir##*/}"
-    if [ -d "$context_dir" ]
-    then
-        echo "
+  # The command ${snapshot%.(rolling|full|archive} did not worked for no
+  # found reason
+  context_dir="${f_snapshot_path%.rolling}"
+  context_dir="${context_dir%.full}"
+  context_dir="${context_dir%.archive}"
+  context_dir="$tmp_dir/tezos-node-${context_dir##*/}"
+  if [ -d "$context_dir" ]; then
+    echo "
 Found existing context in directory ${context_dir}
 If you want to re-import the context from ${f_snapshot_path}
 please delete directory ${context_dir}
 
 The context in ${context_dir} will be used for the test."
-    else
-        echo "
-Importing context from $f_snapshot_path into $context_dir."
-        # $f_snapshot_path might be empty
-        # shellcheck disable=SC2086
-        ./octez-node snapshot import "$f_snapshot_path" --data-dir "$context_dir" $f_blockhash_opt
-    fi
-}
-
-generate_identities (){
-    f_context_dir="$1"
-    ./octez-node identity generate --data-dir "$f_context_dir"
-}
-
-patch_yes_node () {
+  else
     echo "
-Patching the code to obtain a yes-node."
-    patch -p1 < ./scripts/yes-node.patch
+Importing context from $f_snapshot_path into $context_dir."
+    # $f_snapshot_path might be empty
+    # shellcheck disable=SC2086
+    ./octez-node snapshot import "$f_snapshot_path" --data-dir "$context_dir" $f_blockhash_opt
+  fi
 }
 
-create_yes_wallet () {
-    yes_wallet="$tmp_dir/yes-wallet"
-    if [ -d "$yes_wallet" ]
-    then
-        echo "
+generate_identities() {
+  f_context_dir="$1"
+  ./octez-node identity generate --data-dir "$f_context_dir"
+}
+
+patch_yes_node() {
+  echo "
+Patching the code to obtain a yes-node."
+  patch -p1 < ./scripts/yes-node.patch
+}
+
+create_yes_wallet() {
+  yes_wallet="$tmp_dir/yes-wallet"
+  if [ -d "$yes_wallet" ]; then
+    echo "
 Found existing yes-wallet in directory ${yes_wallet}.
 The yes-wallet in ${yes_wallet} will be used for the test
 after deleting spurious files ${yes_wallet}/{blocks,wallet_locks}."
-        [ -f "${yes_wallet}/blocks" ] && rm "${yes_wallet}/blocks"
-        [ -f "${yes_wallet}/wallet_lock" ] && rm "${yes_wallet}/wallet_lock"
-    else
-        echo "
+    [ -f "${yes_wallet}/blocks" ] && rm "${yes_wallet}/blocks"
+    [ -f "${yes_wallet}/wallet_lock" ] && rm "${yes_wallet}/wallet_lock"
+  else
+    echo "
 Creating a yes-wallet in ${yes_wallet} with active delegates from ${context_dir}."
-       dune exec devtools/yes_wallet/yes_wallet.exe -- create from context "$context_dir" in "$yes_wallet" --active-bakers-only
-    fi
-    echo "You can now bake for all active delegates"
+    dune exec devtools/yes_wallet/yes_wallet.exe -- create from context "$context_dir" in "$yes_wallet" --active-bakers-only
+  fi
+  echo "You can now bake for all active delegates"
 }
 
 first_hash() {
-    jq -r .hash < "$1"
+  jq -r .hash < "$1"
 }
 
 #setting tmp dir
-if [ -n "$TMP" ]
-then
-    tmp_dir="$TMP"
-elif [ -n "$TMPDIR" ]
-then
-    tmp_dir="$TMPDIR"
+if [ -n "$TMP" ]; then
+  tmp_dir="$TMP"
+elif [ -n "$TMPDIR" ]; then
+  tmp_dir="$TMPDIR"
 else
-    tmp_dir="/tmp"
+  tmp_dir="/tmp"
 fi
 
 usage="Usage:
@@ -155,48 +150,44 @@ https://gitlab.com/tezos/tezos/-/issues/5924
 for context."
 
 #set variable related to protocol, in particular \$proto_version and \$pred_proto_version
-if echo "$1" | grep -q '^[a-z]\+_[0-9][0-9][0-9]$';
-then
-    proto_name="$1"
-    proto_version=$(echo "$proto_name" | cut -d'_' -f2)
+if echo "$1" | grep -q '^[a-z]\+_[0-9][0-9][0-9]$'; then
+  proto_name="$1"
+  proto_version=$(echo "$proto_name" | cut -d'_' -f2)
 
-    proto_dir="src/proto_${proto_version}_*/"
+  proto_dir="src/proto_${proto_version}_*/"
 
-    # strip leading zeros to prevent version being treated as octal
-    proto_version=$(echo "$proto_version" | sed 's/^0*//')
-    pred_proto_version=$(printf "%03d" $((proto_version - 1)))
+  # strip leading zeros to prevent version being treated as octal
+  proto_version=$(echo "$proto_version" | sed 's/^0*//')
+  pred_proto_version=$(printf "%03d" $((proto_version - 1)))
 else
-    pred_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
-    pred_proto_version=$(echo "$pred_proto_name" | cut -d'_' -f2)
+  pred_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+  pred_proto_version=$(echo "$pred_proto_name" | cut -d'_' -f2)
 
-    proto_dir="src/proto_alpha/"
+  proto_dir="src/proto_alpha/"
 fi
 
 # now calls correct scripts and renaming
-if [ -n "$proto_name" ]
-then
-    snapshot_protocol "$proto_name" $proto_dir
+if [ -n "$proto_name" ]; then
+  snapshot_protocol "$proto_name" $proto_dir
 fi
 
 echo "
 Setting environment for test"
 
-if [ -n "$proto_name" ]
-then
-    mig_level=$2
-    snapshot_path=$3
-    blockhash=$4
+if [ -n "$proto_name" ]; then
+  mig_level=$2
+  snapshot_path=$3
+  blockhash=$4
 else
-    mig_level=$1
-    snapshot_path=$2
-    blockhash=$3
+  mig_level=$1
+  snapshot_path=$2
+  blockhash=$3
 fi
 
 # check if \$mig_level is set
-if [ -z "$mig_level" ]
-then
-    echo "$usage"
-    exit 1
+if [ -z "$mig_level" ]; then
+  echo "$usage"
+  exit 1
 fi
 
 user_activated_upgrade $proto_dir "$mig_level"
@@ -206,15 +197,14 @@ pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
 
 # now calls correct scripts and renaming
 
-if [ "$mig_level" -le 28082 ];
-then
-    # Env test use a fresh context and no yes-node/wallet
-    echo "
+if [ "$mig_level" -le 28082 ]; then
+  # Env test use a fresh context and no yes-node/wallet
+  echo "
 The script detected that you will do a migration on the sandbox."
 
-    make
+  make
 
-    echo "
+  echo "
 Use the following commands to start the sandboxed node:
 $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 $ eval \`./src/bin_client/octez-init-sandboxed-client.sh 1\`
@@ -228,27 +218,25 @@ commands above (the script needs not to be run again)."
 
 else # \$mig_level > 28082
 
-    patch_yes_node
+  patch_yes_node
 
-    make
+  make
 
-    if [ -n "$snapshot_path" ] && [ -f "$snapshot_path" ]
-    then
-        import_snapshot "$snapshot_path" "$blockhash"
-        ! [ -f "$context_dir/identity.json" ] && generate_identities "$context_dir"
-        create_yes_wallet
-    else
-        context_dir="path/to/tezos-node-context"
-        echo "
+  if [ -n "$snapshot_path" ] && [ -f "$snapshot_path" ]; then
+    import_snapshot "$snapshot_path" "$blockhash"
+    ! [ -f "$context_dir/identity.json" ] && generate_identities "$context_dir"
+    create_yes_wallet
+  else
+    context_dir="path/to/tezos-node-context"
+    echo "
 No snapshot file provided. Please use the following commands to import a context
 manually:
 
 $ ./octez-node snapshot import <snapshot_file> --data-dir <new/context/dir>
 $ ./octez-node identity generate --data-dir <new/context/dir>"
-    fi
+  fi
 
-
-    echo "
+  echo "
 Use the following commands to start the node with the imported context:
 $ test_directory=\$(mktemp -d -t \"${context_dir##*/}-XXXX\") && cp -r \"$context_dir/.\" \"\$test_directory\"
 $ ./octez-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &

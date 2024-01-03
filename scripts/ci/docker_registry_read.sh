@@ -19,8 +19,8 @@ tag=${image##*:}
 
 token="$(getBearerToken "${username}" "${password}" "${reponame}")"
 if [ -z "$token" ]; then
-    echo "Failed to fetch the Bearer token"
-    exit 1
+  echo "Failed to fetch the Bearer token"
+  exit 1
 fi
 
 readTag "$token" "$reponame" "$tag"

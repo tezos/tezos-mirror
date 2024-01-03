@@ -14,10 +14,9 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 target_tag='latest'
 
 # Find tag with format vX.Y at branch HEAD
-tag_to_promote=$(git tag --points-at HEAD | grep -oE '^v[0-9]{1,3}\.[0-9]{1,3}$' ||:)
+tag_to_promote=$(git tag --points-at HEAD | grep -oE '^v[0-9]{1,3}\.[0-9]{1,3}$' || :)
 
-if [ -z "${tag_to_promote}" ]
-then
+if [ -z "${tag_to_promote}" ]; then
   echo "Error: could not find valid tag like vX.Y at branch HEAD"
   exit 1
 fi
@@ -25,14 +24,12 @@ fi
 echo "### Promoting docker images with tag '${tag_to_promote}' to tag '${target_tag}'"
 
 # Loop over images
-for docker_image in ${docker_images}
-do
+for docker_image in ${docker_images}; do
   echo "### Merging tags for docker image: ${docker_image}"
 
   # Loop over architectures
   amends=''
-  for docker_architecture in ${docker_architectures}
-  do
+  for docker_architecture in ${docker_architectures}; do
     docker pull "${docker_image}:${docker_architecture}_${tag_to_promote}"
     amends="${amends} --amend ${docker_image}:${docker_architecture}_${tag_to_promote}"
   done
