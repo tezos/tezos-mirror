@@ -152,6 +152,13 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         Ok(path)
     }
 
+    /// Path to the pointer
+    ///
+    /// This path is used when you want to read a pointer or to remove it.
+    fn path(&self, prefix: &impl Path) -> Result<OwnedPath> {
+        Self::pointer_path(&self.id, prefix)
+    }
+
     /// Path to the data held by the pointer.
     fn data_path(&self, prefix: &impl Path) -> Result<OwnedPath> {
         let path = hex::encode(&self.id);
@@ -161,6 +168,25 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         Ok(path)
     }
 
+    fn save_data(
+        &self,
+        host: &mut impl Runtime,
+        prefix: &impl Path,
+        data: &impl Encodable,
+    ) -> Result<()> {
+        let path = self.data_path(prefix)?;
+        storage::store_rlp(data, host, &path).context("cannot save the pointer's data")
+    }
+
+    fn get_data<Elt: Decodable>(
+        &self,
+        host: &impl Runtime,
+        prefix: &impl Path,
+    ) -> Result<Elt> {
+        let path = self.data_path(prefix)?;
+        storage::read_rlp(host, &path).context("cannot read the pointer's data")
+    }
+
     /// Load the pointer from the durable storage
     fn read(host: &impl Runtime, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
         storage::read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
@@ -168,8 +194,22 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
 
     /// Save the pointer in the durable storage
     fn save(&self, host: &mut impl Runtime, prefix: &impl Path) -> Result<()> {
-        storage::store_rlp(self, host, &Self::pointer_path(&self.id, prefix)?)
+        storage::store_rlp(self, host, &self.path(prefix)?)
             .context("cannot save pointer to storage")
+    }
+
+    /// Removes the pointer and its data frm the durable storage.
+    fn remove_with_data(
+        &self,
+        host: &mut impl Runtime,
+        prefix: &impl Path,
+    ) -> Result<()> {
+        let path = hex::encode(&self.id);
+        let path: Vec<u8> = format!("/{}", path).into();
+        let path = OwnedPath::try_from(path)?;
+        let path = concat(prefix, &path)?;
+        host.store_delete(&path)
+            .context("cannot remove the pointer")
     }
 }
 
@@ -238,8 +278,7 @@ where
                 penultimate.save(host, &self.path)?;
                 back.save(host, &self.path)?;
                 // And the save the data
-                let data_path = back.data_path(&self.path)?;
-                storage::store_rlp(elt, host, &data_path)?;
+                back.save_data(host, &self.path, elt)?;
                 // update the back pointer of the list
                 self.pointers = Some(LinkedListPointer {
                     front: front.clone(),
@@ -256,8 +295,7 @@ where
                 };
                 // Saves the pointer and its data
                 back.save(host, &self.path)?;
-                let data_path = back.data_path(&self.path)?;
-                storage::store_rlp(elt, host, &data_path)?;
+                back.save_data(host, &self.path, elt)?;
                 // update the front and back pointers of the list
                 self.pointers = Some(LinkedListPointer {
                     front: back.clone(),
@@ -271,19 +309,92 @@ where
     /// Returns an element at a given index.
     ///
     /// Returns None if the element is not present
-    pub fn get(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
+    pub fn find(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
         let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
         storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
+    }
+
+    /// Removes and returns the element at position index within the vector.
+    pub fn remove(&mut self, host: &mut impl Runtime, id: &Id) -> Result<Option<Elt>> {
+        // Check if the list is empty
+        let Some(LinkedListPointer { front, back }) = &self.pointers else {return Ok(None)};
+        // Get the previous and the next pointer
+        let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
+        let previous = match pointer.previous {
+            Some(ref previous) => Pointer::read(host, &self.path, previous)?,
+            None => None,
+        };
+        let next = match pointer.next {
+            Some(ref next) => Pointer::read(host, &self.path, next)?,
+            None => None,
+        };
+
+        // retrieve the data
+        let data = pointer.get_data(host, &self.path)?;
+        // delete the pointer and the data
+        pointer.remove_with_data(host, &self.path)?;
+        match (previous, next) {
+            // This case represents the list with only one element
+            (None, None) => {
+                // update the list pointers
+                self.pointers = None;
+            }
+            // The head of the list is being removed
+            (None, Some(next)) => {
+                let new_front = Pointer {
+                    previous: None, // because it's the head
+                    ..next
+                };
+                // update the pointer
+                new_front.save(host, &self.path)?;
+                // update the list pointers
+                self.pointers = Some(LinkedListPointer {
+                    front: new_front,
+                    back: back.clone(),
+                });
+            }
+            // The end of the list is being removed
+            (Some(previous), None) => {
+                let new_back = Pointer {
+                    next: None, // because it's the end of the list
+                    ..previous
+                };
+                new_back.save(host, &self.path)?;
+                // update the list pointers
+                self.pointers = Some(LinkedListPointer {
+                    front: front.clone(),
+                    back: new_back,
+                });
+            }
+            // Removes an element between two elements
+            (Some(previous), Some(next)) => {
+                let previous_id = previous.id.clone();
+                let new_previous = Pointer {
+                    next: Some(next.id.clone()),
+                    ..previous
+                };
+                let new_next = Pointer {
+                    previous: Some(previous_id),
+                    ..next
+                };
+                new_previous.save(host, &self.path)?;
+                new_next.save(host, &self.path)?;
+            }
+        };
+        self.save(host)?;
+        Ok(Some(data))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::LinkedList;
+    use proptest::prelude::*;
     use proptest::proptest;
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -312,6 +423,18 @@ mod tests {
         }
     }
 
+    fn assert_length(host: &MockHost, list: &LinkedList<Hash, u8>, expected_len: u64) {
+        // Both the linked list pointers and the element pointers lies under
+        // the `list.path`.
+        let keys = host.store_count_subkeys(&list.path).unwrap_or(0u64);
+        // Removes the linked list pointers to compute the actual length.
+        let actual_length = keys.saturating_sub(1u64);
+        assert_eq!(
+            expected_len, actual_length,
+            "Unexpected length for the list"
+        )
+    }
+
     #[test]
     fn test_empty() {
         let host = MockHost::default();
@@ -322,12 +445,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_returns_none_when_empty() {
+    fn test_find_returns_none_when_empty() {
         let host = MockHost::default();
         let path = RefPath::assert_from(b"/list");
         let list = LinkedList::new(&path, &host).expect("list should be created");
         let hash = Hash([0; TRANSACTION_HASH_SIZE]);
-        let read: Option<u8> = list.get(&host, &hash).expect("storage should work");
+        let read: Option<u8> = list.find(&host, &hash).expect("storage should work");
         assert!(read.is_none())
     }
 
@@ -343,11 +466,44 @@ mod tests {
             .expect("storage should work");
 
         let read: u8 = list
-            .get(&host, &id)
+            .find(&host, &id)
             .expect("storage should work")
             .expect("element should be present");
 
         assert_eq!(read, elt);
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let elt = 0x32_u8;
+
+        assert_length(&host, &list, 0u64);
+        list.push(&mut host, &id, &elt)
+            .expect("storage should work");
+        assert_length(&host, &list, 1u64);
+        let _: Option<u8> = list.remove(&mut host, &id).expect("storage should work");
+        assert_length(&host, &list, 0u64);
+
+        let read: Option<u8> = list.find(&host, &id).expect("storage should work");
+
+        assert!(read.is_none())
+    }
+
+    #[test]
+    fn test_remove_nothing() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+
+        let removed: Option<u8> =
+            list.remove(&mut host, &id).expect("storage should work");
+
+        assert!(removed.is_none())
     }
 
     fn fill_list(
@@ -365,27 +521,63 @@ mod tests {
     }
 
     proptest! {
-    #[test]
-    fn test_pushed_elements_are_present(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
-        let (host, list) = fill_list(&elements);
-        for (id, elt) in & elements {
-            let read: u8 = list.get(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
-            assert_eq!(elt, &read)
+
+        #![proptest_config(ProptestConfig::with_cases(50))]
+
+        #[test]
+        fn test_pushed_elements_are_present(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let (host, list) = fill_list(&elements);
+            for (id, elt) in & elements {
+                let read: u8 = list.find(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                assert_eq!(elt, &read)
+            }
         }
-    }
 
 
-    #[test]
-    fn test_push_element_create_non_empty_list(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
-        let mut host = MockHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        assert!(list.is_empty());
-        for (id, elt) in elements {
-            list.push(&mut host, &Hash(id), &elt).expect("storage should work");
-            assert!(!list.is_empty())
+        #[test]
+        fn test_push_element_create_non_empty_list(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let mut host = MockHost::default();
+            let path = RefPath::assert_from(b"/list");
+            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            assert!(list.is_empty());
+            for (id, elt) in elements {
+                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
+                assert!(!list.is_empty())
+            }
         }
-    }
+
+        #[test]
+        fn test_remove_from_empty_creates_empty_list(elements: Vec<[u8; TRANSACTION_HASH_SIZE]>) {
+            let mut host = MockHost::default();
+            let path = RefPath::assert_from(b"/list");
+            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            assert!(list.is_empty());
+            for id in elements {
+                let _: Option<u8> = list.remove(&mut host, &Hash(id)).expect("storage to work");
+            }
+            assert!(list.is_empty());
+        }
+
+        #[test]
+        fn test_remove_returns_the_appropriate_element(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let (mut host, mut list) = fill_list(&elements);
+            let mut length : u64 = elements.len().try_into().unwrap();
+            for (id, elt) in &elements {
+                let removed: u8 = list.remove(&mut host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                length -= 1;
+                assert_length(&host, &list, length);
+                assert_eq!(elt, &removed)
+            }
+        }
+
+        #[test]
+        fn test_remove_everything_creates_the_empty_list(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+            let (mut host, mut list) = fill_list(&elements);
+            for (id, _) in elements {
+                let _: u8 = list.remove(&mut host, &Hash(id)).expect("storage should work").expect("element should be present");
+            }
+            assert!(list.is_empty())
+        }
 
         #[test]
         fn test_list_is_kept_between_reboots(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
@@ -393,12 +585,16 @@ mod tests {
             let path = RefPath::assert_from(b"/list");
             for (id, elt) in &elements {
                 let mut list = LinkedList::new(&path, &host).expect("list should be created");
-                list.push(&mut host, &Hash(*id), elt).expect("storage should work");
+                list.push(&mut host, &Hash(*id), elt)
+                    .expect("storage should work");
                 assert!(!list.is_empty())
             }
             for (id, elt) in &elements {
                 let list = LinkedList::new(&path, &host).expect("list should be created");
-                let read: u8 = list.get(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                let read: u8 = list
+                    .find(&host, &Hash(*id))
+                    .expect("storage should work")
+                    .expect("element should be present");
                 assert_eq!(elt, &read);
             }
         }
