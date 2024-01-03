@@ -21,30 +21,31 @@ use tezos_smart_rollup_host::{
 pub struct LinkedList<Id, Elt>
 where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone,
-    Elt: Encodable + Decodable,
+    Elt: Encodable + Decodable + Clone,
 {
     /// Absolute path to queue
     path: OwnedPath,
     /// None indicates an empty list
-    pointers: Option<LinkedListPointer<Id>>,
+    pointers: Option<LinkedListPointer<Id, Elt>>,
     _type: PhantomData<(Id, Elt)>,
 }
 
 /// Pointers that indicates the front and the back of the list
-struct LinkedListPointer<Id> {
-    front: Pointer<Id>,
-    back: Pointer<Id>,
+struct LinkedListPointer<Id, Elt> {
+    front: Pointer<Id, Elt>,
+    back: Pointer<Id, Elt>,
 }
 
 /// Each element in the list has a pointer
 #[derive(Clone, Debug)]
-struct Pointer<Id> {
+struct Pointer<Id, Elt> {
     /// Current index of the pointer
     id: Id,
     /// Previous index of the pointer
     previous: Option<Id>,
     /// Next index of the pointer
     next: Option<Id>,
+    _type: PhantomData<Elt>,
 }
 
 /// Helper function to decode a path from rlp
@@ -56,7 +57,7 @@ fn decode_path(
     OwnedPath::try_from(path).map_err(|_| DecoderError::Custom("not a path"))
 }
 
-impl<Id: Decodable> Decodable for LinkedListPointer<Id> {
+impl<Id: Decodable, Elt> Decodable for LinkedListPointer<Id, Elt> {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(rlp::DecoderError::RlpExpectedToBeList);
@@ -71,7 +72,7 @@ impl<Id: Decodable> Decodable for LinkedListPointer<Id> {
     }
 }
 
-impl<Id: Encodable> Encodable for LinkedListPointer<Id> {
+impl<Id: Encodable, Elt> Encodable for LinkedListPointer<Id, Elt> {
     fn rlp_append(&self, stream: &mut RlpStream) {
         stream.begin_list(2);
         stream.append(&self.front);
@@ -79,7 +80,7 @@ impl<Id: Encodable> Encodable for LinkedListPointer<Id> {
     }
 }
 
-impl<Id: Decodable> Decodable for Pointer<Id> {
+impl<Id: Decodable, Elt> Decodable for Pointer<Id, Elt> {
     fn decode(decoder: &Rlp) -> Result<Self, rlp::DecoderError> {
         if !decoder.is_list() {
             return Err(rlp::DecoderError::RlpExpectedToBeList);
@@ -92,11 +93,16 @@ impl<Id: Decodable> Decodable for Pointer<Id> {
         let previous = decode_option(&next(&mut it)?, "previous")?;
         let next = decode_option(&next(&mut it)?, "next")?;
 
-        Ok(Pointer { id, next, previous })
+        Ok(Pointer {
+            id,
+            next,
+            previous,
+            _type: PhantomData,
+        })
     }
 }
 
-impl<Id: Encodable> Encodable for Pointer<Id> {
+impl<Id: Encodable, Elt> Encodable for Pointer<Id, Elt> {
     fn rlp_append(&self, stream: &mut RlpStream) {
         stream.begin_list(3);
         stream.append(&self.id);
@@ -108,7 +114,7 @@ impl<Id: Encodable> Encodable for Pointer<Id> {
 impl<Id, Elt> Encodable for LinkedList<Id, Elt>
 where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone,
-    Elt: Encodable + Decodable,
+    Elt: Encodable + Decodable + Clone,
 {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
@@ -120,7 +126,7 @@ where
 impl<Id, Elt> Decodable for LinkedList<Id, Elt>
 where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone,
-    Elt: Encodable + Decodable,
+    Elt: Encodable + Decodable + Clone,
 {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
@@ -143,7 +149,9 @@ where
 }
 
 #[allow(dead_code)]
-impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
+impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
+    Pointer<Id, Elt>
+{
     fn pointer_path(id: &Id, prefix: &impl Path) -> Result<OwnedPath> {
         let path = hex::encode(id);
         let path: Vec<u8> = format!("/{}/pointer", path).into();
@@ -172,17 +180,13 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
         &self,
         host: &mut impl Runtime,
         prefix: &impl Path,
-        data: &impl Encodable,
+        data: &Elt,
     ) -> Result<()> {
         let path = self.data_path(prefix)?;
         storage::store_rlp(data, host, &path).context("cannot save the pointer's data")
     }
 
-    fn get_data<Elt: Decodable>(
-        &self,
-        host: &impl Runtime,
-        prefix: &impl Path,
-    ) -> Result<Elt> {
+    fn get_data(&self, host: &impl Runtime, prefix: &impl Path) -> Result<Elt> {
         let path = self.data_path(prefix)?;
         storage::read_rlp(host, &path).context("cannot read the pointer's data")
     }
@@ -217,7 +221,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>> Pointer<Id> {
 impl<Id, Elt> LinkedList<Id, Elt>
 where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone,
-    Elt: Encodable + Decodable,
+    Elt: Encodable + Decodable + Clone,
 {
     /// Load a list from the storage.
     /// If the list does not exist, a new empty list is created.
@@ -257,7 +261,7 @@ where
     /// (example: it can be the hash of the element).
     pub fn push(&mut self, host: &mut impl Runtime, id: &Id, elt: &Elt) -> Result<()> {
         // Check if the path already exist
-        if Pointer::read(host, &self.path, id)?.is_some() {
+        if (Pointer::read(host, &self.path, id)? as Option<Pointer<Id, Elt>>).is_some() {
             return Ok(());
         }
         match &self.pointers {
@@ -273,6 +277,7 @@ where
                     id: id.clone(),
                     previous: Some(penultimate.id.clone()), // Points to the penultimate pointer
                     next: None, // None because there is no element after
+                    _type: PhantomData,
                 };
                 // Saves the pointer
                 penultimate.save(host, &self.path)?;
@@ -292,6 +297,7 @@ where
                     id: id.clone(),
                     previous: None, // None because it's the only element of the list
                     next: None,     // None because it's the only element of the list
+                    _type: PhantomData,
                 };
                 // Saves the pointer and its data
                 back.save(host, &self.path)?;
@@ -310,7 +316,7 @@ where
     ///
     /// Returns None if the element is not present
     pub fn find(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
-        let Some(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
+        let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(host, &self.path, id)? else {return Ok(None)};
         storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
     }
 
