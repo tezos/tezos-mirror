@@ -83,8 +83,8 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
                 host,
                 Debug,
                 "Storing chunk {} of sequencer blueprint number {}",
-                seq_blueprint.chunk_index,
-                seq_blueprint.number
+                seq_blueprint.blueprint.chunk_index,
+                seq_blueprint.blueprint.number
             );
             store_sequencer_blueprint(host, seq_blueprint)?
         }
