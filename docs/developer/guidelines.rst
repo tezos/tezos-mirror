@@ -65,6 +65,14 @@ If the evolution is needed to fix some code that does *not* fully implement its 
 Thus, the difference between ``TODO`` and ``FIXME`` tags is a semantic one,  reflecting the full/partial implementation of the specification.
 Consequently, when the specification evolves to become more demanding, some ``TODO`` tags corresponding to *potential* evolutions may have to be recasted as ``FIXME`` tags, corresponding to *required* evolutions.
 
+Another consequence of the fact that FIXME tags indicate an already-specified remaining work, they can point to a merge request (MR) instead of an issue, especially when the remaining work has already been started. This may correspond to at least the following familiar scenarios:
+
+1. You are making a list of small-sized MRs to fix one big issue, and in one MR you want to point the reviewers to other MRs already started.
+2. While working on some MR, you notice a problem with your code, by which it derives from the specification. But you already have one approval for the current MR and you don't want to invalidate it by adding a significant chunk of code. So you fix the problem in a separate MR from the one you are working on.
+
+In the above cases, it would be possible to create a new (sub-)issue, and reference it in the code (and also in the MR). But that would add a level of indirection, both for the person doing the work and for the person reviewing the work.
+Therefore, in such cases, it can be more convenient to refer to an MR directly.
+
 Note that the reference to an existing issue or MR on the first line is mandatory, to facilitate searches of specific evolutions.
 These tags might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`, e.g. to signal tags that refer to non-existent issues or MRs, to closed issues, or to already merged MRs.
 The reference to an issue may be one of:
