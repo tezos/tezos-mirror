@@ -67,13 +67,6 @@ fn compute<Host: Runtime>(
         if block_in_progress.would_overflow() {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
             // there should be an upper bound on gasLimit
-
-            if host.reboot_left()? <= 1 {
-                // TODO: #5873
-                // this case needs to be handle properly
-                log!(host, Info, "Warning: maximum number of reboots reached, some transactions were lost");
-                return Ok(ComputationResult::Finished);
-            }
             return Ok(ComputationResult::RebootNeeded);
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
@@ -180,7 +173,6 @@ fn compute_bip<Host: KernelRuntime>(
                 &block_in_progress.estimated_ticks
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
-            storage::add_reboot_flag(host)?;
             host.mark_for_reboot()?
         }
         ComputationResult::Finished => {
@@ -305,7 +297,9 @@ mod tests {
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_ethereum::tx_signature::TxSignature;
+    use tezos_smart_rollup_core::SmartRollupCore;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
@@ -1195,6 +1189,18 @@ mod tests {
 
     const TOO_MANY_TRANSACTIONS: u64 = 500;
 
+    fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
+        const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
+        host.store_read_all(&REBOOT_PATH).is_ok()
+    }
+
+    fn assert_marked_for_reboot(host: &impl SmartRollupCore) {
+        assert!(
+            is_marked_for_reboot(host),
+            "The kernel should have been marked for reboot"
+        );
+    }
+
     #[test]
     fn test_reboot_many_tx_one_proposal() {
         // init host
@@ -1241,10 +1247,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host)
     }
 
     #[test]
@@ -1298,10 +1301,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host);
 
         let bip = read_block_in_progress(&host)
             .expect("Should be able to read the block in progress")

@@ -2549,11 +2549,13 @@ let test_kernel_upgrade_failing_migration =
   @@ fun protocol ->
   let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
   let installee = "failed_migration" in
-  let* sc_rollup_node, node, client, evm_node, original_kernel_boot_wasm =
-    gen_test_kernel_upgrade ~base_installee ~installee protocol
+  let* sc_rollup_node, node, client, evm_node, _original_kernel_boot_wasm =
+    gen_test_kernel_upgrade
+      ~base_installee
+      ~installee
+      ~should_fail:true
+      protocol
   in
-  (* Fallback mechanism is triggered, no block is produced at that level. *)
-  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   (* We make sure that we can't read under the tmp file, after migration failed,
      everything is reverted. *)
   let* tmp_dummy =
@@ -2567,21 +2569,17 @@ let test_kernel_upgrade_failing_migration =
   (match tmp_dummy with
   | Some _ -> failwith "Nothing should be readable under the temporary dir."
   | None -> ()) ;
-  let* kernel_after_migration_failed = get_kernel_boot_wasm ~sc_rollup_node in
-  (* The upgrade succeeded, but the fallback mechanism was activated, so the kernel
-     after the upgrade/migration is still the previous one. *)
-  Check.((original_kernel_boot_wasm = kernel_after_migration_failed) string)
-    ~error_msg:(sf "Unexpected `boot.wasm` after migration failed.") ;
   (* We ensure that the fallback mechanism went well by checking if the
      kernel still produces blocks since it has booted back to the previous,
      original kernel. *)
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   let endpoint = Evm_node.endpoint evm_node in
   check_block_progression
     ~sc_rollup_node
     ~node
     ~client
     ~endpoint
-    ~expected_block_level:2
+    ~expected_block_level:3
 
 let send_raw_transaction_request raw_tx =
   Evm_node.

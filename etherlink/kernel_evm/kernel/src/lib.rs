@@ -208,32 +208,48 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
 
 pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-    if storage::was_rebooted(host)? {
-        // kernel was rebooted
-        log!(
-            host,
-            Info,
-            "Kernel was rebooted. Reboot left: {}\n",
-            host.reboot_left()?
-        );
-        storage::delete_reboot_flag(host)?;
-    } else {
-        // first kernel run of the level
-        match stage_zero(host)? {
-            MigrationStatus::None | MigrationStatus::Done => {
-                set_kernel_version(host)?;
-                let smart_rollup_address = retrieve_smart_rollup_address(host)
-                    .context("Failed to retrieve smart rollup address")?;
-                let ticketer = read_ticketer(host);
-                let admin = read_admin(host);
-                let is_sequencer = is_sequencer(host)?;
-                stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
-                    .context("Failed during stage 1")?
-            }
-            MigrationStatus::InProgress => return Ok(()),
+
+    // We always start by doing the migration if needed.
+    match stage_zero(host)? {
+        MigrationStatus::None => {
+            // No migration in progress. However as we want to have the kernel
+            // version written in the storage, we check for its existence
+            // at every kernel run.
+            // The alternative is to enforce every new kernels use the
+            // installer configuration to initialize this value.
+            set_kernel_version(host)?
+        }
+        // If the migration is still in progress or was finished, we abort the
+        // current kernel run.
+        MigrationStatus::InProgress => {
+            host.mark_for_reboot()?;
+            return Ok(());
+        }
+        MigrationStatus::Done => {
+            // If a migrtion was finished, we update the kernel version
+            // in the storage.
+            set_kernel_version(host)?;
+            host.mark_for_reboot()?;
+            return Ok(());
         }
     };
+
+    // Fetch kernel metadata.
+    let smart_rollup_address = retrieve_smart_rollup_address(host)
+        .context("Failed to retrieve smart rollup address")?;
+    let ticketer = read_ticketer(host);
+    let admin = read_admin(host);
+    let is_sequencer = is_sequencer(host)?;
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+
+    // Run the stage one, this is a no-op if the inbox was already consumed
+    // by another kernel run. This ensures that if the migration does not
+    // consume all reboots. At least one reboot will be used to consume the
+    // inbox.
+    stage_one(host, smart_rollup_address, ticketer, admin, is_sequencer)
+        .context("Failed during stage 1")?;
+
+    // Start processing blueprints
     stage_two(host, chain_id, base_fee_per_gas).context("Failed during stage 2")
 }
 
@@ -331,8 +347,10 @@ mod tests {
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
-    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
+    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
@@ -414,6 +432,18 @@ mod tests {
         }
     }
 
+    fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
+        const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
+        host.store_read_all(&REBOOT_PATH).is_ok()
+    }
+
+    fn assert_marked_for_reboot(host: &impl SmartRollupCore) {
+        assert!(
+            is_marked_for_reboot(host),
+            "The kernel should have been marked for reboot"
+        );
+    }
+
     #[test]
     fn test_reboot_during_block_production() {
         // init host
@@ -475,9 +505,6 @@ mod tests {
         );
 
         // test reboot is set
-        assert!(
-            storage::was_rebooted(&mut host).expect("Should have found flag"),
-            "Flag should be set"
-        );
+        assert_marked_for_reboot(host.host)
     }
 }

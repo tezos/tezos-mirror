@@ -180,17 +180,21 @@ pub fn read_input<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: &Option<ContractKt1Hash>,
     admin: &Option<ContractKt1Hash>,
+    inbox_is_empty: &mut bool,
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
 
     match input {
-        Some(input) => Ok(InputResult::parse(
-            host,
-            input,
-            smart_rollup_address,
-            ticketer,
-            admin,
-        )),
+        Some(input) => {
+            *inbox_is_empty = false;
+            Ok(InputResult::parse(
+                host,
+                input,
+                smart_rollup_address,
+                ticketer,
+                admin,
+            ))
+        }
         None => Ok(InputResult::NoInput),
     }
 }
@@ -279,16 +283,36 @@ pub fn read_inbox<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<InboxContent, anyhow::Error> {
+) -> Result<Option<InboxContent>, anyhow::Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
         sequencer_blueprints: vec![],
     };
+    // The mutable variable is used to retrieve the information of whether the
+    // inbox was empty or not. As we consume all the inbox in one go, if the
+    // variable remains true, that means that the inbox was already consumed
+    // during this kernel run.
+    let mut inbox_is_empty = true;
     loop {
-        match read_input(host, smart_rollup_address, &ticketer, &admin)? {
+        match read_input(
+            host,
+            smart_rollup_address,
+            &ticketer,
+            &admin,
+            &mut inbox_is_empty,
+        )? {
             InputResult::NoInput => {
-                return Ok(res);
+                if inbox_is_empty {
+                    // If `inbox_is_empty` is true, that means we haven't see
+                    // any input in the current call of `read_inbox`. Therefore,
+                    // the inbox of this level has already been consumed.
+                    return Ok(None);
+                } else {
+                    // If it's a `NoInput` and `inbox_is_empty` is false, we
+                    // have simply reached the end of the inbox.
+                    return Ok(Some(res));
+                }
             }
             InputResult::Unparsable => (),
             InputResult::Input(Input::SimpleTransaction(tx)) => {
@@ -319,11 +343,7 @@ pub fn read_inbox<Host: Runtime>(
                 // simulation and all the previous and next transactions are
                 // discarded.
                 simulation::start_simulation_mode(host)?;
-                return Ok(InboxContent {
-                    kernel_upgrade: None,
-                    transactions: vec![],
-                    sequencer_blueprints: vec![],
-                });
+                return Ok(None);
             }
             InputResult::Input(Input::Info(info)) => {
                 store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
@@ -465,8 +485,9 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+            .unwrap()
+            .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -488,8 +509,9 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+            .unwrap()
+            .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -527,7 +549,9 @@ mod tests {
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         host.add_transfer(payload, &transfer_metadata);
 
-        let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender)).unwrap();
+        let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender))
+            .unwrap()
+            .unwrap();
         let expected_upgrade = Some(KernelUpgrade { preimage_hash });
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
@@ -683,8 +707,9 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+            .unwrap()
+            .unwrap();
         assert_eq!(
             inbox_content,
             InboxContent {
@@ -698,8 +723,9 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+            .unwrap()
+            .unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash,
@@ -752,12 +778,31 @@ mod tests {
 
         host.add_external(framed);
 
-        let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+            .unwrap()
+            .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
+    fn empty_inbox_returns_none() {
+        let mut host = MockHost::default();
+
+        // Even reading the inbox with only the default elements returns
+        // an empty inbox content. As we test in isolation there is nothing
+        // in the inbox, we mock it by adding a single input.
+        host.add_external(Bytes::from(vec![]));
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        assert!(inbox_content.is_some());
+
+        // Reading again the inbox returns no inbox content at all.
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+        assert!(inbox_content.is_none());
     }
 }
