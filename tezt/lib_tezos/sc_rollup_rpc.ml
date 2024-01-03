@@ -38,7 +38,8 @@ let get_global_block_aux ?(block = "head") ?(path = []) () =
 
 let get_global_block = get_global_block_aux ~path:[]
 
-let get_global_block_inbox = get_global_block_aux ~path:["inbox"]
+let get_global_block_inbox ?(block = "head") () =
+  make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
 
 let get_global_block_hash = get_global_block_aux ~path:["hash"]
 

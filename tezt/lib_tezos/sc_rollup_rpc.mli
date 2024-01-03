@@ -42,7 +42,8 @@ val get_global_smart_rollup_address : unit -> string RPC_core.t
 val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
-val get_global_block_inbox : ?block:string -> unit -> JSON.t RPC_core.t
+val get_global_block_inbox :
+  ?block:string -> unit -> RPC.smart_rollup_inbox RPC_core.t
 
 (** RPC: [GET global/block/<block>/hash]. *)
 val get_global_block_hash : ?block:string -> unit -> JSON.t RPC_core.t

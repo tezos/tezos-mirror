@@ -453,31 +453,6 @@ let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
   let* () = Client.bake_for_and_wait client in
   return (List.rev rhashes)
 
-let parse_inbox json =
-  let go () =
-    return JSON.(json |-> "old_levels_messages", json |-> "level" |> as_int)
-  in
-  Lwt.catch go @@ fun exn ->
-  failwith
-    (Printf.sprintf
-       "Unable to parse inbox %s\n%s"
-       (JSON.encode json)
-       (Printexc.to_string exn))
-
-let get_inbox_from_tezos_node client =
-  let* inbox =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_smart_rollups_all_inbox ()
-  in
-  parse_inbox inbox
-
-let get_inbox_from_sc_rollup_node sc_rollup_node =
-  let* inbox =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_inbox ()
-  in
-  parse_inbox inbox
-
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
 
@@ -502,13 +477,21 @@ let test_rollup_node_inbox ?(extra_tags = []) ~variant scenario ~kind =
   @@ fun _protocol sc_rollup_node sc_rollup node client ->
   let* () = scenario sc_rollup_node sc_rollup node client in
   let* inbox_from_sc_rollup_node =
-    get_inbox_from_sc_rollup_node sc_rollup_node
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_inbox ()
   in
-  let* inbox_from_tezos_node = get_inbox_from_tezos_node client in
+  let* inbox_from_tezos_node =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_all_inbox ()
+  in
+  let tup_from_struct RPC.{old_levels_messages; level; current_messages_hash} =
+    (old_levels_messages, level, current_messages_hash)
+  in
   return
   @@ Check.(
-       (inbox_from_sc_rollup_node = inbox_from_tezos_node)
-         (tuple2 json int)
+       (tup_from_struct inbox_from_sc_rollup_node
+       = tup_from_struct inbox_from_tezos_node)
+         (tuple3 string int (option string))
          ~error_msg:"expected value %R, got %L")
 
 let basic_scenario sc_rollup_node sc_rollup _node client =

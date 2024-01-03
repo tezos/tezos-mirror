@@ -927,9 +927,23 @@ val get_chain_block_context_smart_rollups_all :
 val get_chain_block_context_smart_rollups_smart_rollup_staker_games :
   ?chain:string -> ?block:string -> staker:string -> string -> unit -> JSON.t t
 
+(** this type is smaller than the actual encoding and can be enhance
+    on need. *)
+type smart_rollup_inbox = {
+  old_levels_messages : string;
+      (** latest inbox hash. backpointer, and index are not kept from
+          the real encoding. *)
+  level : int;
+  current_messages_hash : string option;
+      (** current_messages_hash is only known in the protocol, and
+          does not exists in the rollup node hence the option.  *)
+}
+
+val smart_rollup_inbox_from_json : JSON.t -> smart_rollup_inbox
+
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/all/inbox] *)
 val get_chain_block_context_smart_rollups_all_inbox :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> smart_rollup_inbox t
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/genesis_info] *)
 val get_chain_block_context_smart_rollups_smart_rollup_genesis_info :
