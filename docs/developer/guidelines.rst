@@ -65,7 +65,8 @@ If the evolution is needed to fix some code that does *not* fully implement its 
 Thus, the difference between ``TODO`` and ``FIXME`` tags is a semantic one,  reflecting the full/partial implementation of the specification.
 Consequently, when the specification evolves to become more demanding, some ``TODO`` tags corresponding to *potential* evolutions may have to be recasted as ``FIXME`` tags, corresponding to *required* evolutions.
 
-Note that the reference to an existing issue or merge request on the first line is mandatory, to facilitate searches of evolutions corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+Note that the reference to an existing issue or MR on the first line is mandatory, to facilitate searches of specific evolutions.
+These tags might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`, e.g. to signal tags that refer to non-existent issues or MRs, to closed issues, or to already merged MRs.
 The reference to an issue may be one of:
 
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
