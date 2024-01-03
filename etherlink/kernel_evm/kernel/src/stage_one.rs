@@ -15,6 +15,11 @@ use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
 
+pub enum Configuration {
+    Proxy,
+    Sequencer { delayed_bridge: ContractKt1Hash },
+}
+
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
@@ -47,14 +52,19 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    delayed_bridge: Option<ContractKt1Hash>,
+    delayed_bridge: ContractKt1Hash,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         kernel_upgrade,
         transactions: _,
         sequencer_blueprints,
-    }) = read_inbox(host, smart_rollup_address, ticketer, admin, delayed_bridge)?
-    {
+    }) = read_inbox(
+        host,
+        smart_rollup_address,
+        ticketer,
+        admin,
+        Some(delayed_bridge),
+    )? {
         // TODO: store delayed inbox messages (transactions).
         // Store the blueprints.
         for seq_blueprint in sequencer_blueprints {
@@ -80,18 +90,18 @@ pub fn fetch<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    delayed_bridge: Option<ContractKt1Hash>,
-    is_sequencer: bool,
+    config: Configuration,
 ) -> Result<(), anyhow::Error> {
-    if is_sequencer {
-        fetch_sequencer_blueprints(
+    match config {
+        Configuration::Sequencer { delayed_bridge } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
             ticketer,
             admin,
             delayed_bridge,
-        )
-    } else {
-        fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
+        ),
+        Configuration::Proxy => {
+            fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
+        }
     }
 }

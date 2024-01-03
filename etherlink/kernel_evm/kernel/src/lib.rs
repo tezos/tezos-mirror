@@ -10,7 +10,7 @@ use crate::error::UpgradeProcessError::Fallback;
 use crate::inbox::KernelUpgrade;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
-use crate::stage_one::fetch;
+use crate::stage_one::{fetch, Configuration};
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 use crate::upgrade::upgrade_kernel;
 use crate::Error::UpgradeError;
@@ -92,8 +92,7 @@ pub fn stage_one<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    delayed_bridge: Option<ContractKt1Hash>,
-    is_sequencer: bool,
+    configuration: Configuration,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage one.");
     log!(
@@ -104,14 +103,7 @@ pub fn stage_one<Host: Runtime>(
         admin
     );
 
-    fetch(
-        host,
-        smart_rollup_address,
-        ticketer,
-        admin,
-        delayed_bridge,
-        is_sequencer,
-    )
+    fetch(host, smart_rollup_address, ticketer, admin, configuration)
 }
 
 fn produce_and_upgrade<Host: KernelRuntime>(
@@ -216,6 +208,22 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     }
 }
 
+fn fetch_configuration<Host: Runtime>(host: &Host) -> anyhow::Result<Configuration> {
+    let is_sequencer = is_sequencer(host)?;
+    if is_sequencer {
+        let delayed_bridge = read_delayed_transaction_bridge(host)
+            // The sequencer must declare a delayed transaction bridge. This
+            // default value is only to facilitate the testing.
+            .unwrap_or_else(|| {
+                ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                    .unwrap()
+            });
+        Ok(Configuration::Sequencer { delayed_bridge })
+    } else {
+        Ok(Configuration::Proxy)
+    }
+}
+
 pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
@@ -249,23 +257,15 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed to retrieve smart rollup address")?;
     let ticketer = read_ticketer(host);
     let admin = read_admin(host);
-    let delayed_bridge = read_delayed_transaction_bridge(host);
-    let is_sequencer = is_sequencer(host)?;
+    let configuration = fetch_configuration(host)?;
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    stage_one(
-        host,
-        smart_rollup_address,
-        ticketer,
-        admin,
-        delayed_bridge,
-        is_sequencer,
-    )
-    .context("Failed during stage 1")?;
+    stage_one(host, smart_rollup_address, ticketer, admin, configuration)
+        .context("Failed during stage 1")?;
 
     // Start processing blueprints
     stage_two(host, chain_id, base_fee_per_gas).context("Failed during stage 2")
