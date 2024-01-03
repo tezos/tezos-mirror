@@ -3816,6 +3816,15 @@ module Sc_rollup : sig
       Raw_level.t ->
       is_reveal_enabled:is_reveal_enabled ->
       serialized t tzresult Lwt.t
+
+    module Dal_helpers : sig
+      val valid_published_level :
+        dal_attestation_lag:int ->
+        origination_level:Raw_level.t ->
+        commit_inbox_level:Raw_level.t ->
+        published_level:Raw_level.t ->
+        bool
+    end
   end
 
   module Game : sig

@@ -110,16 +110,18 @@ let storage_invariant_broken published_level index =
     Raw_level.pp
     published_level
 
-(** Should match the criteria defined in {!Sc_rollup_proof_repr.page_level_is_valid}. *)
 let page_level_is_valid ~dal_attestation_lag ~published_level ~origination_level
     ~inbox_level =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6263
-     Share code with {!Sc_rollup_proof_repr.page_level_is_valid}. *)
-  let not_too_old = published_level > origination_level in
-  let not_too_recent =
-    Int32.(add published_level (of_int dal_attestation_lag) <= inbox_level)
-  in
-  not_too_old && not_too_recent
+  let origination_level_res = Raw_level.of_int32 origination_level in
+  let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
+  match (origination_level_res, commit_inbox_level_res) with
+  | Ok origination_level, Ok commit_inbox_level ->
+      Alpha_context.Sc_rollup.Proof.Dal_helpers.valid_published_level
+        ~dal_attestation_lag
+        ~origination_level
+        ~commit_inbox_level
+        ~published_level
+  | _ -> false
 
 let slot_pages ~dal_attestation_lag ~inbox_level node_ctxt
     Dal.Slot.Header.{published_level; index} =
@@ -131,7 +133,7 @@ let slot_pages ~dal_attestation_lag ~inbox_level node_ctxt
     not
     @@ page_level_is_valid
          ~dal_attestation_lag
-         ~published_level:(Raw_level.to_int32 published_level)
+         ~published_level
          ~origination_level
          ~inbox_level
   then return_none
@@ -166,7 +168,7 @@ let page_content ~dal_attestation_lag ~inbox_level node_ctxt page_id =
     not
     @@ page_level_is_valid
          ~dal_attestation_lag
-         ~published_level:(Raw_level.to_int32 published_level)
+         ~published_level
          ~origination_level
          ~inbox_level
   then return_none
