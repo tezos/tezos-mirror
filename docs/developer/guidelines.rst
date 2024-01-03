@@ -55,7 +55,7 @@ When the place of the future evolution is known in advance (e.g. a given functio
 
 .. code-block:: ocaml
 
-    (* TODO: <reference to issue or merge request>
+    (* TODO: <reference to issue>
        <one-line explanation>
        <Add long explanation if the issue description is not the right place.>
     *)
