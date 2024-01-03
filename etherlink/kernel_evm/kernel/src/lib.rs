@@ -16,6 +16,7 @@ use crate::upgrade::upgrade_kernel;
 use crate::Error::UpgradeError;
 use anyhow::Context;
 use block::ComputationResult;
+use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
@@ -38,6 +39,7 @@ mod block;
 mod block_in_progress;
 mod blueprint;
 mod blueprint_storage;
+mod delayed_inbox;
 mod error;
 mod inbox;
 mod indexable_storage;
@@ -92,7 +94,7 @@ pub fn stage_one<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    configuration: Configuration,
+    configuration: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage one.");
     log!(
@@ -208,7 +210,7 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     }
 }
 
-fn fetch_configuration<Host: Runtime>(host: &Host) -> anyhow::Result<Configuration> {
+fn fetch_configuration<Host: Runtime>(host: &mut Host) -> anyhow::Result<Configuration> {
     let is_sequencer = is_sequencer(host)?;
     if is_sequencer {
         let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -218,7 +220,11 @@ fn fetch_configuration<Host: Runtime>(host: &Host) -> anyhow::Result<Configurati
                 ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
                     .unwrap()
             });
-        Ok(Configuration::Sequencer { delayed_bridge })
+        let delayed_inbox = Box::new(DelayedInbox::new(host)?);
+        Ok(Configuration::Sequencer {
+            delayed_bridge,
+            delayed_inbox,
+        })
     } else {
         Ok(Configuration::Proxy)
     }
@@ -257,15 +263,21 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed to retrieve smart rollup address")?;
     let ticketer = read_ticketer(host);
     let admin = read_admin(host);
-    let configuration = fetch_configuration(host)?;
+    let mut configuration = fetch_configuration(host)?;
     let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    stage_one(host, smart_rollup_address, ticketer, admin, configuration)
-        .context("Failed during stage 1")?;
+    stage_one(
+        host,
+        smart_rollup_address,
+        ticketer,
+        admin,
+        &mut configuration,
+    )
+    .context("Failed during stage 1")?;
 
     // Start processing blueprints
     stage_two(host, chain_id, base_fee_per_gas).context("Failed during stage 2")

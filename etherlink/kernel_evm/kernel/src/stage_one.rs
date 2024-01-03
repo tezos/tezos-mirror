@@ -5,6 +5,7 @@
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
 use crate::current_timestamp;
+use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
 use crate::storage::store_kernel_upgrade;
@@ -17,7 +18,10 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 pub enum Configuration {
     Proxy,
-    Sequencer { delayed_bridge: ContractKt1Hash },
+    Sequencer {
+        delayed_bridge: ContractKt1Hash,
+        delayed_inbox: Box<DelayedInbox>,
+    },
 }
 
 pub fn fetch_inbox_blueprints<Host: Runtime>(
@@ -53,10 +57,11 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
     delayed_bridge: ContractKt1Hash,
+    delayed_inbox: &mut DelayedInbox,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         kernel_upgrade,
-        transactions: _,
+        transactions,
         sequencer_blueprints,
     }) = read_inbox(
         host,
@@ -65,7 +70,11 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         admin,
         Some(delayed_bridge),
     )? {
-        // TODO: store delayed inbox messages (transactions).
+        // Store the transactions in the delayed inbox.
+        for transaction in transactions {
+            delayed_inbox.save_transaction(host, transaction)?;
+        }
+
         // Store the blueprints.
         for seq_blueprint in sequencer_blueprints {
             log!(
@@ -90,15 +99,19 @@ pub fn fetch<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-    config: Configuration,
+    config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     match config {
-        Configuration::Sequencer { delayed_bridge } => fetch_sequencer_blueprints(
+        Configuration::Sequencer {
+            delayed_bridge,
+            delayed_inbox,
+        } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
             ticketer,
             admin,
-            delayed_bridge,
+            delayed_bridge.clone(),
+            delayed_inbox,
         ),
         Configuration::Proxy => {
             fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
