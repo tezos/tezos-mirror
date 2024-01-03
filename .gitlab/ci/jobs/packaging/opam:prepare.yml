@@ -15,6 +15,7 @@
   dependencies: [opam:prepare]
   before_script:
     - eval $(opam env)
+    - mkdir -p $CI_PROJECT_DIR/opam_logs
   script:
     - opam remote add dev-repo ./_opam-repo-for-release
     - opam install --yes ${package}.dev
@@ -37,6 +38,8 @@
     # folder is excluded from opam's rsync. (2) gitlab ci cache
     # requires that cached files are in a sub-folder of the checkout.
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_LOG: debug
     RUSTC_WRAPPER: "sccache"
   cache:
     key: opam-sccache
