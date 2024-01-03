@@ -104,23 +104,16 @@ val post_global_block_simulate :
 val get_global_block_dal_processed_slots :
   ?block:string -> unit -> (int * string) list RPC_core.t
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
+type commitment_and_hash = {
+  commitment : RPC.smart_rollup_commitment;
+  hash : string;
 }
-
-type commitment_and_hash = {commitment : commitment; hash : string}
 
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
   first_published_at_level : int option;
   published_at_level : int option;
 }
-
-(** [commitment_from_json] parses a commitment from its JSON representation. *)
-val commitment_from_json : JSON.t -> commitment option
 
 (** [commitment_info_from_json] parses a commitment, its hash and
     the levels when the commitment was first published (if any) and included,

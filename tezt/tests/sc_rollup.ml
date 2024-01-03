@@ -1466,7 +1466,7 @@ let test_rollup_node_advances_pvm_state ~kind ?boot_sector ~internal =
 
 let eq_commitment_typ =
   Check.equalable
-    (fun ppf (c : Sc_rollup_rpc.commitment) ->
+    (fun ppf (c : RPC.smart_rollup_commitment) ->
       Format.fprintf
         ppf
         "@[<hov 2>{ predecessor: %s,@,\

@@ -526,14 +526,13 @@ let get_sc_rollup_constants client =
     }
 
 let forged_commitment ?(compressed_state = Constant.sc_rollup_compressed_state)
-    ?(number_of_ticks = 1) ~inbox_level ~predecessor () :
-    Sc_rollup_rpc.commitment =
-  {compressed_state; inbox_level; predecessor; number_of_ticks}
+    ?(number_of_ticks = 1) ~inbox_level ~predecessor () =
+  RPC.{compressed_state; inbox_level; predecessor; number_of_ticks}
 
 let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
     client sc_rollup =
   let ({compressed_state; inbox_level; predecessor; number_of_ticks}
-        : Sc_rollup_rpc.commitment) =
+        : RPC.smart_rollup_commitment) =
     commitment
   in
   Client.Sc_rollup.publish_commitment
