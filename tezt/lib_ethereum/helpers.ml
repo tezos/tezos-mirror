@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let evm_type =
+  "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
+
 let no_0x s =
   if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
   else s

@@ -37,6 +37,7 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
@@ -622,7 +623,7 @@ pub fn store_last_info_per_level_timestamp<Host: Runtime>(
 }
 
 pub fn read_timestamp_path<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
     path: &OwnedPath,
 ) -> Result<Timestamp, Error> {
     let mut buffer = [0u8; 8];
@@ -632,7 +633,7 @@ pub fn read_timestamp_path<Host: Runtime>(
 }
 
 pub fn read_last_info_per_level_timestamp<Host: Runtime>(
-    host: &mut Host,
+    host: &Host,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
@@ -672,10 +673,7 @@ pub fn index_account(
     }
 }
 
-fn read_b58_kt1<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-) -> Option<ContractKt1Hash> {
+fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
     let mut buffer = [0; 36];
     store_read_slice(host, path, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
@@ -867,3 +865,13 @@ mod internal_for_tests {
 
 #[cfg(test)]
 pub use internal_for_tests::*;
+
+/// Smart Contract of the delayed bridge
+///
+/// This smart contract is used to submit transactions to the rollup
+/// when in sequencer mode
+pub fn read_delayed_transaction_bridge<Host: Runtime>(
+    host: &Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &DELAYED_BRIDGE.into())
+}

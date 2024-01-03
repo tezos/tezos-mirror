@@ -8,7 +8,7 @@
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
 let make_config ?bootstrap_accounts ?ticketer ?administrator
-    ?(sequencer = false) () =
+    ?(sequencer = false) ?delayed_bridge () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -47,6 +47,17 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
     if sequencer then [Set {value = "00"; to_ = Durable_storage_path.sequencer}]
     else []
   in
-  match ticketer @ bootstrap_accounts @ administrator @ sequencer with
+  let delayed_bridge =
+    Option.fold
+      ~some:(fun delayed_bridge ->
+        let to_ = Durable_storage_path.delayed_bridge_path in
+        let value = Hex.(of_string delayed_bridge |> show) in
+        [Set {value; to_}])
+      ~none:[]
+      delayed_bridge
+  in
+  match
+    ticketer @ bootstrap_accounts @ administrator @ sequencer @ delayed_bridge
+  with
   | [] -> None
   | res -> Some (`Config res)

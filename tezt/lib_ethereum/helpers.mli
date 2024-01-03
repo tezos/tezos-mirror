@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Michelson type to use when originating the EVM rollup. *)
+val evm_type : string
+
 (** [no_0x s] removes the prefix [0x] of [s] if it exists. *)
 val no_0x : string -> string
 

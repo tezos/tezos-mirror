@@ -181,6 +181,7 @@ pub fn read_input<Host: Runtime>(
     ticketer: &Option<ContractKt1Hash>,
     admin: &Option<ContractKt1Hash>,
     inbox_is_empty: &mut bool,
+    delayed_bridge: &Option<ContractKt1Hash>,
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
 
@@ -193,6 +194,7 @@ pub fn read_input<Host: Runtime>(
                 smart_rollup_address,
                 ticketer,
                 admin,
+                delayed_bridge,
             ))
         }
         None => Ok(InputResult::NoInput),
@@ -283,6 +285,7 @@ pub fn read_inbox<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
+    delayed_bridge: Option<ContractKt1Hash>,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
@@ -301,6 +304,7 @@ pub fn read_inbox<Host: Runtime>(
             &ticketer,
             &admin,
             &mut inbox_is_empty,
+            &delayed_bridge,
         )? {
             InputResult::NoInput => {
                 if inbox_is_empty {
@@ -485,7 +489,7 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None)
             .unwrap()
             .unwrap();
         let expected_transactions = vec![Transaction {
@@ -509,7 +513,7 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None)
             .unwrap()
             .unwrap();
         let expected_transactions = vec![Transaction {
@@ -549,7 +553,7 @@ mod tests {
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         host.add_transfer(payload, &transfer_metadata);
 
-        let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender))
+        let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender), None)
             .unwrap()
             .unwrap();
         let expected_upgrade = Some(KernelUpgrade { preimage_hash });
@@ -585,7 +589,7 @@ mod tests {
         )));
 
         let _inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None).unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -628,7 +632,7 @@ mod tests {
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
         let _inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None).unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -660,7 +664,7 @@ mod tests {
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
         let _inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None).unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -707,7 +711,7 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -723,7 +727,7 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None)
             .unwrap()
             .unwrap();
 
@@ -778,7 +782,7 @@ mod tests {
 
         host.add_external(framed);
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None)
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None)
             .unwrap()
             .unwrap();
         let expected_transactions = vec![Transaction {
@@ -797,12 +801,12 @@ mod tests {
         // in the inbox, we mock it by adding a single input.
         host.add_external(Bytes::from(vec![]));
         let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None).unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
         let inbox_content =
-            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None, None).unwrap();
         assert!(inbox_content.is_none());
     }
 }

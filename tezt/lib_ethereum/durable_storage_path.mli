@@ -55,3 +55,6 @@ val sequencer : path
 
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
+
+(** [delayed_bridge_path] is the path to the delayed transaction bridge contract. *)
+val delayed_bridge_path : path
