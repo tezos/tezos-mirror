@@ -507,6 +507,11 @@ module Internal_for_tests : sig
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
 
+  (** Same as [ensure_validity parameters], except that it returns an error if the
+      [parameters] aren't valid and doesn't check the SRS. *)
+  val ensure_validity_without_srs :
+    parameters -> (unit, [> `Fail of string]) result
+
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 

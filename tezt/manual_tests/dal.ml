@@ -61,11 +61,11 @@ let dal_parameters () =
   let parameters =
     {number_of_shards; redundancy_factor; page_size; slot_size}
   in
-  Internal_for_tests.parameters_initialisation parameters
-  |> Internal_for_tests.load_parameters ;
-  match make parameters with
+  match Internal_for_tests.ensure_validity_without_srs parameters with
   | Ok _ ->
-      Log.report "Set of parameters is valid" ;
+      Internal_for_tests.parameters_initialisation parameters
+      |> Internal_for_tests.load_parameters ;
+      let _ = make parameters in
       unit
   | Error (`Fail s) ->
       Test.fail "The set of parameters is invalid. Reason:@.%s@." s
