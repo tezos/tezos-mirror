@@ -12,6 +12,7 @@ use evm_execution::account_storage::EthereumAccount;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
@@ -90,7 +91,8 @@ pub const WORD_SIZE: usize = 32usize;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
-// Path to the flag denoting whether the kernel is in sequencer mode or not.
+// Path to the tz1 administrating the sequencer. If there is nothing
+// at this path, the kernel is in proxy mode.
 const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
@@ -832,8 +834,15 @@ pub fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<(
         .context("Failed to delete kernel upgrade")
 }
 
-pub fn is_sequencer<Host: Runtime>(host: &Host) -> Result<bool, Error> {
-    Ok(host.store_has(&SEQUENCER)?.is_some())
+pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
+    if host.store_has(&SEQUENCER)?.is_some() {
+        let bytes = host.store_read_all(&SEQUENCER)?;
+        let Ok(tz1_b58) = String::from_utf8(bytes) else { return Ok(None) };
+        let Ok(tz1) = PublicKey::from_b58check(&tz1_b58) else { return Ok(None)};
+        Ok(Some(tz1))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
