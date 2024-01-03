@@ -36,7 +36,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
         kernel_upgrade,
         transactions,
         sequencer_blueprints: _,
-    }) = read_inbox(host, smart_rollup_address, ticketer, admin, None)?
+    }) = read_inbox(host, smart_rollup_address, ticketer, admin, None, None)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -60,6 +60,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     admin: Option<ContractKt1Hash>,
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
+    sequencer: PublicKey,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         kernel_upgrade,
@@ -71,6 +72,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         ticketer,
         admin,
         Some(delayed_bridge),
+        Some(sequencer),
     )? {
         // Store the transactions in the delayed inbox.
         for transaction in transactions {
@@ -107,7 +109,7 @@ pub fn fetch<Host: Runtime>(
         Configuration::Sequencer {
             delayed_bridge,
             delayed_inbox,
-            sequencer: _,
+            sequencer,
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
@@ -115,6 +117,7 @@ pub fn fetch<Host: Runtime>(
             admin,
             delayed_bridge.clone(),
             delayed_inbox,
+            sequencer.clone(),
         ),
         Configuration::Proxy => {
             fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)

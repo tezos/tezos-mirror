@@ -7,11 +7,12 @@
 
 use crate::{
     inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent},
-    sequencer_blueprint::SequencerBlueprint,
+    sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
 };
 use primitive_types::{H160, U256};
+use rlp::Encodable;
 use sha3::{Digest, Keccak256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeySignatureVerifier};
 use tezos_ethereum::{
     rlp_helpers::FromRlpBytes,
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
@@ -26,6 +27,7 @@ use tezos_smart_rollup_encoding::{
         ExternalMessageFrame, InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer,
     },
     michelson::{ticket::FA2_1Ticket, MichelsonBytes, MichelsonOr, MichelsonPair},
+    public_key::PublicKey,
 };
 use tezos_smart_rollup_host::input::Message;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -201,10 +203,26 @@ impl InputResult {
         }
     }
 
-    fn parse_sequencer_blueprint_input(bytes: &[u8]) -> Self {
+    fn parse_sequencer_blueprint_input(sequencer: &PublicKey, bytes: &[u8]) -> Self {
+        // Parse the sequencer blueprint
         let seq_blueprint: SequencerBlueprint =
             parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
-        InputResult::Input(Input::SequencerBlueprint(seq_blueprint))
+
+        // Creates and encodes the unsigned blueprint:
+        let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
+        let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
+        // The sequencer signs the hash of the blueprint.
+        let msg = tezos_crypto_rs::blake2b::digest_256(&bytes).unwrap();
+
+        let correctly_signed = sequencer
+            .verify_signature(&seq_blueprint.signature, &msg)
+            .unwrap_or(false);
+
+        if correctly_signed {
+            InputResult::Input(Input::SequencerBlueprint(seq_blueprint))
+        } else {
+            InputResult::Unparsable
+        }
     }
 
     /// Parses transactions that come from the delayed inbox.
@@ -230,9 +248,13 @@ impl InputResult {
 
     /// Parses an external message
     ///
-    /// External message structure :
-    /// EXTERNAL_TAG 1B / FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    fn parse_external(input: &[u8], smart_rollup_address: &[u8]) -> Self {
+    // External message structure :
+    // EXTERNAL_TAG 1B / FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
+    fn parse_external(
+        input: &[u8],
+        smart_rollup_address: &[u8],
+        sequencer: &Option<PublicKey>,
+    ) -> Self {
         // Compatibility with framing protocol for external messages
         let remaining = match ExternalMessageFrame::parse(input) {
             Ok(ExternalMessageFrame::Targetted { address, contents })
@@ -248,7 +270,12 @@ impl InputResult {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
             TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
-            SEQUENCER_BLUEPRINT_TAG => Self::parse_sequencer_blueprint_input(remaining),
+            SEQUENCER_BLUEPRINT_TAG if sequencer.is_some() => {
+                Self::parse_sequencer_blueprint_input(
+                    sequencer.as_ref().unwrap(),
+                    remaining,
+                )
+            }
             _ => InputResult::Unparsable,
         }
     }
@@ -370,6 +397,7 @@ impl InputResult {
         ticketer: &Option<ContractKt1Hash>,
         admin: &Option<ContractKt1Hash>,
         delayed_bridge: &Option<ContractKt1Hash>,
+        sequencer: &Option<PublicKey>,
     ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
@@ -380,7 +408,7 @@ impl InputResult {
         match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
-                    Self::parse_external(message, &smart_rollup_address)
+                    Self::parse_external(message, &smart_rollup_address, sequencer)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
                     host,
@@ -414,6 +442,7 @@ mod tests {
                 &mut host,
                 message,
                 ZERO_SMART_ROLLUP_ADDRESS,
+                &None,
                 &None,
                 &None,
                 &None
