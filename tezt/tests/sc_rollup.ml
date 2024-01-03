@@ -524,8 +524,7 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node ?(extra_tags = []) ~variant scenario ~kind
-    =
+let test_rollup_node_inbox ?(extra_tags = []) ~variant scenario ~kind =
   test_full_scenario
     {
       variant = Some variant;
@@ -1180,7 +1179,7 @@ let test_rollup_list ~kind =
       ~error_msg:"%L %R") ;
   unit
 
-let test_rollup_client_wallet ~kind =
+let test_client_wallet ~kind =
   register_test
     ~__FILE__
     ~tags:["sc_rollup"; "wallet"; "client"]
@@ -5621,11 +5620,7 @@ let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"basic"
-    basic_scenario
-    protocols ;
+  test_rollup_node_inbox ~kind ~variant:"basic" basic_scenario protocols ;
   test_gc
     "many_gc"
     ~kind
@@ -5662,22 +5657,22 @@ let register ~kind ~protocols =
     ~history_mode:Archive
     protocols ;
   test_rpcs ~kind protocols ;
-  test_rollup_inbox_of_rollup_node
+  test_rollup_node_inbox
     ~kind
     ~variant:"stops"
     sc_rollup_node_stops_scenario
     protocols ;
-  test_rollup_inbox_of_rollup_node
+  test_rollup_node_inbox
     ~kind
     ~variant:"disconnects"
     sc_rollup_node_disconnects_scenario
     protocols ;
-  test_rollup_inbox_of_rollup_node
+  test_rollup_node_inbox
     ~kind
     ~variant:"handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
     protocols ;
-  test_rollup_inbox_of_rollup_node
+  test_rollup_node_inbox
     ~kind
     ~variant:"batcher"
     ~extra_tags:["batcher"; Tag.flaky]
@@ -5799,7 +5794,7 @@ let register ~protocols =
   test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
-  test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
+  test_client_wallet protocols ~kind:"wasm_2_0_0" ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
