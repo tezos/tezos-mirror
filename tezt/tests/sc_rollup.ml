@@ -1242,8 +1242,9 @@ let test_client_wallet ~kind =
    When a rollup node starts, we want to make sure that in the absence of
    messages it will boot into the initial state.
 *)
-let test_rollup_node_boots_into_initial_state ~kind =
+let test_rollup_node_boots_into_initial_state ?supports ~kind =
   test_full_scenario
+    ?supports
     {
       variant = None;
       tags = ["bootstrap"];
@@ -5607,13 +5608,17 @@ let start_rollup_node_with_encrypted_key ~kind =
   in
   unit
 
-let register_riscv () =
-  test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
+let register_riscv ~protocols =
+  test_rollup_node_boots_into_initial_state
+    protocols
+    ~supports:Protocol.(From_protocol 019)
+    ~kind:"riscv" ;
   test_commitment_scenario
+    ~supports:Protocol.(From_protocol 019)
     ~extra_tags:["modes"; "operator"]
     ~variant:"operator_publishes"
     (mode_publish Operator true)
-    [Protocol.Alpha]
+    protocols
     ~kind:"riscv"
 
 let register ~kind ~protocols =
@@ -5836,7 +5841,7 @@ let register ~protocols =
   test_injector_uses_available_keys protocols ~kind:"wasm_2_0_0" ;
 
   (* Specific riscv PVM tezt *)
-  register_riscv () ;
+  register_riscv ~protocols ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
