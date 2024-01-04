@@ -29,6 +29,20 @@ let block_number evm_node =
        (fun json -> JSON.(json |-> "result" |> as_string |> Int32.of_string))
        json)
 
+let get_block_by_number ?(full_tx_objects = false) ~block evm_node =
+  let* json =
+    Evm_node.call_evm_rpc
+      evm_node
+      {
+        method_ = "eth_getBlockByNumber";
+        parameters = `A [`String block; `Bool full_tx_objects];
+      }
+  in
+  return
+    (decode_or_error
+       (fun json -> JSON.(json |-> "result" |> Block.of_json))
+       json)
+
 module Syntax = struct
   let ( let*@ ) x f =
     let* r = x in
