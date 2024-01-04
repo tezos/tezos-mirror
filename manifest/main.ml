@@ -362,7 +362,7 @@ let zarith =
 
 let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
-let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.3.0")
+let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
 
 (* This modules aims to define the list of packages versions that
    generate conflicts. *)
