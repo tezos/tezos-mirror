@@ -28,7 +28,7 @@ faster than with a long-lived network.
 Faucets
 =======
 
-Faucets can be accessed from https://teztnets.xyz/. Each of the test
+Faucets can be accessed from https://teztnets.com/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets. Enter the public key hash of any test
 account on the website to receive test tokens.
@@ -56,7 +56,7 @@ Ghostnet was previously known as :ref:`ithacanet`, the testchain for the Ithaca 
 See also
 ========
 
-An external description of the various test networks available can be found on https://teztnets.xyz/.
+An external description of the various test networks available can be found on https://teztnets.com/.
 
 Old Networks
 ============
