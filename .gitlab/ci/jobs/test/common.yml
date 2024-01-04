@@ -10,6 +10,7 @@
   stage: test
   before_script:
     - . ./scripts/version.sh
+    - eval $(opam env)
   retry: 2
 
 # Merge coverage files after the execution

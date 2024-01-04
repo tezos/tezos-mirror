@@ -12,6 +12,7 @@ documentation:build_all:
   needs: [trigger]
   before_script:
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
     - ./.gitlab/ci/jobs/doc/documentation:build_all.sh
   artifacts:

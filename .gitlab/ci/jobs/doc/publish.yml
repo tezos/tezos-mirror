@@ -23,6 +23,7 @@ publish:documentation:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
     - ./scripts/ci/doc_publish.sh
   # Publish jobs are uninterruptible to avoid publishing partial results.
