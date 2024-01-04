@@ -14,6 +14,14 @@ pub struct Cli {
     /// Support some POSIX-style system calls
     #[arg(long)]
     pub posix: bool,
+
+    /// Rollup address
+    #[arg(short, long, default_value = "sr1UNDWPUYVeomgG15wn5jSw689EJ4RNnVQa")]
+    pub address: String,
+
+    /// Rollup origination level
+    #[arg(short = 'l', long, default_value_t = 0)]
+    pub origination_level: u64,
 }
 
 /// Parse the command-line arguments.
