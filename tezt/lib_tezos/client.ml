@@ -117,7 +117,7 @@ let address ?(hostname = false) ?from peer =
      endpoints. Because the API contract of the [Runner] module is to
      provide a way to connect to a remote host using SSH, we cannot return a
      runner for a foreign endpoint, because the module does not provide such
-     invariants (for instance, the public RPC endpoint of Mondaynet is a good
+     invariants (for instance, the public RPC endpoint of Weeklynet is a good
      candidate for a foreign endpoint to which we likely cannot connect to
      using SSH).
 

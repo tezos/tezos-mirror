@@ -227,7 +227,7 @@ let scenario_on_teztnet =
     (* Start L1 node and wait until it's bootstrapped *)
     let* l1_node =
       let network =
-        sf "https://teztnets.xyz/%s-%s" network teztnet_network_day
+        sf "https://teztnets.com/%s-%s" network teztnet_network_day
       in
       start_layer_1_node
         ~network
@@ -250,7 +250,7 @@ let scenario_on_teztnet =
     let* () = Client.bootstrapped client in
 
     (* Start DAL node  *)
-    let peer = sf "dal.%s-%s.teztnets.xyz:11732" network teztnet_network_day in
+    let peer = sf "dal.%s-%s.teztnets.com:11732" network teztnet_network_day in
     let* dal_node =
       start_dal_node
         ~peers:(peer :: dal_bootstrap_peers)

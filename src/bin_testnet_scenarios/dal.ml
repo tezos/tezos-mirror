@@ -561,7 +561,7 @@ let run_scenario network kind scenario =
   let key_indices = range 0 (num_accounts - 1) in
 
   let network_name = Network.name network in
-  let network_url = Format.sprintf "https://teztnets.xyz/%s" network_name in
+  let network_url = Format.sprintf "https://teztnets.com/%s" network_name in
   let network_arg = Node.Network network_url in
   let network_baker =
     (* a bootstrap delegate for both Dailynet and Weeklynet *)
