@@ -21,6 +21,7 @@ type sequencer = {
   preimages : string;
   time_between_blocks : time_between_blocks;
   private_rpc_port : int;
+  sequencer : Signature.secret_key;
 }
 
 type 'a t = {
@@ -68,6 +69,9 @@ let default_sequencer =
     rollup_node_endpoint = Uri.empty;
     time_between_blocks = Time_between_blocks 5.;
     private_rpc_port = default_private_rpc_port;
+    sequencer =
+      Signature.Secret_key.of_b58check_exn
+        "edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz";
   }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
@@ -111,25 +115,29 @@ let encoding_sequencer =
            rollup_node_endpoint;
            time_between_blocks;
            private_rpc_port;
+           sequencer;
          } ->
       ( kernel,
         preimages,
         Uri.to_string rollup_node_endpoint,
         time_between_blocks,
-        private_rpc_port ))
+        private_rpc_port,
+        sequencer ))
     (fun ( kernel,
            preimages,
            rollup_node_endpoint,
            time_between_blocks,
-           private_rpc_port ) ->
+           private_rpc_port,
+           sequencer ) ->
       {
         kernel;
         preimages;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         time_between_blocks;
         private_rpc_port;
+        sequencer;
       })
-    (obj5
+    (obj6
        (dft "kernel" string default_sequencer.kernel)
        (dft "preimages" string default_sequencer.preimages)
        (dft
@@ -144,7 +152,11 @@ let encoding_sequencer =
           "private-rpc-port"
           ~description:"RPC port for private server"
           uint16
-          default_private_rpc_port))
+          default_private_rpc_port)
+       (dft
+          "sequencer"
+          Signature.Secret_key.encoding
+          default_sequencer.sequencer))
 
 let encoding ~default_mode mode_encoding =
   let open Data_encoding in
@@ -260,7 +272,7 @@ module Cli = struct
 
   let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ~verbose ?rollup_node_endpoint
-      ?kernel ?preimages ?time_between_blocks =
+      ?kernel ?preimages ?time_between_blocks ~sequencer =
     let mode =
       {
         rollup_node_endpoint =
@@ -277,6 +289,7 @@ module Cli = struct
           Option.value
             ~default:default_sequencer.private_rpc_port
             private_rpc_port;
+        sequencer;
       }
     in
     create
@@ -326,7 +339,7 @@ module Cli = struct
   let patch_sequencer_configuration_from_args ?private_rpc_port ~devmode
       ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?log_filter ~verbose
       ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks
-      configuration =
+      configuration ~sequencer =
     let mode =
       {
         rollup_node_endpoint =
@@ -343,6 +356,7 @@ module Cli = struct
           Option.value
             ~default:default_sequencer.private_rpc_port
             private_rpc_port;
+        sequencer;
       }
     in
     patch_configuration_from_args
@@ -427,7 +441,8 @@ module Cli = struct
 
   let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
       ?private_rpc_port ?cors_origins ?cors_headers ?log_filter ~verbose
-      ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks () =
+      ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks ~sequencer
+      () =
     create_or_read_config
       ~data_dir
       ~devmode
@@ -444,12 +459,14 @@ module Cli = struct
            ?rollup_node_endpoint
            ?kernel
            ?preimages
-           ?time_between_blocks)
+           ?time_between_blocks
+           ~sequencer)
       ~create:
         (create_sequencer
            ?rollup_node_endpoint
            ?kernel
            ?preimages
-           ?time_between_blocks)
+           ?time_between_blocks
+           ~sequencer)
       ()
 end

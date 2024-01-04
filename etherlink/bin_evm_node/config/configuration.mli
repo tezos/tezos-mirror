@@ -32,6 +32,8 @@ type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)
   time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
   private_rpc_port : int;  (** Port for internal RPC services *)
+  sequencer : Signature.secret_key;
+      (** The secret key used to sign the blueprints. *)
 }
 
 type 'a t = {
@@ -93,6 +95,7 @@ module Cli : sig
     ?kernel:string ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
+    sequencer:Signature.secret_key ->
     unit ->
     sequencer t
 
@@ -123,6 +126,7 @@ module Cli : sig
     ?kernel:string ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
+    sequencer:Signature.secret_key ->
     unit ->
     sequencer t tzresult Lwt.t
 end
