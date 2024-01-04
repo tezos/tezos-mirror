@@ -188,7 +188,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 # In pylint, we ignore the following additional errors:
 # - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
 PYLINTRC?=../.pylintrc
-PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint --disable C0330
+PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447
