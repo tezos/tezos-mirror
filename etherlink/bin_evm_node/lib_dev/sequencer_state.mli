@@ -14,10 +14,11 @@ val execute :
   [< `Input of string] list ->
   (Sequencer_context.t * Sequencer_context.evm_state) tzresult Lwt.t
 
-(** [init ~smart_rollup_address ~rollup_node_endpoint ctxt]
+(** [init ~secret_key ~smart_rollup_address ~rollup_node_endpoint ctxt]
     initializes the local state in [ctxt], produces and publishes the
     genesis block. *)
 val init :
+  secret_key:Signature.secret_key ->
   smart_rollup_address:string ->
   rollup_node_endpoint:Uri.t ->
   Sequencer_context.t ->

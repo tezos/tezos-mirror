@@ -623,12 +623,18 @@ let sequencer_command =
       let* ctxt =
         if loaded then return ctxt
         else
-          Sequencer_state.init ~rollup_node_endpoint ~smart_rollup_address ctxt
+          Sequencer_state.init
+            ~secret_key:sequencer
+            ~rollup_node_endpoint
+            ~smart_rollup_address
+            ctxt
       in
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
 
         let rollup_node_endpoint = rollup_node_endpoint
+
+        let secret_key = sequencer
       end) in
       (* Ignore the smart rollup address for now. *)
       let* () =
