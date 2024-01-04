@@ -104,6 +104,7 @@ pub fn stage_one<Host: Runtime>(
         ticketer,
         admin
     );
+    log!(host, Info, "Configuration: {}", configuration);
 
     fetch(host, smart_rollup_address, ticketer, admin, configuration)
 }

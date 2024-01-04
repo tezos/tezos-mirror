@@ -26,6 +26,23 @@ pub enum Configuration {
     },
 }
 
+impl std::fmt::Display for Configuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Configuration::Proxy => write!(f, "Proxy"),
+            Configuration::Sequencer {
+                delayed_bridge,
+                delayed_inbox: _, // Ignoring delayed_inbox
+                sequencer,
+            } => write!(
+                f,
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
+                delayed_bridge, sequencer
+            ),
+        }
+    }
+}
+
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
