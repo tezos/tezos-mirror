@@ -33,6 +33,7 @@ type mode =
       preimage_dir : string;
       private_rpc_port : int;
       time_between_blocks : time_between_blocks option;
+      sequencer : string;
     }
   | Proxy of {devmode : bool}
 
@@ -149,13 +150,18 @@ let run_args evm_node =
           evm_node.persistent_state.rollup_node_endpoint;
         ]
         @ Cli_arg.optional_switch "devmode" devmode
-    | Sequencer {kernel; preimage_dir; private_rpc_port; time_between_blocks} ->
+    | Sequencer
+        {kernel; preimage_dir; private_rpc_port; time_between_blocks; sequencer}
+      ->
         [
           "run";
           "sequencer";
           "with";
           "endpoint";
           evm_node.persistent_state.rollup_node_endpoint;
+          "signing";
+          "with";
+          sequencer;
           "--kernel";
           kernel;
           "--preimage-dir";

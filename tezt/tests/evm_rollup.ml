@@ -255,6 +255,7 @@ type kernel_installee = {base_installee : string; installee : string}
 type setup_mode =
   | Setup_sequencer of {
       time_between_blocks : Evm_node.time_between_blocks option;
+      sequencer : Account.key;
     }
   | Setup_proxy of {devmode : bool}
 
@@ -283,13 +284,15 @@ let setup_evm_kernel ?config ?kernel_installee
       else None
     in
     let sequencer =
-      match setup_mode with Setup_proxy _ -> false | Setup_sequencer _ -> true
+      match setup_mode with
+      | Setup_proxy _ -> None
+      | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     Configuration.make_config
       ~bootstrap_accounts
       ?ticketer
       ?administrator
-      ~sequencer
+      ?sequencer
       ()
   in
   let config =
@@ -309,18 +312,16 @@ let setup_evm_kernel ?config ?kernel_installee
       ~default_operator:rollup_operator_key
   in
   (* Start a rollup node *)
+  let preimages_dir =
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
+  in
   let* {output; _} =
     let base_installee, installee =
       match kernel_installee with
       | Some {base_installee; installee} -> (base_installee, installee)
       | None -> ("./", "evm_kernel")
     in
-    prepare_installer_kernel
-      ~base_installee
-      ~preimages_dir:
-        (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      ?config
-      installee
+    prepare_installer_kernel ~base_installee ~preimages_dir ?config installee
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -340,16 +341,14 @@ let setup_evm_kernel ?config ?kernel_installee
   let* mode =
     match setup_mode with
     | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
-    | Setup_sequencer {time_between_blocks} ->
-        let preimages_dir = Temp.dir "preimages" in
-        let* {output; _} =
-          prepare_installer_kernel
-            ~base_installee:"./"
-            ~preimages_dir
-            ?config
-            "evm_kernel"
-        in
+    | Setup_sequencer {time_between_blocks; sequencer} ->
         let private_rpc_port = Port.fresh () in
+        let sequencer =
+          match sequencer.secret_key with
+          | Unencrypted sk -> sk
+          | Encrypted _ ->
+              Test.fail "Provide an unencrypted key for the sequencer"
+        in
         return
           (Evm_node.Sequencer
              {
@@ -357,6 +356,7 @@ let setup_evm_kernel ?config ?kernel_installee
                preimage_dir = preimages_dir;
                private_rpc_port;
                time_between_blocks;
+               sequencer;
              })
   in
   let* evm_node =
@@ -482,7 +482,9 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ~past_genesis
   in
   register ~setup_mode:(Setup_proxy {devmode = true}) ;
-  register ~setup_mode:(Setup_sequencer {time_between_blocks})
+  register
+    ~setup_mode:
+      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
 
 type contract = {label : string; abi : string; bin : string}
 

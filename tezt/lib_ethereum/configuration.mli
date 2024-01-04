@@ -15,7 +15,7 @@ val make_config :
   ?bootstrap_accounts:Eth_account.t array ->
   ?ticketer:string ->
   ?administrator:string ->
-  ?sequencer:bool ->
+  ?sequencer:string ->
   ?delayed_bridge:string ->
   unit ->
   [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option
