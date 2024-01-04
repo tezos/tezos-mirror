@@ -342,6 +342,8 @@ types:
       type: z
     - id: level
       type: s4
+    - id: round
+      type: s4
     - id: slot
       type: u2
   dal_page_id:

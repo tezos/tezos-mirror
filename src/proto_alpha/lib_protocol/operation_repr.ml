@@ -1178,9 +1178,10 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
-    obj3
+    obj4
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
+      (req "round" Round_repr.encoding)
       (req "slot" Slot_repr.encoding)
 
   let dal_attestation_case =
@@ -1192,11 +1193,13 @@ module Encoding = struct
         select =
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
-            (attestation, level, slot));
+          (fun (Dal_attestation
+                 Dal_attestation_repr.{attestation; level; round; slot}) ->
+            (attestation, level, round, slot));
         inj =
-          (fun (attestation, level, slot) ->
-            Dal_attestation Dal_attestation_repr.{attestation; level; slot});
+          (fun (attestation, level, round, slot) ->
+            Dal_attestation
+              Dal_attestation_repr.{attestation; level; round; slot});
       }
 
   let seed_nonce_revelation_case =
@@ -2155,9 +2158,9 @@ type round_infos = {level : int32; round : int}
    convert into an {!int}. *)
 type attestation_infos = {round : round_infos; slot : int}
 
-(** [dal_attestation_infos] gives the weight of DAL attestation. *)
+(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
 type dal_attestation_infos = {
-  level : int32;
+  round_infos : round_infos;
   slot : int;
   number_of_attested_slots : int;
 }
@@ -2191,6 +2194,22 @@ let attestation_infos_from_consensus_content (c : consensus_content) =
   let slot = Slot_repr.to_int c.slot in
   let round = round_infos_from_consensus_content c in
   {round; slot}
+
+let dal_attestation_infos_from_dal_operation
+    {Dal_attestation_repr.attestation; level; round; slot} =
+  let round_infos =
+    (* copy of {!round_infos_from_consensus_content} *)
+    let level = Raw_level_repr.to_int32 level in
+    match Round_repr.to_int round with
+    | Ok round -> {level; round}
+    | Error _ -> {level; round = -1}
+  in
+  {
+    round_infos;
+    slot = Slot_repr.to_int slot;
+    number_of_attested_slots =
+      Dal_attestation_repr.number_of_attested_slots attestation;
+  }
 
 (** Compute a {!double_baking_infos} and a {!Block_header_repr.hash}
    from a {!Block_header_repr.t}. It is used to compute the weight of
@@ -2355,16 +2374,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
+  | Single (Dal_attestation content) ->
       W
         ( Consensus,
           Weight_dal_attestation
-            {
-              level = Raw_level_repr.to_int32 level;
-              slot = Slot_repr.to_int slot;
-              number_of_attested_slots =
-                Dal_attestation_repr.number_of_attested_slots attestation;
-            } )
+            (dal_attestation_infos_from_dal_operation content) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2492,18 +2506,20 @@ let compare_baking_infos infos1 infos2 =
     (infos2.round, infos2.bh_hash)
 
 (** Two valid {!Dal_attestation} are compared in the lexicographic order of
-    their level, slot, number of attested slots, and attester hash. *)
+    their level, round, reverse slot, and number of attested slots, meaning
+    that, in order, higher level is better, higher round is better, smaller slot
+    is better, higher number of attested slots is better. *)
 let compare_dal_attestation_infos
-    {level = level1; slot = slot1; number_of_attested_slots = n1}
-    {level = level2; slot = slot2; number_of_attested_slots = n2} =
+    {round_infos = infos1; slot = slot1; number_of_attested_slots = n1}
+    {round_infos = infos2; slot = slot2; number_of_attested_slots = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
-         ~cmp_fst:Compare.Int32.compare
+         ~cmp_fst:compare_round_infos
          ~cmp_snd:(compare_reverse Compare.Int.compare))
-    ~cmp_snd:(compare_reverse Compare.Int.compare)
-    ((level1, slot1), n1)
-    ((level2, slot2), n2)
+    ~cmp_snd:Compare.Int.compare
+    ((infos1, slot1), n1)
+    ((infos2, slot2), n2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 

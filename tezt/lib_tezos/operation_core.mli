@@ -230,11 +230,13 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [dal_attestation ~attestation ~level ~slot] crafts a slot attestation
-     operation to attest at [level] slot headers published at level
-     [level - attestation_lag].  For each slot, the value of the
-     booleans indicates whether the data is deemed available. *)
-  val dal_attestation : attestation:bool array -> level:int -> slot:int -> t
+  (** [dal_attestation ~attestation ~level ~round ~slot] crafts a DAL
+      attestation operation to attest at [level], [round] the slot headers
+      published at level [level + 1 - attestation_lag].  For each slot, the
+      value of the booleans in [attestation] indicates whether the data is
+      deemed available. *)
+  val dal_attestation :
+    attestation:bool array -> level:int -> round:int -> slot:int -> t
 
   (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
       crafts a consensus operation with the [kind] at [level] on the [round]

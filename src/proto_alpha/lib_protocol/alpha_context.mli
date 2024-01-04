@@ -2684,7 +2684,12 @@ module Dal : sig
   module Attestation : sig
     type t = private Bitset.t
 
-    type operation = {attestation : t; level : Raw_level.t; slot : Slot.t}
+    type operation = {
+      attestation : t;
+      level : Raw_level.t;
+      round : Round.t;
+      slot : Slot.t;
+    }
 
     type shard_index = int
 
@@ -2889,6 +2894,7 @@ module Dal_errors : sig
         expected : Raw_level.t;
         given : Raw_level.t;
       }
+    | Dal_attestation_for_wrong_round of {expected : Round.t; given : Round.t}
     | Dal_cryptobox_error of {explanation : string}
     | Dal_unexpected_attestation_at_root_level
 end

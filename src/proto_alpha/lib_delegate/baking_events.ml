@@ -691,14 +691,14 @@ module Actions = struct
       ("round", Round.encoding)
 
   let dal_attestation_injected =
-    declare_5
+    declare_6
       ~section
       ~name:"dal_attestation_injected"
       ~level:Notice
       ~msg:
-        "injected DAL attestation {ophash} for level {attestation_level} with \
-         bitset {bitset} for {delegate} to attest slots published at level \
-         {published_level}"
+        "injected DAL attestation {ophash} for level {attestation_level}, \
+         round {round}, with bitset {bitset} for {delegate} to attest slots \
+         published at level {published_level}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
@@ -706,20 +706,22 @@ module Actions = struct
       ~pp3:Z.pp_print
       ("bitset", Data_encoding.n)
       ("published_level", Data_encoding.int32)
-      ("attestation_level", Data_encoding.int32)
+      ("attestation_level", Raw_level.encoding)
+      ("round", Round.encoding)
 
   let dal_attestation_void =
-    declare_3
+    declare_4
       ~section
       ~name:"dal_attestation_void"
       ~level:Notice
       ~msg:
         "Skipping the injection of the DAL attestation for attestation level \
-         {attestation_level}, as no slot published at level {published_level} \
-         is attestable."
+         {attestation_level}, round {round}, as currently no slot published at \
+         level {published_level} is attestable."
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ("attestation_level", Data_encoding.int32)
+      ("round", Round.encoding)
       ("published_level", Data_encoding.int32)
 
   let synchronizing_round =

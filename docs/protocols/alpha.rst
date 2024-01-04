@@ -27,6 +27,9 @@ Zero Knowledge Rollups (ongoing)
 Data Availability Layer (ongoing)
 ---------------------------------
 
+- Introduced a ``round`` field in DAL attestations, with a similar meaning as
+  for consensus attestations. (MR :gl:`!11285`)
+
 Adaptive Issuance (ongoing)
 ----------------------------
 

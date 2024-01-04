@@ -58,6 +58,8 @@ type operation = {
           level" for the level of the block. We have:
           - [attestation_level + 1 = attested_level]
           - [published_level + attestation_lag = attested_level] *)
+  round : Round_repr.t;
+      (** Similar to {!Operation_repr.consensus_content.round}. *)
   slot : Slot_repr.t;
       (** Similar to {!Operation_repr.consensus_content.slot}. It is the
           attester's first consensus slot at [level]. *)
