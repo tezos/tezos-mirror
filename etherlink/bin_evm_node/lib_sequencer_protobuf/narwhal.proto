@@ -1,0 +1,21 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package narwhal;
+
+message Transaction {
+    bytes transaction = 1;
+}
+
+// Empty message for when we don't have anything to return
+message Empty {}
+
+service Transactions {
+    // Submit a transaction
+    rpc SubmitTransaction(Transaction) returns (Empty) {}
+
+    // Streamed rpc for submitting transactions
+    rpc SubmitTransactionStream(stream Transaction) returns (Empty) {}
+}

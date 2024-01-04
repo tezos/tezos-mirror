@@ -218,6 +218,9 @@ let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
 let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
 
+let ocaml_protoc_compiler =
+  external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
+
 let ocamlformat = opam_only "ocamlformat" V.(exactly "0.24.1")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
@@ -8366,6 +8369,47 @@ let evm_node_lib_prod_encoding =
        version]"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_debugger_plugin]
+
+let _evm_node_sequencer_protobuf =
+  let protobuf_rules =
+    Dune.
+      [
+        target_rule
+          "narwhal.ml"
+          ~deps:Dune.[[S ":proto"; S "narwhal.proto"]]
+          ~action:
+            Dune.
+              [
+                S "run";
+                S "protoc";
+                S "-I";
+                S ".";
+                S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
+                S "%{proto}";
+              ];
+        target_rule
+          "exporter.ml"
+          ~deps:Dune.[[S ":proto"; S "exporter.proto"]]
+          ~action:
+            Dune.
+              [
+                S "run";
+                S "protoc";
+                S "-I";
+                S ".";
+                S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
+                S "%{proto}";
+              ];
+      ]
+  in
+  octez_evm_node_lib
+    "evm_node_sequencer_protobuf"
+    ~path:"etherlink/bin_evm_node/lib_sequencer_protobuf"
+    ~synopsis:
+      "gRPC libraries for interacting with a consensus node, generated from \
+       protobuf definitions"
+    ~deps:[ocaml_protoc_compiler]
+    ~dune:protobuf_rules
 
 let evm_node_lib_prod =
   octez_evm_node_lib
