@@ -98,6 +98,9 @@ HEX_INPUT_DIR="$2"
 # Create a temporary directory
 tmp=$(mktemp -d)
 
+# ignore this problem because the command is
+# called in a trap: https://www.shellcheck.net/wiki/SC2317
+# shellcheck disable=SC2317
 cleanup() {
   rm -rf "${tmp}"
   exit

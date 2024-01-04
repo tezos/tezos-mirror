@@ -168,7 +168,7 @@ fi
 
 # now calls correct scripts and renaming
 if [ -n "$proto_name" ]; then
-  snapshot_protocol "$proto_name" $proto_dir
+  snapshot_protocol "$proto_name" "$proto_dir"
 fi
 
 echo "
@@ -190,7 +190,7 @@ if [ -z "$mig_level" ]; then
   exit 1
 fi
 
-user_activated_upgrade $proto_dir "$mig_level"
+user_activated_upgrade "$proto_dir" "$mig_level"
 
 pred_full_hash=$(first_hash src/proto_"${pred_proto_version}"_*/lib_protocol/TEZOS_PROTOCOL)
 pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
