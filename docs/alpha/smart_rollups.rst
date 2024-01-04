@@ -134,7 +134,7 @@ inbox.
 
 Finally, after the application of the operations of the Tezos block,
 the Layer 1 pushes one final internal message “End of
-level”. Similarly to “Start of level“, these internal messages does not
+level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
 .. _reveal_data_channel_smart_rollups_alpha:
@@ -155,7 +155,7 @@ A rollup can do the following requests through the reveal data channel:
 
 #. **metadata requests** The rollup can request information from the
    protocol, namely the address and the origination level of the
-   rollup node itself. The rollup node retrieves this information
+   rollup itself. The rollup node retrieves this information
    through RPCs to answer the rollup.
 
 Information passing through the reveal data channel does not have to
@@ -211,11 +211,16 @@ A **commitment** claims that the interpretation of all inbox messages
 published during a given commitment period, and applied on the state of
 a parent commitment, led to a given new state by performing a given
 number of execution steps of the PVM. Execution steps are called
-**ticks** in Smart Rollups terminology. A commitment must be
-published on the Layer 1 after each commitment period to have the rollup
-progress. A commitment is always based on a parent commitment (except
+**ticks** in Smart Rollups terminology.
+
+A commitment must be
+published on the Layer 1 any time after each commitment period, to have the rollup
+progress.
+A new commitment period starts right after the previous commitment period, no matter if commitments were published or not for the previous commitment period(s).
+For example, if an operator rollup node stops running for one day long, when it comes back, it will be able to resume publishing commitments for the passed periods, in chronological order.
+Indeed, a commitment is always based on a parent commitment (except
 for the genesis commitment that is automatically published at
-origination time).
+origination time), so publishing a commitment fails if the parent commitment has not yet been published.
 
 Since the PVM is deterministic and the inputs are completely
 determined by the Layer 1 rollups inbox and the reveal channel, there
@@ -236,7 +241,7 @@ the commitment will be published with two stakes on it.
 
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
-after a commitment is published, a two-weeks refutation period
+after a commitment is published, a two-week refutation period
 starts. During the refutation period, anyone noticing that a
 commitment for a given commitment period is invalid can post a
 concurrent commitment for the same commitment period to force the
@@ -363,9 +368,8 @@ Glossary
    commitment. A commitment must be published for each commitment
    period.
 
-#. **Refutation period**: At the end of each commitment period, a
-   period of two weeks starts to allow any commitment related to
-   this commitment period to be challenged.
+#. **Refutation period**: When the first commitment for a commitment period is published, a refutation
+   period of two weeks starts to allow this commitment to be challenged.
 
 #. **Staker**: An implicit account that has made a deposit on a
    commitment.

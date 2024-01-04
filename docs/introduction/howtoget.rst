@@ -72,7 +72,7 @@ Ubuntu Launchpad PPA with Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Ubuntu, you can install packages with Octez binaries from a Launchpad PPA.
-Currently it supports Focal and Bionic versions.
+Currently it supports Jammy and Focal versions.
 
 In order to add the stable release PPA repository to your machine, do:
 
@@ -106,7 +106,7 @@ Fedora Copr repository with Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Octez binaries from a Copr repository.
-Currently it supports Fedora 35.
+Currently it supports Fedora 37 and 38.
 
 In order to add the stable Copr repository to your machine, do:
 
@@ -249,9 +249,8 @@ Environment
 ~~~~~~~~~~~
 
 Currently Octez is being developed for Linux x86_64, mostly for
-Debian/Ubuntu and Arch Linux. The following OSes are also reported to
-work: macOS (x86_64), Arch Linux ARM (aarch64), Debian Linux (bullseye),
-Ubuntu Linux (focal). A Windows port is feasible and might be
+Ubuntu and Fedora Linux. The following OSes are also reported to
+work: macOS (x86_64), Arch Linux ARM (aarch64), Debian Linux (x86_64). A Windows port is feasible and might be
 developed in the future.
 
 .. note::

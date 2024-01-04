@@ -14,7 +14,7 @@ rollups, allowing to increase the throughput of the Tezos blockchain,
 (almost) arbitrarily.
 
 The purpose of this documentation is to provide an overview of the terminology and basic principles of smart rollups.
-In the :doc:`../shell/smart_rollup_node`, we will provide a complete tour 
+In the :doc:`../shell/smart_rollup_node`, we will provide a complete tour
 of smart rollups related workflows and reference documentation for the development of a WASM kernel.
 
 The integration of these rollups in the Tezos protocol is
@@ -208,11 +208,14 @@ A **commitment** claims that the interpretation of all inbox messages
 published during a given commitment period and applied on the state of
 a parent commitment led to a given new state by performing a given
 number of execution steps of the PVM. Execution steps are called
-**ticks** in the smart rollups terminology. A commitment must be
-published on the Layer 1 after each commitment period to have the rollup
-progress. A commitment is always based on a parent commitment (except
+**ticks** in the smart rollups terminology.
+
+A commitment must be published on the Layer 1 any time after each commitment period, to have the rollup progress.
+A new commitment period starts right after the previous commitment period, no matter if commitments were published or not for the previous commitment period(s).
+For example, if an operator rollup node stops running for one day long, when it comes back, it will be able to resume publishing commitments for the passed periods, in chronological order.
+Indeed, a commitment is always based on a parent commitment (except
 for the genesis commitment that is automatically published at
-origination time).
+origination time), so publishing a commitment fails if the parent commitment has not yet been published.
 
 Since the PVM is deterministic and the inputs are completely
 determined by the Layer 1 rollups inbox and the reveal channel, there
@@ -326,9 +329,8 @@ Glossary
    commitment. A commitment must be published for each commitment
    period.
 
-#. **Refutation period**: At the end of each commitment period, a
-   period of two weeks starts to allow any commitment related to
-   this commitment period to be challenged.
+#. **Refutation period**: When the first commitment for a commitment period is published, a refutation
+   period of two weeks starts to allow this commitment to be challenged.
 
 #. **Staker**: An implicit account that has made a deposit on a
    commitment.
