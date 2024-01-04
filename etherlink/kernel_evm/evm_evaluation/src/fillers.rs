@@ -84,7 +84,7 @@ fn check_should_not_exist(
         };
 
         if balance_is_zero && no_code {
-            write_host!(host, "Account {} rightfully do not exist.", hex_address);
+            write_host!(host, "Account {} rightfully does not exist.", hex_address);
         } else {
             write_host!(host, "Account {} should not exist.", hex_address);
             *invalid_state = true;
