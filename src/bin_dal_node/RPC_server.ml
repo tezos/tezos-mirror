@@ -144,7 +144,7 @@ module Slots_handlers = struct
           ~with_proof
         |> Errors.to_option_tzresult)
 
-  let post_slot ctxt () query slot =
+  let post_slot ctxt query slot =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
@@ -330,6 +330,10 @@ let register_new :
     Node_context.t -> unit Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t =
  fun ctxt directory ->
   directory
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.post_slot
+       (Slots_handlers.post_slot ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.post_commitment

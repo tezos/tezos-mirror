@@ -60,7 +60,7 @@ val post_commitment :
     ([slot_size] from the Cryptobox). *)
 val post_slot :
   < meth : [`POST]
-  ; input : Cryptobox.slot
+  ; input : string
   ; output : Cryptobox.commitment * Cryptobox.commitment_proof
   ; prefix : unit
   ; params : unit

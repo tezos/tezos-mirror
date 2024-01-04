@@ -56,7 +56,7 @@ let post_commitment :
 
 let post_slot :
     < meth : [`POST]
-    ; input : Cryptobox.slot
+    ; input : string
     ; output : Cryptobox.commitment * Cryptobox.commitment_proof
     ; prefix : unit
     ; params : unit
@@ -68,7 +68,7 @@ let post_slot :
        proof, then computes the correspoding shards with their proof. The \
        result of this RPC can be directly used to publish a slot header."
     ~query:Types.slot_query
-    ~input:slot_encoding
+    ~input:Data_encoding.string
     ~output:
       Data_encoding.(
         obj2
