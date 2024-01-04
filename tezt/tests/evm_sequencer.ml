@@ -203,7 +203,7 @@ let test_publish_blueprints =
   (* Force the sequencer to produce a block. *)
   let* _ = Rpc.produce_block evm_node in
   (* Ask for the current block. *)
-  let*@ sequencer_head = Rpc.block_number evm_node in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
   (* Stop the EVM node. *)
   let* () = Evm_node.terminate evm_node in
 
@@ -220,8 +220,8 @@ let test_publish_blueprints =
   let* proxy_evm =
     Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let*@ rollup_head = Rpc.block_number proxy_evm in
-  Check.((sequencer_head = rollup_head) int32)
+  let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy_evm in
+  Check.((sequencer_head.hash = rollup_head.hash) (option string))
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit
 
