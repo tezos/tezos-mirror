@@ -33,8 +33,7 @@ gitlab_release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^v([0-9]+)\.
 gitlab_release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\4/p')
 
 # Is this a release candidate?
-if [ -n "${gitlab_release_rc_version}" ]
-then
+if [ -n "${gitlab_release_rc_version}" ]; then
   # Yes, release name: X.Y~rcZ
   # shellcheck disable=SC2034
   gitlab_release_name="${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"

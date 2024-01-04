@@ -36,11 +36,11 @@ set -e
 
 target="$(pwd)"/opam_repo.patch tmp_dir=$(mktemp -dt tezos_deps_opam.XXXXXXXX)
 
-cleanup () {
-    set +e
-    echo Cleaning up...
-    rm -rf "$tmp_dir"
-    rm -rf Dockerfile
+cleanup() {
+  set +e
+  echo Cleaning up...
+  rm -rf "$tmp_dir"
+  rm -rf Dockerfile
 }
 trap cleanup EXIT INT
 
@@ -83,13 +83,12 @@ echo 'opam-version: "2.0"' > $dummy_opam
 # by the solver.
 echo "depends: [ \"ocaml\" { = \"$ocaml_version\" } \"mirage-runtime\" { >= \"4.0.0\" } \"inotify\" ]" >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
-grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
-do
-    f=$(dirname "$f")
-    f=$(basename "$f")
-    p=$(echo "$f" | cut -d '.' -f '1')
-    v=$(echo "$f" | cut -d '.' -f '2-')
-    echo "\"$p\" {= \"$v\"}" >> $dummy_opam
+grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f; do
+  f=$(dirname "$f")
+  f=$(basename "$f")
+  p=$(echo "$f" | cut -d '.' -f '1')
+  v=$(echo "$f" | cut -d '.' -f '2-')
+  echo "\"$p\" {= \"$v\"}" >> $dummy_opam
 done
 # FIXME: https://gitlab.com/tezos/tezos/-/issues/5832
 # opam unintentionally picks up a windows dependency. We add a
@@ -100,8 +99,8 @@ echo ']' >> $dummy_opam
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
 # natively:
 case $(opam --version) in
-    2.0.* ) opam_depext_dep="opam-depext," ;;
-    * )     opam_depext_dep="" ;;
+2.0.*) opam_depext_dep="opam-depext," ;;
+*) opam_depext_dep="" ;;
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
@@ -117,8 +116,8 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 ##   to build tezt.js, and we do want to run some tests using nodejs
 
 ## Adding useful compiler variants
-for variant in afl flambda fp ; do
-    git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
+for variant in afl flambda fp; do
+  git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
 done
 
 ## Removing temporary hacks
@@ -132,7 +131,7 @@ git reset "$opam_repository_tag"
 
 ## opam.2.1 will try to delete opam-depext, we should restore it.
 if [ ! -d packages/opam-depext ]; then
-    git checkout HEAD -- packages/opam-depext
+  git checkout HEAD -- packages/opam-depext
 fi
 
 ## Adding safer hashes
@@ -141,9 +140,8 @@ cp -rf packages packages.bak
 opam admin add-hashes sha256 sha512
 
 (cd "$src_dir" && dune build src/tooling/opam-lint/opam_lint.exe)
-for i in $(cd packages && find ./ -name opam);
-do
-    "$src_dir/_build/default/src/tooling/opam-lint/opam_lint.exe" "packages/$i" "packages.bak/$i"
+for i in $(cd packages && find ./ -name opam); do
+  "$src_dir/_build/default/src/tooling/opam-lint/opam_lint.exe" "packages/$i" "packages.bak/$i"
 done
 rm -rf packages.bak
 

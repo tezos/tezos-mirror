@@ -5,7 +5,7 @@ set -eu
 if [ -n "${TRACE:-}" ]; then set -x; fi
 
 usage() {
-    cat <<EOF
+  cat << EOF
 Usage: $0
 
 Checks that the current branch's history, up to MERGE BASE does not
@@ -29,11 +29,11 @@ pipeline that is not part of a merge train, it exits with error code
 65. Otherwise, it exits with error code 1.
 EOF
 
-    exit 1
+  exit 1
 }
 
 if [ "${1:-}" = "--help" ]; then
-    usage
+  usage
 fi
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
@@ -41,41 +41,41 @@ pattern_file="${script_dir}forbidden_commit_messages.txt"
 
 target_branch=${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-master}
 if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
-    merge_base=${CI_MERGE_REQUEST_DIFF_BASE_SHA}
-    fetches=0
-    while [ $fetches -lt 3 ] && ! git cat-file -t "${merge_base}" > /dev/null 2>&1; do
-        git fetch -q --deepen=100 origin "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-        fetches=$((fetches+1))
-    done
-    if ! git cat-file -t "${merge_base}" > /dev/null 2>&1; then
-        echo "Could not retrieve merge base ${merge_base} after ${fetches} of 100 commits, giving up."
-        exit 1
-    fi
+  merge_base=${CI_MERGE_REQUEST_DIFF_BASE_SHA}
+  fetches=0
+  while [ $fetches -lt 3 ] && ! git cat-file -t "${merge_base}" > /dev/null 2>&1; do
+    git fetch -q --deepen=100 origin "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    fetches=$((fetches + 1))
+  done
+  if ! git cat-file -t "${merge_base}" > /dev/null 2>&1; then
+    echo "Could not retrieve merge base ${merge_base} after ${fetches} of 100 commits, giving up."
+    exit 1
+  fi
 else
-    merge_base=$(git merge-base "${target_branch}" HEAD)
+  merge_base=$(git merge-base "${target_branch}" HEAD)
 fi
 
 check_history() {
-    # Use short flags for grep for busybox-compatibility.
-    if git log --format="%s" "${merge_base}"..HEAD | grep -qE -f "${pattern_file}" > /dev/null; then
-        # Match commits / forbidden patterns cross wise for user
-        # friendly output.
-        for commit in $(git log --format="%H" "${merge_base}"..HEAD); do
-            commit_title=$(git show -s --format=%B "${commit}" | head -n1)
-            while read -r pattern; do
-                if echo  "${commit_title}" | grep -qE "$pattern"; then
-                    echo "/!\ Commit ${commit} with title:"
-                    echo "> '${commit_title}'"
-                    echo "matches blacklist pattern '${pattern}', please revise."
-                fi
-            done < "${pattern_file}"
-        done
+  # Use short flags for grep for busybox-compatibility.
+  if git log --format="%s" "${merge_base}"..HEAD | grep -qE -f "${pattern_file}" > /dev/null; then
+    # Match commits / forbidden patterns cross wise for user
+    # friendly output.
+    for commit in $(git log --format="%H" "${merge_base}"..HEAD); do
+      commit_title=$(git show -s --format=%B "${commit}" | head -n1)
+      while read -r pattern; do
+        if echo "${commit_title}" | grep -qE "$pattern"; then
+          echo "/!\ Commit ${commit} with title:"
+          echo "> '${commit_title}'"
+          echo "matches blacklist pattern '${pattern}', please revise."
+        fi
+      done < "${pattern_file}"
+    done
 
-        return 1
-    else
-        echo "Commit history contains no forbidden words."
-        return 0
-    fi
+    return 1
+  else
+    echo "Commit history contains no forbidden words."
+    return 0
+  fi
 }
 
 # If the message check fails inside a merge request pipeline that is
@@ -87,16 +87,16 @@ event_type=${CI_MERGE_REQUEST_EVENT_TYPE:-}
 
 # If running locally:
 if [ -z "${source}" ]; then
-    check_history
+  check_history
 # If running inside GitLab CI for a merge request:
 elif [ "${source}" = "merge_request_event" ]; then
-    # Unless if running in a merge train, invalid commit titles are
-    # not fatal.
-    check_history ||
-        if [ "${event_type}" != "train" ]; then
-            # Non-fatal failures
-            exit 65
-        else
-            exit 1
-        fi
+  # Unless if running in a merge train, invalid commit titles are
+  # not fatal.
+  check_history ||
+    if [ "${event_type}" != "train" ]; then
+      # Non-fatal failures
+      exit 65
+    else
+      exit 1
+    fi
 fi

@@ -27,13 +27,12 @@ gitlab_upload() {
   max_attempts=10
 
   # Retry because gitlab.com is flaky sometimes, curl upload fails with http status code 524 (timeout)
-  while [ "${i}" != "${max_attempts}" ]
-  do
+  while [ "${i}" != "${max_attempts}" ]; do
     i=$((i + 1))
     http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
-                     -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                     -T "${local_path}" \
-                     "${url}/${remote_file}")
+      -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      -T "${local_path}" \
+      "${url}/${remote_file}")
 
     # Success
     [ "${http_code}" = '201' ] && return
@@ -51,29 +50,25 @@ gitlab_upload() {
 }
 
 # Loop over architectures
-for architecture in ${architectures}
-do
+for architecture in ${architectures}; do
   echo "Upload raw binaries (${architecture})"
 
   # Loop over binaries
-  for binary in ${binaries}
-  do
+  for binary in ${binaries}; do
     gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
   done
 
   echo "Upload debian packages (${architecture})"
 
   # Loop over debian packages
-  for package in ${deb_packages}
-  do
+  for package in ${deb_packages}; do
     gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
   done
 
   echo "Upload rpm packages (${architecture})"
 
   # Loop over rpm packages
-  for package in ${rpm_packages}
-  do
+  for package in ${rpm_packages}; do
     gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
   done
 

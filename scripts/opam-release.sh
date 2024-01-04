@@ -22,46 +22,46 @@ version="${1:-}"
 url="${2:-}"
 opam_dir="${3:-opam-repository}"
 
-if [ -z "$version" ] ; then
-    echo "$usage"
-    echo "Missing argument: <VERSION_NUMBER>"
-    exit 1
+if [ -z "$version" ]; then
+  echo "$usage"
+  echo "Missing argument: <VERSION_NUMBER>"
+  exit 1
 fi
 
-if [ -z "$url" ] ; then
-    echo "$usage"
-    echo "Missing argument: <TARBALL_URL>"
-    exit 1
+if [ -z "$url" ]; then
+  echo "$usage"
+  echo "Missing argument: <TARBALL_URL>"
+  exit 1
 fi
 
-log () {
-    echo '\e[1m'"$1"'\e[0m'
+log() {
+  echo '\e[1m'"$1"'\e[0m'
 }
 
 current_dir=$(pwd)
 
-if [ -d "$opam_dir" ] ; then
-    log "Checking $opam_dir..."
-    cd "$opam_dir"
-    status=$(git status --porcelain)
-    if [ -z "$status" ] ; then
-        git checkout master
-        git pull
-    else
-        log "$opam_dir is not clean."
-        exit 1
-    fi
-else
-    log "Cloning ocaml/opam-repository..."
-    git clone https://github.com/ocaml/opam-repository "$opam_dir"
-    cd "$opam_dir"
+if [ -d "$opam_dir" ]; then
+  log "Checking $opam_dir..."
+  cd "$opam_dir"
+  status=$(git status --porcelain)
+  if [ -z "$status" ]; then
     git checkout master
+    git pull
+  else
+    log "$opam_dir is not clean."
+    exit 1
+  fi
+else
+  log "Cloning ocaml/opam-repository..."
+  git clone https://github.com/ocaml/opam-repository "$opam_dir"
+  cd "$opam_dir"
+  git checkout master
 fi
 
 branch_name="octez-$(echo "$version" | tr '~' -)"
-if git rev-parse "$branch_name" > /dev/null 2> /dev/null ; then
-    log "Error: a branch named $branch_name already exists in $opam_dir."
-    exit 1
+if git rev-parse "$branch_name" > /dev/null 2> /dev/null; then
+  log "Error: a branch named $branch_name already exists in $opam_dir."
+  exit 1
 fi
 
 cd "$current_dir"

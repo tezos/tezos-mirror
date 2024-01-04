@@ -23,7 +23,7 @@ staging_root=_dpkgstage
 
 # Checking prerequisites
 #
-if ! which dpkg-deb >/dev/null 2>&1; then
+if ! which dpkg-deb > /dev/null 2>&1; then
   echo "Needs to run on a system with dpkg-deb in path" >&2
   exit 2
 fi
@@ -104,13 +104,12 @@ for control_file in "$myhome"/*control.in; do
     fi
   done
 
-
   # init.d scripts
   #
   initdScripts "${common}/${pg}.initd.in" "${init_name}" "${staging_dir}"
-    if [ "$pg" = "baker" ]; then
+  if [ "$pg" = "baker" ]; then
     initdScripts "${common}/vdf.initd.in" octez-vdf "${staging_dir}"
-    fi
+  fi
 
   # Configuration files
   #

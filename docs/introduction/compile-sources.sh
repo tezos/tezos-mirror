@@ -6,19 +6,17 @@
 # shellcheck disable=SC2086
 # for omitting quotes in: source $HOME/.cargo/env
 
-usage () {
-    cat >&2 <<!EOF
+usage() {
+  cat >&2 << !EOF
 usage:
   $0 [<repo> <branch>]
 !EOF
 }
 
-if [ $# -eq 2 ]
-then
+if [ $# -eq 2 ]; then
   REPO=$1
   BRANCH=$2
-elif [ $# -eq 0 ]  # don't remove this branch used for an example in the doc!
-then
+elif [ $# -eq 0 ]; then # don't remove this branch used for an example in the doc!
   # [select branch]
   REPO="tezos/tezos"
   BRANCH="latest-release"

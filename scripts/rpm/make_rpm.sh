@@ -24,14 +24,14 @@ pkg_vers=$(getOctezVersion)
 
 # Checking prerequisites
 #
-if ! which rpmbuild >/dev/null 2>&1; then
+if ! which rpmbuild > /dev/null 2>&1; then
   echo "Needs to run on a system with rpmbuild in path" >&2
   echo "yum install rpmdevtools"
   exit 2
 fi
 
 rpmdev-setuptree
-rpmbuild_root=$HOME/rpmbuild  # Seems to be standard
+rpmbuild_root=$HOME/rpmbuild # Seems to be standard
 spec_dir="${rpmbuild_root}/SPECS"
 rpm_dir="${rpmbuild_root}/RPMS"
 src_dir="${rpmbuild_root}/SOURCES"
@@ -54,10 +54,9 @@ for specfile in "$myhome"/*spec.in; do
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")
 
-
   if [ -f "$rpm_fullname" ]; then
     echo "built already - skipping"
-        continue
+    continue
   fi
 
   tar_name=${rpm_name}-${pkg_vers}
@@ -79,20 +78,18 @@ for specfile in "$myhome"/*spec.in; do
         install -s -t "${build_dir}/usr/bin" "${bin}"
       else
         echo "WARN: ${bin} not found"
-                                [ "$dieonwarn" = "1" ] && exit 1
+        [ "$dieonwarn" = "1" ] && exit 1
       fi
     done
   fi
 
-
   # init.d scripts
   #
   initdScripts "${common}/${pg}.initd.in" "${init_name}" "${build_dir}"
-    if [ "$pg" = "baker" ]; then
+  if [ "$pg" = "baker" ]; then
     initdScripts "${common}/vdf.initd.in" octez-vdf \
       "${build_dir}"
   fi
-
 
   # Configuration files
   #
@@ -120,7 +117,7 @@ for specfile in "$myhome"/*spec.in; do
   # Stage the package
   #
   echo "=> Staging ${pg}"
-  (cd ${staging_dir} && tar zcf "${src_dir}/${tar_name}.tar.gz" "${tar_name}" )
+  (cd ${staging_dir} && tar zcf "${src_dir}/${tar_name}.tar.gz" "${tar_name}")
 
   # Build the package
   #

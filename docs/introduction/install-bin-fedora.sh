@@ -1,19 +1,17 @@
 #!/bin/sh
 
-usage () {
-    cat >&2 <<!EOF
+usage() {
+  cat >&2 << !EOF
 usage:
   $0 [rc]
 !EOF
 }
 
-if [ $# -eq 1 ] && [ "$1" = "rc" ]
-then
+if [ $# -eq 1 ] && [ "$1" = "rc" ]; then
   # [setup rc repository]
   REPO="@Serokell/Tezos-rc"
   # [end]
-elif [ $# -eq 0 ]
-then
+elif [ $# -eq 0 ]; then
   # [setup stable repository]
   REPO="@Serokell/Tezos"
   # [end]

@@ -20,63 +20,63 @@ version="${1:-}"
 tarball="${2:-}"
 opam_dir="${3:-opam-repository}"
 
-if [ -z "$version" ] ; then
-    echo "$usage"
-    exit 1
+if [ -z "$version" ]; then
+  echo "$usage"
+  exit 1
 fi
 
-if [ -z "$tarball" ] ; then
-    echo "$usage"
-    exit 1
+if [ -z "$tarball" ]; then
+  echo "$usage"
+  exit 1
 fi
 
-log () {
-    echo '\e[1m'"$1"'\e[0m'
+log() {
+  echo '\e[1m'"$1"'\e[0m'
 }
 
-if [ -d "$opam_dir" ] ; then
-    log "$opam_dir exists"
+if [ -d "$opam_dir" ]; then
+  log "$opam_dir exists"
 else
-    log "Error: $opam_dir does not exists or is not a directory"
-    exit 1
+  log "Error: $opam_dir does not exists or is not a directory"
+  exit 1
 fi
 
 tarball_copy=$(mktemp tezos_tarball.XXXXXXXX --tmpdir)
 
 clean_tarball() {
-    log "Cleaning up..."
-    rm -f "$tarball_copy"
+  log "Cleaning up..."
+  rm -f "$tarball_copy"
 }
 trap clean_tarball EXIT
 
-if [ -f "$tarball" ] ; then
-    cp "$tarball" "$tarball_copy"
-elif [ -d "$tarball" ] ; then
-    tarball=$(realpath "$tarball")
-    log "using directory '$tarball' as url"
-    rm -f "$tarball_copy"
+if [ -f "$tarball" ]; then
+  cp "$tarball" "$tarball_copy"
+elif [ -d "$tarball" ]; then
+  tarball=$(realpath "$tarball")
+  log "using directory '$tarball' as url"
+  rm -f "$tarball_copy"
 else
-    log "Downloading tarball from $tarball..."
-    curl "$tarball" --output "$tarball_copy"
+  log "Downloading tarball from $tarball..."
+  curl "$tarball" --output "$tarball_copy"
 fi
 
-if [ -f "$tarball_copy" ] ; then
-    log "Hashing tarball..."
-    sha256=$(sha256sum "$tarball_copy" | cut -d ' ' -f 1)
-    log "SHA256: $sha256"
-    sha512=$(sha512sum "$tarball_copy" | cut -d ' ' -f 1)
-    log "SHA512: $sha512"
+if [ -f "$tarball_copy" ]; then
+  log "Hashing tarball..."
+  sha256=$(sha256sum "$tarball_copy" | cut -d ' ' -f 1)
+  log "SHA256: $sha256"
+  sha512=$(sha512sum "$tarball_copy" | cut -d ' ' -f 1)
+  log "SHA512: $sha512"
 else
-    sha256=""
-    sha512=""
+  sha256=""
+  sha512=""
 fi
 
 log "Generating opam files for $version..."
 cd "$script_dir"/..
 make -C manifest manifest
 ./manifest/manifest \
-    --packages-dir "$opam_dir/packages" \
-    --url "$tarball" \
-    --sha256 "$sha256" \
-    --sha512 "$sha512" \
-    --release "$version"
+  --packages-dir "$opam_dir/packages" \
+  --url "$tarball" \
+  --sha256 "$sha256" \
+  --sha512 "$sha512" \
+  --release "$version"

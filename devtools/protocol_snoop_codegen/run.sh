@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ##############################################################################
 #                                                                            #
@@ -11,21 +11,18 @@
 
 TEMP_DIR=$(mktemp -d)
 
-
 function cleanup() {
-    rm -rf "$TEMP_DIR"
-    echo "Cleaned up Temporary directory $TEMP_DIR"
+  rm -rf "$TEMP_DIR"
+  echo "Cleaned up Temporary directory $TEMP_DIR"
 }
 
 trap cleanup EXIT
-
 
 cp ./src/proto_alpha/lib_protocol/*_costs.ml "$TEMP_DIR"
 
 ./octez-snoop generate code for solutions src/proto_alpha/lib_protocol/gas_parameters.json --split-to "$TEMP_DIR" --fixed-point ./devtools/protocol_snoop_codegen/fixed_point_config.json
 
-for file in ./src/proto_alpha/lib_protocol/*_costs_generated.ml 
-do
+for file in ./src/proto_alpha/lib_protocol/*_costs_generated.ml; do
   directory_name=$(dirname "$file")
   basename_file=$(basename "$file")
   echo "removing file $file"

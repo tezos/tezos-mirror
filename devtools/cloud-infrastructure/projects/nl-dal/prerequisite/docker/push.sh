@@ -1,12 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
 if [ $# -lt 2 ]; then
-    echo "At least two arguments are required: the OS name (eg 'debian'), and the path to an existing ssh public key. Use a third argument (any string) when pushing the Docker image for the first time."
-    exit 1
+  echo "At least two arguments are required: the OS name (eg 'debian'), and the path to an existing ssh public key. Use a third argument (any string) when pushing the Docker image for the first time."
+  exit 1
 fi
-
 
 os="${1}"
 docker_image="$os-tezos"
@@ -21,16 +20,16 @@ docker_registry_url=$(terraform output --raw docker_registry_url)
 gcp_docker_registry=$(terraform output --raw gcp_docker_registry)
 
 if [ -z "$ssh_public_key_file" ]; then
-    echo "Error: The script should take as second argument the path towards an existing ssh public key."
-    exit 1
+  echo "Error: The script should take as second argument the path towards an existing ssh public key."
+  exit 1
 else
-    ssh_public_key=$(cat "$ssh_public_key_file")
+  ssh_public_key=$(cat "$ssh_public_key_file")
 fi
 
 if [ -z "$bootstrap" ]; then
-    source_image=$docker_registry_url/$docker_image
+  source_image=$docker_registry_url/$docker_image
 else
-    source_image=$os
+  source_image=$os
 fi
 
 echo "$source_image"

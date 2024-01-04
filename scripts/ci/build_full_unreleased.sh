@@ -13,10 +13,10 @@ old_protocol_store=$(mktemp -d)
 . ./scripts/version.sh
 
 # 1. Some basic, fast sanity checks
-if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
-    echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab/ci/templates.yml'." ;
-    echo "${build_deps_image_version} != ${opam_repository_tag}" ;
-    exit 1 ;
+if [ "${build_deps_image_version}" != "${opam_repository_tag}" ]; then
+  echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab/ci/templates.yml'."
+  echo "${build_deps_image_version} != ${opam_repository_tag}"
+  exit 1
 fi
 
 # 2. Actually build.
@@ -37,10 +37,10 @@ chmod +w ${OCTEZ_EXECUTABLES}
 strip -s ${OCTEZ_EXECUTABLES}
 
 if [ -n "${BUILD_EXTRA:-}" ]; then
-    paths=$(for executable in ${BUILD_EXTRA}; do echo _build/default/"$executable"; done)
-    # Paths must be split so disable shellcheck's SC2086 here.
-    # shellcheck disable=SC2086
-    chmod +w $paths
-    # shellcheck disable=SC2086
-    strip -s $paths
+  paths=$(for executable in ${BUILD_EXTRA}; do echo _build/default/"$executable"; done)
+  # Paths must be split so disable shellcheck's SC2086 here.
+  # shellcheck disable=SC2086
+  chmod +w $paths
+  # shellcheck disable=SC2086
+  strip -s $paths
 fi

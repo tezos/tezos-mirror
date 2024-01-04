@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -8,8 +8,8 @@ script_dir="$(dirname "$ci_dir")"
 opam_repository_fork="git@github.com:tezos/opam-repository"
 opam_dir="opam-repository"
 
-log () {
-    echo '\e[1m'"$1"'\e[0m'
+log() {
+  echo '\e[1m'"$1"'\e[0m'
 }
 
 # shellcheck source=./scripts/ci/release.sh
