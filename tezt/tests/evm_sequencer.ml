@@ -195,22 +195,25 @@ let test_persistent_state =
 let test_publish_blueprints =
   Protocol.register_test
     ~__FILE__
-    ~tags:[Tag.flaky; "evm"; "sequencer"; "data"]
+    ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
     ~uses
   @@ fun protocol ->
-  let* {evm_node; node; client; sc_rollup_node; _} = setup_sequencer protocol in
-  (* Force the sequencer to produce a block. *)
-  let* _ = Rpc.produce_block evm_node in
+  let* {evm_node; node; client; sc_rollup_node; _} =
+    setup_sequencer ~time_between_blocks:10000. protocol
+  in
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
   (* Ask for the current block. *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
-  (* Stop the EVM node. *)
-  let* () = Evm_node.terminate evm_node in
 
   (* At this point, the evm node should called the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
   let* () =
-    repeat 5 (fun () ->
+    repeat 10 (fun () ->
         let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
         unit)
   in
