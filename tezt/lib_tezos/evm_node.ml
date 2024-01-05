@@ -26,7 +26,11 @@
 (*****************************************************************************)
 
 type mode =
-  | Sequencer of {kernel : string; preimage_dir : string}
+  | Sequencer of {
+      kernel : string;
+      preimage_dir : string;
+      private_rpc_port : int;
+    }
   | Proxy of {devmode : bool}
 
 module Parameters = struct
@@ -142,7 +146,7 @@ let run_args evm_node =
           evm_node.persistent_state.rollup_node_endpoint;
         ]
         @ Cli_arg.optional_switch "devmode" devmode
-    | Sequencer {kernel; preimage_dir} ->
+    | Sequencer {kernel; preimage_dir; private_rpc_port} ->
         [
           "run";
           "sequencer";
@@ -153,6 +157,8 @@ let run_args evm_node =
           kernel;
           "--preimage-dir";
           preimage_dir;
+          "--private-rpc-port";
+          string_of_int private_rpc_port;
         ]
   in
   mode_args @ shared_args
@@ -173,11 +179,19 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
-let endpoint (evm_node : t) =
-  Format.sprintf
-    "http://%s:%d"
-    evm_node.persistent_state.rpc_addr
-    evm_node.persistent_state.rpc_port
+let endpoint ?(private_ = false) (evm_node : t) =
+  let addr, port, path =
+    if private_ then
+      match evm_node.persistent_state.mode with
+      | Sequencer {private_rpc_port; _} ->
+          ("127.0.0.1", private_rpc_port, "/private")
+      | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
+    else
+      ( evm_node.persistent_state.rpc_addr,
+        evm_node.persistent_state.rpc_port,
+        "" )
+  in
+  Format.sprintf "http://%s:%d%s" addr port path
 
 let init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
   let evm_node =
@@ -205,12 +219,12 @@ let batch_requests requests =
 
 (* We keep both encoding (with a single object or an array of objects) and both
    function on purpose, to ensure both encoding are supported by the server. *)
-let call_evm_rpc evm_node request =
-  let endpoint = endpoint evm_node in
+let call_evm_rpc ?(private_ = false) evm_node request =
+  let endpoint = endpoint ~private_ evm_node in
   Curl.post endpoint (build_request request) |> Runnable.run
 
-let batch_evm_rpc evm_node requests =
-  let endpoint = endpoint evm_node in
+let batch_evm_rpc ?(private_ = false) evm_node requests =
+  let endpoint = endpoint ~private_ evm_node in
   Curl.post endpoint (batch_requests requests) |> Runnable.run
 
 let extract_result json = JSON.(json |-> "result")

@@ -27,6 +27,7 @@ type sequencer = {
           in the tx pool, blocks will be created as soon as possible. However,
           if there are no transactions to include, a block is produced after
           [time_between_blocks]. *)
+  private_rpc_port : int;  (** Port for internal RPC services *)
 }
 
 type 'a t = {
@@ -78,6 +79,7 @@ module Cli : sig
     proxy t
 
   val create_sequencer :
+    ?private_rpc_port:int ->
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
@@ -112,6 +114,7 @@ module Cli : sig
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
+    ?private_rpc_port:int ->
     ?debug:bool ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->

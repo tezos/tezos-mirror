@@ -71,12 +71,12 @@ let request_encoding kind =
           (fun i -> Batch i);
       ])
 
-let dispatch_service =
+let dispatch_service ~path =
   Service.post_service
     ~query:Query.empty
     ~input:(request_encoding JSONRPC.request_encoding)
     ~output:(request_encoding JSONRPC.response_encoding)
-    Path.(root)
+    path
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -477,8 +477,36 @@ let dispatch_request (config : 'a Configuration.t)
   in
   return JSONRPC.{value; id}
 
-let dispatch config ctx dir =
-  Directory.register0 dir dispatch_service (fun () input ->
+let dispatch_private_request (_config : 'a Configuration.t)
+    ((module Backend_rpc : Services_backend_sig.S), _)
+    ({method_; parameters = _; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+  let open Lwt_syntax in
+  let* value =
+    match map_method_name method_ with
+    | Unknown ->
+        return
+          (Error
+             JSONRPC.
+               {
+                 code = -3200;
+                 message = "Method not found";
+                 data = Some (`String method_);
+               })
+    | Unsupported ->
+        return
+          (Error
+             JSONRPC.
+               {
+                 code = -3200;
+                 message = "Method not supported";
+                 data = Some (`String method_);
+               })
+    | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
+  in
+  return JSONRPC.{value; id}
+
+let generic_dispatch config ctx dir path dispatch_request =
+  Directory.register0 dir (dispatch_service ~path) (fun () input ->
       let open Lwt_result_syntax in
       match input with
       | Singleton request ->
@@ -488,9 +516,27 @@ let dispatch config ctx dir =
           let*! outputs = List.map_s (dispatch_request config ctx) requests in
           return (Batch outputs))
 
+let dispatch_public config ctx dir =
+  generic_dispatch config ctx dir Path.root dispatch_request
+
+let dispatch_private config ctx dir =
+  generic_dispatch
+    config
+    ctx
+    dir
+    Path.(add_suffix root "private")
+    dispatch_private_request
+
 let directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version
-  |> dispatch
+  |> dispatch_public
+       config
+       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+
+let private_directory config
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
+  Directory.empty |> version
+  |> dispatch_private
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
