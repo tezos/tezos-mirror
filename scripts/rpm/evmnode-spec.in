@@ -1,0 +1,27 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez EVM node
+
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Packager:       @MAINT@
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez EVM node
+
+%files
+%{_bindir}/octez-*
+
+%post
+getent group tezos >/dev/null 2>&1 || groupadd tezos
+getent passwd tezos >/dev/null 2>&1 || useradd -g tezos -d /var/tezos tezos
+/usr/bin/systemctl daemon-reload

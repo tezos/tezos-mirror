@@ -1,0 +1,90 @@
+#!/bin/bash
+# Start/stop the Octez EVM node compatibility endpoint
+#
+### BEGIN INIT INFO
+# Provides:          octez-evmnode
+# Required-Start:    
+# Required-Stop:     
+# Should-Start:      $network $named 
+# Should-Stop:       $network $named 
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: The Octez EVM node endpoint
+# Description:       The Octez EVM node endpoint is used for Etherlink and
+#		     EVM rollups
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DESC="octez evm node"
+NAME=octez-evmnode
+PIDDIR=/var/run/tezos
+SCRIPTNAME=/etc/init.d/"$NAME"
+
+if [ -f "/lib/lsb/init-functions" ]; then
+        . /lib/lsb/init-functions
+else
+        . /etc/rc.d/init.d/functions
+fi
+
+# Defaults
+user=tezos
+group=tezos
+sraddr=127.0.0.1
+srrpcport=8932
+
+evmaddr=0.0.0.0
+evmport=8545
+evmmode=proxy
+
+additional_cliopts=""
+
+logdir=/var/log/tezos
+rotateonstart=yes
+
+[ -r /etc/octez/evmnode.conf ] && . /etc/octez/evmnode.conf
+
+[ -z "$srnodeurl" ] && srnodeurl="http://$sraddr:$srrpcport"
+
+logfile="${logdir}/evmnode.log"
+evm="/usr/bin/octez-evm-node"
+
+initial_checks()
+{
+	mkdir -p ${PIDDIR}
+	chown $user:$group ${PIDDIR}
+
+	mkdir -p ${logdir}
+	chown $user:$group ${logdir}
+
+}
+
+rotate_logs ()
+{
+	if [ ${rotateonstart} = "yes" ]; then
+		[ -f "${logfile}" ] && mv -f "${logfile}" "${logfile}.1"
+	fi
+}
+
+case "$1" in
+start)	initial_checks
+	rotate_logs
+	su $user -c "${evm} run ${evmmode} with endpoint $srnodeurl --rpc-addr ${evmaddr} --rpc-port ${evmport} ${additional_cliopts} >> ${logfile} 2>&1 &"
+	;;
+stop)	
+       	pkill -f octez-evm-node
+        ;;
+restart) 
+        $0 stop
+        $0 start
+        ;;
+reload|force-reload) 
+        ;;
+status)
+	status_of_proc ${evm} $NAME || exit $?
+	exit 0
+        ;;
+*)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
+        exit 2
+        ;;
+esac
+exit 0
