@@ -1,14 +1,14 @@
 include:
   # Stage: build
-  - .gitlab/ci/jobs/build/arm64.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64.yml
 
   # These jobs are necessary to run flaky tezts
-  - .gitlab/ci/jobs/build/x86_64.yml
-  - .gitlab/ci/jobs/build/kernels.yml
-  - .gitlab/ci/jobs/build/tezt_fetch_records.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64.yml
+  - .gitlab/ci/jobs/build/oc.build_kernels.yml
+  - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
   # Stage: packaging
-  - .gitlab/ci/jobs/packaging/opam_prepare.yml
+  - .gitlab/ci/jobs/packaging/opam:prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: test
@@ -17,5 +17,5 @@ include:
   - .gitlab/ci/jobs/test/tezt_flaky.yml
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/test_install_python.yml
+  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
+  - .gitlab/ci/jobs/doc/oc.install_python.yml
