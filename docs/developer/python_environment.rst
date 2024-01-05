@@ -1,7 +1,7 @@
 Python Environment
 ==================
 
-Octez uses Python to build this documentation website (https://tezos.gitlab.io) and for a limited set of
+Octez uses Python to build this documentation website (:doc:`https://tezos.gitlab.io <../index>`) and for a limited set of
 utility scripts (although this latter usage of Python is deprecated).
 This page contains installation instructions for the Python environment.
 

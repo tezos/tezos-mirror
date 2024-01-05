@@ -44,8 +44,8 @@ Michelson arguments. Moreover, it supports calling `views
 (the ``get*`` entrypoints) offchain, without doing an explicit transaction that
 returns a value on a given contract.
 
-``octez-client man fa1.2`` gives a complete list of the `built-in commands
-<https://tezos.gitlab.io/alpha/cli-commands.html#client-manual>`_ to
+``octez-client man fa1.2`` gives a complete list of the :ref:`built-in commands
+<client_manual>` to
 interact with FA1.2-compatible contracts, with details about the syntax of each
 one.
 

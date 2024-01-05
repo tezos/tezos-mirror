@@ -116,10 +116,10 @@ unspecified by the user, the store sets it to the :ref:`last allowed fork level 
 While the node is running, it is possible to
 call the following RPCs to access the values of all these variables:
 
-- the checkpoint: `GET /chains/<chain_id>/levels/checkpoint <http://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__
-- the savepoint `GET /chains/<chain_id>/levels/savepoint <http://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-savepoint>`__
-- the caboose: `GET /chains/<chain_id>/levels/caboose <http://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-caboose>`__
-- the history mode: `GET /config/history_mode <http://tezos.gitlab.io/shell/rpc.html#get-config-history-mode>`__
+- the checkpoint: `GET /chains/<chain_id>/levels/checkpoint <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__
+- the savepoint `GET /chains/<chain_id>/levels/savepoint <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-savepoint>`__
+- the caboose: `GET /chains/<chain_id>/levels/caboose <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-caboose>`__
+- the history mode: `GET /config/history_mode <https://tezos.gitlab.io/shell/rpc.html#get-config-history-mode>`__
 
 Files hierarchy
 ***************
