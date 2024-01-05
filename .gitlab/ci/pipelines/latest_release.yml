@@ -1,3 +1,18 @@
-include:
-  # Stage: publish_release
-  - .gitlab/ci/jobs/publish/docker:promote_to_latest-release.yml
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+docker:promote_to_latest:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  stage: publish_release
+  tags:
+  - gcp
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_promote_to_latest.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "true"
