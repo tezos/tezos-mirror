@@ -26,12 +26,12 @@ export alpine_version='3.18'
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=cab7b39e74361fc16be1584ba4065eed73012151
+export full_opam_repository_tag=cbef5a5f6021e22273d68a59b37ba23ef2063222
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab-ci.yml`
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-fa75b3c188a552f9b3f4163d7387f3374f30299b}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-10484448ff930f532ef97d0d381ddd9e08f43441}"
 export opam_repository_git="$opam_repository_url.git"
 export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 

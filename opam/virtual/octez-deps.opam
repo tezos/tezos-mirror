@@ -51,7 +51,7 @@ depends: [
   "json-data-encoding" { >= "0.12" & < "0.13" }
   "jsonm"
   "lambda-term" { >= "3.3.1" }
-  "ledgerwallet-tezos" { >= "0.3.0" }
+  "ledgerwallet-tezos" { >= "0.4.0" }
   "logs"
   "lwt" { >= "5.7.0" }
   "lwt-canceler" { >= "0.3" & < "0.4" }

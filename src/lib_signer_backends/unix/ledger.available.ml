@@ -130,7 +130,7 @@ module Ledger_commands = struct
             (Buffer.contents buf) ;
           Buffer.clear buf)
     in
-    let res = f pp in
+    let*! res = f pp in
     match res with
     | Error
         (Ledgerwallet.Transport.AppError
@@ -143,7 +143,7 @@ module Ledger_commands = struct
     let open Lwt_result_syntax in
     let buf = Buffer.create 100 in
     let pp = Format.formatter_of_buffer buf in
-    let version = Ledgerwallet_tezos.get_version ~pp h in
+    let*! version = Ledgerwallet_tezos.get_version ~pp h in
     let*! () = Events.(emit Ledger.communication) (Buffer.contents buf) in
     match version with
     | Error e ->
@@ -292,14 +292,13 @@ module Ledger_commands = struct
     let* hash_opt, signature =
       wrap_ledger_cmd (fun pp ->
           let {Ledgerwallet_tezos.Version.major; minor; patch; _} = version in
-          let open Result_syntax in
           if (major, minor, patch) <= (2, 0, 0) then
-            let* s =
+            let+ s =
               Ledgerwallet_tezos.sign ~pp hid curve path (Cstruct.of_bytes msg)
             in
-            Ok (None, s)
+            (None, s)
           else
-            let* h, s =
+            let+ h, s =
               Ledgerwallet_tezos.sign_and_hash
                 ~pp
                 hid
@@ -307,7 +306,7 @@ module Ledger_commands = struct
                 path
                 (Cstruct.of_bytes msg)
             in
-            Ok (Some h, s))
+            (Some h, s))
     in
     let* () =
       match hash_opt with
@@ -597,7 +596,7 @@ type 'a ledger_function =
 
 let use_ledger ?(filter : Filter.t = `None) (f : 'a ledger_function) =
   let open Lwt_result_syntax in
-  let ledgers = Ledgerwallet.Transport.enumerate () in
+  let*! ledgers = Ledgerwallet.Transport.enumerate () in
   let*! () =
     Events.(emit Ledger.found)
       ( List.length ledgers,
@@ -643,7 +642,8 @@ let use_ledger ?(filter : Filter.t = `None) (f : 'a ledger_function) =
     if not (selected path) then return_none
     else
       let*! () = Events.(emit Ledger.processing) device_name in
-      match Ledgerwallet.Transport.open_path path with
+      let*! open_path = Ledgerwallet.Transport.open_path path in
+      match open_path with
       | None -> return_none
       | Some h ->
           Lwt.finalize
@@ -655,9 +655,7 @@ let use_ledger ?(filter : Filter.t = `None) (f : 'a ledger_function) =
                   let* ledger_id = Ledger_id.get h in
                   f h version_git ~device_path:path ledger_id
               | None | Some _ -> return_none)
-            (fun () ->
-              Ledgerwallet.Transport.close h ;
-              Lwt.return_unit)
+            (fun () -> Ledgerwallet.Transport.close h)
   in
   let rec go = function
     | [] -> return_none
@@ -718,15 +716,14 @@ let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg
     match Request_cache.find_opt cache ledger_id with
     | Some {path; version; git_commit; ledger_id}
       when check_filter (path, version, git_commit) -> (
-        match Ledgerwallet.Transport.(open_path path) with
+        let*! open_path = Ledgerwallet.Transport.(open_path path) in
+        match open_path with
         | None -> return_none
         | Some hidapi ->
             Lwt.finalize
               (fun () ->
                 f hidapi (version, git_commit) ~device_path:path ledger_id)
-              (fun () ->
-                Ledgerwallet.Transport.close hidapi ;
-                Lwt.return_unit))
+              (fun () -> Ledgerwallet.Transport.close hidapi))
     | Some _ | None ->
         use_ledger
           ~filter

@@ -62,7 +62,7 @@ variables:
   # /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
   # in GitLab namespaces `nomadic-labs` and `tezos`
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: fa75b3c188a552f9b3f4163d7387f3374f30299b
+  build_deps_image_version: 10484448ff930f532ef97d0d381ddd9e08f43441
   build_deps_image_name: "${CI_REGISTRY}/tezos/opam-repository"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
