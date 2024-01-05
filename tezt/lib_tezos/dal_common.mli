@@ -174,7 +174,7 @@ module RPC : sig
   val get_profiles : unit -> profiles RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
-        statuses know about the given commitment. The resulting list can be filtered by a
+        statuses known about the given commitment. The resulting list can be filtered by a
         given header publication level and slot index. *)
   val get_commitment_headers :
     ?slot_level:int ->
