@@ -68,7 +68,10 @@ let post_slot :
        proof, then computes the correspoding shards with their proof. The \
        result of this RPC can be directly used to publish a slot header."
     ~query:Types.slot_query
-    ~input:Data_encoding.string
+      (* With [Data_encoding.string], the body of the HTTP request contains
+         two length prefixes: one for the full body, and one for the string.
+         Using [Variable.string] instead fixes this. *)
+    ~input:Data_encoding.Variable.string
     ~output:
       Data_encoding.(
         obj2
