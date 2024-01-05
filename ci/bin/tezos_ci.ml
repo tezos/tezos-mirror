@@ -326,3 +326,32 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     retry;
     parallel;
   }
+
+let external_jobs = ref String_set.empty
+
+let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
+    Gitlab_ci.Types.job =
+  let stage =
+    match job.stage with
+    | Some stage -> stage
+    | None ->
+        (* Test is the name of the default stage in GitLab CI *)
+        "test"
+  in
+  let basename =
+    match filename_suffix with
+    | None -> job.name
+    | Some suffix -> job.name ^ "-" ^ suffix
+  in
+  let directory = Option.value ~default:stage directory in
+  let filename = sf ".gitlab/ci/jobs/%s/%s.yml" directory basename in
+  if String_set.mem filename !external_jobs then
+    failwith
+      "Attempted to write external job %s twice -- perhaps you need to set \
+       filename_suffix?"
+      filename
+  else (
+    external_jobs := String_set.add filename !external_jobs ;
+    let config = [Gitlab_ci.Types.Job job] in
+    Gitlab_ci.To_yaml.to_file ~header ~filename config ;
+    job)
