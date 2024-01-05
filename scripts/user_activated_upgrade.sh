@@ -33,29 +33,30 @@ if [ ! -d "$1" ] || [ -z "$2" ]; then
 fi
 
 if [[ $1 =~ ^.*/proto_[0-9]{3}_.*$ ]]; then
+  #shellcheck disable=SC2001
   version=$(echo "$1" | sed 's/.*proto_\([0-9]\{3\}\)_.*/\1/')
   pred=$(printf "%03d" $((10#$version - 1)))
-  pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
-  pred_short_hash=$(echo $pred_full_hash | head -c 8)
+  pred_full_hash=$(jq -r .hash < src/proto_"${pred}"_*/lib_protocol/TEZOS_PROTOCOL)
+  pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
 
-  full_hash=$(jq -r .hash < $1/lib_protocol/TEZOS_PROTOCOL)
+  full_hash=$(jq -r .hash < "$1/lib_protocol/TEZOS_PROTOCOL")
 else
   pred_version_dir=$(find src -regex "src/proto_[0-9][0-9][0-9]_[^/]*" -printf '%P\n' | sort -r | head -1)
-  pred=$(echo $pred_version_dir | cut -d'_' -f2)
-  pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
-  pred_short_hash=$(echo $pred_full_hash | head -c 8)
+  pred=$(echo "$pred_version_dir" | cut -d'_' -f2)
+  pred_full_hash=$(jq -r .hash < src/proto_"${pred}"_*/lib_protocol/TEZOS_PROTOCOL)
+  pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
 
-  version=$((pred + 1))
+  version=$((10#$pred + 1))
 
   full_hash=$(jq -r .hash < src/proto_alpha/lib_protocol/TEZOS_PROTOCOL)
 fi
 level=$2
 
-if (($level > 28082)); then
+if ((level > 28082)); then
   # we are on a real network and we need a yes-node and yes-wallet to bake
 
   # replace existing upgrades
-  awk -v level=$level -v full_hash=$full_hash '
+  awk -v level="$level" -v full_hash="$full_hash" '
 BEGIN{found=0}{
 if (!found && $0 ~ "BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES")
   {found=1; printf "(* BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)\n";
@@ -73,7 +74,7 @@ else # we are in sandbox
 
   # add upgrade to the sandbox (same awk script as for mainnet but with
   # "SANDBOX" instead of "MAINNET")
-  awk -v level=$level -v full_hash=$full_hash '
+  awk -v level="$level" -v full_hash="$full_hash" '
 BEGIN{found=0}{
 if (!found && $0 ~ "BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES")
   {found=1; printf "(* BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)\n";

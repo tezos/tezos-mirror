@@ -3,8 +3,6 @@
 registry_uri="https://registry.gitlab.com/v2"
 auth_uri="https://gitlab.com/jwt/auth"
 
-scope=push,pull
-
 getBearerToken() {
   local headers
   local username
@@ -13,6 +11,7 @@ getBearerToken() {
   username="$1"
   password="$2"
   reponame="$3"
+  scope=${4:-push,pull}
   basic_token=$(echo -n "${username}:${password}" | base64)
   headers="Authorization: Basic ${basic_token}"
   curl -fs -H "${headers}" "${auth_uri}?service=container_registry&scope=repository:${reponame}:${scope}" | jq '.token' -r
