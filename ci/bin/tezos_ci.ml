@@ -33,12 +33,18 @@ module Pipeline = struct
     name : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
+    jobs : Gitlab_ci.Types.job list;
   }
 
   let pipelines : t list ref = ref []
 
-  let register ?variables name if_ =
-    let pipeline : t = {variables; if_; name} in
+  let filename : name:string -> string =
+   fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
+
+  let register ?variables ?(jobs = []) name if_ =
+    let pipeline : t = {variables; if_; name; jobs} in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
+       check that stages have not been crossed. *)
     if List.exists (fun {name = name'; _} -> name' = name) !pipelines then
       failwith
         "[Pipeline.register] attempted to register pipeline %S twice"
@@ -47,10 +53,100 @@ module Pipeline = struct
 
   let all () = List.rev !pipelines
 
+  (* Perform a set of static checks on the full pipeline before writing it. *)
+  let precheck {name = pipeline_name; jobs; _} =
+    let job_by_name : (string, Gitlab_ci.Types.job) Hashtbl.t =
+      Hashtbl.create 5
+    in
+    (* Populate [job_by_name] and check that no two different jobs have the same name. *)
+    List.iter
+      (fun (job : Gitlab_ci.Types.job) ->
+        match Hashtbl.find_opt job_by_name job.name with
+        | None -> Hashtbl.add job_by_name job.name job
+        | Some _ ->
+            failwith
+              "[%s] the job '%s' is included twice"
+              pipeline_name
+              job.name)
+      jobs ;
+    (* Check usage of [needs:] & [depends:] *)
+    Fun.flip List.iter jobs @@ fun job ->
+    (* Get the [needs:] / [dependencies:] of job *)
+    let opt_set l = String_set.of_list (Option.value ~default:[] l) in
+    let needs =
+      (* The mandatory set of needs *)
+      job.needs |> Option.value ~default:[]
+      |> List.filter_map (fun Gitlab_ci.Types.{job; optional} ->
+             if not optional then Some job else None)
+      |> String_set.of_list
+    in
+    let dependencies = opt_set job.dependencies in
+    (* Check that dependencies are a subset of needs.
+       Note: this is already enforced by the smart constructor {!job}
+       defined below. Is it redundant? Nothing enforces the usage of
+       this smart constructor at this point.*)
+    String_set.iter
+      (fun dependency ->
+        if not (String_set.mem dependency needs) then
+          failwith
+            "[%s] the job '%s' has a [dependency:] on '%s' which is not \
+             included in it's [need:]"
+            pipeline_name
+            job.name
+            dependency)
+      dependencies ;
+    (* Check that needed jobs (which thus includes dependencies) are defined *)
+    ( Fun.flip String_set.iter needs @@ fun need ->
+      match Hashtbl.find_opt job_by_name need with
+      | Some _needed_job ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
+             check rule implication *)
+          ()
+      | None ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
+             handle optional needs *)
+          failwith
+            "[%s] job '%s' has a need on '%s' which is not defined in this \
+             pipeline."
+            pipeline_name
+            job.name
+            need ) ;
+    (* Check that all [dependencies:] are on jobs that produce artifacts *)
+    ( Fun.flip String_set.iter dependencies @@ fun dependency ->
+      match Hashtbl.find_opt job_by_name dependency with
+      | Some {artifacts = Some {paths = _ :: _; _}; _}
+      | Some {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
+          (* This is fine: we depend on a job that define non-report artifacts, or a dotenv file. *)
+          ()
+      | Some _ ->
+          failwith
+            "[%s] the job '%s' has a [dependency:] on '%s' which produces \
+             neither regular, [paths:] artifacts or a dotenv report."
+            pipeline_name
+            job.name
+            dependency
+      | None ->
+          (* This case is precluded by the dependency analysis above. *)
+          assert false ) ;
+
+    ()
+
+  let write () =
+    all ()
+    |> List.iter @@ fun ({name; jobs; _} as pipeline) ->
+       if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
+         precheck pipeline ;
+       match jobs with
+       | [] -> ()
+       | _ :: _ ->
+           let filename = filename ~name in
+           let config = List.map (fun j -> Gitlab_ci.Types.Job j) jobs in
+           Gitlab_ci.To_yaml.to_file ~header ~filename config
+
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
     let workflow_rule_of_pipeline = function
-      | {name; if_; variables} ->
+      | {name; if_; variables; jobs = _} ->
           (* Add [PIPELINE_TYPE] to the variables of the workflow rules, so
              that it can be added to the pipeline [name] *)
           let variables =
@@ -59,13 +155,12 @@ module Pipeline = struct
           workflow_rule ~if_ ~variables ~when_:Always ()
     in
     let include_of_pipeline = function
-      | {name; if_; variables = _} ->
+      | {name; if_; variables = _; jobs = _} ->
           (* Note that variables associated to the pipeline are not
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
-          Gitlab_ci.Types.
-            {local = sf ".gitlab/ci/pipelines/%s.yml" name; rules = [rule]}
+          Gitlab_ci.Types.{local = filename ~name; rules = [rule]}
     in
     let pipelines = all () in
     let workflow =

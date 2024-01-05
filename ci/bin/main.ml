@@ -261,6 +261,7 @@ let config =
     :: {local = ".gitlab/ci/jobs/shared/templates.yml"; rules = []}
     :: includes
   in
+  Pipeline.write () ;
   [
     Workflow workflow;
     Default default;

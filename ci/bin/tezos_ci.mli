@@ -36,14 +36,23 @@ module Pipeline : sig
   (* Register a pipeline.
 
      [register ?variables name rule] will register a pipeline [name]
-     that runs when [rule] is true. The pipeline is expected to be
-     defined in [.gitlab/ci/pipelines/NAME.yml] which will be included
-     from the top-level [.gitlab-ci.yml].
+     that runs when [rule] is true.
 
      If [variables] is set, then these variables will be added to the
-     [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml]. *)
+     [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
+
+     If [jobs] is not set, then the pipeline is a legacy, hand-written
+     .yml file, expected to be defined in
+     [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
+     jobs will be generated to the same file when {!write} is
+     called. In both cases, this file will be included from the
+     top-level [.gitlab-ci.yml]. *)
   val register :
-    ?variables:Gitlab_ci.Types.variables -> string -> Gitlab_ci.If.t -> unit
+    ?variables:Gitlab_ci.Types.variables ->
+    ?jobs:Gitlab_ci.Types.job list ->
+    string ->
+    Gitlab_ci.If.t ->
+    unit
 
   (** Splits the set of registered pipelines into workflow rules and includes.
 
@@ -52,6 +61,11 @@ module Pipeline : sig
       and to include the select pipeline (using [include:]). *)
   val workflow_includes :
     unit -> Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list
+
+  (** Writes the set of non-legacy registered pipelines.
+
+      The string {!header} will be prepended to each written file. *)
+  val write : unit -> unit
 end
 
 (** A facility for registering images for [image:] keywords.
