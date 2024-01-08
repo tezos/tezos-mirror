@@ -30,6 +30,7 @@ type mode =
       kernel : string;
       preimage_dir : string;
       private_rpc_port : int;
+      time_between_blocks : float option;
     }
   | Proxy of {devmode : bool}
 
@@ -146,7 +147,7 @@ let run_args evm_node =
           evm_node.persistent_state.rollup_node_endpoint;
         ]
         @ Cli_arg.optional_switch "devmode" devmode
-    | Sequencer {kernel; preimage_dir; private_rpc_port} ->
+    | Sequencer {kernel; preimage_dir; private_rpc_port; time_between_blocks} ->
         [
           "run";
           "sequencer";
@@ -160,6 +161,10 @@ let run_args evm_node =
           "--private-rpc-port";
           string_of_int private_rpc_port;
         ]
+        @ Cli_arg.optional_arg
+            "time-between-blocks"
+            (Format.sprintf "%.3f")
+            time_between_blocks
   in
   mode_args @ shared_args
 

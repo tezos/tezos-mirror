@@ -35,6 +35,9 @@ type mode =
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
       private_rpc_port : int;  (** Port for private RPC server*)
+      time_between_blocks : float option;
+          (** Interval at which the sequencer creates an empty block by
+              default. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

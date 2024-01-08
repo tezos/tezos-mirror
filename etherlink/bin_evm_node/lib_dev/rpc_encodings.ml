@@ -625,6 +625,20 @@ module Get_logs = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Produce_block = struct
+  type input = unit
+
+  type output = Ethereum_types.quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Ethereum_types.quantity_encoding
+
+  let method_ = "produceBlock"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -665,6 +679,7 @@ let supported_methods : (module METHOD) list =
     (module Txpool_content);
     (module Web3_clientVersion);
     (module Web3_sha3);
+    (module Produce_block);
   ]
 
 let unsupported_methods : string list =

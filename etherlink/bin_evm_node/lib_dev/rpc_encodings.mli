@@ -252,6 +252,9 @@ module Get_logs :
     with type input = Ethereum_types.filter
      and type output = Ethereum_types.filter_changes list
 
+module Produce_block :
+  METHOD with type input = unit and type output = Ethereum_types.quantity
+
 type map_result =
   | Method :
       ('input, 'output) method_

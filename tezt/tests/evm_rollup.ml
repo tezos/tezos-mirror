@@ -252,7 +252,9 @@ let setup_l1_contracts ~admin client =
 
 type kernel_installee = {base_installee : string; installee : string}
 
-type setup_mode = Setup_sequencer | Setup_proxy of {devmode : bool}
+type setup_mode =
+  | Setup_sequencer of {time_between_blocks : float option}
+  | Setup_proxy of {devmode : bool}
 
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
@@ -279,7 +281,7 @@ let setup_evm_kernel ?config ?kernel_installee
       else None
     in
     let sequencer =
-      match setup_mode with Setup_proxy _ -> false | Setup_sequencer -> true
+      match setup_mode with Setup_proxy _ -> false | Setup_sequencer _ -> true
     in
     Configuration.make_config
       ~bootstrap_accounts
@@ -336,7 +338,7 @@ let setup_evm_kernel ?config ?kernel_installee
   let* mode =
     match setup_mode with
     | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
-    | Setup_sequencer ->
+    | Setup_sequencer {time_between_blocks} ->
         let preimages_dir = Temp.dir "preimages" in
         let* {output; _} =
           prepare_installer_kernel
@@ -348,7 +350,12 @@ let setup_evm_kernel ?config ?kernel_installee
         let private_rpc_port = Port.fresh () in
         return
           (Evm_node.Sequencer
-             {kernel = output; preimage_dir = preimages_dir; private_rpc_port})
+             {
+               kernel = output;
+               preimage_dir = preimages_dir;
+               private_rpc_port;
+               time_between_blocks;
+             })
   in
   let* evm_node =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
@@ -372,7 +379,7 @@ let register_test ~title ~tags ?(admin = None) ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
-    | Setup_sequencer -> "sequencer"
+    | Setup_sequencer _ -> "sequencer"
   in
   Protocol.register_test
     ~__FILE__
@@ -388,10 +395,10 @@ let register_test ~title ~tags ?(admin = None) ~setup_mode f =
       let* evm_setup = setup_evm_kernel ~admin ~setup_mode protocol in
       f ~protocol ~evm_setup)
 
-let register_both ~title ~tags ?admin f protocols =
+let register_both ~title ~tags ?admin ?time_between_blocks f protocols =
   let register = register_test ~title ~tags ?admin f protocols in
   register ~setup_mode:(Setup_proxy {devmode = true}) ;
-  register ~setup_mode:Setup_sequencer
+  register ~setup_mode:(Setup_sequencer {time_between_blocks})
 
 let setup_past_genesis
     ?(config :
