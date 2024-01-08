@@ -1,8 +1,10 @@
 use std::collections::LinkedList;
-use tezos_crypto_rs::hash::BlockHash;
+use tezos_crypto_rs::hash::{BlockHash, ContractKt1Hash};
 use tezos_smart_rollup_encoding::{
-    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage},
+    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer},
     michelson,
+    public_key_hash::PublicKeyHash,
+    smart_rollup::SmartRollupAddress,
     timestamp::Timestamp,
 };
 
@@ -79,6 +81,28 @@ impl InboxBuilder {
 
         self.insert_raw(data);
         self
+    }
+
+    /// Inject a transfer notification.
+    pub fn insert_transfer<E: michelson::Michelson>(
+        &mut self,
+        sender: ContractKt1Hash,
+        source: PublicKeyHash,
+        destination: SmartRollupAddress,
+        payload: E,
+    ) -> &mut Self {
+        let msg = InboxMessage::Internal(InternalInboxMessage::Transfer(Transfer {
+            payload,
+            sender,
+            source,
+            destination,
+        }));
+
+        let mut data = Vec::new();
+        msg.serialize(&mut data)
+            .expect("Failed to serialise transfer");
+
+        self.insert_raw(data)
     }
 
     /// Inject a raw message.
