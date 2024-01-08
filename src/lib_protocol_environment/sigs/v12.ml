@@ -12073,7 +12073,7 @@ end
 
 type version
 
-val v3 : version
+val v4 : version
 
 type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 

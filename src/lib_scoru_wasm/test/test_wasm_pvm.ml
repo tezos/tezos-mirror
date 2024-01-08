@@ -481,7 +481,7 @@ let try_availability_above_v1_only ~version import_name import_params
   let predicate state =
     match version with
     | Wasm_pvm_state.V0 -> is_stuck state
-    | V1 | V2 | V3 -> not (is_stuck state)
+    | V1 | V2 | V3 | V4 -> not (is_stuck state)
   in
   assert (predicate state) ;
   Lwt_result_syntax.return_unit

@@ -30,7 +30,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
   | Nairobi -> V1
   | Oxford -> V2
-  | Proto_alpha -> V3
+  | Proto_alpha -> V4
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
@@ -77,7 +77,7 @@ let get_wasm_version {durable; _} =
 
 let stack_size_limit = function
   | Wasm_pvm_state.V0 -> 300
-  | V1 | V2 | V3 -> 60_000
+  | V1 | V2 | V3 | V4 -> 60_000
 (* The limit 60_000 has been chosen such that the simplest WASM program
    consisting in trying to recursively call 60,000 times the same function
    results in Wasmer raising a runtime error.
