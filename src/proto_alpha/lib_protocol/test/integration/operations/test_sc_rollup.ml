@@ -2900,7 +2900,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:60 Context.T3
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:90 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
