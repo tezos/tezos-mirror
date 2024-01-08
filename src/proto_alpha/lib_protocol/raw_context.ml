@@ -955,8 +955,24 @@ let update_block_time_related_constants (c : Constants_parametric_repr.t) =
   let nonce_revelation_threshold = half_more c.nonce_revelation_threshold in
   let blocks_per_stake_snapshot = half_more c.blocks_per_stake_snapshot in
   let max_operations_time_to_live = 3 * c.max_operations_time_to_live / 2 in
+  let seconds_in_a_day = 60 * 60 * 24 in
+  let seconds_in_a_week = seconds_in_a_day * 7 in
+  let block_time = Int64.to_int (Period_repr.to_seconds minimal_block_delay) in
+  let sc_rollup =
+    {
+      c.sc_rollup with
+      challenge_window_in_blocks = seconds_in_a_week * 2 / block_time;
+      (* Same as challenge_window_in_blocks *)
+      max_active_outbox_levels =
+        Int32.of_int (seconds_in_a_week * 2 / block_time);
+      commitment_period_in_blocks = 60 * 15 / block_time;
+      max_lookahead_in_blocks = Int32.of_int (seconds_in_a_day * 30 / block_time);
+      timeout_period_in_blocks = seconds_in_a_week / block_time;
+    }
+  in
   {
     c with
+    sc_rollup;
     blocks_per_cycle;
     blocks_per_commitment;
     nonce_revelation_threshold;

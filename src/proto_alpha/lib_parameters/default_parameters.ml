@@ -27,52 +27,103 @@
 
 open Protocol.Alpha_context
 
-(** The challenge window is about two weeks with 15s block-time,
-    (4 * 60 * 24 * 14).
-    WARNING: changing this value also impacts
-    [sc_rollup_max_active_outbox_levels]. See below. *)
-let sc_rollup_challenge_window_in_blocks = 80_640
+let seconds_in_a_day = 60 * 60 * 24
 
-(** Number of active levels kept for executing outbox messages.
+let seconds_in_a_week = seconds_in_a_day * 7
 
-    WARNING: Changing this value impacts the storage charge for
-    applying messages from the outbox. It also requires migration for
-    remapping existing active outbox levels to new indices. *)
-let sc_rollup_max_active_outbox_levels =
-  Int32.of_int sc_rollup_challenge_window_in_blocks
+let make_sc_rollup_parameter ~dal_activation_level block_time =
+  (* Maximum number of outbox messages per level.
 
-(** Maximum number of outbox messages per level.
+      WARNING: changing this value impacts the storage size a rollup has to
+      pay for at origination time. *)
+  let max_outbox_messages_per_level = 100 in
 
-    WARNING: changing this value impacts the storage size a rollup has to
-    pay for at origination time. *)
-let sc_rollup_max_outbox_messages_per_level = 100
+  (* The commitment period in blocks is about 15 minutes. *)
+  let commitment_period_in_blocks = 60 * 15 / block_time in
 
-(** The timeout period is about a week with 15s block-time,
-    (4 * 60 * 24 * 7).
+  (* The challenge window is about two weeks.  WARNING: changing this
+     value also impacts [sc_rollup_max_active_outbox_levels].  See
+     below. *)
+  let challenge_window_in_blocks = seconds_in_a_week * 2 / block_time in
 
-    It suffers from the same risk of censorship as
-    {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
-*)
-let sc_rollup_timeout_period_in_blocks = 40_320
+  (* Number of active levels kept for executing outbox messages.
 
-(** We want to allow a max lookahead in blocks of 4 weeks, so the rollup
-    can still move forward even if its impossible to cement commitments.
+      WARNING: Changing this value impacts the storage charge for
+      applying messages from the outbox. It also requires migration for
+      remapping existing active outbox levels to new indices. *)
+  let max_active_outbox_levels = Int32.of_int challenge_window_in_blocks in
 
-    As there is a challenge window of 2 weeks, and because the maximum
-    duration of a game is 2 weeks, the hypothetical maximum time
-    to cement a block is a month, (4 * 60 * 24 * 30).
+  (* The timeout period is about a week.  It suffers from the same
+     risk of censorship as {!sc_rollup_challenge_windows_in_blocks} so
+     we use the same value. *)
+  let timeout_period_in_blocks = seconds_in_a_week / block_time in
 
-    Be careful, this constant has an impact of the maximum cost of
-    a rollup on the storage:
-    [maximum_cost_in_storage =
-       (sc_rollup_max_lookahead_in_blocks / commitment_period) *
-       max_commitment_storage_size_in_bytes *
-       cost_per_byte]
+  (* We want to allow a max lookahead in blocks of 4 weeks, so the
+     rollup can still move forward even if its impossible to cement
+     commitments.
 
-    With the current values:
-    [maximum_cost_in_storage = 348.3 tez]
-*)
-let sc_rollup_max_lookahead_in_blocks = 172_800l
+     As there is a challenge window of 2 weeks, and because the maximum
+     duration of a game is 2 weeks, the hypothetical maximum time
+     to cement a block is a month.
+
+     Be careful, this constant has an impact of the maximum cost of
+     a rollup on the storage:
+     [maximum_cost_in_storage =
+        (sc_rollup_max_lookahead_in_blocks / commitment_period) *
+        max_commitment_storage_size_in_bytes *
+        cost_per_byte]
+
+     With the current values:
+     [maximum_cost_in_storage = 348.3 tez]
+  *)
+  let max_lookahead_in_blocks =
+    let seconds_in_a_month = Int32.of_int (seconds_in_a_day * 30) in
+    let block_time = Int32.of_int block_time in
+    Int32.div seconds_in_a_month block_time
+  in
+  Constants.Parametric.
+    {
+      arith_pvm_enable = false;
+      (* The following value is chosen to prevent spam. *)
+      origination_size = 6_314;
+      challenge_window_in_blocks;
+      commitment_period_in_blocks;
+      stake_amount = Tez.of_mutez_exn 10_000_000_000L;
+      max_lookahead_in_blocks;
+      max_active_outbox_levels;
+      max_outbox_messages_per_level;
+      (* The default number of required sections in a dissection *)
+      number_of_sections_in_dissection = 32;
+      timeout_period_in_blocks;
+      (* We store multiple cemented commitments because we want to
+         allow the execution of outbox messages against cemented
+         commitments that are older than the last cemented commitment.
+         The execution of an outbox message is a manager operation,
+         and manager operations are kept in the mempool for one
+         hour. Hence we only need to ensure that an outbox message can
+         be validated against a cemented commitment produced in the
+         last hour. If we assume that the rollup is operating without
+         issues, that is no commitments are being refuted and
+         commitments are published and cemented regularly by one
+         rollup node, we can expect commitments to be cemented
+         approximately every 15 minutes, or equivalently we can expect
+         5 commitments to be published in one hour (at minutes 0, 15,
+         30, 45 and 60).  Therefore, we need to keep 5 cemented
+         commitments to guarantee that the execution of an outbox
+         operation can always be validated against a cemented
+         commitment while it is in the mempool. *)
+      max_number_of_stored_cemented_commitments = 5;
+      max_number_of_parallel_games = 32;
+      reveal_activation_level =
+        {
+          raw_data = {blake2B = Raw_level.root};
+          metadata = Raw_level.root;
+          dal_page = dal_activation_level;
+          dal_parameters = dal_activation_level;
+        };
+      private_enable = true;
+      riscv_pvm_enable = false;
+    }
 
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 
@@ -97,8 +148,8 @@ let default_dal =
     }
 
 let constants_mainnet =
-  let consensus_committee_size = 7000 in
   let block_time = 10 in
+  let consensus_committee_size = 7000 in
   let Constants.Generated.
         {
           consensus_threshold;
@@ -127,6 +178,7 @@ let constants_mainnet =
          exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
       Raw_level.of_int32_exn Int32.(pred max_int)
   in
+  let sc_rollup = make_sc_rollup_parameter ~dal_activation_level block_time in
   {
     Constants.Parametric.preserved_cycles = 5;
     consensus_rights_delay = 5;
@@ -209,49 +261,7 @@ let constants_mainnet =
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
     dal = default_dal;
-    sc_rollup =
-      {
-        arith_pvm_enable = false;
-        (* The following value is chosen to prevent spam. *)
-        origination_size = 6_314;
-        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-        commitment_period_in_blocks = 60;
-        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
-        max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
-        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
-        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
-        (* The default number of required sections in a dissection *)
-        number_of_sections_in_dissection = 32;
-        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
-        (* We store multiple cemented commitments because we want to
-            allow the execution of outbox messages against cemented
-            commitments that are older than the last cemented commitment.
-            The execution of an outbox message is a manager operation,
-            and manager operations are kept in the mempool for one
-            hour. Hence we only need to ensure that an outbox message
-            can be validated against a cemented commitment produced in the
-            last hour. If we assume that the rollup is operating without
-            issues, that is no commitments are being refuted and commitments
-            are published and cemented regularly by one rollup node, we can
-            expect commitments to be cemented approximately every 15
-            minutes, or equivalently we can expect 5 commitments to be
-            published in one hour (at minutes 0, 15, 30, 45 and 60).
-            Therefore, we need to keep 5 cemented commitments to guarantee
-            that the execution of an outbox operation can always be
-            validated against a cemented commitment while it is in the
-            mempool. *)
-        max_number_of_stored_cemented_commitments = 5;
-        max_number_of_parallel_games = 32;
-        reveal_activation_level =
-          {
-            raw_data = {blake2B = Raw_level.root};
-            metadata = Raw_level.root;
-            dal_page = dal_activation_level;
-            dal_parameters = dal_activation_level;
-          };
-        private_enable = true;
-        riscv_pvm_enable = false;
-      };
+    sc_rollup;
     zk_rollup =
       {
         enable = false;
