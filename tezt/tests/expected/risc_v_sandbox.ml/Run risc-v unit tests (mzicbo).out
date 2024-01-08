@@ -1,6 +1,6 @@
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mzicbo-p-zero --posix
-thread 'main' panicked at sandbox/src/main.rs:128:25:
+thread 'main' panicked at sandbox/src/main.rs:121:25:
 Exception IllegalInstruction(4235279) at 0x800001a4: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mzicbo-p-zero: fail

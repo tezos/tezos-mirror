@@ -101,6 +101,7 @@ impl InboxBuilder {
             current_level: 0,
             current_id: 0,
             levels: self.levels,
+            none_counter: 0,
         }
     }
 }
@@ -110,16 +111,14 @@ pub struct Inbox {
     current_level: u32,
     current_id: u32,
     levels: LinkedList<LinkedList<Vec<u8>>>,
+    none_counter: usize,
 }
 
 impl Inbox {
     /// Move to the new inbox message.
     pub fn next(&mut self) -> Option<(u32, u32, Vec<u8>)> {
         let Some(level) = self.levels.front_mut() else {
-            // Advance to the next level.
-            self.current_level += 1;
-            self.current_id = 0;
-
+            self.none_counter += 1;
             return None;
         };
 
@@ -141,13 +140,8 @@ impl Inbox {
         }
     }
 
-    /// Get the current inbox level.
-    pub fn level(&self) -> u32 {
-        self.current_level
-    }
-
-    /// Is the inbox empty?
-    pub fn is_empty(&self) -> bool {
-        self.levels.iter().all(|level| level.is_empty())
+    /// Count the number of nones that have been returned by the inbox so far.
+    pub fn none_count(&self) -> usize {
+        self.none_counter
     }
 }
