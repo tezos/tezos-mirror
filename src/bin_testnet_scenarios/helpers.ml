@@ -52,7 +52,7 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner ?metrics_port () =
   in
   (* By default, Tezt sets the difficulty to generate the identity
      file of the Octez node to 0 (`--expected-pow 0`). The default
-     value used in networks like mainnet, Mondaynet etc. is 26 (see
+     value used in networks like mainnet, Weeklynet etc. is 26 (see
      `lib_node_config/config_file.ml`). *)
   let node =
     Node.create ?runner ?data_dir:testnet.data_dir ?metrics_port l1_node_args
