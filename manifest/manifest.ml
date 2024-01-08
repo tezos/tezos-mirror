@@ -4137,6 +4137,40 @@ let list_tests_to_run_after_changes (changed_files : string list) =
      by setting the MANIFEZT_DEBUG environment variable to "true". *)
   let debug = Sys.getenv_opt "MANIFEZT_DEBUG" = Some "true" in
   if debug then List.iter (Printf.eprintf "changed file: %s\n%!") changed_files ;
+  (* [directory_has_directly_changed] tests whether a [dir],
+     that is supposed to be a directory, is considered to have been modified
+     without considering reverse dependencies.
+     I.e. it returns whether [changed_files] contains a file that is directly in [dir]. *)
+  let directory_has_directly_changed =
+    let changed_dirs =
+      String_set.of_list (List.map Filename.dirname changed_files)
+    in
+    fun (dir : string) -> String_set.mem dir changed_dirs
+  in
+  (* Same as [directory_has_directly_changed] but also consider changes
+     in subdirectories, recursively. *)
+  let directory_has_changed_recursively =
+    let changed_dirs =
+      let rec add acc path =
+        let dir = Filename.dirname path in
+        (* Stop when removing a prefix no longer reduces the size of the path.
+           Termination is thus guaranteed since the size strictly reduces towards 0.
+           Note that [Filename.dirname "" = "."] so the size can in fact grow. *)
+        if String.length dir >= String.length path then
+          (* Avoid infinite loops. *)
+          acc
+        else if String_set.mem dir acc then
+          (* No need to add recursively again. *)
+          acc
+        else
+          let acc = String_set.add dir acc in
+          (* Recursively add parents. *)
+          add acc dir
+      in
+      List.fold_left add String_set.empty changed_files
+    in
+    fun (dir : string) -> String_set.mem dir changed_dirs
+  in
   (* [internal_has_changed] tells whether an internal [target]
      is considered to have changed, directly or indirectly.
      A target is considered to have changed:
@@ -4145,16 +4179,6 @@ let list_tests_to_run_after_changes (changed_files : string list) =
        does not cause "example/" to be considered to have changed);
      - if one of its dependencies is considered to have changed. *)
   let rec internal_has_changed =
-    (* [directory_has_directly_changed] tests whether a [dir],
-       that is supposed to be a directory, is considered to have been modified
-       without considering reverse dependencies.
-       I.e. it returns whether [changed_files] contains a file that is directly in [dir]. *)
-    let directory_has_directly_changed =
-      let changed_dirs =
-        String_set.of_list (List.map Filename.dirname changed_files)
-      in
-      fun (dir : string) -> String_set.mem dir changed_dirs
-    in
     (* [id] associates a unique identifier to each target,
        so that we can quickly know whether we already traversed it. *)
     let id (target : Target.internal) =
@@ -4245,6 +4269,17 @@ let list_tests_to_run_after_changes (changed_files : string list) =
   (* [file_has_changed] just checks if a [path] is in [changed_files].
      It does not assume that [path] is canonical, so it has to make it canonical. *)
   let file_has_changed path = List.mem (canonicalize_path path) changed_files in
+  (* [glob_has_changed] tests if, in a given directory [dir],
+     a [glob] matches files in [changed_files].
+     For now, this is an overapproximation because we do not want to implement
+     the whole glob syntax. Special characters are only special after the last "/",
+     so we can ignore what is after "/" and just check if something changed in
+     the directory. *)
+  let glob_has_changed ~rec_ dir glob =
+    let dir = canonicalize_path (dir // Filename.dirname glob) in
+    if rec_ then directory_has_changed_recursively dir
+    else directory_has_directly_changed dir
+  in
   (* Iterate over all Tezt targets to find test files
      that are directly or indirectly changed.
      This does not find test files from tezt/tests,
@@ -4274,8 +4309,6 @@ let list_tests_to_run_after_changes (changed_files : string list) =
                preprocess;
                preprocessor_deps;
              } ->
-    (* TODO *)
-    ignore (dep_globs, dep_globs_rec) ;
     if
       List.exists target_option_has_changed lib_deps
       || List.exists target_option_has_changed exe_deps
@@ -4291,6 +4324,8 @@ let list_tests_to_run_after_changes (changed_files : string list) =
               (fun (File file : Target.preprocessor_dep) ->
                 tezt_target_dir // file)
               preprocessor_deps)
+      || List.exists (glob_has_changed ~rec_:false tezt_target_dir) dep_globs
+      || List.exists (glob_has_changed ~rec_:true tezt_target_dir) dep_globs_rec
     then (
       let path =
         match tezt_local_test_lib with
