@@ -222,7 +222,7 @@ dependencies = [
 [[package]]
 name = "rvemu"
 version = "0.0.11"
-source = "git+https://github.com/d0iasm/rvemu.git#f55eb5b376f22a73c0cf2630848c03f8d5c93922"
+source = "git+https://github.com/vapourismo/rvemu.git?branch=no-dtb#aebb35d51fda0e4bcc68af8c914dad0f0ca8e1cc"
 dependencies = [
  "js-sys",
  "wasm-bindgen",

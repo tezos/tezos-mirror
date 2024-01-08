@@ -23,12 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let risc_v_sandbox = Uses.make ~tag:"risc_v_sandbox" ~path:"risc-v-sandbox"
+let risc_v_sandbox = Uses.make ~tag:"risc_v_sandbox" ~path:"./risc-v-sandbox"
 
 let run_kernel ?(posix = false) ~input ?initrd () =
   let process =
     Process.spawn
-      (project_root // Uses.path risc_v_sandbox)
+      ~hooks:Tezt_tezos.Tezos_regression.hooks
+      (Uses.path risc_v_sandbox)
       (["--input"; input]
       @ Option.fold ~none:[] ~some:(fun initrd -> ["--initrd"; initrd]) initrd
       @ if posix then ["--posix"] else [])

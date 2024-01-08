@@ -10,4 +10,5 @@ goblin = "0.7.1"
 derive_more = "0.99.17"
 
 [dependencies.rvemu]
-git = "https://github.com/d0iasm/rvemu.git"
+git = "https://github.com/vapourismo/rvemu.git"
+branch = "no-dtb"
