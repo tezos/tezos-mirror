@@ -111,6 +111,12 @@ pub enum EthereumError {
     /// gas_limit * gas_price > u64::max
     #[error("Gas payment overflowed u64::max")]
     GasPaymentOverflow,
+    /// Converting non-execution fees to gas overflowed u64::max
+    #[error("Gas for fees overflowed u64::max in conversion")]
+    FeesToGasOverflow,
+    /// Underflow of gas limit when subtracting gas for fees
+    #[error("Insufficient gas to cover the non-execution fees")]
+    GasToFeesUnderflow,
 }
 
 /// Execute an Ethereum Transaction

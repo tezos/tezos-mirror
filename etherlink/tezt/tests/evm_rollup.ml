@@ -1491,7 +1491,7 @@ let transfer ?data ~flat_fee ~expected_execution_gas ~evm_setup () =
   unit
 
 let test_l2_transfer =
-  let flat_fee = Wei.zero in
+  let flat_fee = Wei.of_eth_string "0.000123" in
   let expected_execution_gas = 21000 in
   let test_f ~protocol:_ ~evm_setup =
     transfer ~evm_setup ~flat_fee ~expected_execution_gas ()
@@ -1501,7 +1501,7 @@ let test_l2_transfer =
   register_both ~title ~tags ~flat_fee test_f
 
 let test_chunked_transaction =
-  let flat_fee = Wei.zero in
+  let flat_fee = Wei.of_eth_string "0.005" in
   let expected_execution_gas = 117000 in
   let test_f ~protocol:_ ~evm_setup =
     transfer

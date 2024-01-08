@@ -1167,7 +1167,7 @@ mod tests {
         // Ensures the caller has enough balance to pay for the fees, but not
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
-        let fees = U256::from(21000) * tx.execution_gas_limit();
+        let fees = U256::from(21000) * tx.gas_limit_with_fees();
         set_balance(&mut host, &mut evm_account_storage, &caller, fees);
 
         // Prepare a invalid transaction, i.e. with not enough funds.

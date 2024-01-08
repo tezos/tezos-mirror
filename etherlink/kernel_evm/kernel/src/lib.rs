@@ -39,6 +39,7 @@ mod blueprint;
 mod blueprint_storage;
 mod delayed_inbox;
 mod error;
+mod fees;
 mod inbox;
 mod indexable_storage;
 mod linked_list;

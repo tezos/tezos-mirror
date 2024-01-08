@@ -19,7 +19,6 @@ use thiserror::Error;
 
 use crate::{
     access_list::AccessList,
-    block::BlockFees,
     rlp_helpers::{
         append_h256, append_option, append_vec, decode_field, decode_field_h256,
         decode_list, decode_option, next,
@@ -96,8 +95,6 @@ pub struct EthereumTransactionCommon {
     /// *NB* this is inclusive of any additional fees that are paid, prior to execution:
     /// - flat fee
     /// - data availability fee
-    ///
-    /// For the execution gas limit, see [execution_gas_limit].
     gas_limit: u64,
     /// The 160-bit address of the message call’s recipient
     /// or, for a contract creation transaction
@@ -555,31 +552,9 @@ impl EthereumTransactionCommon {
         }
     }
 
-    /// Returns overall_gas_price of the transaction.
-    ///
-    /// *NB* this is not the gas price used _for execution_, but rather the gas price that
-    /// should be reported in the transaction receipt.
-    pub fn overall_gas_price(
-        &self,
-        block_fees: &BlockFees,
-    ) -> Result<U256, anyhow::Error> {
-        let block_base_fee_per_gas = block_fees.base_fee_per_gas();
-
-        if self.max_fee_per_gas >= block_base_fee_per_gas {
-            Ok(block_base_fee_per_gas)
-        } else {
-            Err(anyhow::anyhow!("Underflow when calculating gas price"))
-        }
-    }
-
-    /// Returns the gas limit for executing this transaction.
-    ///
-    /// This is strictly lower than the gas limit set by the user, as additional gas is required
-    /// in order to pay for the *flat fee* and *data availability fee*.
-    ///
-    /// The user pre-pays this (in addition to the flat fee & data availability fee) prior to execution.
-    /// If execution does not use all of the execution gas limit, they will be partially refunded.
-    pub fn execution_gas_limit(&self) -> u64 {
+    /// Returns the total gas limit for this transaction, including execution and fees.
+    #[inline(always)]
+    pub const fn gas_limit_with_fees(&self) -> u64 {
         self.gas_limit
     }
 }
