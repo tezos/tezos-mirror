@@ -9,7 +9,7 @@ opam_repository_fork="git@github.com:tezos/opam-repository"
 opam_dir="opam-repository"
 
 log() {
-  echo '\e[1m'"$1"'\e[0m'
+  printf '\e[1m%s\e[0m' "$1"
 }
 
 # shellcheck source=./scripts/ci/release.sh

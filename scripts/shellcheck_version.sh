@@ -4,7 +4,7 @@
 # in case of success, 1 otherwise.
 
 declare -r github="https://github.com/koalaman/shellcheck"
-declare -r expected_version="0.8.0" # This version is the one used
+declare -r expected_version="0.9.0" # This version is the one used
 # by the CI's test Docker image. This version hence needs to be updated
 # when the image is updated and pulls a newer version of shellcheck.
 # When this happens, the CI of tezos/tezos will start failing; so we will

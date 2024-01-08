@@ -35,7 +35,7 @@ if [ -z "$url" ]; then
 fi
 
 log() {
-  echo '\e[1m'"$1"'\e[0m'
+  printf '\e[1m%s\e[0m' "$1"
 }
 
 current_dir=$(pwd)
