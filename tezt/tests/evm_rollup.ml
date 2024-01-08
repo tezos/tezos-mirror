@@ -1368,20 +1368,8 @@ let ensure_block_integrity ~block_result evm_setup =
   assert (block.transactions = block_result.transactions) ;
   unit
 
-let get_block_by_number ?(full_tx_objects = false) evm_setup block_param =
-  let* latest_block =
-    Evm_node.(
-      call_evm_rpc
-        evm_setup.evm_node
-        {
-          method_ = "eth_getBlockByNumber";
-          parameters = `A [`String block_param; `Bool full_tx_objects];
-        })
-  in
-  return @@ (latest_block |> Evm_node.extract_result |> Block.of_json)
-
-let latest_block ?(full_tx_objects = false) evm_setup =
-  get_block_by_number ~full_tx_objects evm_setup "latest"
+let latest_block ?(full_tx_objects = false) evm_node =
+  Rpc.get_block_by_number ~full_tx_objects ~block:"latest" evm_node
 
 type transfer_result = {
   sender_balance_before : Wei.t;
@@ -2848,7 +2836,7 @@ let test_kernel_migration =
         ~receiver
         evm_setup
     in
-    let* block_result = latest_block evm_setup in
+    let*@ block_result = latest_block evm_setup.evm_node in
     let* config_result = config_setup evm_setup in
     return {transfer_result; block_result; config_result}
   in

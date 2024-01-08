@@ -195,22 +195,25 @@ let test_persistent_state =
 let test_publish_blueprints =
   Protocol.register_test
     ~__FILE__
-    ~tags:[Tag.flaky; "evm"; "sequencer"; "data"]
+    ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
     ~uses
   @@ fun protocol ->
-  let* {evm_node; node; client; sc_rollup_node; _} = setup_sequencer protocol in
-  (* Force the sequencer to produce a block. *)
-  let* _ = Rpc.produce_block evm_node in
+  let* {evm_node; node; client; sc_rollup_node; _} =
+    setup_sequencer ~time_between_blocks:10000. protocol
+  in
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
   (* Ask for the current block. *)
-  let*@ sequencer_head = Rpc.block_number evm_node in
-  (* Stop the EVM node. *)
-  let* () = Evm_node.terminate evm_node in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
 
   (* At this point, the evm node should called the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
   let* () =
-    repeat 5 (fun () ->
+    repeat 10 (fun () ->
         let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
         unit)
   in
@@ -220,8 +223,13 @@ let test_publish_blueprints =
   let* proxy_evm =
     Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let*@ rollup_head = Rpc.block_number proxy_evm in
-  Check.((sequencer_head = rollup_head) int32)
+  (* We have unfortunately noticed that the test can be flaky. Sometimes,
+     the following RPC is done before the proxy being initialised, even though
+     we wait for it. The source of flakiness is unknown but happens very rarely,
+     we put a small sleep to make the least flaky possible. *)
+  let* () = Lwt_unix.sleep 2. in
+  let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy_evm in
+  Check.((sequencer_head.hash = rollup_head.hash) (option string))
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit
 
