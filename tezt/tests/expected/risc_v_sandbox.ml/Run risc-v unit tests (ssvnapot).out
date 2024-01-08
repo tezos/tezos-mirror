@@ -1,6 +1,6 @@
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ssvnapot-p-napot --posix
-thread 'main' panicked at sandbox/src/main.rs:120:25:
+thread 'main' panicked at sandbox/src/main.rs:128:25:
 Exception EnvironmentCallFromMMode at 0x80000344: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ssvnapot-p-napot: fail

@@ -140,4 +140,14 @@ impl Inbox {
             }
         }
     }
+
+    /// Get the current inbox level.
+    pub fn level(&self) -> u32 {
+        self.current_level
+    }
+
+    /// Is the inbox empty?
+    pub fn is_empty(&self) -> bool {
+        self.levels.iter().all(|level| level.is_empty())
+    }
 }
