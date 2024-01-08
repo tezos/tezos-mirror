@@ -89,12 +89,18 @@ impl Evaluation {
         &self,
         host: &mut Host,
     ) -> Result<Option<ExecutionOutcome>, Error> {
-        let timestamp = current_timestamp(host);
-        let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host)?;
         let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
-        let block_constants =
-            BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas);
+
+        let current_constants = match storage::read_current_block(host) {
+            Ok(block) => block.constants(chain_id, base_fee_per_gas),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas)
+            }
+        };
+
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
@@ -107,7 +113,7 @@ impl Evaluation {
             );
         let outcome = evm_execution::run_transaction(
             host,
-            &block_constants,
+            &current_constants,
             &mut evm_account_storage,
             &precompiles,
             CONFIG,
