@@ -11,12 +11,12 @@
   # Therefore, a retry was added. This should be removed once the
   # underlying tests have been fixed.
   retry: 2
+  needs: [opam:prepare]
+  dependencies: [opam:prepare]
   script:
     - opam remote add dev-repo ./_opam-repo-for-release
     - opam install --yes ${package}.dev
     - opam reinstall --yes --with-test ${package}.dev
-  needs: [opam:prepare]
-  dependencies: [opam:prepare]
   after_script:
     # Stores logs in opam_logs for artifacts and outputs an excerpt on failure.
     - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
