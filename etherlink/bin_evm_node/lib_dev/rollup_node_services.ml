@@ -154,6 +154,23 @@ let call_service ~base ?(media_types = Media_type.all_media_types) a b c d =
   | Error trace when is_connection_error trace -> fail (Lost_connection :: trace)
   | Error trace -> fail trace
 
+let make_streamed_call ~rollup_node_endpoint =
+  let open Lwt_syntax in
+  let stream, push = Lwt_stream.create () in
+  let on_chunk v = push (Some v) and on_close () = push None in
+  let* _spill_all =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.json]
+      ~base:rollup_node_endpoint
+      global_block_watcher
+      ~on_chunk
+      ~on_close
+      ()
+      ()
+      ()
+  in
+  return stream
+
 let publish :
     rollup_node_endpoint:Uri.t ->
     [< `External of string] list ->

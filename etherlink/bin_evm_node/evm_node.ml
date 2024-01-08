@@ -150,7 +150,9 @@ let install_finalizer_seq server private_server =
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
   let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
   let* () = Evm_node_lib_dev.Blueprints_publisher.shutdown () in
-  Evm_node_lib_dev.Blueprint_event.publisher_shutdown ()
+  let* () = Evm_node_lib_dev.Blueprint_event.publisher_shutdown () in
+  let* () = Evm_node_lib_dev.Delayed_inbox.shutdown () in
+  Evm_node_lib_dev.Delayed_inbox_events.shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -696,6 +698,9 @@ let sequencer_command =
             smart_rollup_address;
             mode = Sequencer;
           }
+      in
+      let* () =
+        Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
       in
       let* directory =
         dev_directory config ((module Sequencer), smart_rollup_address)

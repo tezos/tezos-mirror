@@ -446,23 +446,6 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let make_streamed_call ~rollup_node_endpoint =
-  let open Lwt_syntax in
-  let stream, push = Lwt_stream.create () in
-  let on_chunk v = push (Some v) and on_close () = push None in
-  let* _spill_all =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
-      [Media_type.json]
-      ~base:rollup_node_endpoint
-      Rollup_node_services.global_block_watcher
-      ~on_chunk
-      ~on_close
-      ()
-      ()
-      ()
-  in
-  return stream
-
 let rec subscribe_l2_block ~stream_l2 worker =
   let open Lwt_syntax in
   let* new_head = Lwt_stream.get stream_l2 in
@@ -487,7 +470,9 @@ let start ({mode; _} as parameters) =
       (fun () ->
         match mode with
         | Proxy {rollup_node_endpoint} ->
-            let*! stream_l2 = make_streamed_call ~rollup_node_endpoint in
+            let*! stream_l2 =
+              Rollup_node_services.make_streamed_call ~rollup_node_endpoint
+            in
             subscribe_l2_block ~stream_l2 worker
         | Sequencer -> Lwt.return_unit)
       (fun _ -> ())
