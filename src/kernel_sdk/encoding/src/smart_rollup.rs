@@ -67,7 +67,7 @@ mod test {
 
         let smart_rollup_address = SmartRollupAddress::from_b58check(sr1);
 
-        assert!(matches!(smart_rollup_address, Ok(_)));
+        assert!(smart_rollup_address.is_ok());
 
         let sr1_from_smart_rollup_address = smart_rollup_address.unwrap().to_b58check();
 

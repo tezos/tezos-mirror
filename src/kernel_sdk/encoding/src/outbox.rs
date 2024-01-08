@@ -331,10 +331,7 @@ mod test {
         // garbage (to be ignored) tail
         bytes.extend_from_slice([10; 1000].as_slice());
 
-        assert!(matches!(
-            OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()),
-            Err(_)
-        ));
+        assert!(OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()).is_err());
     }
 
     #[test]
@@ -346,10 +343,7 @@ mod test {
         // garbage (to be ignored) tail
         bytes.extend_from_slice([10; 1000].as_slice());
 
-        assert!(matches!(
-            OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()),
-            Err(_)
-        ));
+        assert!(OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()).is_err());
     }
 
     fn transaction_one() -> OutboxMessageTransaction<StringTicket> {

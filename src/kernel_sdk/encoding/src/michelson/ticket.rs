@@ -45,7 +45,7 @@ pub struct TicketHash {
 
 impl PartialOrd for TicketHash {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner.as_ref().partial_cmp(other.inner.as_ref())
+        Some(self.cmp(other))
     }
 }
 
