@@ -4112,6 +4112,23 @@ let read_tezt_runtime_dependencies () =
         in
         Some (tag, path)
 
+(* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
+let canonicalize_path path =
+  let rec simplify_parents acc = function
+    | [] -> List.rev acc
+    | ".." :: tail ->
+        let acc =
+          match acc with
+          | [] -> failwith ("cannot remove '..' from path: " ^ path)
+          | _ :: acc_tail -> acc_tail
+        in
+        simplify_parents acc tail
+    | head :: tail -> simplify_parents (head :: acc) tail
+  in
+  String.split_on_char '/' path
+  |> List.filter (function "" | "." -> false | _ -> true)
+  |> simplify_parents [] |> String.concat "/"
+
 (* Compute and print a Tezt TSL expression representing the set of tests
    to run after [changed_files] changed.
    [changed_files] is supposed to only contain files, not directories. *)
@@ -4225,6 +4242,9 @@ let list_tests_to_run_after_changes (changed_files : string list) =
           Fun.flip List.iter (Ne_list.to_list names) @@ fun internal_name ->
           add_tag_for_path
             ("_build/default" // target.path // (internal_name ^ ".exe"))) ) ;
+  (* [file_has_changed] just checks if a [path] is in [changed_files].
+     It does not assume that [path] is canonical, so it has to make it canonical. *)
+  let file_has_changed path = List.mem (canonicalize_path path) changed_files in
   (* Iterate over all Tezt targets to find test files
      that are directly or indirectly changed.
      This does not find test files from tezt/tests,
@@ -4232,7 +4252,7 @@ let list_tests_to_run_after_changes (changed_files : string list) =
      this is the special case of [make_tezt_exe]. *)
   let test_files = ref String_set.empty in
   ( Fun.flip String_map.iter !tezt_targets_by_path
-  @@ fun _
+  @@ fun tezt_target_dir
              {
                opam = _;
                lib_deps;
@@ -4255,13 +4275,22 @@ let list_tests_to_run_after_changes (changed_files : string list) =
                preprocessor_deps;
              } ->
     (* TODO *)
-    ignore (dep_globs, dep_globs_rec, dep_files, preprocessor_deps) ;
+    ignore (dep_globs, dep_globs_rec) ;
     if
       List.exists target_option_has_changed lib_deps
       || List.exists target_option_has_changed exe_deps
       || List.exists target_option_has_changed js_deps
       || target_option_has_changed tezt_local_test_lib
       || List.exists preprocessor_has_changed preprocess
+      || List.exists
+           file_has_changed
+           (List.map (fun file -> tezt_target_dir // file) dep_files)
+      || List.exists
+           file_has_changed
+           (List.map
+              (fun (File file : Target.preprocessor_dep) ->
+                tezt_target_dir // file)
+              preprocessor_deps)
     then (
       let path =
         match tezt_local_test_lib with
