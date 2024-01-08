@@ -13,12 +13,17 @@
   retry: 2
   needs: [opam:prepare]
   dependencies: [opam:prepare]
+  before_script:
+    - eval $(opam env)
   script:
     - opam remote add dev-repo ./_opam-repo-for-release
     - opam install --yes ${package}.dev
     - opam reinstall --yes --with-test ${package}.dev
   after_script:
-    # Stores logs in opam_logs for artifacts and outputs an excerpt on failure.
+    # Stores logs in opam_logs for artifacts and outputs an excerpt on
+    # failure. [after_script] runs in a separate shell and so requires
+    # a second opam environment initialization.
+    - eval $(opam env)
     - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   artifacts:
     paths:
