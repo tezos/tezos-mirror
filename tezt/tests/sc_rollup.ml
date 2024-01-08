@@ -2160,6 +2160,7 @@ let attempt_withdraw_stake =
       ?(check_liquid_balance = true)
       ?(src = Constant.bootstrap1.public_key_hash)
       ?(staker = Constant.bootstrap1.public_key_hash)
+      ?(keys = [Constant.bootstrap2.alias])
       client ->
     let recover_bond_fee = 1_000_000 in
     let inject_op () =
@@ -2175,9 +2176,7 @@ let attempt_withdraw_stake =
     | None ->
         let*! () = inject_op () in
         let* old_bal = contract_balances ~pkh:staker client in
-        let* () =
-          Client.bake_for_and_wait ~keys:[Constant.bootstrap2.alias] client
-        in
+        let* () = Client.bake_for_and_wait ~keys client in
         let* new_bal = contract_balances ~pkh:staker client in
         let expected_liq_new_bal =
           old_bal.liquid - recover_bond_fee + sc_rollup_stake_amount
@@ -2259,6 +2258,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
       ~sc_rollup
       ~sc_rollup_stake_amount:(Tez.to_mutez constants.stake_amount)
       client
+      ~keys:[]
       ~expect_failure:
         "Attempted to withdraw while not staked on the last cemented \
          commitment."
@@ -2277,6 +2277,8 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
     attempt_withdraw_stake
       ~sc_rollup
       ~sc_rollup_stake_amount:(Tez.to_mutez constants.stake_amount)
+      ~keys:[]
+      ~check_liquid_balance:false
       client
   in
 
