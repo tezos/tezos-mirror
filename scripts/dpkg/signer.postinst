@@ -5,9 +5,8 @@ group=tzsigner
 homedir=/var/tzsigner
 
 # Ensure the tzsigner user is created
-getent group ${group} >/dev/null 2>&1 || addgroup --system ${group}
-getent passwd ${user} >/dev/null 2>&1 || adduser --system	\
-						--home $homedir \
+getent group ${group} >/dev/null 2>&1 || addgroup ${group}
+getent passwd ${user} >/dev/null 2>&1 || adduser --home $homedir \
 						--shell /bin/bash \
 						--disabled-password \
 						--ingroup ${group} ${user}
