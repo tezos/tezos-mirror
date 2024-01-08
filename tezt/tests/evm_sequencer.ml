@@ -223,6 +223,11 @@ let test_publish_blueprints =
   let* proxy_evm =
     Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  (* We have unfortunately noticed that the test can be flaky. Sometimes,
+     the following RPC is done before the proxy being initialised, even though
+     we wait for it. The source of flakiness is unknown but happens very rarely,
+     we put a small sleep to make the least flaky possible. *)
+  let* () = Lwt_unix.sleep 2. in
   let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy_evm in
   Check.((sequencer_head.hash = rollup_head.hash) (option string))
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
