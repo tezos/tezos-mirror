@@ -767,6 +767,7 @@ name = "risc-v-dummy"
 version = "0.0.0"
 dependencies = [
  "tezos-smart-rollup",
+ "tezos-smart-rollup-constants",
  "tezos_crypto_rs",
 ]
 
