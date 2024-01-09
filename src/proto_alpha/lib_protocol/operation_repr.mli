@@ -190,6 +190,8 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
+type dal_content = {attestation : Dal_attestation_repr.t}
+
 type consensus_watermark =
   | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
@@ -236,7 +238,11 @@ and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
   (* Attestation: About consensus, attestation of a block held by a
      validator. *)
-  | Attestation : consensus_content -> Kind.attestation contents
+  | Attestation : {
+      consensus_content : consensus_content;
+      dal_content : dal_content option;
+    }
+      -> Kind.attestation contents
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying attestation encoding. *)
@@ -686,6 +692,10 @@ module Encoding : sig
   val endorsement_case : Kind.attestation case
 
   val attestation_case : Kind.attestation case
+
+  val endorsement_with_dal_case : Kind.attestation case
+
+  val attestation_with_dal_case : Kind.attestation case
 
   val dal_attestation_case : Kind.dal_attestation case
 

@@ -577,7 +577,9 @@ let sign_consensus_votes state operations kind =
           | `Attestation ->
               forge_and_sign_consensus_vote
                 delegate
-                (Single (Attestation consensus_content))
+                (Single
+                   (Attestation
+                      {consensus_content; dal_content = None (* TODO *)}))
           | `Preattestation ->
               forge_and_sign_consensus_vote
                 delegate

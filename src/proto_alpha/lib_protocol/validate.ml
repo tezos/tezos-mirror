@@ -730,7 +730,7 @@ module Consensus = struct
         ~error:(trace_of_error Consensus_operation_not_allowed)
         vi.consensus_info
     in
-    let (Single (Attestation consensus_content)) =
+    let (Single (Attestation {consensus_content; dal_content = _ (* TODO *)})) =
       operation.protocol_data.contents
     in
     let* consensus_key, voting_power =
@@ -756,7 +756,9 @@ module Consensus = struct
 
   let check_attestation_conflict vs oph (operation : Kind.attestation operation)
       =
-    let (Single (Attestation {slot; level; round; _})) =
+    let (Single
+          (Attestation
+            {consensus_content = {slot; level; round; _}; dal_content = _})) =
       operation.protocol_data.contents
     in
     match
@@ -776,7 +778,9 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
   let add_attestation vs oph (op : Kind.attestation operation) =
-    let (Single (Attestation {slot; level; round; _})) =
+    let (Single
+          (Attestation
+            {consensus_content = {slot; level; round; _}; dal_content = _})) =
       op.protocol_data.contents
     in
     let attestations_seen =
@@ -800,7 +804,9 @@ module Consensus = struct
   let remove_attestation vs (operation : Kind.attestation operation) =
     (* We do not remove the attestation power because it is not
        relevant for the mempool mode. *)
-    let (Single (Attestation {slot; level; round; _})) =
+    let (Single
+          (Attestation
+            {consensus_content = {slot; level; round; _}; dal_content = _})) =
       operation.protocol_data.contents
     in
     let attestations_seen =
@@ -1383,7 +1389,8 @@ module Anonymous = struct
     let open Lwt_result_syntax in
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | Single (Preattestation e1), Single (Preattestation e2)
-    | Single (Attestation e1), Single (Attestation e2) ->
+    | ( Single (Attestation {consensus_content = e1; dal_content = _}),
+        Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
         let op1_hash = Operation.hash op1 in
         let op2_hash = Operation.hash op2 in
         let same_levels = Raw_level.(e1.level = e2.level) in
@@ -1471,7 +1478,8 @@ module Anonymous = struct
   let check_double_attesting_evidence_conflict (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
-    | Single (Preattestation e1) | Single (Attestation e1) -> (
+    | Single (Preattestation e1)
+    | Single (Attestation {consensus_content = e1; dal_content = _}) -> (
         match
           Double_attesting_evidence_map.find
             (e1.level, e1.round, e1.slot)
@@ -1502,7 +1510,8 @@ module Anonymous = struct
   let add_double_attesting_evidence (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
-    | Single (Preattestation e1) | Single (Attestation e1) ->
+    | Single (Preattestation e1)
+    | Single (Attestation {consensus_content = e1; dal_content = _}) ->
         let double_attesting_evidences_seen =
           Double_attesting_evidence_map.add
             (e1.level, e1.round, e1.slot)
@@ -1532,7 +1541,8 @@ module Anonymous = struct
   let remove_double_attesting_evidence (type kind) vs
       (op : kind Kind.consensus Operation.t) =
     match op.protocol_data.contents with
-    | Single (Attestation e) | Single (Preattestation e) ->
+    | Single (Attestation {consensus_content = e; dal_content = _})
+    | Single (Preattestation e) ->
         let double_attesting_evidences_seen =
           Double_attesting_evidence_map.remove
             (e.level, e.round, e.slot)

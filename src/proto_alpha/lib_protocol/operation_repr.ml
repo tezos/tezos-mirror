@@ -155,6 +155,8 @@ type consensus_content = {
          important but could make things easier for debugging *)
 }
 
+type dal_content = {attestation : Dal_attestation_repr.t}
+
 let consensus_content_encoding =
   let open Data_encoding in
   conv
@@ -238,7 +240,11 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Attestation : consensus_content -> Kind.attestation contents
+  | Attestation : {
+      consensus_content : consensus_content;
+      dal_content : dal_content option;
+    }
+      -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -1103,12 +1109,55 @@ module Encoding = struct
                   @@ union [make preattestation_case]))
                (varopt "signature" Signature.encoding)))
 
-  let endorsement_encoding =
+  let consensus_content_encoding =
     obj4
       (req "slot" Slot_repr.encoding)
       (req "level" Raw_level_repr.encoding)
       (req "round" Round_repr.encoding)
       (req "block_payload_hash" Block_payload_hash.encoding)
+
+  let dal_content_encoding =
+    obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
+
+  let endorsement_encoding = consensus_content_encoding
+
+  let endorsement_with_dal_encoding =
+    merge_objs consensus_content_encoding dal_content_encoding
+
+  (* Precondition: [dal_content = None]. *)
+  let attestation_encoding_proj
+      (Attestation {consensus_content; dal_content = _}) =
+    ( consensus_content.slot,
+      consensus_content.level,
+      consensus_content.round,
+      consensus_content.block_payload_hash )
+
+  let attestation_encoding_inj (slot, level, round, block_payload_hash) =
+    Attestation
+      {
+        consensus_content = {slot; level; round; block_payload_hash};
+        dal_content = None;
+      }
+
+  (* Precondition: [dal_content <> None]. Check usage! *)
+  let attestation_with_dal_encoding_proj
+      (Attestation {consensus_content; dal_content}) =
+    match dal_content with
+    | None -> assert false
+    | Some dal_content ->
+        ( ( consensus_content.slot,
+            consensus_content.level,
+            consensus_content.round,
+            consensus_content.block_payload_hash ),
+          dal_content.attestation )
+
+  let attestation_with_dal_encoding_inj
+      ((slot, level, round, block_payload_hash), attestation) =
+    Attestation
+      {
+        consensus_content = {slot; level; round; block_payload_hash};
+        dal_content = Some {attestation};
+      }
 
   (* Encoding case that accepts legacy attestation name : `endorsement` in JSON
 
@@ -1124,16 +1173,11 @@ module Encoding = struct
         name = "endorsement";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Attestation _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Attestation consensus_content) ->
-            ( consensus_content.slot,
-              consensus_content.level,
-              consensus_content.round,
-              consensus_content.block_payload_hash ));
-        inj =
-          (fun (slot, level, round, block_payload_hash) ->
-            Attestation {slot; level; round; block_payload_hash});
+          (function
+          | Contents (Attestation {dal_content = None; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_encoding_proj;
+        inj = attestation_encoding_inj;
       }
 
   let attestation_case =
@@ -1143,16 +1187,39 @@ module Encoding = struct
         name = "attestation";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Attestation _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Attestation consensus_content) ->
-            ( consensus_content.slot,
-              consensus_content.level,
-              consensus_content.round,
-              consensus_content.block_payload_hash ));
-        inj =
-          (fun (slot, level, round, block_payload_hash) ->
-            Attestation {slot; level; round; block_payload_hash});
+          (function
+          | Contents (Attestation {dal_content = None; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_encoding_proj;
+        inj = attestation_encoding_inj;
+      }
+
+  let endorsement_with_dal_case =
+    Case
+      {
+        tag = 23;
+        name = "endorsement_with_dal";
+        encoding = endorsement_with_dal_encoding;
+        select =
+          (function
+          | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_with_dal_encoding_proj;
+        inj = attestation_with_dal_encoding_inj;
+      }
+
+  let attestation_with_dal_case =
+    Case
+      {
+        tag = 23;
+        name = "attestation_with_dal";
+        encoding = endorsement_with_dal_encoding;
+        select =
+          (function
+          | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_with_dal_encoding_proj;
+        inj = attestation_with_dal_encoding_inj;
       }
 
   (* Encoding that accepts legacy attestation name : `endorsement` in JSON
@@ -1162,10 +1229,21 @@ module Encoding = struct
      This encoding is temporary and should be removed when the endorsements
      kinds in JSON will not be accepted any more by the protocol (Planned for
      protocol Q). *)
-
   let endorsement_encoding =
-    let make (Case {tag; name; encoding; select = _; proj; inj}) =
-      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | o -> (
+              match (kind, o) with
+              | `Simple, (Attestation {dal_content = None; _} as op) ->
+                  Some (proj op)
+              | `Full, (Attestation {dal_content = Some _; _} as op) ->
+                  Some (proj op)
+              | _ -> None))
+        (fun x -> inj x)
     in
     let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
     let of_list : Kind.attestation contents -> _ = fun o -> Single o in
@@ -1182,12 +1260,28 @@ module Encoding = struct
                   "operations"
                   (conv to_list of_list
                   @@ def "inlined.endorsement_mempool.contents"
-                  @@ union [make endorsement_case]))
+                  @@ union
+                       [
+                         make `Simple endorsement_case;
+                         make `Full endorsement_with_dal_case;
+                       ]))
                (varopt "signature" Signature.encoding)))
 
   let attestation_encoding =
-    let make (Case {tag; name; encoding; select = _; proj; inj}) =
-      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | o -> (
+              match (kind, o) with
+              | `Without_dal, (Attestation {dal_content = None; _} as op) ->
+                  Some (proj op)
+              | `With_dal, (Attestation {dal_content = Some _; _} as op) ->
+                  Some (proj op)
+              | _ -> None))
+        (fun x -> inj x)
     in
     let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
     let of_list : Kind.attestation contents -> _ = fun o -> Single o in
@@ -1204,7 +1298,11 @@ module Encoding = struct
                   "operations"
                   (conv to_list of_list
                   @@ def "inlined.attestation_mempool.contents"
-                  @@ union [make attestation_case]))
+                  @@ union
+                       [
+                         make `Without_dal attestation_case;
+                         make `With_dal attestation_with_dal_case;
+                       ]))
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
@@ -1622,6 +1720,7 @@ module Encoding = struct
 
   let contents_cases =
     PCase preattestation_case :: PCase attestation_case
+    :: PCase attestation_with_dal_case
     :: PCase double_preattestation_evidence_case
     :: PCase double_attestation_evidence_case :: common_cases
 
@@ -1635,6 +1734,7 @@ module Encoding = struct
       protocol Q). *)
   let contents_cases_with_legacy_attestation_name =
     PCase preendorsement_case :: PCase endorsement_case
+    :: PCase endorsement_with_dal_case
     :: PCase double_preendorsement_evidence_case
     :: PCase double_endorsement_evidence_case :: common_cases
 
@@ -2423,7 +2523,7 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_preattestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Attestation consensus_content) ->
+  | Single (Attestation {consensus_content; dal_content = _ (* TODO *)}) ->
       W
         ( Consensus,
           Weight_attestation
@@ -2443,7 +2543,7 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_vdf_revelation solution)
   | Single (Double_attestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Attestation consensus_content) ->
+      | Single (Attestation {consensus_content; dal_content = _ (* TODO *)}) ->
           W
             ( Anonymous,
               Weight_double_attestation

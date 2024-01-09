@@ -549,7 +549,7 @@ let pre_filter info config
   | Single (Failing_noop _) ->
       return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Preattestation consensus_content)
-  | Single (Attestation consensus_content) ->
+  | Single (Attestation {consensus_content; dal_content = _}) ->
       let level_and_round : level_and_round =
         {level = consensus_content.level; round = consensus_content.round}
       in

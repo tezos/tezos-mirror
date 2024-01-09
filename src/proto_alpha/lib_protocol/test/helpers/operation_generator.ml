@@ -386,7 +386,7 @@ let generate_preattestation =
 let generate_attestation =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
-  Attestation cc
+  Attestation {consensus_content = cc; dal_content = None}
 
 let generate_dal_attestation =
   let open QCheck2.Gen in

@@ -208,7 +208,11 @@ let state_attesting_power =
     Operation_pool.filter_attestations
     (fun
       ({
-         protocol_data = {contents = Single (Attestation consensus_content); _};
+         protocol_data =
+           {
+             contents = Single (Attestation {consensus_content; dal_content = _});
+             _;
+           };
          _;
        } :
         Kind.attestation operation)
@@ -500,7 +504,7 @@ let rec baking_minimal_timestamp ~count state
          (fun
            ({
               protocol_data =
-                {contents = Single (Attestation consensus_content); _};
+                {contents = Single (Attestation {consensus_content; _}); _};
               _;
             } :
              Kind.attestation operation)

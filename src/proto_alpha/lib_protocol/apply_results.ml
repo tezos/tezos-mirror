@@ -1150,7 +1150,9 @@ module Encoding = struct
           | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
+          | Contents_and_result
+              ((Attestation {dal_content = None; _} as op), res) ->
+              Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1173,7 +1175,59 @@ module Encoding = struct
           | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
+          | Contents_and_result
+              ((Attestation {dal_content = None; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Attestation_result
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
+        inj =
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
+            Attestation_result
+              {balance_updates; delegate; consensus_key; consensus_power});
+      }
+
+  let endorsement_with_dal_case =
+    Case
+      {
+        op_case = Operation.Encoding.endorsement_with_dal_case;
+        encoding = consensus_result_encoding_legacy "endorsement";
+        select =
+          (function
+          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result
+              ((Attestation {dal_content = Some _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Attestation_result
+              {balance_updates; delegate; consensus_key; consensus_power} ->
+              (balance_updates, delegate, consensus_power, consensus_key));
+        inj =
+          (fun (balance_updates, delegate, consensus_power, consensus_key) ->
+            Attestation_result
+              {balance_updates; delegate; consensus_key; consensus_power});
+      }
+
+  let attestation_with_dal_case =
+    Case
+      {
+        op_case = Operation.Encoding.attestation_with_dal_case;
+        encoding = consensus_result_encoding;
+        select =
+          (function
+          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result
+              ((Attestation {dal_content = Some _; _} as op), res) ->
+              Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1844,13 +1898,15 @@ let common_cases =
 
 let contents_cases =
   let open Encoding in
-  attestation_case :: preattestation_case :: double_attestation_evidence_case
-  :: double_preattestation_evidence_case :: common_cases
+  attestation_case :: attestation_with_dal_case :: preattestation_case
+  :: double_attestation_evidence_case :: double_preattestation_evidence_case
+  :: common_cases
 
 let contents_cases_with_legacy_attestation_name =
   let open Encoding in
-  endorsement_case :: preendorsement_case :: double_endorsement_evidence_case
-  :: double_preendorsement_evidence_case :: common_cases
+  endorsement_case :: endorsement_with_dal_case :: preendorsement_case
+  :: double_endorsement_evidence_case :: double_preendorsement_evidence_case
+  :: common_cases
 
 let make_contents_result
     (Encoding.Case

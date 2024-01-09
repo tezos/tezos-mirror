@@ -242,7 +242,12 @@ let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
       | ( Operation_data
             {
               contents =
-                Single (Attestation {level; round; block_payload_hash; _});
+                Single
+                  (Attestation
+                    {
+                      consensus_content = {level; round; block_payload_hash; _};
+                      dal_content = _;
+                    });
               _;
             },
           _ ) ->

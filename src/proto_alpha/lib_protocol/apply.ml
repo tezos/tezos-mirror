@@ -2374,7 +2374,8 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
         Double_attestation_evidence_result {forbidden_delegate; balance_updates}
   in
   match op1.protocol_data.contents with
-  | Single (Preattestation e1) | Single (Attestation e1) ->
+  | Single (Preattestation e1)
+  | Single (Attestation {consensus_content = e1; dal_content = _}) ->
       let level = Level.from_raw ctxt e1.level in
       let* ctxt, consensus_pk1 =
         Stake_distribution.slot_owner ctxt level e1.slot
@@ -2421,7 +2422,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   match contents_list with
   | Single (Preattestation consensus_content) ->
       record_preattestation ctxt mode consensus_content
-  | Single (Attestation consensus_content) ->
+  | Single (Attestation {consensus_content; dal_content = _ (* TODO *)}) ->
       record_attestation ctxt mode consensus_content
   | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115

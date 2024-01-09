@@ -97,8 +97,8 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   let* signer = Account.find delegate_pkh in
   return (consensus_content, signer.sk, branch)
 
-let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
+    ?dal_content ?branch attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -110,7 +110,7 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?branch
       attested_block
   in
-  let op = Single (Attestation consensus_content) in
+  let op = Single (Attestation {consensus_content; dal_content}) in
   return
     (sign
        ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
@@ -118,8 +118,8 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
        branch
        op)
 
-let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
+    ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_attestation
@@ -128,6 +128,7 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?level
       ?round
       ?block_payload_hash
+      ?dal_content
       ?branch
       attested_block
   in
