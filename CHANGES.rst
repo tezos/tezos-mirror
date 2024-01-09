@@ -90,6 +90,11 @@ Smart Rollup node
 
 - Snapshot inspection command. (MR :gl:`!11456`)
 
+- Snapshot export options. (MRs :gl:`!10812`, :gl:`!11078`, :gl:`!11256`,
+  :gl:`!11454`)
+
+- Snapshot import. (MRs :gl:`!10803`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
