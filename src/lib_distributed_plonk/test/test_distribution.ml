@@ -150,3 +150,5 @@ let () =
     (test_distribution
        ~circuit_builder:Circuit_Builder.range_checks
        (module DP_Pack ()))
+
+let () = Test.run ()

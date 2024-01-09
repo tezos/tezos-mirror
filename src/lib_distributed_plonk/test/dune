@@ -1,40 +1,25 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(library
- (name src_lib_distributed_plonk_test_tezt_lib)
- (instrumentation (backend bisect_ppx))
+(executable
+ (name test_distribution)
  (libraries
-  tezt.core
   octez-libs.distributed-plonk
   octez-libs.plonk
   octez-libs.plonk.aggregation
   octez-libs.plonk.distribution
   octez-libs.aplonk
   octez-libs.plonk.plonk-test
-  octez-libs.test-helpers)
- (library_flags (:standard -linkall))
+  octez-libs.test-helpers
+  tezt)
  (flags
   (:standard)
-  -open Tezt_core
-  -open Tezt_core.Base
-  -open Tezos_test_helpers)
- (modules test_distribution))
-
-(executable
- (name main)
- (instrumentation (backend bisect_ppx --bisect-sigterm))
- (libraries
-  src_lib_distributed_plonk_test_tezt_lib
-  tezt)
- (modules main))
+  -open Tezos_test_helpers
+  -open Tezt
+  -open Tezt.Base))
 
 (rule
  (alias runtest)
  (package octez-libs)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
-
-(rule
- (targets main.ml)
- (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+ (enabled_if (= false %{env:CI=false}))
+ (action (run %{dep:./test_distribution.exe})))
