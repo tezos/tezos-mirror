@@ -564,6 +564,8 @@ module State = struct
     let* launch_cycle_opt =
       Context.get_adaptive_issuance_launch_cycle (B block)
     in
+    (* Apply all slashes *)
+    let state = apply_all_slashes_at_cycle_end current_cycle state in
     (* Sets initial frozen for future cycle *)
     let state =
       update_map
@@ -572,9 +574,6 @@ module State = struct
              (Cycle.add current_cycle (state.constants.preserved_cycles + 1)))
         state
     in
-    (* Apply all slashes. They also apply to the frozen rights computed above,
-       for "reasons" related to snapshoting and the way slashes are applied to it *)
-    let state = apply_all_slashes_at_cycle_end current_cycle state in
     (* Apply autostaking *)
     let*?@ state =
       if not state.constants.adaptive_issuance.autostaking_enable then Ok state
