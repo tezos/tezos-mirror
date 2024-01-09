@@ -41,11 +41,11 @@ let manager_kind_to_string = function
 
 (* These operations numbers are computed to consume the maximum number of gas
    unit in a block without exceeding the `hard_gas_limit_per_block` from the
-   protocol (2.6M gas unit since Mumbai). *)
+   protocol (1.73M gas unit since P). *)
 let number_of_operation_from_manager_kind = function
-  | `Transfer -> 2500 (* x1040 gas units *)
-  | `Origination -> 26 (* x100_000 gas units *)
-  | `Call -> 3 (* x850_000 gas units *)
+  | `Transfer -> 1666 (* x1040 gas units *)
+  | `Origination -> 17 (* x100_000 gas units *)
+  | `Call -> 2 (* x850_000 gas units *)
 
 let protocols = Protocol.all
 
