@@ -310,3 +310,20 @@ let compress ~snapshot_file =
     Gzip.close_out out_chan ;
     close_in in_chan ;
     raise e
+
+let read_metadata (module Reader : READER) ~snapshot_file =
+  let in_chan = Reader.open_in snapshot_file in
+  let reader_input : (module READER_INPUT) =
+    (module struct
+      include Reader
+
+      let in_chan = in_chan
+    end)
+  in
+  try
+    let metadata = read_snapshot_metadata reader_input in
+    Reader.close_in in_chan ;
+    metadata
+  with e ->
+    Reader.close_in in_chan ;
+    raise e
