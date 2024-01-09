@@ -1,5 +1,3 @@
-scripts/ci/docker_registry_delete.sh
-scripts/user_activated_upgrade.sh
 src/bin_snoop/bash-completion.sh
 src/bin_client/bash-completion.sh
 src/bin_client/octez-init-sandboxed-client.sh
