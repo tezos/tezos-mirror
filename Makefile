@@ -404,7 +404,10 @@ check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
 
 .PHONY: fmt fmt-ocaml fmt-python
-fmt: fmt-ocaml fmt-python
+fmt: fmt-ocaml fmt-python fmt-shell
+
+fmt-shell:
+	scripts/lint.sh --format-shell
 
 fmt-ocaml:
 	@dune build --profile=$(PROFILE) @fmt --auto-promote
