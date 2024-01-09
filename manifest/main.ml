@@ -1871,8 +1871,14 @@ let octez_distributed_plonk =
     ~bisect_ppx:Yes
 
 let _octez_distributed_plonk_test_main =
-  tezt
-    ["test_distribution"]
+  test
+    "test_distribution"
+    (* This test is disabled in the CI since the test is flaky and
+       development of distributed plonk is on hiatus. As the
+       dependencies of distributed plonk have significant load-time,
+       we do not integrate it in the main tezt entrypoint using the
+       [tezt] function. *)
+    ~enabled_if:Dune.[S "="; S "false"; S "%{env:CI=false}"]
     ~opam:"octez-libs"
     ~path:"src/lib_distributed_plonk/test"
     ~deps:
@@ -1884,6 +1890,7 @@ let _octez_distributed_plonk_test_main =
         octez_aplonk;
         octez_plonk_test_helpers;
         octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
 let _octez_distributed_plonk_worker_runner =
