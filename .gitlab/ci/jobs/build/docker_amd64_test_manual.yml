@@ -3,6 +3,7 @@ include: .gitlab/ci/jobs/build/common.yml
 oc.docker:amd64:
   extends:
     - .oc.build_docker_release_template
+    - .tags_template__build
   stage: manual
   needs: []
   # override the rules inherited from .oc.build_docker_release_template:
