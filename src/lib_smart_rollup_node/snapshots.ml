@@ -597,3 +597,9 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
     ~message:"Checking imported data"
     snapshot_metadata
     ~dest:data_dir
+
+let info ~snapshot_file =
+  let compressed = is_compressed_snapshot snapshot_file in
+  let reader = if compressed then gzip_reader else stdlib_reader in
+  let metadata = read_metadata reader ~snapshot_file in
+  (metadata, if compressed then `Compressed else `Uncompressed)

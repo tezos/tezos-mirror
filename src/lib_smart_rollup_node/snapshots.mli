@@ -43,3 +43,9 @@ val import :
   data_dir:string ->
   snapshot_file:string ->
   unit tzresult Lwt.t
+
+(** [info ~snapshot_file] returns information that can be used to inspect the
+    snapshot file. *)
+val info :
+  snapshot_file:string ->
+  Snapshot_utils.snapshot_metadata * [`Compressed | `Uncompressed]
