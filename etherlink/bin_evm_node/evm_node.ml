@@ -524,7 +524,6 @@ let main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
     if nb_transactions > 0 || force then loop now else loop last_produced_block
   in
   let now = Helpers.now () in
-  let* _nb_transactions = Tx_pool.produce_block ~force:true ~timestamp:now in
   loop now
 
 let sequencer_command =
