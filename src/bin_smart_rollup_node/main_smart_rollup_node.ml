@@ -374,7 +374,25 @@ let dump_durable_storage =
           return_unit
       | Error errs -> cctxt#error "%a" pp_print_trace errs)
 
-let export_snapshot =
+let export_snapshot
+    (data_dir, dest, no_checks, compress_on_the_fly, uncompressed) filename
+    (cctxt : Client_context.full) =
+  let open Lwt_result_syntax in
+  let*! compression =
+    match (compress_on_the_fly, uncompressed) with
+    | true, true ->
+        cctxt#error "Cannot have both --uncompressed and --compress-on-the-fly"
+    | true, false -> Lwt.return Snapshots.On_the_fly
+    | false, false -> Lwt.return Snapshots.After
+    | false, true -> Lwt.return Snapshots.No
+  in
+  let* snapshot_file =
+    Snapshots.export ~no_checks ~compression ~data_dir ~dest ~filename
+  in
+  let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
+  return_unit
+
+let export_snapshot_auto_name =
   let open Tezos_clic in
   command
     ~group
@@ -386,22 +404,24 @@ let export_snapshot =
        Cli.compress_on_the_fly_arg
        Cli.uncompressed)
     (prefixes ["snapshot"; "export"] @@ stop)
-    (fun (data_dir, dest, no_checks, compress_on_the_fly, uncompressed) cctxt ->
-      let open Lwt_result_syntax in
-      let*! compression =
-        match (compress_on_the_fly, uncompressed) with
-        | true, true ->
-            cctxt#error
-              "Cannot have both --uncompressed and --compress-on-the-fly"
-        | true, false -> Lwt.return Snapshots.On_the_fly
-        | false, false -> Lwt.return Snapshots.After
-        | false, true -> Lwt.return Snapshots.No
-      in
-      let* snapshot_file =
-        Snapshots.export ~no_checks ~compression ~data_dir ~dest
-      in
-      let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
-      return_unit)
+    (fun params cctxt -> export_snapshot params None cctxt)
+
+let export_snapshot_named =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Export a snapshot of the rollup node state to a given file."
+    (args4
+       data_dir_arg
+       Cli.no_checks_arg
+       Cli.compress_on_the_fly_arg
+       Cli.uncompressed)
+    (prefixes ["snapshot"; "export"] @@ Cli.snapshot_file_param @@ stop)
+    (fun (data_dir, no_checks, compress_on_the_fly, uncompressed) filename cctxt ->
+      export_snapshot
+        (data_dir, None, no_checks, compress_on_the_fly, uncompressed)
+        (Some filename)
+        cctxt)
 
 let import_snapshot =
   let open Tezos_clic in
@@ -437,7 +457,8 @@ let sc_rollup_commands () =
     protocols_command;
     dump_metrics;
     dump_durable_storage;
-    export_snapshot;
+    export_snapshot_auto_name;
+    export_snapshot_named;
     import_snapshot;
     openapi_command;
   ]

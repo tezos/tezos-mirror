@@ -408,7 +408,7 @@ let snapshot_dir_arg =
 
 let snapshot_file_param next =
   Tezos_clic.param
-    ~name:"<snapshot_file>"
+    ~name:"snapshot_file"
     ~desc:"Snapshot archive file"
     string_parameter
     next
