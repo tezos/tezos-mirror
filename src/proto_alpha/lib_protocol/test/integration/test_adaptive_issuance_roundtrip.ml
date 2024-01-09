@@ -1794,17 +1794,13 @@ let test_expected_error =
            (exec (fun _ -> failwith "")))
 
 let init_constants ?reward_per_block ?(deactivate_dynamic = false)
-    ?blocks_per_cycle ?(force_snapshot_at_end = false) ~autostaking_enable () =
+    ?blocks_per_cycle ~autostaking_enable () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
   (* default for tests: 12 *)
   let blocks_per_cycle =
     Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
-  in
-  let blocks_per_stake_snapshot =
-    if force_snapshot_at_end then blocks_per_cycle
-    else default_constants.blocks_per_stake_snapshot
   in
   let issuance_weights =
     Protocol.Alpha_context.Constants.Parametric.
@@ -1842,7 +1838,6 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
     cost_per_byte;
     adaptive_issuance;
     blocks_per_cycle;
-    blocks_per_stake_snapshot;
   }
 
 (** Initialization of scenarios with 3 cases:
@@ -2561,11 +2556,7 @@ module Slashing = struct
   let test_slash_monotonous_stake =
     let scenario ~op ~early_d =
       let constants =
-        init_constants
-          ~force_snapshot_at_end:true
-          ~blocks_per_cycle:8l
-          ~autostaking_enable:false
-          ()
+        init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
       in
       begin_test ~activate_ai:false constants ["delegate"]
       --> next_cycle
@@ -2589,11 +2580,7 @@ module Slashing = struct
 
   let test_slash_timing =
     let constants =
-      init_constants
-        ~force_snapshot_at_end:true
-        ~blocks_per_cycle:8l
-        ~autostaking_enable:false
-        ()
+      init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
     in
     begin_test ~activate_ai:false constants ["delegate"]
     --> next_cycle
@@ -2610,9 +2597,7 @@ module Slashing = struct
     --> double_bake "delegate" --> make_denunciations () --> next_cycle
 
   let init_scenario_with_delegators delegate_name faucet_name delegators_list =
-    let constants =
-      init_constants ~force_snapshot_at_end:true ~autostaking_enable:false ()
-    in
+    let constants = init_constants ~autostaking_enable:false () in
     let rec init_delegators = function
       | [] -> Empty
       | (delegator, amount) :: t ->
