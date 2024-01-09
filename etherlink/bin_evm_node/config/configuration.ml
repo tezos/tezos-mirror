@@ -13,11 +13,13 @@ type log_filter_config = {
 
 type proxy = {rollup_node_endpoint : Uri.t}
 
+type time_between_blocks = Nothing | Time_between_blocks of float
+
 type sequencer = {
   rollup_node_endpoint : Uri.t;
   kernel : string;
   preimages : string;
-  time_between_blocks : float;
+  time_between_blocks : time_between_blocks;
   private_rpc_port : int;
 }
 
@@ -64,7 +66,7 @@ let default_sequencer =
     kernel = "sequencer.wasm";
     preimages = "_evm_installer_preimages";
     rollup_node_endpoint = Uri.empty;
-    time_between_blocks = 5.;
+    time_between_blocks = Time_between_blocks 5.;
     private_rpc_port = default_private_rpc_port;
   }
 
@@ -91,6 +93,14 @@ let encoding_proxy =
           "rollup_node_endpoint"
           string
           (Uri.to_string default_proxy.rollup_node_endpoint)))
+
+let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
+  let open Data_encoding in
+  def "time_between_blocks"
+  @@ conv
+       (function Nothing -> None | Time_between_blocks f -> Some f)
+       (function None -> Nothing | Some f -> Time_between_blocks f)
+       (option float)
 
 let encoding_sequencer =
   let open Data_encoding in
@@ -126,7 +136,10 @@ let encoding_sequencer =
           "rollup_node_endpoint"
           string
           (Uri.to_string default_proxy.rollup_node_endpoint))
-       (dft "time_between_blocks" float default_sequencer.time_between_blocks)
+       (dft
+          "time_between_blocks"
+          encoding_time_between_blocks
+          default_sequencer.time_between_blocks)
        (dft
           "private-rpc-port"
           ~description:"RPC port for private server"
