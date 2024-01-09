@@ -1135,16 +1135,17 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let adaptive_rewards_params =
           Constants_parametric_repr.
             {
-              issuance_ratio_final_min =
-                c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_min;
-              issuance_ratio_final_max =
-                c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
-              (* Placeholder values for progressive min/max *)
-              (* TODO #6732: fix adaptive rewards parameters *)
-              issuance_ratio_initial_min = Q.(2 // 100);
-              issuance_ratio_initial_max = Q.(2 // 100);
-              initial_period = 3;
-              transition_period = 3;
+              issuance_ratio_final_min = Q.(0_25 // 100_00);
+              (* 0.25% *)
+              issuance_ratio_final_max = Q.(10 // 100) (* 10% *);
+              issuance_ratio_initial_min = Q.(45 // 1000);
+              (* 4.5% *)
+              issuance_ratio_initial_max = Q.(55 // 1000);
+              (* 5.5% *)
+              initial_period = 10;
+              (* 1 month *)
+              transition_period = 50;
+              (* 5 months *)
               max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
               growth_rate =
                 c.adaptive_issuance.adaptive_rewards_params.growth_rate;
