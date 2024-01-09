@@ -11,4 +11,4 @@ derive_more = "0.99.17"
 
 [dependencies.rvemu]
 git = "https://github.com/vapourismo/rvemu.git"
-branch = "no-dtb"
+branch = "pub-translate"

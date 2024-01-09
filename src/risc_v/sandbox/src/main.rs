@@ -5,6 +5,7 @@ use std::{error::Error, fs};
 mod boot;
 mod cli;
 mod devicetree;
+mod inbox;
 mod input;
 mod rv;
 mod syscall;
@@ -28,9 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .initrd
         .map(|initrd_path| -> Result<_, Box<dyn Error>> {
             let initrd = fs::read(initrd_path)?;
-            emu.cpu
-                .bus
-                .write_bytes(initrd_addr as u64, initrd.as_slice())?;
+            emu.cpu.bus.write_bytes(initrd_addr, initrd.as_slice())?;
             Ok(devicetree::InitialRamDisk {
                 start: initrd_addr,
                 length: initrd.len() as u64,
@@ -49,8 +48,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Prepare the boot procedure
     boot::configure(&mut emu, dtb_addr);
 
+    // Prepare inbox
+    let mut inbox = inbox::InboxBuilder::new();
+    inbox
+        .insert_external(vec![1, 2, 3, 4])
+        .insert_external(vec![1, 4, 3, 2])
+        .next_level()
+        .insert_external(vec![1, 1])
+        .next_level()
+        .insert_external(vec![1, 2]);
+    let mut inbox = inbox.build();
+
     let handle_syscall = if cli.posix {
-        syscall::handle_posix
+        fn dummy(emu: &mut Emulator, _: &mut inbox::Inbox) -> Result<(), Box<dyn Error>> {
+            syscall::handle_posix(emu)
+        }
+        dummy
     } else {
         syscall::handle_sbi
     };
@@ -73,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .or_else(|exception| -> Result<(), Box<dyn Error>> {
                 match exception {
                     Exception::EnvironmentCallFromSMode | Exception::EnvironmentCallFromUMode => {
-                        handle_syscall(&mut emu).map_err(|err| -> Box<dyn Error> {
+                        handle_syscall(&mut emu, &mut inbox).map_err(|err| -> Box<dyn Error> {
                             format!("Failed to handle environment call at {prev_pc:x}: {}", err)
                                 .as_str()
                                 .into()

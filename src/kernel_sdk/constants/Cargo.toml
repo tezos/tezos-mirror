@@ -1,0 +1,10 @@
+[package]
+name = "tezos-smart-rollup-constants"
+version = "0.2.2"
+edition = "2021"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Low-level constants for Tezos Smart Rollups"
+keywords = ["tezos", "smart", "rollup"]
+categories = ["no-std", "no-std::no-alloc"]

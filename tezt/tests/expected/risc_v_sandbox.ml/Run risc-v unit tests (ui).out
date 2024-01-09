@@ -208,313 +208,313 @@ Received request to exit with code 0
 rv64ui-p-xori: success
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-add --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-add: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addi --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addi: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addiw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addiw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-and --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-and: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-andi --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-andi: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-auipc --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-auipc: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-beq --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-beq: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bge --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bge: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bgeu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bgeu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-blt --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-blt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bltu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bltu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bne --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bne: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-fence_i --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-fence_i: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jal --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-jal: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jalr --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-jalr: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lb --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lb: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lbu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lbu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ld --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ld: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lh --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lh: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lhu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lhu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lui --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lui: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lwu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lwu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ma_data --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ma_data: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-or --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-or: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ori --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ori: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sb --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sb: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sd --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sh --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sh: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-simple --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-simple: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sll --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sll: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slli --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slli: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slliw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slliw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sllw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sllw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slt --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slti --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slti: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltiu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sltiu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltu --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sltu: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sra --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sra: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srai --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srai: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraiw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sraiw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sraw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srl --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srl: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srli --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srli: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srliw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srliw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srlw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srlw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sub --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sub: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-subw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-subw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sw --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sw: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xor --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-xor: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xori --posix
-thread 'main' panicked at src/main.rs:94:25:
+thread 'main' panicked at src/main.rs:107:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-xori: fail

@@ -1612,8 +1612,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-smart-rollup-constants"
+version = "0.2.2"
+
+[[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
+dependencies = [
+ "tezos-smart-rollup-constants",
+]
 
 [[package]]
 name = "tezos-smart-rollup-debug"

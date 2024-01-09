@@ -5,16 +5,19 @@
 //! More information on SBI specification:
 //!   - https://www.scs.stanford.edu/~zyedidia/docs/riscv/riscv-sbi.pdf
 
-use crate::rv::{A0, A6, A7};
+use crate::inbox::Inbox;
+use crate::rv::{A0, A1, A2, A6, A7};
+use kernel_loader::Memory;
+use rvemu::cpu::AccessType;
 use rvemu::emulator::Emulator;
 use std::{
     error::Error,
     io::{self, Write},
     process::exit,
 };
-
-/// Extension ID for [sbi_console_putchar]
-const SBI_CONSOLE_PUTCHAR: u64 = 0x01;
+use tezos_smart_rollup_constants::riscv::{
+    SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_INBOX_NEXT,
+};
 
 /// SBI extension ID 0x01
 fn sbi_console_putchar(emu: &mut Emulator) -> Result<(), Box<dyn Error>> {
@@ -24,21 +27,49 @@ fn sbi_console_putchar(emu: &mut Emulator) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Extension ID for [sbi_shutdown]
-const SBI_SHUTDOWN: u64 = 0x08;
-
 /// SBI extension ID 0x08
 fn sbi_shutdown() -> ! {
     eprintln!("Received SBI shutdown request");
     exit(0)
 }
 
-/// Extension ID for Tezos-specific functions
-// IDs from 0x0A000000 to 0x0AFFFFFF are "firmware-specific" extension IDs
-const SBI_FIRMWARE_TEZOS: u64 = 0x0A000000;
+/// Move the Inbox to the next message.
+fn sbi_tezos_inbox_next(emu: &mut Emulator, inbox: &mut Inbox) -> Result<(), Box<dyn Error>> {
+    match inbox.next() {
+        Some((level, id, data)) => {
+            let dest_addr = emu.cpu.xregs.read(A0);
+            let max_bytes = emu.cpu.xregs.read(A1);
+
+            let dest_addr = emu
+                .cpu
+                .translate(dest_addr, AccessType::Store)
+                .map_err(super::exception_to_error)?;
+            let length = max_bytes.min(data.len() as u64);
+
+            let source_data = &data[0..length as usize];
+            emu.cpu.bus.write_bytes(dest_addr, source_data)?;
+
+            emu.cpu.xregs.write(A0, level as u64);
+            emu.cpu.xregs.write(A1, id as u64);
+            emu.cpu.xregs.write(A2, length);
+        }
+
+        None => {
+            emu.cpu.xregs.write(A0, 0);
+            emu.cpu.xregs.write(A1, 0);
+            emu.cpu.xregs.write(A2, 0);
+        }
+    }
+
+    Ok(())
+}
 
 /// Handle a system call originating from the user program.
-pub fn handle_sbi(emu: &mut Emulator) -> Result<(), Box<dyn Error>> {
+pub fn handle_sbi(emu: &mut Emulator, inbox: &mut Inbox) -> Result<(), Box<dyn Error>> {
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/6767
+    // Feed errors back to caller instead of raising them in the sandbox.
+    // This means this function most likely should return unit.
+
     // SBI extension is contained in a7.
     let sbi_extension = emu.cpu.xregs.read(A7);
     match sbi_extension {
@@ -46,8 +77,8 @@ pub fn handle_sbi(emu: &mut Emulator) -> Result<(), Box<dyn Error>> {
         SBI_SHUTDOWN => sbi_shutdown(),
         SBI_FIRMWARE_TEZOS => {
             let sbi_function = emu.cpu.xregs.read(A6);
-            #[allow(clippy::match_single_binding)]
             match sbi_function {
+                SBI_TEZOS_INBOX_NEXT => sbi_tezos_inbox_next(emu, inbox),
                 _ => Err(format!(
                     "Unimplemented Tezos SBI extension ({sbi_extension}) function {sbi_function}"
                 )

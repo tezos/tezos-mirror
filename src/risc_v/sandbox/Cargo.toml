@@ -7,6 +7,7 @@ edition = "2021"
 goblin = "0.7.1"
 derive_more = "0.99.17"
 vm-fdt = "0.3.0"
+tezos_crypto_rs = "0.5.2"
 
 [dependencies.clap]
 version = "4.4.6"
@@ -18,4 +19,10 @@ path = "../kernel_loader"
 
 [dependencies.rvemu]
 git = "https://github.com/vapourismo/rvemu.git"
-branch = "no-dtb"
+branch = "pub-translate"
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../../kernel_sdk/encoding"
+
+[dependencies.tezos-smart-rollup-constants]
+path = "../../kernel_sdk/constants"
