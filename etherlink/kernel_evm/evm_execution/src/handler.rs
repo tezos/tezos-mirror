@@ -653,9 +653,26 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         initial_code: Vec<u8>,
         create_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
-        log!(self.host, Debug, "Executing a contract create");
-
         let address = self.create_address(scheme);
+
+        if self.deleted(address) && create_opcode {
+            if let CreateScheme::Create2 { .. } = scheme {
+                // The contract has been deleted, so the address is empty.
+                // We are trying to re-create the same contract that was deleted at
+                // the same transaction level: this is not allowed.
+                // TODO/NB: https://gitlab.com/tezos/tezos/-/issues/6783
+                // This behaviour is appropriate to <=Shanghai configuration.
+                // In the upcoming Cancun fork, the semantic of this behaviour will change.
+                self.increment_nonce(caller)?;
+                return Ok((
+                    ExitReason::Succeed(ExitSucceed::Stopped),
+                    Some(H160::zero()), // see: https://www.evm.codes/#f5?fork=shanghai
+                    vec![],
+                ));
+            }
+        }
+
+        log!(self.host, Debug, "Executing a contract create");
 
         // TODO: mark `caller` and `address` as hot for gas calculation
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
@@ -730,12 +747,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.record_cost(self.compute_gas_code_deposit(code_out.len()))
             {
                 return Ok((ExitReason::Error(err), None, vec![]));
-            }
-
-            if self.deleted(address) {
-                // The contract has been deleted, so the address is empty. However, after
-                // creating the new contract, the _new_ contract isn't deleted.
-                self.unmark_deletion(address);
             }
 
             self.set_contract_code(address, code_out)?;
@@ -1033,15 +1044,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.get_account(address)
             .map(|account| account.nonce(self.host).map_err(EthereumError::from))
             .unwrap_or(Ok(U256::zero()))
-    }
-
-    /// If a contract has been marked for deletion, and another contract is
-    /// created in its place, we need to unmark it, so that we don't delete the
-    /// new contract when we finalize the effects of the transactions.
-    fn unmark_deletion(&mut self, address: H160) {
-        for data in &mut self.transaction_data {
-            data.deleted_contracts.retain(|a| *a != address);
-        }
     }
 
     /// Completely delete an account including nonce, code, and data. This is for
