@@ -74,6 +74,15 @@ module Handler = struct
       ~msg:"signing data for key {key}"
       ("key", Data_encoding.string)
 
+  let signing_data_failure =
+    declare_2
+      ~section
+      ~level
+      ~name:"signing_data_failure"
+      ~msg:"Failed to sign data for key {key}: {failure}"
+      ("key", Data_encoding.string)
+      ("failure", Data_encoding.string)
+
   let request_for_deterministic_nonce =
     declare_2
       ~section

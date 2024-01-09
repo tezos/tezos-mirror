@@ -233,15 +233,21 @@ module Authorized_key = Client_aliases.Alias (struct
   let of_source t = Lwt.return (of_b58check t)
 end)
 
-let check_magic_byte magic_bytes data =
+let check_magic_byte name magic_bytes data =
   let open Lwt_result_syntax in
   match magic_bytes with
   | None -> return_unit
   | Some magic_bytes ->
       let byte = TzEndian.get_uint8 data 0 in
-      if Bytes.length data < 1 then failwith "can't sign empty data"
+      if Bytes.length data < 1 then
+        let failure = "can't sign empty data" in
+        let*! () = Events.(emit signing_data_failure) (name, failure) in
+        failwith "%s" failure
       else if List.mem ~equal:Int.equal byte magic_bytes then return_unit
-      else failwith "magic byte 0x%02X not allowed" byte
+      else
+        let failure = Format.sprintf "magic byte 0x%02X not allowed" byte in
+        let*! () = Events.(emit signing_data_failure) (name, failure) in
+        failwith "%s" failure
 
 let check_authorization cctxt pkh data require_auth signature =
   let open Lwt_result_syntax in
