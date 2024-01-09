@@ -5,12 +5,12 @@ oc.docker:arm64:
     - .oc.build_docker_release_template
     - .tags_template__build_arm64
   stage: manual
-  needs: []
-  # override the rules inherited from .oc.build_docker_release_template:
-  rules:
-  - when: manual
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
     CI_DOCKER_HUB: "false"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+  needs: []
+  # override the rules inherited from .oc.build_docker_release_template:
+  rules:
+  - when: manual
   allow_failure: true

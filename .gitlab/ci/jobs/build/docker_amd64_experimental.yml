@@ -2,11 +2,11 @@ include: .gitlab/ci/jobs/build/common.yml
 
 oc.docker:amd64:
   extends:
-    - .tags_template__build
     - .oc.build_docker_release_template
+    - .tags_template__build
+  stage: build
   variables:
-    DOCKER_BUILD_TARGET: "with-evm-artifacts"
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "true"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
-  stage: build
+    DOCKER_BUILD_TARGET: "with-evm-artifacts"
