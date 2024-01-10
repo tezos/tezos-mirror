@@ -171,3 +171,7 @@ val direct_ticket_spending_enable : Raw_context.t -> bool
 (** Delay in cycle before the current state of the stake impacts the
     issuance rate.*)
 val issuance_modification_delay : Raw_context.t -> int
+
+(** Time in cycle before activation of AI after the voting EMA threshold is
+   reached *)
+val adaptive_issuance_activation_delay : Raw_context.t -> int

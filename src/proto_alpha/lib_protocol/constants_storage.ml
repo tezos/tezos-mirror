@@ -44,6 +44,10 @@ let issuance_modification_delay c =
   let constants = Raw_context.constants c in
   constants.consensus_rights_delay
 
+let adaptive_issuance_activation_delay c =
+  let constants = Raw_context.constants c in
+  1 + constants.consensus_rights_delay + Constants_repr.max_slashing_period
+
 let blocks_per_cycle c =
   let constants = Raw_context.constants c in
   constants.blocks_per_cycle

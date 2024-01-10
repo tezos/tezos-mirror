@@ -370,9 +370,7 @@ let update_ema ctxt ~vote =
       | None ->
           (* set the feature to activate in a few cycles *)
           let current_cycle = (Level_storage.current ctxt).cycle in
-          let delay =
-            1 + preserved_cycles ctxt + Constants_repr.max_slashing_period
-          in
+          let delay = adaptive_issuance_activation_delay ctxt in
           let cycle = Cycle_repr.add current_cycle delay in
           let+ ctxt = activate ctxt ~cycle in
           (ctxt, Some cycle)
