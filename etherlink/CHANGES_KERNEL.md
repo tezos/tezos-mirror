@@ -11,6 +11,8 @@ deployed. (!11225)
 - Implement EIP-684: Prevent create collision. Reject contract creation to non-empty address (!11150)
 - Smart contract starts at nonce 1 following EIP-161. (!11276)
 - Support signature of transactions pre EIP-155. (!11281)
+- Prevent collision when creating a contract at the same level it was self-
+  destructed. (!11474)
 
 ### Bug fixes
 
