@@ -26,7 +26,7 @@ boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "ajob410
 [dependencies.tezos-smart-rollup]
 version = "0.2.2"
 default-features = false
-features = ["std", "crypto", "panic-hook", "data-encoding", "storage", "proto-alpha"]
+features = ["std", "crypto", "panic-hook", "data-encoding", "storage", "proto-alpha", "experimental-host-in-memory-store"]
 
 [dependencies.jstz_kernel]
 git = "https://github.com/victor-dumitrescu/jstz.git"

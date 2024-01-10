@@ -62,9 +62,9 @@ macro_rules! kernel_entry {
         pub fn main() -> ! {
             $crate::set_panic_hook();
             use $crate::RollupHost;
+            let mut host = unsafe { RollupHost::new() };
             loop {
                 // TODO #6727: Capture and recover panics.
-                let mut host = unsafe { RollupHost::new() };
                 $kernel_run(&mut host);
             }
         }
@@ -72,4 +72,11 @@ macro_rules! kernel_entry {
 }
 
 #[doc(hidden)]
+#[cfg(not(feature = "experimental-host-in-memory-store"))]
 pub use tezos_smart_rollup_core::rollup_host::RollupHost;
+
+pub(crate) mod host;
+
+#[doc(hidden)]
+#[cfg(feature = "experimental-host-in-memory-store")]
+pub use host::RollupHostWithInMemoryStorage as RollupHost;
