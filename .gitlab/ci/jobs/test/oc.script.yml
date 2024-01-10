@@ -11,6 +11,7 @@ oc.script:snapshot_alpha_and_link:
     - .image_template__runtime_build_dependencies
   stage: test
   before_script:
+    - ./scripts/ci/take_ownership.sh
     - . ./scripts/version.sh
     - eval $(opam env)
   needs:
@@ -41,15 +42,18 @@ oc.script:test-gen-genesis:
   stage: test
   needs: [trigger]
   before_script:
-    - cd scripts/gen-genesis
     - eval $(opam env)
+    - cd scripts/gen-genesis
   script:
     - dune build gen_genesis.exe
 
 oc.script:test_release_versions:
   extends: .test_template
-  script:
+  before_script:
     - ./scripts/ci/take_ownership.sh
+    - . ./scripts/version.sh
+    - eval $(opam env)
+  script:
     - ./scripts/test_release_version.sh
 
 oc.script:b58_prefix:

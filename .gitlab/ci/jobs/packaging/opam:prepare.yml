@@ -50,8 +50,9 @@ opam:prepare:
     - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
   needs: [trigger]
-  script:
+  before_script:
     - eval $(opam env)
+  script:
     - git init _opam-repo-for-release
     - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
     - git -C _opam-repo-for-release add packages

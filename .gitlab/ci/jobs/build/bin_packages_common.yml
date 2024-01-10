@@ -7,7 +7,6 @@
      BLST_PORTABLE: "yes"
      ARCH: "amd64"
    script:
-    - . ./scripts/version.sh
     - wget https://sh.rustup.rs/rustup-init.sh
     - chmod +x rustup-init.sh
     - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version -y

@@ -5,11 +5,12 @@ oc.misc_checks:
   stage: "test"
   needs: [trigger]
   before_script:
+    - ./scripts/ci/take_ownership.sh
+    - eval $(opam env)
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
-    - eval $(opam env)
   rules:
     # The linting job runs over the set of [source_directories]
     # defined in [scripts/lint.sh] that must be included here:
@@ -25,7 +26,6 @@ oc.misc_checks:
         - .gitlab-ci.yml
         - .gitlab/**/*
   script:
-    - ./scripts/ci/take_ownership.sh
     - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
 
@@ -64,7 +64,7 @@ kaitai_e2e_checks:
           - .gitlab/**/*
           - .gitlab-ci.yml
       when: on_success
-  script:
+  before_script:
     - . ./scripts/version.sh
     # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
     #       As observed for the `unit:js_components` running `npm i`
@@ -74,6 +74,7 @@ kaitai_e2e_checks:
     #       and npm dependencies (package.json) in one place, and that the local
     #       environment is then the same as CI environment.
     - . ./scripts/install_build_deps.js.sh
+  script:
     - ./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh
       contrib/kaitai-struct-files/files
       contrib/kaitai-struct-files/input

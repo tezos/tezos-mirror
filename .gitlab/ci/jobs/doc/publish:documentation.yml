@@ -17,13 +17,13 @@ publish:documentation:
   # pipeline to ensure it has time to run before the next merge.
   needs: []
   before_script:
-    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
-    - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - chmod 400 ~/.ssh/id_ed25519
+    - eval $(opam env)
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
-    - eval $(opam env)
+    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - chmod 400 ~/.ssh/id_ed25519
   script:
     - ./scripts/ci/doc_publish.sh
   # Publish jobs are uninterruptible to avoid publishing partial results.
