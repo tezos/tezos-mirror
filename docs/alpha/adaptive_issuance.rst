@@ -162,10 +162,10 @@ In this formula:
    :math:`\IL{\F{f}{c}}` and the interval
    :math:`\IL{\left[ \tc - \tr, \tc + \tr \right]}`.
 
--  :math:`\IL{\DTF = \frac{16384 \tmult 15}{86400} = 2.8\overline{444}}`,
+-  :math:`\IL{\DTF = \frac{24576 \tmult 10}{86400} = 2.8\overline{444}}`,
    denotes the minimal duration (in days) of a Tezos cycle, assuming all
-   16384 blocks in the cycle are produced at the minimal allowed time –
-   that is, every 15 seconds.
+   24576 blocks in the cycle are produced at the minimal allowed time –
+   that is, every 10 seconds.
 
 -  :math:`\IL{\sgn{\tc - \F{f}{c}} = 1}` if
    :math:`\IL{\F{f}{c} \leq \tc}` and :math:`-1` otherwise, denotes the
@@ -273,11 +273,11 @@ being subject to the existing participation conditions.
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
 for contributing to :ref:`random seed generation <randomness_generation_alpha>`
 (that is for, revealing nonce seeds and posting VDF proofs) are not paid
-each block, but rather every 128 blocks. The adjusted formulas result:
+each block, but rather every 192 blocks. The adjusted formulas result:
 
 .. math::
 
-  \tip{\vdf}{c} = \tip{nr}{c} = 128 \tmult \frac{1}{\tw} \tmult \isb{c}
+  \tip{\vdf}{c} = \tip{nr}{c} = 192 \tmult \frac{1}{\tw} \tmult \isb{c}
 
 **Liquidity baking subsidy.** The :doc:`LB
 subsidy <liquidity_baking>` per block is determined by the following formula:

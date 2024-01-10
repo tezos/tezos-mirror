@@ -170,7 +170,7 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 16384 blocks
+     - 24576 blocks
    * - ``PRESERVED_CYCLES``
      - 5 cycles
    * - ``MINIMAL_STAKE``
@@ -178,7 +178,7 @@ Proof-of-stake parameters
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
-     - 1024 blocks
+     - 1536 blocks
 
 
 Further External Resources
