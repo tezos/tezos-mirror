@@ -862,6 +862,24 @@ pub mod tests {
         assert!(check(csreg::stvec, 0x0) == 0x0);
         assert!(check(csreg::stvec, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFD);
 
+        // mip / mie
+        assert!(check(csreg::mip, 0x0) == 0x0);
+        assert!(check(csreg::mip, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
+        assert!(check(csreg::mie, 0x0) == 0x0);
+        assert!(check(csreg::mie, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
+
+        // sip / sie
+        assert!(check(csreg::sip, 0x0) == 0x0);
+        assert!(check(csreg::sip, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0222);
+        assert!(check(csreg::sie, 0x0) == 0x0);
+        assert!(check(csreg::sie, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0222);
+
+        // mepc / sepc
+        assert!(check(csreg::mepc, 0x0) == 0x0);
+        assert!(check(csreg::mepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
+        assert!(check(csreg::sepc, 0x0) == 0x0);
+        assert!(check(csreg::sepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
+
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
     }
