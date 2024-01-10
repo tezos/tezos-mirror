@@ -958,7 +958,7 @@ let octez_risc_v_pvm =
           [S "source_tree"; S "src"];
           [S "file"; S "build.rs"];
           [S "file"; S "Cargo.toml"];
-          [S "file"; S "Cargo.lock"];
+          [S "file"; S "../Cargo.lock"];
           (* For the local dependent crates, these patterns only include files
            * directly contained in the crate's directory, as well as the [src]
            * directory, excluding all other directories in order to avoid

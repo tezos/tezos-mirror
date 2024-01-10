@@ -73,6 +73,8 @@ pub trait Elem: Copy + 'static {
     fn to_stored_in_place(&mut self);
 
     /// Convert from stored representation in place.
+    // The naming of this function trips Clippy.
+    #[allow(clippy::wrong_self_convention)]
     fn from_stored_in_place(&mut self);
 
     /// Read a value from its stored representation.
@@ -145,7 +147,7 @@ impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
 
     #[inline(always)]
     fn from_stored(source: &Self) -> Self {
-        let mut new = source.clone();
+        let mut new = *source;
 
         // NOTE: This loop may be eliminated if [from_stored_in_place] is a no-op.
         for elem in new.iter_mut() {
@@ -200,10 +202,10 @@ pub trait Backend: BackendManagement + Sized {
     type Layout: layout::Layout;
 
     /// Allocate regions for the given layout placement.
-    fn allocate<'backend>(
-        &'backend mut self,
+    fn allocate(
+        &mut self,
         placed: PlacedOf<Self::Layout>,
-    ) -> AllocatedOf<Self::Layout, Self::Manager<'backend>>;
+    ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
 
     /// Read bytes from the backing storage.
     fn read(&self, index: usize, buffer: &mut [u8]);

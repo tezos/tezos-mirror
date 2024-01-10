@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+  # Libraries
+  "kernel_loader",
+  "machine_state",
+  "interpreter",
+  "pvm",
+  # Executables
+  "sandbox",
+]
+exclude = ["jstz", "dummy_kernel", "tests"]

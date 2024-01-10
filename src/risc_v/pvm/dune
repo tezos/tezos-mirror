@@ -39,7 +39,7 @@
   (source_tree src)
   (file build.rs)
   (file Cargo.toml)
-  (file Cargo.lock)
+  (file ../Cargo.lock)
   (glob_files ../interpreter/*)
   (source_tree ../interpreter/src)
   (glob_files ../machine_state/*)
