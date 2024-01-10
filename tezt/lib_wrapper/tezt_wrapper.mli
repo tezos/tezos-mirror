@@ -69,6 +69,26 @@ module Uses : sig
 
   (** ["./octez-admin-client"], with tag ["admin_client"]. *)
   val octez_admin_client : t
+
+  (** Register a test that generates:
+      {[
+        tezt/lib_wrapper/expected/tezt_wrapper.ml/runtime-dependency-tags.out
+      ]}
+
+      This file can be used by the manifest to deduce which tests to run.
+      By having this be a regression test, we guarantee that this list is always up-to-date
+      and that there is only one source of truth.
+
+      To regenerate the file, run:
+      {[
+        dune exec tezt/tests/main.exe -- \
+          --reset-regressions -t 'meta: list runtime dependencies'
+      ]}
+
+      Since the contents of the file depends on the tests which are registered,
+      but the file is always the same, this function should only be called
+      by the executable that is linked with all tests, i.e. [tezt/tests/main.exe]. *)
+  val register_meta_test : unit -> unit
 end
 
 module Test : sig

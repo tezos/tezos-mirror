@@ -53,6 +53,17 @@ module Uses = struct
   let octez_client = make ~tag:"client" ~path:"./octez-client"
 
   let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
+
+  let register_meta_test () =
+    Regression.register
+      ~__FILE__
+      ~title:"meta: list runtime dependencies"
+      ~file:"runtime-dependency-tags"
+      ~tags:["meta"; "uses"]
+    @@ fun () ->
+    ( Fun.flip String_map.iter !known_paths @@ fun path {tag; _} ->
+      Regression.capture @@ sf "%s: %s" tag path ) ;
+    unit
 end
 
 let error mode =
