@@ -90,7 +90,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
           Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Preattestation
+  Baking_actions.inject_consensus_votes state consensus_list `Preattestation
 
 let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
@@ -127,7 +127,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Attestation
+  Baking_actions.inject_consensus_votes state consensus_list `Attestation
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in

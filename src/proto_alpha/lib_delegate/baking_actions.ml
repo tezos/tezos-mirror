@@ -436,7 +436,7 @@ let inject_block ~updated_state state signed_block =
   in
   return updated_state
 
-let sign_consensus_votes state operations kind =
+let sign_consensus_votes state votes kind =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -447,7 +447,7 @@ let sign_consensus_votes state operations kind =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
   (* Hypothesis: all consensus votes have the same round and level *)
-  match operations with
+  match votes with
   | [] -> return_nil
   | (_, (consensus_content : consensus_content)) :: _ ->
       let level = Raw_level.to_int32 consensus_content.level in
@@ -461,7 +461,7 @@ let sign_consensus_votes state operations kind =
           | `Preattestation -> Baking_highwatermarks.may_sign_preattestation
           | `Attestation -> Baking_highwatermarks.may_sign_attestation
         in
-        let*! authorized_operations =
+        let*! authorized_votes =
           List.filter_s
             (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
               let may_sign =
@@ -496,14 +496,12 @@ let sign_consensus_votes state operations kind =
                             ] ))
                 in
                 Lwt.return_false)
-            operations
+            votes
         in
         (* Record all consensus votes new highwatermarks as one batch *)
         let* () =
           let delegates =
-            List.map
-              (fun ((ck, _), _) -> ck.public_key_hash)
-              authorized_operations
+            List.map (fun ((ck, _), _) -> ck.public_key_hash) authorized_votes
           in
           let record_all_consensus_vote =
             match kind with
@@ -519,7 +517,7 @@ let sign_consensus_votes state operations kind =
             ~level
             ~round
         in
-        return authorized_operations
+        return authorized_votes
       in
       let forge_and_sign_consensus_vote : type a. _ -> a contents_list -> _ =
        fun ((consensus_key, _) as delegate) contents ->
@@ -586,11 +584,11 @@ let sign_consensus_votes state operations kind =
                 (Single (Preattestation consensus_content)))
         authorized_consensus_votes
 
-let inject_consensus_vote state preattestations kind =
+let inject_consensus_votes state votes kind =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let* signed_operations = sign_consensus_votes state preattestations kind in
+  let* signed_operations = sign_consensus_votes state votes kind in
   (* TODO: add a RPC to inject multiple operations *)
   let fail_inject_event, injected_event =
     match kind with
@@ -954,11 +952,11 @@ let rec perform_action ~state_recorder state (action : action) =
       in
       updated_state
   | Inject_preattestations {preattestations} ->
-      let* () = inject_consensus_vote state preattestations `Preattestation in
+      let* () = inject_consensus_votes state preattestations `Preattestation in
       perform_action ~state_recorder state Watch_proposal
   | Inject_attestations {attestations} ->
       let* () = state_recorder ~new_state:state in
-      let* () = inject_consensus_vote state attestations `Attestation in
+      let* () = inject_consensus_votes state attestations `Attestation in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
       let*! () = start_waiting_for_attestation_quorum state in

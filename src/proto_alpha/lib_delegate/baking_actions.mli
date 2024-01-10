@@ -104,7 +104,7 @@ val sign_consensus_votes :
   tzresult
   Lwt.t
 
-val inject_consensus_vote :
+val inject_consensus_votes :
   state ->
   (consensus_key_and_delegate * consensus_content) list ->
   [`Preattestation | `Attestation] ->
