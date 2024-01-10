@@ -964,8 +964,6 @@ let rec perform_action ~state_recorder state (action : action) =
       let*! () = start_waiting_for_attestation_quorum state in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4667
          Also inject attestations for the migration block. *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
-         Don't inject multiple attestations? *)
       let* () = get_and_inject_dal_attestations state in
       return state
   | Update_to_level level_update ->

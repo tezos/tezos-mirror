@@ -559,8 +559,6 @@ let propose_block_action state delegate round ~last_proposal =
       let attestations_in_last_proposal = last_proposal.block.quorum in
       (* Also insert the DAL attestations from the proposal, because the mempool
          may not contain them anymore *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
-         The block may therefore contain multiple attestations for the same delegate. *)
       let dal_attestations_in_last_proposal =
         last_proposal.block.dal_attestations
       in
