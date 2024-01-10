@@ -542,7 +542,6 @@ impl CSRegister {
     ///
     /// Exception codes to delegate.
     /// If an exception can't be thrown from a lower privilege mode, set it here read-only 0
-    // TODO: Add TEST
     const WARL_MASK_MEDELEG: CSRValue = !(
         ones(1) << 10 // reserved
         | ones(1) << 11 // environment call from M-mode
@@ -555,7 +554,6 @@ impl CSRegister {
     ///
     /// Interrupt codes to delegate.
     /// If an interrupt can't be thrown from a lower privilege mode, set it here read-only 0
-    // TODO: Add TEST
     const WARL_MASK_MIDELEG: CSRValue = !(
         ones(1) << 0    // reserved
         | ones(1) << 2  // reserved
@@ -805,6 +803,12 @@ pub mod tests {
         // misa field
         assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
         assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_112D);
+
+        // medeleg / mideleg
+        assert!(check(csreg::medeleg, 0x0) == 0x0);
+        assert!(check(csreg::medeleg, 0x0000_FFFF_0000_FFFF) == 0x0000_0000_0000_B3FF);
+        assert!(check(csreg::mideleg, 0x0) == 0x0);
+        assert!(check(csreg::mideleg, 0xFFFF_0000_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
 
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
