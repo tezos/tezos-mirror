@@ -29,32 +29,6 @@ open Protocol
 open Alpha_context
 open Apply_results
 
-let check_pvm_initial_state_hash {Node_context.cctxt; config; kind; _} =
-  let open Lwt_result_syntax in
-  let module PVM = (val Pvm.of_kind kind) in
-  let* l1_reference_initial_state_hash =
-    RPC.Sc_rollup.initial_pvm_state_hash
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, cctxt#block)
-      config.sc_rollup_address
-  in
-  let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
-  let*! l2_initial_state_hash = PVM.state_hash s in
-  let l1_reference_initial_state_hash =
-    Sc_rollup_proto_types.State_hash.to_octez l1_reference_initial_state_hash
-  in
-  let l2_initial_state_hash =
-    Sc_rollup_proto_types.State_hash.to_octez l2_initial_state_hash
-  in
-  fail_unless
-    Octez_smart_rollup.State_hash.(
-      l1_reference_initial_state_hash = l2_initial_state_hash)
-    (Sc_rollup_node_errors.Wrong_initial_pvm_state
-       {
-         initial_state_hash = l2_initial_state_hash;
-         expected_state_hash = l1_reference_initial_state_hash;
-       })
-
 (** Returns [Some c] if [their_commitment] is refutable where [c] is our
       commitment for the same inbox level. *)
 let is_refutable_commitment node_ctxt

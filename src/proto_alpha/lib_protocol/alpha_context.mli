@@ -3595,8 +3595,6 @@ module Sc_rollup : sig
       val get_outbox : Raw_level.t -> state -> output list Lwt.t
     end
 
-    val reference_initial_state_hash : State_hash.t
-
     module Protocol_implementation :
       PVM.S
         with type context = Context.t
@@ -3651,13 +3649,9 @@ module Sc_rollup : sig
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t
-
-    val reference_initial_state_hash : State_hash.t
   end
 
   module Riscv_PVM : sig
-    val reference_initial_state_hash : State_hash.t
-
     module Protocol_implementation :
       PVM.S
         with type context = unit

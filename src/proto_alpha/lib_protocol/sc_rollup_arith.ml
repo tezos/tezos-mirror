@@ -26,33 +26,6 @@
 open Sc_rollup_repr
 module PS = Sc_rollup_PVM_sig
 
-(*
-  This is the state hash of reference that both the prover of the node
-  and the verifier of the protocol {!Protocol_implementation} have to
-  agree on (if they do, it means they are using the same tree
-  structure).
-
-  We have to hard-code this value because the Arith PVM uses Irmin as
-  its Merkle proof verification backend, and the economic protocol
-  cannot create an empty Irmin context. Such a context is required to
-  create an empty tree, itself required to create the initial state of
-  the Arith PVM.
-
-  Utlimately, the value of this constant is decided by the prover of
-  reference (the only need is for it to be compatible with
-  {!Protocol_implementation}.)
-
-  Its value is the result of the following snippet
-
-  {|
-  let*! state = Prover.initial_state ~empty in
-  Prover.state_hash state
-  |}
-*)
-let reference_initial_state_hash =
-  State_hash.of_b58check_exn
-    "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj"
-
 type error +=
   | Arith_proof_production_failed
   | Arith_output_proof_production_failed

@@ -129,33 +129,6 @@ module V2_0_0 = struct
            requesting the [well_known_reveal_hash] preimage *)
         Reveal_raw_data well_known_reveal_hash
 
-  (*
-    This is the state hash of reference that both the prover of the
-    node and the verifier of the protocol {!Protocol_implementation}
-    have to agree on (if they do, it means they are using the same
-    tree structure).
-
-    We have to hard-code this value because the Wasm PVM uses Irmin as
-    its Merkle proof verification backend, and the economic protocol
-    cannot create an empty Irmin context. Such a context is required to
-    create an empty tree, itself required to create the initial state of
-    the Wasm PVM.
-
-    Utlimately, the value of this constant is decided by the prover of
-    reference (the only need is for it to be compatible with
-    {!Protocol_implementation}.)
-
-    Its value is the result of the following snippet
-
-    {|
-    let*! state = Prover.initial_state context in
-    Prover.state_hash state
-    |}
-  *)
-  let reference_initial_state_hash =
-    Sc_rollup_repr.State_hash.of_b58check_exn
-      "srs127FAyj2NkJYtN8RE8yPieBGpakvAH8MgwzRPUM4UnsCKB24rrA"
-
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
 

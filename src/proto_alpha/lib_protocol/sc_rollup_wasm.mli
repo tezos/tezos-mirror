@@ -82,12 +82,6 @@ module V2_0_0 : sig
        and type state = Context.tree
        and type proof = Context.Proof.tree Context.Proof.t
 
-  (** This is the state hash of reference that both the prover of the
-      node and the verifier of the protocol {!Protocol_implementation}
-      have to agree on (if they do, it means they are using the same
-      tree structure). *)
-  val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
-
   (** Number of ticks between snapshotable states, chosen low enough
       to maintain refutability.
 

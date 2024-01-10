@@ -32,5 +32,3 @@ module Protocol_implementation :
     with type context = unit
      and type state = minimal_state
      and type proof = void
-
-val reference_initial_state_hash : Sc_rollup_repr.State_hash.t

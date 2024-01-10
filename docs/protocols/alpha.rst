@@ -21,6 +21,8 @@ It requires protocol environment V12, compared to V11 for Oxford.
 Smart Rollups
 -------------
 
+- The unnecessary initial PVM state hash and its associated RPC are removed. (MR :gl:`!12345`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
