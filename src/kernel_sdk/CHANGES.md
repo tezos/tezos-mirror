@@ -8,6 +8,8 @@
 
 ### Installer client/kernel
 
+- Add support for using the `set` instruction with large (> 512 byte) values.
+
 ## Version 0.2.2
 
 ### SDK
