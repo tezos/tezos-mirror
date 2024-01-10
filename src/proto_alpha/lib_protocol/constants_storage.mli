@@ -175,3 +175,7 @@ val issuance_modification_delay : Raw_context.t -> int
 (** Time in cycle before activation of AI after the voting EMA threshold is
    reached *)
 val adaptive_issuance_activation_delay : Raw_context.t -> int
+
+(** Tolerated period of inactivity, in cycles, before a delegate is
+    deactivated *)
+val tolerated_inactivity_period : Raw_context.t -> int

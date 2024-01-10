@@ -59,13 +59,14 @@ let set_active ctxt delegate =
   let open Lwt_result_syntax in
   let* inactive = is_inactive ctxt delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let tolerance = Constants_storage.tolerated_inactivity_period ctxt in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   (* We allow a number of cycles before a delegate is deactivated as follows:
-     - if the delegate is active, we give it at least `1 + preserved_cycles`
+     - if the delegate is active, we give it at least `tolerance` cycles
      after the current cycle before to be deactivated.
      - if the delegate is new or inactive, we give it additionally
      `preserved_cycles` because the delegate needs this number of cycles to
-     receive rights, so `1 + 2 * preserved_cycles` in total. *)
+     receive rights, so `tolerance + preserved_cycles` in total. *)
   let delegate_contract = Contract_repr.Implicit delegate in
   let* current_last_active_cycle =
     Storage.Contract.Delegate_last_cycle_before_deactivation.find
@@ -74,10 +75,10 @@ let set_active ctxt delegate =
   in
   let last_active_cycle =
     match current_last_active_cycle with
-    | None -> Cycle_repr.add current_cycle (1 + (2 * preserved_cycles))
+    | None -> Cycle_repr.add current_cycle (tolerance + preserved_cycles)
     | Some current_last_active_cycle ->
         let delay =
-          if inactive then 1 + (2 * preserved_cycles) else 1 + preserved_cycles
+          if inactive then tolerance + preserved_cycles else tolerance
         in
         let updated = Cycle_repr.add current_cycle delay in
         Cycle_repr.max current_last_active_cycle updated
