@@ -49,8 +49,7 @@ oc.script:test-gen-genesis:
 oc.script:test_release_versions:
   extends: .test_template
   script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) ${CI_PROJECT_DIR}
+    - ./scripts/ci/take_ownership.sh
     - ./scripts/test_release_version.sh
 
 oc.script:b58_prefix:
