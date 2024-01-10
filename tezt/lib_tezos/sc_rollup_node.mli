@@ -56,12 +56,22 @@ type history_mode = Archive | Full
 
 (** Octez smart rollup node command-line arguments. *)
 type argument =
+  | Data_dir of string
+  | Rpc_addr of string
+  | Rpc_port of int
   | Log_kernel_debug
   | Log_kernel_debug_file of string
   | Metrics_addr of string
   | Injector_attempts of int
   | Boot_sector_file of string
   | Dac_observer of Dac_node.t
+  | Loser_mode of string
+  | No_degraded
+  | Gc_frequency of int
+  | History_mode of history_mode
+  | Dal_node of Dal_node.t
+  | Mode of mode
+  | Rollup of string
 
 type event = {name : string; value : JSON.t; timestamp : float}
 
@@ -96,6 +106,10 @@ val string_of_history_mode : history_mode -> string
     so if you do not call [config_init] or generate the configuration file
     through some other means, your sc node will not listen.
 
+    [history_mode] is [full] by default to make the rollup runs the
+    GC, and the [gc_frequency] is [1] by default to make it runs on
+    every occasion during tests.
+
 *)
 val create :
   ?runner:Runner.t ->
@@ -112,6 +126,11 @@ val create :
   ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  ?password_file:string ->
   mode ->
   Node.t ->
   t
@@ -132,6 +151,11 @@ val create_with_endpoint :
   ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  ?password_file:string ->
   mode ->
   Client.endpoint ->
   t
@@ -177,7 +201,7 @@ val string_of_purpose : purpose -> string
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
-    ?gc_frequency ?history_mode ?wait_ready node rollup_address arguments ]
+    ?wait_ready node rollup_address arguments ]
     launches the given smart contract rollup node for the rollup at
     [rollup_address] with the given extra arguments. [event_level] and
     [event_sections_levels] allow to select which events we want the node to
@@ -185,18 +209,13 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     to use the legacy [run] command of the node (which requires a config file to
     exist). If [wait_ready] is [false], tezt does not wait for the node to be
     ready. If [restart] is [true], it will stop and restart the node if it is
-    already running. [gc_frequency] is [1] by default to make the rollup GC on
-    every occasion during tests. *)
+    already running.  *)
 val run :
   ?legacy:bool ->
   ?restart:bool ->
   ?mode:mode ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
-  ?loser_mode:string ->
-  ?allow_degraded:bool ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
   ?wait_ready:bool ->
   ?password_file:string ->
   t ->
@@ -223,26 +242,12 @@ val kill : t -> unit Lwt.t
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init].  Returns the name of the resulting
     configuration file. *)
-val config_init :
-  t ->
-  ?force:bool ->
-  ?loser_mode:string ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  string ->
-  string Lwt.t
+val config_init : ?force:bool -> t -> string -> string Lwt.t
 
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init] and return the corresponding
     process. *)
-val spawn_config_init :
-  t ->
-  ?force:bool ->
-  ?loser_mode:string ->
-  ?gc_frequency:int ->
-  ?history_mode:history_mode ->
-  string ->
-  Process.t
+val spawn_config_init : ?force:bool -> t -> string -> Process.t
 
 module Config_file : sig
   (** Sc node configuration files. *)

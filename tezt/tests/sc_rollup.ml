@@ -184,8 +184,8 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) ?rpc_local {variant; tags; description}
-    scenario =
+    ?(uses = fun _protocol -> []) ?rpc_local ?allow_degraded
+    {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
     ?supports
@@ -220,6 +220,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?whitelist
       ?operator
       ?operators
+      ?allow_degraded
       tezos_node
       tezos_client
   in
@@ -927,7 +928,10 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
           incr gc_finalisations
       | _ -> ()) ;
   let* () =
-    Sc_rollup_node.run ~gc_frequency ~history_mode sc_rollup_node sc_rollup []
+    Sc_rollup_node.run
+      sc_rollup_node
+      sc_rollup
+      [Gc_frequency gc_frequency; History_mode history_mode]
   in
   let* origination_level = Node.get_level node in
   (* We start at level 2, bake until the expected level *)
@@ -1019,7 +1023,9 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
      additional commitments). *)
   let total_blocks = level_snapshot + (4 * commitment_period) in
   let stop_rollup_node_2_levels = challenge_window + 2 in
-  let* () = Sc_rollup_node.run ~history_mode sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup [History_mode history_mode]
+  in
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
   let rollup_node_2 =
@@ -1031,8 +1037,12 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   let rollup_node_4 =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
   in
-  let* () = Sc_rollup_node.run ~history_mode rollup_node_2 sc_rollup [] in
-  let* () = Sc_rollup_node.run ~history_mode rollup_node_4 other_rollup [] in
+  let* () =
+    Sc_rollup_node.run rollup_node_2 sc_rollup [History_mode history_mode]
+  in
+  let* () =
+    Sc_rollup_node.run rollup_node_4 other_rollup [History_mode history_mode]
+  in
   let rollup_node_processing =
     let* () = bake_levels stop_rollup_node_2_levels client in
     Log.info "Stopping rollup node 2 before snapshot is made." ;
@@ -1092,8 +1102,11 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   Log.info "Importing snapshot in late rollup node." ;
   let*! () = Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file in
   Log.info "Running rollup nodes with snapshots until they catch up." ;
-  let* () = Sc_rollup_node.run ~history_mode rollup_node_2 sc_rollup []
-  and* () = Sc_rollup_node.run ~history_mode rollup_node_3 sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run rollup_node_2 sc_rollup [History_mode history_mode]
+  and* () =
+    Sc_rollup_node.run rollup_node_3 sc_rollup [History_mode history_mode]
+  in
   let* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_2
   and* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_3 in
   Log.info "Try importing outdated snapshot." ;
@@ -2683,6 +2696,7 @@ let test_reveals_fails_on_unknown_hash =
     ~supports:(Protocol.From_protocol 17)
     ~timeout:120
     ~kind
+    ~allow_degraded:true
     {
       tags = ["reveals"; "unknown"];
       variant = None;
@@ -2692,9 +2706,7 @@ let test_reveals_fails_on_unknown_hash =
   let unknown_hash =
     "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
   in
-  let* () =
-    Sc_rollup_node.run ~allow_degraded:true sc_rollup_node sc_rollup []
-  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let error_promise =
     Sc_rollup_node.wait_for
       sc_rollup_node
@@ -2861,7 +2873,7 @@ let test_cement_ignore_commitment ~kind =
   unit
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind scenario =
+    ~kind ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -2881,6 +2893,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~timeout:60
     ?challenge_window
     ~rollup_node_name:"honest"
+    ~allow_degraded
     {
       tags;
       variant = Some variant;
@@ -3645,9 +3658,7 @@ let test_late_rollup_node_2 =
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
   (* Do gc every block, to test we don't remove live data *)
-  let* () =
-    Sc_rollup_node.run ~gc_frequency:1 sc_rollup_node2 sc_rollup_address []
-  in
+  let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
   let* _level = wait_for_current_level node ~timeout:20. sc_rollup_node2 in
   Log.info "Alternative rollup node is synchronized." ;
   let* () = Client.bake_for_and_wait client in
@@ -5588,10 +5599,11 @@ let start_rollup_node_with_encrypted_key ~kind =
       ~exit_code:1
       ~msg:(rex "3 incorrect password attempts")
   in
-  let* () = Sc_rollup_node.kill rollup_node in
   let password_file = Filename.temp_file "password_file" "" in
   let () = write_file password_file ~contents:password in
-  let* () = Sc_rollup_node.run ~password_file rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run ~restart:true ~password_file rollup_node sc_rollup []
+  in
   unit
 
 let register_riscv () =

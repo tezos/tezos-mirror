@@ -138,6 +138,7 @@ val setup_rollup :
   ?rollup_node_name:string ->
   ?whitelist:string list ->
   ?sc_rollup:string ->
+  ?allow_degraded:bool ->
   Node.t ->
   Client.t ->
   (Sc_rollup_node.t * string) Lwt.t
