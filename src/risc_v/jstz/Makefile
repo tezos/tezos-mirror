@@ -2,16 +2,21 @@
 #
 # SPDX-License-Identifier: MIT
 
+NATIVE_TARGET ?=
+ifneq ($(NATIVE_TARGET),)
+NATIVE_OPT := --target "$(NATIVE_TARGET)"
+endif
+
 .PHONY: all
 all: build test check
 
 .PHONY: build
 build:
-	@cargo build --release --target=riscv64gc-unknown-hermit
+	@cargo build --release
 
 .PHONY: test
 test:
-	@cargo test --no-default-features
+	@cargo test --no-default-features $(NATIVE_OPT)
 
 .PHONY: run
 run:

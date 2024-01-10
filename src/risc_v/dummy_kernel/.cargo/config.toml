@@ -1,2 +1,5 @@
 [env]
 HERMIT_LOG_LEVEL_FILTER = { value = "Warn", force = true }
+
+[build]
+target = "riscv64gc-unknown-hermit"
