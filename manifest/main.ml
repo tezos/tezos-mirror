@@ -8372,35 +8372,7 @@ let evm_node_lib_prod_encoding =
 
 let _evm_node_sequencer_protobuf =
   let protobuf_rules =
-    Dune.
-      [
-        target_rule
-          "narwhal.ml"
-          ~deps:Dune.[[S ":proto"; S "narwhal.proto"]]
-          ~action:
-            Dune.
-              [
-                S "run";
-                S "protoc";
-                S "-I";
-                S ".";
-                S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
-                S "%{proto}";
-              ];
-        target_rule
-          "exporter.ml"
-          ~deps:Dune.[[S ":proto"; S "exporter.proto"]]
-          ~action:
-            Dune.
-              [
-                S "run";
-                S "protoc";
-                S "-I";
-                S ".";
-                S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
-                S "%{proto}";
-              ];
-      ]
+    Dune.[protobuf_rule "narwhal"; protobuf_rule "exporter"]
   in
   octez_evm_node_lib
     "evm_node_sequencer_protobuf"

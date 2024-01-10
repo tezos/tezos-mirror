@@ -13,9 +13,7 @@
  (deps (:proto narwhal.proto))
  (action
   (run
-   protoc
-   -I
-   .
+   protoc -I .
    "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
    %{proto})))
 
@@ -24,8 +22,6 @@
  (deps (:proto exporter.proto))
  (action
   (run
-   protoc
-   -I
-   .
+   protoc -I .
    "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
    %{proto})))
