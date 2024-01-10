@@ -818,6 +818,12 @@ pub mod tests {
         assert!(check(csreg::mideleg, 0x0) == 0x0);
         assert!(check(csreg::mideleg, 0xFFFF_0000_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
 
+        // mtvec / stvec field
+        assert!(check(csreg::mtvec, 0x0) == 0x0);
+        assert!(check(csreg::mtvec, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFD);
+        assert!(check(csreg::stvec, 0x0) == 0x0);
+        assert!(check(csreg::stvec, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFD);
+
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
     }
