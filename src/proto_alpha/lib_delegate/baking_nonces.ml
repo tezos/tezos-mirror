@@ -119,7 +119,8 @@ let get_block_level_opt cctxt ~chain ~block =
 
 let get_outdated_nonces {cctxt; constants; chain; _} nonces =
   let open Lwt_result_syntax in
-  let {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} =
+  let {Constants.parametric = {blocks_per_cycle; consensus_rights_delay; _}; _}
+      =
     constants
   in
   let*! current_level = get_block_level_opt cctxt ~chain ~block:(`Head 0) in
@@ -129,9 +130,10 @@ let get_outdated_nonces {cctxt; constants; chain; _} nonces =
       return (empty, empty)
   | Some current_level ->
       let current_cycle = Int32.(div current_level blocks_per_cycle) in
-      let is_older_than_preserved_cycles block_level =
+      let is_older_than_consensus_rights_delay block_level =
         let block_cycle = Int32.(div block_level blocks_per_cycle) in
-        Int32.sub current_cycle block_cycle > Int32.of_int preserved_cycles
+        Int32.sub current_cycle block_cycle
+        > Int32.of_int consensus_rights_delay
       in
       Block_hash.Map.fold
         (fun hash nonce acc ->
@@ -141,7 +143,7 @@ let get_outdated_nonces {cctxt; constants; chain; _} nonces =
           in
           match level with
           | Some level ->
-              if is_older_than_preserved_cycles level then
+              if is_older_than_consensus_rights_delay level then
                 return (orphans, add outdated hash nonce)
               else acc
           | None -> return (add orphans hash nonce, outdated))

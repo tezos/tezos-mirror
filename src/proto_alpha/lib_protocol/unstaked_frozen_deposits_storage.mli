@@ -32,7 +32,7 @@
     - when a delegator changes delegate.
     The amounts are attached to a given cycle, the cycle at which the unstake
     happened, and are slashable for another
-    [preserved_cycles + max_slashing_period - 1] cycles. After this, they can be
+    [consensus_rights_delay + max_slashing_period - 1] cycles. After this, they can be
     finalized either with the "finalize_unstake" pseudo-operation, via
     auto-staking (for bakers only), or when staking or unstaking.
 

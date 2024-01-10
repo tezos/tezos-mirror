@@ -255,7 +255,7 @@ let constants_mainnet =
        chosen not too exceed 100 000 000 bytes. *)
     cache_script_size = 100_000_000;
     (* A cache for the stake distribution for all cycles stored at any
-       moment: preserved_cycles + max_slashing_period + 1 = 8 currently. *)
+       moment: consensus_rights_delay + max_slashing_period + 1 = 8 currently. *)
     cache_stake_distribution_cycles = 8;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;

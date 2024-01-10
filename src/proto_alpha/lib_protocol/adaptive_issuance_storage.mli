@@ -36,7 +36,7 @@ val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_stored_rewards_at_cycle_end ctxt ~new_cycle] updates
     {!Storage.Issuance_coeff} with a new coefficient that will be applied
-    [preserved_cycles] cycles after the given [new_cycle]. This new coefficient
+    [consensus_rights_delay] cycles after the given [new_cycle]. This new coefficient
     depends on the current {!Storage.Total_supply}, and the total active stake
     for when this coefficient is computed.
 
@@ -72,7 +72,7 @@ module For_RPC : sig
       from the storage.
 
       Fails if the given cycle is not between [current_cycle] and
-      [current_cycle + preserved_cycles].
+      [current_cycle + consensus_rights_delay].
 
       If adaptive issuance has not been activated,
       then this function returns [Q.one].
@@ -84,7 +84,7 @@ module For_RPC : sig
       from the storage. If [cycle] is [None], returns 0.
 
       Returns 0 if the given cycle is not between [current_cycle] and
-      [current_cycle + preserved_cycles].
+      [current_cycle + consensus_rights_delay].
 
       If adaptive issuance has not been activated,
       then this function returns 0.

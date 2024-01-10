@@ -123,8 +123,8 @@ let purge_nonces_and_get_unrevealed ctxt ~cycle =
 let compute_randao ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Level_storage.current ctxt).cycle in
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  let cycle_computed = Cycle_repr.add current_cycle (preserved + 1) in
+  let delay = Constants_storage.consensus_rights_delay ctxt in
+  let cycle_computed = Cycle_repr.add current_cycle (delay + 1) in
   let*! seed_computed = Storage.Seed.For_cycle.mem ctxt cycle_computed in
   (* Check if seed has already been computed, and not in cycle 0. *)
   match Cycle_repr.(pred current_cycle, pred cycle_computed) with
@@ -160,9 +160,9 @@ let get_seed_computation_status ctxt =
     let* status = Storage.Seed.get_status ctxt in
     match status with
     | RANDAO_seed ->
-        let preserved = Constants_storage.preserved_cycles ctxt in
-        let cycle_computed = Cycle_repr.add current_cycle (preserved + 1) in
-        let previous_cycle = Cycle_repr.add current_cycle preserved in
+        let delay = Constants_storage.consensus_rights_delay ctxt in
+        let cycle_computed = Cycle_repr.add current_cycle (delay + 1) in
+        let previous_cycle = Cycle_repr.add current_cycle delay in
         let* seed_discriminant =
           Storage.Seed.For_cycle.get ctxt previous_cycle
         in
@@ -207,8 +207,8 @@ let update_seed ctxt vdf_solution =
   (* compute and update seed and change seed status from RANDAO to
      VDF *)
   let current_cycle = (Level_storage.current ctxt).cycle in
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  let cycle_computed = Cycle_repr.add current_cycle (preserved + 1) in
+  let delay = Constants_storage.consensus_rights_delay ctxt in
+  let cycle_computed = Cycle_repr.add current_cycle (delay + 1) in
   let* seed_challenge = Storage.Seed.For_cycle.get ctxt cycle_computed in
   let new_seed = Seed_repr.vdf_to_seed seed_challenge vdf_solution in
   Storage.Seed.For_cycle.update ctxt cycle_computed new_seed Seed_repr.VDF_seed
@@ -217,13 +217,13 @@ let raw_for_cycle = Storage.Seed.For_cycle.get
 
 let for_cycle ctxt cycle =
   let open Lwt_result_syntax in
-  let preserved = Constants_storage.preserved_cycles ctxt in
+  let delay = Constants_storage.consensus_rights_delay ctxt in
   let max_slashing_period = Constants_repr.max_slashing_period in
   let current_cycle = (Level_storage.current ctxt).cycle in
   let latest =
     if Cycle_repr.(current_cycle = root) then
-      Cycle_repr.add current_cycle (preserved + 1)
-    else Cycle_repr.add current_cycle preserved
+      Cycle_repr.add current_cycle (delay + 1)
+    else Cycle_repr.add current_cycle delay
   in
   let oldest =
     match Cycle_repr.sub current_cycle (max_slashing_period - 1) with
@@ -239,7 +239,7 @@ let for_cycle ctxt cycle =
 
 let init ?initial_seed ctxt =
   let open Lwt_result_syntax in
-  let preserved = Constants_storage.preserved_cycles ctxt in
+  let delay = Constants_storage.consensus_rights_delay ctxt in
   let* ctxt = Storage.Seed_status.init ctxt Seed_repr.RANDAO_seed in
   let+ (_ : int), ctxt =
     List.fold_left_es
@@ -248,7 +248,7 @@ let init ?initial_seed ctxt =
         let+ ctxt = Storage.Seed.For_cycle.init ctxt cycle seed in
         (c + 1, ctxt))
       (0, ctxt)
-      (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
+      (Seed_repr.initial_seeds ?initial_seed (delay + 2))
   in
   ctxt
 

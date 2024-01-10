@@ -104,7 +104,7 @@ let pp ppf {delegate; consensus_pkh} =
       No two delegates use the same active consensus key at a given time.
 
    To ensure that, {!Storage.Consensus_keys} contains keys that will be active
-   at cycle `current + preserved_cycles + 1`.
+   at cycle `current + consensus_rights_delay + 1`.
 *)
 
 let check_unused ctxt pkh =

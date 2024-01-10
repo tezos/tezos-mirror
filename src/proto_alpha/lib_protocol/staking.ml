@@ -31,7 +31,7 @@ let () =
   let description =
     "A contract tries to stake to its delegate while having unstake requests \
      to a previous delegate that cannot be finalized yet. Try again in a later \
-     cycle (no more than preserved_cycles + max_slashing_period)."
+     cycle (no more than consensus_rights_delay + max_slashing_period)."
   in
   register_error_kind
     `Permanent

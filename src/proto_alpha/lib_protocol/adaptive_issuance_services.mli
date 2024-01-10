@@ -58,7 +58,7 @@ val launch_cycle :
   'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
 
 (** Returns the list of expected issued tez for the current cycle and for the next
-    [preserved_cycles] cycles. *)
+    [consensus_rights_delay] cycles. *)
 val expected_issuance :
   'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
 
