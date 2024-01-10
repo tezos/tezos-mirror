@@ -313,7 +313,7 @@ pub fn process(
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
                 successes: report_value.successes + 1,
-                failures: report_value.failures,
+                ..*report_value
             };
         });
     } else {
@@ -328,8 +328,8 @@ pub fn process(
         }
         report_map.entry(report_key).and_modify(|report_value| {
             *report_value = ReportValue {
-                successes: report_value.successes,
                 failures: report_value.failures + 1,
+                ..*report_value
             };
         });
     }

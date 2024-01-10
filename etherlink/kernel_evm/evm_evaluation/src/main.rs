@@ -35,6 +35,7 @@ pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
 pub struct ReportValue {
     pub successes: u16,
     pub failures: u16,
+    pub skipped: u16,
 }
 
 #[derive(Debug, StructOpt)]
@@ -86,20 +87,28 @@ fn generate_final_report(
 ) {
     let mut successes_total = 0;
     let mut failure_total = 0;
-    let mut final_report: HashMap<&str, Vec<(String, u16, u16)>> = HashMap::new();
+    let mut skipped_total = 0;
+    let mut final_report: HashMap<&str, Vec<(String, u16, u16, u16)>> = HashMap::new();
 
     for (key, report_value) in report_map {
         let insert_element = (
             key.to_string(),
             report_value.successes,
             report_value.failures,
+            report_value.skipped,
         );
         successes_total += report_value.successes;
         failure_total += report_value.failures;
+        skipped_total += report_value.skipped;
         if report_value.successes != 0 || report_value.failures != 0 {
             if report_value.failures == 0 {
+                let entry = if report_value.skipped == 0 {
+                    "Fully Successful Tests"
+                } else {
+                    "Fully Successful Unskipped Tests"
+                };
                 final_report
-                    .entry("Fully Successful Tests")
+                    .entry(entry)
                     .and_modify(|section_elems| {
                         section_elems.push(insert_element.clone())
                     })
@@ -221,11 +230,16 @@ fn generate_final_report(
 
     for (section, items) in final_report {
         writeln!(output_file, "\n••• {} •••\n", section).unwrap();
-        for (key, successes, failures) in items {
+        for (key, successes, failures, skipped) in items {
+            let skipped_msg = if skipped == 0 {
+                String::new()
+            } else {
+                format!(" with {} test(s) skipped", skipped)
+            };
             writeln!(
                 output_file,
-                "For sub-dir {}, there was(were) {} success(es) and {} failure(s).",
-                key, successes, failures
+                "For sub-dir {}, there was(were) {} success(es) and {} failure(s){}.",
+                key, successes, failures, skipped_msg
             )
             .unwrap();
         }
@@ -233,8 +247,8 @@ fn generate_final_report(
 
     writeln!(
         output_file,
-        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}",
-        successes_total, failure_total
+        "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}\nSKIPPED IN TOTAL: {}",
+        successes_total, failure_total, skipped_total
     )
     .unwrap();
 }
@@ -291,7 +305,15 @@ pub fn main() {
             writeln!(output_file, "---------- Test: {:?} ----------", test_file).unwrap();
         }
 
-        let mut skip_msg = || {
+        let mut process_skip = || {
+            report_map
+                .entry(report_key.to_owned())
+                .and_modify(|report_value| {
+                    *report_value = ReportValue {
+                        skipped: report_value.skipped + 1,
+                        ..*report_value
+                    };
+                });
             if !opt.report_only {
                 writeln!(output_file, "\nSKIPPED\n").unwrap()
             }
@@ -301,7 +323,7 @@ pub fn main() {
             // Funky test with `bigint 0x00` value in json not possible to happen on
             // Mainnet and require custom json parser.
             if test_file.file_name() == Some(OsStr::new("ValueOverflow.json")) {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -318,26 +340,26 @@ pub fn main() {
                 || test_file.file_name()
                     == Some(OsStr::new("201503110226PYTHON_DUP6.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
             // The following test(s) is/are failing they need in depth debugging
             // Reason: memory allocation of X bytes failed | 73289 IOT instruction (core dumped)
             if test_file.file_name() == Some(OsStr::new("sha3.json")) {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
             // Long tests ✔ (passing)
             if test_file.file_name() == Some(OsStr::new("loopMul.json")) {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
             // Oddly long checks on a test that do no relevant check (passing)
             if test_file.file_name() == Some(OsStr::new("intrinsic.json")) {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -347,14 +369,14 @@ pub fn main() {
                     == Some(OsStr::new("static_Call50000_ecrec.json"))
                 || test_file.file_name() == Some(OsStr::new("static_Call50000.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
             // Reason: panicked at 'attempt to add with overflow'
             if let Some(file_name) = test_file.to_str() {
                 if file_name.contains("DiffPlaces.json") {
-                    skip_msg();
+                    process_skip();
                     continue;
                 }
             }
@@ -367,7 +389,7 @@ pub fn main() {
                 || test_file.file_name()
                     == Some(OsStr::new("static_Call1024PreCalls3.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -377,7 +399,7 @@ pub fn main() {
                     == Some(OsStr::new("static_Call1024PreCalls2.json"))
                 || test_file.file_name() == Some(OsStr::new("diffPlaces.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -398,7 +420,7 @@ pub fn main() {
                 || test_file.file_name()
                     == Some(OsStr::new("CreateAndGasInsideCreate.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -407,7 +429,7 @@ pub fn main() {
             if test_file.file_name()
                 == Some(OsStr::new("ZeroValue_SUICIDE_ToOneStorageKey.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -420,7 +442,7 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("OverflowGasRequire2.json"))
                 || test_file.file_name() == Some(OsStr::new("StackDepthLimitSEC.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -431,7 +453,7 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("clearReturnBuffer.json"))
                 || test_file.file_name() == Some(OsStr::new("gasCost.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
 
@@ -480,7 +502,7 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("callNonConst.json"))
                 || test_file.file_name() == Some(OsStr::new("twoOps.json"))
             {
-                skip_msg();
+                process_skip();
                 continue;
             }
         }
