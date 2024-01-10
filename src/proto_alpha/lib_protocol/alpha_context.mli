@@ -965,6 +965,8 @@ module Constants : sig
 
   val delegate_parameters_activation_delay : context -> int
 
+  val issuance_modification_delay : context -> int
+
   val blocks_per_cycle : context -> int32
 
   val blocks_per_commitment : context -> int32

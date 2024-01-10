@@ -66,10 +66,9 @@ let check_determined_cycle ctxt cycle =
   let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
-    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    let cycles_delay = Constants_storage.issuance_modification_delay ctxt in
     fail_unless
-      Cycle_repr.(
-        ctxt_cycle <= cycle && cycle <= add ctxt_cycle preserved_cycles)
+      Cycle_repr.(ctxt_cycle <= cycle && cycle <= add ctxt_cycle cycles_delay)
       (Undetermined_issuance_coeff_for_cycle cycle)
   else return_unit
 
@@ -242,8 +241,10 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let reward_params =
       Constants_storage.adaptive_issuance_rewards_params ctxt
     in
-    let preserved = Constants_storage.preserved_cycles ctxt in
-    let for_cycle = Cycle_repr.add new_cycle preserved in
+    let modification_delay =
+      Constants_storage.issuance_modification_delay ctxt
+    in
+    let for_cycle = Cycle_repr.add new_cycle modification_delay in
     let before_for_cycle = Cycle_repr.pred for_cycle in
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
