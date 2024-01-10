@@ -3,14 +3,15 @@ include: .gitlab/ci/jobs/build/common.yml
 oc.docker:amd64:
   extends:
     - .oc.build_docker_release_template
+    - .tags_template__build
   stage: manual
+  variables:
+    IMAGE_ARCH_PREFIX: "amd64_"
+    CI_DOCKER_HUB: "false"
+    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+    DOCKER_BUILD_TARGET: "with-evm-artifacts"
   needs: []
   # override the rules inherited from .oc.build_docker_release_template:
   rules:
   - when: manual
-  variables:
-    DOCKER_BUILD_TARGET: "with-evm-artifacts"
-    IMAGE_ARCH_PREFIX: "amd64_"
-    CI_DOCKER_HUB: "false"
-    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
   allow_failure: true
