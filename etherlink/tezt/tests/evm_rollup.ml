@@ -4164,6 +4164,70 @@ let test_reboot_out_of_ticks =
        which implies there have been no reboot, contrary to what was expected." ;
   unit
 
+let test_l2_timestamp_opcode =
+  let test ~protocol:_ ~evm_setup =
+    let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
+    let endpoint = Evm_node.endpoint evm_node in
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let* timestamp_address, _tx =
+      deploy ~contract:timestamp ~sender evm_setup
+    in
+
+    let* set_timestamp_tx =
+      let call_create =
+        Eth_cli.contract_send
+          ~source_private_key:sender.private_key
+          ~endpoint
+          ~abi_label:timestamp.label
+          ~address:timestamp_address
+          ~method_call:(Printf.sprintf "setTimestamp()")
+      in
+      wait_for_application
+        ~evm_node
+        ~sc_rollup_node
+        ~node
+        ~client
+        call_create
+        ()
+    in
+
+    let* saved_timestamp =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:timestamp.label
+        ~address:timestamp_address
+        ~method_call:(Printf.sprintf "getSavedTimestamp()")
+        ()
+    in
+    let saved_timestamp = Int64.of_string (String.trim saved_timestamp) in
+
+    (* This call being done after saving the timestamp, it should be higher. *)
+    let* simulated_timestamp =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:timestamp.label
+        ~address:timestamp_address
+        ~method_call:(Printf.sprintf "getTimestamp()")
+        ()
+    in
+    let simulated_timestamp =
+      Int64.of_string (String.trim simulated_timestamp)
+    in
+
+    let* () = check_tx_succeeded ~endpoint ~tx:set_timestamp_tx in
+    Check.(
+      (saved_timestamp < simulated_timestamp)
+        int64
+        ~error_msg:
+          "Simulated timestamp (%R) should be higher than the one saved from a \
+           previous block (%L)") ;
+    unit
+  in
+  register_both
+    ~tags:["evm"; "timestamp"; "opcode"]
+    ~title:"Check L2 opcode timestamp"
+    test
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4236,7 +4300,8 @@ let register_evm_node ~protocols =
   test_l2_ether_wallet protocols ;
   test_keep_alive protocols ;
   test_regression_block_hash_gen protocols ;
-  test_reboot_out_of_ticks protocols
+  test_reboot_out_of_ticks protocols ;
+  test_l2_timestamp_opcode protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
