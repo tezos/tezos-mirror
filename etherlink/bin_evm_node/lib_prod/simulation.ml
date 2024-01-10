@@ -127,13 +127,15 @@ let encode_tx tx =
 module Encodings = struct
   open Data_encoding
 
+  type insights = {result : bytes option; success : bool option}
+
   type eval_result = {
     state_hash : string;
     status : string;
     output : unit;
     inbox_level : unit;
     num_ticks : Z.t;
-    insights : bytes option list;
+    insights : insights;
         (** The simulation can ask to look at values on the state after
           the simulation. *)
   }
@@ -200,6 +202,25 @@ module Encodings = struct
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
 
+  let bool_as_bytes =
+    let bytes_to_bool b =
+      b |> Data_encoding.Binary.of_bytes Data_encoding.bool |> Result.to_option
+    in
+
+    let bool_to_bytes b =
+      b |> Data_encoding.Binary.to_bytes Data_encoding.bool |> Result.to_option
+    in
+    conv
+      (fun b -> Option.bind b bool_to_bytes)
+      (fun b -> Option.bind b bytes_to_bool)
+      (option bytes)
+
+  let insights =
+    conv
+      (fun {result; success} -> (result, success))
+      (fun (result, success) -> {result; success})
+      (tup2 (option bytes) bool_as_bytes)
+
   let eval_result =
     conv
       (fun {state_hash; status; output; inbox_level; num_ticks; insights} ->
@@ -228,7 +249,7 @@ module Encodings = struct
             ~description:"Ticks taken by the PVM for evaluating the messages")
          (req
             "insights"
-            (list (option bytes))
+            insights
             ~description:"PVM state values requested after the simulation")
 end
 
@@ -241,19 +262,23 @@ let parse_insights decode (r : Data_encoding.json) =
         "Couldn't parse insights: %s"
         (Data_encoding.Json.to_string r)
 
-let decode_call_result bytes =
-  match bytes with
-  | Some b :: _ ->
+let decode_call_result {Encodings.result; success} =
+  match (result, success) with
+  | Some b, _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Some (Hash (Hex v))
+      Some (Ok (Hash (Hex v)))
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6752
+     better propagate errors and reverts messages from kernel to help the
+     user debug their call *)
+  | None, Some false -> Some (Error ())
   | _ -> None
 
 let call_result json = parse_insights decode_call_result json
 
-let decode_gas_estimation bytes =
-  match bytes with
-  | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> Option.some
-  | _ -> None
+let decode_gas_estimation {Encodings.result; _} =
+  match result with
+  | Some b -> b |> Bytes.to_string |> Z.of_bits |> Option.some
+  | None -> None
 
 let gas_estimation json =
   let open Lwt_result_syntax in
@@ -268,13 +293,10 @@ let gas_estimation json =
   let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
   return (quantity_of_z simulated_amount)
 
-let decode_is_valid bytes =
-  match bytes with
-  | [Some b; Some payload] ->
-      let is_valid =
-        b |> Data_encoding.Binary.of_bytes_exn Data_encoding.bool
-      in
-      if is_valid then
+let decode_is_valid {Encodings.result; success} =
+  match (result, success) with
+  | Some payload, Some success ->
+      if success then
         let address = Ethereum_types.decode_address payload in
         Some (Ok address)
       else

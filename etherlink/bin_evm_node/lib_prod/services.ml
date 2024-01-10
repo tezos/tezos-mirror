@@ -231,9 +231,20 @@ let dispatch_input (config : 'a Configuration.t)
               (Send_raw_transaction.Output
                  (Error {code = -32000; message = reason; data = None}))
         (* By default, the current dispatch handles the inputs *))
-    | Eth_call.Input (Some (call, _)) ->
+    | Eth_call.Input (Some (call, _)) -> (
         let* call_result = Rollup_node_rpc.simulate_call call in
-        return (Eth_call.Output (Ok call_result))
+        match call_result with
+        | Ok result -> return (Eth_call.Output (Ok result))
+        | Error () ->
+            return
+              (Eth_call.Output
+                 (Error
+                    JSONRPC.
+                      {
+                        code = -32000;
+                        message = "Call simulation failed";
+                        data = None;
+                      })))
     | Get_estimate_gas.Input (Some (call, _)) ->
         let* gas = Rollup_node_rpc.estimate_gas call in
         return (Get_estimate_gas.Output (Ok gas))
