@@ -164,7 +164,7 @@ let blockchain_network_ghostnet =
       ]
     ~default_bootstrap_peers:
       [
-        "ghostnet.teztnets.xyz";
+        "ghostnet.teztnets.com";
         "ghostnet.tzinit.org";
         "ghostnet.tzboot.net";
         "ghostnet.boot.ecadinfra.com";

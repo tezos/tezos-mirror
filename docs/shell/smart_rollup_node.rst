@@ -23,14 +23,14 @@ Prerequisites
 -------------
 
 To experiment with the commands described in this section, we use
-the `Dailynet <https://teztnets.xyz/dailynet-about>`_.
+the `Dailynet <https://teztnets.com/dailynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
 implicit account on Dailynet owned by the reader.
 
 Notice that you need a specific development version of Octez to
 participate to Dailynet. This version is either available from
 docker images or can be compiled from sources. Please refer to the
-`Dailynet <https://teztnets.xyz/dailynet-about>`_ website
+`Dailynet <https://teztnets.com/dailynet-about>`_ website
 for installation details.
 
 An Octez rollup node needs an Octez node to run. We assume that
@@ -42,7 +42,7 @@ an Octez node has been launched locally, typically by issuing:
    octez-node run --data-dir "${ONODE_DIR}" --network "${NETWORK}" --rpc-addr 127.0.0.1
 
 in a terminal where ``${NETWORK}`` is of the
-form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
+form ``https://teztnets.com/dailynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store, by default ``~/.tezos-node``.
 
 The commands will only work when the node is completely boostrapped, and therefore the current protocol on the target network is activated.

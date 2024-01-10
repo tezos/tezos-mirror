@@ -284,7 +284,7 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     This variant of {!wait_for_sync} should not be used in sandboxes, as it has
     been witnessed time and time again that these tests are more subject to
     race conditions when setting up rollup infrastructure. On open testnets
-    like mondaynet and dailynet, this does not happen because of the large
+    like weeklynet and dailynet, this does not happen because of the large
     block time. *)
 val unsafe_wait_sync : ?path_client:string -> ?timeout:float -> t -> int Lwt.t
 

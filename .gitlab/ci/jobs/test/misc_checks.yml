@@ -9,6 +9,7 @@ misc_checks:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
     - ./scripts/ci/take_ownership.sh
     - ./scripts/ci/lint_misc_check.sh
@@ -22,8 +23,6 @@ kaitai_checks:
   needs: [trigger]
   needs:
     - "build_x86_64-released"
-  before_script:
-    - . ./scripts/version.sh
   script:
     - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
 
