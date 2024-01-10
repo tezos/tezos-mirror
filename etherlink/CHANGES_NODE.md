@@ -19,4 +19,7 @@ Currently supported kernel version: 32f957d52ace920916d54b9f02a2d32ee30e16b3
 
 ### Breaking changes
 
+- The node no longer show the RPC requests by default, you need to specify the
+  `--verbose` flag to log the inputs and outputs of RPC. (!11475)
+
 ### Internal

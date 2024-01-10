@@ -33,7 +33,6 @@ type sequencer = {
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
-  debug : bool;
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
@@ -69,7 +68,6 @@ module Cli : sig
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
-    ?debug:bool ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
@@ -83,7 +81,6 @@ module Cli : sig
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
-    ?debug:bool ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
@@ -100,7 +97,6 @@ module Cli : sig
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
-    ?debug:bool ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
@@ -115,7 +111,6 @@ module Cli : sig
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?private_rpc_port:int ->
-    ?debug:bool ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->

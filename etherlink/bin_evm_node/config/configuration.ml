@@ -24,7 +24,6 @@ type sequencer = {
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
-  debug : bool;
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
@@ -50,7 +49,6 @@ let default default_mode =
   {
     rpc_addr = default_rpc_addr;
     rpc_port = default_rpc_port;
-    debug = true;
     devmode = false;
     cors_origins = [];
     cors_headers = [];
@@ -142,7 +140,6 @@ let encoding ~default_mode mode_encoding =
     (fun {
            rpc_addr;
            rpc_port;
-           debug;
            devmode;
            cors_origins;
            cors_headers;
@@ -150,28 +147,25 @@ let encoding ~default_mode mode_encoding =
            log_filter;
            mode;
          } ->
-      ( ( rpc_addr,
-          rpc_port,
-          debug,
-          devmode,
-          cors_origins,
-          cors_headers,
-          verbose,
-          log_filter ),
+      ( rpc_addr,
+        rpc_port,
+        devmode,
+        cors_origins,
+        cors_headers,
+        verbose,
+        log_filter,
         mode ))
-    (fun ( ( rpc_addr,
-             rpc_port,
-             debug,
-             devmode,
-             cors_origins,
-             cors_headers,
-             verbose,
-             log_filter ),
+    (fun ( rpc_addr,
+           rpc_port,
+           devmode,
+           cors_origins,
+           cors_headers,
+           verbose,
+           log_filter,
            mode ) ->
       {
         rpc_addr;
         rpc_port;
-        debug;
         devmode;
         cors_origins;
         cors_headers;
@@ -179,17 +173,15 @@ let encoding ~default_mode mode_encoding =
         log_filter;
         mode;
       })
-    (merge_objs
-       (obj8
-          (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-          (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-          (dft "debug" bool default.debug)
-          (dft "devmode" bool default.devmode)
-          (dft "cors_origins" (list string) default.cors_origins)
-          (dft "cors_headers" (list string) default.cors_headers)
-          (dft "verbose" bool default.verbose)
-          (dft "log_filter" log_filter_config_encoding default_filter_config))
-       (obj1 (dft "mode" mode_encoding default_mode)))
+    ((obj8
+        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+        (dft "devmode" bool default.devmode)
+        (dft "cors_origins" (list string) default.cors_origins)
+        (dft "cors_headers" (list string) default.cors_headers)
+        (dft "verbose" bool default.verbose)
+        (dft "log_filter" log_filter_config_encoding default_filter_config))
+       (dft "mode" mode_encoding default_mode))
 
 let save ~force ~data_dir encoding config =
   let open Lwt_result_syntax in
@@ -227,13 +219,12 @@ let load_sequencer ~data_dir =
   load ~data_dir encoding
 
 module Cli = struct
-  let create ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
+  let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?log_filter ~verbose ~mode () =
     let default = default mode in
     {
       rpc_addr = Option.value ~default:default.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default.rpc_port rpc_port;
-      debug = Option.value ~default:default.debug debug;
       devmode;
       cors_origins = Option.value ~default:default.cors_origins cors_origins;
       cors_headers = Option.value ~default:default.cors_headers cors_headers;
@@ -242,20 +233,19 @@ module Cli = struct
       mode;
     }
 
-  let create_proxy ~devmode ?rpc_addr ?rpc_port ?debug ?cors_origins
-      ?cors_headers ?log_filter ~verbose ~rollup_node_endpoint =
+  let create_proxy ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+      ?log_filter ~verbose ~rollup_node_endpoint =
     create
       ~devmode
       ?rpc_addr
       ?rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
       ~verbose
       ~mode:{rollup_node_endpoint}
 
-  let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port ?debug
+  let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ~verbose ?rollup_node_endpoint
       ?kernel ?preimages ?time_between_blocks =
     let mode =
@@ -280,19 +270,17 @@ module Cli = struct
       ~devmode
       ?rpc_addr
       ?rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
       ~verbose
       ~mode
 
-  let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?debug
-      ?cors_origins ?cors_headers ?log_filter ~verbose ~mode configuration =
+  let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
+      ?cors_headers ?log_filter ~verbose ~mode configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-      debug = Option.value ~default:configuration.debug debug;
       devmode;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
@@ -303,7 +291,7 @@ module Cli = struct
       mode;
     }
 
-  let patch_proxy_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?debug
+  let patch_proxy_configuration_from_args ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ~verbose ?rollup_node_endpoint
       configuration =
     let mode =
@@ -315,7 +303,6 @@ module Cli = struct
       ~devmode
       ?rpc_addr
       ?rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
@@ -324,8 +311,8 @@ module Cli = struct
       configuration
 
   let patch_sequencer_configuration_from_args ?private_rpc_port ~devmode
-      ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers ?log_filter
-      ~verbose ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks
+      ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?log_filter ~verbose
+      ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks
       configuration =
     let mode =
       {
@@ -349,7 +336,6 @@ module Cli = struct
       ~devmode
       ?rpc_addr
       ?rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
@@ -358,8 +344,8 @@ module Cli = struct
       configuration
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?private_rpc_port ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
-      ~load ~patch_configuration_from_args ~create () =
+      ?private_rpc_port ?cors_origins ?cors_headers ?log_filter ~verbose ~load
+      ~patch_configuration_from_args ~create () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -386,7 +372,6 @@ module Cli = struct
           ~devmode
           ?rpc_addr
           ?rpc_port
-          ?debug
           ?cors_origins
           ?cors_headers
           ?log_filter
@@ -401,7 +386,6 @@ module Cli = struct
           ~devmode
           ?rpc_addr
           ?rpc_port
-          ?debug
           ?cors_origins
           ?cors_headers
           ?log_filter
@@ -410,7 +394,7 @@ module Cli = struct
       in
       return config
 
-  let create_or_read_proxy_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?debug
+  let create_or_read_proxy_config ~data_dir ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ~verbose ~rollup_node_endpoint ()
       =
     create_or_read_config
@@ -418,7 +402,6 @@ module Cli = struct
       ~devmode
       ?rpc_addr
       ?rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
@@ -430,7 +413,7 @@ module Cli = struct
       ()
 
   let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?private_rpc_port ?debug ?cors_origins ?cors_headers ?log_filter ~verbose
+      ?private_rpc_port ?cors_origins ?cors_headers ?log_filter ~verbose
       ?rollup_node_endpoint ?kernel ?preimages ?time_between_blocks () =
     create_or_read_config
       ~data_dir
@@ -438,7 +421,6 @@ module Cli = struct
       ?rpc_addr
       ?rpc_port
       ?private_rpc_port
-      ?debug
       ?cors_origins
       ?cors_headers
       ?log_filter
