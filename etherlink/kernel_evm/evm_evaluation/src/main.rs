@@ -403,6 +403,14 @@ pub fn main() {
                 continue;
             }
 
+            // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
+            if let Some(file_name) = test_file.to_str() {
+                if file_name.contains("chainId.json") {
+                    process_skip();
+                    continue;
+                }
+            }
+
             // SKIPPED BECAUSE OF WRONG PARSING OF FILLER FILES
 
             // ********** JSON ********** //
