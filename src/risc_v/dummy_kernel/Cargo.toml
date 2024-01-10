@@ -17,4 +17,5 @@ features = [
   "panic-hook",
   "data-encoding",
   "alloc",
+  "experimental-host-in-memory-store",
 ]

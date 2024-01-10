@@ -1,6 +1,6 @@
 use tezos_smart_rollup::{
     inbox::InboxMessage, kernel_entry, michelson::MichelsonUnit, prelude::*,
-    types::SmartRollupAddress,
+    storage::path::OwnedPath, types::SmartRollupAddress,
 };
 
 pub fn entry(host: &mut impl Runtime) {
@@ -21,6 +21,14 @@ pub fn entry(host: &mut impl Runtime) {
         debug_msg!(host, "{:#?}\n", msg);
     }
 
+    let path: OwnedPath = "/hello".as_bytes().to_vec().try_into().unwrap();
+    let () = host
+        .store_write(&path, msg.as_bytes(), 0)
+        .expect("Could not write to storage");
+    let read_msg = host
+        .store_read(&path, 0, msg.len())
+        .expect("Could not read from storage");
+    assert_eq!(read_msg.as_slice(), msg.as_bytes());
     panic!("Abort");
 }
 
