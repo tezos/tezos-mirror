@@ -1,0 +1,11 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# The build_arm64 jobs are split in two to keep the artifact size
+# under the 1GB hard limit set by GitLab.
+
+# 'oc.build_arm64-released' builds the released executables.
+oc.build_arm64-released:
+  extends:
+    - .oc.build_arm64
+  variables:
+    EXECUTABLE_FILES: "script-inputs/released-executables"
