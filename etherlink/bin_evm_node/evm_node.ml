@@ -194,8 +194,8 @@ let dev_private_directory config rollup_node_config =
   let open Evm_node_lib_dev in
   Services.private_directory config rollup_node_config
 
-let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
-    =
+let start {rpc_addr; rpc_port; cors_origins; cors_headers; verbose; _}
+    ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -220,7 +220,7 @@ let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
           ~host
           server
           ~callback:
-            (if debug then callback_log server
+            (if verbose then callback_log server
             else RPC_server.resto_callback server)
           node
       in
@@ -234,9 +234,9 @@ let seq_start
     {
       rpc_addr;
       rpc_port;
-      debug;
       cors_origins;
       cors_headers;
+      verbose;
       mode = {private_rpc_port; _};
       _;
     } ~directory ~private_directory =
@@ -272,7 +272,7 @@ let seq_start
           ~host
           server
           ~callback:
-            (if debug then callback_log server
+            (if verbose then callback_log server
             else RPC_server.resto_callback server)
           node
       in
@@ -281,7 +281,7 @@ let seq_start
           ~host:Ipaddr.V4.(to_string localhost)
           private_server
           ~callback:
-            (if debug then callback_log private_server
+            (if verbose then callback_log private_server
             else RPC_server.resto_callback private_server)
           private_node
       in
