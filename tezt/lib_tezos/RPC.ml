@@ -1039,18 +1039,11 @@ type smart_rollup_commitment = {
 }
 
 let smart_rollup_commitment_from_json json =
-  (* TODO https://gitlab.com/tezos/tezos/-/issues/6649
-     This function should fails when the json is null and
-     instead let the responsability to the caller to check
-     if the rpc should fail or not.
-  *)
-  if JSON.is_null json then None
-  else
-    let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
-    let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
-    let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
-    let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
-    Some {compressed_state; inbox_level; predecessor; number_of_ticks}
+  let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
+  let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
+  let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
+  let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
+  {compressed_state; inbox_level; predecessor; number_of_ticks}
 
 let get_chain_block_context_smart_rollups_smart_rollup_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup ~hash () =

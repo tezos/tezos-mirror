@@ -152,9 +152,10 @@ let commitment_with_hash_from_json json =
   let hash, commitment_json =
     (JSON.get "hash" json, JSON.get "commitment" json)
   in
-  Option.map
-    (fun commitment -> {hash = JSON.as_string hash; commitment})
-    (RPC.smart_rollup_commitment_from_json commitment_json)
+  {
+    hash = JSON.as_string hash;
+    commitment = RPC.smart_rollup_commitment_from_json commitment_json;
+  }
 
 let commitment_info_from_json json =
   let hash, commitment_json, first_published_at_level, published_at_level =
@@ -163,16 +164,17 @@ let commitment_info_from_json json =
       JSON.get "first_published_at_level" json,
       JSON.get "published_at_level" json )
   in
-  Option.map
-    (fun commitment ->
+  {
+    commitment_and_hash =
       {
-        commitment_and_hash = {hash = JSON.as_string hash; commitment};
-        first_published_at_level =
-          first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-        published_at_level =
-          published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-      })
-    (RPC.smart_rollup_commitment_from_json commitment_json)
+        hash = JSON.as_string hash;
+        commitment = RPC.smart_rollup_commitment_from_json commitment_json;
+      };
+    first_published_at_level =
+      first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+    published_at_level =
+      published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+  }
 
 let get_global_last_stored_commitment () =
   make GET ["global"; "last_stored_commitment"] commitment_with_hash_from_json

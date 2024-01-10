@@ -341,16 +341,11 @@ let genesis_commitment ~sc_rollup tezos_client =
   let genesis_commitment_hash =
     JSON.(genesis_info |-> "commitment_hash" |> as_string)
   in
-  let* commitment_opt =
-    Client.RPC.call ~hooks tezos_client
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
-         ~sc_rollup
-         ~hash:genesis_commitment_hash
-         ()
-  in
-  match commitment_opt with
-  | None -> failwith "genesis commitment have been removed"
-  | Some commitment -> return commitment
+  Client.RPC.call ~hooks tezos_client
+  @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
+       ~sc_rollup
+       ~hash:genesis_commitment_hash
+       ()
 
 let call_rpc ~smart_rollup_node ~service =
   let open Runnable.Syntax in

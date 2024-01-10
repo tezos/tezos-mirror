@@ -118,24 +118,22 @@ type commitment_info = {
 (** [commitment_info_from_json] parses a commitment, its hash and
     the levels when the commitment was first published (if any) and included,
     from the JSON representation. *)
-val commitment_info_from_json : JSON.t -> commitment_info option
+val commitment_info_from_json : JSON.t -> commitment_info
 
 (** RPC: [GET global/last_stored_commitment] gets the last commitment with its hash
     stored by the rollup node.  *)
-val get_global_last_stored_commitment :
-  unit -> commitment_and_hash option RPC_core.t
+val get_global_last_stored_commitment : unit -> commitment_and_hash RPC_core.t
 
 (** RPC: [GET local/last_published_commitment] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published
     and the level it was included. *)
-val get_local_last_published_commitment :
-  unit -> commitment_info option RPC_core.t
+val get_local_last_published_commitment : unit -> commitment_info RPC_core.t
 
 (** RPC: [GET local/commitments] gets commitment by its [hash] from the rollup node,
     with its hash and level when the commitment was first published and the
     level it was included. *)
 val get_local_commitments :
-  commitment_hash:string -> unit -> commitment_info option RPC_core.t
+  commitment_hash:string -> unit -> commitment_info RPC_core.t
 
 type gc_info = {last_gc_level : int; first_available_level : int}
 

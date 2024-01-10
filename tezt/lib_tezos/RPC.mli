@@ -948,7 +948,7 @@ type smart_rollup_commitment = {
 
 (** [smart_rollup_commitment_from_json json] parses a commitment from
     its JSON representation. *)
-val smart_rollup_commitment_from_json : JSON.t -> smart_rollup_commitment option
+val smart_rollup_commitment_from_json : JSON.t -> smart_rollup_commitment
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/commitment/<hash>] *)
 val get_chain_block_context_smart_rollups_smart_rollup_commitment :
@@ -957,7 +957,7 @@ val get_chain_block_context_smart_rollups_smart_rollup_commitment :
   sc_rollup:string ->
   hash:string ->
   unit ->
-  smart_rollup_commitment option t
+  smart_rollup_commitment t
 
 (** RPC: [GET: chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<staker>/staked_on_commitment] *)
 val get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment :
