@@ -63,6 +63,14 @@ module Event = struct
       ~level:Notice
       ("exit_status", Data_encoding.int8)
 
+  let event_shutdown_tx_pool =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"evm_node_shutting_down_tx_pool"
+      ~msg:"Stopping the tx-pool"
+      ~level:Notice
+      ()
+
   let event_shutdown_rpc_server ~private_ =
     let server = if private_ then "private" else "public" in
     Internal_event.Simple.declare_0
@@ -72,13 +80,15 @@ module Event = struct
       ~level:Notice
       ()
 
-  let event_shutdown_tx_pool =
-    Internal_event.Simple.declare_0
+  let event_callback_log =
+    Internal_event.Simple.declare_3
       ~section
-      ~name:"evm_node_shutting_down_tx_pool"
-      ~msg:"Stopping the tx-pool"
+      ~name:"evm_node_callback_log"
+      ~msg:"Uri: {uri}\nMethod: {method}\nBody: {body}\n"
       ~level:Notice
-      ()
+      ("uri", Data_encoding.string)
+      ("method", Data_encoding.string)
+      ("body", Data_encoding.string)
 end
 
 let emit = Internal_event.Simple.emit
@@ -127,7 +137,7 @@ let install_finalizer_dev server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  emit Event.event_shutdown_tx_pool ()
+  Evm_node_lib_dev.Tx_pool_events.shutdown ()
 
 let install_finalizer_seq server private_server =
   let open Lwt_syntax in
@@ -138,7 +148,7 @@ let install_finalizer_seq server private_server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:true) () in
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  emit Event.event_shutdown_tx_pool ()
+  Evm_node_lib_dev.Tx_pool_events.shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -146,7 +156,7 @@ let callback_log server conn req body =
   let uri = req |> Request.uri |> Uri.to_string in
   let meth = req |> Request.meth |> Code.string_of_method in
   let* body_str = body |> Cohttp_lwt.Body.to_string in
-  Format.printf "Uri: %s\nMethod: %s\nBody: %s\n%!" uri meth body_str ;
+  let* () = emit Event.event_callback_log (uri, meth, body_str) in
   Tezos_rpc_http_server.RPC_server.resto_callback
     server
     conn
