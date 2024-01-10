@@ -969,6 +969,15 @@ let block_hash_gen =
     bin = kernel_inputs_path ^ "/block_hash_gen.bin";
   }
 
+(** The info for the "timestamp.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/timestamp.sol] *)
+let timestamp =
+  {
+    label = "timestamp";
+    abi = kernel_inputs_path ^ "/timestamp.abi";
+    bin = kernel_inputs_path ^ "/timestamp.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
