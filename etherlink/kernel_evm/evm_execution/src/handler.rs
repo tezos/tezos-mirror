@@ -2824,4 +2824,67 @@ mod test {
             result,
         )
     }
+
+    #[test]
+    fn prevent_collision_create2_selfdestruct() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
+        let config = Config::shanghai();
+
+        let caller_address: [u8; 20] =
+            hex::decode("a94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let caller = H160::from(caller_address);
+        let target_address: [u8; 20] =
+            hex::decode("ec2c6832d00680ece8ff9254f81fdab0a5a2ac50")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let target_address = H160::from(target_address);
+
+        let transaction_context =
+            TransactionContext::new(caller, target_address, U256::zero());
+
+        // { (CALL 50000 0xec2c6832d00680ece8ff9254f81fdab0a5a2ac50 0 0 0 0 0) (MSTORE 0 0x6460016001556000526005601bf3) (CREATE2 0 18 14 0) }
+        let input = hex::decode("6000600060006000600073e2b35478fdd26477cc576dd906e6277761246a3c61c350f1506000600060006000f500").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        // { (SELFDESTRUCT 0x10) }
+        let code = hex::decode("6010ff").unwrap();
+
+        set_code(&mut handler, &target_address, code);
+        set_balance(&mut handler, &caller, U256::from(1000000000000000000u64));
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_call(target_address, None, input, transaction_context);
+
+        // This assertion will change with the upcoming Dencun config/fork
+        // See: https://eips.ethereum.org/EIPS/eip-6780
+        assert_eq!(
+            Ok((ExitReason::Succeed(ExitSucceed::Suicided), None, vec![],)),
+            result,
+        );
+
+        let code = handler.code(target_address);
+        let balance = handler.balance(target_address);
+
+        assert_eq!(code, vec![]);
+        assert_eq!(balance, U256::zero());
+    }
 }
