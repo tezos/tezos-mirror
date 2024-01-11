@@ -4132,8 +4132,8 @@ let canonicalize_path path =
 (* Compute and print a Tezt TSL expression representing the set of tests
    to run after [changed_files] changed.
    [changed_files] is supposed to only contain files, not directories. *)
-let list_tests_to_run_after_changes ~(tezt_exe_deps : target list)
-    (changed_files : string list) =
+let list_tests_to_run_after_changes ~(tezt_exe : target)
+    ~(tezt_exe_deps : target list) (changed_files : string list) =
   (* Verbose mode can be activated for debugging this function
      by setting the MANIFEZT_DEBUG environment variable to "true". *)
   let debug = Sys.getenv_opt "MANIFEZT_DEBUG" = Some "true" in
@@ -4353,10 +4353,27 @@ let list_tests_to_run_after_changes ~(tezt_exe_deps : target list)
       Fun.flip List.iter modules @@ fun module_name ->
       let test_file = path // (module_name ^ ".ml") in
       test_files := String_set.add test_file !test_files) ) ;
+  (* If a test in [tezt/tests] changes, it needs to be run.
+     The above analysis does not detect this because tezt/tests/main.exe is not a
+     [tezt_target], it has the special status of "the executable that gathers all tests".
+     Note that if a file in [tezt/tests] changes, it could be a helper for other tests,
+     so if one wants a safe overapproximation one needs to run all tests.
+     But it would mean that changing any file in [tezt/tests] would cause all tests to run,
+     which is unnecessary in most cases. The current implementation is thus a heuristic
+     where we assume that most files in [tezt/tests] are not helpers but files that register
+     tests. In other words, helpers should be put in [tezt/lib_tezos]. *)
+  (match tezt_exe with
+  | None -> failwith "make_tezt_exe returned no target"
+  | Some target -> (
+      match Target.get_internal target with
+      | None -> failwith "make_tezt_exe did not return an internal target"
+      | Some {path; _} ->
+          (* Filter [changed_files] to keep those that are in [path].
+             Add them to the list of files for which to run tests. *)
+          Fun.flip List.iter changed_files @@ fun file ->
+          if Filename.dirname file = path then
+            test_files := String_set.add file !test_files)) ;
   (* TODO:
-     - if a test in tezt/tests changes, it needs to be run
-       (in theory, all tests should be run, since there may be helpers modules
-       in tezt/tests too; but maybe it is fine, as a heuristic, to avoid that)
      - supports non-executable ~uses:
        - if a target that is not an executable changed, still try to find a matching tag?
        - if changed_files contains something that matches the path of a tag,
@@ -4390,12 +4407,12 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
   try
-    register_tezt_targets ~make_tezt_exe ;
+    let tezt_exe = register_tezt_targets ~make_tezt_exe in
     precheck () ;
     (match manifezt with
     | None -> ()
     | Some changes ->
-        list_tests_to_run_after_changes ~tezt_exe_deps changes ;
+        list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
         exit 0) ;
     Target.can_register := false ;
     generate_dune_files () ;
