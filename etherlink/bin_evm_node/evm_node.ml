@@ -435,6 +435,56 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
+let blueprint_mode_arg =
+  Tezos_clic.switch
+    ~long:"as-blueprint"
+    ~doc:"Chunk the data into a blueprint usable in sequencer mode"
+    ()
+
+let timestamp_arg =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  parameter (fun _ timestamp ->
+      let timestamp = String.trim timestamp in
+      match Time.Protocol.of_notation timestamp with
+      | Some t -> return t
+      | None -> (
+          match
+            Int64.of_string_opt timestamp |> Option.map Time.Protocol.of_seconds
+          with
+          | Some t -> return t
+          | None ->
+              failwith
+                "Timestamp must be either in RFC3399 format  (e.g., \
+                 [\"1970-01-01T00:00:00Z\"]) or in number of seconds since the \
+                 {!Time.Protocol.epoch}."))
+  |> Tezos_clic.default_arg
+       ~long:"timestamp"
+       ~doc:""
+       ~placeholder:"1970-01-01T00:00:00Z"
+       ~default:"0"
+
+let blueprint_number_arg =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  parameter (fun _ number ->
+      try String.trim number |> Z.of_string |> return
+      with _ -> failwith "Blueprint number must be an integer")
+  |> default_arg
+       ~long:"number"
+       ~doc:"Level of the blueprint"
+       ~placeholder:"0"
+       ~default:"0"
+
+let secret_key_arg =
+  let open Tezos_clic in
+  Params.secret_key
+  |> default_arg
+       ~long:"Secret ley"
+       ~doc:"Secret key to sign the blueprints"
+       ~placeholder:"<secret-key>"
+       ~default:"edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz"
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -689,9 +739,22 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args2 devmode_arg rollup_address_arg)
+    (args6
+       devmode_arg
+       rollup_address_arg
+       blueprint_mode_arg
+       timestamp_arg
+       blueprint_mode_arg
+       secret_key_arg)
     (prefixes ["chunk"; "data"] @@ data_parameter @@ stop)
-    (fun (devmode, rollup_address) data () ->
+    (fun ( devmode,
+           rollup_address,
+           _as_blueprint,
+           _blueprint_timestamp,
+           _blueprint_number,
+           _secret_key )
+         data
+         () ->
       let print_chunks smart_rollup_address s =
         let* messages =
           if devmode then make_dev_messages ~smart_rollup_address s
