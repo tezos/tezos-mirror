@@ -9,6 +9,13 @@ include:
   - .gitlab/ci/jobs/build/oc.build_kernels.yml
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
+  # These jobs may not have been run in before_merging pipeline
+  # because of absence of certain changes
+  - .gitlab/ci/jobs/build/ocaml-check.yml
+  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
+  - .gitlab/ci/jobs/build/build_get_contracts.yml
+  - .gitlab/ci/jobs/doc/documentation:build_all.yml
+
   # Stage: packaging
   - .gitlab/ci/jobs/packaging/opam:prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
@@ -17,6 +24,18 @@ include:
   - .gitlab/ci/jobs/test/install_octez.yml
   # Flaky tezts
   - .gitlab/ci/jobs/test/tezt_flaky.yml
+  # Tests that may not have been run in before_merging pipeline
+  # because of absence of certain changes
+  - .gitlab/ci/jobs/test/misc_checks.yml
+  - .gitlab/ci/jobs/test/misc_opam_checks.yml
+  - .gitlab/ci/jobs/test/oc.semgrep.yml
+  - .gitlab/ci/jobs/test/oc.unit.yml
+  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
+  - .gitlab/ci/jobs/test/oc.script.yml
+  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
+  - .gitlab/ci/jobs/test/tezt.yml
+  - .gitlab/ci/jobs/test/tezt:build-long.yml
+  - .gitlab/ci/jobs/test/test_kernels.yml
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
