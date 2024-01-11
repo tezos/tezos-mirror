@@ -8731,25 +8731,25 @@ let () =
   (* [make_tezt_exe] makes the global executable that contains all tests.
      [generate] gives it the list of libraries that register Tezt tests
      so that it can link all of them. *)
+  let tezt_exe_deps =
+    [
+      octez_test_helpers |> open_;
+      tezt_wrapper |> open_ |> open_ ~m:"Base";
+      str;
+      bls12_381;
+      tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+      tezt_ethereum |> open_;
+      tezt_risc_v_sandbox;
+      tezt_tx_kernel;
+      data_encoding;
+      octez_base;
+      octez_base_unix;
+      octez_stdlib_unix;
+      Protocol.(main alpha);
+      octez_scoru_wasm_regressions;
+    ]
+  in
   let make_tezt_exe test_libs =
-    let deps =
-      [
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        str;
-        bls12_381;
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_ethereum |> open_;
-        tezt_risc_v_sandbox;
-        tezt_tx_kernel;
-        data_encoding;
-        octez_base;
-        octez_base_unix;
-        octez_stdlib_unix;
-        Protocol.(main alpha);
-        octez_scoru_wasm_regressions;
-      ]
-    in
     test
       "main"
       ~with_macos_security_framework:true
@@ -8759,10 +8759,11 @@ let () =
            Tezt worker processes are collected. *)
       ~bisect_ppx:With_sigterm
       ~opam:""
-      ~deps:(deps @ test_libs)
+      ~deps:(tezt_exe_deps @ test_libs)
   in
   generate
     ~make_tezt_exe
+    ~tezt_exe_deps
     ~default_profile:"octez-deps"
     ~add_to_meta_package:
       [
