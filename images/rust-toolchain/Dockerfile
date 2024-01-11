@@ -61,6 +61,10 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73
     && rust-std-1.73.0-riscv64gc-unknown-hermit/install.sh \
     && rm -r rust-std-1.73.0-riscv64gc-unknown-hermit rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz
 
+# Install Taplo
+RUN cargo +stable install taplo-cli --version 0.8.1 && \
+    taplo --version
+
 # install wabt: https://packages.debian.org/source/sid/wabt
 # hadolint ignore=DL3008
 RUN apt-get update \
