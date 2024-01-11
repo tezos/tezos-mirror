@@ -204,7 +204,7 @@ mod benchmarks {
         input: &Vec<u8>,
     ) {
         unsafe {
-            START_PRECOMPILE_SECTION_MSG[33..53].copy_from_slice(&address.as_bytes());
+            START_PRECOMPILE_SECTION_MSG[33..53].copy_from_slice(address.as_bytes());
             START_PRECOMPILE_SECTION_MSG[53..57]
                 .copy_from_slice(&input.len().to_be_bytes());
             host.write_debug(core::str::from_utf8_unchecked(
