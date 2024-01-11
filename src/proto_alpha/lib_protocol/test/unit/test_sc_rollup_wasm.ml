@@ -89,37 +89,6 @@ end
 module Full_Wasm =
   Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
 
-let test_initial_state_hash_wasm_pvm () =
-  let open Alpha_context in
-  let open Lwt_result_syntax in
-  let empty = Sc_rollup_helpers.Wasm_pvm.make_empty_state () in
-  let*! state = Sc_rollup_helpers.Wasm_pvm.initial_state ~empty in
-  let*! hash = Sc_rollup_helpers.Wasm_pvm.state_hash state in
-  let expected = Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash in
-  if Sc_rollup.State_hash.(hash = expected) then return_unit
-  else
-    failwith
-      "incorrect hash, expected %a, got %a"
-      Sc_rollup.State_hash.pp
-      expected
-      Sc_rollup.State_hash.pp
-      hash
-
-let test_initial_state_hash_wasm_machine () =
-  let open Lwt_result_syntax in
-  let open Sc_rollup_machine_no_proofs in
-  let*! state = Wasm.initial_state ~empty:(empty_tree ()) in
-  let*! hash = Wasm.state_hash state in
-  let expected = Sc_rollup_wasm.V2_0_0.reference_initial_state_hash in
-  if Sc_rollup_repr.State_hash.(hash = expected) then return_unit
-  else
-    failwith
-      "incorrect hash, expected %a, got %a"
-      Sc_rollup_repr.State_hash.pp
-      expected
-      Sc_rollup_repr.State_hash.pp
-      hash
-
 let test_metadata_size () =
   let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in
   let metadata =
@@ -443,14 +412,6 @@ let test_reveal_host_function_can_request_dal_pages () =
 
 let tests =
   [
-    Tztest.tztest
-      "initial state hash for Wasm"
-      `Quick
-      test_initial_state_hash_wasm_pvm;
-    Tztest.tztest
-      "initial state hash for Wasm machine"
-      `Quick
-      test_initial_state_hash_wasm_machine;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
     Tztest.tztest "output proofs" `Quick test_output;

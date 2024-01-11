@@ -551,22 +551,6 @@ let test_invalid_outbox_level () =
   ]
   |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
 
-let test_initial_state_hash_arith_pvm () =
-  let open Alpha_context in
-  let open Lwt_result_syntax in
-  let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
-  let*! state = Sc_rollup_helpers.Arith_pvm.initial_state ~empty in
-  let*! hash = Sc_rollup_helpers.Arith_pvm.state_hash state in
-  let expected = Sc_rollup.ArithPVM.reference_initial_state_hash in
-  if Sc_rollup.State_hash.(hash = expected) then return_unit
-  else
-    failwith
-      "incorrect hash, expected %a, got %a"
-      Sc_rollup.State_hash.pp
-      expected
-      Sc_rollup.State_hash.pp
-      hash
-
 let dummy_internal_transfer address =
   let open Lwt_result_wrap_syntax in
   let open Alpha_context.Sc_rollup in
@@ -780,10 +764,6 @@ let tests =
     Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
     Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
     Tztest.tztest "Invalid outbox level" `Quick test_invalid_outbox_level;
-    Tztest.tztest
-      "Initial state hash for Arith"
-      `Quick
-      test_initial_state_hash_arith_pvm;
     Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
     Tztest.tztest
       "Reveal below threshold"

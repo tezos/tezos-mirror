@@ -2579,13 +2579,6 @@ module Sc_rollup = struct
         ~output:Sc_rollup.Kind.encoding
         RPC_path.(path_sc_rollup / "kind")
 
-    let initial_pvm_state_hash =
-      RPC_service.get_service
-        ~description:"Initial PVM state hash of smart rollup"
-        ~query:RPC_query.empty
-        ~output:Sc_rollup.State_hash.encoding
-        RPC_path.(path_sc_rollup / "initial_pvm_state_hash")
-
     let genesis_info =
       RPC_service.get_service
         ~description:
@@ -2818,19 +2811,6 @@ module Sc_rollup = struct
     let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
     Some kind
 
-  let register_initial_pvm_state_hash () =
-    let open Lwt_result_syntax in
-    Registration.opt_register1 ~chunked:true S.initial_pvm_state_hash
-    @@ fun ctxt address () () ->
-    let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
-    match kind with
-    | Sc_rollup.Kind.Example_arith ->
-        Some Sc_rollup.ArithPVM.reference_initial_state_hash
-    | Sc_rollup.Kind.Wasm_2_0_0 ->
-        Some Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash
-    | Sc_rollup.Kind.Riscv ->
-        Some Sc_rollup.Riscv_PVM.reference_initial_state_hash
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_genesis_info () =
     let open Lwt_result_syntax in
@@ -3022,7 +3002,6 @@ module Sc_rollup = struct
     register_timeout () ;
     register_timeout_reached () ;
     register_can_be_cemented () ;
-    register_initial_pvm_state_hash () ;
     register_ticket_balance ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
@@ -3105,15 +3084,6 @@ module Sc_rollup = struct
       sc_rollup_address
       staker1
       staker2
-      ()
-      ()
-
-  let initial_pvm_state_hash ctxt block sc_rollup_address =
-    RPC_context.make_call1
-      S.initial_pvm_state_hash
-      ctxt
-      block
-      sc_rollup_address
       ()
       ()
 

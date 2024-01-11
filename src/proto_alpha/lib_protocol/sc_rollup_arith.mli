@@ -159,12 +159,6 @@ module Protocol_implementation :
      and type state = Context.tree
      and type proof = Context.Proof.tree Context.Proof.t
 
-(** This is the state hash of reference that both the prover of the
-    node and the verifier of the protocol {!Protocol_implementation}
-    have to agree on (if they do, it means they are using the same
-    tree structure). *)
-val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
-
 module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
   S
     with type context = Context.Tree.t

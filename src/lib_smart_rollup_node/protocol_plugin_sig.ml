@@ -223,10 +223,6 @@ end
 
 (** Protocol specific functions for processing L1 blocks. *)
 module type L1_PROCESSING = sig
-  (** Ensure that the initial state hash of the PVM as defined by the rollup
-      node matches the one of the PVM on the L1 node.  *)
-  val check_pvm_initial_state_hash : _ Node_context.t -> unit tzresult Lwt.t
-
   (** React to L1 operations included in a block of the chain. When
       [catching_up] is true, the process block is in the past and the
       failure condition of the process differs (e.g. if it detects a

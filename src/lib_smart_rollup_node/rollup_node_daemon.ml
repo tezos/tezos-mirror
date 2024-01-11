@@ -726,7 +726,6 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       current_protocol
       configuration
   in
-  let* () = Plugin.L1_processing.check_pvm_initial_state_hash node_ctxt in
   let dir = Rpc_directory.directory node_ctxt in
   let* rpc_server = Rpc_server.start configuration dir in
   let state = {node_ctxt; rpc_server; configuration; plugin} in

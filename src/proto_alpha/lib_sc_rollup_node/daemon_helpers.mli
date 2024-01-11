@@ -25,10 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Ensure that the initial state hash of the PVM as defined by the rollup node
-    matches the one of the PVM on the L1 node.  *)
-val check_pvm_initial_state_hash : _ Node_context.t -> unit tzresult Lwt.t
-
 (** React to L1 operations included in a block of the chain. *)
 val process_l1_block_operations :
   catching_up:bool -> Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
