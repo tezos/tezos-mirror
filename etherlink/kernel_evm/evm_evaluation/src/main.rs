@@ -393,13 +393,6 @@ pub fn main() {
         };
 
         if SKIP_ANY {
-            // Funky test with `bigint 0x00` value in json not possible to happen on
-            // Mainnet and require custom json parser.
-            if test_file.file_name() == Some(OsStr::new("ValueOverflow.json")) {
-                process_skip();
-                continue;
-            }
-
             // The following test(s) is/are failing they need in depth debugging
             // Reason: panicked at 'arithmetic operation overflow'
             if test_file.file_name() == Some(OsStr::new("HighGasPrice.json"))
@@ -499,6 +492,7 @@ pub fn main() {
             // byte array containing between (0; 32] bytes
             if test_file.file_name()
                 == Some(OsStr::new("ZeroValue_SUICIDE_ToOneStorageKey.json"))
+                || test_file.file_name() == Some(OsStr::new("ValueOverflow.json"))
             {
                 process_skip();
                 continue;
