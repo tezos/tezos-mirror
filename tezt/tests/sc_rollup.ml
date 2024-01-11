@@ -195,6 +195,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ~uses:(fun protocol -> Constant.octez_smart_rollup_node :: uses protocol)
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
+  let riscv_pvm_enable = kind = "riscv" in
   let* tezos_node, tezos_client =
     setup_l1
       ?rpc_local
@@ -202,6 +203,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?challenge_window
       ?timeout
       ?whitelist_enable
+      ~riscv_pvm_enable
       protocol
   in
   let operator =

@@ -107,6 +107,7 @@ val setup_l1 :
   ?timeout:int ->
   ?whitelist_enable:bool ->
   ?rpc_local:bool ->
+  ?riscv_pvm_enable:bool ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
