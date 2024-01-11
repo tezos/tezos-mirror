@@ -253,7 +253,9 @@ let setup_l1_contracts ~admin client =
 type kernel_installee = {base_installee : string; installee : string}
 
 type setup_mode =
-  | Setup_sequencer of {time_between_blocks : float option}
+  | Setup_sequencer of {
+      time_between_blocks : Evm_node.time_between_blocks option;
+    }
   | Setup_proxy of {devmode : bool}
 
 let setup_evm_kernel ?config ?kernel_installee

@@ -16,17 +16,21 @@ type log_filter_config = {
 
 type proxy = {rollup_node_endpoint : Uri.t}
 
+type time_between_blocks =
+  | Nothing  (** Does not produce any block if not forced by the private RPC *)
+  | Time_between_blocks of float
+      (** Maximum time interval between blocks. If transactions are present
+          in the tx pool, blocks will be created as soon as possible. However,
+          if there are no transactions to include, a block is produced after
+           [time_between_blocks]. *)
+
 type sequencer = {
   rollup_node_endpoint : Uri.t;
       (** Rollup node endpoint used to make blueprints available and
           monitor the delayed inbox. *)
   kernel : string;  (** Path to the kernel to execute. *)
   preimages : string;  (** Path to the preimages directory. *)
-  time_between_blocks : float;
-      (** Maximum time interval between blocks. If transactions are present
-          in the tx pool, blocks will be created as soon as possible. However,
-          if there are no transactions to include, a block is produced after
-          [time_between_blocks]. *)
+  time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
   private_rpc_port : int;  (** Port for internal RPC services *)
 }
 
@@ -88,7 +92,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?kernel:string ->
     ?preimages:string ->
-    ?time_between_blocks:float ->
+    ?time_between_blocks:time_between_blocks ->
     unit ->
     sequencer t
 
@@ -118,7 +122,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?kernel:string ->
     ?preimages:string ->
-    ?time_between_blocks:float ->
+    ?time_between_blocks:time_between_blocks ->
     unit ->
     sequencer t tzresult Lwt.t
 end

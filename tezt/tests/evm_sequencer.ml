@@ -200,7 +200,7 @@ let test_publish_blueprints =
     ~uses
   @@ fun protocol ->
   let* {evm_node; node; client; sc_rollup_node; _} =
-    setup_sequencer ~time_between_blocks:10000. protocol
+    setup_sequencer ~time_between_blocks:Nothing protocol
   in
   let* _ =
     repeat 5 (fun () ->
@@ -340,7 +340,7 @@ let test_rpc_produceBlock =
   @@ fun protocol ->
   (* Set a large [time_between_blocks] to make sure the block production is
      triggered by the RPC call. *)
-  let* {evm_node; _} = setup_sequencer ~time_between_blocks:10000. protocol in
+  let* {evm_node; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
   let*@ start_block_number = Rpc.block_number evm_node in
   let* _ = Rpc.produce_block evm_node in
   let*@ new_block_number = Rpc.block_number evm_node in

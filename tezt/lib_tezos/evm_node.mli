@@ -28,6 +28,12 @@
 (** EVM node server state. *)
 type t
 
+type time_between_blocks =
+  | Nothing  (** Does not produce any block if not forced by the private RPC *)
+  | Time_between_blocks of float
+      (** Interval at which the sequencer creates an empty block by
+          default. *)
+
 (** EVM node mode. *)
 type mode =
   | Sequencer of {
@@ -35,9 +41,9 @@ type mode =
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
       private_rpc_port : int;  (** Port for private RPC server*)
-      time_between_blocks : float option;
-          (** Interval at which the sequencer creates an empty block by
-              default. *)
+      time_between_blocks : time_between_blocks option;
+          (** See {!time_between_blocks}, if the value is not
+              provided, the sequencer uses it default value. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

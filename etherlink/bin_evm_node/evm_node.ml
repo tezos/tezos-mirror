@@ -304,8 +304,13 @@ module Params = struct
         let list = String.split ',' s in
         Lwt.return_ok list)
 
-  let float =
-    Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Float.of_string s))
+  let time_between_blocks =
+    Tezos_clic.parameter (fun _ s ->
+        let time_between_blocks =
+          if s = "none" then Nothing
+          else Time_between_blocks (Float.of_string s)
+        in
+        Lwt.return_ok time_between_blocks)
 end
 
 let rpc_addr_arg =
@@ -420,7 +425,7 @@ let time_between_blocks_arg =
     ~long:"time-between-blocks"
     ~doc:"Interval at which the sequencer creates an empty block by default."
     ~placeholder:"10."
-    Params.float
+    Params.time_between_blocks
 
 let keep_alive_arg =
   Tezos_clic.switch
@@ -516,8 +521,11 @@ let main_sequencer : sequencer Configuration.t -> unit tzresult Lwt.t =
     let now = Helpers.now () in
     (* We force if the last produced block is older than [time_between_blocks]. *)
     let force =
-      let diff = Time.Protocol.(diff now last_produced_block) in
-      diff >= Int64.of_float time_between_blocks
+      match time_between_blocks with
+      | Nothing -> false
+      | Time_between_blocks time_between_blocks ->
+          let diff = Time.Protocol.(diff now last_produced_block) in
+          diff >= Int64.of_float time_between_blocks
     in
     let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
     let*! () = Lwt_unix.sleep 0.5 in

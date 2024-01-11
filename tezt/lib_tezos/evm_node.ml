@@ -25,12 +25,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type time_between_blocks = Nothing | Time_between_blocks of float
+
 type mode =
   | Sequencer of {
       kernel : string;
       preimage_dir : string;
       private_rpc_port : int;
-      time_between_blocks : float option;
+      time_between_blocks : time_between_blocks option;
     }
   | Proxy of {devmode : bool}
 
@@ -163,7 +165,9 @@ let run_args evm_node =
         ]
         @ Cli_arg.optional_arg
             "time-between-blocks"
-            (Format.sprintf "%.3f")
+            (function
+              | Nothing -> "none"
+              | Time_between_blocks f -> Format.sprintf "%.3f" f)
             time_between_blocks
   in
   mode_args @ shared_args
