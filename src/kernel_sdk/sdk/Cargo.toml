@@ -62,7 +62,9 @@ optional = true
 [target.'cfg(target_os = "hermit")'.dependencies.hermit]
 # TODO: remove pin once patched version of hermit is published
 git = "https://github.com/hermit-os/hermit-rs.git"
-version = "0.7.2"
+# This is the latest revision we can use at the moment. The 'hermit' crate
+# introduces breaking changes that require Rust 1.74+.
+rev = "01df75880c9be03fe935c3faabd191082d8916a2"
 default-features = false
 
 [features]

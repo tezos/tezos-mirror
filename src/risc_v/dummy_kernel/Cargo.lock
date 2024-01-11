@@ -393,7 +393,7 @@ dependencies = [
 [[package]]
 name = "hermit"
 version = "0.7.2"
-source = "git+https://github.com/hermit-os/hermit-rs.git#d207a82a0a0580cfa51dcc1924cfacc8d303a28d"
+source = "git+https://github.com/hermit-os/hermit-rs.git?rev=01df75880c9be03fe935c3faabd191082d8916a2#01df75880c9be03fe935c3faabd191082d8916a2"
 dependencies = [
  "flate2",
  "tar",
