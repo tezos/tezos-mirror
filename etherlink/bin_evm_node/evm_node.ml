@@ -721,14 +721,27 @@ let make_prod_messages ~smart_rollup_address s =
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
-let make_dev_messages ~smart_rollup_address s =
+let make_dev_messages ~kind ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let s = Ethereum_types.hex_of_string s in
-  let*? _, messages =
-    Transaction_format.make_encoded_messages
-      ~smart_rollup_address
-      (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
+  let*? messages =
+    match kind with
+    | `Blueprint (secret_key, timestamp, number) ->
+        Sequencer_blueprint.create
+          ~secret_key
+          ~timestamp
+          ~smart_rollup_address
+          ~number:(Ethereum_types.quantity_of_z number)
+          ~transactions:
+            [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
+        |> List.map (fun (`External s) -> s)
+        |> Result.ok
+    | `Transaction ->
+        Transaction_format.make_encoded_messages
+          ~smart_rollup_address
+          (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
+        |> Result.map snd
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
@@ -744,20 +757,25 @@ let chunker_command =
        rollup_address_arg
        blueprint_mode_arg
        timestamp_arg
-       blueprint_mode_arg
+       blueprint_number_arg
        secret_key_arg)
     (prefixes ["chunk"; "data"] @@ data_parameter @@ stop)
     (fun ( devmode,
            rollup_address,
-           _as_blueprint,
-           _blueprint_timestamp,
-           _blueprint_number,
-           _secret_key )
+           as_blueprint,
+           blueprint_timestamp,
+           blueprint_number,
+           secret_key )
          data
          () ->
+      let kind =
+        if as_blueprint then
+          `Blueprint (secret_key, blueprint_timestamp, blueprint_number)
+        else `Transaction
+      in
       let print_chunks smart_rollup_address s =
         let* messages =
-          if devmode then make_dev_messages ~smart_rollup_address s
+          if devmode then make_dev_messages ~kind ~smart_rollup_address s
           else make_prod_messages ~smart_rollup_address s
         in
         Format.printf "Chunked transactions :\n%!" ;
