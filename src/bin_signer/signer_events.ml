@@ -77,7 +77,7 @@ module Handler = struct
   let signing_data_failure =
     declare_2
       ~section
-      ~level
+      ~level:Error
       ~name:"signing_data_failure"
       ~msg:"Failed to sign data for key {key}: {failure}"
       ("key", Data_encoding.string)
@@ -142,7 +142,7 @@ module Handler = struct
   let request_for_public_key =
     declare_1
       ~section
-      ~level
+      ~level:Error
       ~name:"request_for_public_key"
       ~msg:"request for public key {key}"
       ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
