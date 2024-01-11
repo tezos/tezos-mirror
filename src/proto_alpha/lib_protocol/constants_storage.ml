@@ -212,6 +212,10 @@ let sc_rollup_private_enable c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.private_enable
 
+let sc_rollup_riscv_pvm_enable c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.riscv_pvm_enable
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots

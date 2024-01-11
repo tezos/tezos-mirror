@@ -2031,10 +2031,17 @@ module Manager = struct
       Fees.Storage_limit_too_high
 
   let assert_pvm_kind_enabled vi kind =
+    let open Result_syntax in
+    let* () =
+      error_when
+        ((not (Constants.sc_rollup_arith_pvm_enable vi.ctxt))
+        && Sc_rollup.Kind.(equal kind Example_arith))
+        Sc_rollup_arith_pvm_disabled
+    in
     error_when
-      ((not (Constants.sc_rollup_arith_pvm_enable vi.ctxt))
-      && Sc_rollup.Kind.(equal kind Example_arith))
-      Sc_rollup_arith_pvm_disabled
+      ((not (Constants.sc_rollup_riscv_pvm_enable vi.ctxt))
+      && Sc_rollup.Kind.(equal kind Riscv))
+      Sc_rollup_riscv_pvm_disabled
 
   let assert_not_zero_messages messages =
     match messages with

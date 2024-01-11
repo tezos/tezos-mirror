@@ -1015,6 +1015,8 @@ module Constants : sig
 
   val sc_rollup_arith_pvm_enable : context -> bool
 
+  val sc_rollup_riscv_pvm_enable : context -> bool
+
   val dal_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
