@@ -655,19 +655,35 @@ let update_output_buffer pvm_state level =
     Wasm.Output_buffer.move_outbox_forward output_buffer
   else Wasm.Output_buffer.initialize_outbox output_buffer level
 
+let apply_migration version pvm_state =
+  match version with
+  | Wasm_pvm_state.V4 ->
+      {
+        pvm_state with
+        buffers =
+          {
+            pvm_state.buffers with
+            output = {pvm_state.buffers.output with validity_period = 241_920l};
+          };
+      }
+  | V0 | V1 | V2 | V3 -> pvm_state
+
 let set_input_step input_info message pvm_state =
   let open Lwt_syntax in
   let open Wasm_pvm_state in
   let {inbox_level; message_counter} = input_info in
   let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
-  let return ?(durable = pvm_state.durable) x = Lwt.return (durable, x) in
+  let return ?(pvm_state = pvm_state) ?(durable = pvm_state.durable) tick_state
+      =
+    Lwt.return {pvm_state with durable; tick_state}
+  in
   let return_stuck state_name =
     return
       (Stuck
          (Wasm_pvm_errors.invalid_state
          @@ Format.sprintf "No input required during %s" state_name))
   in
-  let next_tick_state () =
+  let next_pvm_state () =
     match pvm_state.tick_state with
     | Collect -> (
         let* () =
@@ -688,7 +704,10 @@ let set_input_step input_info message pvm_state =
                    Wasm_pvm_state.version_encoding
                    (version_for_protocol proto))
             in
-            return ~durable Collect
+            let pvm_state =
+              apply_migration (version_for_protocol proto) pvm_state
+            in
+            return ~pvm_state ~durable Collect
         | Internal Start_of_level ->
             update_output_buffer pvm_state raw_level ;
             return Collect
@@ -701,16 +720,14 @@ let set_input_step input_info message pvm_state =
     | Eval _ -> return_stuck "evaluation"
     | Padding -> return_stuck "padding"
   in
-  let+ durable, tick_state =
-    Lwt.catch next_tick_state (fun exn ->
+  let+ pvm_state =
+    Lwt.catch next_pvm_state (fun exn ->
         let+ tick_state = exn_to_stuck pvm_state exn in
-        (pvm_state.durable, tick_state))
+        {pvm_state with tick_state})
   in
   (* Increase the current tick counter and update last input *)
   {
     pvm_state with
-    durable;
-    tick_state;
     current_tick = Z.succ pvm_state.current_tick;
     last_input_info = Some input_info;
   }
