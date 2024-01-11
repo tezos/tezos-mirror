@@ -26,7 +26,7 @@
 
 (* Testing
    -------
-   Component:    Smart Contract Optimistic Rollups
+   Component:    Smart Optimistic Rollups
    Invocation:   dune exec tezt/long_tests/main.exe -- --file sc_rollup.ml
 *)
 
@@ -92,7 +92,6 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
-    @ [(["smart_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
