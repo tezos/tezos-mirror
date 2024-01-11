@@ -11,14 +11,15 @@ mod runner;
 use std::{
     collections::HashMap,
     ffi::OsStr,
-    fs::{File, OpenOptions},
+    fs::{read_to_string, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::helpers::construct_folder_path;
+use fillers::TestResult;
+use helpers::{construct_folder_path, OutputOptions};
 
 const SKIP_ANY: bool = true;
 
@@ -63,10 +64,11 @@ pub struct Opt {
     #[structopt(
         short = "o",
         long = "output",
-        default_value = "evm_evaluation.regression",
-        about = "Specify the file where the logs will be outputed. By default it will be outputed to 'evm_evaluation.regression'."
+        about = "Specify the file where the logs will be outputed. \
+                 By default it will be outputed to 'evm_evaluation.regression' \
+                 (evm_evaluation.result with --result and evm_evaluation.diff with --diff)."
     )]
-    output: String,
+    output: Option<String>,
     #[structopt(
         short = "r",
         long = "report-only",
@@ -79,6 +81,13 @@ pub struct Opt {
         about = "Overwrite the target file where the logs will be outputed."
     )]
     from_scratch: bool,
+    #[structopt(
+        long = "result",
+        about = "Dump the result of the evaluation to be used for later diff."
+    )]
+    result: bool,
+    #[structopt(long = "diff", about = "Compare result with a former evaluation.")]
+    diff: Option<String>,
 }
 
 fn generate_final_report(
@@ -253,20 +262,79 @@ fn generate_final_report(
     .unwrap();
 }
 
+fn load_former_result(path: &str) -> HashMap<String, (TestResult, Option<TestResult>)> {
+    let mut result_map: HashMap<String, (TestResult, Option<TestResult>)> =
+        HashMap::new();
+    for line in read_to_string(path).unwrap().lines() {
+        match fillers::parse_result(line) {
+            None => continue,
+            Some((full_name, result)) => {
+                result_map.insert(full_name, (result, None));
+            }
+        }
+    }
+    result_map
+}
+
+fn generate_diff(
+    output_file: &mut File,
+    diff_result_map: &HashMap<String, (TestResult, Option<TestResult>)>,
+) {
+    let mut empty = true;
+
+    for (test_case, (former_res, new_res)) in diff_result_map.iter() {
+        match new_res {
+            None => {
+                empty = false;
+                writeln!(output_file, "{}: UNPROCESSED", test_case).unwrap()
+            }
+            Some(result) if former_res != result => {
+                empty = false;
+                writeln!(
+                    output_file,
+                    "{}: {:?} -> {:?}",
+                    test_case, former_res, result
+                )
+                .unwrap()
+            }
+            _ => continue,
+        }
+    }
+
+    if empty {
+        writeln!(output_file, "None of the test evaluation was changed.").unwrap()
+    }
+}
+
 pub fn main() {
     let opt = Opt::from_args();
+    let diff = opt.diff.is_some();
+    let output_name = match (opt.output.as_ref(), opt.result, diff) {
+        (Some(name), _, _) => name,
+        (_, true, _) => "evm_evaluation.result",
+        (_, _, true) => "evm_evaluation.diff",
+        _ => "evm_evaluation.regression",
+    };
     let mut output_file = OpenOptions::new()
         .write(true)
-        .append(!opt.from_scratch)
+        .append(!(opt.from_scratch || opt.result || diff))
         .create(true)
-        .open(&opt.output)
+        .open(output_name)
         .unwrap();
     let folder_path =
         construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
     let test_files = find_all_json_tests(&folder_path);
     let mut report_map: HashMap<String, ReportValue> = HashMap::new();
+    let mut diff_result_map = opt.diff.as_ref().map(|p| load_former_result(p));
 
-    if !opt.report_only {
+    let output = OutputOptions {
+        summary: !(opt.result || diff),
+        log: !(opt.report_only || opt.result || diff),
+        result: opt.result,
+        diff,
+    };
+
+    if output.log {
         writeln!(
             output_file,
             "Start running tests on: {}",
@@ -295,16 +363,20 @@ pub fn main() {
                     report_key.to_owned(),
                     &opt,
                     &mut output_file,
+                    false,
+                    &mut diff_result_map,
+                    &output,
                 )
                 .unwrap();
             }
             continue;
         }
 
-        if !opt.report_only {
+        if output.log {
             writeln!(output_file, "---------- Test: {:?} ----------", test_file).unwrap();
         }
 
+        let mut skip = false;
         let mut process_skip = || {
             report_map
                 .entry(report_key.to_owned())
@@ -314,9 +386,10 @@ pub fn main() {
                         ..*report_value
                     };
                 });
-            if !opt.report_only {
+            if output.log {
                 writeln!(output_file, "\nSKIPPED\n").unwrap()
-            }
+            };
+            skip = true
         };
 
         if SKIP_ANY {
@@ -334,33 +407,28 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("randomStatetest7.json"))
                 || test_file.file_name() == Some(OsStr::new("randomStatetest50.json"))
                 || test_file.file_name() == Some(OsStr::new("randomStatetest468.json"))
-                || test_file.file_name() == Some(OsStr::new("gasCostBerlin.json"))
                 || test_file.file_name() == Some(OsStr::new("underflowTest.json"))
                 || test_file.file_name() == Some(OsStr::new("randomStatetest384.json"))
                 || test_file.file_name()
                     == Some(OsStr::new("201503110226PYTHON_DUP6.json"))
             {
                 process_skip();
-                continue;
             }
 
             // The following test(s) is/are failing they need in depth debugging
             // Reason: memory allocation of X bytes failed | 73289 IOT instruction (core dumped)
             if test_file.file_name() == Some(OsStr::new("sha3.json")) {
                 process_skip();
-                continue;
             }
 
             // Long tests ✔ (passing)
             if test_file.file_name() == Some(OsStr::new("loopMul.json")) {
                 process_skip();
-                continue;
             }
 
             // Oddly long checks on a test that do no relevant check (passing)
             if test_file.file_name() == Some(OsStr::new("intrinsic.json")) {
                 process_skip();
-                continue;
             }
 
             // Long tests ~ (outcome is unknown)
@@ -370,14 +438,12 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("static_Call50000.json"))
             {
                 process_skip();
-                continue;
             }
 
             // Reason: panicked at 'attempt to add with overflow'
             if let Some(file_name) = test_file.to_str() {
                 if file_name.contains("DiffPlaces.json") {
                     process_skip();
-                    continue;
                 }
             }
 
@@ -390,7 +456,6 @@ pub fn main() {
                     == Some(OsStr::new("static_Call1024PreCalls3.json"))
             {
                 process_skip();
-                continue;
             }
 
             // Reason: panicked at 'attempt to add with overflow'
@@ -400,14 +465,12 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("diffPlaces.json"))
             {
                 process_skip();
-                continue;
             }
 
             // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
             if let Some(file_name) = test_file.to_str() {
                 if file_name.contains("chainId.json") {
                     process_skip();
-                    continue;
                 }
             }
 
@@ -450,6 +513,13 @@ pub fn main() {
                 || test_file.file_name() == Some(OsStr::new("OverflowGasRequire2.json"))
                 || test_file.file_name() == Some(OsStr::new("StackDepthLimitSEC.json"))
             {
+                process_skip();
+                continue;
+            }
+
+            // The following test(s) is/are failing they need in depth debugging
+            // Reason: panicked at 'Invalid character 'N' at position 62'
+            if test_file.file_name() == Some(OsStr::new("gasCostBerlin.json")) {
                 process_skip();
                 continue;
             }
@@ -521,13 +591,22 @@ pub fn main() {
             report_key.to_owned(),
             &opt,
             &mut output_file,
+            skip,
+            &mut diff_result_map,
+            &output,
         )
         .unwrap();
     }
 
-    if !opt.report_only {
+    if output.log {
         writeln!(output_file, "@@@@@ END OF TESTING @@@@@\n").unwrap();
     }
 
-    generate_final_report(&mut output_file, &mut report_map)
+    if let Some(map) = diff_result_map {
+        generate_diff(&mut output_file, &map)
+    }
+
+    if output.summary {
+        generate_final_report(&mut output_file, &mut report_map);
+    }
 }

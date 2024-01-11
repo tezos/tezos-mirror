@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::evalhost::EvalHost;
-use crate::helpers::{parse_and_get_cmp, purify_network};
+use crate::helpers::{parse_and_get_cmp, purify_network, OutputOptions};
 use crate::models::spec::SpecId;
 use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
@@ -18,6 +18,13 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TestResult {
+    Skipped,
+    Success,
+    Failure,
+}
 
 fn check_filler_constraints(
     indexes: &FillerResultIndexes,
@@ -211,7 +218,7 @@ fn check_storage(
 fn check_durable_storage(
     host: &mut EvalHost,
     filler_expectation_result: &HashMap<String, AccountInfoFiller>,
-    good_state: &mut bool,
+    status: &mut TestResult,
 ) {
     for (account, info) in filler_expectation_result.iter() {
         let hex_address = if account.contains("0x") {
@@ -260,13 +267,34 @@ fn check_durable_storage(
         );
 
         if invalid_state {
+            *status = TestResult::Failure;
             // One invalid state will cause the entire test to be a failure.
-            *good_state = false;
             write_host!(host, "==> [INVALID STATE]\n");
         } else {
             write_host!(host, "==> [CORRECT STATE]\n");
         }
     }
+}
+
+pub fn parse_result(line: &str) -> Option<(String, TestResult)> {
+    match line.find(':') {
+        None => None,
+        Some(index) => {
+            let name = line[..index].to_string();
+            match &line[index + 2..] {
+                "Skipped" => Some((name, TestResult::Skipped)),
+                "Failure" => Some((name, TestResult::Failure)),
+                "Success" => Some((name, TestResult::Success)),
+                _ => None,
+            }
+        }
+    }
+}
+
+pub fn output_result(file: &mut File, name: &str, status: TestResult) {
+    // If the format of the following line is modified `parse_result` above
+    // should be readapted accordingly to avoid any inconsistency.
+    writeln!(file, "{}: {:?}", name, status).unwrap()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -279,9 +307,11 @@ pub fn process(
     output_file: &mut File,
     tx_label: Option<&String>,
     tx_index: i64,
-    report_only: bool,
+    output: &OutputOptions,
+    test_name: &str,
+    diff_result_map: &mut Option<HashMap<String, (TestResult, Option<TestResult>)>>,
 ) {
-    let mut good_state = true;
+    let mut status = TestResult::Success;
 
     for (name, fillers) in filler_source.0.into_iter() {
         write_host!(host, "Processing checks with filler: {}Filler\n", name);
@@ -296,41 +326,50 @@ pub fn process(
                     write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
                     write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
 
-                    check_durable_storage(
-                        host,
-                        &filler_expectation.result,
-                        &mut good_state,
-                    );
+                    check_durable_storage(host, &filler_expectation.result, &mut status);
                 }
             }
         }
     }
 
-    if good_state {
-        if !report_only {
-            writeln!(output_file, "\nFINAL RESULT: SUCCESS\n").unwrap();
+    let full_name = format!("{}_{}_{}", &report_key, test_name, tx_index);
+
+    match status {
+        TestResult::Success => {
+            report_map.entry(report_key).and_modify(|report_value| {
+                *report_value = ReportValue {
+                    successes: report_value.successes + 1,
+                    ..*report_value
+                };
+            });
         }
-        report_map.entry(report_key).and_modify(|report_value| {
-            *report_value = ReportValue {
-                successes: report_value.successes + 1,
-                ..*report_value
-            };
-        });
-    } else {
-        if !report_only {
-            write!(
-                output_file,
-                "{}",
-                String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
-            )
-            .unwrap();
-            writeln!(output_file, "FINAL RESULT: FAILURE\n").unwrap();
+        TestResult::Failure => {
+            if output.log {
+                write!(
+                    output_file,
+                    "{}",
+                    String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
+                )
+                .unwrap();
+            }
+            report_map.entry(report_key).and_modify(|report_value| {
+                *report_value = ReportValue {
+                    failures: report_value.failures + 1,
+                    ..*report_value
+                };
+            });
         }
-        report_map.entry(report_key).and_modify(|report_value| {
-            *report_value = ReportValue {
-                failures: report_value.failures + 1,
-                ..*report_value
-            };
-        });
+        _ => (),
+    }
+    if output.log {
+        writeln!(output_file, "\nFINAL RESULT: {:?}\n", status).unwrap();
+    }
+    if output.result {
+        output_result(output_file, &full_name, status);
+    }
+    if let Some(map) = diff_result_map {
+        if let Some((result, _)) = map.get(&full_name) {
+            map.insert(full_name, (*result, Some(status)));
+        }
     }
 }

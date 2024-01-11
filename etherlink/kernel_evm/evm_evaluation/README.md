@@ -6,7 +6,7 @@ Clone [ethereum/tests](https://github.com/ethereum/tests).
 
 Since Rust has a small minimum stack size, some tests will fail.
 To prevent that run the following command:
- 
+
 ```
 $ ulimit -s 20000
 ```
