@@ -1217,13 +1217,58 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              ("chain_id", `String "NetXaFDF7xZQCpR");
            ]
     in
+    (* Since adaptive rewards use [Q.t], the numerators and denominators should be co-primes. *)
+    let co_primed_adaptive_rewards : JSON.t =
+      let adaptive_rewards_succ =
+        JSON.(parametric_constants_succ |-> "adaptive_rewards_params")
+      in
+      if JSON.is_null adaptive_rewards_succ then
+        JSON.annotate ~origin:"no_adaptive_rewards" `Null
+      else
+        let simplify_field obj =
+          match JSON.as_object_opt obj with
+          | Some [("numerator", numerator); ("denominator", denominator)] ->
+              let numerator = JSON.as_int numerator in
+              let denominator = JSON.as_int denominator in
+              let Q.{num; den} = Q.(numerator // denominator) in
+              JSON.annotate ~origin:"simplify_field"
+              @@ `O
+                   [
+                     ("numerator", `String (Z.to_int num |> string_of_int));
+                     ("denominator", `String (Z.to_int den |> string_of_int));
+                   ]
+          | _ -> obj
+        in
+        let all_fields = JSON.as_object adaptive_rewards_succ in
+        let co_primed_adaptive_rewards_params =
+          JSON.annotate ~origin:"new_adaptive_rewards_params"
+          @@ `O
+               (List.map
+                  (fun (field_name, obj) ->
+                    (field_name, JSON.unannotate (simplify_field obj)))
+                  all_fields)
+        in
+        let new_adaptive_rewards_params =
+          JSON.merge_objects
+            adaptive_rewards_succ
+            co_primed_adaptive_rewards_params
+        in
+        JSON.annotate ~origin:"co_primed_adaptive_rewards"
+        @@ `O
+             [
+               ( "adaptive_rewards_params",
+                 JSON.unannotate new_adaptive_rewards_params );
+             ]
+    in
     return
       JSON.(
         merge_objects
           (merge_objects
-             (merge_objects parametric_constants_succ updated_dal_parametric)
-             constant_parametric_constants)
-          mockup_constants)
+             (merge_objects
+                (merge_objects parametric_constants_succ updated_dal_parametric)
+                constant_parametric_constants)
+             mockup_constants)
+          co_primed_adaptive_rewards)
   in
 
   let get_state_using_config_show_mockup ~protocol mockup_client =
