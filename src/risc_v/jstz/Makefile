@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-NATIVE_TARGET ?=
+NATIVE_TARGET ?= $(shell rustc -vV | grep 'host:' | awk '{print $$2}')
 ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
@@ -25,7 +25,7 @@ run:
 .PHONY: check
 check:
 	@cargo fmt --check
-	# TODO: Clippy! (currently doesn't work)
+	cargo clippy -- --deny warnings
 
 .PHONY: clean
 clean:

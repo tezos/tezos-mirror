@@ -6,9 +6,7 @@
 
 KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf jstz
 SDK_DIR=src/kernel_sdk
-RISC_V_SANDBOX_DIR=src/risc_v/sandbox
-RISC_V_INTERPRETER_DIR=src/risc_v/interpreter
-RISC_V_KERNELS_DIR=src/risc_v
+RISC_V_DIR=src/risc_v
 RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
 RISC_V_JSTZ_DIR=src/risc_v/jstz
 RISC_V_TESTS_DIR=src/risc_v/tests
@@ -29,12 +27,8 @@ kernel_sdk:
 
 .PHONY: risc-v-sandbox
 risc-v-sandbox:
-	@make -C $(RISC_V_SANDBOX_DIR) build
-	@ln -f $(RISC_V_SANDBOX_DIR)/target/$(NATIVE_TARGET)/release/risc-v-sandbox $@
-
-.PHONY: risc-v-interpreter
-risc-v-interpreter:
-	@make -C $(RISC_V_INTERPRETER_DIR) build
+	@make -C $(RISC_V_DIR) build-sandbox
+	@ln -f $(RISC_V_DIR)/target/$(NATIVE_TARGET)/release/risc-v-sandbox $@
 
 .PHONY: evm-execution
 evm-execution:
@@ -132,7 +126,7 @@ risc-v-tests:
 	@make -C ${RISC_V_TESTS_DIR} build
 
 .PHONY: build
-build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk risc-v-sandbox risc-v-interpreter risc-v-tests
+build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk risc-v-sandbox risc-v-tests
 
 .PHONY: clang-supports-wasm
 clang-supports-wasm:
@@ -148,11 +142,10 @@ build-dev-deps: clang-supports-wasm build-deps
 .PHONY: build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
-	@make -C ${RISC_V_SANDBOX_DIR} build-deps
 	@make -C ${EVM_DIR} build-deps
 	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
-	@make -C ${RISC_V_KERNELS_DIR} build-deps
+	@make -C ${RISC_V_DIR} build-deps
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
@@ -161,9 +154,7 @@ build-deps:
 .PHONY: test
 test:
 	@make -C ${SDK_DIR} test
-	@make -C ${RISC_V_SANDBOX_DIR} test
-	@make -C ${RISC_V_INTERPRETER_DIR} test
-	@make -C ${RISC_V_KERNELS_DIR} test
+	@make -C ${RISC_V_DIR} test
 	@make -C ${EVM_DIR} test
 	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
@@ -171,9 +162,7 @@ test:
 .PHONY: check
 check: build-dev-deps
 	@make -C ${SDK_DIR} check
-	@make -C ${RISC_V_SANDBOX_DIR} check
-	@make -C ${RISC_V_INTERPRETER_DIR} check
-	@make -C ${RISC_V_KERNELS_DIR} check
+	@make -C ${RISC_V_DIR} check
 	@make -C ${EVM_DIR} check
 	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
@@ -194,9 +183,7 @@ publish-sdk:
 clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
-	@make -C ${RISC_V_SANDBOX_DIR} clean
-	@make -C ${RISC_V_INTERPRETER_DIR} clean
-	@make -C ${RISC_V_KERNELS_DIR} clean
+	@make -C ${RISC_V_DIR} clean
 	@make -C ${EVM_DIR} clean
 	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean

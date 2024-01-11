@@ -12,6 +12,8 @@ pub struct InMemoryBackend<L> {
     _pd: PhantomData<L>,
 }
 
+// We don't want to implement `Borrow` and `BorrowMut` at the moment.
+#[allow(clippy::should_implement_trait)]
 impl<L> InMemoryBackend<L>
 where
     L: Layout,
@@ -33,14 +35,14 @@ where
     }
 
     /// Borrow the backing storage.
-    pub fn borrow<'backend>(&'backend self) -> &'backend [u8] {
+    pub fn borrow(&self) -> &[u8] {
         // SAFETY: [slice::from_raw_parts_mut] is layout safe given we allocated t using
         // [self.layout] (u8 makes this easy). This slice is lifetime safe because of `'backend`.
         unsafe { slice::from_raw_parts(self.backing_storage, self.layout.size()) }
     }
 
     /// Borrow the backing storage mutably.
-    pub fn borrow_mut<'backend>(&'backend mut self) -> &'backend mut [u8] {
+    pub fn borrow_mut(&mut self) -> &mut [u8] {
         // SAFETY: [slice::from_raw_parts_mut] is layout safe given we allocated t using
         // [self.layout] (u8 makes this easy). This slice is lifetime safe because of `'backend`.
         unsafe { slice::from_raw_parts_mut(self.backing_storage, self.layout.size()) }
@@ -75,10 +77,10 @@ impl<L: Layout> backend::BackendManagement for InMemoryBackend<L> {
 impl<L: Layout> backend::Backend for InMemoryBackend<L> {
     type Layout = L;
 
-    fn allocate<'backend>(
-        &'backend mut self,
+    fn allocate(
+        &mut self,
         placed: backend::PlacedOf<Self::Layout>,
-    ) -> backend::AllocatedOf<Self::Layout, Self::Manager<'backend>> {
+    ) -> backend::AllocatedOf<Self::Layout, Self::Manager<'_>> {
         let mut manager = SliceManager::new(self.borrow_mut());
 
         L::allocate(&mut manager, placed)
@@ -120,12 +122,10 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
         &mut self,
         loc: backend::Location<[E; LEN]>,
     ) -> Self::Region<E, LEN> {
-        let backing_storage = unsafe {
+        unsafe {
             let ptr = self.backing_storage + loc.offset();
             &mut *(ptr as *mut [E; LEN])
-        };
-
-        backing_storage
+        }
     }
 
     type VolatileRegion<E: backend::Elem, const LEN: usize> = VolatileRegion<'backend, E, LEN>;
@@ -163,7 +163,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
         // properly aligned as well.
         debug_assert_eq!(self.backing_storage.align_offset(mem::align_of::<E>()), 0);
 
-        let mut elem = unsafe { self.backing_storage.offset(index as isize).read_volatile() };
+        let mut elem = unsafe { self.backing_storage.add(index).read_volatile() };
         elem.from_stored_in_place();
         elem
     }
@@ -178,11 +178,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
         debug_assert_eq!(self.backing_storage.align_offset(mem::align_of::<E>()), 0);
 
         value.to_stored_in_place();
-        unsafe {
-            self.backing_storage
-                .offset(index as isize)
-                .write_volatile(value)
-        }
+        unsafe { self.backing_storage.add(index).write_volatile(value) }
     }
 }
 

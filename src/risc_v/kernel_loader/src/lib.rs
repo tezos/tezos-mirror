@@ -135,7 +135,7 @@ pub fn load_elf_reloc<'a>(
 /// Loads an ELF file. If the file is relocatable, loads it at the given [start] address in the memory of the VM.
 /// If it is not relocatable, [start] is ignored.
 pub fn load_elf(mem: &mut impl Memory, start: u64, contents: &[u8]) -> Result<LoadResult, Error> {
-    let elf = Elf::parse(contents.as_ref())?;
+    let elf = Elf::parse(contents)?;
     match elf.header.e_type {
         ET_EXEC => load_elf_nonreloc(mem, &elf, contents),
         ET_DYN => load_elf_reloc(mem, start, &elf, contents),
@@ -145,7 +145,7 @@ pub fn load_elf(mem: &mut impl Memory, start: u64, contents: &[u8]) -> Result<Lo
 
 impl Memory for rvemu::bus::Bus {
     fn write_bytes(&mut self, paddr: u64, bytes: &[u8]) -> Result<(), Error> {
-        for (i, b) in bytes.into_iter().enumerate() {
+        for (i, b) in bytes.iter().enumerate() {
             let addr = paddr + i as u64;
             self.write(addr, *b as u64, rvemu::cpu::BYTE)
                 .map_err(|exn| {

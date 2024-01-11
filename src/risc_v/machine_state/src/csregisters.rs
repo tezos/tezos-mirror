@@ -305,6 +305,8 @@ pub enum CSRegister {
     dscratch1 = 0x7B3,
 }
 
+// We want to allow shifts by 0 for clarity and consistency.
+#[allow(clippy::identity_op)]
 impl CSRegister {
     // Since read-only misa.MXL = 0b10, we have MXLEN = 64 from table 3.1
     const MXLEN: u64 = 64;

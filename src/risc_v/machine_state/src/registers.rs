@@ -17,7 +17,7 @@ pub enum XRegister {
     // index into the 31-element array holding the registers.
     // x0 represents no entry in this array because it is handled separately.
     // Therefore we assign a dummy index to x0.
-    x0 = usize::MAX,
+    x0 = 0xFFFF,
     x1 = 0,
     x2,
     x3,
