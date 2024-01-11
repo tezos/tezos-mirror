@@ -1,0 +1,36 @@
+Source: octez
+Section: devel
+Priority: optional
+Maintainer: Nomadic Labs <pkg@nomadic-labs.com>
+Homepage: https://gitlab.com/tezos/tezos
+
+Package: octez-zcash-params
+Architecture: all
+Multi-Arch: foreign
+Description: Octez zcash parameters
+ This package provides Zcash parameters necessary for the Octez node,
+ covering cryptographic keys, zk-SNARKs, and protocol configurations.
+
+Package: octez-node
+Architecture: amd64 arm64
+Depends: adduser,
+  logrotate,
+  octez-zcash-params,
+  ${misc:Depends},
+  ${shlibs:Depends},
+  debconf (>= 0.5) | debconf-2.0
+Recommends: octez-client (= ${source:Version}),
+Suggests: lz4, curl
+Description: L1 Octez node for the Tezos network
+ This package serves as the core implementation for the Tezos blockchain node.
+ It contains the fundamental components required for protocol execution,
+ consensus, and network communication within the Tezos blockchain network
+
+Package: octez-client
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: Octez client
+ This package serves as the client-side interface for interacting with the
+ Tezos blockchain. It includes command-line tools and functionalities for
+ querying blockchain data, broadcasting transactions, and interacting with
+ smart contracts on the Tezos network.

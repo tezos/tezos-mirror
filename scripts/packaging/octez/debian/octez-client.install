@@ -1,0 +1,3 @@
+binaries/octez-client /usr/bin/
+binaries/octez-admin-client /usr/bin/
+binaries/octez-codec /usr/bin/

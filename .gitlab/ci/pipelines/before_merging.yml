@@ -9,6 +9,7 @@ include:
   # Stage: package
   - .gitlab/ci/jobs/packaging/opam:prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
+  - .gitlab/ci/jobs/packaging/debian_repository.yml
 
   # Stage: build
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-before_merging.yml

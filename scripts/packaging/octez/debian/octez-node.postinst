@@ -1,0 +1,56 @@
+#!/bin/sh
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+db_version 2.0
+
+HOME=/var/tezos
+
+case "${1}" in
+  configure)
+    # these are the defaults for the package and only used
+    # in the "configure" stage.
+    DATADIR="$HOME/.tezos-node"
+
+    # shellcheck disable=SC2119
+    if ! id "tezos" >/dev/null 2>&1; then
+      sudo adduser --quiet --disabled-password \
+        --home $HOME --shell /bin/bash \
+        --gecos "admin user for octez" tezos
+      mkdir -p /var/log/tezos
+      mkdir -p "$DATADIR"
+      chown tezos /var/log/tezos
+      chown tezos "$DATADIR"
+    fi
+
+    db_get octez-node/configure
+    case "$RET" in
+      no)
+        db_get octez-node/network
+        NETWORK=${RET}
+        echo "NETWORK=${RET}" >> /etc/default/octez-node
+        db_get octez-node/history-mode
+        HISTORY_MODE=${RET}
+        echo "HISTORY_MODE=${RET}" >> /etc/default/octez-node
+
+        if [ ! -e $DATADIR/config.json ]; then
+          su tezos -c "/usr/bin/octez-node config init --data-dir=$DATADIR\
+            --network=\"$NETWORK\" \
+            --history-mode=\"$HISTORY_MODE\" \
+            --net-addr=\"[::]:9732\" \
+            --rpc-addr=\"127.0.0.1:8732\""
+        fi
+        ;;
+      *)
+        echo "Skipping initialization."
+        ;;
+    esac
+    ;;
+  *)
+    echo "postinst noop"
+    ;;
+esac
+
+#DEBHELPER#

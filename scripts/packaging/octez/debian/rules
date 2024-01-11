@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_OPTIONS=noautodbgsym
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	binaries/octez-node --help=groff > manpages/octez-node.1
+	dh_auto_build --parallel
+
+override_dh_builddeb:
+	dh_builddeb
+	cp debian/octez-node.lintian-overrides debian/octez-node/DEBIAN/
+
+override_dh_installman:
+	dh_installman --name octez-node manpages/octez-node.1
+	dh_installman --name octez-client manpages/octez-client.1
+
+override_dh_installdocs:
+	dh_installdocs -p octez-node docs/README.octez-node
+
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start --name octez-node
+
+override_dh_installlogrotate:
+	dh_installlogrotate --package=octez-node
+
+override_dh_install:
+	dh_install
+	# Include debconf configuration
+	dh_installdebconf
+
+# avoid creating debug symbols
+override_dh_dwz:
+
+override_dh_strip:
+	dh_strip -no-automatic-dbgsym
