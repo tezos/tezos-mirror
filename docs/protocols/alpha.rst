@@ -33,6 +33,13 @@ Data Availability Layer (ongoing)
 Adaptive Issuance (ongoing)
 ----------------------------
 
+- The staking balance is now explicitly initialized when a delegate is registered. (MR :gl:`!11197`)
+
+- The issuance reward coeff is now computed only once.
+  It used to be computed twice, once for the bonus, assuming a zero bonus, and once afterwards taking the bonus into account. (MR :gl:`!10935`)
+
+- The minimal frozen stake is now checked before applying limits and then re-checked after applying limits and edge. (MR :gl:`!11086`)
+
 Gas improvements
 ----------------
 
@@ -53,6 +60,8 @@ Protocol parameters
 - Added ``blocks_preservation_cycles`` parametric constant. (MR :gl:`!11280`)
 
 - Added ``delegate_parameters_activation_delay`` parametric constant. (MR :gl:`!11279`)
+
+- Set the number of blocks preservation cycles to 1. (MR :gl:`!11325`)
 
 Bug Fixes
 ---------
