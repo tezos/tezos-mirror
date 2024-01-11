@@ -156,9 +156,10 @@ trigger:
     - .image_template__alpine
   stage: trigger
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == "tezos" && $CI_MERGE_REQUEST_ASSIGNEES !~ /nomadic-margebot/'
-      when: manual
-    - when: always
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_ASSIGNEES
+      !~ /nomadic-margebot/
+    when: manual
+  - when: always
   allow_failure: false
   timeout: "10m"
   script:
