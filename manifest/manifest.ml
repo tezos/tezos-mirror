@@ -3858,7 +3858,7 @@ let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml

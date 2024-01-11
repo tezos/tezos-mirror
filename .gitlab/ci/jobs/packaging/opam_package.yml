@@ -20,7 +20,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -49,7 +49,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -78,7 +78,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -107,7 +107,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -136,7 +136,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -165,7 +165,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -194,7 +194,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -223,7 +223,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -252,7 +252,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -281,7 +281,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -310,7 +310,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -339,7 +339,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -368,7 +368,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml
@@ -397,7 +397,7 @@
         - "**/dune-project"
         - "**/dune-workspace"
         - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam_prepare.yml
+        - .gitlab/ci/jobs/packaging/opam:prepare.yml
         - .gitlab/ci/jobs/packaging/opam_package.yml
         - manifest/manifest.ml
         - manifest/main.ml

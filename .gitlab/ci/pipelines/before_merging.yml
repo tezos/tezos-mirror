@@ -1,45 +1,45 @@
 include:
   # Stage: sanity
   - .gitlab/ci/jobs/sanity/sanity_ci.yml
-  - .gitlab/ci/jobs/sanity/docker_hadolint.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint.yml
 
   # Stage: package
-  - .gitlab/ci/jobs/packaging/opam_prepare.yml
+  - .gitlab/ci/jobs/packaging/opam:prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: build
-  - .gitlab/ci/jobs/build/check.yml
-  - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
-  - .gitlab/ci/jobs/build/arm64.yml
-  - .gitlab/ci/jobs/build/x86_64.yml
-  - .gitlab/ci/jobs/build/kernels.yml
-  - .gitlab/ci/jobs/build/get_contracts.yml
-  - .gitlab/ci/jobs/doc/build_all.yml
-  - .gitlab/ci/jobs/build/docker_amd64_test_manual.yml
-  - .gitlab/ci/jobs/build/docker_arm64_test_manual.yml
+  - .gitlab/ci/jobs/build/ocaml-check.yml
+  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64.yml
+  - .gitlab/ci/jobs/build/oc.build_kernels.yml
+  - .gitlab/ci/jobs/build/build_get_contracts.yml
+  - .gitlab/ci/jobs/doc/documentation:build_all.yml
+  - .gitlab/ci/jobs/build/oc.docker:amd64-test_manual.yml
+  - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml
   - .gitlab/ci/jobs/build/bin_packages_manual.yml
-  - .gitlab/ci/jobs/build/tezt_fetch_records.yml
+  - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
-  - .gitlab/ci/jobs/test/semgrep.yml
-  - .gitlab/ci/jobs/test/unit.yml
-  - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
-  - .gitlab/ci/jobs/test/check_scripts.yml
-  - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
+  - .gitlab/ci/jobs/test/oc.semgrep.yml
+  - .gitlab/ci/jobs/test/oc.unit.yml
+  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
+  - .gitlab/ci/jobs/test/oc.script.yml
+  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml
-  - .gitlab/ci/jobs/test/tezt_build_long.yml
-  - .gitlab/ci/jobs/test/kernels.yml
+  - .gitlab/ci/jobs/test/tezt:build-long.yml
+  - .gitlab/ci/jobs/test/test_kernels.yml
 
   # Stage: test_coverage
   # Only run on merge requests that do not have the label `ci--no-coverage`
-  - local: .gitlab/ci/jobs/coverage/coverage.yml
+  - local: .gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml
     rules:
       - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/test_install_python.yml
+  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
+  - .gitlab/ci/jobs/doc/oc.install_python.yml

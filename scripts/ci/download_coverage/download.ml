@@ -32,10 +32,12 @@ let default_branch =
 let coverage_traces_directory =
   Sys.getenv_opt "COVERAGE_OUTPUT" |> Option.value ~default:"_coverage_output"
 
-(* Read [.gitlab/ci/jobs/coverage/coverage.yml] to find the set of
-   jobs from which to collect coverage traces *)
+let coverage_yml_path =
+  ".gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml"
+
+(** Read {!coverage_yml_path} to find the set of
+    jobs from which to collect coverage traces *)
 let coverage_jobs =
-  let coverage_yml_path = ".gitlab/ci/jobs/coverage/coverage.yml" in
   let coverage_yml =
     Base.read_file coverage_yml_path |> String.split_on_char '\n'
   in

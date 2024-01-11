@@ -53,7 +53,7 @@ oc.script:test_release_versions:
     - sudo chown -R $(id -u):$(id -g) ${CI_PROJECT_DIR}
     - ./scripts/test_release_version.sh
 
-oc.check_scripts_b58_prefix:
+oc.script:b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
   extends:

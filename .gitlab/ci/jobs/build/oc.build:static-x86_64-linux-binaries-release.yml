@@ -1,6 +1,6 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-# See comments in static_x86_64_experimental.yml.
+# See comments in oc.build:static-x86_64-linux-binaries-experimental.yml.
 oc.build:static-x86_64-linux-binaries:
   extends:
     - .tags_template__build

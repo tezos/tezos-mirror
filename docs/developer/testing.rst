@@ -520,7 +520,7 @@ The OCaml package tests (Alcotest & QCheck)
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
-  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/unit.yml` under the
+  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/oc.unit.yml` under the
   protocol that they are testing. For example, to run a new protocol test for
   ``proto_XXX_YYYYYYYY``, add the corresponding
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
