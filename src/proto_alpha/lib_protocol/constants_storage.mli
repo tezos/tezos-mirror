@@ -121,6 +121,8 @@ val sc_rollup_number_of_sections_in_dissection : Raw_context.t -> int
 
 val sc_rollup_max_number_of_parallel_games : Raw_context.t -> int
 
+val sc_rollup_riscv_pvm_enable : Raw_context.t -> bool
+
 val max_number_of_stored_cemented_commitments : Raw_context.t -> int
 
 val sc_rollup_timeout_period_in_blocks : Raw_context.t -> int

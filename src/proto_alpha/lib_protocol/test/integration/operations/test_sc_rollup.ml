@@ -3643,6 +3643,10 @@ let tests =
       `Quick
       test_disable_arith_pvm_feature_flag;
     Tztest.tztest
+      "check effect of disabled RISC-V pvm flag"
+      `Quick
+      test_disable_riscv_pvm_feature_flag;
+    Tztest.tztest
       "can publish a commit, cement it and withdraw stake"
       `Quick
       test_publish_cement_and_recover_bond;
