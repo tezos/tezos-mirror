@@ -30,7 +30,7 @@ oc.build:rpm:amd64:
     TARGET: "rpm"
   before_script:
     - dnf update -y
-    - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env
+    - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env gcc-c++
   artifacts:
     paths:
       - octez-*.rpm
