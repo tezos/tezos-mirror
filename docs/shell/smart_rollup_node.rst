@@ -154,32 +154,7 @@ Deploying a rollup node
 Now that the rollup is originated, anyone can make it progress by deploying a
 rollup node.
 
-First, we need to decide on a directory where the rollup node stores
-its data. Let us assign ``${ROLLUP_NODE_DIR}`` with this path, by default
-``~/.tezos-smart-rollup-node``.
-
-
-The rollup node can then be run with:
-
-.. code:: sh
-
-   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
-                    run operator for "${SR_ALIAS_OR_ADDR}" \
-                    with operators "${OPERATOR_ADDR}" \
-                    --data-dir "${ROLLUP_NODE_DIR}"
-
-where ``${OCLIENT_DIR}`` is the data directory of the Octez client, by default  ``~/.tezos-client``.
-
-The log should show that the rollup node follows the Layer 1 chain and
-processes the inbox of each level.
-
-
-Notice that distinct Layer 1 addresses could be used for the Layer 1
-operations issued by the rollup node simply by editing the
-:ref:`configuration file <rollup_node_config_file>` to set different addresses for ``publish``,
-``add_messages``, ``cement``, and ``refute``.
-
-In addition, a rollup node can run under different modes:
+First, we need to decide on a mode the rollup node will run:
 
 #. ``operator`` activates a full-fledged rollup node. This means that
    the rollup node will do everything needed to make the rollup
@@ -221,27 +196,103 @@ In addition, a rollup node can run under different modes:
    kinds of operations the rollup node injects. It provides tailored control and
    flexibility customized to specific requirements, and is mostly used for tests.
 
-The following table summarizes the operation modes, focusing on the L1
-operations which are injected by the rollup node in each mode.
+To each mode corresponds a set of purposes where each purpose is a set
+of L1 operations which are injected by the rollup node.
 
-+-------------+--------------+-----------+------------+------------+
-|             | Add messages | Publish   | Cement     | Refute     |
-+=============+==============+===========+============+============+
-| Operator    | Yes          | Yes       | Yes        | Yes        |
-+-------------+--------------+-----------+------------+------------+
-| Batcher     | Yes          | No        | No         | No         |
-+-------------+--------------+-----------+------------+------------+
-| Observer    | No           | No        | No         | No         |
-+-------------+--------------+-----------+------------+------------+
-| Maintenance | No           | Yes       | Yes        | Yes        |
-+-------------+--------------+-----------+------------+------------+
-| Accuser     | No           | Yes [*]_  | No         | Yes        |
-+-------------+--------------+-----------+------------+------------+
-| Bailout     | No           | No        | Yes        | Yes        |
-+-------------+--------------+-----------+------------+------------+
+The following table links each purpose to its corresponding L1 operations.
 
-.. [*] An accuser node will publish commitments only when it detects
++-------------------+-----------------------------------------------------------------+
+| Operating         | smart_rollup_publish, smart_rollup_refute, smart_rollup_timeout |
++-------------------+-----------------------------------------------------------------+
+| Batching          | smart_rollup_add_messages                                       |
++-------------------+-----------------------------------------------------------------+
+| Cementing         | smart_rollup_cement                                             |
++-------------------+-----------------------------------------------------------------+
+| Recovering        | smart_rollup_recover                                            |
++-------------------+-----------------------------------------------------------------+
+| Executing_outbox  | smart_rollup_execute_outbox_message                             |
++-------------------+-----------------------------------------------------------------+
+
+The table below summarises the modes and their associated purposes:
+
++-------------+------------+----------+------------+------------+------------------+
+|             | Operating  | Batching | Cementing  | Recovering | Executing_outbox |
++=============+============+==========+============+============+==================+
+| Operator    | Yes        | Yes      | Yes        | No         | Yes[^1]_         |
++-------------+------------+----------+------------+------------+------------------+
+| Maintenance | Yes        | No       | Yes        | No         | Yes[^1]_         |
++-------------+------------+----------+------------+------------+------------------+
+| Bailout     | Yes[^2]_   | No       | Yes        | Yes        | No               |
++-------------+------------+----------+------------+------------+------------------+
+| Accuser     | Yes [^3]_  | No       | No         | No         | No               |
++-------------+------------+----------+------------+------------+------------------+
+| Batcher     | No         | Yes      | No         | No         | No               |
++-------------+------------+----------+------------+------------+------------------+
+| Observer    | No         | No       | No         | No         | No               |
++-------------+------------+----------+------------+------------+------------------+
+
+.. [^1] If and only it's a private rollup. In that case, only the
+       whitelist update outbox message are injected.
+.. [^2] A rollup node in bailout mode won't publish any new commitments but only
+       defends the one published by the operator if they are refuted.
+.. [^3] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
+
+
+Then to run the rollup node, use the following command:
+
+.. code:: sh
+
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                    run "${ROLLUP_NODE_MODE}" \
+                    for "${SR_ALIAS_OR_ADDR}" \
+                    with operators "${OPERATOR_ADDR}" \
+                    --data-dir "${ROLLUP_NODE_DIR}"
+
+where ``${OCLIENT_DIR}`` is the data directory of the Octez client, by
+default ``~/.tezos-client``, and ``${ROLLUP_NODE_DIR}`` is the data
+directory of the Octez smart rollup node, by default
+``~/.tezos-smart-rollup-node``.
+
+The log should show that the rollup node follows the Layer 1 chain and
+processes the inbox of each level.
+
+Distinct Layer 1 signers can be used for each purpose of the mode by
+either editing the :ref:`configuration file <rollup_node_config_file>`
+or by listing multiple operators on the command line.
+
+For example for the ``operator`` mode we can replace
+``${OPERATOR_ADDR}`` by ``default:${OPERATOR_ADDR1}
+batching:${OPERATOR_ADDR2}``.  Where the rollup node will use
+``${OPERATOR_ADDR2}`` for the batching purpose and
+``${OPERATOR_ADDR1}`` for everything else.
+
+The L1 chain has a limitation of one manager operation per key per
+block (see :doc:`../active/precheck`). In the case of a high
+throughput rollup, this limitation could slow down the rollup by
+capping the number of L2 messages that the rollup node's batcher
+purpose can inject per block to the maximum size of one L1 operation's
+maximal size (e.g., 32kb on mainnet).
+
+To bypass that limitation and inject multiple
+``smart_rollup_add_messages`` L1 operations within a single L1 block,
+it is possible to provide multiple keys for the batcher purpose of a
+rollup node. At each block, the rollup node will use as many keys as
+possible to inject a corresponding number of queued L2 messages into
+the L1 rollup inbox[^1].
+
+[^1]: The order of the batches of L2 messages is not guaranteed to be
+preserved by the rollup node nor by the octez node mempool.
+
+The way to provide multiple batcher keys on the command line is:
+
+.. code:: sh
+
+   octez-smart-rollup-node run ${ROLLUP_NODE_MODE} for "${SR_ALIAS_OR_ADDR}" \
+                    with operators default:${DEFAULT_ADDR} \
+                    batching:${BATCHER_ADDR1} \
+                    batching:${BATCHER_ADDR2} ...
+
 
 .. _rollup_node_config_file:
 
