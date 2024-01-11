@@ -185,9 +185,7 @@ module Attestation_set = Set.Make (struct
          protocol_data =
            {
              contents =
-               Single
-                 (Attestation
-                   {consensus_content = op1; dal_content = _ (* TODO *)});
+               Single (Attestation {consensus_content = op1; dal_content = _});
              _;
            };
          shell = _;
@@ -203,6 +201,10 @@ module Attestation_set = Set.Make (struct
          shell = _;
        } :
         t) =
+    (* We do not consider the DAL content (therefore two attestations with the
+       same consensus content but different DAL content are considered equal),
+       in order to correctly count the voting power. Note however that there
+       should be no such operations in the mempool in the first place. *)
     compare_consensus_contents op1 op2
 end)
 

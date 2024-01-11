@@ -612,17 +612,6 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let skipping_dal_attestation =
-    declare_2
-      ~section
-      ~name:"skipping_dal_attestation"
-      ~level:Error
-      ~msg:"unable to sign DAL attestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
   let failed_to_inject_preattestation =
     declare_2
       ~section
@@ -690,39 +679,22 @@ module Actions = struct
       ~pp4:Round.pp
       ("round", Round.encoding)
 
-  let dal_attestation_injected =
-    declare_6
+  let attach_dal_attestation =
+    declare_5
       ~section
-      ~name:"dal_attestation_injected"
+      ~name:"attach_dal_attestation"
       ~level:Notice
       ~msg:
-        "injected DAL attestation {ophash} for level {attestation_level}, \
-         round {round}, with bitset {bitset} for {delegate} to attest slots \
+        "ready to attach DAL attestation for level {attestation_level}, round \
+         {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
-      ~pp1:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp3:Z.pp_print
-      ("bitset", Data_encoding.n)
-      ("published_level", Data_encoding.int32)
-      ("attestation_level", Raw_level.encoding)
-      ("round", Round.encoding)
-
-  let dal_attestation_void =
-    declare_4
-      ~section
-      ~name:"dal_attestation_void"
-      ~level:Notice
-      ~msg:
-        "Skipping the injection of the DAL attestation for attestation level \
-         {attestation_level}, round {round}, as currently no slot published at \
-         level {published_level} is attestable."
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Z.pp_print
+      ("bitset", Data_encoding.n)
+      ("published_level", Data_encoding.int32)
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("published_level", Data_encoding.int32)
 
   let synchronizing_round =
     declare_1

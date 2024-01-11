@@ -553,17 +553,6 @@ let rec baking_minimal_timestamp ~count state
       current_mempool
       (List.map (fun (_, x, _, _) -> x) signed_attestations)
   in
-  let* own_dal_attestations = Baking_actions.get_dal_attestations state in
-  let* signed_dal_attestations =
-    Baking_actions.sign_dal_attestations state own_dal_attestations
-  in
-  let pool =
-    Operation_pool.add_operations
-      pool
-      (List.map
-         (fun (_delegate, op, _bitset, _published_level) -> op)
-         signed_dal_attestations)
-  in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =
     {
