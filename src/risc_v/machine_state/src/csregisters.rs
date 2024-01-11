@@ -409,6 +409,94 @@ impl CSRegister {
     pub fn clear_wpri_fields(self, new_value: CSRValue) -> CSRValue {
         new_value & self.wpri_mask()
     }
+
+    /// Possible `mcause` values, table 3.6
+    const WLRL_MCAUSE_VALUES: [u64; 20] = {
+        const INTERRUPT_BIT: u64 = 1 << 63;
+        [
+            // interrupt exception codes
+            INTERRUPT_BIT | 1,  // Supervisor software interrupt
+            INTERRUPT_BIT | 3,  // Machine software interrupt
+            INTERRUPT_BIT | 5,  // Supervisor timer interrupt
+            INTERRUPT_BIT | 7,  // Machine timer interrupt
+            INTERRUPT_BIT | 9,  // Supervisor external interrupt
+            INTERRUPT_BIT | 11, // Machine external interrupt
+            // other values between 0-15 are reserved
+            // values >= 16 for platform use, we treat them as reserved
+
+            // non-interrupt exception codes
+            0,  // Instruction address misaligned
+            1,  // Instruction address fault
+            2,  // Illegal instruction
+            3,  // Breakpoint
+            4,  // Load address misaligned
+            5,  // Load access fault
+            6,  // Store/AMO address misaligned
+            7,  // Store/AMO access fault
+            8,  // Environment call from U-mode
+            9,  // Environment call from S-mode
+            11, // Environment call from M-mode
+            12, // Instruction page fault
+            13, // Load page fault
+            15, // Store/AMO page fault
+                // other values between 0-15 are reserved
+                // values 16-23, 32-47, >= 64 are reserved
+                // values 24-31, 48-63 are for custom use, we treat them as reserved
+        ]
+    };
+
+    /// Possible `scause` values, table 4.2
+    const WLRL_SCAUSE_VALUES: [u64; 16] = {
+        const INTERRUPT_BIT: u64 = 1 << 63;
+        [
+            // interrupt exception codes
+            INTERRUPT_BIT | 1, // Supervisor software interrupt
+            INTERRUPT_BIT | 5, // Supervisor timer interrupt
+            INTERRUPT_BIT | 9, // Supervisor external interrupt
+            // other values between 0-15 are reserved
+            // values >= 16 for platform use, we treat them as reserved
+
+            // non-interrupt exception codes
+            0,  // Instruction address misaligned
+            1,  // Instruction address fault
+            2,  // Illegal instruction
+            3,  // Breakpoint
+            4,  // Load address misaligned
+            5,  // Load access fault
+            6,  // Store/AMO address misaligned
+            7,  // Store/AMO access fault
+            8,  // Environment call from U-mode
+            9,  // Environment call from S-mode
+            12, // Instruction page fault
+            13, // Load page fault
+            15, // Store/AMO page fault
+                // other values between 0-15 are reserved
+                // values 16-23, 32-47, >= 64 are reserved
+                // values 24-31, 48-63 are for custom use, we treat them as reserved
+        ]
+    };
+
+    /// Obtain the legal values for a register.
+    ///
+    /// If all the values are legal or the register is not WLRL, return an empty list.
+    #[inline(always)]
+    pub fn legal_values(self) -> &'static [u64] {
+        match self {
+            CSRegister::mcause => &CSRegister::WLRL_MCAUSE_VALUES,
+            CSRegister::scause => &CSRegister::WLRL_SCAUSE_VALUES,
+            _ => &[],
+        }
+    }
+
+    /// If the register is WLRL, return if `new_value` is legal, false otherwise
+    ///
+    /// Section 2.3 - privileged spec
+    #[inline(always)]
+    fn is_legal(self, new_value: CSRValue) -> bool {
+        let legal_values = self.legal_values();
+        // if no legal values are defined, then the register is not WLRL
+        legal_values.is_empty() || legal_values.contains(&new_value)
+    }
 }
 
 /// Value in a CSR
@@ -460,9 +548,10 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        let value = reg.clear_wpri_fields(value);
 
-        self.registers.write(reg as usize, value);
+        if let Some(value) = self.make_value_writable(reg, value) {
+            self.registers.write(reg as usize, value);
+        }
     }
 
     /// Read from a CSR.
@@ -478,9 +567,12 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn replace(&mut self, reg: CSRegister, value: CSRValue) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        let value = reg.clear_wpri_fields(value);
 
-        self.registers.replace(reg as usize, value)
+        if let Some(value) = self.make_value_writable(reg, value) {
+            self.registers.replace(reg as usize, value)
+        } else {
+            self.registers.read(reg as usize)
+        }
     }
 
     /// Set bits in the CSR.
@@ -504,6 +596,18 @@ impl<M: backend::Manager> CSRegisters<M> {
         self.write(reg, new_value);
         old_value
     }
+
+    /// Enforce the WPRI and WLRL field specifications.
+    ///
+    /// Either return the value to be written, or None to signify that no write is necessary,
+    /// to leave existing value in its place.
+    #[inline(always)]
+    fn make_value_writable(&self, reg: CSRegister, value: CSRValue) -> Option<CSRValue> {
+        // respect the reserved WPRI fields, setting them 0
+        let value = reg.clear_wpri_fields(value);
+        // check if value is legal w.r.t. WLRL fields
+        reg.is_legal(value).then_some(value)
+    }
 }
 
 /// Layout for [CSRegisters]
@@ -518,7 +622,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{csregisters::Exception, mode::Mode};
+    use crate::{
+        csregisters::{CSRValue, Exception},
+        mode::Mode,
+    };
 
     #[test]
     pub fn test_privilege_access() {
@@ -586,5 +693,34 @@ pub mod tests {
             check(csreg::sstatus, 0b1100_0011_0101_1010_0110_1001)
                 == 0b0000_0001_0100_0010_0110_0000
         );
+    }
+
+    #[test]
+    fn test_wlrl() {
+        use crate::csregisters::CSRegister as csreg;
+
+        let check = |reg: csreg, value| reg.is_legal(value);
+
+        // Registers that are not xcause should always be ok
+        const ALL_BITS: CSRValue = 0xFFFF_FFFF_FFFF_FFFF;
+        assert!(check(csreg::mstatus, ALL_BITS));
+        assert!(check(csreg::sstatus, 0x0));
+        assert!(check(csreg::time, 0x0));
+
+        // scause & mcause tests
+        assert!(check(csreg::mcause, 0x8000_0000_0000_0003));
+        assert!(!check(csreg::mcause, 0x8000_0000_0000_0008));
+        assert!(check(csreg::mcause, 0x8000_0000_0000_000B));
+        assert!(check(csreg::mcause, 0x0002));
+        assert!(check(csreg::mcause, 0x000F));
+        assert!(!check(csreg::mcause, 0x000A));
+        assert!(!check(csreg::mcause, 0x0000_FFF0_00F0_0002));
+
+        assert!(check(csreg::scause, 0x0000));
+        assert!(check(csreg::scause, 0x8000_0000_0000_0001));
+        assert!(!check(csreg::scause, 0x8000_F0F0_0000_0003));
+        assert!(!check(csreg::scause, 0x8000_0000_0000_000B));
+        assert!(!check(csreg::scause, 0x0000_0F00_0000_F0F0));
+        assert!(!check(csreg::scause, 0x000A));
     }
 }
