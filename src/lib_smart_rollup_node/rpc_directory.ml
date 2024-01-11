@@ -176,10 +176,14 @@ let () =
   Local_directory.register0 Rollup_node_services.Local.gc_info
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in
-  let+ {last_gc_level; first_available_level} =
+  let* {last_gc_level; first_available_level} =
     Node_context.get_gc_levels node_ctxt
+  and* last_context_split_level =
+    Node_context.get_last_context_split_level node_ctxt
   in
-  Rollup_node_services.{last_gc_level; first_available_level}
+  return
+    Rollup_node_services.
+      {last_gc_level; first_available_level; last_context_split_level}
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.injection

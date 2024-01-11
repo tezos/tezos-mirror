@@ -124,6 +124,9 @@ module Gc_levels : sig
   include SINGLETON_STORE with type value = levels
 end
 
+(** Level at which context was last split. *)
+module Last_context_split : SINGLETON_STORE with type value := int32
+
 (** History mode of the rollup node. *)
 module History_mode :
   SINGLETON_STORE with type value := Configuration.history_mode
@@ -142,6 +145,7 @@ type +'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  last_context_split_level : 'a Last_context_split.t;
   history_mode : 'a History_mode.t;
 }
 

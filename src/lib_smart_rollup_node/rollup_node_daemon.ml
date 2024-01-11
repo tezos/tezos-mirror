@@ -82,6 +82,16 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   state.node_ctxt.current_protocol <- new_protocol ;
   return_unit
 
+let maybe_split_context node_ctxt commitment_hash head_level =
+  let open Lwt_result_syntax in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
+  let commit_is_gc_candidate =
+    history_mode <> Archive && Option.is_some commitment_hash
+  in
+  when_ commit_is_gc_candidate @@ fun () ->
+  Context.split node_ctxt.context ;
+  Node_context.save_context_split_level node_ctxt head_level
+
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
@@ -123,11 +133,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       head
       ctxt
   in
-  let* history_mode = Node_context.get_history_mode node_ctxt in
-  let commit_is_gc_candidate =
-    history_mode <> Archive && Option.is_some commitment_hash
-  in
-  if commit_is_gc_candidate then Context.split node_ctxt.context ;
+  let* () = maybe_split_context node_ctxt commitment_hash head.level in
   let* () =
     unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
     Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
