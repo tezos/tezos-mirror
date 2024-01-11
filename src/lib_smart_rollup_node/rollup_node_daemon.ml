@@ -89,8 +89,14 @@ let maybe_split_context node_ctxt commitment_hash head_level =
     history_mode <> Archive && Option.is_some commitment_hash
   in
   when_ commit_is_gc_candidate @@ fun () ->
-  Context.split node_ctxt.context ;
-  Node_context.save_context_split_level node_ctxt head_level
+  let* last = Node_context.get_last_context_split_level node_ctxt in
+  let last = Option.value last ~default:node_ctxt.genesis_info.level in
+  if Int32.(to_int @@ sub head_level last) >=
+    node_ctxt.current_protocol.constants.sc_rollup
+          .challenge_window_in_blocks then (
+    Context.split node_ctxt.context ;
+    Node_context.save_context_split_level node_ctxt head_level)
+  else return_unit
 
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
