@@ -201,19 +201,21 @@ val commit :
   t ->
   polynomial ->
   ( commitment,
-    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
-  )
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** [pp_commit_error fmt error] pretty-prints the error returned by {!val:commit}. *)
 val pp_commit_error :
   Format.formatter ->
-  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container] ->
+  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+  | `Prover_SRS_not_loaded ] ->
   unit
 
 (** [string_of_commit_error error] returns an error string message for [error]. *)
 val string_of_commit_error :
-  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container] ->
+  [< `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+  | `Prover_SRS_not_loaded ] ->
   string
 
 (** A portion of the data represented by a polynomial. *)
@@ -329,8 +331,8 @@ val prove_commitment :
   t ->
   polynomial ->
   ( commitment_proof,
-    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
-  )
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** [prove_page t polynomial n] produces a proof for the [n]-th page of
@@ -359,7 +361,8 @@ val prove_page :
   int ->
   ( page_proof,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
-    | `Page_index_out_of_range ] )
+    | `Page_index_out_of_range
+    | `Prover_SRS_not_loaded ] )
   Result.t
 
 (** The precomputation used to produce shard proofs. *)
@@ -429,6 +432,11 @@ module Internal_for_tests : sig
      is linear with respect to [parameters.slot_size]. Order of magnitude can
      be around 1 minute for a size of 1MiB. *)
   val parameters_initialisation : parameters -> initialisation_parameters
+
+  (** Same as [parameters_initialisation] but the resulting
+      initialisation_parameters will be tagged for the verifier *)
+  val parameters_initialisation_verifier :
+    parameters -> initialisation_parameters
 
   (** Same as {!val:load_parameters} except it erase parameters if
      they were already loaded. This is used to circumvent limitation
@@ -547,6 +555,14 @@ module Config : sig
      check is run.) In this case, [init_dal] can take several seconds
      to run. *)
   val init_dal :
+    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+    ?srs_size_log2:int ->
+    t ->
+    unit Error_monad.tzresult Lwt.t
+
+  (** For now, it’s a duplicate of [init_dal]. In the future it will initialize
+      the DAL verification, loading only the SRS part needed for verification *)
+  val init_dal_verifier :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
     ?srs_size_log2:int ->
     t ->
