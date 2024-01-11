@@ -415,10 +415,10 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
         let* () = Events.(emit branch_proposal_has_same_prequorum ()) in
         do_nothing state
 
-(* Create a fresh block proposal containing the  current operations of
-   the mempool in [state] and the additional  [attestations] and
-   [dal_attestations] for [delegate] at round [round]. *)
-let prepare_block_to_bake ~attestations ~dal_attestations ?last_proposal
+(* Create a fresh block proposal containing the current operations of the
+   mempool in [state] and the additional [attestations] for [delegate] at round
+   [round]. *)
+let prepare_block_to_bake ~attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
   (* The block to bake embeds the operations gathered by the
      worker. However, consensus operations that are not relevant for
@@ -466,16 +466,11 @@ let prepare_block_to_bake ~attestations ~dal_attestations ?last_proposal
     let filtered_mempool =
       {current_mempool with consensus = relevant_consensus_operations}
     in
-    (* 3. Add the additional given [attestations] and [dal_attestations].
+    (* 3. Add the additional given [attestations].
          N.b. this is a set: there won't be duplicates *)
-    let pool =
-      Operation_pool.add_operations
-        filtered_mempool
-        (List.map Operation.pack attestations)
-    in
     Operation_pool.add_operations
-      pool
-      (List.map Operation.pack dal_attestations)
+      filtered_mempool
+      (List.map Operation.pack attestations)
   in
   let kind = Fresh operation_pool in
   let* () = Events.(emit preparing_fresh_block (delegate, round)) in
@@ -486,13 +481,12 @@ let prepare_block_to_bake ~attestations ~dal_attestations ?last_proposal
   in
   return {predecessor; round; delegate; kind; force_apply}
 
-let forge_fresh_block_action ~attestations ~dal_attestations ?last_proposal
+let forge_fresh_block_action ~attestations ?last_proposal
     ~(predecessor : block_info) state delegate =
   let open Lwt_syntax in
   let* block_to_bake =
     prepare_block_to_bake
       ~attestations
-      ~dal_attestations
       ?last_proposal
       ~predecessor
       state
@@ -504,7 +498,7 @@ let forge_fresh_block_action ~attestations ~dal_attestations ?last_proposal
 
 (** Create an inject action that will inject either a fresh block or the pre-emptively
     forged block if it exists. *)
-let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
+let propose_fresh_block_action ~attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
   (* TODO check if there is a trace where we could not have updated the level *)
   let open Lwt_syntax in
@@ -526,7 +520,6 @@ let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
         let+ block_to_bake =
           prepare_block_to_bake
             ~attestations
-            ~dal_attestations
             ?last_proposal
             ~predecessor
             state
@@ -557,14 +550,8 @@ let propose_block_action state delegate round ~last_proposal =
          payload *)
       assert (state.level_state.locked_round = None) ;
       let attestations_in_last_proposal = last_proposal.block.quorum in
-      (* Also insert the DAL attestations from the proposal, because the mempool
-         may not contain them anymore *)
-      let dal_attestations_in_last_proposal =
-        last_proposal.block.dal_attestations
-      in
       propose_fresh_block_action
         ~attestations:attestations_in_last_proposal
-        ~dal_attestations:dal_attestations_in_last_proposal
         state
         ~last_proposal:last_proposal.block
         ~predecessor:last_proposal.predecessor
@@ -595,9 +582,8 @@ let propose_block_action state delegate round ~last_proposal =
           List.fold_left
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
-            ((List.map Operation.pack proposal.block.quorum
-             @ List.map Operation.pack prequorum.preattestations)
-            @ List.map Operation.pack proposal.block.dal_attestations)
+            (List.map Operation.pack proposal.block.quorum
+            @ List.map Operation.pack prequorum.preattestations)
         in
         let attestation_filter =
           {
@@ -697,15 +683,9 @@ let time_to_forge_block state =
       assert false
   | Some elected_block, Some {consensus_key_and_delegate; _} ->
       let attestations = elected_block.attestation_qc in
-      let dal_attestations =
-        (* Unlike proposal attestations, we don't watch and store DAL attestations for
-           each proposal, we'll retrieve them from the mempool *)
-        []
-      in
       let* action =
         forge_fresh_block_action
           ~attestations
-          ~dal_attestations
           ~predecessor:elected_block.proposal.block
           state
           consensus_key_and_delegate
@@ -726,11 +706,6 @@ let time_to_bake_at_next_level state at_round =
       assert false
   | Some elected_block, Some {consensus_key_and_delegate; _} ->
       let attestations = elected_block.attestation_qc in
-      let dal_attestations =
-        (* Unlike proposal attestations, we don't watch and store DAL attestations for
-           each proposal, we'll retrieve them from the mempool *)
-        []
-      in
       let new_level_state =
         {state.level_state with next_level_proposed_round = Some at_round}
       in
@@ -738,7 +713,6 @@ let time_to_bake_at_next_level state at_round =
       let* action =
         propose_fresh_block_action
           ~attestations
-          ~dal_attestations
           ~predecessor:elected_block.proposal.block
           new_state
           consensus_key_and_delegate
