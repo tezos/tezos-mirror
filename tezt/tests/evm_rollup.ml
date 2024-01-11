@@ -81,6 +81,22 @@ let check_tx_failed ~endpoint ~tx =
   Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
   unit
 
+(* Check simple transfer base fee is correct
+
+   We apply a flat base fee to every tx - which is paid through an
+   increase in estimate gas used at the given price.
+*)
+let check_tx_gas_for_base_fee ~base_fee ~gas_price ~gas_used =
+  let expected_gas_used = 21000l in
+  let gas_for_base_fee = Z.of_int32 (Int32.sub gas_used expected_gas_used) in
+  let gas_price = gas_price |> Z.of_int32 in
+  (* integer division truncates - so we make sure to take ceil(a/b) not floor(a/b).
+     otherwise we'd end up with very slightly less gas than needed to cover the
+     base fee. *)
+  let actual_gas_for_base_fee = Wei.cdiv base_fee gas_price in
+  Check.((actual_gas_for_base_fee = Wei.to_wei_z gas_for_base_fee) Wei.typ)
+    ~error_msg:"Unexpected base fee"
+
 let check_status_n_logs ~endpoint ~status ~logs ~tx =
   let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
   match receipt with
@@ -267,8 +283,9 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ~admin ?commitment_period ?challenge_window
-    ?timestamp ?(setup_mode = Setup_proxy {devmode = true}) protocol =
+    ?(with_administrator = true) ?base_fee ~admin ?commitment_period
+    ?challenge_window ?timestamp ?(setup_mode = Setup_proxy {devmode = true})
+    protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -294,6 +311,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     in
     Configuration.make_config
       ~bootstrap_accounts
+      ?base_fee
       ?ticketer
       ?administrator
       ?sequencer
@@ -377,7 +395,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ~setup_mode f =
+    ?challenge_window ?bootstrap_accounts ?base_fee ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -406,6 +424,7 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
           ?commitment_period
           ?challenge_window
           ?bootstrap_accounts
+          ?base_fee
           ~admin
           ~setup_mode
           protocol
@@ -428,7 +447,7 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
     ~setup_mode:(Setup_proxy {devmode = true})
 
 let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
-    ?bootstrap_accounts ?config ?time_between_blocks f protocols =
+    ?bootstrap_accounts ?base_fee ?config ?time_between_blocks f protocols =
   let register =
     register_test
       ?config
@@ -439,6 +458,7 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ?commitment_period
       ?challenge_window
       ?bootstrap_accounts
+      ?base_fee
       f
       protocols
   in
@@ -1364,7 +1384,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
       receiver_balance_after;
     }
 
-let transfer ?data ~evm_setup () =
+let transfer ?data ~base_fee ~evm_setup () =
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
@@ -1389,12 +1409,13 @@ let transfer ?data ~evm_setup () =
   let* receipt =
     Eth_cli.get_receipt ~endpoint:evm_setup.endpoint ~tx:tx_object.hash
   in
-  let fees =
+  let gas_used, gas_price =
     match receipt with
     | Some Transaction.{status = true; gasUsed; effectiveGasPrice; _} ->
-        expected_gas_fees ~gas_price:effectiveGasPrice ~gas_used:gasUsed
+        (gasUsed, effectiveGasPrice)
     | _ -> Test.fail "Transaction didn't succeed"
   in
+  let fees = expected_gas_fees ~gas_price ~gas_used in
   Check.(
     Wei.(sender_balance_after = sender_balance_before - value - fees) Wei.typ)
     ~error_msg:
@@ -1413,17 +1434,21 @@ let transfer ?data ~evm_setup () =
     ~error_msg:"Unexpected transaction's receiver" ;
   Check.((tx_object.value = value) Wei.typ)
     ~error_msg:"Unexpected transaction's value" ;
+  if Option.is_none data then
+    check_tx_gas_for_base_fee ~base_fee ~gas_used ~gas_price ;
   unit
 
 let test_l2_transfer =
-  let test_f ~protocol:_ ~evm_setup = transfer ~evm_setup () in
+  let base_fee = Wei.zero in
+  let test_f ~protocol:_ ~evm_setup = transfer ~evm_setup ~base_fee () in
   let title = "Check L2 transfers are applied" in
   let tags = ["evm"; "l2_transfer"] in
   register_both ~title ~tags test_f
 
 let test_chunked_transaction =
+  let base_fee = Wei.zero in
   let test_f ~protocol:_ ~evm_setup =
-    transfer ~data:("0x" ^ String.make 12_000 'a') ~evm_setup ()
+    transfer ~data:("0x" ^ String.make 12_000 'a') ~base_fee ~evm_setup ()
   in
   let title = "Check L2 chunked transfers are applied" in
   let tags = ["evm"; "l2_transfer"; "chunked"] in

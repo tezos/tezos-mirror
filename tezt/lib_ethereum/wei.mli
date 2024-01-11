@@ -80,6 +80,9 @@ val ( * ) : t -> Z.t -> t
 (** Division. This doesn't perform any bound checks. *)
 val ( / ) : t -> Z.t -> t
 
+(** Division, rounding towards +oo. *)
+val cdiv : t -> Z.t -> t
+
 (** The wei {!Check.typ}. *)
 val typ : t Check.typ
 

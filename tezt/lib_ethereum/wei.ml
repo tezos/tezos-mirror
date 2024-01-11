@@ -66,6 +66,8 @@ let ( * ) = Z.mul
 
 let ( / ) = Z.div
 
+let cdiv = Z.cdiv
+
 let typ =
   Check.comparable
     (fun fmt t -> Format.fprintf fmt "%s" (to_string t))
