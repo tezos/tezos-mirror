@@ -1,3 +1,13 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
+(*                                                                           *)
+(*****************************************************************************)
+
 open Ethereum_types
 
 type path = string
