@@ -3,10 +3,15 @@
 # for future merge request pipelines.
 oc.tezt:fetch-records:
   extends:
-    - .tags_template__build
-    - .oc.build_template
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies
     - .rules__octez_changes
+    - .tags_template__build
   stage: build
+  before_script:
+    - ./scripts/ci/take_ownership.sh
+    - . ./scripts/version.sh
+    - eval $(opam env)
   script:
     - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
   after_script:
