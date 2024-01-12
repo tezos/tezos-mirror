@@ -188,6 +188,12 @@ let has_minimal_frozen_stake ~minimal_frozen_stake full_staking_balance =
   let own_frozen = own_frozen full_staking_balance in
   Tez_repr.(own_frozen >= minimal_frozen_stake)
 
+(* The set of delegates to consider [Active_delegates_with_minimal_stake] is an
+   over-approximation of participating delegates. It is maintained by
+   {!Stake_storage}.
+   To avoid having to do any maintenance at cycle end, we have to rely on values
+   that do not change when crossing cycle boundaries: the current amount works,
+   the minimal in a given cycle wouldn't. *)
 let has_minimal_stake_to_be_considered ~minimal_stake full_staking_balance =
   match current_total full_staking_balance with
   | Error _total_overflows ->
