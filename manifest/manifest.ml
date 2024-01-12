@@ -4132,7 +4132,8 @@ let canonicalize_path path =
 (* Compute and print a Tezt TSL expression representing the set of tests
    to run after [changed_files] changed.
    [changed_files] is supposed to only contain files, not directories. *)
-let list_tests_to_run_after_changes (changed_files : string list) =
+let list_tests_to_run_after_changes ~(tezt_exe_deps : target list)
+    (changed_files : string list) =
   (* Verbose mode can be activated for debugging this function
      by setting the MANIFEZT_DEBUG environment variable to "true". *)
   let debug = Sys.getenv_opt "MANIFEZT_DEBUG" = Some "true" in
@@ -4229,6 +4230,15 @@ let list_tests_to_run_after_changes (changed_files : string list) =
     match preprocessor with
     | PPS {targets; args = _} | Staged_PPS targets ->
         List.exists target_has_changed targets
+  in
+  (* If a dependency of [tezt/tests/main.exe] is modified, all tests should be run.
+     But those dependencies include the libraries that define tests
+     (those that end in [_tezt_lib]). We assume that those only contain
+     test definitions, i.e. if they are modified, only their tests need to be run.
+     This leaves only [tezt_exe_deps] as the list of dependencies
+     that should trigger all tests. *)
+  let tezt_exe_dep_changed =
+    List.exists target_option_has_changed tezt_exe_deps
   in
   (* We will need the list of (tag, path) from Tezt [~uses] to deduce tags. *)
   let runtime_dependencies = read_tezt_runtime_dependencies () in
@@ -4344,9 +4354,6 @@ let list_tests_to_run_after_changes (changed_files : string list) =
       let test_file = path // (module_name ^ ".ml") in
       test_files := String_set.add test_file !test_files) ) ;
   (* TODO:
-     - if there is a change in tezt/lib_tezos,
-       possibly from a dependency (which means octez-libs.base too!),
-       in theory we need to run all tests from tezt/tests
      - if a test in tezt/tests changes, it needs to be run
        (in theory, all tests should be run, since there may be helpers modules
        in tezt/tests too; but maybe it is fine, as a heuristic, to avoid that)
@@ -4356,7 +4363,9 @@ let list_tests_to_run_after_changes (changed_files : string list) =
          or is in a directory that matches the path of a tag,
          add this tag to the list *)
   let tsl =
-    if String_set.is_empty !tags && String_set.is_empty !test_files then "false"
+    if tezt_exe_dep_changed then "true"
+    else if String_set.is_empty !tags && String_set.is_empty !test_files then
+      "false"
     else
       let tags = String_set.elements !tags in
       let files =
@@ -4377,7 +4386,8 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
-let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
+let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
+    =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
@@ -4385,7 +4395,7 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     (match manifezt with
     | None -> ()
     | Some changes ->
-        list_tests_to_run_after_changes changes ;
+        list_tests_to_run_after_changes ~tezt_exe_deps changes ;
         exit 0) ;
     Target.can_register := false ;
     generate_dune_files () ;
