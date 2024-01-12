@@ -3950,47 +3950,7 @@ let packages_dir, release, remove_extra_files, manifezt =
   in
   (!packages_dir, release, !remove_extra_files, manifezt)
 
-let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
-  Format.fprintf
-    fmt
-    {|@..rules_template__trigger_%s_opam_batch_%d:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: %s
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: %d minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '%s'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: %d minutes
-    - when: never # default
-|}
-    pipeline_type
-    batch_index
-    (string_of_int batch_index ^ " "
-    ^ if batch_index = 1 then "minute" else "minutes")
-    batch_index
-    marge_restriction
-    batch_index
-
-let generate_opam_ci opam_release_graph =
+let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
      that will need to pass the public Opam CI. *)
   let contain_executables package =
@@ -4046,38 +4006,18 @@ let generate_opam_ci opam_release_graph =
     List.sort by_name l
   in
   (* Now [packages] is a list of [batch_index, package_name]
-     where [batch_index] is 0 for packages that we do not need to test. *)
-  write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
-  pp_do_not_edit ~comment_start:"#" fmt () ;
-  (* Output one template per batch. *)
-  let marge_restriction_exec =
-    "$CI_PIPELINE_SOURCE == \"merge_request_event\""
-  in
-  let marge_restriction_all =
-    marge_restriction_exec ^ " && $GITLAB_USER_LOGIN == \"nomadic-margebot\""
-  in
-  for batch_index = 1 to batch_count do
-    print_opam_job_rules fmt batch_index "exec" marge_restriction_exec ;
-    print_opam_job_rules fmt batch_index "all" marge_restriction_all
-  done ;
-
-  (* Output one job per released package. *)
+     where [batch_index] is 0 for packages that we do not need to test.
+     Write the set of packages and whether they are executables to [script-inputs],
+     for consumption by the CI generator. *)
+  write "script-inputs/ci-opam-package-tests" @@ fun fmt ->
   let output_job (batch_index, package_name, is_executable) =
     if batch_index > 0 then
       Format.fprintf
         fmt
-        {|@.opam:%s:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_%s_opam_batch_%d
-  variables:
-    package: %s
-|}
+        "%s\t%s\t%d\n"
         package_name
         (if is_executable then "exec" else "all")
         batch_index
-        package_name
-    else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
   in
   List.iter output_job packages
 
@@ -4546,7 +4486,7 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     generate_dune_project_files () ;
     generate_package_json_file () ;
     let opam_release_graph = compute_opam_release_graph () in
-    generate_opam_ci opam_release_graph ;
+    generate_opam_ci_input opam_release_graph ;
     generate_executable_list "script-inputs/released-executables" Released ;
     generate_executable_list
       "script-inputs/experimental-executables"
