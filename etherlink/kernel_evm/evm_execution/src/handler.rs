@@ -204,7 +204,7 @@ mod benchmarks {
         input: &Vec<u8>,
     ) {
         unsafe {
-            START_PRECOMPILE_SECTION_MSG[33..53].copy_from_slice(&address.as_bytes());
+            START_PRECOMPILE_SECTION_MSG[33..53].copy_from_slice(address.as_bytes());
             START_PRECOMPILE_SECTION_MSG[53..57]
                 .copy_from_slice(&input.len().to_be_bytes());
             host.write_debug(core::str::from_utf8_unchecked(
@@ -653,9 +653,26 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         initial_code: Vec<u8>,
         create_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
-        log!(self.host, Debug, "Executing a contract create");
-
         let address = self.create_address(scheme);
+
+        if self.deleted(address) && create_opcode {
+            if let CreateScheme::Create2 { .. } = scheme {
+                // The contract has been deleted, so the address is empty.
+                // We are trying to re-create the same contract that was deleted at
+                // the same transaction level: this is not allowed.
+                // TODO/NB: https://gitlab.com/tezos/tezos/-/issues/6783
+                // This behaviour is appropriate to <=Shanghai configuration.
+                // In the upcoming Cancun fork, the semantic of this behaviour will change.
+                self.increment_nonce(caller)?;
+                return Ok((
+                    ExitReason::Succeed(ExitSucceed::Stopped),
+                    Some(H160::zero()), // see: https://www.evm.codes/#f5?fork=shanghai
+                    vec![],
+                ));
+            }
+        }
+
+        log!(self.host, Debug, "Executing a contract create");
 
         // TODO: mark `caller` and `address` as hot for gas calculation
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
@@ -730,12 +747,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.record_cost(self.compute_gas_code_deposit(code_out.len()))
             {
                 return Ok((ExitReason::Error(err), None, vec![]));
-            }
-
-            if self.deleted(address) {
-                // The contract has been deleted, so the address is empty. However, after
-                // creating the new contract, the _new_ contract isn't deleted.
-                self.unmark_deletion(address);
             }
 
             self.set_contract_code(address, code_out)?;
@@ -1033,15 +1044,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.get_account(address)
             .map(|account| account.nonce(self.host).map_err(EthereumError::from))
             .unwrap_or(Ok(U256::zero()))
-    }
-
-    /// If a contract has been marked for deletion, and another contract is
-    /// created in its place, we need to unmark it, so that we don't delete the
-    /// new contract when we finalize the effects of the transactions.
-    fn unmark_deletion(&mut self, address: H160) {
-        for data in &mut self.transaction_data {
-            data.deleted_contracts.retain(|a| *a != address);
-        }
     }
 
     /// Completely delete an account including nonce, code, and data. This is for
@@ -2821,5 +2823,68 @@ mod test {
             )),
             result,
         )
+    }
+
+    #[test]
+    fn prevent_collision_create2_selfdestruct() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+
+        let config = Config::shanghai();
+
+        let caller_address: [u8; 20] =
+            hex::decode("a94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let caller = H160::from(caller_address);
+        let target_address: [u8; 20] =
+            hex::decode("ec2c6832d00680ece8ff9254f81fdab0a5a2ac50")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let target_address = H160::from(target_address);
+
+        let transaction_context =
+            TransactionContext::new(caller, target_address, U256::zero());
+
+        // { (CALL 50000 0xec2c6832d00680ece8ff9254f81fdab0a5a2ac50 0 0 0 0 0) (MSTORE 0 0x6460016001556000526005601bf3) (CREATE2 0 18 14 0) }
+        let input = hex::decode("6000600060006000600073e2b35478fdd26477cc576dd906e6277761246a3c61c350f1506000600060006000f500").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        // { (SELFDESTRUCT 0x10) }
+        let code = hex::decode("6010ff").unwrap();
+
+        set_code(&mut handler, &target_address, code);
+        set_balance(&mut handler, &caller, U256::from(1000000000000000000u64));
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_call(target_address, None, input, transaction_context);
+
+        // This assertion will change with the upcoming Dencun config/fork
+        // See: https://eips.ethereum.org/EIPS/eip-6780
+        assert_eq!(
+            Ok((ExitReason::Succeed(ExitSucceed::Suicided), None, vec![],)),
+            result,
+        );
+
+        let code = handler.code(target_address);
+        let balance = handler.balance(target_address);
+
+        assert_eq!(code, vec![]);
+        assert_eq!(balance, U256::zero());
     }
 }
