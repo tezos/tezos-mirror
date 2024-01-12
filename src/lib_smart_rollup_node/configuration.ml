@@ -251,11 +251,7 @@ let string_of_mode = function
   | Batcher -> "batcher"
   | Maintenance -> "maintenance"
   | Operator -> "operator"
-  | Custom op_kinds ->
-      if op_kinds = [] then "custom"
-      else
-        "custom:"
-        ^ String.concat "," (List.map Operation_kind.to_string op_kinds)
+  | Custom _op_kinds -> "custom"
 
 let mode_of_string s =
   match s with
@@ -289,8 +285,8 @@ let description_of_mode = function
         List.map Operation_kind.to_string op_kinds |> String.concat ", "
       in
       Printf.sprintf
-        "In this mode, the system handles only the specific operation \
-         kinds:[%s]. This allows for tailored control and flexibility."
+        "In this mode, the system handles only the specific operation kinds: \
+         [%s]. This allows for tailored control and flexibility."
         op_kinds_desc
 
 let mode_encoding =
@@ -314,10 +310,10 @@ let mode_encoding =
       (fun operation_kinds -> Custom operation_kinds)
   in
   let all_cases =
-    List.map
-      constant_case
-      [Observer; Accuser; Bailout; Batcher; Maintenance; Operator]
-    @ [custom_case]
+    custom_case
+    :: List.map
+         constant_case
+         [Observer; Accuser; Bailout; Batcher; Maintenance; Operator]
   in
   def "sc_rollup_node_mode" @@ union all_cases
 

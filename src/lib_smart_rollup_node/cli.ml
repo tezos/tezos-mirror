@@ -58,7 +58,9 @@ let operator_param next =
        can be specialized to a particular purpose by prefixing its key or \
        alias by said purpose, e.g. operating:<alias_of_my_operator>. The \
        possible purposes are: @[<h>%a@]."
-      (Format.pp_print_list Purpose.pp_ex_purpose)
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+         Purpose.pp_ex_purpose)
       Purpose.all
   in
   let parse_default cctxt s =
