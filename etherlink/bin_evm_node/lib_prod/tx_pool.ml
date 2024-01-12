@@ -12,7 +12,7 @@ module Pool = struct
   (** Transaction stored in the pool. *)
   type transaction = {
     index : int64; (* Global index of the transaction. *)
-    raw_tx : Ethereum_types.hex; (* Current transaction. *)
+    raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
   }
 
@@ -24,7 +24,7 @@ module Pool = struct
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transacion to the pool.*)
-  let add t pkey base_fee (raw_tx : Ethereum_types.hex) =
+  let add t pkey base_fee raw_tx =
     let open Result_syntax in
     let {transactions; global_index} = t in
     let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
@@ -75,7 +75,7 @@ module Pool = struct
     let selected = selected |> Nonce_map.bindings |> List.map snd in
     (selected, {transactions; global_index})
 
-  (** Removes from the pool the transactions matching the predicate 
+  (** Removes from the pool the transactions matching the predicate
       for the given pkey. *)
   let remove pkey predicate t =
     let _txs, t = partition pkey predicate t in
@@ -104,15 +104,23 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
+type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer
+
+type parameters = {
+  rollup_node : (module Services_backend_sig.S);
+  smart_rollup_address : string;
+  mode : mode;
+}
+
 module Types = struct
   type state = {
-    rollup_node : (module Rollup_node.S);
+    rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
-    mutable level : Ethereum_types.block_height;
     mutable pool : Pool.t;
+    mode : mode;
   }
 
-  type parameters = (module Rollup_node.S) * string
+  type nonrec parameters = parameters
 end
 
 module Name = struct
@@ -131,9 +139,9 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Ethereum_types.hex
+        string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | New_l2_head : Ethereum_types.block_height -> (unit, tztrace) t
+    | Inject_transactions : (bool * Time.Protocol.t) -> (int, tztrace) t
 
   type view = View : _ t -> view
 
@@ -148,28 +156,39 @@ module Request = struct
           ~title:"Add_transaction"
           (obj2
              (req "request" (constant "add_transaction"))
-             (req "transaction" Ethereum_types.hex_encoding))
+             (req "transaction" string))
           (function
             | View (Add_transaction messages) -> Some ((), messages) | _ -> None)
           (fun ((), messages) -> View (Add_transaction messages));
         case
           (Tag 1)
-          ~title:"New_l2_head"
-          (obj2
+          ~title:"Inject_transactions"
+          (obj3
              (req "request" (constant "new_l2_head"))
-             (req "block_height" Ethereum_types.block_height_encoding))
-          (function View (New_l2_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_l2_head b));
+             (req "force" bool)
+             (req "timestamp" Time.Protocol.encoding))
+          (function
+            | View (Inject_transactions (force, timestamp)) ->
+                Some ((), force, timestamp)
+            | _ -> None)
+          (fun ((), force, timestamp) ->
+            View (Inject_transactions (force, timestamp)));
       ]
 
   let pp ppf (View r) =
     match r with
     | Add_transaction transaction ->
-        let (Ethereum_types.Hex transaction) = transaction in
-        Format.fprintf ppf "Add [%s] tx to tx-pool" transaction
-    | New_l2_head block_height ->
-        let (Ethereum_types.Block_height block_height) = block_height in
-        Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
+        Format.fprintf
+          ppf
+          "Add [%s] tx to tx-pool"
+          (Hex.of_string transaction |> Hex.show)
+    | Inject_transactions (force, timestamp) ->
+        Format.fprintf
+          ppf
+          "Inject transactions at %a (force is %b)"
+          Time.Protocol.pp
+          timestamp
+          force
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -192,7 +211,6 @@ let on_transaction state tx_raw =
       (* Add the tx to the pool*)
       let*? pool = Pool.add pool pkey base_fee tx_raw in
       (* compute the hash *)
-      let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
@@ -204,12 +222,10 @@ let on_transaction state tx_raw =
       state.pool <- pool ;
       return (Ok hash)
 
-let on_head state block_height =
+let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
+    =
   let open Lwt_result_syntax in
-  let open Types in
-  let {rollup_node = (module Rollup_node); smart_rollup_address; pool; _} =
-    state
-  in
+  let (module Rollup_node : Services_backend_sig.S) = rollup_node in
   (* Get all the addresses in the tx-pool. *)
   let addresses = Pool.addresses pool in
   (* Get the nonce related to each address. *)
@@ -261,29 +277,46 @@ let on_head state block_height =
            Int64.compare index_a index_b)
     |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
   in
-  (* Send the txs to the rollup *)
-  let*! () =
-    Lwt_list.iter_s
-      (fun raw_tx ->
-        let open Lwt_syntax in
-        let+ hash_result =
-          Rollup_node.inject_raw_transaction ~smart_rollup_address raw_tx
-        in
-        match hash_result with
-        | Error _ ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-            Format.printf "[tx-pool] Error when sending transaction.\n%!"
-        | Ok _ ->
-            Format.printf
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-              "[tx-pool] Transaction %s sent to the rollup.\n%!"
-              (Ethereum_types.hex_to_string raw_tx))
-      txs
+
+  let n = List.length txs in
+
+  if n > 0 || force then
+    (* Send the txs to the rollup *)
+    let*! hashes =
+      Rollup_node.inject_raw_transactions
+        ~timestamp
+        ~smart_rollup_address
+        ~transactions:txs
+    in
+    let nb_transactions =
+      match hashes with
+      | Error _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+          Format.printf "[tx-pool] Error when sending transaction.\n%!" ;
+          0
+      | Ok hashes ->
+          List.iter
+            (fun hash ->
+              Format.printf
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
+                "[tx-pool] Transaction %s sent to the rollup.\n%!"
+                (Ethereum_types.hash_to_string hash))
+            hashes ;
+          n
+    in
+    return (pool, nb_transactions)
+  else return (pool, 0)
+
+let on_head ~force ~timestamp state =
+  let open Lwt_result_syntax in
+  let open Types in
+  let {rollup_node; smart_rollup_address; pool; _} = state in
+  let* pool, nb_transactions =
+    inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
   in
   (* update the pool *)
-  state.level <- block_height ;
   state.pool <- pool ;
-  return_unit
+  return nb_transactions
 
 module Handlers = struct
   type self = worker
@@ -297,20 +330,15 @@ module Handlers = struct
     match request with
     | Request.Add_transaction raw_tx ->
         protect @@ fun () -> on_transaction state raw_tx
-    | Request.New_l2_head block_height ->
-        protect @@ fun () -> on_head state block_height
+    | Request.Inject_transactions (force, timestamp) ->
+        protect @@ fun () -> on_head ~force ~timestamp state
 
   type launch_error = error trace
 
-  let on_launch _w () (rollup_node, smart_rollup_address) =
+  let on_launch _w ()
+      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
     let state =
-      Types.
-        {
-          rollup_node;
-          smart_rollup_address;
-          level = Block_height Z.zero;
-          pool = Pool.empty;
-        }
+      Types.{rollup_node; smart_rollup_address; pool = Pool.empty; mode}
     in
     Lwt_result_syntax.return state
 
@@ -349,43 +377,52 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-(** Sends New_l2_level each time there is a new l2 level 
-TODO: https://gitlab.com/tezos/tezos/-/issues/6079
-listen to the node instead of pulling the level each 5s
-*)
-let rec subscribe_l2_block worker =
-  let open Lwt_result_syntax in
-  let*! () = Lwt_unix.sleep 5.0 in
-  let state = Worker.state worker in
-  let Types.{rollup_node = (module Rollup_node_rpc); _} = state in
-  (* Get the current eth level.*)
-  let*! res = Rollup_node_rpc.current_block_number () in
-  match res with
-  | Error _ ->
+let make_streamed_call ~rollup_node_endpoint =
+  let open Lwt_syntax in
+  let stream, push = Lwt_stream.create () in
+  let on_chunk _v = push (Some ()) and on_close () = push None in
+  let* _spill_all =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.json]
+      ~base:rollup_node_endpoint
+      Rollup_node_services.global_block_watcher
+      ~on_chunk
+      ~on_close
+      ()
+      ()
+      ()
+  in
+  return stream
+
+let rec subscribe_l2_block ~stream_l2 worker =
+  let open Lwt_syntax in
+  let* new_head = Lwt_stream.get stream_l2 in
+  match new_head with
+  | Some () ->
+      let* _pushed =
+        Worker.Queue.push_request
+          worker
+          (Request.Inject_transactions (true, Helpers.now ()))
+      in
+      subscribe_l2_block ~stream_l2 worker
+  | None ->
       (* Kind of retry strategy *)
       Format.printf
         "Connection with the rollup node has been lost, retrying...\n" ;
-      subscribe_l2_block worker
-  | Ok block_number ->
-      if state.level != block_number then
-        let*! _pushed =
-          Worker.Queue.push_request worker (Request.New_l2_head block_number)
-        in
-        subscribe_l2_block worker
-      else subscribe_l2_block worker
+      let* () = Lwt_unix.sleep 1. in
+      subscribe_l2_block ~stream_l2 worker
 
-let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
+let start ({mode; _} as parameters) =
   let open Lwt_result_syntax in
-  let+ worker =
-    Worker.launch
-      table
-      ()
-      ((module Rollup_node_rpc), smart_rollup_address)
-      (module Handlers)
-  in
+  let+ worker = Worker.launch table () parameters (module Handlers) in
   let () =
     Lwt.dont_wait
-      (fun () -> subscribe_l2_block worker)
+      (fun () ->
+        match mode with
+        | Proxy {rollup_node_endpoint} ->
+            let*! stream_l2 = make_streamed_call ~rollup_node_endpoint in
+            subscribe_l2_block ~stream_l2 worker
+        | Sequencer -> Lwt.return_unit)
       (fun _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
         Format.printf "[tx-pool] Pool has been stopped.\n%!")
@@ -417,3 +454,11 @@ let nonce pkey =
     | Some current_nonce -> Pool.next_nonce pkey current_nonce pool
   in
   return next_nonce
+
+let produce_block ~force ~timestamp =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Inject_transactions (force, timestamp))
+  |> handle_request_error

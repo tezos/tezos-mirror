@@ -48,7 +48,7 @@ type valid_filter = {
 }
 
 module Event = struct
-  let section = ["evm_node"; "prod"; "logs_filter"]
+  let section = ["evm_node"; "dev"; "logs_filter"]
 
   let incompatible_block_params =
     Internal_event.Simple.declare_0
@@ -94,7 +94,8 @@ end
 (** [height_from_param (module Rollup_node_rpc) from to_] returns the
     block height for params [from] and [to_] as a tuple.
 *)
-let height_from_param (module Rollup_node_rpc : Rollup_node.S) from to_ =
+let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
+    =
   let open Lwt_result_syntax in
   match (from, to_) with
   | Hash_param h1, Hash_param h2 -> return (h1, h2)
@@ -116,8 +117,8 @@ let emit_and_return_none event arg =
   return_none
 
 (* Parses the [from_block] and [to_block] fields, as described before.  *)
-let validate_range log_filter_config (module Rollup_node_rpc : Rollup_node.S)
-    (filter : filter) =
+let validate_range log_filter_config
+    (module Rollup_node_rpc : Services_backend_sig.S) (filter : filter) =
   let open Lwt_result_syntax in
   match filter with
   | {from_block = Some _; to_block = Some _; block_hash = Some _; _} ->
@@ -165,7 +166,8 @@ let ( let*?? ) m f =
 
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
-let validate_filter log_filter_config (module Rollup_node_rpc : Rollup_node.S) :
+let validate_filter log_filter_config
+    (module Rollup_node_rpc : Services_backend_sig.S) :
     filter -> valid_filter option tzresult Lwt.t =
  fun filter ->
   let open Lwt_result_syntax in
@@ -221,7 +223,7 @@ let filter_one_log : valid_filter -> transaction_log -> filter_changes option =
   else None
 
 (* Apply a filter on one transaction *)
-let filter_one_tx (module Rollup_node_rpc : Rollup_node.S) :
+let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
     valid_filter -> hash -> filter_changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
@@ -234,7 +236,7 @@ let filter_one_tx (module Rollup_node_rpc : Rollup_node.S) :
   | None -> emit_and_return_none Event.receipt_not_found tx_hash
 
 (* Apply a filter on one block *)
-let filter_one_block (module Rollup_node_rpc : Rollup_node.S) :
+let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
     valid_filter -> Z.t -> filter_changes list option tzresult Lwt.t =
  fun filter block_number ->
   let open Lwt_result_syntax in
@@ -292,7 +294,7 @@ let split_in_chunks ~chunk_size ~base ~length =
    performace and not exceeding the bound in number of logs.
 *)
 let get_logs (log_filter_config : Configuration.log_filter_config)
-    (module Rollup_node_rpc : Rollup_node.S) filter =
+    (module Rollup_node_rpc : Services_backend_sig.S) filter =
   let open Lwt_result_syntax in
   let+ logs =
     let*?? filter =

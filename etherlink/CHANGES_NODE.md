@@ -2,9 +2,19 @@
 
 ## Notes
 
-Currently supported kernel version: 32f957d52ace920916d54b9f02a2d32ee30e16b3
+Currently supported kernel version: 9978f3a5f8bee0be78686c5c568109d2e6148f13
 
 ## Version Next
+
+### Features
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for kernel 9978f3a5f8bee0be78686c5c568109d2e6148f13
 
 ### Features
 

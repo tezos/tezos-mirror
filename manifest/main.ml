@@ -8386,6 +8386,11 @@ let evm_node_lib_prod =
         evm_node_lib_prod_encoding |> open_;
         lwt_exit;
         evm_node_config |> open_;
+        octez_context_disk;
+        octez_context_encoding;
+        octez_scoru_wasm;
+        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_debugger_lib |> open_;
       ]
 
 let evm_node_lib_dev_encoding =
