@@ -221,8 +221,9 @@ fn deserialize_index(v: &Value) -> Option<Either> {
             }
         }
         Value::String(string) => {
-            if let Some(label) =
-                regex::Regex::new(r":label (\w+)").unwrap().captures(string)
+            if let Some(label) = regex::Regex::new(r":label ([\w-]+)")
+                .unwrap()
+                .captures(string)
             {
                 Some(Either::Constraint(IndexKind::Label(String::from(
                     label.get(1).unwrap().as_str(),
