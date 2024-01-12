@@ -497,6 +497,44 @@ impl CSRegister {
         // if no legal values are defined, then the register is not WLRL
         legal_values.is_empty() || legal_values.contains(&new_value)
     }
+
+    /// Value for CSR `misa`, see section 3.1.1 & tables 3.1 (MXL) & 3.2 (Extensions)
+    const WARL_MISA_VALUE: CSRValue = {
+        /* MXLEN encoding of 64 bits */
+        const MXL_ENCODING: u64 = 0b10 << 62;
+        /* Extensions (A + C + D + F + I + M + S + U) */
+        const ATOMIC_EXT: u64 = 1 << 0;
+        const COMPRESSED_EXT: u64 = 1 << 2;
+        const DOUBLE_EXT: u64 = 1 << 3;
+        const SINGLE_EXT: u64 = 1 << 5;
+        const RV64I_ISA_EXT: u64 = 1 << 8;
+        const MULT_DIV_EXT: u64 = 1 << 12;
+        const SUPERVISOR_EXT: u64 = 1 << 18;
+        const USER_EXT: u64 = 1 << 20;
+        /* MXL */
+        MXL_ENCODING |
+        /* Extensions */
+        ATOMIC_EXT |
+        COMPRESSED_EXT |
+        DOUBLE_EXT |
+        SINGLE_EXT |
+        SINGLE_EXT |
+        RV64I_ISA_EXT |
+        MULT_DIV_EXT |
+        SUPERVISOR_EXT |
+        USER_EXT
+    };
+
+    /// Ensures WARL registers / fields are respected
+    ///
+    /// Section 2.3 - privileged spec
+    #[inline(always)]
+    pub fn transform_warl_fields(self, new_value: CSRValue) -> CSRValue {
+        match self {
+            CSRegister::misa => CSRegister::WARL_MISA_VALUE,
+            _ => new_value,
+        }
+    }
 }
 
 /// Value in a CSR
@@ -605,6 +643,8 @@ impl<M: backend::Manager> CSRegisters<M> {
     fn make_value_writable(&self, reg: CSRegister, value: CSRValue) -> Option<CSRValue> {
         // respect the reserved WPRI fields, setting them 0
         let value = reg.clear_wpri_fields(value);
+        // apply WARL rules
+        let value = reg.transform_warl_fields(value);
         // check if value is legal w.r.t. WLRL fields
         reg.is_legal(value).then_some(value)
     }
@@ -722,5 +762,19 @@ pub mod tests {
         assert!(!check(csreg::scause, 0x8000_0000_0000_000B));
         assert!(!check(csreg::scause, 0x0000_0F00_0000_F0F0));
         assert!(!check(csreg::scause, 0x000A));
+    }
+
+    #[test]
+    fn test_warl() {
+        use crate::csregisters::CSRegister as csreg;
+
+        let check = |reg: csreg, value| reg.transform_warl_fields(value);
+
+        // misa field
+        assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
+        assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_112D);
+
+        // non warl register
+        assert!(check(csreg::instret, 0x42) == 0x42);
     }
 }
