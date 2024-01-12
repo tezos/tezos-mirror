@@ -33,163 +33,163 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "44000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "99000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "99000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "154000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "154000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "209000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "209000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "264000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "264000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "319000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "319000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "374000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "374000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "429000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "429000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "484000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "484000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "539000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "539000000000"
 
-GET http://127.0.0.1:[PORT]/global/block/head/state_hash
+GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "594000000000"
 

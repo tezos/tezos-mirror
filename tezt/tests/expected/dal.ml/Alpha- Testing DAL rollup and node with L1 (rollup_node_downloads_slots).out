@@ -62,15 +62,15 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 170.875
 
-GET http://127.0.0.1:[PORT]/global/block/head/dal/slot_headers
+GET http://[HOST]:[PORT]/global/block/head/dal/slot_headers
 200 OK
 [{"level":4,"index":0,"commitment":"[DAL_SLOT_HEADER]"},{"level":4,"index":1,"commitment":"[DAL_SLOT_HEADER]"},{"level":4,"index":2,"commitment":"[DAL_SLOT_HEADER]"}]
 
-GET http://127.0.0.1:[PORT]/global/block/head/dal/processed_slots
+GET http://[HOST]:[PORT]/global/block/head/dal/processed_slots
 200 OK
 [{"index":0,"status":"unconfirmed"},{"index":1,"status":"confirmed"},{"index":2,"status":"confirmed"},{"index":3,"status":"unconfirmed"},{"index":4,"status":"unconfirmed"},{"index":5,"status":"unconfirmed"},{"index":6,"status":"unconfirmed"},{"index":7,"status":"unconfirmed"},{"index":8,"status":"unconfirmed"},{"index":9,"status":"unconfirmed"},{"index":10,"status":"unconfirmed"},{"index":11,"status":"unconfirmed"},{"index":12,"status":"unconfirmed"},{"index":13,"status":"unconfirmed"},{"index":14,"status":"unconfirmed"},{"index":15,"status":"unconfirmed"}]
 
-GET http://127.0.0.1:[PORT]/global/block/8/dal/processed_slots
+GET http://[HOST]:[PORT]/global/block/8/dal/processed_slots
 200 OK
 [{"index":0,"status":"unconfirmed"},{"index":1,"status":"confirmed"},{"index":2,"status":"confirmed"},{"index":3,"status":"unconfirmed"},{"index":4,"status":"unconfirmed"},{"index":5,"status":"unconfirmed"},{"index":6,"status":"unconfirmed"},{"index":7,"status":"unconfirmed"},{"index":8,"status":"unconfirmed"},{"index":9,"status":"unconfirmed"},{"index":10,"status":"unconfirmed"},{"index":11,"status":"unconfirmed"},{"index":12,"status":"unconfirmed"},{"index":13,"status":"unconfirmed"},{"index":14,"status":"unconfirmed"},{"index":15,"status":"unconfirmed"}]
 

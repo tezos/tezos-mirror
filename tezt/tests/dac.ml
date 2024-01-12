@@ -2386,7 +2386,9 @@ module Api_regression = struct
       [
         ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
         ("(BLsig|asig)\\w{137}\\b", "[AGGREGATED_SIG]");
+        ("http://localhost:\\d{4,5}/", "$SCHEME://$HOST:$PORT/");
         ("http://127.0.0.1:\\d{4,5}/", "$SCHEME://$HOST:$PORT/");
+        ("http://\\[::1\\]:\\d{4,5}/", "$SCHEME://$HOST:$PORT/");
       ]
     in
     List.fold_left
