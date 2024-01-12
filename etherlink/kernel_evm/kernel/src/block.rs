@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -796,7 +797,7 @@ mod tests {
         let dest_balance =
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
-        assert_eq!(sender_balance, U256::from(9999999999499979000u64));
+        assert_eq!(sender_balance, U256::from(9999999159500000000u64));
         assert_eq!(dest_balance, U256::from(500000000u64))
     }
 
@@ -1063,13 +1064,7 @@ mod tests {
         // Ensures the caller has enough balance to pay for the fees, but not
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
-        let fees = BlockConstants::first_block(
-            U256::from(0),
-            DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .gas_price
-            * tx.gas_limit;
+        let fees = U256::from(21000) * tx.gas_limit;
         set_balance(&mut host, &mut evm_account_storage, &caller, fees);
 
         // Prepare a invalid transaction, i.e. with not enough funds.

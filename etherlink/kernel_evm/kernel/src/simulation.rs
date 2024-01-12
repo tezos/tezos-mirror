@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -111,6 +111,13 @@ impl Evaluation {
                 0,
                 tx_data_size,
             );
+
+        let gas_price = if let Some(gas_price) = self.gas_price {
+            U256::from(gas_price)
+        } else {
+            crate::retrieve_base_fee_per_gas(host)?
+        };
+
         let outcome = evm_execution::run_transaction(
             host,
             &current_constants,
@@ -123,6 +130,7 @@ impl Evaluation {
             self.gas
                 .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
                 .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
+            gas_price,
             self.value,
             false,
             allocated_ticks,
@@ -538,6 +546,7 @@ mod tests {
         // gas limit was estimated using Remix on Shanghai network (256,842)
         // plus a safety margin for gas accounting discrepancies
         let gas_limit = 300_000;
+        let gas_price = U256::from(21000);
         // create contract
         let outcome = evm_execution::run_transaction(
             host,
@@ -549,6 +558,7 @@ mod tests {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             false,
             DUMMY_ALLOCATED_TICKS,

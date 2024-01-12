@@ -1776,6 +1776,7 @@ dependencies = [
 name = "tezos_ethereum"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "ethbloom",
  "ethereum",
  "hex",

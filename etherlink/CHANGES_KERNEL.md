@@ -6,6 +6,8 @@
 
 ### Bug fixes
 
+- Fix minimum gas price used for charging fees: should be `base_fee_per_gas`, instead of `1 wei`. (!11509)
+
 ### Breaking changes
 
 ### Internal

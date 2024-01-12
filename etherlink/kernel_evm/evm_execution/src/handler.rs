@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
@@ -268,10 +268,13 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// Estimated ticks spent for the execution of the current transaction,
     /// according to the ticks per gas per opcode model
     pub estimated_ticks_used: u64,
+    /// The effective gas price of the current transaction
+    effective_gas_price: U256,
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Create a new handler to suit a new, initial EVM call context
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         host: &'a mut Host,
         evm_account_storage: &'a mut EthereumAccountStorage,
@@ -280,6 +283,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         config: &'a Config,
         precompiles: &'a dyn PrecompileSet<Host>,
         ticks_allocated: u64,
+        effective_gas_price: U256,
     ) -> Self {
         Self {
             host,
@@ -291,6 +295,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             transaction_data: vec![],
             ticks_allocated,
             estimated_ticks_used: 0,
+            effective_gas_price,
         }
     }
 
@@ -451,10 +456,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         caller: H160,
         gas_limit: Option<u64>,
+        effective_gas_price: U256,
     ) -> Result<bool, EthereumError> {
         match gas_limit {
             Some(gas_limit) => {
-                let amount = U256::from(gas_limit) * self.block.gas_price;
+                let amount = U256::from(gas_limit).saturating_mul(effective_gas_price);
                 log!(
                     self.host,
                     Debug,
@@ -476,10 +482,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         caller: H160,
         unused_gas: Option<u64>,
+        effective_gas_price: U256,
     ) -> Result<(), EthereumError> {
         match unused_gas {
             Some(unused_gas) => {
-                let amount = U256::from(unused_gas) * self.block.gas_price;
+                let amount = U256::from(unused_gas).saturating_mul(effective_gas_price);
                 log!(
                     self.host,
                     Debug,
@@ -1583,7 +1590,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn gas_price(&self) -> U256 {
-        self.block.gas_price
+        self.effective_gas_price
     }
 
     fn origin(&self) -> H160 {
@@ -1889,6 +1896,8 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::shanghai();
 
+        let gas_price = U256::from(21000);
+
         // This is a randomly generated address. It has been used for testing legacy address
         // generation with zero nonce using Ethereum. To replicate (with new address):
         // - generate a fresh Ethereum account (on Rinkeby or other test net)
@@ -1907,6 +1916,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let result = handler.create_address(CreateScheme::Legacy { caller });
@@ -1927,6 +1937,8 @@ mod test {
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -1935,6 +1947,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -1959,6 +1972,9 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::shanghai();
+
+        let gas_price = U256::from(21000);
+
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -1970,6 +1986,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -2002,6 +2019,8 @@ mod test {
         // We use an origin distinct from caller for testing purposes
         let origin = H160::from_low_u64_be(117_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2010,6 +2029,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2059,6 +2079,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(28349_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2067,6 +2089,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2154,6 +2177,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(2340);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2162,6 +2187,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let input_value = U256::from(2026_u32);
@@ -2255,6 +2281,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(8213);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2263,6 +2291,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let input_value = U256::from(1025_u32); // transaction depth for contract below is callarg - 1
@@ -2343,6 +2372,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(444);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2351,6 +2382,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(312);
@@ -2410,6 +2442,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(117);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2418,6 +2452,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let value = U256::zero();
@@ -2463,6 +2498,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(118);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2471,6 +2508,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(117);
@@ -2521,6 +2559,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2529,6 +2569,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -2578,6 +2619,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2586,6 +2629,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -2645,6 +2689,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2653,6 +2699,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let hash_of_unavailable_block = handler.block_hash(U256::zero());
@@ -2668,6 +2715,8 @@ mod test {
         let config = Config::london();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2676,6 +2725,7 @@ mod test {
             &config,
             &precompiles,
             10_000,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -2724,6 +2774,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2732,6 +2784,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -2771,6 +2824,8 @@ mod test {
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(523_u64);
 
+        let gas_price = U256::from(21000);
+
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2779,6 +2834,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -2850,6 +2906,8 @@ mod test {
         let transaction_context =
             TransactionContext::new(caller, target_address, U256::zero());
 
+        let gas_price = U256::from(21000);
+
         // { (CALL 50000 0xec2c6832d00680ece8ff9254f81fdab0a5a2ac50 0 0 0 0 0) (MSTORE 0 0x6460016001556000526005601bf3) (CREATE2 0 18 14 0) }
         let input = hex::decode("6000600060006000600073e2b35478fdd26477cc576dd906e6277761246a3c61c350f1506000600060006000f500").unwrap();
 
@@ -2861,6 +2919,7 @@ mod test {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         // { (SELFDESTRUCT 0x10) }
