@@ -53,7 +53,7 @@ module Event = struct
   let incompatible_block_params =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"incompatible_block_params"
+      ~name:"incompatible_block_params_dev"
       ~msg:"block_hash field cannot be set when from_block and to_block are set"
       ~level:Error
       ()
@@ -61,7 +61,7 @@ module Event = struct
   let block_range_too_large =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"block_range_too_large"
+      ~name:"block_range_too_large_dev"
       ~msg:"Requested block range is above the maximum"
       ~level:Error
       ()
@@ -69,7 +69,7 @@ module Event = struct
   let topic_list_too_large =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"topic_list_too_large"
+      ~name:"topic_list_too_large_dev"
       ~msg:"Topic list length should be at most 4"
       ~level:Error
       ()
@@ -77,7 +77,7 @@ module Event = struct
   let receipt_not_found =
     Internal_event.Simple.declare_1
       ~section
-      ~name:"receipt_not_found"
+      ~name:"receipt_not_found_dev"
       ~msg:"Receipt not found for {tx_hash}"
       ~level:Error
       ("tx_hash", hash_encoding)
@@ -85,7 +85,7 @@ module Event = struct
   let too_many_logs =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"too_many_logs"
+      ~name:"too_many_logs_dev"
       ~msg:"Too many logs requested"
       ~level:Error
       ()
