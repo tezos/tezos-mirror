@@ -1819,6 +1819,12 @@ val sign_block : t -> string -> delegate:string -> string Lwt.t
 (** Same as [sign_block], but do not wait for the process to exit. *)
 val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
+(** Run [octez-client sign bytes <bytes> for <signer>]. *)
+val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
+
+(** Same as [sign_bytes], but do not wait for the process to exit. *)
+val spawn_sign_bytes : signer:string -> data:string -> t -> Process.t
+
 (** Run [octez-client sign message <message> for <src>]. *)
 val sign_message : ?branch:string -> t -> string -> src:string -> string Lwt.t
 
@@ -2582,9 +2588,6 @@ val contract_entrypoint_type :
 (** Same as [contract_entrypoint_type], but do not wait for the process to exit. *)
 val spawn_contract_entrypoint_type :
   entrypoint:string -> contract:string -> t -> Process.t
-
-(** Sign a string of bytes with secret key of the given account. *)
-val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 
 (** Show a conversion format as used for the [convert*] function
     family *)

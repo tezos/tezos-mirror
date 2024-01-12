@@ -3042,10 +3042,12 @@ let contract_entrypoint_type ~entrypoint ~contract client =
   spawn_contract_entrypoint_type ~entrypoint ~contract client
   |> Process.check_and_read_stdout
 
+let spawn_sign_bytes ~signer ~data client =
+  spawn_command client ["sign"; "bytes"; data; "for"; signer]
+
 let sign_bytes ~signer ~data client =
   let* output =
-    spawn_command client ["sign"; "bytes"; data; "for"; signer]
-    |> Process.check_and_read_stdout
+    spawn_sign_bytes ~signer ~data client |> Process.check_and_read_stdout
   in
   match output =~* rex "Signature: ([a-zA-Z0-9]+)" with
   | Some signature -> Lwt.return signature

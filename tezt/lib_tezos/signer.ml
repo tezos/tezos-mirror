@@ -29,6 +29,7 @@ module Parameters = struct
     base_dir : string;
     uri : Uri.t;
     keys : Account.key list;
+    magic_byte : string option;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -91,7 +92,7 @@ let spawn_import_secret_key signer (key : Account.key) =
 let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
-let create ?name ?color ?event_pipe ?base_dir ?uri ?runner
+let create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?magic_byte
     ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
@@ -107,7 +108,7 @@ let create ?name ?color ?event_pipe ?base_dir ?uri ?runner
       ?color
       ?event_pipe
       ?runner
-      {runner; base_dir; uri; keys; pending_ready = []}
+      {runner; base_dir; uri; keys; pending_ready = []; magic_byte}
   in
   on_event signer (handle_readiness signer) ;
   let* () = Lwt_list.iter_s (import_secret_key signer) keys in
@@ -126,6 +127,11 @@ let run signer =
     | None -> []
     | Some port -> ["--port"; Int.to_string port]
   in
+  let magic_bytes_args =
+    match signer.persistent_state.magic_byte with
+    | None -> []
+    | Some magic_byte -> ["--magic-bytes"; magic_byte]
+  in
   let arguments =
     [
       "--base-dir";
@@ -136,7 +142,7 @@ let run signer =
       "--address";
       host;
     ]
-    @ port_args
+    @ port_args @ magic_bytes_args
   in
   let arguments =
     if !passfile = "" then arguments
@@ -166,9 +172,9 @@ let wait_for_ready signer =
         resolver :: signer.persistent_state.pending_ready ;
       check_event signer "Signer started." promise
 
-let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys () =
+let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte () =
   let* signer =
-    create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ()
+    create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte ()
   in
   let* () = run signer in
   let* () = wait_for_ready signer in

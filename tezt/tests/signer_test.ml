@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,6 +79,36 @@ let signer_simple_test =
   in
   unit
 
+let signer_magic_bytes_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"signer magic-bytes test"
+    ~tags:["signer"; "magicbytes"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun protocol ->
+  let* _node, client = Client.init_with_protocol ~protocol `Client () in
+  let* signer =
+    Signer.init ~keys:[Constant.tz4_account] ~magic_byte:"0x03" ()
+  in
+  let* () =
+    let uri = Signer.uri signer in
+    let Account.{alias; public_key_hash; _} = Constant.tz4_account in
+    Client.import_signer_key client ~alias ~public_key_hash uri
+  in
+  (* Check allowed magic byte. *)
+  let* _ =
+    Client.sign_bytes ~signer:Constant.tz4_account.alias ~data:"0x03" client
+  in
+  (* Check unallowed magic byte. *)
+  let* () =
+    Client.spawn_sign_bytes
+      ~signer:Constant.tz4_account.alias
+      ~data:"0x04"
+      client
+    |> Process.check_error ~msg:(rex "magic byte 0x04 not allowed\n")
+  in
+  unit
+
 let signer_bls_test =
   Protocol.register_test
     ~__FILE__
@@ -124,4 +154,5 @@ let signer_bls_test =
 
 let register ~protocols =
   signer_simple_test protocols ;
+  signer_magic_bytes_test protocols ;
   signer_bls_test protocols

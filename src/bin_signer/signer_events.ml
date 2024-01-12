@@ -74,6 +74,15 @@ module Handler = struct
       ~msg:"signing data for key {key}"
       ("key", Data_encoding.string)
 
+  let signing_data_failure =
+    declare_2
+      ~section
+      ~level:Error
+      ~name:"signing_data_failure"
+      ~msg:"Failed to sign data for key {key}: {failure}"
+      ("key", Data_encoding.string)
+      ("failure", Data_encoding.string)
+
   let request_for_deterministic_nonce =
     declare_2
       ~section
@@ -133,7 +142,7 @@ module Handler = struct
   let request_for_public_key =
     declare_1
       ~section
-      ~level
+      ~level:Error
       ~name:"request_for_public_key"
       ~msg:"request for public key {key}"
       ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
