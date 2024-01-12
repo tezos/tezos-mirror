@@ -32,6 +32,12 @@
     [Dev] means "Development Version".
     All non-release branches should use this.
 
+    [Beta] refers to a version that is not believed to be stable
+    but contains features for the next release.
+    For each release, the first beta version has number 1.
+
+    [Beta_dev] refers to a beta version "in development".
+
     [RC] means "Release Candidate".
     For each release, the first release candidate has number 1.
 
@@ -41,9 +47,14 @@
 
     [Release] means "no additional information".
     This is an actual released version.
-    No additional info is printed. *)
+    No additional info is printed.
+
+    Documentation on the semantics of version numbers is available
+    at [docs/releases/releases.rst]. *)
 type additional_info = Tezos_version_parser.additional_info =
   | Dev
+  | Beta of int
+  | Beta_dev of int
   | RC of int
   | RC_dev of int
   | Release

@@ -21,6 +21,8 @@
   (* for the doc of this structure refer to the file version.mli *)
   type additional_info =
     | Dev
+    | Beta of int
+    | Beta_dev of int
     | RC of int
     | RC_dev of int
     | Release [@@deriving show]
@@ -52,6 +54,10 @@ and extra = parse
       { (RC (int rc)) }
   | "-rc" (num as rc) _
       { (RC_dev (int rc)) }
+  | "-beta" (num as beta) eof
+      { (Beta (int beta)) }
+  | "-beta" (num as beta) _
+      { (Beta_dev (int beta)) }
   | eof
       { Release }
   | _
