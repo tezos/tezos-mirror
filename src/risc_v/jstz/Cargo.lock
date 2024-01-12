@@ -1828,6 +1828,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
 ]
 

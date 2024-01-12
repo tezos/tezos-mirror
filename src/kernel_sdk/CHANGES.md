@@ -4,6 +4,7 @@
 
 ### SDK
 - Add experimental support for compiling kernels to a Hermit RISC-V image behind the `proto-alpha` flag.
+- Add an experimental rollup host with an in-memory store behind the `experimental-host-in-memory-store` flag.
 
 ### Installer client/kernel
 

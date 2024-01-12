@@ -44,6 +44,8 @@ const NAIROBI_BLOCK_TIME: i64 = 15;
 // Nairobi activated approximately at 0:07AM UTC on June 24th 2023.
 const NAIROBI_ACTIVATION_TIMESTAMP: i64 = 1_687_561_630;
 
+pub use state::InMemoryStore;
+
 /// The runtime host when _not_ running in **wasm**.
 #[derive(Debug)]
 pub struct MockHost {
@@ -112,7 +114,7 @@ impl MockHost {
         // `run_level` API.
         let reboots = MAXIMUM_REBOOTS_PER_INPUT;
         let bytes = reboots.to_le_bytes().to_vec();
-        state.store.set_value(REBOOT_COUNTER_KEY, bytes);
+        state.store.0.set_value(REBOOT_COUNTER_KEY, bytes);
 
         state.curr_level = NAIROBI_ACTIVATION_LEVEL;
 
@@ -177,21 +179,22 @@ impl MockHost {
 
         loop {
             let bytes = reboots.to_le_bytes().to_vec();
-            self.as_mut().store.set_value(REBOOT_COUNTER_KEY, bytes);
+            self.as_mut().store.0.set_value(REBOOT_COUNTER_KEY, bytes);
 
             kernel_run(self);
-            self.as_mut().store.node_delete(TOO_MANY_REBOOT_FLAG_KEY);
+            self.as_mut().store.0.node_delete(TOO_MANY_REBOOT_FLAG_KEY);
 
             reboots -= 1;
 
             let reboot_requested = self
                 .as_mut()
                 .store
+                .0
                 .maybe_get_value(REBOOT_FLAG_KEY)
                 .is_some();
 
             if reboot_requested {
-                self.as_mut().store.node_delete(REBOOT_FLAG_KEY);
+                self.as_mut().store.0.node_delete(REBOOT_FLAG_KEY);
 
                 if reboots > 0 {
                     continue;
@@ -199,6 +202,7 @@ impl MockHost {
 
                 self.as_mut()
                     .store
+                    .0
                     .set_value(TOO_MANY_REBOOT_FLAG_KEY, vec![]);
             }
             break;
@@ -222,7 +226,7 @@ impl MockHost {
 
     /// Show the outbox at the given level
     pub fn outbox_at(&self, level: u32) -> Vec<Vec<u8>> {
-        self.state.borrow().store.outbox_at(level).to_vec()
+        self.state.borrow().store.0.outbox_at(level).to_vec()
     }
 
     fn bump_level(&mut self) {

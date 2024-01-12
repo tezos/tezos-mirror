@@ -8,17 +8,14 @@
 
 use crypto::hash::SmartRollupHash;
 use tezos_smart_rollup_core::{
-    MAX_FILE_CHUNK_SIZE, MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
+    MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
-use tezos_smart_rollup_host::{
-    metadata::RollupMetadata,
-    path::{PathError, RefPath},
-    Error,
-};
+use tezos_smart_rollup_host::{metadata::RollupMetadata, Error};
 
+pub(crate) mod in_memory_store;
 pub(crate) mod store;
 
-use self::store::Store;
+pub use self::in_memory_store::InMemoryStore;
 
 const MAX_OUTPUTS_PER_LEVEL: usize = 100;
 
@@ -33,7 +30,7 @@ pub(crate) struct NextInput {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct HostState {
     /// Key-value store of runtime state.
-    pub store: Store,
+    pub store: InMemoryStore,
     pub metadata: RollupMetadata,
     // Inbox metadata
     pub(crate) curr_level: u32,
@@ -43,7 +40,7 @@ pub(crate) struct HostState {
 
 impl Default for HostState {
     fn default() -> Self {
-        let store = Store::default();
+        let store = InMemoryStore::default();
         let raw_rollup_address: [u8; 20] =
             SmartRollupHash::from_base58_check("sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h")
                 .unwrap()
@@ -79,8 +76,8 @@ impl HostState {
             return Err(Error::InputOutputTooLarge);
         }
 
-        if self.store.outbox_at(self.curr_level).len() < MAX_OUTPUTS_PER_LEVEL {
-            self.store.outbox_insert(self.curr_level, output);
+        if self.store.0.outbox_at(self.curr_level).len() < MAX_OUTPUTS_PER_LEVEL {
+            self.store.0.outbox_insert(self.curr_level, output);
             Ok(())
         } else {
             Err(Error::FullOutbox)
@@ -121,7 +118,7 @@ impl HostState {
         hash: &[u8; PREIMAGE_HASH_SIZE],
         max_bytes: usize,
     ) -> &[u8] {
-        let preimage = self.store.retrieve_preimage(hash);
+        let preimage = self.store.0.retrieve_preimage(hash);
         if preimage.len() < max_bytes {
             preimage
         } else {
@@ -130,195 +127,11 @@ impl HostState {
     }
 
     pub(crate) fn set_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
-        self.store.add_preimage(preimage)
+        self.store.0.add_preimage(preimage)
     }
 
     pub(crate) fn get_metadata(&self) -> &RollupMetadata {
         &self.metadata
-    }
-
-    pub(crate) fn handle_store_has(&self, raw_path: &[u8]) -> Result<i32, Error> {
-        let path = validate_path(raw_path)?;
-
-        let has_value = self.store.has_entry(&path);
-        let has_subvalue = self.handle_store_list_size(raw_path).unwrap_or_default()
-            > i64::from(has_value);
-
-        let result = match (has_value, has_subvalue) {
-            (false, false) => tezos_smart_rollup_core::VALUE_TYPE_NONE,
-            (true, false) => tezos_smart_rollup_core::VALUE_TYPE_VALUE,
-            (false, true) => tezos_smart_rollup_core::VALUE_TYPE_SUBTREE,
-            (true, true) => tezos_smart_rollup_core::VALUE_TYPE_VALUE_WITH_SUBTREE,
-        };
-
-        Ok(result)
-    }
-
-    pub(crate) fn handle_store_read(
-        &self,
-        path: &[u8],
-        offset: usize,
-        max_bytes: usize,
-    ) -> Result<Vec<u8>, Error> {
-        let path = validate_path_maybe_readonly(path)?;
-
-        if !self.store.has_entry(&path) {
-            return Err(Error::StoreNotAValue);
-        }
-
-        let bytes = self.store.get_value(&path);
-        if offset > bytes.len() {
-            return Err(Error::StoreInvalidAccess);
-        }
-
-        let num_bytes = usize::min(
-            MAX_FILE_CHUNK_SIZE,
-            usize::min(max_bytes, bytes.len() - offset),
-        );
-        let mut value = Vec::with_capacity(num_bytes);
-
-        value.extend_from_slice(&bytes[offset..(offset + num_bytes)]);
-        Ok(value)
-    }
-
-    pub(crate) fn handle_store_write(
-        &mut self,
-        path: &[u8],
-        offset: usize,
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        if bytes.len() > MAX_FILE_CHUNK_SIZE {
-            return Err(Error::InputOutputTooLarge);
-        }
-
-        let path = validate_path(path)?;
-
-        let mut value = match self.store.maybe_get_value(&path) {
-            Some(value) => value.as_ref().clone(),
-            // No value, so only valid offset is zero (ie writing a new value).
-            None => Vec::with_capacity(bytes.len()),
-        };
-
-        if offset > value.len() {
-            return Err(Error::StoreInvalidAccess);
-        } else if offset < value.len() && (offset + bytes.len()) <= value.len() {
-            let _ = value
-                .splice(offset..(offset + bytes.len()), bytes.iter().copied())
-                .collect::<Vec<_>>();
-        } else {
-            value.truncate(offset);
-            value.extend_from_slice(bytes);
-        };
-
-        self.store.set_value(&path, value);
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_store_delete(&mut self, prefix: &[u8]) -> Result<(), Error> {
-        let durable_prefix = validate_path(prefix)?;
-
-        self.store.node_delete(&durable_prefix);
-        Ok(())
-    }
-
-    pub(crate) fn handle_store_delete_value(
-        &mut self,
-        prefix: &[u8],
-    ) -> Result<(), Error> {
-        let durable_prefix = validate_path(prefix)?;
-
-        self.store.delete_value(&durable_prefix);
-        Ok(())
-    }
-
-    pub(crate) fn handle_store_list_size(&self, prefix: &[u8]) -> Result<i64, Error> {
-        let prefix = validate_path(prefix)?;
-        self.store
-            .node_from_path(&prefix)
-            .map(|n| n.inner.len() as i64)
-            .ok_or(Error::StoreNotANode)
-    }
-
-    pub(crate) fn handle_store_move(
-        &mut self,
-        from_path: &[u8],
-        to_path: &[u8],
-    ) -> Result<(), Error> {
-        let from_durable_prefix = validate_path(from_path)?;
-        let to_durable_prefix = validate_path(to_path)?;
-
-        let from_node = self
-            .store
-            .node_from_path(&from_durable_prefix)
-            .ok_or(Error::StoreNotANode)?
-            .clone();
-
-        self.store.node_delete(&from_durable_prefix);
-        self.store.node_insert(&to_durable_prefix, from_node);
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_store_copy(
-        &mut self,
-        from_path: &[u8],
-        to_path: &[u8],
-    ) -> Result<(), Error> {
-        let from_durable_prefix = validate_path(from_path)?;
-        let to_durable_prefix = validate_path(to_path)?;
-
-        let from_node = self
-            .store
-            .node_from_path(&from_durable_prefix)
-            .ok_or(Error::StoreNotANode)?
-            .clone();
-
-        self.store.node_insert(&to_durable_prefix, from_node);
-
-        Ok(())
-    }
-
-    pub(crate) fn handle_store_value_size(&self, path: &[u8]) -> Result<i32, Error> {
-        let path = validate_path(path)?;
-        if !self.store.has_entry(&path) {
-            return Err(Error::StoreNotAValue);
-        }
-        Ok(self.store.get_value(&path).len() as i32)
-    }
-}
-
-fn validate_path(s: &[u8]) -> Result<String, Error> {
-    match RefPath::try_from(s) {
-        Err(PathError::PathTooLong) => Err(Error::StoreKeyTooLarge),
-        Err(_) => Err(Error::StoreInvalidKey),
-        Ok(_) => {
-            // SAFETY: a valid path is valid UTF-8
-            Ok(unsafe { String::from_utf8_unchecked(s.to_vec()) })
-        }
-    }
-}
-
-fn validate_path_maybe_readonly(s: &[u8]) -> Result<String, Error> {
-    const READONLY_PATH_SEGMENT: &[u8] = b"/readonly/";
-    const READONLY_PREFIX: &[u8] = b"/readonly";
-    let to_check = if s.len() > READONLY_PATH_SEGMENT.len()
-        && &s[..READONLY_PATH_SEGMENT.len()] == READONLY_PATH_SEGMENT
-    {
-        // the path has form "/readonly/(.+)", so we check the "/(.+)" part
-        &s[READONLY_PREFIX.len()..]
-    } else if s == READONLY_PREFIX {
-        return Ok(unsafe { String::from_utf8_unchecked(READONLY_PREFIX.to_vec()) });
-    } else {
-        s
-    };
-    match RefPath::try_from(to_check) {
-        Err(PathError::PathTooLong) => Err(Error::StoreKeyTooLarge),
-        Err(_) => Err(Error::StoreInvalidKey),
-        Ok(_) => {
-            // SAFETY: a valid path is valid UTF-8
-            Ok(unsafe { String::from_utf8_unchecked(s.to_vec()) })
-        }
     }
 }
 
@@ -372,15 +185,15 @@ mod tests {
         let written = vec![1, 2, 3, 4];
 
         // Act
-        state.handle_store_write(path, 0, &written).unwrap();
+        state.store.handle_store_write(path, 0, &written).unwrap();
 
         // Assert
         assert_eq!(
             Ok(VALUE_TYPE_VALUE),
-            state.handle_store_has(path),
+            state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(written), state.handle_store_read(path, 0, 4096));
+        assert_eq!(Ok(written), state.store.handle_store_read(path, 0, 4096));
     }
 
     #[test]
@@ -390,19 +203,19 @@ mod tests {
         let path: &[u8] = b"/test/path";
 
         let written = vec![1, 2, 3, 4];
-        state.handle_store_write(path, 0, &written).unwrap();
+        state.store.handle_store_write(path, 0, &written).unwrap();
 
         // Act
-        state.handle_store_write(path, 4, &written).unwrap();
+        state.store.handle_store_write(path, 4, &written).unwrap();
 
         // Assert
         let expected = vec![1, 2, 3, 4, 1, 2, 3, 4];
         assert_eq!(
             Ok(VALUE_TYPE_VALUE),
-            state.handle_store_has(path),
+            state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.handle_store_read(path, 0, 4096));
+        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
     }
 
     #[test]
@@ -412,19 +225,19 @@ mod tests {
         let path: &[u8] = b"/test/path";
 
         let written = vec![1, 2, 3, 4];
-        state.handle_store_write(path, 0, &written).unwrap();
+        state.store.handle_store_write(path, 0, &written).unwrap();
 
         // Act
-        state.handle_store_write(path, 2, &written).unwrap();
+        state.store.handle_store_write(path, 2, &written).unwrap();
 
         // Assert
         let expected = vec![1, 2, 1, 2, 3, 4];
         assert_eq!(
             Ok(VALUE_TYPE_VALUE),
-            state.handle_store_has(path),
+            state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.handle_store_read(path, 0, 4096));
+        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
     }
 
     #[test]
@@ -433,19 +246,22 @@ mod tests {
         let mut state = HostState::default();
         let path: &[u8] = b"/test/path";
 
-        state.handle_store_write(path, 0, &[1, 2, 3, 4]).unwrap();
+        state
+            .store
+            .handle_store_write(path, 0, &[1, 2, 3, 4])
+            .unwrap();
 
         // Act
-        state.handle_store_write(path, 1, &[9, 10]).unwrap();
+        state.store.handle_store_write(path, 1, &[9, 10]).unwrap();
 
         // Assert
         let expected = vec![1, 9, 10, 4];
         assert_eq!(
             Ok(VALUE_TYPE_VALUE),
-            state.handle_store_has(path),
+            state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.handle_store_read(path, 0, 4096));
+        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
     }
 
     #[test]
@@ -454,7 +270,10 @@ mod tests {
         let mut state = HostState::default();
         let prefix = "/a/long/prefix";
 
-        state.handle_store_write(prefix.as_bytes(), 0, &[]).unwrap();
+        state
+            .store
+            .handle_store_write(prefix.as_bytes(), 0, &[])
+            .unwrap();
 
         for i in 0..10 {
             // subkey of prefix
@@ -464,27 +283,32 @@ mod tests {
             // completely different prefix
             let not_subkey = format!("/different/prefix/{}", i);
 
-            state.handle_store_write(subkey.as_bytes(), 0, &[]).unwrap();
             state
+                .store
+                .handle_store_write(subkey.as_bytes(), 0, &[])
+                .unwrap();
+            state
+                .store
                 .handle_store_write(almost_subkey.as_bytes(), 0, &[])
                 .unwrap();
             state
+                .store
                 .handle_store_write(not_subkey.as_bytes(), 0, &[])
                 .unwrap();
         }
 
         // Act
-        state.handle_store_delete(prefix.as_bytes()).unwrap();
+        state.store.handle_store_delete(prefix.as_bytes()).unwrap();
 
         // Assert
         assert_eq!(
             Ok(VALUE_TYPE_NONE),
-            state.handle_store_has(prefix.as_bytes())
+            state.store.handle_store_has(prefix.as_bytes())
         );
 
         assert_eq!(
             Err(Error::StoreNotANode),
-            state.handle_store_list_size(prefix.as_bytes())
+            state.store.handle_store_list_size(prefix.as_bytes())
         );
     }
 
@@ -494,7 +318,10 @@ mod tests {
         let mut state = HostState::default();
         let prefix = "/a/long/prefix";
 
-        state.handle_store_write(prefix.as_bytes(), 0, &[]).unwrap();
+        state
+            .store
+            .handle_store_write(prefix.as_bytes(), 0, &[])
+            .unwrap();
 
         for i in 0..10 {
             // subkey of prefix
@@ -504,25 +331,36 @@ mod tests {
             // completely different prefix
             let not_subkey = format!("/different/prefix/{}", i);
 
-            state.handle_store_write(subkey.as_bytes(), 0, &[]).unwrap();
             state
+                .store
+                .handle_store_write(subkey.as_bytes(), 0, &[])
+                .unwrap();
+            state
+                .store
                 .handle_store_write(almost_subkey.as_bytes(), 0, &[])
                 .unwrap();
             state
+                .store
                 .handle_store_write(not_subkey.as_bytes(), 0, &[])
                 .unwrap();
         }
 
         // Act
-        state.handle_store_delete_value(prefix.as_bytes()).unwrap();
+        state
+            .store
+            .handle_store_delete_value(prefix.as_bytes())
+            .unwrap();
 
         // Assert
         assert_eq!(
             Ok(VALUE_TYPE_SUBTREE),
-            state.handle_store_has(prefix.as_bytes())
+            state.store.handle_store_has(prefix.as_bytes())
         );
 
-        assert_eq!(Ok(10), state.handle_store_list_size(prefix.as_bytes()));
+        assert_eq!(
+            Ok(10),
+            state.store.handle_store_list_size(prefix.as_bytes())
+        );
     }
 
     #[test]
@@ -539,26 +377,38 @@ mod tests {
             // completely different prefix
             let not_subkey = format!("/different/prefix/{}", i);
 
-            state.handle_store_write(subkey.as_bytes(), 0, &[]).unwrap();
             state
+                .store
+                .handle_store_write(subkey.as_bytes(), 0, &[])
+                .unwrap();
+            state
+                .store
                 .handle_store_write(almost_subkey.as_bytes(), 0, &[])
                 .unwrap();
             state
+                .store
                 .handle_store_write(not_subkey.as_bytes(), 0, &[])
                 .unwrap();
         }
 
         // Act
-        let result = state.handle_store_list_size(prefix.as_bytes()).unwrap();
+        let result = state
+            .store
+            .handle_store_list_size(prefix.as_bytes())
+            .unwrap();
 
         // Assert
         assert_eq!(10, result, "Expected 10 subkeys of prefix");
 
         // Value is included in the count
         state
+            .store
             .handle_store_write(prefix.as_bytes(), 0, &[1, 2, 3])
             .unwrap();
-        let with_value = state.handle_store_list_size(prefix.as_bytes()).unwrap();
+        let with_value = state
+            .store
+            .handle_store_list_size(prefix.as_bytes())
+            .unwrap();
         assert_eq!(11, with_value, "Expected 10 subkeys of prefix, plus value");
     }
 
@@ -566,90 +416,117 @@ mod tests {
     fn store_move() {
         // Arrange
         let mut state = HostState::default();
-        state.handle_store_write(b"/a/b", 0, b"ab").unwrap();
-        state.handle_store_write(b"/a/b/c", 0, b"abc").unwrap();
-        state.handle_store_write(b"/a/b/c/z", 0, b"abcz").unwrap();
-        state.handle_store_write(b"/a/b/d", 0, b"abd").unwrap();
-        state.handle_store_write(b"/a/bc", 0, b"abc").unwrap();
+        state.store.handle_store_write(b"/a/b", 0, b"ab").unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/c", 0, b"abc")
+            .unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/c/z", 0, b"abcz")
+            .unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/d", 0, b"abd")
+            .unwrap();
+        state.store.handle_store_write(b"/a/bc", 0, b"abc").unwrap();
 
         // Act
-        state.handle_store_move(b"/a/b", b"/a/b/c").unwrap();
+        state.store.handle_store_move(b"/a/b", b"/a/b/c").unwrap();
 
         // Assert
         assert_eq!(
             Ok(b"ab".to_vec()),
-            state.handle_store_read(b"/a/b/c", 0, 4096)
+            state.store.handle_store_read(b"/a/b/c", 0, 4096)
         );
         assert_eq!(
             Ok(b"abc".to_vec()),
-            state.handle_store_read(b"/a/b/c/c", 0, 4096)
+            state.store.handle_store_read(b"/a/b/c/c", 0, 4096)
         );
         assert_eq!(
             b"abd".to_vec(),
-            state.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.handle_store_read(b"/a/bc", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/bc", 0, 4096).unwrap()
         );
-        assert_eq!(Ok(VALUE_TYPE_SUBTREE), state.handle_store_has(b"/a/b"));
-        assert_eq!(Ok(VALUE_TYPE_NONE), state.handle_store_has(b"/a/b/c/z"));
+        assert_eq!(
+            Ok(VALUE_TYPE_SUBTREE),
+            state.store.handle_store_has(b"/a/b")
+        );
+        assert_eq!(
+            Ok(VALUE_TYPE_NONE),
+            state.store.handle_store_has(b"/a/b/c/z")
+        );
     }
 
     #[test]
     fn store_copy() {
         // Arrange
         let mut state = HostState::default();
-        state.handle_store_write(b"/a/b", 0, b"ab").unwrap();
-        state.handle_store_write(b"/a/b/c", 0, b"abc").unwrap();
-        state.handle_store_write(b"/a/b/c/z", 0, b"abcz").unwrap();
-        state.handle_store_write(b"/a/b/d", 0, b"abd").unwrap();
-        state.handle_store_write(b"/a/bc", 0, b"abc").unwrap();
+        state.store.handle_store_write(b"/a/b", 0, b"ab").unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/c", 0, b"abc")
+            .unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/c/z", 0, b"abcz")
+            .unwrap();
+        state
+            .store
+            .handle_store_write(b"/a/b/d", 0, b"abd")
+            .unwrap();
+        state.store.handle_store_write(b"/a/bc", 0, b"abc").unwrap();
 
         // Act
-        state.handle_store_copy(b"/a/b", b"/a/b/c").unwrap();
+        state.store.handle_store_copy(b"/a/b", b"/a/b/c").unwrap();
 
         // Assert
         assert_eq!(
             b"ab".to_vec(),
-            state.handle_store_read(b"/a/b/c", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b/c", 0, 4096).unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.handle_store_read(b"/a/b/c/c", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b/c/c", 0, 4096).unwrap()
         );
         assert_eq!(
             b"abd".to_vec(),
-            state.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.handle_store_read(b"/a/bc", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/bc", 0, 4096).unwrap()
         );
         assert_eq!(
             b"ab".to_vec(),
-            state.handle_store_read(b"/a/b", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b", 0, 4096).unwrap()
         );
-        assert_eq!(Ok(VALUE_TYPE_NONE), state.handle_store_has(b"/a/b/c/z"));
+        assert_eq!(
+            Ok(VALUE_TYPE_NONE),
+            state.store.handle_store_has(b"/a/b/c/z")
+        );
     }
 
     #[test]
     fn simple_store_copy() {
         // Arrange
         let mut state = HostState::default();
-        state.handle_store_write(b"/a/b", 0, b"xxx").unwrap();
+        state.store.handle_store_write(b"/a/b", 0, b"xxx").unwrap();
 
         // Act
-        state.handle_store_copy(b"/a", b"/c").unwrap();
+        state.store.handle_store_copy(b"/a", b"/c").unwrap();
 
         // Assert
         assert_eq!(
             b"xxx".to_vec(),
-            state.handle_store_read(b"/a/b", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/a/b", 0, 4096).unwrap()
         );
         assert_eq!(
             b"xxx".to_vec(),
-            state.handle_store_read(b"/c/b", 0, 4096).unwrap()
+            state.store.handle_store_read(b"/c/b", 0, 4096).unwrap()
         );
     }
 
@@ -659,9 +536,9 @@ mod tests {
         let size = 256_i32;
         let data = vec![b'a'; size as usize];
         let path = b"/a/b";
-        state.handle_store_write(path, 0, &data).unwrap();
+        state.store.handle_store_write(path, 0, &data).unwrap();
 
-        let value_size = state.handle_store_value_size(path);
+        let value_size = state.store.handle_store_value_size(path);
 
         assert_eq!(Ok(size), value_size);
     }
@@ -670,8 +547,11 @@ mod tests {
     fn read_from_readonly() {
         let mut state = HostState::default();
         let path = "/readonly/kernel/env/reboot_count";
-        state.store.set_value(path, 4i32.to_le_bytes().to_vec());
-        let read_back = state.handle_store_read(path.as_bytes(), 0, 4).unwrap();
+        state.store.0.set_value(path, 4i32.to_le_bytes().to_vec());
+        let read_back = state
+            .store
+            .handle_store_read(path.as_bytes(), 0, 4)
+            .unwrap();
         assert_eq!(read_back, [4, 0, 0, 0]);
     }
 }
