@@ -68,7 +68,10 @@ let apply_limits ctxt staking_parameters staking_balance =
         Tez_repr.min staked_frozen max_allowed_staked_frozen
     | Error _max_allowed_staked_frozen_overflows -> staked_frozen
   in
-  (* Overstaked tez count as delegated. *)
+  (* Overstaked tez count as delegated.
+     Note that, unlike delegated tez, overstaked tez may not have been staked
+     the whole cycle to contribute to rights, but they are going to be frozen
+     for several cycles. *)
   let* overstaked = Tez_repr.(staked_frozen -? allowed_staked_frozen) in
   let* delegated = Tez_repr.(delegated +? overstaked) in
   (* Overdelegated tez don't count. *)
