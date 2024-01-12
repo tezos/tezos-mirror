@@ -20,7 +20,7 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
-RISCV_OPTS = --target riscv64gc-unknown-none-elf --no-default-features
+RISCV_OPTS = --target riscv64gc-unknown-hermit --no-default-features
 RISCV_OPTS_ALPHA = $(RISCV_OPTS) --features proto-alpha
 
 SDK_VERSION := "0.2.2"
@@ -60,9 +60,8 @@ riscv-check:
 	@cargo check -p tezos-smart-rollup-entrypoint $(RISCV_OPTS_ALPHA)
 	@cargo check -p tezos-smart-rollup-encoding $(RISCV_OPTS_ALPHA)
 	# @cargo check -p tezos-smart-rollup-storage $(RISCV_OPTS_ALPHA)
-	# @cargo check -p tezos-smart-rollup-mock $(RISCV_OPTS_ALPHA)
+	@cargo check -p tezos-smart-rollup-mock $(RISCV_OPTS_ALPHA)
 	@cargo check -p tezos-smart-rollup $(RISCV_OPTS) --features proto-alpha-no-mock
-
 
 .PHONY: build
 build: installer-template
@@ -91,7 +90,7 @@ doc:
 
 .PHONY: build-deps
 build-deps:
-	@rustup target add wasm32-unknown-unknown riscv64gc-unknown-none-elf $(NATIVE_TARGET)
+	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
