@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
@@ -52,6 +52,12 @@ let hex_256_of_address acc =
   let s = String.lowercase_ascii @@ String.sub s 2 (n - 2) in
   (* prepend 24 leading zeros *)
   String.("0x" ^ make 24 '0' ^ s)
+
+let expected_gas_fees ~gas_price ~gas_used =
+  let open Wei in
+  let gas_price = gas_price |> Z.of_int32 |> Wei.to_wei_z in
+  let gas_used = gas_used |> Z.of_int32 in
+  gas_price * gas_used
 
 let evm_node_version evm_node =
   let endpoint = Evm_node.endpoint evm_node in
@@ -1391,7 +1397,7 @@ let transfer ?data ~evm_setup () =
   let fees =
     match receipt with
     | Some Transaction.{status = true; gasUsed; effectiveGasPrice; _} ->
-        Int32.(to_string (mul gasUsed effectiveGasPrice)) |> Wei.of_string
+        expected_gas_fees ~gas_price:effectiveGasPrice ~gas_used:gasUsed
     | _ -> Test.fail "Transaction didn't succeed"
   in
   Check.(
@@ -3875,9 +3881,7 @@ let test_l2_revert_returns_unused_gas =
   let* balance_after = Eth_cli.balance ~account:sender.address ~endpoint in
   let gas_fee_paid = Wei.(balance_before - balance_after) in
   let gas_price = transaction_receipt.effectiveGasPrice in
-  let expected_gas_fee_paid =
-    Wei.to_wei_z @@ Z.of_int32 @@ Int32.mul gas_price gas_used
-  in
+  let expected_gas_fee_paid = expected_gas_fees ~gas_price ~gas_used in
   Check.((expected_gas_fee_paid = gas_fee_paid) Wei.typ)
     ~error_msg:"Expected gas fee paid to be %L, got %R" ;
   unit
