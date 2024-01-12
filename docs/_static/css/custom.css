@@ -339,3 +339,20 @@ pre {
 footer {
     color: rgb(85, 85, 85);
 }
+
+.reference.external {
+  display:inline-block;
+  text-decoration:none;
+  padding-right:1em;
+}
+
+.reference.external:after {
+    content: '';
+    background:url('external-link.png');
+    background-size:cover;
+    position:absolute;
+    width:0.7em;
+    height:0.7em;
+    margin-left:0.2em;
+    margin-top:0.4em;
+}

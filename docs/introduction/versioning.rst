@@ -18,7 +18,7 @@ Protocol environment versions
 
 The economic protocol can interact with the rest of the Octez software through a sandboxed API called a protocol environment.
 When new features are needed by a proposed protocol, or if the protocol API is changed, a new environment version is created,
-see `Protocol environment versions <https://tezos.gitlab.io/shell/protocol_environment.html#environment-versions>`__.
+see :ref:`Protocol environment versions <environment_versions>`.
 The new environment is delivered as part of a new Octez release.
 
 

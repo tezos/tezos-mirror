@@ -126,6 +126,10 @@ html_css_files = [
     'css/custom.css',
 ]
 
+html_js_files = [
+    'js/custom.js',
+]
+
 html_extra_path = [
     '404.html',
     '_redirects',

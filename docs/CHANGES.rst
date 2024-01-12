@@ -2568,12 +2568,12 @@ Proxy server
 
 -  Added a new binary: ``octez-proxy-server``, a read-only frontend to a node.
    It is designed to lower the load of nodes, by being capable
-   of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
+   of serving :doc:`protocol RPCs <alpha/rpc>`.
    An instance of a proxy server is protocol-specific: it automatically picks
    up the protocol from the backing node when it starts. Proxy servers
    can be started and destroyed at will, making them easy to deploy.
 
-   Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
+   Please refer to the :doc:`online documentation <user/proxy-server>`
    for further details.
 
 Version 9.7
@@ -3041,8 +3041,7 @@ Node
 -  Added new RPC ``/config`` to query the configuration of a node.
 
 -  Changed signal handling and exit codes for most binaries. The codes’
-   significance are detailed in `the user
-   documentation <http://tezos.gitlab.io/user/exits.html#tezos_binaries_signals_and_exit_codes>`__.
+   significance are detailed in :doc:`the user documentation <user/exits>`.
 
 -  Command ``octez-node --version`` now exits with exit code 0 instead
    of 1.
@@ -3414,7 +3413,7 @@ Multinetwork
 
 -  The network name is printed in the logs on startup.
 
-For more information, see: http://tezos.gitlab.io/user/multinetwork.html
+For more information, see :doc:`user/multinetwork`.
 
 
 Node

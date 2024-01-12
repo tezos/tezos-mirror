@@ -219,7 +219,7 @@ Configuring and Running Tezt Long Tests
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For more information about how to use the configuration file, please refer
-to the `Long test module API <https://tezos.gitlab.io/api/odoc/_html/tezt-tezos/Tezt_tezos_tezt_performance_regression/>`__.
+to the :package-api:`Long test module API <tezt-tezos/Tezt_tezos_tezt_performance_regression/index.html>`.
 
 A predefined configuration has already been shipped in :src:`tezt/lib_performance_regression/local-sandbox/tezt_config.json`.
 It allows to use the InfluxDB and Grafana instances set up by the

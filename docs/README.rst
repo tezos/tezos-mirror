@@ -2,7 +2,7 @@
 Documenting
 ***********
 
-The documentation is available online at `tezos.gitlab.io <http://tezos.gitlab.io/>`_,
+The documentation is available online at :doc:`https://tezos.gitlab.io <./index>`,
 and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezos/tezos>`_.
 
 Building the documentation
