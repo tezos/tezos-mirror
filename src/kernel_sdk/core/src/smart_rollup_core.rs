@@ -456,7 +456,10 @@ mod riscv64_hermit {
         io::{self, Write},
         slice::from_raw_parts,
     };
-    use tezos_smart_rollup_constants::riscv::{SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT};
+    use tezos_smart_rollup_constants::riscv::{
+        SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
+        SBI_TEZOS_META_ORIGINATION_LEVEL,
+    };
 
     /// Information about the next inbox level
     struct MessageInfo {
@@ -489,6 +492,39 @@ mod riscv64_hermit {
         );
 
         MessageInfo { level, id, length }
+    }
+
+    /// Retrieve this rollup's origination level.
+    #[inline(always)]
+    unsafe fn sbi_tezos_meta_origination_level() -> u64 {
+        let level: u64;
+
+        core::arch::asm!(
+            "ecall",
+            in("a7") SBI_FIRMWARE_TEZOS,
+            in("a6") SBI_TEZOS_META_ORIGINATION_LEVEL,
+            lateout("a0") level
+        );
+
+        level
+    }
+
+    /// Retrieve the address of this rollup and return it via `buffer`. Returns
+    /// the number of bytes written to `buffer`.
+    #[inline(always)]
+    unsafe fn sbi_tezos_meta_address(buffer: *mut u8, max_len: u64) -> u64 {
+        let result: u64;
+
+        core::arch::asm!(
+            "ecall",
+            in("a0") buffer,
+            in("a1") max_len,
+            in("a7") SBI_FIRMWARE_TEZOS,
+            in("a6") SBI_TEZOS_META_ADDRESS,
+            lateout("a0") result
+        );
+
+        result
     }
 
     pub unsafe fn read_input(
@@ -597,8 +633,18 @@ mod riscv64_hermit {
         unimplemented!()
     }
 
-    pub unsafe fn reveal_metadata(_destination_addr: *mut u8, _max_bytes: usize) -> i32 {
-        unimplemented!()
+    pub unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
+        // Fill in the address part of the buffer.
+        let offset = sbi_tezos_meta_address(buffer, max_bytes as u64) as usize;
+
+        // Fill the remaining part of the buffer with the origination level.
+        let orig_level = (sbi_tezos_meta_origination_level() as u32).to_le_bytes();
+        assert!(max_bytes - offset >= orig_level.len());
+        buffer
+            .add(offset)
+            .copy_from(orig_level.as_ptr(), orig_level.len());
+
+        (offset + orig_level.len()) as i32
     }
 }
 

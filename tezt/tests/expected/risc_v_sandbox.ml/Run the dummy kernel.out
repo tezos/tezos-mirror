@@ -3,6 +3,32 @@
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World
+I am [SMART_ROLLUP_HASH]
+RollupMetadata {
+    raw_rollup_address: [
+        244,
+        228,
+        124,
+        179,
+        196,
+        58,
+        104,
+        176,
+        212,
+        142,
+        48,
+        148,
+        9,
+        44,
+        164,
+        45,
+        113,
+        58,
+        221,
+        181,
+    ],
+    origination_level: 0,
+}
 [09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
 Internal(
     StartOfLevel,
@@ -80,5 +106,5 @@ External(
 Internal(
     EndOfLevel,
 )
-Kernel panic Some("Abort") at Some(Location { file: "src/main.rs", line: 17, col: 5 })
+Kernel panic Some("Abort") at Some(Location { file: "src/main.rs", line: 24, col: 5 })
 Received SBI shutdown request

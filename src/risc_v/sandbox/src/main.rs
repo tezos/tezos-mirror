@@ -1,6 +1,7 @@
 use kernel_loader::Memory;
 use rvemu::{emulator::Emulator, exception::Exception};
 use std::{error::Error, fs};
+use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 mod boot;
 mod cli;
@@ -59,8 +60,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         .insert_external(vec![1, 2]);
     let mut inbox = inbox.build();
 
+    // Rollup metadata
+    let meta = syscall::RollupMetadata {
+        origination_level: cli.origination_level,
+        address: SmartRollupAddress::from_b58check(cli.address.as_str()).unwrap(),
+    };
+
     let handle_syscall = if cli.posix {
-        fn dummy(emu: &mut Emulator, _: &mut inbox::Inbox) -> Result<(), Box<dyn Error>> {
+        fn dummy(
+            emu: &mut Emulator,
+            _: &syscall::RollupMetadata,
+            _: &mut inbox::Inbox,
+        ) -> Result<(), Box<dyn Error>> {
             syscall::handle_posix(emu)
         }
         dummy
@@ -86,11 +97,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             .or_else(|exception| -> Result<(), Box<dyn Error>> {
                 match exception {
                     Exception::EnvironmentCallFromSMode | Exception::EnvironmentCallFromUMode => {
-                        handle_syscall(&mut emu, &mut inbox).map_err(|err| -> Box<dyn Error> {
-                            format!("Failed to handle environment call at {prev_pc:x}: {}", err)
-                                .as_str()
-                                .into()
-                        })?;
+                        handle_syscall(&mut emu, &meta, &mut inbox).map_err(
+                            |err| -> Box<dyn Error> {
+                                format!("Failed to handle environment call at {prev_pc:x}: {}", err)
+                                    .as_str()
+                                    .into()
+                            },
+                        )?;
 
                         // We need to update the program counter ourselves now.
                         // This is a recent change in behaviour in RVEmu.

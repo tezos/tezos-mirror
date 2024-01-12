@@ -1,66 +1,66 @@
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-access --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionAccessFault at 0x80000000800001f0: Fatal
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-access: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-breakpoint --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x800002cc: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-breakpoint: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-csr --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x800003fc: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-csr: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-illegal --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(0) at 0x800001a4: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-illegal: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-ld-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000420: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-ld-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-lh-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000208: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-lh-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-lw-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000260: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-lw-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-ma_addr --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x800006ac: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-ma_addr: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-ma_fetch --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000304: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-ma_fetch: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-mcsr --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000208: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-mcsr: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-sbreak --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception Breakpoint at 0x800001a4: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-sbreak: fail
@@ -70,25 +70,25 @@ Error: "Failed to handle environment call at 800001e4: Unimplemented system call
 rv64mi-p-scall: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-sd-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000500: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-sd-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-sh-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000240: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-sh-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-sw-misaligned --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x800002b0: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-sw-misaligned: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64mi-p-zicntr --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception EnvironmentCallFromMMode at 0x80000250: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-zicntr: fail

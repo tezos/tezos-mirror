@@ -11,4 +11,10 @@ default-features = false
 path = "../../kernel_sdk/sdk"
 version = "0.2.2"
 default-features = false
-features = ["debug_alloc", "proto-alpha", "panic-hook", "data-encoding"]
+features = [
+  "debug_alloc",
+  "proto-alpha",
+  "panic-hook",
+  "data-encoding",
+  "alloc",
+]

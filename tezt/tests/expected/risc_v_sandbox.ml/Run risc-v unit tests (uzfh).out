@@ -1,54 +1,54 @@
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fadd --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fclass --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(4093969747) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fclass: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fcmp --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fcmp: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fcvt --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(3557126227) at 0x800001b0: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fcvt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fcvt_w --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fcvt_w: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fdiv --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fdiv: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fmadd --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fmadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-fmin --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(331783) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-fmin: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-p-ldst --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception IllegalInstruction(4558983) at 0x800001a8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-p-ldst: fail
@@ -62,67 +62,67 @@ Received request to exit with code 0
 rv64uzfh-p-recoding: success
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fadd --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fclass --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fclass: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fcmp --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fcmp: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fcvt --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fcvt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fcvt_w --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fcvt_w: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fdiv --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fdiv: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fmadd --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fmadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-fmin --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-fmin: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-ldst --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-ldst: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-move --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-move: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uzfh-v-recoding --posix
-thread 'main' panicked at sandbox/src/main.rs:107:25:
+thread 'main' panicked at sandbox/src/main.rs:120:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uzfh-v-recoding: fail
