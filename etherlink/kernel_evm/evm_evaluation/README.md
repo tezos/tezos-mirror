@@ -69,6 +69,13 @@ $ evm-evaluation-assessor --from-scratch
 $ evm-evaluation-assessor -h
 ```
 
+Dump a result of an evaluation and use it to produce a diff in the log file after making some changes:
+
+```
+$ evm-evaluation-assessor --result // By default the execution will be outputed into `evm_evaluation.result`
+$ evm-evaluation-assessor --diff <result-file> // By default the execution will be outputed into `evm_evaluation.diff`
+```
+
 Multiple options can be combined:
 
 ```
