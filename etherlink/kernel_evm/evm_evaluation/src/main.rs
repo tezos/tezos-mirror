@@ -37,6 +37,10 @@ pub struct ReportValue {
     pub skipped: u16,
 }
 
+pub type ReportMap = HashMap<String, ReportValue>;
+
+pub type DiffMap = Option<HashMap<String, (TestResult, Option<TestResult>)>>;
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "evm-evaluation", about = "Evaluate EVM's engine semantic.")]
 pub struct Opt {
@@ -442,6 +446,25 @@ pub fn check_skip_parsing(test_file_path: &Path) -> bool {
     )
 }
 
+fn process_skip(
+    output: &OutputOptions,
+    output_file: &mut File,
+    report_map: &mut ReportMap,
+    report_key: &str,
+) {
+    report_map
+        .entry(report_key.to_owned())
+        .and_modify(|report_value| {
+            *report_value = ReportValue {
+                skipped: report_value.skipped + 1,
+                ..*report_value
+            };
+        });
+    if output.log {
+        writeln!(output_file, "\nSKIPPED\n").unwrap()
+    };
+}
+
 pub fn main() {
     let opt = Opt::from_args();
     let diff = opt.diff.is_some();
@@ -462,7 +485,7 @@ pub fn main() {
     let folder_path =
         construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
     let test_files = find_all_json_tests(&folder_path);
-    let mut report_map: HashMap<String, ReportValue> = HashMap::new();
+    let mut report_map: ReportMap = HashMap::new();
     let mut diff_result_map = opt.diff.as_ref().map(|p| load_former_result(p));
 
     let output = OutputOptions {
@@ -494,40 +517,26 @@ pub fn main() {
         if let Some(test) = &opt.test {
             let mut file_name = PathBuf::from(test);
             file_name.set_extension("json");
-            if test_file.file_name() == Some(OsStr::new(&file_name)) {
-                runner::run_test(
-                    &test_file,
-                    &mut report_map,
-                    report_key.to_owned(),
-                    &opt,
-                    &mut output_file,
-                    false,
-                    &mut diff_result_map,
-                    &output,
-                )
-                .unwrap();
+            if test_file.file_name() != Some(OsStr::new(&file_name)) {
+                continue;
             }
+        };
+
+        if output.log {
+            writeln!(output_file, "---------- Test: {:?} ----------", &test_file)
+                .unwrap();
+        }
+
+        if check_skip_parsing(&test_file) {
+            process_skip(&output, &mut output_file, &mut report_map, report_key);
             continue;
         }
 
-        if output.log {
-            writeln!(output_file, "---------- Test: {:?} ----------", test_file).unwrap();
-        }
-
-        let mut skip = false;
-        let mut process_skip = || {
-            report_map
-                .entry(report_key.to_owned())
-                .and_modify(|report_value| {
-                    *report_value = ReportValue {
-                        skipped: report_value.skipped + 1,
-                        ..*report_value
-                    };
-                });
-            if output.log {
-                writeln!(output_file, "\nSKIPPED\n").unwrap()
-            };
-            skip = true
+        let skip = if check_skip(&test_file) {
+            process_skip(&output, &mut output_file, &mut report_map, report_key);
+            true
+        } else {
+            false
         };
 
         runner::run_test(

@@ -8,7 +8,7 @@ use crate::models::spec::SpecId;
 use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
 };
-use crate::{write_host, ReportValue};
+use crate::{write_host, DiffMap, ReportMap, ReportValue};
 
 use evm_execution::account_storage::EthereumAccount;
 
@@ -302,14 +302,14 @@ pub fn process(
     host: &mut EvalHost,
     filler_source: FillerSource,
     spec_name: &SpecName,
-    report_map: &mut HashMap<String, ReportValue>,
+    report_map: &mut ReportMap,
     report_key: String,
     output_file: &mut File,
     tx_label: Option<&String>,
     tx_index: i64,
     output: &OutputOptions,
     test_name: &str,
-    diff_result_map: &mut Option<HashMap<String, (TestResult, Option<TestResult>)>>,
+    diff_result_map: &mut DiffMap,
 ) {
     let mut status = TestResult::Success;
 
