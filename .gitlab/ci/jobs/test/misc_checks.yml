@@ -1,34 +1,3 @@
-oc.misc_checks:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
-    - .needs__trigger
-  stage: "test"
-  before_script:
-    - ./scripts/ci/take_ownership.sh
-    - eval $(opam env)
-    - . ./scripts/version.sh
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
-  rules:
-    # The linting job runs over the set of [source_directories]
-    # defined in [scripts/lint.sh] that must be included here:
-    - changes:
-        paths:
-        - src/**/*
-        - tezt/**/*
-        - devtools/**/*
-        - scripts/**/*
-        - docs/**/*
-        - contrib/**/*
-        - etherlink/**/*
-        - .gitlab-ci.yml
-        - .gitlab/**/*
-  script:
-    - ./scripts/ci/lint_misc_check.sh
-    - scripts/check_wasm_pvm_regressions.sh check
-
 # check that ksy files are still up-to-date with octez
 kaitai_checks:
   extends:
