@@ -1,4 +1,8 @@
 include:
+  # Stage: sanity
+  - .gitlab/ci/jobs/sanity/sanity_ci.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint.yml
+
   # Stage: build
   - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml
   - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
