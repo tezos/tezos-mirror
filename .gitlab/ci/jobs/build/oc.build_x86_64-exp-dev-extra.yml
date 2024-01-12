@@ -1,29 +1,5 @@
 include: .gitlab/ci/jobs/build/common.yml
 
-.oc.build_x86_64:
-  extends:
-    - .oc.build
-    # These job are the main bottleneck since a lot of tests depend on
-    # them.  So we start them even before sanity_ci.
-  needs: [trigger]
-  variables:
-    ARCH: "x86_64"
-
-# The build_x86_64 jobs are split in two to keep the artifact size
-# under the 1GB hard limit set by GitLab.
-# 'oc.build_x86_64-released' builds the released executables.
-oc.build_x86_64-released:
-  extends:
-    - .tags_template__build
-    - .oc.build_x86_64
-    # Produced artifacts may be needed later by tools that download
-    # them to build a specific snapshot of octez (e.g., for
-    # weeklynets), that's why - at least for the time being - we run
-    # this job everytime when pipeline is by Marge Bot.
-    - .rules__octez_changes_or_margebot
-  variables:
-    EXECUTABLE_FILES: "script-inputs/released-executables"
-
 # 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
 # executables, as well as the tezt test suite used by the subsequent
 # 'tezt' jobs and TPS evaluation tool.

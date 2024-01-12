@@ -4,7 +4,8 @@ include:
   - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
 
   # These jobs are necessary to run flaky tezts
-  - .gitlab/ci/jobs/build/oc.build_x86_64.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
   - .gitlab/ci/jobs/build/oc.build_kernels.yml
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 

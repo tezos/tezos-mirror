@@ -74,3 +74,12 @@
     IMAGE_ARCH_PREFIX: ""
   script:
     - ./scripts/ci/docker_release.sh
+
+.oc.build_x86_64:
+  extends:
+    - .oc.build
+    # These job are the main bottleneck since a lot of tests depend on
+    # them.  So we start them even before sanity_ci.
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"
