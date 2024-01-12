@@ -139,6 +139,11 @@ let current_delegated
     } =
   delegated
 
+(* The minimum over the cycle is either:
+     - the current delegated value if it didn't change during the cycle, i.e.
+       [cycle_of_min_delegated] is not the current cycle;
+     - or the stored [min_delegated_in_cycle] otherwise.
+*)
 let min_delegated_in_cycle ~current_cycle
     {
       own_frozen = _;
