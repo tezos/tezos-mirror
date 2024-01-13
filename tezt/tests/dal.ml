@@ -119,6 +119,14 @@ let regression_test ~__FILE__ ?(tags = []) ?uses title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
+let sc_rollup_activation_dal_params dal_enable =
+  if Option.value dal_enable ~default:false then
+    [
+      (["smart_rollup_reveal_activation_level"; "dal_parameters"], `Int 0);
+      (["smart_rollup_reveal_activation_level"; "dal_page"], `Int 0);
+    ]
+  else []
+
 let redundancy_factor_param redundancy_factor =
   make_int_parameter ["dal_parametric"; "redundancy_factor"] redundancy_factor
 
@@ -199,6 +207,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
+    @ sc_rollup_activation_dal_params dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
     @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
