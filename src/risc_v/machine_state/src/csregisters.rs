@@ -535,6 +535,9 @@ impl CSRegister {
             CSRegister::medeleg => new_value & CSRegister::WARL_MASK_MEDELEG,
             CSRegister::mideleg => new_value & CSRegister::WARL_MASK_MIDELEG,
             CSRegister::mtvec | CSRegister::stvec => new_value & CSRegister::WARL_MASK_XTVEC,
+            CSRegister::mip | CSRegister::mie => new_value & CSRegister::WARL_MASK_MIP_MIE,
+            CSRegister::sip | CSRegister::sie => new_value & CSRegister::WARL_MASK_SIP_SIE,
+            CSRegister::mepc | CSRegister::sepc => new_value & CSRegister::WARL_MASK_XEPC,
             _ => new_value,
         }
     }
@@ -573,6 +576,41 @@ impl CSRegister {
     /// `mtvec.BASE = mtvec[MXLEN-1:2] << 2` (since it has to be 4-byte aligned).
     /// The same applies for stvec. Sections 3.1.7 & 4.1.2
     const WARL_MASK_XTVEC: CSRValue = !(ones(1) << 1);
+
+    // List of possible standard interrupt bits
+    /// Supervisor software interrupt
+    const SSIP_BIT: CSRValue = 1 << 1;
+    /// Machine software interrupt
+    const MSIP_BIT: CSRValue = 1 << 3;
+    /// Supervisor timer interrupt
+    const STIP_BIT: CSRValue = 1 << 5;
+    /// Machine timer interrupt
+    const MTIP_BIT: CSRValue = 1 << 7;
+    /// Supervisor external interrupt
+    const SEIP_BIT: CSRValue = 1 << 9;
+    /// Machine external interrupt
+    const MEIP_BIT: CSRValue = 1 << 11;
+
+    /// WARL mask for mip/mie interrupt bits.
+    ///
+    /// 0-15 are for standard interrupts. The rest are for custom used and are treated as reserved
+    const WARL_MASK_MIP_MIE: CSRValue = (CSRegister::SSIP_BIT
+        | CSRegister::MSIP_BIT
+        | CSRegister::STIP_BIT
+        | CSRegister::MTIP_BIT
+        | CSRegister::SEIP_BIT
+        | CSRegister::MEIP_BIT);
+
+    /// WARL mask for sip/sie interrupt bits.
+    ///
+    /// 0-15 are for standard interrupts. The rest are for custom used and are treated as reserved
+    const WARL_MASK_SIP_SIE: CSRValue =
+        (CSRegister::SSIP_BIT | CSRegister::STIP_BIT | CSRegister::SEIP_BIT);
+
+    /// WARL mask for mepc/sepc addresses.
+    ///
+    /// Since extension C is supported, we only make the low bit read-only 0
+    const WARL_MASK_XEPC: CSRValue = !1;
 }
 
 /// Value in a CSR
@@ -823,6 +861,24 @@ pub mod tests {
         assert!(check(csreg::mtvec, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFD);
         assert!(check(csreg::stvec, 0x0) == 0x0);
         assert!(check(csreg::stvec, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFD);
+
+        // mip / mie
+        assert!(check(csreg::mip, 0x0) == 0x0);
+        assert!(check(csreg::mip, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
+        assert!(check(csreg::mie, 0x0) == 0x0);
+        assert!(check(csreg::mie, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0AAA);
+
+        // sip / sie
+        assert!(check(csreg::sip, 0x0) == 0x0);
+        assert!(check(csreg::sip, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0222);
+        assert!(check(csreg::sie, 0x0) == 0x0);
+        assert!(check(csreg::sie, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0222);
+
+        // mepc / sepc
+        assert!(check(csreg::mepc, 0x0) == 0x0);
+        assert!(check(csreg::mepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
+        assert!(check(csreg::sepc, 0x0) == 0x0);
+        assert!(check(csreg::sepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
 
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
