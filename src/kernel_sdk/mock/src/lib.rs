@@ -120,10 +120,15 @@ impl MockHost {
 
         let info = info_for_level(state.curr_level as i32);
 
-        Self {
+        let mut host = Self {
             state: state.into(),
             info,
-        }
+        };
+
+        // Ensure inbox setup correctly
+        host.bump_level();
+
+        host
     }
 
     /// Append an internal message to the current inbox.

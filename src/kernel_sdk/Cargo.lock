@@ -1412,6 +1412,7 @@ name = "tezos-smart-rollup"
 version = "0.2.2"
 dependencies = [
  "hermit",
+ "hex",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",

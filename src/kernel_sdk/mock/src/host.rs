@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -229,12 +229,14 @@ mod tests {
             .add_input(vec![5; MAX_INPUT_MESSAGE_SIZE / 2]);
 
         // Act
+        let _ = mock_host.read_input(); // sol
+        let _ = mock_host.read_input(); // info per level
         let result = mock_host.read_input();
 
         // Assert
         let expected = Ok(Some(Message::new(
             mock_host.level(),
-            0,
+            2,
             vec![5; MAX_INPUT_MESSAGE_SIZE / 2],
         )));
 

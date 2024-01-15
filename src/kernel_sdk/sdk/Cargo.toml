@@ -16,6 +16,9 @@ categories = ["wasm", "encoding", "development-tools"]
 [package.metadata.docs.rs]
 features = ["testing"]
 
+[dependencies]
+hex = { version = "0.4", default-features = false}
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
@@ -68,7 +71,7 @@ rev = "01df75880c9be03fe935c3faabd191082d8916a2"
 default-features = false
 
 [features]
-default = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "bls"]
+default = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "bls", "testing"]
 crypto = ["tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
 debug_alloc = ["tezos-smart-rollup-debug/alloc"]
