@@ -11,12 +11,12 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
     variables:
-      PIPELINE_TYPE: latest_release
+      PIPELINE_TYPE: octez_latest_release
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release-test"
     variables:
-      PIPELINE_TYPE: latest_release_test
+      PIPELINE_TYPE: octez_latest_release_test
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "master"
@@ -26,17 +26,17 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^v\d+\.\d+(?:\-rc\d+)?$/
     variables:
-      PIPELINE_TYPE: release_tag
+      PIPELINE_TYPE: octez_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^v\d+\.\d+\-beta\d*$/
     variables:
-      PIPELINE_TYPE: beta_release_tag
+      PIPELINE_TYPE: octez_beta_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_TAG
       =~ /^v\d+\.\d+(?:\-rc\d+)?$/ || $CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/)
     variables:
-      PIPELINE_TYPE: release_tag_test
+      PIPELINE_TYPE: octez_release_tag_test
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG !~
@@ -100,12 +100,12 @@ include:
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
     when: always
-- local: .gitlab/ci/pipelines/latest_release.yml
+- local: .gitlab/ci/pipelines/octez_latest_release.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
     when: always
-- local: .gitlab/ci/pipelines/latest_release_test.yml
+- local: .gitlab/ci/pipelines/octez_latest_release_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release-test"
@@ -115,17 +115,17 @@ include:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "master"
     when: always
-- local: .gitlab/ci/pipelines/release_tag.yml
+- local: .gitlab/ci/pipelines/octez_release_tag.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^v\d+\.\d+(?:\-rc\d+)?$/
     when: always
-- local: .gitlab/ci/pipelines/beta_release_tag.yml
+- local: .gitlab/ci/pipelines/octez_beta_release_tag.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^v\d+\.\d+\-beta\d*$/
     when: always
-- local: .gitlab/ci/pipelines/release_tag_test.yml
+- local: .gitlab/ci/pipelines/octez_release_tag_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_TAG
       =~ /^v\d+\.\d+(?:\-rc\d+)?$/ || $CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/)

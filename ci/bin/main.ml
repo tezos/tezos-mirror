@@ -974,11 +974,11 @@ let () =
   in
   register "before_merging" If.(on_tezos_namespace && merge_request) ;
   register
-    "latest_release"
+    "octez_latest_release"
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:true]
     If.(on_tezos_namespace && push && on_branch "latest-release") ;
   register
-    "latest_release_test"
+    "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:false] ;
   register
@@ -1137,15 +1137,15 @@ let () =
          job_publish_kernel_sdk;
        ]) ;
   register
-    "release_tag"
+    "octez_release_tag"
     If.(on_tezos_namespace && push && has_tag_match release_tag_re)
     ~jobs:(release_tag_pipeline Release_tag) ;
   register
-    "beta_release_tag"
+    "octez_beta_release_tag"
     If.(on_tezos_namespace && push && has_tag_match beta_release_tag_re)
     ~jobs:(release_tag_pipeline Beta_release_tag) ;
   register
-    "release_tag_test"
+    "octez_release_tag_test"
     If.(not_on_tezos_namespace && push && has_any_release_tag)
     ~jobs:(release_tag_pipeline ~test:true Release_tag) ;
   register
