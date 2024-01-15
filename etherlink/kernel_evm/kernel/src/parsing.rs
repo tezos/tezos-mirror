@@ -21,7 +21,6 @@ use tezos_ethereum::{
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     inbox::{
@@ -193,15 +192,8 @@ impl InputResult {
             return Self::Unparsable;
         }
 
-        // Next PREIMAGE_HASH_SIZE bytes is the preimage hash
-        let (preimage_hash, remaining) = parsable!(split_at(bytes, PREIMAGE_HASH_SIZE));
-        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] =
-            parsable!(preimage_hash.try_into().ok());
-        if remaining.is_empty() {
-            Self::Input(Input::Upgrade(KernelUpgrade { preimage_hash }))
-        } else {
-            Self::Unparsable
-        }
+        let kernel_upgrade = parsable!(KernelUpgrade::from_rlp_bytes(bytes).ok());
+        Self::Input(Input::Upgrade(kernel_upgrade))
     }
 
     fn parse_sequencer_blueprint_input(sequencer: &PublicKey, bytes: &[u8]) -> Self {

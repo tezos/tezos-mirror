@@ -516,6 +516,7 @@ mod tests {
         // the upgrade mechanism should not start otherwise it will fail
         let broken_kernel_upgrade = KernelUpgrade {
             preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
+            activation_timestamp: Timestamp::from(1_000_000i64),
         };
         crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
             .expect("Should be able to store kernel upgrade");
