@@ -53,7 +53,16 @@ let mapping_position index map_position =
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
-let next_evm_level ~sc_rollup_node ~node ~client =
+let next_rollup_node_level ~sc_rollup_node ~node ~client =
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
+
+let next_evm_level ~evm_node ~sc_rollup_node ~node ~client =
+  match Evm_node.mode evm_node with
+  | Proxy _ -> next_rollup_node_level ~sc_rollup_node ~node ~client
+  | Sequencer _ ->
+      let open Rpc.Syntax in
+      let* _ = Rpc.produce_block evm_node in
+      let*@ level = Rpc.block_number evm_node in
+      return (Int32.to_int level)
