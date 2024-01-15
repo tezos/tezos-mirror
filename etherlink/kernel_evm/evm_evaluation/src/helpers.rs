@@ -11,6 +11,12 @@ pub struct OutputOptions {
     pub diff: bool,
 }
 
+pub struct LabelIndexes<'a> {
+    pub data_label: Option<&'a String>,
+    pub gas_label: Option<&'a String>,
+    pub value_label: Option<&'a String>,
+}
+
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
         u8::gt
