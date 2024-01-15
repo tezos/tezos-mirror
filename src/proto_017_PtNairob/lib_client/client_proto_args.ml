@@ -746,7 +746,7 @@ module Sc_rollup_params = struct
         [
           desc;
           "Can be an alias or a literal (autodetected in order).\n\
-           Use 'alias:name' or 'text:literal' to force.";
+           Use 'alias:<name>' or 'text:<literal>' to force.";
         ]
     in
     Tezos_clic.param ~name ~desc sc_rollup_address_parameter next

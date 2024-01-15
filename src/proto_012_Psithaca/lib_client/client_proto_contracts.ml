@@ -76,7 +76,7 @@ module Contract_alias = struct
     let desc =
       desc ^ "\n"
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
-         Use 'key:name' to force the later."
+         Use 'key:<name>' to force the later."
     in
     Tezos_clic.(
       param
@@ -115,7 +115,7 @@ module Contract_alias = struct
         [
           desc;
           "Can be a literal, an alias, or a key (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force.";
+           Use 'text:<literal>', 'alias:<name>', 'key:<key>' to force.";
         ]
     in
     Tezos_clic.param ~name ~desc (destination_parameter ()) next
@@ -127,7 +127,7 @@ module Contract_alias = struct
         [
           doc;
           "Can be a literal, an alias, or a key (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force.";
+           Use 'text:<literal>', 'alias:<name>', 'key:<key>' to force.";
         ]
     in
     Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
