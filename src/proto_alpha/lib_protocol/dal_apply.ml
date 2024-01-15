@@ -120,10 +120,9 @@ let validate_dal_attestation ctxt get_consensus_key_and_round_opt op =
   in
   return consensus_key
 
-let apply_attestation ctxt consensus_key op =
+let apply_attestation ctxt consensus_key level attestation =
   let open Result_syntax in
   let* () = assert_dal_feature_enabled ctxt in
-  let Dal.Attestation.{attestation; level; _} = op in
   let attester = pkh_of_consensus_key consensus_key in
   match Dal.Attestation.shards_of_attester ctxt ~attester with
   | None ->

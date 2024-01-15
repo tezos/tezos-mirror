@@ -60,10 +60,11 @@ val validate_dal_attestation :
   Dal.Attestation.operation ->
   Consensus_key.pk tzresult Lwt.t
 
-(** [apply_attestation ctxt consensus_key op] applies [op.attestation] into the
-   [ctxt] assuming [consensus_key.delegate] issued those attestations. *)
+(** [apply_attestation ctxt consensus_key level attestation] applies
+    [attestation] into the [ctxt] assuming [consensus_key.delegate] issued those
+    attestations at level [level]. *)
 val apply_attestation :
-  t -> Consensus_key.pk -> Dal.Attestation.operation -> t tzresult
+  t -> Consensus_key.pk -> Raw_level.t -> Dal.Attestation.t -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be
