@@ -243,7 +243,7 @@ null
 
 GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version
 200 OK
-"322e302e302d7233"
+"322e302e302d7234"
 
 GET http://127.0.0.1:[PORT]/global/block/head/durable/wasm_2_0_0/length?key=/readonly/wasm_version
 200 OK

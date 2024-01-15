@@ -103,11 +103,11 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
-  let current_version = Wasm_2_0_0.v3
+  let current_version = Wasm_2_0_0.v4
 
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
-  let outbox_validity_period = Int32.of_int 80_640
+  let outbox_validity_period = 241_920l
 
   let outbox_message_limit = Z.of_int 100
 

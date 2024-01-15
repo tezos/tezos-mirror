@@ -43,7 +43,7 @@ open Sc_rollup_helpers
 *)
 
 let default_wasm_pvm_revision = function
-  | Protocol.Alpha -> "2.0.0-r3"
+  | Protocol.Alpha -> "2.0.0-r4"
   | Protocol.Oxford -> "2.0.0-r3"
   | Protocol.Nairobi -> "2.0.0-r1"
 

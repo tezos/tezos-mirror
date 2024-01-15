@@ -41,6 +41,7 @@ let version_name = function
   | V1 -> "v1"
   | V2 -> "v2"
   | V3 -> "v3"
+  | V4 -> "v4"
 
 let capture_hash_of tree =
   Regression.capture @@ Context_hash.to_b58check

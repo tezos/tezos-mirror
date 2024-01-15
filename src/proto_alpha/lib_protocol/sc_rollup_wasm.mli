@@ -97,9 +97,14 @@ module V2_0_0 : sig
       see #3590 for more pointers *)
   val ticks_per_snapshot : Z.t
 
-  (* The number of outboxes to keep, which is for a period of two weeks. For a
-     block time of 30 seconds, this equals to 2 * 60 * 24 * 14 = 40_320
-     blocks. *)
+  (* The number of outboxes to keep, which is for a period of two
+     weeks. For a block time of 5 seconds, this equals to (60 * 60 *
+     24 * 14) / 5 = 241_920 blocks. We choose to consider 5 seconds
+     instead of 10 proposed in protocol P to remove the need to
+     introduce a new PVM version every time the block time is
+     modified. We believe 5 seconds is small enough to be "safe" for
+     multiple months. It does not create a critical issue, we will just keep
+     more outboxes than expected. *)
   val outbox_validity_period : int32
 
   (* Maximum number of outbox messages per level.
