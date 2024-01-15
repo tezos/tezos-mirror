@@ -61,22 +61,6 @@ do
     gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
   done
 
-  echo "Upload debian packages (${architecture})"
-
-  # Loop over debian packages
-  for package in ${deb_packages}
-  do
-    gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
-  done
-
-  echo "Upload rpm packages (${architecture})"
-
-  # Loop over rpm packages
-  for package in ${rpm_packages}
-  do
-    gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
-  done
-
   echo "Upload tarball with all binaries (${architecture})"
 
   mkdir -pv "octez-binaries/octez-${architecture}"
@@ -86,6 +70,20 @@ do
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
   gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_package_name}-linux-${architecture}.tar.gz"
   cd ..
+done
+
+echo "Upload debian packages"
+
+# Loop over debian packages
+for package in ${deb_packages}; do
+  gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
+done
+
+echo "Upload rpm packages"
+
+# Loop over rpm packages
+for package in ${rpm_packages}; do
+  gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
 done
 
 # Source code archives automatically published in a GitLab release do not have a static checksum,
