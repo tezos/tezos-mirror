@@ -43,7 +43,10 @@ type batcher = {
 
 type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
-type gc_parameters = {frequency_in_blocks : int32}
+type gc_parameters = {
+  frequency_in_blocks : int32;
+  context_splitting_period : int option;
+}
 
 type history_mode = Archive | Full
 
@@ -216,6 +219,7 @@ let default_gc_parameters =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6415
      * Refine the default GC frequency parameter *)
     frequency_in_blocks = 100l;
+    context_splitting_period = None;
   }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6576
@@ -377,9 +381,13 @@ let injector_encoding : injector Data_encoding.t =
 let gc_parameters_encoding : gc_parameters Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {frequency_in_blocks} -> frequency_in_blocks)
-    (fun frequency_in_blocks -> {frequency_in_blocks})
-  @@ obj1 (dft "frequency" int32 default_gc_parameters.frequency_in_blocks)
+    (fun {frequency_in_blocks; context_splitting_period} ->
+      (frequency_in_blocks, context_splitting_period))
+    (fun (frequency_in_blocks, context_splitting_period) ->
+      {frequency_in_blocks; context_splitting_period})
+  @@ obj2
+       (dft "frequency" int32 default_gc_parameters.frequency_in_blocks)
+       (opt "context_splitting_period" int31)
 
 let history_mode_encoding : history_mode Data_encoding.t =
   Data_encoding.string_enum [("archive", Archive); ("full", Full)]
@@ -712,6 +720,7 @@ module Cli = struct
             Option.value
               ~default:default_gc_parameters.frequency_in_blocks
               gc_frequency;
+          context_splitting_period = None;
         };
       history_mode;
       cors =
@@ -793,6 +802,8 @@ module Cli = struct
               Option.value
                 ~default:configuration.gc_parameters.frequency_in_blocks
                 gc_frequency;
+            context_splitting_period =
+              configuration.gc_parameters.context_splitting_period;
           };
         history_mode = Option.either history_mode configuration.history_mode;
         cors =

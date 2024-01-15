@@ -91,9 +91,14 @@ let maybe_split_context node_ctxt commitment_hash head_level =
   when_ commit_is_gc_candidate @@ fun () ->
   let* last = Node_context.get_last_context_split_level node_ctxt in
   let last = Option.value last ~default:node_ctxt.genesis_info.level in
-  if Int32.(to_int @@ sub head_level last) >=
-    node_ctxt.current_protocol.constants.sc_rollup
-          .challenge_window_in_blocks then (
+  let splitting_period =
+    Option.value
+      node_ctxt.config.gc_parameters.context_splitting_period
+      ~default:
+        node_ctxt.current_protocol.constants.sc_rollup
+          .challenge_window_in_blocks
+  in
+  if Int32.(to_int @@ sub head_level last) >= splitting_period then (
     Context.split node_ctxt.context ;
     Node_context.save_context_split_level node_ctxt head_level)
   else return_unit
