@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::error::Error;
 use crate::error::UpgradeProcessError;
 use crate::storage::read_optional_rlp;
 use anyhow::Context;
@@ -64,16 +63,18 @@ fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
         .context("Failed to delete kernel upgrade")
 }
 
-pub fn upgrade_kernel<Host: Runtime>(
+pub fn upgrade<Host: Runtime>(
     host: &mut Host,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     log!(host, Info, "Kernel upgrade initialisation.");
 
     let config = upgrade_reveal_flow(root_hash);
     config
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
+
+    delete_kernel_upgrade(host)?;
 
     // Mark for reboot, the upgrade/migration will happen at next
     // kernel run, it doesn't matter if it is within the Tezos level
@@ -115,9 +116,14 @@ mod tests {
     // the debug kernel one from `tests/resources/debug_kernel.wasm`.
     fn test_kernel_upgrade() {
         let mut host = MockHost::default();
-        let (root_hash, original_kernel) = preliminary_upgrade(&mut host);
-        upgrade_kernel(&mut host, root_hash.into())
-            .expect("Kernel upgrade must succeed.");
+        let (preimage_hash, original_kernel) = preliminary_upgrade(&mut host);
+        let preimage_hash = preimage_hash.into();
+
+        let kernel_upgrade = KernelUpgrade { preimage_hash };
+        store_kernel_upgrade(&mut host, &kernel_upgrade)
+            .expect("It should be able to store");
+
+        upgrade(&mut host, preimage_hash).expect("Kernel upgrade must succeed.");
 
         let boot_kernel = host.store_read_all(&KERNEL_BOOT_PATH).unwrap();
         assert_eq!(original_kernel, boot_kernel);
