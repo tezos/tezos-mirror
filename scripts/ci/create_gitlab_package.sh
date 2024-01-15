@@ -58,20 +58,6 @@ for architecture in ${architectures}; do
     gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
   done
 
-  echo "Upload debian packages (${architecture})"
-
-  # Loop over debian packages
-  for package in ${deb_packages}; do
-    gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
-  done
-
-  echo "Upload rpm packages (${architecture})"
-
-  # Loop over rpm packages
-  for package in ${rpm_packages}; do
-    gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
-  done
-
   echo "Upload tarball with all binaries (${architecture})"
 
   mkdir -pv "octez-binaries/octez-${architecture}"
@@ -82,6 +68,21 @@ for architecture in ${architectures}; do
   gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
+
+ echo "Upload debian packages (${architecture})"
+
+ # Loop over debian packages
+ for package in ${deb_packages}; do
+     gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
+ done
+
+ echo "Upload rpm packages (${architecture})"
+
+ # Loop over rpm packages
+ for package in ${rpm_packages}; do
+     gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
+ done
+
 
 # Source code archives automatically published in a GitLab release do not have a static checksum,
 # which is mandatory for the opam repository, because they are dynamically generated
