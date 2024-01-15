@@ -106,5 +106,3 @@ External(
 Internal(
     EndOfLevel,
 )
-Kernel panic Some("Abort") at Some(Location { file: "src/main.rs", line: 32, col: 5 })
-Received SBI shutdown request

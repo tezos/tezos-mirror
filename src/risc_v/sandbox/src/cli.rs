@@ -11,6 +11,10 @@ pub struct Cli {
     #[arg(long)]
     pub initrd: Option<String>,
 
+    /// Keep going after the inbox has been drained.
+    #[arg(short, long)]
+    pub keep_going: bool,
+
     /// Support some POSIX-style system calls
     #[arg(long)]
     pub posix: bool,

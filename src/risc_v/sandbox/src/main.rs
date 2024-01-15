@@ -80,7 +80,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut prev_pc = emu.cpu.pc;
-    loop {
+    let mut inbox_exhausted = false;
+
+    while !inbox_exhausted || cli.keep_going {
         emu.cpu.devices_increment();
 
         if let Some(interrupt) = emu.cpu.check_pending_interrupt() {
@@ -97,6 +99,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             .or_else(|exception| -> Result<(), Box<dyn Error>> {
                 match exception {
                     Exception::EnvironmentCallFromSMode | Exception::EnvironmentCallFromUMode => {
+                        let inbox_level = inbox.level();
+                        let inbox_empty = inbox.is_empty();
+
                         handle_syscall(&mut emu, &meta, &mut inbox).map_err(
                             |err| -> Box<dyn Error> {
                                 format!("Failed to handle environment call at {prev_pc:x}: {}", err)
@@ -104,6 +109,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     .into()
                             },
                         )?;
+
+                        // This occurs when calling `next()` twice on an empty inbox.
+                        inbox_exhausted = inbox_empty && inbox.level() > inbox_level;
 
                         // We need to update the program counter ourselves now.
                         // This is a recent change in behaviour in RVEmu.
@@ -129,4 +137,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         prev_pc = emu.cpu.pc;
     }
+
+    Ok(())
 }
