@@ -9,7 +9,10 @@ pub mod spec;
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use crate::models::deserializer::*;
 
@@ -144,6 +147,16 @@ pub struct TxPartIndices {
     pub data: usize,
     pub gas: usize,
     pub value: usize,
+}
+
+impl fmt::Display for TxPartIndices {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "data_index: {}, gas_index: {}, value_index: {}",
+            self.data, self.gas, self.value
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]

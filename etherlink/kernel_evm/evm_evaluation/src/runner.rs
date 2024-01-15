@@ -24,7 +24,9 @@ use thiserror::Error;
 
 use crate::evalhost::EvalHost;
 use crate::fillers::{output_result, process, TestResult};
-use crate::helpers::{construct_folder_path, LabelIndexes, OutputOptions};
+use crate::helpers::{
+    construct_folder_path, string_of_hexa, LabelIndexes, OutputOptions,
+};
 use crate::models::{Env, FillerSource, SpecName, Test, TestSuite, TestUnit};
 use crate::{write_host, DiffMap, Opt, ReportMap};
 
@@ -208,6 +210,16 @@ fn execute_transaction(
     let transaction_value = Some(env.tx.value);
     let pay_for_gas = true; // always, for now
 
+    write_host!(
+        host,
+        "Executing transaction with:\n\
+                    \t- data: {}\n\
+                    \t- gas: {} gas\n\
+                    \t- value: {} wei",
+        string_of_hexa(&env.tx.data),
+        gas_limit.unwrap(),
+        env.tx.value
+    );
     run_transaction(
         host,
         &block_constants,
@@ -307,14 +319,13 @@ pub fn run_test(
             };
 
             for test_execution in tests.iter() {
+                let data = test_execution.indexes.data;
+                let gas = test_execution.indexes.gas;
+                let value = test_execution.indexes.value;
                 if skip {
                     let full_name = format!(
                         "{}_{}_data_index_{}_gas_index_{}_value_index_{}",
-                        &report_key,
-                        name,
-                        test_execution.indexes.data,
-                        test_execution.indexes.gas,
-                        test_execution.indexes.value
+                        &report_key, name, data, gas, value
                     );
                     let status = TestResult::Skipped;
                     if output.result {
@@ -327,14 +338,12 @@ pub fn run_test(
                     }
                     continue;
                 }
-
                 host = prepare_host_with_buffer(host.buffer.take());
                 initialize_accounts(&mut host, &unit);
-
-                let tx_label = info.labels.get(&test_execution.indexes.data);
-                if let Some(tx_label) = tx_label {
+                let data_label = info.labels.get(&data);
+                if let Some(data_label) = data_label {
                     if output.log {
-                        writeln!(output_file, "Executing test {}", tx_label).unwrap();
+                        writeln!(output_file, "Executing test {}", data_label).unwrap();
                     }
                 }
 
@@ -349,9 +358,9 @@ pub fn run_test(
                 );
 
                 let labels = LabelIndexes {
-                    data_label: tx_label,
-                    gas_label: info.labels.get(&test_execution.indexes.gas),
-                    value_label: info.labels.get(&test_execution.indexes.value),
+                    data_label,
+                    gas_label: info.labels.get(&gas),
+                    value_label: info.labels.get(&value),
                 };
                 // Check the state after the execution of the result.
                 match filler_source.clone() {

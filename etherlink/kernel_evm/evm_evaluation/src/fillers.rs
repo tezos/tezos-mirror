@@ -327,7 +327,12 @@ pub fn process(
     let mut status = TestResult::Success;
 
     for (name, fillers) in filler_source.0.into_iter() {
-        write_host!(host, "Processing checks with filler: {}Filler\n", name);
+        write_host!(
+            host,
+            "Processing checks with filler: {}Filler and config: {}\n",
+            name,
+            tx_indices
+        );
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
                 if check_filler_constraints(

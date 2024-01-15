@@ -17,6 +17,14 @@ pub struct LabelIndexes<'a> {
     pub value_label: Option<&'a String>,
 }
 
+pub fn string_of_hexa(bytes: &bytes::Bytes) -> String {
+    let mut hexa = String::from("0x");
+    for byte in bytes.into_iter() {
+        hexa.push_str(format!("{:02x?}", byte).as_str());
+    }
+    hexa
+}
+
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
         u8::gt
