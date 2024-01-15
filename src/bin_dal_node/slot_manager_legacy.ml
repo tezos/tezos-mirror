@@ -32,6 +32,7 @@ type error +=
   | Illformed_pages
   | Invalid_shards_commitment_association
   | Invalid_degree_strictly_less_than_expected of {given : int; expected : int}
+  | Prover_SRS_not_loaded
 
 let () =
   register_error_kind
@@ -122,7 +123,16 @@ let () =
           Some (given, expected)
       | _ -> None)
     (fun (given, expected) ->
-      Invalid_degree_strictly_less_than_expected {given; expected})
+      Invalid_degree_strictly_less_than_expected {given; expected}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.prover_srs_not_loaded"
+    ~title:"Prover SRS not loaded"
+    ~description:"The SRS for the prover was not loaded."
+    ~pp:(fun ppf () -> Cryptobox.pp_commit_error ppf `Prover_SRS_not_loaded)
+    Data_encoding.(unit)
+    (function Prover_SRS_not_loaded -> Some () | _ -> None)
+    (fun () -> Prover_SRS_not_loaded)
 
 type slot = bytes
 
@@ -142,6 +152,7 @@ let commit cryptobox polynomial =
       (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
     ->
       Error [Invalid_degree_strictly_less_than_expected {given; expected}]
+  | Error `Prover_SRS_not_loaded -> Error [Prover_SRS_not_loaded]
 
 let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in

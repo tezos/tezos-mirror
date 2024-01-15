@@ -104,6 +104,7 @@ module Publish_slot_header : Benchmark.S = struct
                      expected=%d}"
                     given
                     expected
+              | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
             in
             failwith "Dal_benchmarks: failed to generate operation (%s)" msg
       in

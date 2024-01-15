@@ -54,7 +54,8 @@ let page_membership_proof params page_index slot_data =
         | `Fail s -> "Fail " ^ s
         | `Page_index_out_of_range -> "Page_index_out_of_range"
         | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
-        | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
+        | ( `Invalid_degree_strictly_less_than_expected _
+          | `Prover_SRS_not_loaded ) as commit_error ->
             Cryptobox.string_of_commit_error commit_error)
 
 (** When the PVM is waiting for a Dal page input, this function attempts to

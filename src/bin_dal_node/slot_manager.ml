@@ -28,6 +28,7 @@ include Slot_manager_legacy
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
+  | No_prover_SRS
 
 let () =
   register_error_kind
@@ -76,6 +77,7 @@ let commit cryptobox polynomial =
       Error
         (Errors.other
            [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
+  | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
