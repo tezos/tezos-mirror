@@ -61,7 +61,7 @@ riscv-check:
 	@cargo check -p tezos-smart-rollup-encoding $(RISCV_OPTS_ALPHA)
 	# @cargo check -p tezos-smart-rollup-storage $(RISCV_OPTS_ALPHA)
 	@cargo check -p tezos-smart-rollup-mock $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup $(RISCV_OPTS) --features proto-alpha-no-mock
+	@cargo check -p tezos-smart-rollup $(RISCV_OPTS_ALPHA)
 
 .PHONY: build
 build: installer-template
