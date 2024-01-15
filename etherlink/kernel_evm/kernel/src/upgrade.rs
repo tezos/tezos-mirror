@@ -6,11 +6,15 @@
 
 use crate::error::Error;
 use crate::error::UpgradeProcessError;
+use crate::storage::read_optional_rlp;
+use anyhow::Context;
 use rlp::Decodable;
 use rlp::DecoderError;
 use rlp::Encodable;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
@@ -34,6 +38,30 @@ impl Encodable for KernelUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.append_iter(self.preimage_hash);
     }
+}
+
+const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
+
+pub fn store_kernel_upgrade<Host: Runtime>(
+    host: &mut Host,
+    kernel_upgrade: &KernelUpgrade,
+) -> Result<(), anyhow::Error> {
+    let path = OwnedPath::from(KERNEL_UPGRADE);
+    let bytes = &kernel_upgrade.rlp_bytes();
+    host.store_write_all(&path, bytes)
+        .context("Failed to store kernel upgrade")
+}
+
+pub fn read_kernel_upgrade<Host: Runtime>(
+    host: &Host,
+) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+    let path = OwnedPath::from(KERNEL_UPGRADE);
+    read_optional_rlp(host, &path).context("Failed to decode kernel upgrade")
+}
+
+fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&KERNEL_UPGRADE)
+        .context("Failed to delete kernel upgrade")
 }
 
 pub fn upgrade_kernel<Host: Runtime>(

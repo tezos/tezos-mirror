@@ -140,7 +140,7 @@ fn upgrade<Host: Runtime>(
     // reboot before upgrade just in case
     upgrade_kernel(host, kernel_upgrade.preimage_hash)
         .context("Failed to upgrade kernel")?;
-    storage::delete_kernel_upgrade(host)
+    upgrade::delete_kernel_upgrade(host)
 }
 
 pub fn stage_two<Host: KernelRuntime>(
@@ -149,7 +149,7 @@ pub fn stage_two<Host: KernelRuntime>(
     base_fee_per_gas: U256,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage two.");
-    if let Some(kernel_upgrade) = storage::read_kernel_upgrade(host)? {
+    if let Some(kernel_upgrade) = upgrade::read_kernel_upgrade(host)? {
         produce_and_upgrade(host, kernel_upgrade, chain_id, base_fee_per_gas)
     } else {
         block::produce(host, chain_id, base_fee_per_gas).map(|_| ())
@@ -524,7 +524,7 @@ mod tests {
         let broken_kernel_upgrade = KernelUpgrade {
             preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
         };
-        storage::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
+        crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
             .expect("Should be able to store kernel upgrade");
 
         // If the upgrade is started, it should raise an error
