@@ -20,6 +20,8 @@ The Octez EVM node
 
 %files
 %{_bindir}/octez-*
+%{_sysconfdir}/init.d/octez-evmnode
+%config /etc/octez/evmnode.conf
 
 %post
 getent group tezos >/dev/null 2>&1 || groupadd tezos
