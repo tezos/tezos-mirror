@@ -195,7 +195,7 @@ pub(crate) mod tests {
         // let mut array1 = manager.allocate_region(array1_place);
         let mut array1_mirror = [0; LEN];
 
-        for i in 0..LEN {
+        for (i, item) in array1_mirror.iter_mut().enumerate() {
             // Ensure the array is zero-initialised.
             assert_eq!(array1.read(i), 0);
 
@@ -205,7 +205,7 @@ pub(crate) mod tests {
             assert_eq!(array1.read(i), value);
 
             // Retain the value for later.
-            array1_mirror[i] = value;
+            *item = value;
         }
 
         let array1_vec = array1.read_all();
@@ -222,10 +222,10 @@ pub(crate) mod tests {
             assert_eq!(array2.read(i), value);
         }
 
-        for i in 0..LEN {
+        for (i, item) in array1_mirror.into_iter().enumerate() {
             // Ensure that writing to the second array didn't mess with the
             // first array.
-            assert_eq!(array1_mirror[i], array1.read(i));
+            assert_eq!(item, array1.read(i));
         }
     }
 
@@ -271,15 +271,11 @@ pub(crate) mod tests {
             }
 
             fn to_stored_in_place(&mut self) {
-                let a = self.a;
-                self.a = self.b;
-                self.b = a;
+                std::mem::swap(&mut self.a, &mut self.b);
             }
 
             fn from_stored_in_place(&mut self) {
-                let b = self.b;
-                self.b = self.a;
-                self.a = b;
+                std::mem::swap(&mut self.b, &mut self.a);
             }
 
             fn from_stored(source: &Self) -> Self {

@@ -35,8 +35,8 @@ test:
 
 .PHONY: check
 check:
-	@cargo check --workspace
-	@cargo clippy --workspace -- --deny warnings
+	@cargo check --workspace --all-targets
+	@cargo clippy --workspace --all-targets -- --deny warnings
 	@make -C dummy_kernel check
 	@make -C jstz check
 
