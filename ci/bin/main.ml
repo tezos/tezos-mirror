@@ -37,7 +37,7 @@ module Stages = struct
 
   let _doc = Stage.register "doc"
 
-  let _prepare_release = Stage.register "prepare_release"
+  let prepare_release = Stage.register "prepare_release"
 
   let _publish_release_gitlab = Stage.register "publish_release_gitlab"
 
@@ -522,7 +522,7 @@ let rules_octez_docker_changes_or_master =
     job_rule ~changes:changeset_octez_docker_changes_or_master ();
   ]
 
-let _job_docker_amd64_experimental : job =
+let job_docker_amd64_experimental : job =
   job_docker_build
     ~external_:true
       (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
@@ -548,7 +548,7 @@ let _job_docker_amd64_test_manual : job =
     ~arch:Amd64
     Test_manual
 
-let _job_docker_amd64_test : job =
+let job_docker_amd64_test : job =
   job_docker_build
     ~external_:true (* TODO: see above *)
     ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
@@ -556,7 +556,7 @@ let _job_docker_amd64_test : job =
     ~arch:Amd64
     Test
 
-let _job_docker_arm64_experimental : job =
+let job_docker_arm64_experimental : job =
   job_docker_build
     ~external_:true (* TODO: see above *)
     ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
@@ -580,13 +580,50 @@ let _job_docker_arm64_test_manual : job =
     ~arch:Arm64
     Test_manual
 
-let _job_docker_arm64_test : job =
+let job_docker_arm64_test : job =
   job_docker_build
     ~external_:true (* TODO: see above *)
     ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
     ~rules:rules_octez_docker_changes_or_master
     ~arch:Arm64
     Test
+
+(* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
+   Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
+   [$IMAGE_ARCH_PREFIX] is only used when building Docker images,
+   here we handle all architectures so there is no such variable. *)
+let job_docker_merge_manifests ~ci_docker_hub ~job_docker_amd64
+    ~job_docker_arm64 : job =
+  job_docker_authenticated
+    ~stage:Stages.prepare_release
+    ~name:"docker:merge_manifests"
+      (* This job merges the images produced in the jobs
+         [docker:{amd64,arm64}] into a single multi-architecture image, and
+         so must be run after these jobs. *)
+    ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
+    ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
+    ["./scripts/ci/docker_merge_manifests.sh"]
+
+let _job_docker_merge_manifests_release =
+  job_external ~filename_suffix:"release"
+  @@ job_docker_merge_manifests
+       ~ci_docker_hub:true
+         (* TODO: In theory, actually uses either release or
+            experimental variant of docker jobs depending on
+            pipeline. In practice, this does not matter as these jobs
+            have the same name in the generated files
+            ([oc.build:ARCH]). However, when the merge_manifest jobs
+            are created directly in the appropriate pipeline, the
+            correcty variant must be used. *)
+       ~job_docker_amd64:job_docker_amd64_experimental
+       ~job_docker_arm64:job_docker_arm64_experimental
+
+let _job_docker_merge_manifests_test =
+  job_external ~filename_suffix:"test"
+  @@ job_docker_merge_manifests
+       ~ci_docker_hub:false
+       ~job_docker_amd64:job_docker_amd64_test
+       ~job_docker_arm64:job_docker_arm64_test
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
