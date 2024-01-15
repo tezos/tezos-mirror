@@ -88,6 +88,9 @@ types:
     - id: attestation
       type: attestation
       if: (alpha__inlined__attestation_mempool__contents_tag == alpha__inlined__attestation_mempool__contents_tag::attestation)
+    - id: attestation_with_dal
+      type: attestation_with_dal
+      if: (alpha__inlined__attestation_mempool__contents_tag == alpha__inlined__attestation_mempool__contents_tag::attestation_with_dal)
   alpha__inlined__preattestation:
     seq:
     - id: alpha__inlined__preattestation
@@ -128,6 +131,9 @@ types:
     - id: attestation
       type: attestation
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation)
+    - id: attestation_with_dal
+      type: attestation_with_dal
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation_with_dal)
     - id: double_preattestation_evidence
       type: double_preattestation_evidence
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::double_preattestation_evidence)
@@ -270,6 +276,18 @@ types:
       type: s4
     - id: block_payload_hash
       size: 32
+  attestation_with_dal:
+    seq:
+    - id: slot
+      type: u2
+    - id: level
+      type: s4
+    - id: round
+      type: s4
+    - id: block_payload_hash
+      size: 32
+    - id: dal_attestation
+      type: z
   ballot:
     seq:
     - id: source
@@ -1465,6 +1483,7 @@ enums:
     255: named
   alpha__inlined__attestation_mempool__contents_tag:
     21: attestation
+    23: attestation_with_dal
   alpha__inlined__preattestation__contents_tag:
     20: preattestation
   alpha__michelson__v1__primitives:
@@ -1875,6 +1894,7 @@ enums:
     20: preattestation
     21: attestation
     22: dal_attestation
+    23: attestation_with_dal
     107: reveal
     108: transaction
     109: origination
