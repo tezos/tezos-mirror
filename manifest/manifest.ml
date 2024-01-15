@@ -4263,12 +4263,25 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
   let tags = ref String_set.empty in
   let add_tag_for_path path =
     if debug then Printf.eprintf "- path has changed: %s\n%!" path ;
-    Fun.flip List.iter runtime_dependencies @@ fun (tag, tag_path) ->
-    (* We are comparing paths that are canonical:
-       - Tezt_wrapper writes canonical paths in the list of runtime dependencies;
-       - the code below calls [path_has_changed] on canonical path. *)
-    if tag_path = path then tags := String_set.add tag !tags
+    (* Search for a tag [tag] with path [tag_path] such that [tag_path] is equal to [path]
+       or to a parent directory of [path]. For instance, if tag ["michelson"]
+       corresponds to path ["michelson_test_scripts"] and if ["path"] is
+       ["michelson_test_scripts/opcodes/xor.tz"], tag ["michelson"] must be added. *)
+    let rec find_tag path =
+      ( Fun.flip List.iter runtime_dependencies @@ fun (tag, tag_path) ->
+        (* We are comparing paths that are canonical:
+           - Tezt_wrapper writes canonical paths in the list of runtime dependencies;
+           - the code below calls [add_tag_for_path] on canonical path. *)
+        if tag_path = path then tags := String_set.add tag !tags ) ;
+      let parent = Filename.dirname path in
+      (* See remark on comparing path lengths in [directory_has_changed_recursively]. *)
+      if String.length parent < String.length path then find_tag parent
+    in
+    find_tag path
   in
+  (* If a file that changed directly matches a tag, add this tag.
+     This allows [~uses] to refer to static files or directories. *)
+  List.iter add_tag_for_path changed_files ;
   (* Iterate over all internal targets to find the ones that changed
      and see if they have an associated tag. *)
   ( Fun.flip List.iter !Target.registered @@ fun (target : Target.internal) ->
@@ -4389,12 +4402,6 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
           Fun.flip List.iter changed_files @@ fun file ->
           if Filename.dirname file = path then
             test_files := String_set.add file !test_files)) ;
-  (* TODO:
-     - supports non-executable ~uses:
-       - if a target that is not an executable changed, still try to find a matching tag?
-       - if changed_files contains something that matches the path of a tag,
-         or is in a directory that matches the path of a tag,
-         add this tag to the list *)
   let tsl =
     if tezt_exe_dep_changed then "true"
     else if String_set.is_empty !tags && String_set.is_empty !test_files then
