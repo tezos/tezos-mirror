@@ -455,12 +455,12 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Revert(ExitRevert::Reverted),
+            reason: ExitReason::Error(ExitError::OutOfFund),
             new_address: None,
             logs: vec![],
-            result: Some(vec![]),
+            result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 55427,
+            estimated_ticks_used: 0,
         }));
 
         assert_eq!(expected_result, result);
