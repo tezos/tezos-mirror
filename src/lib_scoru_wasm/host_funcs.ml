@@ -1505,10 +1505,7 @@ let registry_V3 ~write_debug =
 
 let registry_V3_noop = registry_V3 ~write_debug:Noop
 
-let base_V4 =
-  Host_funcs.(
-    base_V3
-    |> with_host_function ~global_name:reveal_raw_name ~implem:reveal_raw)
+let base_V4 = base_V3
 
 let registry_V4 ~write_debug =
   Host_funcs.(base_V4 |> with_write_debug ~write_debug |> construct)
