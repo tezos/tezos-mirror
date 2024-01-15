@@ -7,12 +7,11 @@
 
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::inbox::KernelUpgrade;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::{fetch, Configuration};
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
-use crate::upgrade::upgrade_kernel;
+use crate::upgrade::{upgrade_kernel, KernelUpgrade};
 use crate::Error::UpgradeError;
 use anyhow::Context;
 use block::ComputationResult;
@@ -373,8 +372,9 @@ mod tests {
     use crate::safe_storage::{KernelRuntime, SafeStorage};
     use crate::{
         blueprint::Blueprint,
-        inbox::{KernelUpgrade, Transaction, TransactionContent},
+        inbox::{Transaction, TransactionContent},
         stage_two, storage,
+        upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
     use primitive_types::{H160, U256};

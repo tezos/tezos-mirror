@@ -6,10 +6,35 @@
 
 use crate::error::Error;
 use crate::error::UpgradeProcessError;
+use rlp::Decodable;
+use rlp::DecoderError;
+use rlp::Encodable;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct KernelUpgrade {
+    pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
+}
+
+impl Decodable for KernelUpgrade {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        let hash: Vec<u8> = decoder.as_val()?;
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hash
+            .try_into()
+            .map_err(|_| DecoderError::RlpInvalidLength)?;
+
+        Ok(Self { preimage_hash })
+    }
+}
+
+impl Encodable for KernelUpgrade {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.append_iter(self.preimage_hash);
+    }
+}
 
 pub fn upgrade_kernel<Host: Runtime>(
     host: &mut Host,

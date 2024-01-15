@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::inbox::KernelUpgrade;
 use crate::indexable_storage::IndexableStorage;
+use crate::upgrade::KernelUpgrade;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
