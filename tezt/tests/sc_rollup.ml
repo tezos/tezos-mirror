@@ -524,8 +524,7 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node ?(extra_tags = []) ~variant scenario ~kind
-    =
+let test_rollup_node_inbox ?(extra_tags = []) ~variant scenario ~kind =
   test_full_scenario
     {
       variant = Some variant;
@@ -1180,7 +1179,7 @@ let test_rollup_list ~kind =
       ~error_msg:"%L %R") ;
   unit
 
-let test_rollup_client_wallet ~kind =
+let test_client_wallet ~kind =
   register_test
     ~__FILE__
     ~tags:["sc_rollup"; "wallet"; "client"]
@@ -1243,8 +1242,9 @@ let test_rollup_client_wallet ~kind =
    When a rollup node starts, we want to make sure that in the absence of
    messages it will boot into the initial state.
 *)
-let test_rollup_node_boots_into_initial_state ~kind =
+let test_rollup_node_boots_into_initial_state ?supports ~kind =
   test_full_scenario
+    ?supports
     {
       variant = None;
       tags = ["bootstrap"];
@@ -5608,84 +5608,23 @@ let start_rollup_node_with_encrypted_key ~kind =
   in
   unit
 
-let register_riscv () =
-  test_rollup_node_boots_into_initial_state [Protocol.Alpha] ~kind:"riscv" ;
+let register_riscv ~protocols =
+  test_rollup_node_boots_into_initial_state
+    protocols
+    ~supports:Protocol.(From_protocol 019)
+    ~kind:"riscv" ;
   test_commitment_scenario
+    ~supports:Protocol.(From_protocol 019)
     ~extra_tags:["modes"; "operator"]
     ~variant:"operator_publishes"
     (mode_publish Operator true)
-    [Protocol.Alpha]
+    protocols
     ~kind:"riscv"
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
-  test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"basic"
-    basic_scenario
-    protocols ;
-  test_gc
-    "many_gc"
-    ~kind
-    ~challenge_window:5
-    ~commitment_period:2
-    ~history_mode:Full
-    ~tags:[Tag.flaky]
-    protocols ;
-  test_gc
-    "sparse_gc"
-    ~kind
-    ~challenge_window:10
-    ~commitment_period:5
-    ~history_mode:Full
-    ~tags:[Tag.flaky]
-    protocols ;
-  test_gc
-    "no_gc"
-    ~kind
-    ~challenge_window:10
-    ~commitment_period:5
-    ~history_mode:Archive
-    protocols ;
-  test_snapshots
-    ~kind
-    ~challenge_window:5
-    ~commitment_period:2
-    ~history_mode:Full
-    protocols ;
-  test_snapshots
-    ~kind
-    ~challenge_window:10
-    ~commitment_period:5
-    ~history_mode:Archive
-    protocols ;
   test_rpcs ~kind protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"stops"
-    sc_rollup_node_stops_scenario
-    protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"disconnects"
-    sc_rollup_node_disconnects_scenario
-    protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"handles_chain_reorg"
-    sc_rollup_node_handles_chain_reorg
-    protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    ~variant:"batcher"
-    ~extra_tags:["batcher"; Tag.flaky]
-    sc_rollup_node_batcher
-    protocols ;
-  test_rollup_node_boots_into_initial_state protocols ~kind ;
-  test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
-  test_rollup_node_advances_pvm_state protocols ~kind ~internal:true ;
   test_commitment_scenario
     ~variant:"commitment_is_stored"
     commitment_stored
@@ -5775,31 +5714,13 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_cement_ignore_commitment ~kind protocols ;
-  bailout_mode_not_publish ~kind protocols ;
-  bailout_mode_fail_to_start_without_operator ~kind protocols ;
-  bailout_mode_fail_operator_no_stake ~kind protocols ;
-  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
-  custom_mode_empty_operation_kinds ~kind protocols ;
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
-     Uncomment this test as soon as the issue done.
-     test_reinject_failed_commitment protocols ~kind ; *)
-  test_late_rollup_node protocols ~kind ;
-  test_late_rollup_node_2 protocols ~kind ;
-  test_interrupt_rollup_node protocols ~kind ;
-  test_outbox_message protocols ~kind ;
-  test_messages_processed_by_commitment ~kind protocols ;
-  test_arg_boot_sector_file ~kind protocols
+  test_outbox_message protocols ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific features. *)
-  start_rollup_node_with_encrypted_key protocols ~kind:"arith" ;
-  test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
-  test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
-  test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
@@ -5819,8 +5740,6 @@ let register ~protocols =
     ~boot_sector2:"31"
     ~kind:"arith"
     protocols ;
-  test_reveals_fails_on_wrong_hash protocols ;
-  test_reveals_fails_on_unknown_hash protocols ;
   test_reveals_4k protocols ;
   test_reveals_above_4k protocols ;
   (* Specific Wasm PVM tezts *)
@@ -5834,14 +5753,9 @@ let register ~protocols =
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
-  test_accuser protocols ;
-  test_bailout_refutation protocols ;
-  test_injector_auto_discard protocols ;
-  test_multiple_batcher_key ~kind:"wasm_2_0_0" protocols ;
-  test_injector_uses_available_keys protocols ~kind:"wasm_2_0_0" ;
 
   (* Specific riscv PVM tezt *)
-  register_riscv () ;
+  register_riscv ~protocols ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
@@ -5851,7 +5765,100 @@ let register ~protocols =
   (* Private rollup node *)
   test_private_rollup_whitelisted_staker protocols ;
   test_private_rollup_non_whitelisted_staker protocols ;
-  test_private_rollup_node_publish_in_whitelist protocols ;
-  test_private_rollup_node_publish_not_in_whitelist protocols ;
   test_rollup_whitelist_update ~kind:"wasm_2_0_0" protocols ;
   test_rollup_whitelist_outdated_update ~kind:"wasm_2_0_0" protocols
+
+let register_protocol_independent () =
+  let protocols = Protocol.[Alpha] in
+  let with_kind kind =
+    test_rollup_node_running ~kind protocols ;
+    test_rollup_node_boots_into_initial_state protocols ~kind ;
+    test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
+    test_rollup_node_advances_pvm_state protocols ~kind ~internal:true
+  in
+  with_kind "wasm_2_0_0" ;
+  with_kind "arith" ;
+  let kind = "wasm_2_0_0" in
+  start_rollup_node_with_encrypted_key protocols ~kind ;
+  test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
+  test_rollup_node_configuration protocols ~kind ;
+  test_client_wallet protocols ~kind ;
+  test_reveals_fails_on_wrong_hash protocols ;
+  test_reveals_fails_on_unknown_hash protocols ;
+  test_injector_auto_discard protocols ;
+  test_accuser protocols ;
+  test_bailout_refutation protocols ;
+  test_multiple_batcher_key ~kind protocols ;
+  test_injector_uses_available_keys protocols ~kind ;
+  test_private_rollup_node_publish_in_whitelist protocols ;
+  test_private_rollup_node_publish_not_in_whitelist protocols ;
+  test_rollup_node_inbox
+    ~kind
+    ~variant:"stops"
+    sc_rollup_node_stops_scenario
+    protocols ;
+  test_rollup_node_inbox
+    ~kind
+    ~variant:"disconnects"
+    sc_rollup_node_disconnects_scenario
+    protocols ;
+  test_rollup_node_inbox
+    ~kind
+    ~variant:"handles_chain_reorg"
+    sc_rollup_node_handles_chain_reorg
+    protocols ;
+  test_rollup_node_inbox
+    ~kind
+    ~variant:"batcher"
+    ~extra_tags:["batcher"; Tag.flaky]
+    sc_rollup_node_batcher
+    protocols ;
+  test_rollup_node_inbox ~kind ~variant:"basic" basic_scenario protocols ;
+  test_gc
+    "many_gc"
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    ~tags:[Tag.flaky]
+    protocols ;
+  test_gc
+    "sparse_gc"
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Full
+    ~tags:[Tag.flaky]
+    protocols ;
+  test_gc
+    "no_gc"
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Archive
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:5
+    ~history_mode:Archive
+    protocols ;
+  custom_mode_empty_operation_kinds ~kind protocols ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
+     Uncomment this test as soon as the issue done.
+     test_reinject_failed_commitment protocols ~kind ; *)
+  test_late_rollup_node protocols ~kind ;
+  test_late_rollup_node_2 protocols ~kind ;
+  test_interrupt_rollup_node protocols ~kind ;
+  test_arg_boot_sector_file ~kind protocols ;
+  test_messages_processed_by_commitment ~kind protocols ;
+  bailout_mode_not_publish ~kind protocols ;
+  bailout_mode_fail_to_start_without_operator ~kind protocols ;
+  bailout_mode_fail_operator_no_stake ~kind protocols ;
+  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols

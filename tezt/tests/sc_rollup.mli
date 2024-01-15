@@ -31,3 +31,5 @@
 *)
 
 val register : protocols:Protocol.t list -> unit
+
+val register_protocol_independent : unit -> unit
