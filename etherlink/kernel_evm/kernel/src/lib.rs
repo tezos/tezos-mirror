@@ -11,10 +11,8 @@ use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::{fetch, Configuration};
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
-use crate::upgrade::{upgrade, KernelUpgrade};
 use crate::Error::UpgradeError;
 use anyhow::Context;
-use block::ComputationResult;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
 use migration::MigrationStatus;
@@ -106,45 +104,6 @@ pub fn stage_one<Host: Runtime>(
     log!(host, Info, "Configuration: {}", configuration);
 
     fetch(host, smart_rollup_address, ticketer, admin, configuration)
-}
-
-fn produce_and_upgrade<Host: KernelRuntime>(
-    host: &mut Host,
-    kernel_upgrade: KernelUpgrade,
-    chain_id: U256,
-    base_fee_per_gas: U256,
-    config: &mut Configuration,
-) -> Result<(), anyhow::Error> {
-    // Since a kernel upgrade was detected, in case an error is thrown
-    // by the block production, we exceptionally "recover" from it and
-    // still process the kernel upgrade.
-    // In case of a reboot request, the upgrade is delayed.
-    match block::produce(host, chain_id, base_fee_per_gas, config) {
-        Ok(ComputationResult::RebootNeeded) => Ok(()),
-        Err(e) => {
-            log!(
-            host,
-            Error,
-            "{:?} happened during block production but a kernel upgrade was detected.",
-            e);
-            upgrade(host, kernel_upgrade.preimage_hash)
-        }
-        Ok(ComputationResult::Finished) => upgrade(host, kernel_upgrade.preimage_hash),
-    }
-}
-
-pub fn stage_two<Host: KernelRuntime>(
-    host: &mut Host,
-    chain_id: U256,
-    base_fee_per_gas: U256,
-    config: &mut Configuration,
-) -> Result<(), anyhow::Error> {
-    log!(host, Info, "Entering stage two.");
-    if let Some(kernel_upgrade) = upgrade::read_kernel_upgrade(host)? {
-        produce_and_upgrade(host, kernel_upgrade, chain_id, base_fee_per_gas, config)
-    } else {
-        block::produce(host, chain_id, base_fee_per_gas, config).map(|_| ())
-    }
 }
 
 fn retrieve_smart_rollup_address<Host: Runtime>(
@@ -275,7 +234,8 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     .context("Failed during stage 1")?;
 
     // Start processing blueprints
-    stage_two(host, chain_id, base_fee_per_gas, &mut configuration)
+    block::produce(host, chain_id, base_fee_per_gas, &mut configuration)
+        .map(|_| ())
         .context("Failed during stage 2")
 }
 
@@ -366,7 +326,7 @@ mod tests {
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
-        stage_two, storage,
+        storage,
         upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
@@ -522,7 +482,7 @@ mod tests {
             .expect("Should be able to store kernel upgrade");
 
         // If the upgrade is started, it should raise an error
-        stage_two(
+        crate::block::produce(
             &mut host,
             DUMMY_CHAIN_ID,
             DUMMY_BASE_FEE_PER_GAS.into(),
