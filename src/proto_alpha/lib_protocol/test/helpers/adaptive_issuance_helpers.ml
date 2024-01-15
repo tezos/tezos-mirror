@@ -1107,28 +1107,6 @@ let apply_slashing
       culprit_name
       account_map
   in
-  let update_frozen_rights_with_slash ({frozen_rights; _} as acc) =
-    let cycle_to_slash =
-      Cycle.add current_cycle (constants.preserved_cycles + 1)
-    in
-    let frozen_rights =
-      CycleMap.update
-        cycle_to_slash
-        (function
-          | None -> None
-          | Some x ->
-              Some
-                (Tez.mul_q
-                   x
-                   Q.((Protocol.Int_percentage.neg slashed_pct :> int) // 100)
-                |> Tez.of_q ~round_up:false))
-        frozen_rights
-    in
-    {acc with frozen_rights}
-  in
-  let account_map =
-    update_account ~f:update_frozen_rights_with_slash culprit_name account_map
-  in
   let total_after_slash = get_total_supply account_map in
   let portion_reward =
     constants.adaptive_issuance.global_limit_of_staking_over_baking + 2
