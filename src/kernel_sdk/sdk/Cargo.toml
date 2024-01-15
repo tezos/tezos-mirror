@@ -80,7 +80,5 @@ storage = ["tezos-smart-rollup-storage"]
 std = ["alloc", "debug_alloc", "tezos-smart-rollup-entrypoint/std"]
 testing = ["crypto", "tezos-smart-rollup-mock"]
 proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi", "tezos-smart-rollup-host/proto-nairobi", "tezos-smart-rollup-mock/proto-nairobi"]
-proto-alpha = ["proto-alpha-no-mock", "tezos-smart-rollup-mock/proto-alpha"]
-# TODO: remove `proto-alpha-no-mock` once `mock` can compile on RISC-V
-proto-alpha-no-mock = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha", "tezos-smart-rollup-mock/proto-alpha"]
 experimental-host-in-memory-store = ["tezos-smart-rollup-entrypoint/proto-alpha", "tezos-smart-rollup-entrypoint/experimental-host-in-memory-store"]
