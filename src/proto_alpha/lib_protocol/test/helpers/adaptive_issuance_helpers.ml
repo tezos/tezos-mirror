@@ -58,8 +58,8 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
-  let of_q ~round_up Q.{num; den} =
-    (if round_up then Z.cdiv num den else Z.div num den) |> of_z
+  let of_q ~round Q.{num; den} =
+    (match round with `Up -> Z.cdiv num den | `Down -> Z.div num den) |> of_z
 
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
@@ -79,7 +79,7 @@ module Partial_tez = struct
     let tez, rem = Z.div_rem num den in
     (Tez.of_z tez, rem /// den)
 
-  let to_tez ~round_up = Tez.of_q ~round_up
+  let to_tez ~round = Tez.of_q ~round
 
   let get_rem a = snd (to_tez_rem a)
 
@@ -178,7 +178,7 @@ module Frozen_tez = struct
   (* For rewards, distribute equally *)
   let add_tez_to_all_current tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
-    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round_up:true in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
     let co_quantity = Partial_tez.of_tez Tez.(tez -! self_quantity) in
     let co_current = add_q_to_all_co_current co_quantity a.co_current in
     {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
@@ -186,9 +186,7 @@ module Frozen_tez = struct
   (* For slashing, slash equally *)
   let sub_tez_from_all_current tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
-    let self_quantity =
-      Tez.mul_q tez self_portion |> Tez.of_q ~round_up:false
-    in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Down in
     let self_current =
       if Tez.(self_quantity >= a.self_current) then Tez.zero
       else Tez.(a.self_current -! self_quantity)
@@ -252,9 +250,7 @@ module Frozen_tez = struct
 
   let slash base_amount (pct : Protocol.Percentage.t) a =
     let pct_q = Protocol.Percentage.to_q pct in
-    let slashed_amount =
-      Tez.mul_q base_amount pct_q |> Tez.of_q ~round_up:false
-    in
+    let slashed_amount = Tez.mul_q base_amount pct_q |> Tez.of_q ~round:`Down in
     let total_current = total_current a in
     let slashed_amount_final = Tez.min slashed_amount total_current in
     (sub_tez_from_all_current slashed_amount a, slashed_amount_final)
@@ -298,13 +294,13 @@ module Unstaked_frozen = struct
 
   let apply_slash_to_request slash_pct amount =
     let slashed_amount =
-      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round_up:true
+      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round:`Up
     in
     Tez.(amount -! slashed_amount)
 
   let apply_slash_to_current slash_pct initial current =
     let slashed_amount =
-      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round_up:false
+      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round:`Down
     in
     Tez.sub_opt current slashed_amount |> Option.value ~default:Tez.zero
 
@@ -733,8 +729,8 @@ let assert_balance_equal ~loc account_name
           Tez.equal
           (f "Staked balances do not match")
           Tez.pp
-          (Partial_tez.to_tez ~round_up:false a_staked_b)
-          (Partial_tez.to_tez ~round_up:false b_staked_b);
+          (Partial_tez.to_tez ~round:`Down a_staked_b)
+          (Partial_tez.to_tez ~round:`Down b_staked_b);
         Assert.equal
           ~loc
           Tez.equal
@@ -1009,7 +1005,7 @@ let balance_and_total_balance_of_account account_name account_map =
   ( balance,
     Tez.(
       liquid_b +! bonds_b
-      +! Partial_tez.to_tez ~round_up:false staked_b
+      +! Partial_tez.to_tez ~round:`Down staked_b
       +! unstaked_frozen_b +! unstaked_finalizable_b) )
 
 let apply_slashing
@@ -1116,7 +1112,7 @@ let apply_slashing
      down each time *)
   let reward_to_snitch =
     List.map
-      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round_up:false)
+      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round:`Down)
       total_slashed
     |> List.fold_left Tez.( +! ) Tez.zero
   in
@@ -1273,4 +1269,4 @@ let portion_of_rewards_to_liquid_for_cycle ?policy ctxt cycle pkh rewards =
   in
   let portion = Tez.(ratio weighted_delegated (frozen +! weighted_delegated)) in
   let to_liquid = Tez.mul_q rewards portion in
-  return (Partial_tez.to_tez ~round_up:false to_liquid)
+  return (Partial_tez.to_tez ~round:`Down to_liquid)

@@ -854,7 +854,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   let issuance_from_rate =
     Tez.(
       mul_q total_supply Q.(div yearly_rate_exact ~$525_600_00)
-      |> of_q ~round_up:false)
+      |> of_q ~round:`Down)
   in
   let* () =
     Assert.equal
@@ -1352,7 +1352,7 @@ let unstake src_name unstake_value : (t, t) scenarios =
         unstake_value ;
       let stake_balance =
         (balance_of_account src_name state.account_map).staked_b
-        |> Partial_tez.to_tez ~round_up:false
+        |> Partial_tez.to_tez ~round:`Down
       in
       let amount = quantity_to_tez stake_balance unstake_value in
       let* operation = unstake (B block) src.contract amount in
@@ -1760,7 +1760,7 @@ let rec loop_action n : ('a -> 'a tzresult Lwt.t) -> ('a, 'a) scenarios =
 let check_balance_field src_name field amount : (t, t) scenarios =
   let open Lwt_result_syntax in
   let check = Assert.equal_tez ~loc:__LOC__ amount in
-  let check' a = check (Partial_tez.to_tez ~round_up:false a) in
+  let check' a = check (Partial_tez.to_tez ~round:`Down a) in
   exec_state (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
