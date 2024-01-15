@@ -196,7 +196,10 @@ val polynomial_to_slot : t -> polynomial -> slot
      polynomial [p].
 
       Fails with [`Invalid_degree_strictly_less_than_expected _]
-      if the degree of [p] exceeds the SRS size. *)
+      if the degree of [p] exceeds the SRS size.
+      
+      Fails with [`Prover_SRS_not_loaded] if the prover’s SRS is not loaded
+      (ie: [init_dal_verifier] has been used to load the SRS). *)
 val commit :
   t ->
   polynomial ->
@@ -326,7 +329,9 @@ val verify_shard :
 
     Fails with:
     - [Error `Invalid_degree_strictly_less_than_expected _] if the SRS
-    contained in [t] is too small to produce the proof *)
+    contained in [t] is too small to produce the proof
+    - [Error `Prover_SRS_not_loaded] if the prover’s SRS is not loaded
+    (ie: [init_dal_verifier] has been used to load the SRS). *)
 val prove_commitment :
   t ->
   polynomial ->
@@ -347,6 +352,8 @@ val prove_commitment :
     - [Error (`Page_index_out_of_range msg)] if the page index
     is not within the range [0, slot_size/page_size - 1]
     (where [slot_size] and [page_size] are found in [t]).
+    - [Error `Prover_SRS_not_loaded] if the SRS has been loaded with
+    [init_dal_verifier].
 
     Ensures:
     - [verify_page t commitment ~page_index page page_proof = Ok ()] if

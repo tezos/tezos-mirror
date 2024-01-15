@@ -1314,6 +1314,8 @@ module Internal_for_tests = struct
     in
     Prover_init_param {srs_g1; srs_g2}
 
+  (* This function is duplicated from parameters_initialisation for now.
+     At some point the two functions will differ *)
   let parameters_initialisation_verifier
       {slot_size; page_size; number_of_shards; redundancy_factor; _} =
     let length = slot_as_polynomial_length ~slot_size ~page_size in
