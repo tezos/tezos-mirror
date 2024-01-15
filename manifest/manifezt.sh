@@ -8,7 +8,7 @@ if [ -z "$ORIGIN" ]; then
 fi
 
 make -C manifest manifest
-CHANGES="$(git diff --name-only "$ORIGIN")"
+CHANGES="$(git diff --name-only $(git merge-base HEAD "$ORIGIN"))"
 
 if [ -z "$CHANGES" ]; then
   echo "No changes => no tests to run."
