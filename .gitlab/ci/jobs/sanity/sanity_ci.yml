@@ -3,9 +3,10 @@ sanity_ci:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies
   stage: sanity
-  script:
-    - eval $(opam env)
+  before_script:
     - ./scripts/ci/take_ownership.sh
+    - eval $(opam env)
+  script:
     - make -C manifest check
     - ./scripts/lint.sh --check-gitlab-ci-yml
     # Check that the opam-repo images' Alpine version corresponds to

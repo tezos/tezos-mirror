@@ -34,9 +34,10 @@
   stage: build
   variables:
     ARCH: ""
-  script:
-    - eval $(opam env)
+  before_script:
     - ./scripts/ci/take_ownership.sh
+    - eval $(opam env)
+  script:
     - ./scripts/ci/build_static_binaries.sh
   artifacts:
     paths:

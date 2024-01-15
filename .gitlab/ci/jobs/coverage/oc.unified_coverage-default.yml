@@ -16,8 +16,9 @@ oc.unified_coverage:
     # The default branch where the coverage downloader will search for
     # merge commits.
     DEFAULT_BRANCH: $CI_COMMIT_SHA
-  script:
+  before_script:
     - . ./scripts/version.sh # sets COVERAGE_OUTPUT
+  script:
     # On the project default branch, we fetch coverage from the last merged MR
     - mkdir -p _coverage_report
     - dune exec scripts/ci/download_coverage/download.exe -- -a from=last-merged-pipeline --info --log-file _coverage_report/download_coverage.log

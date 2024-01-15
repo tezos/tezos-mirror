@@ -13,8 +13,8 @@ documentation:linkcheck:
     - when: manual
   before_script:
     - . ./scripts/version.sh
-    - . $HOME/.venv/bin/activate
     - eval $(opam env)
+    - . $HOME/.venv/bin/activate
   script:
     - make all
     - make -C docs redirectcheck

@@ -102,8 +102,14 @@ oc.unit:js_components:
   variables:
     # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
     RUNTEZTALIAS: "true"
-  script:
+  # Note: this overrides the `before_script` inherited from
+  # `.test_template` to add `take_ownership.sh`.
+  before_script:
+    - ./scripts/ci/take_ownership.sh
+    - . ./scripts/version.sh
+    - eval $(opam env)
     - . ./scripts/install_build_deps.js.sh
+  script:
     - make test-js
 
 oc.unit:protocol_compiles:

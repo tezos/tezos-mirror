@@ -87,8 +87,7 @@
     - .oc.template__coverage
   stage: build
   before_script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - ./scripts/ci/take_ownership.sh
     - . ./scripts/version.sh
     - eval $(opam env)
 

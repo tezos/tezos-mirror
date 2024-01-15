@@ -11,6 +11,7 @@ oc.build:dpkg:amd64:
   variables:
     TARGET: "dpkg"
   before_script:
+    - . ./scripts/version.sh
     - apt update
     - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev
     - wget https://sh.rustup.rs/rustup-init.sh
@@ -29,6 +30,7 @@ oc.build:rpm:amd64:
   variables:
     TARGET: "rpm"
   before_script:
+    - . ./scripts/version.sh
     - dnf update -y
     - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env gcc-c++
   artifacts:
