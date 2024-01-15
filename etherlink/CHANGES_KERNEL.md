@@ -4,6 +4,16 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 9978f3a5f8bee0be78686c5c568109d2e6148f13
+
+### Features
+
 - Fix contract code storage cost (!10356)
 - Fix contract creation gas cost and transaction data cost. (!10349)
 - Implementation of EIP-3541, new code starting with the 0xEF byte cannot be

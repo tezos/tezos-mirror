@@ -116,7 +116,9 @@ let install_finalizer_prod server =
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = emit Event.event_shutdown_node exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  emit (Event.event_shutdown_rpc_server ~private_:false) ()
+  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
+  let* () = Evm_node_lib_prod.Tx_pool.shutdown () in
+  emit Event.event_shutdown_tx_pool ()
 
 let install_finalizer_dev server =
   let open Lwt_syntax in
@@ -160,10 +162,11 @@ let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
   let* smart_rollup_address =
     fetch_smart_rollup_address
       ~keep_alive
-      (fun _endpoint -> Rollup_node_rpc.smart_rollup_address)
+      Rollup_node_services.smart_rollup_address
       rollup_node_endpoint
   in
-  return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+  return
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
 let rollup_node_config_dev ~rollup_node_endpoint ~keep_alive =
   let open Lwt_result_syntax in
@@ -479,10 +482,17 @@ let proxy_command =
       let* () = Configuration.save_proxy ~force:true ~data_dir config in
       let* () =
         if not config.devmode then
-          let* rollup_config =
+          let* ((backend_rpc, smart_rollup_address) as rollup_config) =
             rollup_node_config_prod ~rollup_node_endpoint ~keep_alive
           in
-          let* () = Evm_node_lib_prod.Tx_pool.start rollup_config in
+          let* () =
+            Evm_node_lib_prod.Tx_pool.start
+              {
+                rollup_node = backend_rpc;
+                smart_rollup_address;
+                mode = Proxy {rollup_node_endpoint};
+              }
+          in
           let* directory = prod_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
@@ -631,12 +641,13 @@ let sequencer_command =
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
+  let s = Ethereum_types.hex_of_string s in
   let*? _, messages =
-    Rollup_node.make_encoded_messages
+    Transaction_format.make_encoded_messages
       ~smart_rollup_address
-      (Evm_node_lib_prod_encoding.Ethereum_types.hex_of_string s)
+      (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
   in
-  return messages
+  return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
 let make_dev_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in

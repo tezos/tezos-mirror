@@ -161,6 +161,22 @@ let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
+let pad_to_n_bytes_le bytes length =
+  let current_length = Bytes.length bytes in
+  if current_length >= length then bytes
+  else
+    let padding_length = length - current_length in
+    let padding = Bytes.make padding_length '\x00' in
+    Bytes.cat bytes padding
+
+let encode_u256_le (Qty n) =
+  let bits = Z.to_bits n |> Bytes.of_string in
+  pad_to_n_bytes_le bits 32
+
+let encode_u16_le (Qty n) =
+  let bits = Z.to_bits n |> Bytes.of_string in
+  pad_to_n_bytes_le bits 2
+
 type transaction_log = {
   address : address;
   topics : hash list;
@@ -971,10 +987,9 @@ let hash_raw_tx str =
   str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   |> Bytes.to_string
 
-(** [transaction_nonce raw_tx] returns the nonce of a given raw transaction. *)
-let transaction_nonce raw_tx =
+(** [transaction_nonce bytes] returns the nonce of a given raw transaction. *)
+let transaction_nonce bytes =
   let open Result_syntax in
-  let bytes = hex_to_bytes raw_tx in
   if String.starts_with ~prefix:"01" bytes then
     (* eip 2930*)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -999,11 +1014,10 @@ let transaction_nonce raw_tx =
         Qty nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
-(** [transaction_gas_price base_fee raw_tx] returns the maximum gas price the
+(** [transaction_gas_price base_fee bytes] returns the maximum gas price the
     user can pay for the tx. *)
-let transaction_gas_price base_fee raw_tx =
+let transaction_gas_price base_fee bytes =
   let open Result_syntax in
-  let bytes = hex_to_bytes raw_tx in
   if String.starts_with ~prefix:"01" bytes then
     (* eip 2930*)
     match bytes |> String.to_bytes |> Rlp.decode with

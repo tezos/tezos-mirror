@@ -52,8 +52,6 @@ let rlp_encode call =
   (* we aim to use [String.chunk_bytes] *)
   Rlp.encode rlp_form
 
-let tx_rlp_encode tx_raw = `Hex tx_raw |> Hex.to_bytes_exn
-
 type simulation_message =
   | Start
   | Simple of string
@@ -94,21 +92,18 @@ let evaluation_tag = "\000"
 (** Tag indicating simulation is a validation *)
 let validation_tag = "\001"
 
-(** [hex_str_of_binary_string s] translate a binary string into an hax string *)
-let hex_str_of_binary_string s = s |> Hex.of_string |> Hex.show
-
 (** [add_tag tag bytes] prefixes bytes by the given tag *)
 let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
 let encode_message = function
-  | Start -> hex_str_of_binary_string @@ simulation_tag
-  | Simple s -> hex_str_of_binary_string @@ simulation_tag ^ simple_tag ^ s
+  | Start -> simulation_tag
+  | Simple s -> simulation_tag ^ simple_tag ^ s
   | NewChunked n ->
       let n_le_str = Ethereum_types.u16_to_bytes n in
-      hex_str_of_binary_string @@ simulation_tag ^ new_chunked_tag ^ n_le_str
+      simulation_tag ^ new_chunked_tag ^ n_le_str
   | Chunk (i, c) ->
       let i_le_str = Ethereum_types.u16_to_bytes i in
-      hex_str_of_binary_string @@ simulation_tag ^ chunk_tag ^ i_le_str ^ c
+      simulation_tag ^ chunk_tag ^ i_le_str ^ c
 
 let encode call =
   let open Result_syntax in
@@ -120,7 +115,7 @@ let encode call =
 let encode_tx tx =
   let open Result_syntax in
   let* messages =
-    tx |> tx_rlp_encode |> add_tag validation_tag |> split_in_messages
+    Bytes.of_string tx |> add_tag validation_tag |> split_in_messages
   in
   return @@ List.map encode_message messages
 
@@ -150,8 +145,6 @@ module Encodings = struct
     insight_requests : insight_request list;
     log_kernel_debug_file : string option;
   }
-
-  let hex_string = conv Bytes.of_string Bytes.to_string bytes
 
   let insight_request =
     union
@@ -183,11 +176,11 @@ module Encodings = struct
     @@ obj4
          (req
             "messages"
-            (list string)
+            (list (string' Hex))
             ~description:"Serialized messages for simulation.")
          (opt
             "reveal_pages"
-            (list hex_string)
+            (list (string' Hex))
             ~description:"Pages (at most 4kB) to be used for revelation ticks")
          (dft
             "insight_requests"
@@ -221,6 +214,20 @@ module Encodings = struct
       (fun (result, success) -> {result; success})
       (tup2 (option bytes) bool_as_bytes)
 
+  let insights_from_list l =
+    match l with
+    | [result; success] ->
+        Some
+          {
+            result;
+            success =
+              Option.bind success (fun s ->
+                  s
+                  |> Data_encoding.Binary.of_bytes Data_encoding.bool
+                  |> Result.to_option);
+          }
+    | _ -> None
+
   let eval_result =
     conv
       (fun {state_hash; status; output; inbox_level; num_ticks; insights} ->
@@ -253,36 +260,25 @@ module Encodings = struct
             ~description:"PVM state values requested after the simulation")
 end
 
-let parse_insights decode (r : Data_encoding.json) =
-  let s = Data_encoding.Json.destruct Encodings.eval_result r in
-  match decode s.insights with
-  | Some insight -> Lwt.return_ok insight
-  | None ->
-      Error_monad.failwith
-        "Couldn't parse insights: %s"
-        (Data_encoding.Json.to_string r)
-
-let decode_call_result {Encodings.result; success} =
+let call_result {Encodings.result; success} =
+  let open Lwt_result_syntax in
   match (result, success) with
   | Some b, _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Some (Ok (Hash (Hex v)))
+      return (Ok (Hash (Hex v)))
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6752
      better propagate errors and reverts messages from kernel to help the
      user debug their call *)
-  | None, Some false -> Some (Error ())
-  | _ -> None
+  | None, Some false -> return (Error ())
+  | _ -> failwith "Insights of 'call_result' cannot be parsed"
 
-let call_result json = parse_insights decode_call_result json
-
-let decode_gas_estimation {Encodings.result; _} =
-  match result with
-  | Some b -> b |> Bytes.to_string |> Z.of_bits |> Option.some
-  | None -> None
-
-let gas_estimation json =
+let gas_estimation {Encodings.result; _} =
   let open Lwt_result_syntax in
-  let* simulated_amount = parse_insights decode_gas_estimation json in
+  let* simulated_amount =
+    match result with
+    | Some b -> b |> Bytes.to_string |> Z.of_bits |> return
+    | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
+  in
   (* See EIP2200 for reference. But the tl;dr is: we cannot do the
      opcode SSTORE if we have less than 2300 gas available, even if we don't
      consume it. The simulated amount then gives an amount of gas insufficient
@@ -293,18 +289,14 @@ let gas_estimation json =
   let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
   return (quantity_of_z simulated_amount)
 
-let decode_is_valid {Encodings.result; success} =
+let is_tx_valid {Encodings.result; success} =
+  let open Lwt_result_syntax in
   match (result, success) with
   | Some payload, Some success ->
       if success then
         let address = Ethereum_types.decode_address payload in
-        Some (Ok address)
+        return (Ok address)
       else
         let error_msg = Bytes.to_string payload in
-        Some (Error error_msg)
-  | _ -> None
-
-let is_tx_valid json =
-  let open Lwt_result_syntax in
-  let* result = parse_insights decode_is_valid json in
-  return result
+        return (Error error_msg)
+  | _ -> failwith "Insights of 'is_tx_valid' is not [Some _, Some _]"
