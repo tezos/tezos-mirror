@@ -73,6 +73,30 @@
           - .gitlab-ci.yml
       when: on_success
 
+# Only if the dependencies of the Octez Docker changed or if we're on
+# master.
+.rules__octez_docker_changes_or_master:
+  rules:
+      - if: '$CI_COMMIT_BRANCH == "master"'
+        when: on_success
+      - changes:
+          - scripts/**/*
+          - script-inputs/**/*
+          - src/**/*
+          - tezt/**/*
+          - vendors/**/*
+          - dune
+          - dune-project
+          - dune-workspace
+          - opam
+          - Makefile
+          - kernels.mk
+          - build.Dockerfile
+          - Dockerfile
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+        when: on_success
+
 # Add variables for bisect_ppx instrumentation
 .oc.template__coverage:
   variables:
