@@ -6,7 +6,7 @@ Clone [ethereum/tests](https://github.com/ethereum/tests).
 
 Since Rust has a small minimum stack size, some tests will fail.
 To prevent that run the following command:
- 
+
 ```
 $ ulimit -s 20000
 ```
@@ -67,6 +67,13 @@ Overwrite the target file and start the report from scratch:
 $ evm-evaluation-assessor --from-scratch
 # or
 $ evm-evaluation-assessor -h
+```
+
+Dump a result of an evaluation and use it to produce a diff in the log file after making some changes:
+
+```
+$ evm-evaluation-assessor --result // By default the execution will be outputed into `evm_evaluation.result`
+$ evm-evaluation-assessor --diff <result-file> // By default the execution will be outputed into `evm_evaluation.diff`
 ```
 
 Multiple options can be combined:

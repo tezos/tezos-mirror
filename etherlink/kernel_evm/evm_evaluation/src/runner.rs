@@ -22,8 +22,8 @@ use std::path::Path;
 use thiserror::Error;
 
 use crate::evalhost::EvalHost;
-use crate::fillers::process;
-use crate::helpers::construct_folder_path;
+use crate::fillers::{output_result, process, TestResult};
+use crate::helpers::{construct_folder_path, OutputOptions};
 use crate::models::{Env, FillerSource, SpecName, Test, TestSuite, TestUnit};
 use crate::{write_host, Opt, ReportValue};
 
@@ -270,18 +270,22 @@ fn check_results(
     write_host!(host, "\n=======> OK! <=======\n");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_test(
     path: &Path,
     report_map: &mut HashMap<String, ReportValue>,
     report_key: String,
     opt: &Opt,
     output_file: &mut File,
+    skip: bool,
+    diff_result_map: &mut Option<HashMap<String, (TestResult, Option<TestResult>)>>,
+    output: &OutputOptions,
 ) -> Result<(), TestError> {
     let suit = read_testsuite(path)?;
     let mut host = prepare_host();
 
     for (name, unit) in suit.0.into_iter() {
-        if !opt.report_only {
+        if output.log {
             writeln!(output_file, "Running unit test: {}", name).unwrap();
         }
         let precompiles = precompile_set::<EvalHost>();
@@ -302,12 +306,26 @@ pub fn run_test(
             };
 
             for (test_index, test_execution) in tests.iter().enumerate() {
+                if skip {
+                    let full_name = format!("{}_{}_{}", &report_key, name, test_index);
+                    let status = TestResult::Skipped;
+                    if output.result {
+                        output_result(output_file, &full_name, status);
+                    }
+                    if let Some(map) = diff_result_map {
+                        if let Some((result, _)) = map.get(&full_name) {
+                            map.insert(full_name, (*result, Some(status)));
+                        }
+                    }
+                    continue;
+                }
+
                 host = prepare_host_with_buffer(host.buffer.take());
                 initialize_accounts(&mut host, &unit);
 
                 let tx_label = info.labels.get(&test_index);
                 if let Some(tx_label) = tx_label {
-                    if !opt.report_only {
+                    if output.log {
                         writeln!(
                             output_file,
                             "Executing test with label: {} and index: {}",
@@ -338,7 +356,9 @@ pub fn run_test(
                         output_file,
                         tx_label,
                         test_index as i64,
-                        opt.report_only,
+                        output,
+                        &name,
+                        diff_result_map,
                     ),
                     None => write_host!(
                         host,

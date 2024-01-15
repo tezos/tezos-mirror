@@ -4,6 +4,13 @@
 
 use std::path::{Path, PathBuf};
 
+pub struct OutputOptions {
+    pub log: bool,
+    pub summary: bool,
+    pub result: bool,
+    pub diff: bool,
+}
+
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
     if data.contains('>') {
         u8::gt
