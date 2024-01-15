@@ -28,16 +28,33 @@
 
 open Alpha_context
 
-(** [validate_attestation ctxt get_consensus_key_and_round op] checks whether
+(** [validate_attestation ctxt level consensus_key attestation] checks whether
+    the DAL attestation [attestation] emitted at given [level] by the attester
+    with the given [consensus_key] is valid. If an [Error _] is returned, the
+    [op] is not valid. The checks made are:
+    * the attestation size does not exceed the maximum;
+    * the delegate is in the DAL committee.
+
+    These are checks done for the DAL part alone, checks on other fields of an
+    attestation (like level, round, slot) are done by the caller. *)
+val validate_attestation :
+  t ->
+  Raw_level.t ->
+  Consensus_key.pk ->
+  Dal.Attestation.t ->
+  unit tzresult Lwt.t
+
+(** [validate_dal_attestation ctxt get_consensus_key_and_round op] checks whether
     the DAL attestation [op] is valid. If an [Error _] is returned, the [op]
     is not valid. The checks made are:
+    * the attestation size does not exceed the maximum;
     * the level as expected;
     * the round is as expected;
     * the delegate is in the DAL committee.
     [get_consensus_key_and_round_opt ()] returns the delegate that supposedly
     issued the attestation and optionally the round at which it was emitted. The
     round is not provided in the mempool validation mode. *)
-val validate_attestation :
+val validate_dal_attestation :
   t ->
   (unit -> (Consensus_key.pk * Round.t option) tzresult Lwt.t) ->
   Dal.Attestation.operation ->

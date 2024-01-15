@@ -699,7 +699,7 @@ module Consensus = struct
 
       Return the slot owner's consensus key and voting power. *)
   let check_block_attestation vi consensus_info
-      {level; round; block_payload_hash = bph; slot} =
+      {level; round; block_payload_hash = bph; slot} dal_content_opt =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
       match Consensus.attestation_branch vi.ctxt with
@@ -720,6 +720,17 @@ module Consensus = struct
       get_delegate_details consensus_info.attestation_slot_map kind slot
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
+    let* () =
+      Option.fold
+        ~none:return_unit
+        ~some:(fun dal ->
+          Dal_apply.validate_attestation
+            vi.ctxt
+            level
+            consensus_key
+            dal.attestation)
+        dal_content_opt
+    in
     return (consensus_key, voting_power)
 
   let check_attestation vi ~check_signature
@@ -730,13 +741,17 @@ module Consensus = struct
         ~error:(trace_of_error Consensus_operation_not_allowed)
         vi.consensus_info
     in
-    let (Single (Attestation {consensus_content; dal_content = _ (* TODO *)})) =
+    let (Single (Attestation {consensus_content; dal_content})) =
       operation.protocol_data.contents
     in
     let* consensus_key, voting_power =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
-          check_block_attestation vi consensus_info consensus_content
+          check_block_attestation
+            vi
+            consensus_info
+            consensus_content
+            dal_content
       | Mempool ->
           check_mempool_consensus
             vi
@@ -850,7 +865,10 @@ module Consensus = struct
     in
     let* consensus_key =
       (* Note that this function checks the dal feature flag. *)
-      Dal_apply.validate_attestation vi.ctxt get_consensus_key_and_round_opt op
+      Dal_apply.validate_dal_attestation
+        vi.ctxt
+        get_consensus_key_and_round_opt
+        op
     in
     let*? () =
       if check_signature then
