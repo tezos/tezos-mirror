@@ -74,7 +74,7 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 183.803
 
-GET http://127.0.0.1:[PORT]/global/block/head/total_ticks
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
 "143000000000"
 
@@ -103,7 +103,7 @@ This sequence of operations was run:
       This smart rollup messages submission was successfully applied
       Consumed gas: 186.213
 
-GET http://127.0.0.1:[PORT]/global/block/12/total_ticks
+GET http://[HOST]:[PORT]/global/block/12/total_ticks
 200 OK
 "341000000000"
 
