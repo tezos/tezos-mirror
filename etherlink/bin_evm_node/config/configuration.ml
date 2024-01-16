@@ -46,33 +46,25 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8545
 
-let default_private_rpc_port = 8546
+let default_devmode = false
 
-let default default_mode =
-  {
-    rpc_addr = default_rpc_addr;
-    rpc_port = default_rpc_port;
-    devmode = false;
-    cors_origins = [];
-    cors_headers = [];
-    verbose = false;
-    log_filter = default_filter_config;
-    mode = default_mode;
-  }
+let default_cors_origins = []
+
+let default_cors_headers = []
+
+let default_verbose = false
 
 let default_proxy = {rollup_node_endpoint = Uri.empty}
 
-let default_sequencer =
-  {
-    kernel = "sequencer.wasm";
-    preimages = "_evm_installer_preimages";
-    rollup_node_endpoint = Uri.empty;
-    time_between_blocks = Time_between_blocks 5.;
-    private_rpc_port = default_private_rpc_port;
-    sequencer =
-      Signature.Secret_key.of_b58check_exn
-        "edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz";
-  }
+let default_kernel = "sequencer.wasm"
+
+let default_preimages = "_evm_installer_preimages"
+
+let default_rollup_node_endpoint = Uri.empty
+
+let default_time_between_blocks = Time_between_blocks 5.
+
+let default_private_rpc_port = 8546
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -138,29 +130,26 @@ let encoding_sequencer =
         sequencer;
       })
     (obj6
-       (dft "kernel" string default_sequencer.kernel)
-       (dft "preimages" string default_sequencer.preimages)
+       (dft "kernel" string default_kernel)
+       (dft "preimages" string default_preimages)
        (dft
           "rollup_node_endpoint"
           string
-          (Uri.to_string default_proxy.rollup_node_endpoint))
+          (Uri.to_string default_rollup_node_endpoint))
        (dft
           "time_between_blocks"
           encoding_time_between_blocks
-          default_sequencer.time_between_blocks)
+          default_time_between_blocks)
        (dft
           "private-rpc-port"
           ~description:"RPC port for private server"
           uint16
           default_private_rpc_port)
-       (dft
-          "sequencer"
-          Signature.Secret_key.encoding
-          default_sequencer.sequencer))
+       (req "sequencer" Signature.Secret_key.encoding))
 
-let encoding ~default_mode mode_encoding =
+let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
+ fun mode_encoding ->
   let open Data_encoding in
-  let default = default default_mode in
   conv
     (fun {
            rpc_addr;
@@ -201,12 +190,12 @@ let encoding ~default_mode mode_encoding =
     ((obj8
         (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
         (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-        (dft "devmode" bool default.devmode)
-        (dft "cors_origins" (list string) default.cors_origins)
-        (dft "cors_headers" (list string) default.cors_headers)
-        (dft "verbose" bool default.verbose)
+        (dft "devmode" bool default_devmode)
+        (dft "cors_origins" (list string) default_cors_origins)
+        (dft "cors_headers" (list string) default_cors_headers)
+        (dft "verbose" bool default_verbose)
         (dft "log_filter" log_filter_config_encoding default_filter_config))
-       (dft "mode" mode_encoding default_mode))
+       (req "mode" mode_encoding))
 
 let save ~force ~data_dir encoding config =
   let open Lwt_result_syntax in
@@ -222,11 +211,11 @@ let save ~force ~data_dir encoding config =
     Lwt_utils_unix.Json.write_file config_file json
 
 let save_proxy ~force ~data_dir config =
-  let encoding = encoding ~default_mode:default_proxy encoding_proxy in
+  let encoding = encoding encoding_proxy in
   save ~force ~data_dir encoding config
 
 let save_sequencer ~force ~data_dir config =
-  let encoding = encoding ~default_mode:default_sequencer encoding_sequencer in
+  let encoding = encoding encoding_sequencer in
   save ~force ~data_dir encoding config
 
 let load ~data_dir encoding =
@@ -236,23 +225,22 @@ let load ~data_dir encoding =
   config
 
 let load_proxy ~data_dir =
-  let encoding = encoding ~default_mode:default_proxy encoding_proxy in
+  let encoding = encoding encoding_proxy in
   load ~data_dir encoding
 
 let load_sequencer ~data_dir =
-  let encoding = encoding ~default_mode:default_sequencer encoding_sequencer in
+  let encoding = encoding encoding_sequencer in
   load ~data_dir encoding
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?log_filter ~verbose ~mode () =
-    let default = default mode in
     {
-      rpc_addr = Option.value ~default:default.rpc_addr rpc_addr;
-      rpc_port = Option.value ~default:default.rpc_port rpc_port;
+      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
+      rpc_port = Option.value ~default:default_rpc_port rpc_port;
       devmode;
-      cors_origins = Option.value ~default:default.cors_origins cors_origins;
-      cors_headers = Option.value ~default:default.cors_headers cors_headers;
+      cors_origins = Option.value ~default:default_cors_origins cors_origins;
+      cors_headers = Option.value ~default:default_cors_headers cors_headers;
       verbose;
       log_filter = Option.value ~default:default_filter_config log_filter;
       mode;
@@ -277,18 +265,14 @@ module Cli = struct
       {
         rollup_node_endpoint =
           Option.value
-            ~default:default_sequencer.rollup_node_endpoint
+            ~default:default_rollup_node_endpoint
             rollup_node_endpoint;
-        kernel = Option.value ~default:default_sequencer.kernel kernel;
-        preimages = Option.value ~default:default_sequencer.preimages preimages;
+        kernel = Option.value ~default:default_kernel kernel;
+        preimages = Option.value ~default:default_preimages preimages;
         time_between_blocks =
-          Option.value
-            ~default:default_sequencer.time_between_blocks
-            time_between_blocks;
+          Option.value ~default:default_time_between_blocks time_between_blocks;
         private_rpc_port =
-          Option.value
-            ~default:default_sequencer.private_rpc_port
-            private_rpc_port;
+          Option.value ~default:default_private_rpc_port private_rpc_port;
         sequencer;
       }
     in
@@ -353,9 +337,7 @@ module Cli = struct
             ~default:configuration.mode.time_between_blocks
             time_between_blocks;
         private_rpc_port =
-          Option.value
-            ~default:default_sequencer.private_rpc_port
-            private_rpc_port;
+          Option.value ~default:default_private_rpc_port private_rpc_port;
         sequencer;
       }
     in
