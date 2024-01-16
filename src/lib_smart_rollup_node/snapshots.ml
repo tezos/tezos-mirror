@@ -426,7 +426,7 @@ let snapshotable_files_regexp =
   Re.Str.regexp
     "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|context/.*\\|metadata$\\)"
 
-let export ~no_checks ~compression ~data_dir ~dest =
+let export ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
   let* snapshot_file =
     Format.eprintf "Acquiring GC lock@." ;
@@ -436,17 +436,28 @@ let export ~no_checks ~compression ~data_dir ~dest =
     Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
     @@ fun () ->
     let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
-    let suffix =
-      match compression with On_the_fly -> "" | No | After -> ".uncompressed"
-    in
     let dest_file_name =
-      Format.asprintf
-        "snapshot-%a-%ld.%s%s"
-        Address.pp_short
-        metadata.address
-        metadata.head_level
-        (Configuration.string_of_history_mode metadata.history_mode)
-        suffix
+      match filename with
+      | Some f ->
+          let suffix =
+            match compression with
+            | No | On_the_fly -> ""
+            | After -> ".uncompressed"
+          in
+          f ^ suffix
+      | None ->
+          let suffix =
+            match compression with
+            | On_the_fly -> ""
+            | No | After -> ".uncompressed"
+          in
+          Format.asprintf
+            "snapshot-%a-%ld.%s%s"
+            Address.pp_short
+            metadata.address
+            metadata.head_level
+            (Configuration.string_of_history_mode metadata.history_mode)
+            suffix
     in
     let dest_file =
       match dest with
