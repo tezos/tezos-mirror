@@ -50,7 +50,7 @@ let operator_param next =
     Format.asprintf
       "Public key hash, or alias, of a smart rollup node operator. An operator \
        can be specialized to a particular purpose by prefixing its key or \
-       alias by said purpose, e.g. operating:alias_of_my_operator. The \
+       alias by said purpose, e.g. operating:<alias_of_my_operator>. The \
        possible purposes are: @[<h>%a@]."
       (Format.pp_print_list Purpose.pp_ex_purpose)
       Purpose.all
