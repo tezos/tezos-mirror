@@ -40,6 +40,7 @@ module Plugin = struct
     let* parametric = parametric_constants chain block ctxt in
     let {
       Constants.Parametric.feature_enable;
+      incentives_enable;
       number_of_slots;
       attestation_lag;
       attestation_threshold;
@@ -51,6 +52,7 @@ module Plugin = struct
     return
       {
         Dal_plugin.feature_enable;
+        incentives_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;

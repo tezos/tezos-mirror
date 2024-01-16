@@ -1038,6 +1038,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           Constants_parametric_repr.
             {
               feature_enable = c.dal.feature_enable;
+              incentives_enable = false;
               number_of_slots = c.dal.number_of_slots;
               attestation_lag = c.dal.attestation_lag;
               attestation_threshold = c.dal.attestation_threshold;

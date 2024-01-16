@@ -140,6 +140,7 @@ let default_dal =
   Constants.Parametric.
     {
       feature_enable = false;
+      incentives_enable = false;
       number_of_slots = 256;
       attestation_lag = 4;
       attestation_threshold = 50;

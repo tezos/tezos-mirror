@@ -44,6 +44,7 @@ type slot_header = {
 
 type proto_parameters = {
   feature_enable : bool;
+  incentives_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
