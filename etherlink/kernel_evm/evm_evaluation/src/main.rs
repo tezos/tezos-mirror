@@ -315,9 +315,11 @@ pub fn main() {
         (_, _, true) => "evm_evaluation.diff",
         _ => "evm_evaluation.regression",
     };
+
     let mut output_file = OpenOptions::new()
         .write(true)
         .append(!(opt.from_scratch || opt.result || diff))
+        .truncate(opt.from_scratch || opt.result || diff)
         .create(true)
         .open(output_name)
         .unwrap();
