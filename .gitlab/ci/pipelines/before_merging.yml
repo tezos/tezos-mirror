@@ -29,6 +29,7 @@ include:
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
+  - .gitlab/ci/jobs/test/commit_titles.yml
   - .gitlab/ci/jobs/test/oc.semgrep.yml
   - .gitlab/ci/jobs/test/oc.unit.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml

@@ -1,0 +1,14 @@
+commit_titles:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies
+    - .needs__trigger
+  stage: "test"
+  script:
+    # Check commit messages
+    - ./scripts/ci/check_commit_messages.sh || exit $?
+  allow_failure:
+    # ./scripts/ci/check_commit_messages.sh exits with code 65 when a
+    # git history contains invalid commits titles in situations where
+    # that is allowed.
+    exit_codes: [65]
