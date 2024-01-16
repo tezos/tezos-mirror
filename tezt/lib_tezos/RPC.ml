@@ -981,6 +981,23 @@ let get_chain_block_context_smart_rollups_smart_rollup_staker_games
     ]
     Fun.id
 
+type smart_rollup_inbox = {
+  old_levels_messages : string;
+  level : int;
+  current_messages_hash : string option;
+}
+
+let smart_rollup_inbox_from_json json =
+  let open JSON in
+  let old_levels_messages =
+    json |-> "old_levels_messages" |-> "content" |-> "hash" |> as_string
+  in
+  let level = json |-> "level" |> as_int in
+  let current_messages_hash =
+    json |-> "current_messages_hash" |> as_string_opt
+  in
+  {old_levels_messages; level; current_messages_hash}
+
 let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
     ?(block = "head") () =
   make
@@ -995,7 +1012,7 @@ let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
       "all";
       "inbox";
     ]
-    Fun.id
+    smart_rollup_inbox_from_json
 
 let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
     ?(chain = "main") ?(block = "head") sc_rollup =
@@ -1031,6 +1048,20 @@ let get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_
     ]
     Fun.id
 
+type smart_rollup_commitment = {
+  compressed_state : string;
+  inbox_level : int;
+  predecessor : string;
+  number_of_ticks : int;
+}
+
+let smart_rollup_commitment_from_json json =
+  let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
+  let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
+  let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
+  let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
+  {compressed_state; inbox_level; predecessor; number_of_ticks}
+
 let get_chain_block_context_smart_rollups_smart_rollup_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup ~hash () =
   make
@@ -1047,7 +1078,7 @@ let get_chain_block_context_smart_rollups_smart_rollup_commitment
       "commitment";
       hash;
     ]
-    (fun json -> Sc_rollup_rpc.commitment_from_json json)
+    (fun json -> smart_rollup_commitment_from_json json)
 
 let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =

@@ -158,7 +158,7 @@ val last_cemented_commitment_hash_with_level :
     commitment, fails if this commitment have been cleaned from the
     context. *)
 val genesis_commitment :
-  sc_rollup:string -> Client.t -> Sc_rollup_rpc.commitment Lwt.t
+  sc_rollup:string -> Client.t -> RPC.smart_rollup_commitment Lwt.t
 
 (** [call_rpc ~smart_rollup_node ~service] call the RPC for [service] on
     [smart_rollup_node]. *)
@@ -259,7 +259,7 @@ val get_sc_rollup_constants : Client.t -> sc_rollup_constants Lwt.t
 
 val publish_commitment :
   ?src:string ->
-  commitment:Sc_rollup_rpc.commitment ->
+  commitment:RPC.smart_rollup_commitment ->
   Client.t ->
   string ->
   unit Runnable.process
@@ -272,7 +272,7 @@ val forge_and_publish_commitment_return_runnable :
   sc_rollup:string ->
   src:string ->
   Client.t ->
-  Sc_rollup_rpc.commitment * unit Runnable.process
+  RPC.smart_rollup_commitment * unit Runnable.process
 
 val get_staked_on_commitment :
   sc_rollup:string -> staker:string -> Client.t -> string Lwt.t
@@ -285,7 +285,7 @@ val forge_and_publish_commitment :
   sc_rollup:string ->
   src:string ->
   Client.t ->
-  (Sc_rollup_rpc.commitment * string) Lwt.t
+  (RPC.smart_rollup_commitment * string) Lwt.t
 
 val bake_period_then_publish_commitment :
   ?compressed_state:string ->
@@ -293,7 +293,7 @@ val bake_period_then_publish_commitment :
   sc_rollup:string ->
   src:string ->
   Client.t ->
-  (Sc_rollup_rpc.commitment * string) Lwt.t
+  (RPC.smart_rollup_commitment * string) Lwt.t
 
 val cement_commitment :
   Protocol.t ->

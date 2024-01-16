@@ -2165,9 +2165,8 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
 let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
     node _client dal_node =
   let pkh = Constant.bootstrap1.public_key_hash in
-  let* level =
+  let* {level; _} =
     Node.RPC.(call node @@ get_chain_block_helper_current_level ())
-    |> Lwt.map (fun level -> level.RPC.level)
   in
   let* committee_from_l1 = Dal.Committee.at_level node ~level in
   let* shards_from_dal =

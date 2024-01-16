@@ -38,7 +38,8 @@ let get_global_block_aux ?(block = "head") ?(path = []) () =
 
 let get_global_block = get_global_block_aux ~path:[]
 
-let get_global_block_inbox = get_global_block_aux ~path:["inbox"]
+let get_global_block_inbox ?(block = "head") () =
+  make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
 
 let get_global_block_hash = get_global_block_aux ~path:["hash"]
 
@@ -137,14 +138,10 @@ let get_global_block_dal_processed_slots ?(block = "head") () =
              let status = JSON.(obj |-> "status" |> as_string) in
              (index, status)))
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
+type commitment_and_hash = {
+  commitment : RPC.smart_rollup_commitment;
+  hash : string;
 }
-
-type commitment_and_hash = {commitment : commitment; hash : string}
 
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
@@ -152,27 +149,14 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-let commitment_from_json json =
-  (* TODO https://gitlab.com/tezos/tezos/-/issues/6649
-     This function should fails when the json is null and
-     instead let the responsability to the caller to check
-     if the rpc should fail or not.
-  *)
-  if JSON.is_null json then None
-  else
-    let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
-    let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
-    let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
-    let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
-    Some {compressed_state; inbox_level; predecessor; number_of_ticks}
-
 let commitment_with_hash_from_json json =
   let hash, commitment_json =
     (JSON.get "hash" json, JSON.get "commitment" json)
   in
-  Option.map
-    (fun commitment -> {hash = JSON.as_string hash; commitment})
-    (commitment_from_json commitment_json)
+  {
+    hash = JSON.as_string hash;
+    commitment = RPC.smart_rollup_commitment_from_json commitment_json;
+  }
 
 let commitment_info_from_json json =
   let hash, commitment_json, first_published_at_level, published_at_level =
@@ -181,16 +165,17 @@ let commitment_info_from_json json =
       JSON.get "first_published_at_level" json,
       JSON.get "published_at_level" json )
   in
-  Option.map
-    (fun commitment ->
+  {
+    commitment_and_hash =
       {
-        commitment_and_hash = {hash = JSON.as_string hash; commitment};
-        first_published_at_level =
-          first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-        published_at_level =
-          published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
-      })
-    (commitment_from_json commitment_json)
+        hash = JSON.as_string hash;
+        commitment = RPC.smart_rollup_commitment_from_json commitment_json;
+      };
+    first_published_at_level =
+      first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+    published_at_level =
+      published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+  }
 
 let get_global_last_stored_commitment () =
   make GET ["global"; "last_stored_commitment"] commitment_with_hash_from_json

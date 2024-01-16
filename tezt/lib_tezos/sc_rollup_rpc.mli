@@ -42,7 +42,8 @@ val get_global_smart_rollup_address : unit -> string RPC_core.t
 val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
-val get_global_block_inbox : ?block:string -> unit -> JSON.t RPC_core.t
+val get_global_block_inbox :
+  ?block:string -> unit -> RPC.smart_rollup_inbox RPC_core.t
 
 (** RPC: [GET global/block/<block>/hash]. *)
 val get_global_block_hash : ?block:string -> unit -> JSON.t RPC_core.t
@@ -104,14 +105,10 @@ val post_global_block_simulate :
 val get_global_block_dal_processed_slots :
   ?block:string -> unit -> (int * string) list RPC_core.t
 
-type commitment = {
-  compressed_state : string;
-  inbox_level : int;
-  predecessor : string;
-  number_of_ticks : int;
+type commitment_and_hash = {
+  commitment : RPC.smart_rollup_commitment;
+  hash : string;
 }
-
-type commitment_and_hash = {commitment : commitment; hash : string}
 
 type commitment_info = {
   commitment_and_hash : commitment_and_hash;
@@ -119,30 +116,25 @@ type commitment_info = {
   published_at_level : int option;
 }
 
-(** [commitment_from_json] parses a commitment from its JSON representation. *)
-val commitment_from_json : JSON.t -> commitment option
-
 (** [commitment_info_from_json] parses a commitment, its hash and
     the levels when the commitment was first published (if any) and included,
     from the JSON representation. *)
-val commitment_info_from_json : JSON.t -> commitment_info option
+val commitment_info_from_json : JSON.t -> commitment_info
 
 (** RPC: [GET global/last_stored_commitment] gets the last commitment with its hash
     stored by the rollup node.  *)
-val get_global_last_stored_commitment :
-  unit -> commitment_and_hash option RPC_core.t
+val get_global_last_stored_commitment : unit -> commitment_and_hash RPC_core.t
 
 (** RPC: [GET local/last_published_commitment] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published
     and the level it was included. *)
-val get_local_last_published_commitment :
-  unit -> commitment_info option RPC_core.t
+val get_local_last_published_commitment : unit -> commitment_info RPC_core.t
 
 (** RPC: [GET local/commitments] gets commitment by its [hash] from the rollup node,
     with its hash and level when the commitment was first published and the
     level it was included. *)
 val get_local_commitments :
-  commitment_hash:string -> unit -> commitment_info option RPC_core.t
+  commitment_hash:string -> unit -> commitment_info RPC_core.t
 
 type gc_info = {last_gc_level : int; first_available_level : int}
 
