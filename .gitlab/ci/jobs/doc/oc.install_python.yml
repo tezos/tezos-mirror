@@ -6,7 +6,7 @@
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - docs/developer/install-python-debian-ubuntu.sh
       when: on_success

@@ -12,7 +12,7 @@
       when: delayed
       start_in: 1 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -41,7 +41,7 @@
       when: delayed
       start_in: 1 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -70,7 +70,7 @@
       when: delayed
       start_in: 2 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -99,7 +99,7 @@
       when: delayed
       start_in: 2 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -128,7 +128,7 @@
       when: delayed
       start_in: 3 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -157,7 +157,7 @@
       when: delayed
       start_in: 3 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -186,7 +186,7 @@
       when: delayed
       start_in: 4 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -215,7 +215,7 @@
       when: delayed
       start_in: 4 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -244,7 +244,7 @@
       when: delayed
       start_in: 5 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -273,7 +273,7 @@
       when: delayed
       start_in: 5 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -302,7 +302,7 @@
       when: delayed
       start_in: 6 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -331,7 +331,7 @@
       when: delayed
       start_in: 6 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -360,7 +360,7 @@
       when: delayed
       start_in: 7 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - "**/dune"
         - "**/dune.inc"
@@ -389,7 +389,7 @@
       when: delayed
       start_in: 7 minutes
     # Run on merge requests when opam changes are detected.
-    - if: '$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == "nomadic-margebot"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
       changes:
         - "**/dune"
         - "**/dune.inc"
