@@ -544,6 +544,10 @@ val get_gc_levels : _ t -> Store.Gc_levels.levels tzresult Lwt.t
     [level] is before the first non garbage collected level. *)
 val check_level_available : _ t -> int32 -> unit tzresult Lwt.t
 
+val get_last_context_split_level : _ t -> int32 option tzresult Lwt.t
+
+val save_context_split_level : rw -> int32 -> unit tzresult Lwt.t
+
 (** {2 Helpers} *)
 
 (** [make_kernel_logger event ?log_kernel_debug_file logs_dir] returns two

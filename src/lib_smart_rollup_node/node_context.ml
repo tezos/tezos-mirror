@@ -913,6 +913,9 @@ let get_gc_levels node_ctxt =
         first_available_level = node_ctxt.genesis_info.level;
       }
 
+let get_last_context_split_level node_ctxt =
+  Store.Last_context_split.read node_ctxt.store.last_context_split_level
+
 let save_gc_info node_ctxt ~at_level ~gc_level =
   let open Lwt_syntax in
   (* Note: Setting the `first_available_level` before GC succeeds simplifies the
@@ -928,6 +931,9 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
   match res with
   | Error _ -> Event.gc_levels_storage_failure ()
   | Ok () -> return_unit
+
+let save_context_split_level node_ctxt level =
+  Store.Last_context_split.write node_ctxt.store.last_context_split_level level
 
 let get_gc_level node_ctxt =
   let open Lwt_result_syntax in
@@ -950,7 +956,7 @@ let gc node_ctxt ~(level : int32) =
      called. *)
   let* gc_level = get_gc_level node_ctxt in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
-  let* {last_gc_level; first_available_level} = get_gc_levels node_ctxt in
+  let* {last_gc_level; first_available_level; _} = get_gc_levels node_ctxt in
   match gc_level with
   | None -> return_unit
   | Some gc_level

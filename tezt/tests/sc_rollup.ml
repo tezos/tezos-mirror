@@ -992,6 +992,24 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
         "Commitment was published but publication info is not available \
          anymore."
   | _ -> ()) ;
+  let* context_files =
+    Process.run_and_read_stdout
+      "ls"
+      [Sc_rollup_node.data_dir sc_rollup_node ^ "/context/"]
+  in
+  let last_suffix =
+    String.split_on_char '\n' context_files
+    |> List.filter_map (fun s -> s =~* rex "store\\.(\\d+)\\.suffix")
+    |> List.rev |> List.hd
+  in
+  let nb_suffix = int_of_string last_suffix in
+  let max_nb_split =
+    match history_mode with
+    | Archive -> 0
+    | _ -> (level - origination_level + challenge_window - 1) / challenge_window
+  in
+  Check.((nb_suffix <= max_nb_split) int)
+    ~error_msg:"Expected at most %R context suffix files, instead got %L" ;
   unit
 
 (* Testing that snapshots can be exported correctly for a running node, and that
