@@ -202,11 +202,16 @@ let () =
   let release_tag_re = "/^v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
   (* Matches beta release tags, e.g. [v1.2.3-beta5]. *)
   let beta_release_tag_re = "/^v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches either release tags or beta release tags, e.g. [v1.2.3],
-     [v1.2.3-rc4] or [v1.2.3-beta5]. *)
-  let any_release_tag_re = "/^v\\d+\\.\\d+(?:\\-(rc|beta)\\d*)?$/" in
   let open Rules in
   let open Pipeline in
+  (* Matches either release tags or beta release tags, e.g. [v1.2.3],
+     [v1.2.3-rc4] or [v1.2.3-beta5]. *)
+  let has_any_release_tag =
+    If.(has_tag_match release_tag_re || has_tag_match beta_release_tag_re)
+  in
+  let has_non_release_tag =
+    If.(Predefined_vars.ci_commit_tag != null && not has_any_release_tag)
+  in
   register "before_merging" If.(on_tezos_namespace && merge_request) ;
   register
     "latest_release"
@@ -223,13 +228,13 @@ let () =
     If.(on_tezos_namespace && push && has_tag_match beta_release_tag_re) ;
   register
     "release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_match any_release_tag_re) ;
+    If.(not_on_tezos_namespace && push && has_any_release_tag) ;
   register
     "non_release_tag"
-    If.(on_tezos_namespace && push && has_tag_not_match any_release_tag_re) ;
+    If.(on_tezos_namespace && push && has_non_release_tag) ;
   register
     "non_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_not_match any_release_tag_re) ;
+    If.(not_on_tezos_namespace && push && has_non_release_tag) ;
   register "schedule_extended_test" schedule_extended_tests
 
 (* Split pipelines and writes image templates *)
