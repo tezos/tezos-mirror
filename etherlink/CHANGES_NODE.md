@@ -22,6 +22,7 @@ Currently supported kernel version: 9978f3a5f8bee0be78686c5c568109d2e6148f13
   transactions on the L1. (!11102)
 - Add a keep alive argument that waits until the connection is made with the
   rollup node. (!11236)
+- The chunker can also produce blueprints out of the given bytes. (!11497)
 
 ### Bug fixes
 

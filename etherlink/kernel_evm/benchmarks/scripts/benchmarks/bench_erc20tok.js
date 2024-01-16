@@ -37,5 +37,9 @@ txs.push(utils.send(player1, create.addr, 0, transfer_token(player2, 5000)));
 txs.push(utils.send(player1, create.addr, 0, burn(15000)));
 txs.push(utils.send(player2, create.addr, 0, burn(5000)));
 
-
-utils.print_bench([txs])
+var args = process.argv.slice(2)
+if (args.length == 1 && args[0] == '--blueprint') {
+    utils.print_bench([txs], { blueprint: true })
+} else {
+    utils.print_bench([txs])
+}
