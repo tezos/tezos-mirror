@@ -113,12 +113,13 @@ fn produce_and_upgrade<Host: KernelRuntime>(
     kernel_upgrade: KernelUpgrade,
     chain_id: U256,
     base_fee_per_gas: U256,
+    config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     // Since a kernel upgrade was detected, in case an error is thrown
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
     // In case of a reboot request, the upgrade is delayed.
-    match block::produce(host, chain_id, base_fee_per_gas) {
+    match block::produce(host, chain_id, base_fee_per_gas, config) {
         Ok(ComputationResult::RebootNeeded) => Ok(()),
         Err(e) => {
             log!(
@@ -136,12 +137,13 @@ pub fn stage_two<Host: KernelRuntime>(
     host: &mut Host,
     chain_id: U256,
     base_fee_per_gas: U256,
+    config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage two.");
     if let Some(kernel_upgrade) = upgrade::read_kernel_upgrade(host)? {
-        produce_and_upgrade(host, kernel_upgrade, chain_id, base_fee_per_gas)
+        produce_and_upgrade(host, kernel_upgrade, chain_id, base_fee_per_gas, config)
     } else {
-        block::produce(host, chain_id, base_fee_per_gas).map(|_| ())
+        block::produce(host, chain_id, base_fee_per_gas, config).map(|_| ())
     }
 }
 
@@ -273,7 +275,8 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     .context("Failed during stage 1")?;
 
     // Start processing blueprints
-    stage_two(host, chain_id, base_fee_per_gas).context("Failed during stage 2")
+    stage_two(host, chain_id, base_fee_per_gas, &mut configuration)
+        .context("Failed during stage 2")
 }
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
@@ -359,6 +362,7 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::mock_internal::MockInternal;
     use crate::safe_storage::{KernelRuntime, SafeStorage};
+    use crate::stage_one::Configuration;
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
@@ -517,8 +521,13 @@ mod tests {
             .expect("Should be able to store kernel upgrade");
 
         // If the upgrade is started, it should raise an error
-        stage_two(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Should have produced");
+        stage_two(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Should have produced");
 
         // test there is a new block
         assert!(

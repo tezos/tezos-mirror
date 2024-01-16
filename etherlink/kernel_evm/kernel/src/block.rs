@@ -13,6 +13,7 @@ use crate::indexable_storage::IndexableStorage;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::init_account_index;
+use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
@@ -129,8 +130,9 @@ fn next_bip_from_blueprints<Host: Runtime>(
     current_block_parent_hash: H256,
     current_constants: &BlockConstants,
     tick_counter: &TickCounter,
+    config: &mut Configuration,
 ) -> Result<Option<BlockInProgress>, anyhow::Error> {
-    match read_next_blueprint(host)? {
+    match read_next_blueprint(host, config)? {
         Some(blueprint) => {
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
@@ -198,6 +200,7 @@ pub fn produce<Host: KernelRuntime>(
     host: &mut Host,
     chain_id: U256,
     base_fee_per_gas: U256,
+    config: &mut Configuration,
 ) -> Result<ComputationResult, anyhow::Error> {
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
@@ -250,6 +253,7 @@ pub fn produce<Host: KernelRuntime>(
         current_block_parent_hash,
         &current_constants,
         &tick_counter,
+        config,
     )? {
         match compute_bip(
             host,
@@ -486,8 +490,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
     }
 
     fn assert_current_block_reading_validity<Host: KernelRuntime>(host: &mut Host) {
@@ -527,8 +536,13 @@ mod tests {
             &sender,
             U256::from(30000u64),
         );
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         assert!(
             read_transaction_receipt_status(&mut host, &tx_hash).is_err(),
@@ -565,8 +579,13 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
             .expect("Should have found receipt");
@@ -606,8 +625,13 @@ mod tests {
             U256::from(5000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
@@ -679,8 +703,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -726,8 +755,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
             .expect("should have found receipt");
         let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
@@ -788,8 +822,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -831,8 +870,13 @@ mod tests {
             &sender,
             U256::from(5000000000000000u64),
         );
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
 
@@ -865,14 +909,24 @@ mod tests {
         let transactions = vec![tx];
         store_blueprints(&mut host, vec![blueprint(transactions.clone())]);
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts = accounts_index.length(&host).unwrap();
         // Next blueprint
         store_blueprints(&mut host, vec![blueprint(transactions)]);
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
 
@@ -917,8 +971,13 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let new_number_of_transactions_indexed =
@@ -1076,8 +1135,13 @@ mod tests {
         store_blueprints(&mut host, vec![blueprint(vec![transaction])]);
 
         // Apply the transaction
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
         assert!(
             read_transaction_receipt(&mut host, &tx_hash).is_err(),
             "Transaction is invalid, so should not have a receipt"
@@ -1121,22 +1185,37 @@ mod tests {
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
 
         // second block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
 
         // third block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
     }
 
@@ -1232,8 +1311,13 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Should have produced");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1284,8 +1368,13 @@ mod tests {
 
         store_blueprints(&mut host, proposals);
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("Should have produced");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1307,8 +1396,8 @@ mod tests {
             "There should be some transactions left"
         );
 
-        let _next_blueprint =
-            read_next_blueprint(&host).expect("The next blueprint should be available");
+        let _next_blueprint = read_next_blueprint(&mut host, &mut Configuration::Proxy)
+            .expect("The next blueprint should be available");
     }
 
     #[test]
@@ -1368,8 +1457,13 @@ mod tests {
             U256::from(500000000000000000u64),
         );
 
-        produce(&mut host, DUMMY_CHAIN_ID, DUMMY_BASE_FEE_PER_GAS.into())
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &mut Configuration::Proxy,
+        )
+        .expect("The block production failed.");
 
         // See address at https://www.multicall3.com/ on in the github repository linked above
         let expected_created_contract =

@@ -4,10 +4,12 @@
 
 use crate::blueprint::Blueprint;
 use crate::error::{Error, StorageError};
-use crate::sequencer_blueprint::SequencerBlueprint;
+use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
+use crate::stage_one::Configuration;
 use crate::storage::{
     read_current_block_number, read_rlp, store_read_slice, store_rlp, write_u256,
 };
+use crate::DelayedInbox;
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers;
@@ -189,11 +191,32 @@ fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     }
 }
 
+fn fetch_delayed_txs<Host: Runtime>(
+    host: &mut Host,
+    blueprint_with_hashes: BlueprintWithDelayedHashes,
+    delayed_inbox: &mut DelayedInbox,
+) -> anyhow::Result<Option<Blueprint>> {
+    let mut delayed_txs = vec![];
+    for tx_hash in blueprint_with_hashes.delayed_hashes {
+        let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
+        match tx {
+            Some(tx) => delayed_txs.push(tx),
+            None => return Ok(None),
+        }
+    }
+    delayed_txs.extend(blueprint_with_hashes.blueprint.transactions);
+    Ok(Some(Blueprint {
+        transactions: delayed_txs,
+        timestamp: blueprint_with_hashes.blueprint.timestamp,
+    }))
+}
+
 fn read_all_chunks<Host: Runtime>(
-    host: &Host,
+    host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
-) -> Result<Blueprint, Error> {
+    config: &mut Configuration,
+) -> anyhow::Result<Option<Blueprint>> {
     let mut chunks = vec![];
     for i in 0..nb_chunks {
         let path = blueprint_chunk_path(blueprint_path, i)?;
@@ -202,18 +225,27 @@ fn read_all_chunks<Host: Runtime>(
             StoreBlueprint::InboxBlueprint(blueprint) => {
                 // Special case when there's an inbox blueprint stored.
                 // There must be only one chunk in this case.
-                return Ok(blueprint);
+                return Ok(Some(blueprint));
             }
             StoreBlueprint::SequencerChunk(chunk) => chunks.push(chunk),
         }
     }
-    let blueprint = rlp::decode(&chunks.concat())?;
-    Ok(blueprint)
+    match config {
+        Configuration::Proxy => Ok(None),
+        Configuration::Sequencer { delayed_inbox, .. } => {
+            let blueprint_with_hashes: BlueprintWithDelayedHashes =
+                rlp::decode(&chunks.concat())?;
+            let blueprint =
+                fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)?;
+            Ok(blueprint)
+        }
+    }
 }
 
 pub fn read_next_blueprint<Host: Runtime>(
-    host: &Host,
-) -> Result<Option<Blueprint>, Error> {
+    host: &mut Host,
+    config: &mut Configuration,
+) -> anyhow::Result<Option<Blueprint>> {
     let number = read_next_blueprint_number(host)?;
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
@@ -223,8 +255,8 @@ pub fn read_next_blueprint<Host: Runtime>(
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
             // All chunks are available
-            let blueprint = read_all_chunks(host, &blueprint_path, nb_chunks)?;
-            Ok(Some(blueprint))
+            let blueprint = read_all_chunks(host, &blueprint_path, nb_chunks, config)?;
+            Ok(blueprint)
         } else {
             Ok(None)
         }
