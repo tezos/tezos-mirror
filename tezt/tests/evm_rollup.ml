@@ -377,34 +377,8 @@ let setup_evm_kernel ?config ?kernel_installee
       config;
     }
 
-let setup_past_genesis
-    ?(config :
-       [< `Config of Installer_kernel_config.instr list | `Path of string]
-       option) ?commitment_period ?challenge_window ?with_administrator
-    ?kernel_installee ?originator_key ?bootstrap_accounts ?rollup_operator_key
-    ?timestamp ?setup_mode ~admin protocol =
-  let* ({node; client; sc_rollup_node; evm_node; _} as full_setup) =
-    setup_evm_kernel
-      ?config
-      ?kernel_installee
-      ?originator_key
-      ?bootstrap_accounts
-      ?rollup_operator_key
-      ?with_administrator
-      ?timestamp
-      ?setup_mode
-      ?commitment_period
-      ?challenge_window
-      ~admin
-      protocol
-  in
-  (* Force a level to got past the genesis block *)
-  let* _level = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
-  return full_setup
-
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?(past_genesis = false) ~setup_mode f
-    =
+    ?challenge_window ?bootstrap_accounts ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -427,29 +401,19 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
     ~title:(sf "%s (%s)" title extra_tag)
     (fun protocol ->
       let* evm_setup =
-        if past_genesis then
-          setup_past_genesis
-            ?config
-            ?commitment_period
-            ?challenge_window
-            ?bootstrap_accounts
-            ~admin
-            ~setup_mode
-            protocol
-        else
-          setup_evm_kernel
-            ?config
-            ?commitment_period
-            ?challenge_window
-            ?bootstrap_accounts
-            ~admin
-            ~setup_mode
-            protocol
+        setup_evm_kernel
+          ?config
+          ?commitment_period
+          ?challenge_window
+          ?bootstrap_accounts
+          ~admin
+          ~setup_mode
+          protocol
       in
       f ~protocol ~evm_setup)
 
 let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?(past_genesis = false) f protocols =
+    ?challenge_window ?bootstrap_accounts f protocols =
   register_test
     ?config
     ~title
@@ -461,12 +425,10 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
     ?bootstrap_accounts
     f
     protocols
-    ~past_genesis
     ~setup_mode:(Setup_proxy {devmode = true})
 
 let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
-    ?bootstrap_accounts ?(past_genesis = false) ?config ?time_between_blocks f
-    protocols =
+    ?bootstrap_accounts ?config ?time_between_blocks f protocols =
   let register =
     register_test
       ?config
@@ -479,7 +441,6 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ?bootstrap_accounts
       f
       protocols
-      ~past_genesis
   in
   register ~setup_mode:(Setup_proxy {devmode = true}) ;
   register
@@ -641,10 +602,7 @@ let test_originate_evm_kernel =
   unit
 
 let test_rpc_getBalance =
-  register_both
-    ~tags:["evm"; "get_balance"]
-    ~title:"RPC method eth_getBalance"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "get_balance"] ~title:"RPC method eth_getBalance"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* balance =
@@ -663,7 +621,6 @@ let test_rpc_getBlockByNumber =
   register_both
     ~tags:["evm"; "get_block_by_number"]
     ~title:"RPC method eth_getBlockByNumber"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
@@ -687,7 +644,6 @@ let test_rpc_getBlockByHash =
   register_both
     ~tags:["evm"; "get_block_by_hash"]
     ~title:"RPC method eth_getBlockByHash"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
@@ -701,7 +657,6 @@ let test_l2_block_size_non_zero =
   register_both
     ~tags:["evm"; "block"; "size"]
     ~title:"Block size is greater than zero"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
@@ -726,7 +681,6 @@ let test_rpc_getTransactionCount =
   register_both
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* transaction_count =
     get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
@@ -739,7 +693,6 @@ let test_rpc_getTransactionCountBatch =
   register_both
     ~tags:["evm"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* transaction_count =
     get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
@@ -760,10 +713,7 @@ let test_rpc_getTransactionCountBatch =
   unit
 
 let test_rpc_batch =
-  register_both
-    ~tags:["evm"; "rpc"; "batch"]
-    ~title:"RPC batch requests"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "rpc"; "batch"] ~title:"RPC batch requests"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* transaction_count, chain_id =
     let transaction_count =
@@ -1001,7 +951,6 @@ let test_l2_deploy_simple_storage =
   register_proxy
     ~tags:["evm"; "l2_deploy"]
     ~title:"Check L2 contract deployment"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   deploy_with_base_checks
     {
@@ -1038,7 +987,6 @@ let test_l2_call_simple_storage =
   register_proxy
     ~tags:["evm"; "l2_deploy"; "l2_call"]
     ~title:"Check L2 contract call"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -1090,7 +1038,6 @@ let test_l2_deploy_erc20 =
   register_proxy
     ~tags:["evm"; "l2_deploy"; "erc20"; "l2_call"]
     ~title:"Check L2 erc20 contract deployment"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
   let {evm_node; node; client; sc_rollup_node; _} = evm_setup in
@@ -1267,7 +1214,6 @@ let test_log_index =
   register_both
     ~tags:["evm"; "log_index"]
     ~title:"Check that log index is correctly computed"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
   let {evm_node; node; client; sc_rollup_node; _} = evm_setup in
@@ -1512,10 +1458,7 @@ let test_rpc_web3_clientVersion =
   unit
 
 let test_rpc_web3_sha3 =
-  register_both
-    ~tags:["evm"; "sha3"]
-    ~title:"Check RPC web3_sha3"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "sha3"] ~title:"Check RPC web3_sha3"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* From the example provided in
      https://ethereum.org/en/developers/docs/apis/json-rpc/#web3_sha3 *)
@@ -1537,7 +1480,6 @@ let test_simulate =
   register_proxy
     ~tags:["evm"; "simulate"]
     ~title:"A block can be simulated in the rollup node"
-    ~past_genesis:true
     (fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; _} ->
       let*@ block_number = Rpc.block_number evm_node in
       let* simulation_result =
@@ -1573,7 +1515,6 @@ let test_full_blocks =
     ~title:
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
        informations"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   let txs =
     read_tx_from_file ()
@@ -1626,8 +1567,8 @@ let test_latest_block =
     ~title:
       "Check `evm_getBlockByNumber` works correctly when asking for the \
        `latest`"
-    ~past_genesis:true
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   (* The first execution of the kernel actually builds two blocks: the genesis
      block and the block for the current inbox. As such, the latest block is
      always of level 1. *)
@@ -1649,7 +1590,6 @@ let test_eth_call_nullable_recipient =
   register_both
     ~tags:["evm"; "eth_call"; "null"]
     ~title:"Check `eth_call.to` input can be null"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* call_result =
     Evm_node.(
@@ -1669,7 +1609,6 @@ let test_inject_100_transactions =
     ~tags:["evm"; "bigger_blocks"]
     ~title:"Check blocks can contain more than 64 transactions"
     ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -1861,7 +1800,6 @@ let test_eth_call_storage_contract_proxy =
   register_proxy
     ~tags:["evm"; "simulate"]
     ~title:"Call a view (directly through rollup node)"
-    ~past_genesis:true
     (fun ~protocol:_ ~evm_setup ->
       let {sc_rollup_node; evm_node; _} = evm_setup in
 
@@ -2471,7 +2409,6 @@ let test_rpc_sendRawTransaction =
     ~tags:["evm"; "tx_hash"]
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* hashes =
@@ -2559,7 +2496,6 @@ let test_rpc_getTransactionByBlockHashAndIndex =
     ~tags:["evm"; "get_transaction_by"; "block_hash_and_index"]
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
     ~config
-    ~past_genesis:true
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
 let test_rpc_getTransactionByBlockNumberAndIndex =
@@ -2570,7 +2506,6 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
     ~tags:["evm"; "get_transaction_by"; "block_number_and_index"]
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
     ~config
-    ~past_genesis:true
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
 let test_validation_result =
@@ -2578,7 +2513,6 @@ let test_validation_result =
     ~tags:["evm"; "simulate"]
     ~title:
       "Ensure validation returns appropriate address for a given transaction."
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; _} ->
   (* tx is a signed legacy transaction obtained with the following data, using
      the following private key:
@@ -2636,7 +2570,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   in
   let current_kernel_installee = "ghostnet_evm_kernel" in
   let* evm_setup =
-    setup_past_genesis
+    setup_evm_kernel
       ?config
       ~kernel_installee:
         {
@@ -2834,7 +2768,6 @@ let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
     ~tags:["evm"; "nonce"]
     ~title:"Returns an error if the nonce is too low"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Nonce: 0 *)
   let raw_tx =
@@ -2862,7 +2795,6 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   register_both
     ~tags:["evm"; "nonce"]
     ~title:"Accepts transactions with nonce too high."
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* Nonce: 1 *)
   let raw_tx =
@@ -2962,7 +2894,9 @@ let test_block_storage_before_and_after_migration =
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
   let block_id = "1" in
-  let scenario_prior ~evm_setup:{endpoint; _} =
+  let scenario_prior
+      ~evm_setup:{endpoint; evm_node; sc_rollup_node; node; client; _} =
+    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
     let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint in
     return block
   in
@@ -2989,7 +2923,7 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
       ])
     ~title:"Returns an error if the chainId is not correct."
   @@ fun protocol ->
-  let* {evm_node; _} = setup_past_genesis ~admin:None protocol in
+  let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
   (* Nonce: 0, chainId: 4242*)
   let raw_tx =
     "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
@@ -3075,7 +3009,6 @@ let test_reboot =
   register_proxy
     ~tags:["evm"; "reboot"; "loop"]
     ~title:"Check that the kernel can handle too many txs for a single run"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let transfers =
@@ -3145,7 +3078,6 @@ let test_rpc_getBlockTransactionCountBy =
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
     ~config
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
@@ -3199,7 +3131,6 @@ let test_rpc_getUncleCountByBlock =
     ~title:
       "RPC methods eth_getUncleCountByBlockHash and \
        eth_getUncleCountByBlockNumber"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
@@ -3244,7 +3175,6 @@ let test_rpc_getUncleByBlockArgAndIndex =
     ~title:
       "RPC methods eth_getUncleByBlockHashAndIndex and \
        eth_getUncleByBlockNumberAndIndex"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let block_id = "0" in
@@ -3271,7 +3201,6 @@ let test_simulation_eip2200 =
   register_both
     ~tags:["evm"; "loop"; "simulation"; "eip2200"]
     ~title:"Simulation is EIP2200 resilient"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {sc_rollup_node; node; client; endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3296,7 +3225,6 @@ let test_cover_fees =
   register_both
     ~tags:["evm"; "validity"]
     ~title:"Transaction is invalid if sender cannot cover the fees"
-    ~past_genesis:true
     ~bootstrap_accounts:[||]
   (* No bootstrap accounts, so no one has funds. *)
   @@ fun ~protocol:_
@@ -3328,10 +3256,7 @@ let test_cover_fees =
   check_for_receipt 6
 
 let test_rpc_sendRawTransaction_with_consecutive_nonce =
-  register_both
-    ~tags:["evm"; "tx_nonce"]
-    ~title:"Can submit many transactions."
-    ~past_genesis:true
+  register_both ~tags:["evm"; "tx_nonce"] ~title:"Can submit many transactions."
   @@ fun ~protocol:_ ~evm_setup:{evm_node; node; client; sc_rollup_node; _} ->
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 0*)
@@ -3372,7 +3297,6 @@ let test_rpc_sendRawTransaction_not_included =
     ~tags:["evm"; "tx_nonce"]
     ~title:
       "Tx with nonce too high are not included without previous transactions."
-    ~past_genesis:true
   @@ fun ~protocol:_
              ~evm_setup:{evm_node; node; client; sc_rollup_node; endpoint; _} ->
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
@@ -3399,10 +3323,7 @@ let test_rpc_sendRawTransaction_not_included =
   unit
 
 let test_rpc_gasPrice =
-  register_both
-    ~tags:["evm"; "gas_price"]
-    ~title:"RPC methods eth_gasPrice"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "gas_price"] ~title:"RPC methods eth_gasPrice"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let expected_gas_price = 21_000l in
   let* gas_price =
@@ -3438,7 +3359,6 @@ let test_rpc_getStorageAt =
   register_both
     ~tags:["evm"; "get_storage_at"]
     ~title:"RPC methods eth_getStorageAt"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3488,7 +3408,6 @@ let test_accounts_double_indexing =
   register_proxy
     ~tags:["evm"; "accounts"; "index"]
     ~title:"Accounts have a unique index"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup:full_evm_setup ->
   let check_accounts_length expected_length =
     let* length =
@@ -3570,7 +3489,7 @@ let test_l2_call_inter_contract =
   @@ fun protocol ->
   (* setup *)
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
-    setup_past_genesis ~admin:None protocol
+    setup_evm_kernel ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3672,10 +3591,7 @@ let get_logs ?from_block ?to_block ?address ?topics proxy_server =
     JSON.(response |-> "result" |> as_list |> List.map Transaction.logs_of_json)
 
 let test_rpc_getLogs =
-  register_both
-    ~tags:["evm"; "rpc"; "get_logs"]
-    ~title:"Check getLogs RPC"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "rpc"; "get_logs"] ~title:"Check getLogs RPC"
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; node; client; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -3813,10 +3729,7 @@ let test_rpc_getLogs =
   unit
 
 let test_tx_pool_replacing_transactions =
-  register_both
-    ~tags:["evm"; "tx_pool"]
-    ~title:"Transactions can be replaced"
-    ~past_genesis:true
+  register_both ~tags:["evm"; "tx_pool"] ~title:"Transactions can be replaced"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   let bob = Eth_account.bootstrap_accounts.(0) in
   let* bob_nonce = get_transaction_count evm_node bob.address in
@@ -3852,7 +3765,6 @@ let test_l2_nested_create =
   register_both
     ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
     ~title:"Check L2 nested create"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -3916,7 +3828,7 @@ let test_block_hash_regression =
   (* We use a timestamp equal to the next day after genesis.
      The genesis timestamp can be found in tezt/lib_tezos/client.ml *)
   let* {evm_node; sc_rollup_node; node; client; _} =
-    setup_past_genesis
+    setup_evm_kernel
       ~config
       ~admin:None
       ~timestamp:(At (Option.get @@ Ptime.of_date (2018, 7, 1)))
@@ -3931,10 +3843,7 @@ let test_block_hash_regression =
   unit
 
 let test_l2_revert_returns_unused_gas =
-  register_both
-    ~tags:["evm"]
-    ~title:"Check L2 revert returns unused gas"
-    ~past_genesis:true
+  register_both ~tags:["evm"] ~title:"Check L2 revert returns unused gas"
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -3977,7 +3886,6 @@ let test_l2_create_collision =
   register_both
     ~tags:["evm"; "l2_create"; "collision"]
     ~title:"Check L2 create collision"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4033,7 +3941,6 @@ let test_l2_intermediate_OOG_call =
     ~title:
       "Check that an L2 call to a smart contract with an intermediate call \
        that runs out of gas still succeeds."
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4067,7 +3974,6 @@ let test_l2_ether_wallet =
   register_both
     ~tags:["evm"; "l2_call"; "wallet"]
     ~title:"Check ether wallet functions correctly"
-    ~past_genesis:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4169,7 +4075,10 @@ let test_regression_block_hash_gen =
       ])
     ~title:"Random generation based on block hash and timestamp"
   @@ fun protocol ->
-  let* evm_setup = setup_past_genesis ~admin:None protocol in
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* _address, _tx = deploy ~contract:block_hash_gen ~sender evm_setup in
   unit
