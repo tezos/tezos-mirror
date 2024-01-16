@@ -187,7 +187,8 @@ val max_injector_retention_period : int
 (** This is the list of available modes. *)
 val modes : mode list
 
-(** [string_of_mode mode] returns a string representation of the mode [mode]. *)
+(** [string_of_mode mode] returns a string representation of the mode
+    specified by the argument [mode]. *)
 val string_of_mode : mode -> string
 
 (** [mode_of_string s] returns the mode represented by string [s] if it exists. *)
