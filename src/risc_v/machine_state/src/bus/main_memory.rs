@@ -167,23 +167,23 @@ pub mod tests {
 
         memory.write(0, 0x1122334455667788u64);
 
-        assert_eq!(Addressable::<u64>::read(&mut memory, 0), 0x1122334455667788);
+        assert_eq!(Addressable::<u64>::read(&memory, 0), 0x1122334455667788);
 
-        assert_eq!(Addressable::<u32>::read(&mut memory, 0), 0x55667788);
-        assert_eq!(Addressable::<u32>::read(&mut memory, 4), 0x11223344);
+        assert_eq!(Addressable::<u32>::read(&memory, 0), 0x55667788);
+        assert_eq!(Addressable::<u32>::read(&memory, 4), 0x11223344);
 
-        assert_eq!(Addressable::<u16>::read(&mut memory, 0), 0x7788);
-        assert_eq!(Addressable::<u16>::read(&mut memory, 2), 0x5566);
-        assert_eq!(Addressable::<u16>::read(&mut memory, 4), 0x3344);
-        assert_eq!(Addressable::<u16>::read(&mut memory, 6), 0x1122);
+        assert_eq!(Addressable::<u16>::read(&memory, 0), 0x7788);
+        assert_eq!(Addressable::<u16>::read(&memory, 2), 0x5566);
+        assert_eq!(Addressable::<u16>::read(&memory, 4), 0x3344);
+        assert_eq!(Addressable::<u16>::read(&memory, 6), 0x1122);
 
-        assert_eq!(Addressable::<u8>::read(&mut memory, 0), 0x88);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 1), 0x77);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 2), 0x66);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 3), 0x55);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 4), 0x44);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 5), 0x33);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 6), 0x22);
-        assert_eq!(Addressable::<u8>::read(&mut memory, 7), 0x11);
+        assert_eq!(Addressable::<u8>::read(&memory, 0), 0x88);
+        assert_eq!(Addressable::<u8>::read(&memory, 1), 0x77);
+        assert_eq!(Addressable::<u8>::read(&memory, 2), 0x66);
+        assert_eq!(Addressable::<u8>::read(&memory, 3), 0x55);
+        assert_eq!(Addressable::<u8>::read(&memory, 4), 0x44);
+        assert_eq!(Addressable::<u8>::read(&memory, 5), 0x33);
+        assert_eq!(Addressable::<u8>::read(&memory, 6), 0x22);
+        assert_eq!(Addressable::<u8>::read(&memory, 7), 0x11);
     }
 }
