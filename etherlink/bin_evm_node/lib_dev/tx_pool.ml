@@ -288,6 +288,7 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
         ~timestamp
         ~smart_rollup_address
         ~transactions:txs
+        ~delayed:[]
     in
     let* nb_transactions =
       match hashes with

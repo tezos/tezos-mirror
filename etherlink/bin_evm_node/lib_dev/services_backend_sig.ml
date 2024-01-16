@@ -24,6 +24,7 @@ module type S = sig
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
     transactions:string list ->
+    delayed:Ethereum_types.Delayed_transaction.t list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
@@ -108,7 +109,7 @@ module type Backend = sig
 
   module TxEncoder : Publisher.TxEncoder
 
-  module Publisher : Publisher.Publisher
+  module Publisher : Publisher.Publisher with type messages = TxEncoder.messages
 
   module SimulatorBackend : Simulator.SimulationBackend
 end

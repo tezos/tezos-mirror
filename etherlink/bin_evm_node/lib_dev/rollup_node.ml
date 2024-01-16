@@ -43,11 +43,32 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    let encode_transaction ~smart_rollup_address ~transaction =
-      make_encoded_messages ~smart_rollup_address transaction
+    type transactions = {
+      raw : string list;
+      delayed : Ethereum_types.Delayed_transaction.t list;
+    }
+
+    type messages = string list
+
+    let encode_transactions ~smart_rollup_address
+        ~transactions:({raw = transactions; _} : transactions) =
+      let open Result_syntax in
+      let* rev_hashes, messages =
+        List.fold_left_e
+          (fun (tx_hashes, to_publish) tx_raw ->
+            let* tx_hash, messages =
+              make_encoded_messages ~smart_rollup_address tx_raw
+            in
+            return (tx_hash :: tx_hashes, to_publish @ messages))
+          ([], [])
+          transactions
+      in
+      return (List.rev rev_hashes, messages)
   end
 
   module Publisher = struct
+    type messages = TxEncoder.messages
+
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =
       let open Lwt_result_syntax in
       (* The injection's service returns a notion of L2 message hash (defined
