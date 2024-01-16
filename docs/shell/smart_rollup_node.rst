@@ -305,7 +305,8 @@ uses the same arguments as the ``run`` command:
 .. code:: sh
 
    octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
-                    init operator config for "${SR_ALIAS_OR_ADDR}" \
+                    init "${ROLLUP_NODE_MODE}" config \
+                    for "${SR_ALIAS_OR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
@@ -322,13 +323,13 @@ Here is the content of the file:
 ::
 
   {
-    "data-dir": "${ROLLUP_NODE_DIR}",
-    "smart-rollup-address": "${SR_ADDR}",
-    "smart-rollup-node-operator": {
-      "publish": "${OPERATOR_ADDR}",
-      "add_messages": "${OPERATOR_ADDR}",
-      "cement": "${OPERATOR_ADDR}",
-      "refute": "${OPERATOR_ADDR}"
+    "smart-rollup-address": "${SR_ALIAS_OR_ADDR}",
+    "smart-rollup-node-operator":
+    {
+      "operating": "${OPERATOR_ADDR}",
+      "batching": [ "${OPERATOR_ADDR}" ],
+      "cementing": "${OPERATOR_ADDR}",
+      "executing_outbox": "${OPERATOR_ADDR}"
     },
     "fee-parameters": {},
     "mode": "operator"
@@ -338,7 +339,7 @@ The rollup node can now be run with just:
 
 .. code:: sh
 
-   octez-smart-rollup-node -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
 
 The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
