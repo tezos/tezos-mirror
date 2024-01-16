@@ -15,6 +15,8 @@ type proxy = {rollup_node_endpoint : Uri.t}
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
+(** TODO https://gitlab.com/tezos/tezos/-/issues/6811
+    We need to properly handle the secrets in the node. *)
 type sequencer = {
   rollup_node_endpoint : Uri.t;
   kernel : string;
