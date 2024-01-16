@@ -29,7 +29,7 @@ let execute ?(commit = false) ctxt inbox =
   in
   return (ctxt, evm_state)
 
-let init ~smart_rollup_address ~rollup_node_endpoint ctxt =
+let init ~secret_key ~smart_rollup_address ~rollup_node_endpoint ctxt =
   let open Lwt_result_syntax in
   let* evm_state =
     Wasm.start
@@ -43,6 +43,7 @@ let init ~smart_rollup_address ~rollup_node_endpoint ctxt =
   (* Create the first empty block. *)
   let inputs =
     Sequencer_blueprint.create
+      ~secret_key
       ~timestamp:(Helpers.now ())
       ~smart_rollup_address
       ~transactions:[]

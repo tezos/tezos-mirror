@@ -72,7 +72,8 @@ let setup_l1_contracts client =
   return {delayed_transaction_bridge; exchanger; bridge}
 
 let setup_sequencer ?time_between_blocks
-    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) protocol =
+    ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
+    ?(sequencer = Constant.bootstrap1) protocol =
   let* node, client = setup_l1 protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -86,7 +87,7 @@ let setup_sequencer ?time_between_blocks
   let config =
     Configuration.make_config
       ~bootstrap_accounts
-      ~sequencer:true
+      ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
       ()
@@ -110,12 +111,18 @@ let setup_sequencer ?time_between_blocks
   in
   let private_rpc_port = Port.fresh () in
   let mode =
+    let sequencer =
+      match sequencer.secret_key with
+      | Unencrypted sk -> sk
+      | Encrypted _ -> Test.fail "Provide an unencrypted key for the sequencer"
+    in
     Evm_node.Sequencer
       {
         kernel = output;
         preimage_dir = preimages_dir;
         private_rpc_port;
         time_between_blocks;
+        sequencer;
       }
   in
   let* evm_node =

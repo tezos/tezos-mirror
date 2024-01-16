@@ -9,6 +9,8 @@ module MakeBackend (Ctxt : sig
   val ctxt : Sequencer_context.t
 
   val rollup_node_endpoint : Uri.t
+
+  val secret_key : Signature.secret_key
 end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
@@ -38,6 +40,7 @@ end) : Services_backend_sig.Backend = struct
       let (Ethereum_types.(Qty next) as number) = ctxt.next_blueprint_number in
       let inputs =
         Sequencer_blueprint.create
+          ~secret_key:Ctxt.secret_key
           ~timestamp
           ~smart_rollup_address
           ~transactions:messages
@@ -74,5 +77,7 @@ module Make (Ctxt : sig
   val ctxt : Sequencer_context.t
 
   val rollup_node_endpoint : Uri.t
+
+  val secret_key : Signature.secret_key
 end) =
   Services_backend_sig.Make (MakeBackend (Ctxt))

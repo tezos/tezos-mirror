@@ -21,11 +21,11 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    is_sequencer, read_admin, read_base_fee_per_gas, read_chain_id,
-    read_delayed_transaction_bridge, read_kernel_version,
-    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_ticketer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_admin, read_base_fee_per_gas, read_chain_id, read_delayed_transaction_bridge,
+    read_kernel_version, read_last_info_per_level_timestamp,
+    read_last_info_per_level_timestamp_stats, read_ticketer, sequencer,
+    store_base_fee_per_gas, store_chain_id, store_kernel_version, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -104,6 +104,7 @@ pub fn stage_one<Host: Runtime>(
         ticketer,
         admin
     );
+    log!(host, Info, "Configuration: {}", configuration);
 
     fetch(host, smart_rollup_address, ticketer, admin, configuration)
 }
@@ -211,22 +212,26 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
 }
 
 fn fetch_configuration<Host: Runtime>(host: &mut Host) -> anyhow::Result<Configuration> {
-    let is_sequencer = is_sequencer(host)?;
-    if is_sequencer {
-        let delayed_bridge = read_delayed_transaction_bridge(host)
-            // The sequencer must declare a delayed transaction bridge. This
-            // default value is only to facilitate the testing.
-            .unwrap_or_else(|| {
-                ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+    let sequencer = sequencer(host)?;
+    match sequencer {
+        Some(sequencer) => {
+            let delayed_bridge = read_delayed_transaction_bridge(host)
+                // The sequencer must declare a delayed transaction bridge. This
+                // default value is only to facilitate the testing.
+                .unwrap_or_else(|| {
+                    ContractKt1Hash::from_base58_check(
+                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                    )
                     .unwrap()
-            });
-        let delayed_inbox = Box::new(DelayedInbox::new(host)?);
-        Ok(Configuration::Sequencer {
-            delayed_bridge,
-            delayed_inbox,
-        })
-    } else {
-        Ok(Configuration::Proxy)
+                });
+            let delayed_inbox = Box::new(DelayedInbox::new(host)?);
+            Ok(Configuration::Sequencer {
+                delayed_bridge,
+                delayed_inbox,
+                sequencer,
+            })
+        }
+        None => Ok(Configuration::Proxy),
     }
 }
 

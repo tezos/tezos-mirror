@@ -12,6 +12,7 @@ use crate::storage::store_kernel_upgrade;
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -21,7 +22,25 @@ pub enum Configuration {
     Sequencer {
         delayed_bridge: ContractKt1Hash,
         delayed_inbox: Box<DelayedInbox>,
+        sequencer: PublicKey,
     },
+}
+
+impl std::fmt::Display for Configuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Configuration::Proxy => write!(f, "Proxy"),
+            Configuration::Sequencer {
+                delayed_bridge,
+                delayed_inbox: _, // Ignoring delayed_inbox
+                sequencer,
+            } => write!(
+                f,
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
+                delayed_bridge, sequencer
+            ),
+        }
+    }
 }
 
 pub fn fetch_inbox_blueprints<Host: Runtime>(
@@ -34,7 +53,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
         kernel_upgrade,
         transactions,
         sequencer_blueprints: _,
-    }) = read_inbox(host, smart_rollup_address, ticketer, admin, None)?
+    }) = read_inbox(host, smart_rollup_address, ticketer, admin, None, None)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -58,6 +77,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     admin: Option<ContractKt1Hash>,
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
+    sequencer: PublicKey,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         kernel_upgrade,
@@ -69,6 +89,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         ticketer,
         admin,
         Some(delayed_bridge),
+        Some(sequencer),
     )? {
         // Store the transactions in the delayed inbox.
         for transaction in transactions {
@@ -81,8 +102,8 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
                 host,
                 Debug,
                 "Storing chunk {} of sequencer blueprint number {}",
-                seq_blueprint.chunk_index,
-                seq_blueprint.number
+                seq_blueprint.blueprint.chunk_index,
+                seq_blueprint.blueprint.number
             );
             store_sequencer_blueprint(host, seq_blueprint)?
         }
@@ -105,6 +126,7 @@ pub fn fetch<Host: Runtime>(
         Configuration::Sequencer {
             delayed_bridge,
             delayed_inbox,
+            sequencer,
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
@@ -112,6 +134,7 @@ pub fn fetch<Host: Runtime>(
             admin,
             delayed_bridge.clone(),
             delayed_inbox,
+            sequencer.clone(),
         ),
         Configuration::Proxy => {
             fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)

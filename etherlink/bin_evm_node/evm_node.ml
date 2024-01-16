@@ -302,6 +302,10 @@ module Params = struct
   let rollup_node_endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
+  let secret_key : (Signature.secret_key, unit) Tezos_clic.parameter =
+    Tezos_clic.parameter (fun _ sk ->
+        Lwt.return_ok (Signature.Secret_key.of_b58check_exn sk))
+
   let string_list =
     Tezos_clic.parameter (fun _ s ->
         let list = String.split ',' s in
@@ -372,14 +376,6 @@ let data_dir_arg =
          default)
     ~default
     Params.string
-
-let rollup_node_endpoint_param =
-  Tezos_clic.param
-    ~name:"rollup-node-endpoint"
-    ~desc:
-      "The smart rollup node endpoint address (as ADDR:PORT) the node will \
-       communicate with."
-    Params.rollup_node_endpoint
 
 let rollup_address_arg =
   let open Lwt_result_syntax in
@@ -454,7 +450,13 @@ let proxy_command =
        verbose_arg
        keep_alive_arg)
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
-    @@ rollup_node_endpoint_param @@ stop)
+    @@ param
+         ~name:"rollup-node-endpoint"
+         ~desc:
+           "The smart rollup node endpoint address (as ADDR:PORT) the node \
+            will communicate with."
+         Params.rollup_node_endpoint
+    @@ stop)
     (fun ( data_dir,
            devmode,
            rpc_addr,
@@ -561,7 +563,19 @@ let sequencer_command =
        preimages_arg
        time_between_blocks_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
-    @@ rollup_node_endpoint_param @@ stop)
+    @@ param
+         ~name:"rollup-node-endpoint"
+         ~desc:
+           "The smart rollup node endpoint address (as ADDR:PORT) the node \
+            will communicate with."
+         Params.rollup_node_endpoint
+    @@ prefixes ["signing"; "with"]
+    @@ param
+         ~name:"secret-key"
+         ~desc:
+           "The tezos secret key used to sign the blueprints published to L1"
+         Params.secret_key
+    @@ stop)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -573,6 +587,7 @@ let sequencer_command =
            preimages,
            time_between_blocks )
          rollup_node_endpoint
+         sequencer
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
@@ -590,6 +605,7 @@ let sequencer_command =
           ?kernel
           ?preimages
           ?time_between_blocks
+          ~sequencer
           ()
       in
       let* () = Configuration.save_sequencer ~force:true ~data_dir config in
@@ -607,12 +623,18 @@ let sequencer_command =
       let* ctxt =
         if loaded then return ctxt
         else
-          Sequencer_state.init ~rollup_node_endpoint ~smart_rollup_address ctxt
+          Sequencer_state.init
+            ~secret_key:sequencer
+            ~rollup_node_endpoint
+            ~smart_rollup_address
+            ctxt
       in
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
 
         let rollup_node_endpoint = rollup_node_endpoint
+
+        let secret_key = sequencer
       end) in
       (* Ignore the smart rollup address for now. *)
       let* () =

@@ -159,11 +159,11 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: SequencerBlueprint,
 ) -> Result<(), Error> {
-    let blueprint_path = blueprint_path(blueprint.number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
+    let blueprint_path = blueprint_path(blueprint.blueprint.number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.blueprint.nb_chunks)?;
     let blueprint_chunk_path =
-        blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
-    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
+        blueprint_chunk_path(&blueprint_path, blueprint.blueprint.chunk_index)?;
+    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.blueprint.chunk);
     store_rlp(&store_blueprint, host, &blueprint_chunk_path)
 }
 

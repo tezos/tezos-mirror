@@ -44,6 +44,7 @@ type mode =
       time_between_blocks : time_between_blocks option;
           (** See {!time_between_blocks}, if the value is not
               provided, the sequencer uses it default value. *)
+      sequencer : string;  (** Secret key used to sign the blueprints. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 
