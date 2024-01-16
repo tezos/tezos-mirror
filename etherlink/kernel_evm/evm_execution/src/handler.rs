@@ -939,29 +939,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.end_initial_transaction(result)
     }
 
-    /// Perform a transfer transaction
-    pub fn transfer(
-        &mut self,
-        from: H160,
-        to: H160,
-        value: U256,
-        gas_limit: Option<u64>,
-    ) -> Result<ExecutionOutcome, EthereumError> {
-        self.begin_initial_transaction(false, gas_limit)?;
-
-        if let Err(err) = self.record_base_gas_cost(false, &[]) {
-            return self.end_initial_transaction(Ok((
-                ExitReason::Error(err),
-                None,
-                vec![],
-            )));
-        }
-
-        let result = self.execute_transfer(from, to, value)?;
-
-        self.end_initial_transaction(Ok((result, None, vec![])))
-    }
-
     fn get_or_create_account(
         &self,
         address: H160,
