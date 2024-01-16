@@ -40,31 +40,50 @@ let max_chunk_size =
   - blueprint_tag_size - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
-let make_blueprint_chunks ~timestamp ~transactions =
+let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
   let open Rlp in
-  let messages =
+  let open Ethereum_types in
+  let encode_tx hash raw =
+    List
+      [
+        Value (Bytes.of_string hash);
+        List [Value (Bytes.of_string "\001"); Value (Bytes.of_string raw)];
+      ]
+  in
+  let delayed_hashes =
     List
       (List.map
-         (fun transaction ->
-           let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-           List
-             [
-               Value (Bytes.of_string tx_hash_str);
-               List
-                 [
-                   Value (Bytes.of_string "\001");
-                   Value (Bytes.of_string transaction);
-                 ];
-             ])
-         transactions)
+         (fun tx ->
+           Value
+             (Delayed_transaction.hash tx |> hash_to_bytes |> Bytes.of_string))
+         delayed_transactions)
+  in
+  let delayed_transactions =
+    List.map
+      (function
+        | Ethereum_types.Delayed_transaction.Transaction {hash; raw_tx} ->
+            encode_tx (hash_to_bytes hash) raw_tx)
+      delayed_transactions
+  in
+  let messages, full_messages =
+    let m =
+      List.map
+        (fun transaction ->
+          let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
+          encode_tx tx_hash_str transaction)
+        transactions
+    in
+    (List m, List (delayed_transactions @ m))
   in
   let timestamp = Value (Helpers.timestamp_to_bytes timestamp) in
-  (* To be added in a future MR *)
-  let delayed_transaction_hashes = List [] in
-  let blob = List [delayed_transaction_hashes; messages; timestamp] |> encode in
-  match String.chunk_bytes max_chunk_size blob with
-  | Ok chunks -> chunks
-  | Error _ ->
+  let to_publish = List [delayed_hashes; messages; timestamp] |> encode in
+  let to_execute = List [List []; full_messages; timestamp] |> encode in
+  match
+    ( String.chunk_bytes max_chunk_size to_publish,
+      String.chunk_bytes max_chunk_size to_execute )
+  with
+  | Ok to_publish, Ok to_execute -> (to_publish, to_execute)
+  | _ ->
       (* [chunk_bytes] can only return an [Error] if the optional
          argument [error_on_partial_chunk] is passed. As this is not
          the case in this call, this branch is impossible. *)
@@ -75,15 +94,24 @@ let encode_u16_le i =
   Bytes.set_uint16_le bytes 0 i ;
   bytes
 
-let create ~secret_key ~timestamp ~smart_rollup_address ~number ~transactions =
+type t = {to_publish : Blueprint_types.t; to_execute : Blueprint_types.t}
+
+let create ~secret_key ~timestamp ~smart_rollup_address ~number
+    ~delayed_transactions ~transactions =
   let open Rlp in
   let number = Value (encode_u256_le number) in
-  let chunks = make_blueprint_chunks ~timestamp ~transactions in
-  let nb_chunks = Value (encode_u16_le @@ List.length chunks) in
-  let message_from_chunk chunk_index chunk =
-    let chunk_index = Value (encode_u16_le chunk_index) in
+  let to_publish_chunks, to_execute_chunks =
+    make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions
+  in
+  let nb_chunks_publish =
+    Rlp.Value (encode_u16_le @@ List.length to_publish_chunks)
+  in
+  let nb_chunks_execute =
+    Rlp.Value (encode_u16_le @@ List.length to_execute_chunks)
+  in
+  let message_from_chunk nb_chunks chunk_index chunk =
+    let chunk_index = Rlp.Value (encode_u16_le chunk_index) in
     let value = Value (Bytes.of_string chunk) in
-
     (* Takes the blueprints fields and sign them. *)
     let rlp_unsigned_blueprint =
       List [value; number; nb_chunks; chunk_index] |> encode
@@ -91,17 +119,20 @@ let create ~secret_key ~timestamp ~smart_rollup_address ~number ~transactions =
     let signature =
       Signature.(sign secret_key rlp_unsigned_blueprint |> to_bytes)
     in
-
     (* Encode the blueprints fields and its signature. *)
     let rlp_sequencer_blueprint =
       List [value; number; nb_chunks; chunk_index; Value signature]
       |> encode |> Bytes.to_string
     in
-
     `External
       ("\000" (* Framed protocol *) ^ smart_rollup_address
       ^ "\003"
       ^ (* Sequencer blueprint *)
       rlp_sequencer_blueprint)
   in
-  List.mapi message_from_chunk chunks
+  {
+    to_publish =
+      List.mapi (message_from_chunk nb_chunks_publish) to_publish_chunks;
+    to_execute =
+      List.mapi (message_from_chunk nb_chunks_execute) to_execute_chunks;
+  }

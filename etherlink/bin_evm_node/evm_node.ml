@@ -731,15 +731,17 @@ let make_dev_messages ~kind ~smart_rollup_address s =
   let*? messages =
     match kind with
     | `Blueprint (secret_key, timestamp, number) ->
-        Sequencer_blueprint.create
-          ~secret_key
-          ~timestamp
-          ~smart_rollup_address
-          ~number:(Ethereum_types.quantity_of_z number)
-          ~transactions:
-            [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
-        |> List.map (fun (`External s) -> s)
-        |> Result.ok
+        let Sequencer_blueprint.{to_publish; _} =
+          Sequencer_blueprint.create
+            ~secret_key
+            ~timestamp
+            ~smart_rollup_address
+            ~number:(Ethereum_types.quantity_of_z number)
+            ~transactions:
+              [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
+            ~delayed_transactions:[]
+        in
+        to_publish |> List.map (fun (`External s) -> s) |> Result.ok
     | `Transaction ->
         Transaction_format.make_encoded_messages
           ~smart_rollup_address

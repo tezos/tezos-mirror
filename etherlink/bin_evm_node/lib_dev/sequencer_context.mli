@@ -64,4 +64,4 @@ val find_blueprint :
 (** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
     state stored under [ctxt]. It commits the result if the blueprint produces
     the expected block. *)
-val apply_blueprint : t -> Blueprint_types.t -> t tzresult Lwt.t
+val apply_blueprint : t -> Sequencer_blueprint.t -> t tzresult Lwt.t

@@ -57,6 +57,7 @@ end) : Services_backend_sig.Backend = struct
           ~timestamp
           ~smart_rollup_address
           ~transactions:messages.TxEncoder.raw
+          ~delayed_transactions:messages.TxEncoder.delayed
           ~number:ctxt.next_blueprint_number
       in
       (* Apply the blueprint *)
