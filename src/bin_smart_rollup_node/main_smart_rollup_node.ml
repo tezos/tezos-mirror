@@ -438,6 +438,37 @@ let import_snapshot =
       let*! () = cctxt#message "Snapshot successfully imported@." in
       return_unit)
 
+let snapshot_info =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Display information about a snapshot file."
+    no_options
+    (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_param @@ stop)
+    (fun () snapshot_file cctxt ->
+      let open Lwt_result_syntax in
+      let ( {Snapshot_utils.history_mode; address; head_level; last_commitment},
+            compressed ) =
+        Snapshots.info ~snapshot_file
+      in
+      let*! () =
+        cctxt#message
+          "@[<v 0>Valid smart rollup node snapshot.@,\
+           Format:          %scompressed@,\
+           History mode:    %s@,\
+           Rollup address:  %a@,\
+           Head level:      %ld@,\
+           Last commitment: %a@]"
+          (match compressed with `Compressed -> "" | `Uncompressed -> "un")
+          (Configuration.string_of_history_mode history_mode)
+          Address.pp
+          address
+          head_level
+          Commitment.Hash.pp
+          last_commitment
+      in
+      return_unit)
+
 let openapi_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -462,6 +493,7 @@ let sc_rollup_commands () =
     export_snapshot_auto_name;
     export_snapshot_named;
     import_snapshot;
+    snapshot_info;
     openapi_command;
   ]
 

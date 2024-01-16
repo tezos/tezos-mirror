@@ -68,3 +68,7 @@ val extract :
     ["path/to/snapshot"] whose path is returned. [snapshot_file] is removed upon
     successful compression. *)
 val compress : snapshot_file:string -> string
+
+(** [read_metadata reader ~snapshot_file] reads the metadata from the snapshot
+    file without extracting it. *)
+val read_metadata : reader -> snapshot_file:string -> snapshot_metadata

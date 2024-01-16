@@ -88,6 +88,8 @@ Smart Rollup node
 - Fix a critical bug that could lead to data loss when chain
   reorganizations happen while a GC is running. (MR :gl:`!11358`)
 
+- Snapshot inspection command. (MR :gl:`!11456`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
