@@ -6,8 +6,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent},
+    inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
+    upgrade::KernelUpgrade,
 };
 use primitive_types::{H160, U256};
 use rlp::Encodable;

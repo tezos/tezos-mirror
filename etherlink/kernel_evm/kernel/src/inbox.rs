@@ -14,6 +14,7 @@ use crate::storage::{
     get_and_increment_deposit_nonce, remove_chunked_transaction,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
+use crate::upgrade::*;
 use crate::Error;
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -23,7 +24,6 @@ use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -144,28 +144,6 @@ impl Decodable for Transaction {
         let content: TransactionContent =
             decode_field(&next(&mut it)?, "Transaction content")?;
         Ok(Transaction { tx_hash, content })
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct KernelUpgrade {
-    pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
-}
-
-impl Decodable for KernelUpgrade {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        let hash: Vec<u8> = decoder.as_val()?;
-        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hash
-            .try_into()
-            .map_err(|_| DecoderError::RlpInvalidLength)?;
-
-        Ok(Self { preimage_hash })
-    }
-}
-
-impl Encodable for KernelUpgrade {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.append_iter(self.preimage_hash);
     }
 }
 
@@ -376,6 +354,7 @@ mod tests {
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};

@@ -8,7 +8,7 @@ use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
-use crate::storage::store_kernel_upgrade;
+use crate::upgrade::store_kernel_upgrade;
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};

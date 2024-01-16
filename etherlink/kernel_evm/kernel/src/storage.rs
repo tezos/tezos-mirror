@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::inbox::KernelUpgrade;
 use crate::indexable_storage::IndexableStorage;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
@@ -88,8 +87,6 @@ const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
-
-const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
@@ -810,28 +807,6 @@ pub fn read_block_in_progress<Host: Runtime>(
 pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
     host.store_delete(&EVM_BLOCK_IN_PROGRESS)
         .context("Failed to delete block in progress")
-}
-
-pub fn store_kernel_upgrade<Host: Runtime>(
-    host: &mut Host,
-    kernel_upgrade: &KernelUpgrade,
-) -> Result<(), anyhow::Error> {
-    let path = OwnedPath::from(KERNEL_UPGRADE);
-    let bytes = &kernel_upgrade.rlp_bytes();
-    host.store_write_all(&path, bytes)
-        .context("Failed to store kernel upgrade")
-}
-
-pub fn read_kernel_upgrade<Host: Runtime>(
-    host: &Host,
-) -> Result<Option<KernelUpgrade>, anyhow::Error> {
-    let path = OwnedPath::from(KERNEL_UPGRADE);
-    read_optional_rlp(host, &path).context("Failed to decode kernel upgrade")
-}
-
-pub fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&KERNEL_UPGRADE)
-        .context("Failed to delete kernel upgrade")
 }
 
 pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
