@@ -2571,33 +2571,30 @@ let weight_of : packed_operation -> operation_weight =
       let manweight, src = weight_manager ops in
       W (Manager, Weight_manager (manweight, src))
 
-(** {3 Comparisons of operations {!weight}} *)
+(** {3 Comparisons of operations' {!weight}} *)
 
 (** {4 Helpers} *)
 
-(** compare a pair of elements in lexicographic order. *)
+(** Compare a pair of elements in lexicographic order. *)
 let compare_pair_in_lexico_order ~cmp_fst ~cmp_snd (a1, b1) (a2, b2) =
   let resa = cmp_fst a1 a2 in
   if Compare.Int.(resa <> 0) then resa else cmp_snd b1 b2
 
-(** compare in reverse order. *)
+(** Compare in reverse order. *)
 let compare_reverse (cmp : 'a -> 'a -> int) a b = cmp b a
 
 (** {4 Comparison of {!consensus_infos}} *)
 
-(** Two {!round_infos} compares as the pair of [level, round] in
+(** Two {!round_infos} pairs [(level, round)] compare in
    lexicographic order: the one with the greater [level] being the
    greater [round_infos]. When levels are the same, the one with the
    greater [round] being the better.
 
-    The greater {!round_infos} is the farther to the current state
+    The better {!round_infos} is farther to the current state
    when part of the weight of a valid consensus operation.
 
-    The best {!round_infos} is the nearer to the current state when
+    The better {!round_infos} is nearer to the current state when
    part of the weight of a valid denunciation.
-
-    In both case, that is the greater according to the lexicographic
-   order.
 
    Precondition: the {!round_infos} are from valid operation. They
    have been computed by either {!round_infos_from_consensus_content}
@@ -2612,40 +2609,14 @@ let compare_round_infos (infos1 : round_infos) (infos2 : round_infos) =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** When comparing {!Attestation} to {!Preattestation} or
-   {!Double_attestation_evidence} to {!Double_preattestation}, in case
-   of {!round_infos} equality, the position is relevant to compute the
-   order. *)
-type prioritized_position = Nopos | Fstpos | Sndpos
-
-(** Comparison of two {!round_infos} with priority in case of
-   {!round_infos} equality. *)
-let compare_round_infos_with_prioritized_position ~prioritized_position infos1
-    infos2 =
-  let cmp = compare_round_infos infos1 infos2 in
-  if Compare.Int.(cmp <> 0) then cmp
-  else match prioritized_position with Fstpos -> 1 | Sndpos -> -1 | Nopos -> 0
-
-(** When comparing consensus operation with {!attestation_infos}, in
-   case of equality of their {!round_infos}, either they are of the
-   same kind and their [slot] have to be compared in the reverse
-   order, otherwise the {!Attestation} is better and
-   [prioritized_position] gives its position. *)
-let compare_prioritized_position_or_slot ~prioritized_position =
-  match prioritized_position with
-  | Nopos -> compare_reverse Compare.Int.compare
-  | Fstpos -> fun _ _ -> 1
-  | Sndpos -> fun _ _ -> -1
-
 (** Two {!attestation_infos} are compared by their {!round_infos}.
    When their {!round_infos} are equal, they are compared according to
-   their priority or their [slot], see
-   {!compare_prioritized_position_or_slot} for more details. *)
-let compare_attestation_infos ~prioritized_position (infos1 : attestation_infos)
+   their [slot]: the smaller the better. *)
+let compare_attestation_infos (infos1 : attestation_infos)
     (infos2 : attestation_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:compare_round_infos
-    ~cmp_snd:(compare_prioritized_position_or_slot ~prioritized_position)
+    ~cmp_snd:(compare_reverse Compare.Int.compare)
     (infos1.round, infos1.slot)
     (infos2.round, infos2.slot)
 
@@ -2679,9 +2650,11 @@ let compare_dal_attestation_infos
 
 (** {5 Comparison of valid consensus operations} *)
 
-(** Comparing consensus operations by their [weight] uses the
-   comparison on {!attestation_infos} for {!Attestation} and
-   {!Preattestation}: see {!attestation_infos} for more details.
+(** Comparing consensus operations by their [weight] uses the comparison on
+    {!attestation_infos} for {!Attestation} and {!Preattestation}. In case of
+    equality of their {!round_infos}, either they are of the same kind and their
+    [slot]s have to be compared in the reverse order, otherwise the
+    {!Attestation}s are better.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are
@@ -2689,13 +2662,17 @@ let compare_dal_attestation_infos
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
   | Weight_attestation infos1, Weight_attestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
+      compare_attestation_infos infos1 infos2
   | Weight_preattestation infos1, Weight_preattestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_attestation infos1, Weight_preattestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
-  | Weight_preattestation infos1, Weight_attestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
+      compare_attestation_infos infos1 infos2
+  | ( Weight_attestation {round = round_infos1; _},
+      Weight_preattestation {round = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
+  | ( Weight_preattestation {round = round_infos1; _},
+      Weight_attestation {round = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->
       compare_dal_attestation_infos infos1 infos2
   | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
@@ -2753,15 +2730,11 @@ let compare_anonymous_weight w1 w2 =
   | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
       compare_round_infos infos1 infos2
   | Weight_double_preattestation infos1, Weight_double_attestation infos2 ->
-      compare_round_infos_with_prioritized_position
-        ~prioritized_position:Fstpos
-        infos1
-        infos2
+      let cmp = compare_round_infos infos1 infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
   | Weight_double_attestation infos1, Weight_double_preattestation infos2 ->
-      compare_round_infos_with_prioritized_position
-        ~prioritized_position:Sndpos
-        infos1
-        infos2
+      let cmp = compare_round_infos infos1 infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_double_attestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos infos1 infos2
   | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
