@@ -638,17 +638,18 @@ let export_snapshot ?(compress_on_the_fly = false) sc_rollup_node dir =
   in
   Runnable.{value = process; run = parse}
 
-let import_snapshot sc_rollup_node ~snapshot_file =
+let import_snapshot ?(force = false) sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
-      [
-        "snapshot";
-        "import";
-        snapshot_file;
-        "--data-dir";
-        data_dir sc_rollup_node;
-      ]
+      ([
+         "snapshot";
+         "import";
+         snapshot_file;
+         "--data-dir";
+         data_dir sc_rollup_node;
+       ]
+      @ Cli_arg.optional_switch "force" force)
   in
   Runnable.{value = process; run = Process.check}
 

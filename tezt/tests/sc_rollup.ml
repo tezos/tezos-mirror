@@ -1107,7 +1107,7 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   let* () = rollup_node_processing in
   Log.info "Try importing snapshot for wrong rollup." ;
   let*? process_other =
-    Sc_rollup_node.import_snapshot rollup_node_4 ~snapshot_file
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_4 ~snapshot_file
   in
   let* () =
     Process.check_error
@@ -1118,8 +1118,15 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   let*! () = Sc_rollup_node.import_snapshot rollup_node_3 ~snapshot_file in
   (* rollup_node_2 was stopped before so it has data but is late with respect to
      sc_rollup_node. *)
+  Log.info "Try importing snapshot in already populated rollup node." ;
+  let*? populated =
+    Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file
+  in
+  let* () = Process.check_error ~msg:(rex "is already populated") populated in
   Log.info "Importing snapshot in late rollup node." ;
-  let*! () = Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file in
+  let*! () =
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
+  in
   Log.info "Running rollup nodes with snapshots until they catch up." ;
   let* () =
     Sc_rollup_node.run rollup_node_2 sc_rollup [History_mode history_mode]
@@ -1131,7 +1138,7 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   Log.info "Try importing outdated snapshot." ;
   let* () = Sc_rollup_node.terminate rollup_node_2 in
   let*? outdated =
-    Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
   in
   let* () =
     Process.check_error
@@ -1151,7 +1158,7 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   Log.info "Try importing outdated snapshot." ;
   let* () = Sc_rollup_node.terminate rollup_node_2 in
   let*? unpublished =
-    Sc_rollup_node.import_snapshot rollup_node_2 ~snapshot_file
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
   in
   let* () =
     Process.check_error

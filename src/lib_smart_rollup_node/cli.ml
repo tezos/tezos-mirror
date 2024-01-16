@@ -29,6 +29,12 @@ let force_switch : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Overwrites the configuration file when it exists."
     ()
 
+let import_force_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"force"
+    ~doc:"Import into an already populated data dir."
+    ()
+
 let sc_rollup_address_param x =
   Smart_rollup_alias.Address.param
     ~name:"smart-rollup-address"

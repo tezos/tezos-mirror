@@ -558,8 +558,22 @@ let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
   in
   return_unit
 
-let import ~no_checks cctxt ~data_dir ~snapshot_file =
+let check_data_dir_unpopulated data_dir () =
   let open Lwt_result_syntax in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  let context_dir = Configuration.default_context_dir data_dir in
+  let*! store_exists = Lwt_utils_unix.dir_exists store_dir in
+  let*! context_exists = Lwt_utils_unix.dir_exists context_dir in
+  if store_exists || context_exists then
+    failwith
+      "The rollup node data dir %s is already populated. If you want to \
+       overwrite its non-local content use the --force option."
+      data_dir
+  else return_unit
+
+let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
+  let open Lwt_result_syntax in
+  let* () = unless force (check_data_dir_unpopulated data_dir) in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let*! () = Event.acquiring_lock () in
   Utils.with_lockfile
