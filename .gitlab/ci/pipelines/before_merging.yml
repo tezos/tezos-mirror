@@ -19,7 +19,6 @@ include:
   - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
   - .gitlab/ci/jobs/build/oc.build_kernels.yml
-  - .gitlab/ci/jobs/build/build_get_contracts.yml
   - .gitlab/ci/jobs/doc/documentation:build_all.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-test_manual.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml

@@ -20,7 +20,6 @@ include:
   # because of absence of certain changes
   - .gitlab/ci/jobs/build/ocaml-check.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
-  - .gitlab/ci/jobs/build/build_get_contracts.yml
   - .gitlab/ci/jobs/doc/documentation:build_all.yml
 
   # Stage: packaging
