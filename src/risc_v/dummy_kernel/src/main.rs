@@ -29,7 +29,11 @@ pub fn entry(host: &mut impl Runtime) {
         .store_read(&path, 0, msg.len())
         .expect("Could not read from storage");
     assert_eq!(read_msg.as_slice(), msg.as_bytes());
-    panic!("Abort");
+
+    debug_msg!(host, "Done\n");
+
+    // Drain the inbox, making the sandbox stop.
+    while host.read_input().map(|msg| msg.is_some()).unwrap_or(true) {}
 }
 
 kernel_entry!(entry);
