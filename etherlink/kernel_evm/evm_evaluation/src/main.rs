@@ -356,6 +356,10 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "underflowTest.json"
         | "randomStatetest384.json"
         | "201503110226PYTHON_DUP6.json"
+
+        // Reason: this test rely on hot/cold access and as of right now
+        // this feature will not be part of Etherlink
+        | "sloadGasCost.json"
     )
 }
 
