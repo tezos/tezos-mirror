@@ -3,7 +3,7 @@
 # Copyright 2023 Trilitech <contact@trili.tech>
 # SPDX-License-Identifier: MIT
 
-if [ -z "$CC_wasm_unknown_unkown" ]; then
+if [ -z "$CC_wasm_unknown_unknown" ]; then
   CLANG=$(which clang 2> /dev/null)
 
   CLANG_HAS_WASM=$([ -e "$CLANG" ] && $CLANG -print-targets | grep 'wasm32')
