@@ -147,6 +147,12 @@ type adaptive_issuance = {
     (* If set to true, a stake/unstake/finalize operation will be triggered for
        all delegate at end of cycle. *)
     bool;
+  force_activation :
+    (* For testing purposes. If set to true, the adaptive issuance feature is
+       enabled without waiting to reach the launch_ema_threshold.*)
+    bool;
+  ns_enable : (* If set to true, enables the NS feature *)
+              bool;
 }
 
 type issuance_weights = {

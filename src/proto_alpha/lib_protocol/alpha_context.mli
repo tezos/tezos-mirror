@@ -874,6 +874,8 @@ module Constants : sig
       adaptive_rewards_params : adaptive_rewards_params;
       activation_vote_enable : bool;
       autostaking_enable : bool;
+      force_activation : bool;
+      ns_enable : bool;
     }
 
     type issuance_weights = {

@@ -262,5 +262,10 @@ let adaptive_issuance_activation_vote_enable c =
 let adaptive_issuance_autostaking_enable c =
   (adaptive_issuance c).autostaking_enable
 
+let adaptive_issuance_force_activation c =
+  (adaptive_issuance c).force_activation
+
+let adaptive_issuance_ns_enable c = (adaptive_issuance c).ns_enable
+
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable
