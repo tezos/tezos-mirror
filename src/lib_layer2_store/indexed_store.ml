@@ -646,7 +646,12 @@ end) : SINGLETON_STORE with type value := S.t = struct
 
   let read store =
     let open Lwt_result_syntax in
-    match store.cache with Some v -> return v | None -> read_disk store
+    match store.cache with
+    | Some v -> return v
+    | None ->
+        let* value = read_disk store in
+        store.cache <- Some value ;
+        return value
 
   let write_disk store x =
     let open Lwt_result_syntax in
