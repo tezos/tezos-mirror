@@ -36,10 +36,10 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-rc.json
-proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
+openapi_json=docs/api/rpc-openapi.json
+proto_openapi_json=docs/api/$protocol_name-openapi.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
