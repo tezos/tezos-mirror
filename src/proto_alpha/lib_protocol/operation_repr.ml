@@ -2308,16 +2308,20 @@ let compare_inner_pass : type a b. a pass -> b pass -> int =
    failed to convert in a {!int}, the value of [round] is (-1). *)
 type round_infos = {level : int32; round : int}
 
-(** [attestation_infos] is the pair of a {!round_infos} and a [slot]
+(** [preattestation_infos] is the pair of a {!round_infos} and a [slot]
    convert into an {!int}. *)
-type attestation_infos = {round : round_infos; slot : int}
+type preattestation_infos = {round : round_infos; slot : int}
 
-(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
-type dal_attestation_infos = {
+(** [attestation_infos] is the tuple consisting of a {!round_infos} value, a
+    [slot], and the number of DAL slots in the DAL attestation. *)
+type attestation_infos = {
   round_infos : round_infos;
   slot : int;
   number_of_attested_slots : int;
 }
+
+(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
+type dal_attestation_infos = attestation_infos
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
@@ -2348,6 +2352,31 @@ let attestation_infos_from_consensus_content (c : consensus_content) =
   let slot = Slot_repr.to_int c.slot in
   let round = round_infos_from_consensus_content c in
   {round; slot}
+
+(** Compute a {!attestation_infos} value from a {!consensus_content} value
+    and an optional {!dal_content} value. It is used to compute the weight of
+    an {!Attestation}.
+
+    An {!Attestation} with no DAL content or with a DAL content that has 0
+    attested DAL slots have the same weight (everything else being
+    equal). That's ok, because they are semantically equal, therefore it
+    does not matter which one is picked.
+
+    Precondition: [c] and [d] come from a valid operation.  *)
+let attestation_infos_from_content (c : consensus_content)
+    (d : dal_content option) =
+  let slot = Slot_repr.to_int c.slot in
+  let round_infos = round_infos_from_consensus_content c in
+  {
+    round_infos;
+    slot;
+    number_of_attested_slots =
+      Option.fold
+        ~none:0
+        ~some:(fun d ->
+          Dal_attestation_repr.number_of_attested_slots d.attestation)
+        d;
+  }
 
 let dal_attestation_infos_from_dal_operation
     {Dal_attestation_repr.attestation; level; round; slot} =
@@ -2394,12 +2423,12 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    is used to compare it to an operation of the same pass.
     Operation weight are defined by validation pass.
 
-    The [weight] of an {!Attestation} or {!Preattestation} depends on
-   its {!attestation_infos}.
+    The [weight] of an {!Attestation} or {!Preattestation} depends on its
+    {!attestation_infos}. For {!Attestation}s it also depends on the number of
+    attested DAL slots.
 
-    The [weight] of a {!Dal_attestation} depends on the pair of
-   the size of its bitset, {!Dal_attestation_repr.t}, and the
-   signature of its attester {! Signature.Public_key_hash.t}.
+    The [weight] of a {!Dal_attestation} is the same as that of an
+    {!Attestation}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2428,7 +2457,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
-  | Weight_preattestation : attestation_infos -> consensus_pass_type weight
+  | Weight_preattestation : preattestation_infos -> consensus_pass_type weight
   | Weight_dal_attestation : dal_attestation_infos -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
@@ -2523,11 +2552,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_preattestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Attestation {consensus_content; dal_content = _ (* TODO *)}) ->
+  | Single (Attestation {consensus_content; dal_content}) ->
       W
         ( Consensus,
           Weight_attestation
-            (attestation_infos_from_consensus_content consensus_content) )
+            (attestation_infos_from_content consensus_content dal_content) )
   | Single (Dal_attestation content) ->
       W
         ( Consensus,
@@ -2543,7 +2572,7 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_vdf_revelation solution)
   | Single (Double_attestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content = _ (* TODO *)}) ->
+      | Single (Attestation {consensus_content; dal_content = _}) ->
           W
             ( Anonymous,
               Weight_double_attestation
@@ -2609,11 +2638,11 @@ let compare_round_infos (infos1 : round_infos) (infos2 : round_infos) =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** Two {!attestation_infos} are compared by their {!round_infos}.
+(** Two {!Preattestation}s are compared by their {!preattestation_infos}.
    When their {!round_infos} are equal, they are compared according to
    their [slot]: the smaller the better. *)
-let compare_attestation_infos (infos1 : attestation_infos)
-    (infos2 : attestation_infos) =
+let compare_preattestation_infos (infos1 : preattestation_infos)
+    (infos2 : preattestation_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:compare_round_infos
     ~cmp_snd:(compare_reverse Compare.Int.compare)
@@ -2630,11 +2659,11 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_attestation} are compared in the lexicographic order of
-    their level, round, reverse slot, and number of attested slots, meaning
-    that, in order, higher level is better, higher round is better, smaller slot
-    is better, higher number of attested slots is better. *)
-let compare_dal_attestation_infos
+(** Two {!Attestation}s are compared by their {!attestation_infos}. When their
+    {!round_infos} are equal, they are compared according to their [slot]: the
+    smaller the better. When the slots are also equal they are compared
+    according to the number of attested DAL slots: the more the better. *)
+let compare_attestation_infos
     {round_infos = infos1; slot = slot1; number_of_attested_slots = n1}
     {round_infos = infos2; slot = slot2; number_of_attested_slots = n2} =
   compare_pair_in_lexico_order
@@ -2646,15 +2675,22 @@ let compare_dal_attestation_infos
     ((infos1, slot1), n1)
     ((infos2, slot2), n2)
 
+(** Two valid {!Dal_attestation} are compared in the lexicographic order of
+    their level, round, reverse slot, and number of attested slots, meaning
+    that, in order, higher level is better, higher round is better, smaller slot
+    is better, higher number of attested slots is better. *)
+let compare_dal_attestation_infos = compare_attestation_infos
+
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
 
 (** Comparing consensus operations by their [weight] uses the comparison on
-    {!attestation_infos} for {!Attestation} and {!Preattestation}. In case of
+    {!attestation_infos} for {!Attestation}s and {!Preattestation}s. In case of
     equality of their {!round_infos}, either they are of the same kind and their
     [slot]s have to be compared in the reverse order, otherwise the
-    {!Attestation}s are better.
+    {!Attestation}s are better. In case of {!Attestation}s, the number of
+    attested DAL slots is taken into account when all else is equal.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are
@@ -2664,13 +2700,13 @@ let compare_consensus_weight w1 w2 =
   | Weight_attestation infos1, Weight_attestation infos2 ->
       compare_attestation_infos infos1 infos2
   | Weight_preattestation infos1, Weight_preattestation infos2 ->
-      compare_attestation_infos infos1 infos2
-  | ( Weight_attestation {round = round_infos1; _},
+      compare_preattestation_infos infos1 infos2
+  | ( Weight_attestation {round_infos = round_infos1; _},
       Weight_preattestation {round = round_infos2; _} ) ->
       let cmp = compare_round_infos round_infos1 round_infos2 in
       if Compare.Int.(cmp <> 0) then cmp else 1
   | ( Weight_preattestation {round = round_infos1; _},
-      Weight_attestation {round = round_infos2; _} ) ->
+      Weight_attestation {round_infos = round_infos2; _} ) ->
       let cmp = compare_round_infos round_infos1 round_infos2 in
       if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->

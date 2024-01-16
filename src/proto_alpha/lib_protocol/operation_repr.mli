@@ -616,15 +616,14 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.
 
-   {!Attestation} and {!Preattestation} are compared by the pair of
-   their [level] and [round] such as the farther to the current state
-   [level] and [round] is greater; e.g. the greater pair in
-   lexicographic order being the better. When equal and both
-   operations being of the same kind, we compare their [slot]: the
-   The smaller being the better, assuming that the more slots an attester
-   has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Attestation} to a {!Preattestation}, the
-   {!Attestation} is better.
+   {!Attestation} and {!Preattestation} are compared by the pair of their
+   [level] and [round] such as the farther to the current state [level] and
+   [round] is greater; e.g. the greater pair in lexicographic order being the
+   better. When equal and both operations being of the same kind, we compare
+   their [slot], the smaller being the better (assuming that the more slots an
+   attester has, the smaller is its smallest [slot]), and then the number of the
+   DAL attested slots, the more the better. When the pair is equal and comparing
+   an {!Attestation} to a {!Preattestation}, the {!Attestation} is better.
 
    Two {!Dal_attestation} ops are compared in the lexicographic order of the
    tuple of their level, their slot, their number of slots attested as
