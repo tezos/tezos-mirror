@@ -42,7 +42,7 @@ mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
 smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
 
 # Get version number.
-version=$(dune exec octez-version)
+version=$(dune exec octez-version -- --full-with-commit)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
