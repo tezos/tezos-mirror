@@ -149,6 +149,8 @@ let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
+let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
+
 let empty_hash = Hash (Hex "")
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)

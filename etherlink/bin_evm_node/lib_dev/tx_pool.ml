@@ -75,7 +75,7 @@ module Pool = struct
     let selected = selected |> Nonce_map.bindings |> List.map snd in
     (selected, {transactions; global_index})
 
-  (** Removes from the pool the transactions matching the predicate 
+  (** Removes from the pool the transactions matching the predicate
       for the given pkey. *)
   let remove pkey predicate t =
     let _txs, t = partition pkey predicate t in
@@ -199,13 +199,14 @@ let on_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
-  Format.printf "[tx-pool] Incoming transaction.\n%!" ;
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-      Format.printf "[tx-pool] Transaction is not valid.\n%!" ;
+      let*! () =
+        Tx_pool_events.invalid_transaction
+          ~transaction:(Hex.of_string tx_raw |> Hex.show)
+      in
       return (Error err)
   | Ok pkey ->
       (* Add the tx to the pool*)
@@ -215,10 +216,10 @@ let on_transaction state tx_raw =
       let hash =
         Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
       in
-      Format.printf
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-        "[tx-pool] Transaction %s added to the tx-pool.\n%!"
-        (Ethereum_types.hash_to_string hash) ;
+      let*! () =
+        Tx_pool_events.add_transaction
+          ~transaction:(Ethereum_types.hash_to_string hash)
+      in
       state.pool <- pool ;
       return (Ok hash)
 
@@ -288,21 +289,18 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
         ~smart_rollup_address
         ~transactions:txs
     in
-    let nb_transactions =
+    let* nb_transactions =
       match hashes with
       | Error _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-          Format.printf "[tx-pool] Error when sending transaction.\n%!" ;
-          0
+          let*! () = Tx_pool_events.transaction_injection_failed () in
+          return 0
       | Ok hashes ->
-          List.iter
-            (fun hash ->
-              Format.printf
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-                "[tx-pool] Transaction %s sent to the rollup.\n%!"
-                (Ethereum_types.hash_to_string hash))
-            hashes ;
-          n
+          let*! () =
+            List.iter_s
+              (fun hash -> Tx_pool_events.transaction_injected ~hash)
+              hashes
+          in
+          return n
     in
     return (pool, nb_transactions)
   else return (pool, 0)
@@ -350,7 +348,7 @@ module Handlers = struct
 
   let on_no_request _ = Lwt.return_unit
 
-  let on_close _ = Lwt.return_unit
+  let on_close _ = Tx_pool_events.stopped ()
 end
 
 let table = Worker.create_table Queue
@@ -406,9 +404,7 @@ let rec subscribe_l2_block ~stream_l2 worker =
       in
       subscribe_l2_block ~stream_l2 worker
   | None ->
-      (* Kind of retry strategy *)
-      Format.printf
-        "Connection with the rollup node has been lost, retrying...\n" ;
+      let* () = Tx_pool_events.connection_lost () in
       let* () = Lwt_unix.sleep 1. in
       subscribe_l2_block ~stream_l2 worker
 
@@ -423,9 +419,7 @@ let start ({mode; _} as parameters) =
             let*! stream_l2 = make_streamed_call ~rollup_node_endpoint in
             subscribe_l2_block ~stream_l2 worker
         | Sequencer -> Lwt.return_unit)
-      (fun _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6569*)
-        Format.printf "[tx-pool] Pool has been stopped.\n%!")
+      (fun _ -> ())
   in
   Lwt.wakeup worker_waker worker
 
