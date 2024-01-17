@@ -41,6 +41,8 @@ let () =
   | [|_; "--additional-info"|] ->
       print_endline (string_of_additional_info version.additional_info)
   | [|_; "--full"|] | [|_|] -> print_endline (to_string version)
+  | [|_; "--full-with-commit"|] ->
+      print_endline Tezos_version_value.Bin_version.simple_version_string
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;

@@ -1,6 +1,6 @@
 (*****************************************************************************)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,3 +26,6 @@
 
     This string is suitable for binaries to show when e.g. a [--version] flag is given.  *)
 val version_string : string
+
+(** Version string containing only the current version and the abbreviated hash. *)
+val simple_version_string : string

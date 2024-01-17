@@ -432,7 +432,7 @@ let generate_openapi dir proto =
             "Smart Rollup Node RPC API for protocol %a"
             Protocol_hash.pp
             proto)
-       Tezos_version_value.Bin_version.version_string
+       Tezos_version_value.Bin_version.simple_version_string
   |> Openapi.to_json |> return
 
 let () =
