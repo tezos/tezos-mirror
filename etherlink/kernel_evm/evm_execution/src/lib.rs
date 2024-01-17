@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
@@ -128,6 +128,7 @@ pub fn run_transaction<'a, Host>(
     caller: H160,
     call_data: Vec<u8>,
     gas_limit: Option<u64>,
+    effective_gas_price: U256,
     value: Option<U256>,
     pay_for_gas: bool,
     allocated_ticks: u64,
@@ -152,9 +153,12 @@ where
         &config,
         precompiles,
         allocated_ticks,
+        effective_gas_price,
     );
 
-    if (!pay_for_gas) || handler.pre_pay_transactions(caller, gas_limit)? {
+    if (!pay_for_gas)
+        || handler.pre_pay_transactions(caller, gas_limit, effective_gas_price)?
+    {
         let result = if let Some(address) = address {
             handler.call_contract(caller, address, value, call_data, gas_limit, false)?
         } else {
@@ -166,7 +170,7 @@ where
 
         if do_refund(&result, pay_for_gas) {
             let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-            handler.repay_gas(caller, unused_gas)?;
+            handler.repay_gas(caller, unused_gas, effective_gas_price)?;
         }
 
         Ok(Some(result))
@@ -285,6 +289,7 @@ mod test {
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
         let config = Config::shanghai();
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -309,6 +314,7 @@ mod test {
             caller,
             call_data,
             Some(22000),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -348,6 +354,7 @@ mod test {
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
         let config = Config::shanghai();
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -372,6 +379,7 @@ mod test {
             caller,
             call_data,
             Some(21000),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -411,6 +419,7 @@ mod test {
         let caller = H160::from_low_u64_be(328794);
         let transaction_value = U256::from(100_u32);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
@@ -429,6 +438,7 @@ mod test {
             caller,
             call_data,
             None,
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -463,6 +473,7 @@ mod test {
         let caller = H160::from_low_u64_be(117);
         let transaction_value = U256::from(0);
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -483,6 +494,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -516,6 +528,7 @@ mod test {
             caller,
             call_data2,
             Some(31000),
+            gas_price,
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -543,6 +556,7 @@ mod test {
             caller,
             call_data_set,
             Some(100000),
+            gas_price,
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -569,6 +583,7 @@ mod test {
             caller,
             hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
             Some(31000),
+            gas_price,
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -601,10 +616,11 @@ mod test {
         // gas_limit estimated using remix on shanghai network (1,631,430)
         // plus a 50% margin for gas accounting discrepancies
         let gas_limit = 2_400_000;
+        let gas_price = U256::from(21000);
 
         // the test is not to check that account can prepay,
         // so we can choose the balance depending on set gas limit
-        let balance = block.gas_price.saturating_mul(gas_limit.into());
+        let balance = gas_price.saturating_mul(gas_limit.into());
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -621,6 +637,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -651,6 +668,7 @@ mod test {
         // 0xFE, which is the designated INVALID opcode, so running this code
         // snippet must fail.
         let call_data: Vec<u8> = hex::decode("602e600055600054600154fe").unwrap();
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
@@ -669,6 +687,7 @@ mod test {
             caller,
             call_data,
             None,
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -701,6 +720,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -720,6 +740,7 @@ mod test {
             caller,
             vec![],
             Some(22000),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -846,6 +867,7 @@ mod test {
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
         let all_the_gas = 25_000;
+        let gas_price = U256::from(1);
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -864,6 +886,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -896,6 +919,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(1);
         let code = vec![
             Opcode::PUSH1.as_u8(),
             0u8,
@@ -925,6 +949,7 @@ mod test {
             caller,
             vec![],
             Some(init_balance),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -950,9 +975,7 @@ mod test {
         // Some gas is returned to the send after the transaction is reverted
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
-            block
-                .gas_price
-                .saturating_mul((init_balance - expected_gas).into())
+            gas_price.saturating_mul((init_balance - expected_gas).into())
         )
     }
 
@@ -965,6 +988,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(21000);
         let code = vec![
             Opcode::INVALID.as_u8(),
             Opcode::PUSH1.as_u8(),
@@ -987,6 +1011,7 @@ mod test {
             caller,
             vec![],
             None,
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1014,6 +1039,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118_u64);
+        let gas_price = U256::from(21000);
 
         let address = H160::from_low_u64_be(117_u64);
         let code: Vec<u8> = vec![
@@ -1042,6 +1068,7 @@ mod test {
             caller,
             vec![],
             None,
+            gas_price,
             Some(U256::from(100)),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1079,6 +1106,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
         let data = [1u8; 32]; // Need some data to make it a contract call
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1098,6 +1126,7 @@ mod test {
             caller,
             data.to_vec(),
             Some(22001),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1136,12 +1165,14 @@ mod test {
         let target = H160::from_low_u64_be(1u64);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(21000);
+        let gas_limit = 35000;
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            35001.into(),
+            gas_price * gas_limit + U256::one(),
         );
 
         // Act
@@ -1154,7 +1185,8 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(35000),
+            Some(gas_limit),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1187,6 +1219,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(21000);
 
         let code = vec![
             // Create a contract that creates an exception if first word of calldata is 0
@@ -1265,6 +1298,7 @@ mod test {
             caller,
             vec![],
             None,
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1286,6 +1320,7 @@ mod test {
         let caller = H160::from_low_u64_be(118_u64);
         let static_call_target = H160::from_low_u64_be(200_u64);
         let all_the_gas = 2_000_000_u64;
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1341,6 +1376,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1378,6 +1414,7 @@ mod test {
         let caller = H160::from_low_u64_be(118_u64);
         let static_call_target = H160::from_low_u64_be(200_u64);
         let all_the_gas = 2_000_000_u64;
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1432,6 +1469,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1470,6 +1508,7 @@ mod test {
         let caller = H160::from_low_u64_be(118_u64);
         let call_target = H160::from_low_u64_be(200_u64);
         let all_the_gas = 2_000_000_u64;
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1545,6 +1584,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             1_000_000_000,
@@ -1589,6 +1629,7 @@ mod test {
         let caller = H160::from_low_u64_be(118_u64);
         let static_call_target = H160::from_low_u64_be(200_u64);
         let all_the_gas = 2_000_000_u64;
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1655,6 +1696,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1693,6 +1735,7 @@ mod test {
         let caller = H160::from_low_u64_be(115_u64);
         let selfdestructing_contract = H160::from_low_u64_be(100_u64);
         let all_the_gas = 1_000_000_u64;
+        let gas_price = U256::from(1);
 
         // This contract selfdestructs and gives its funds to `caller`
         let selfdestructing_code = vec![
@@ -1754,6 +1797,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -1802,6 +1846,7 @@ mod test {
         let caller = H160::from_low_u64_be(115_u64);
         let selfdestructing_contract = H160::from_low_u64_be(100_u64);
         let all_the_gas = 1_000_000_u64;
+        let gas_price = U256::from(1);
 
         set_balance(
             &mut mock_runtime,
@@ -1870,6 +1915,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             10_000_000_000,
@@ -1921,6 +1967,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(21000);
         let code = vec![
             Opcode::CHAINID.as_u8(), // cost 2
             Opcode::PUSH1.as_u8(),   // push ost, cost 3
@@ -1940,7 +1987,7 @@ mod test {
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            all_the_gas.into(),
+            gas_price * all_the_gas,
         );
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
@@ -1956,6 +2003,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2005,12 +2053,13 @@ mod test {
 
         // value not relevant to test, just needs to be big enough
         let all_the_gas = 25_000_u64;
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            all_the_gas.into(),
+            gas_price * all_the_gas,
         );
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
@@ -2026,6 +2075,7 @@ mod test {
             caller,
             vec![],
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2077,6 +2127,7 @@ mod test {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(523);
         let target = H160::from_low_u64_be(210);
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
@@ -2101,6 +2152,7 @@ mod test {
             caller,
             vec![],
             None,
+            gas_price,
             Some(U256::from(100)),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2128,10 +2180,11 @@ mod test {
 
         // not testing gas_limit, should be big enough
         let gas_limit = 2_400_000;
+        let gas_price = U256::from(21000);
 
         // the test is not to check that account can prepay,
         // so we can choose the balance depending on set gas limit
-        let balance = block.gas_price.saturating_mul(gas_limit.into());
+        let balance = gas_price.saturating_mul(gas_limit.into());
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2148,6 +2201,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2180,10 +2234,11 @@ mod test {
 
         // not testing gas_limit, should be big enough
         let gas_limit = 2_400_000;
+        let gas_price = U256::from(21000);
 
         // the test is not to check that account can prepay,
         // so we can choose the balance depending on set gas limit
-        let balance = block.gas_price.saturating_mul(gas_limit.into());
+        let balance = gas_price.saturating_mul(gas_limit.into());
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
@@ -2200,6 +2255,7 @@ mod test {
             caller,
             create_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2238,12 +2294,13 @@ mod test {
 
         // value not relevant to test, just needs to be big enough
         let all_the_gas = 25_000_u64;
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            all_the_gas.into(),
+            gas_price * all_the_gas,
         );
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
@@ -2259,6 +2316,7 @@ mod test {
             caller,
             data.to_vec(),
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2295,12 +2353,13 @@ mod test {
 
         // value not relevant to test, just needs to be big enough
         let all_the_gas = 25_000_u64;
+        let gas_price = U256::from(21000);
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            all_the_gas.into(),
+            gas_price * all_the_gas,
         );
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
@@ -2316,6 +2375,7 @@ mod test {
             caller,
             data.to_vec(),
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2347,12 +2407,13 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
+        let gas_price = U256::from(1356);
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            all_the_gas.into(),
+            gas_price * all_the_gas,
         );
 
         // Act
@@ -2367,6 +2428,7 @@ mod test {
             caller,
             data.to_vec(),
             Some(all_the_gas),
+            gas_price,
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
@@ -2453,6 +2515,7 @@ mod test {
         .expect("Failed to decode call data");
 
         let gas_limit = 300_000;
+        let gas_price = U256::from(1);
 
         let result = run_transaction(
             &mut mock_runtime,
@@ -2464,6 +2527,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             None,
             true,
             10_000_000_000,
@@ -2514,6 +2578,7 @@ mod test {
         .expect("Failed to decode call data");
 
         let gas_limit = 300_000;
+        let gas_price = U256::from(1);
 
         let result = run_transaction(
             &mut mock_runtime,
@@ -2525,6 +2590,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             None,
             true,
             10_000_000_000,
@@ -2554,7 +2620,8 @@ mod test {
         let call_data: Vec<u8> = hex::decode(data_str).unwrap();
 
         let gas_limit = 2_400_000;
-        let balance = block.gas_price.saturating_mul(gas_limit.into());
+        let gas_price = U256::from(21000);
+        let balance = gas_price.saturating_mul(gas_limit.into());
 
         set_balance(&mut host, &mut evm_account_storage, &caller, balance);
 
@@ -2568,6 +2635,7 @@ mod test {
             caller,
             call_data,
             Some(gas_limit),
+            gas_price,
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,

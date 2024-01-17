@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -43,6 +44,10 @@ pub struct BlockInProgress {
     /// index for next transaction
     pub index: u32,
     /// gas price for transactions in the block being created
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/6810
+    //       this seems like dead code, can we remove it?
+    //       (ensure that BlockInProgress encoding doesn't need
+    //        backwards compatibility).
     pub gas_price: U256,
     /// hash of the parent
     pub parent_hash: H256,
@@ -208,7 +213,7 @@ impl BlockInProgress {
         BlockInProgress::new_with_ticks(
             current_block_number,
             parent_hash,
-            constants.gas_price,
+            constants.base_fee_per_gas,
             ring,
             tick_counter,
             blueprint.timestamp,
@@ -334,12 +339,12 @@ impl BlockInProgress {
             caller: from,
             to,
             execution_outcome,
+            effective_gas_price,
             ..
         } = receipt_info;
 
         let &mut Self {
             number: block_number,
-            gas_price: effective_gas_price,
             cumulative_gas,
             logs_offset,
             ..

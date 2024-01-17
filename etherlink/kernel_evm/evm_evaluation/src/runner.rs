@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -193,7 +194,6 @@ fn execute_transaction(
     env.tx.transact_to = unit.transaction.to;
 
     let block_constants = BlockConstants {
-        gas_price: env.tx.gas_price,
         number: env.block.number,
         coinbase: env.block.coinbase.to_fixed_bytes().into(),
         timestamp: env.block.timestamp,
@@ -218,6 +218,7 @@ fn execute_transaction(
         caller,
         call_data,
         gas_limit,
+        env.tx.gas_price,
         transaction_value,
         pay_for_gas,
         u64::MAX, // don't account for ticks during the test

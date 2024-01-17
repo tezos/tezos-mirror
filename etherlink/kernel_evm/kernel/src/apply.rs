@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 use alloc::borrow::Cow;
-use anyhow::anyhow;
 use evm::{ExitError, ExitReason, ExitSucceed};
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
@@ -65,16 +64,7 @@ impl Transaction {
         match &self.content {
             TransactionContent::Deposit(_) => Ok(U256::zero()),
             TransactionContent::Ethereum(transaction) => {
-                let priority_fee_per_gas = U256::min(
-                    transaction.max_priority_fee_per_gas,
-                    transaction
-                        .max_fee_per_gas
-                        .checked_sub(block_base_fee_per_gas)
-                        .ok_or_else(|| anyhow!("Underflow when calculating gas price"))?,
-                );
-                priority_fee_per_gas
-                    .checked_add(block_base_fee_per_gas)
-                    .ok_or_else(|| anyhow!("Overflow"))
+                transaction.effective_gas_price(block_base_fee_per_gas)
             }
         }
     }
@@ -107,6 +97,7 @@ pub struct TransactionReceiptInfo {
     pub execution_outcome: Option<ExecutionOutcome>,
     pub caller: H160,
     pub to: Option<H160>,
+    pub effective_gas_price: U256,
 }
 
 pub struct TransactionObjectInfo {
@@ -129,6 +120,7 @@ fn make_receipt_info(
     execution_outcome: Option<ExecutionOutcome>,
     caller: H160,
     to: Option<H160>,
+    effective_gas_price: U256,
 ) -> TransactionReceiptInfo {
     TransactionReceiptInfo {
         tx_hash,
@@ -136,6 +128,7 @@ fn make_receipt_info(
         execution_outcome,
         caller,
         to,
+        effective_gas_price,
     }
 }
 
@@ -203,11 +196,15 @@ pub enum Validity {
     InvalidMaxBaseFee,
 }
 
+// TODO: https://gitlab.com/tezos/tezos/-/issues/6812
+//       arguably, effective_gas_price should be set on EthereumTransactionCommon
+//       directly - initialised when constructed.
 fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
+    effective_gas_price: U256,
 ) -> Result<Validity, Error> {
     // Chain id is correct.
     if transaction.chain_id.is_some()
@@ -250,7 +247,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     };
 
     // The sender account balance contains at least the cost.
-    let cost = U256::from(transaction.gas_limit).saturating_mul(block_constant.gas_price);
+    let cost = U256::from(transaction.gas_limit).saturating_mul(effective_gas_price);
     // The sender can afford the max gas fee he set, see EIP-1559
     let max_fee =
         U256::from(transaction.gas_limit).saturating_mul(transaction.max_fee_per_gas);
@@ -292,12 +289,15 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
     allocated_ticks: u64,
-) -> Result<Option<TransactionResult>, Error> {
+) -> Result<Option<TransactionResult>, anyhow::Error> {
+    let effective_gas_price =
+        transaction.effective_gas_price(block_constants.base_fee_per_gas)?;
     let caller = match is_valid_ethereum_transaction_common(
         host,
         evm_account_storage,
         transaction,
         block_constants,
+        effective_gas_price,
     )? {
         Validity::Valid(caller) => caller,
         _reason => return Ok(None),
@@ -317,6 +317,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         caller,
         call_data,
         Some(gas_limit),
+        effective_gas_price,
         Some(value),
         true,
         allocated_ticks,
@@ -327,7 +328,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             // Because the proposal's state is unclear, and we do not have a sequencer
             // if an error that leads to a durable storage corruption is caught, we
             // invalidate the entire proposal.
-            return Err(Error::InvalidRunTransaction(err));
+            return Err(Error::InvalidRunTransaction(err).into());
         }
     };
 
@@ -492,11 +493,11 @@ pub fn apply_transaction<Host: Runtime>(
             evm_account_storage,
             tx,
             allocated_ticks,
-        ),
+        )?,
         TransactionContent::Deposit(deposit) => {
-            apply_deposit(host, evm_account_storage, deposit)
+            apply_deposit(host, evm_account_storage, deposit)?
         }
-    }?;
+    };
 
     match apply_result {
         Some(TransactionResult {
@@ -513,14 +514,6 @@ pub fn apply_transaction<Host: Runtime>(
                 post_withdrawals(host, &execution_outcome.withdrawals)?
             }
 
-            let receipt_info = make_receipt_info(
-                transaction.tx_hash,
-                index,
-                execution_outcome,
-                caller,
-                to,
-            );
-
             let object_info = make_object_info(
                 transaction,
                 caller,
@@ -528,6 +521,15 @@ pub fn apply_transaction<Host: Runtime>(
                 gas_used,
                 block_constants.base_fee_per_gas,
             )?;
+
+            let receipt_info = make_receipt_info(
+                transaction.tx_hash,
+                index,
+                execution_outcome,
+                caller,
+                to,
+                object_info.gas_price,
+            );
 
             index_new_accounts(host, accounts_index, &receipt_info)?;
             Ok(Some(ExecutionInfo {
@@ -629,7 +631,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let transaction = valid_tx();
         // fund account
         set_balance(&mut host, &mut evm_account_storage, &address, balance);
@@ -640,6 +643,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::Valid(address),
@@ -657,6 +661,7 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
         // account doesnt have enough fundes
         let balance = U256::from(1);
         let transaction = valid_tx();
@@ -669,6 +674,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidPrePay,
@@ -686,7 +692,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         transaction.signature = None;
         // fund account
@@ -698,6 +705,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidSignature,
@@ -715,7 +723,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         transaction.nonce = U256::from(42);
         transaction = resign(transaction);
@@ -729,6 +738,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidNonce,
@@ -746,7 +756,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         transaction.chain_id = Some(U256::from(42));
         transaction = resign(transaction);
@@ -760,6 +771,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidChainId,
@@ -777,7 +789,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         transaction.gas_limit = MAX_TRANSACTION_GAS_LIMIT + 1;
         transaction = resign(transaction);
@@ -791,6 +804,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidGasLimit,
@@ -808,7 +822,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         // set a max base fee too low
         transaction.max_fee_per_gas = U256::from(1);
@@ -823,6 +838,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidMaxBaseFee,
@@ -840,7 +856,8 @@ mod tests {
 
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let balance = U256::from(21000 * 21000);
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
         let mut transaction = valid_tx();
         // set a max_priority_fee bigger than,
         transaction.max_priority_fee_per_gas = U256::from(22000);
@@ -855,6 +872,7 @@ mod tests {
             &mut evm_account_storage,
             &transaction,
             &block_constants,
+            gas_price,
         );
         assert_eq!(
             Validity::InvalidMaxBaseFee,

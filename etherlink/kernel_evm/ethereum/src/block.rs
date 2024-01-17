@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -19,11 +19,9 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// All data for an Ethereum block.
 ///
-/// This data does not change for the duration of the block. All balues are
+/// This data does not change for the duration of the block. All values are
 /// updated when the block is finalized and may change for the next block.
 pub struct BlockConstants {
-    /// Price of one unit of gas in Wei
-    pub gas_price: U256,
     /// The number of the current block
     pub number: U256,
     /// Who is the beneficiary of the current block
@@ -46,7 +44,6 @@ impl BlockConstants {
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
     pub fn first_block(timestamp: U256, chain_id: U256, base_fee_per_gas: U256) -> Self {
         Self {
-            gas_price: U256::one(),
             number: U256::zero(),
             coinbase: H160::zero(),
             timestamp,
@@ -136,7 +133,6 @@ impl L2Block {
     pub fn constants(&self, chain_id: U256, base_fee_per_gas: U256) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         BlockConstants {
-            gas_price: U256::one(),
             number: self.number,
             coinbase: H160::zero(),
             timestamp,

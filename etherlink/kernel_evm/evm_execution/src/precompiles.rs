@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -519,13 +519,18 @@ mod tests {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
         let config = Config::shanghai();
+        let gas_price = U256::from(21000);
 
         if let Some(Transfer { source, value, .. }) = transfer {
             set_balance(
                 &mut mock_runtime,
                 &mut evm_account_storage,
                 &source,
-                value + gas_limit.unwrap_or(0),
+                value
+                    + gas_limit
+                        .map(U256::from)
+                        .unwrap_or_default()
+                        .saturating_mul(gas_price),
             );
         }
 
@@ -537,6 +542,7 @@ mod tests {
             &config,
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
+            gas_price,
         );
 
         let is_static = true;

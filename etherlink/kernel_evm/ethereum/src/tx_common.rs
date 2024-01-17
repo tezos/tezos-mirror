@@ -519,6 +519,24 @@ impl EthereumTransactionCommon {
             }
         }
     }
+
+    /// Returns effective_gas_price of the transaction.
+    ///
+    /// For more details see [eip-1559](https://eips.ethereum.org/EIPS/eip-1559#specification).
+    pub fn effective_gas_price(
+        &self,
+        block_base_fee_per_gas: U256,
+    ) -> Result<U256, anyhow::Error> {
+        let priority_fee_per_gas = U256::min(
+            self.max_priority_fee_per_gas,
+            self.max_fee_per_gas
+                .checked_sub(block_base_fee_per_gas)
+                .ok_or_else(|| anyhow::anyhow!("Underflow when calculating gas price"))?,
+        );
+        priority_fee_per_gas
+            .checked_add(block_base_fee_per_gas)
+            .ok_or_else(|| anyhow::anyhow!("Overflow"))
+    }
 }
 
 impl From<String> for EthereumTransactionCommon {
