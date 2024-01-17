@@ -14,6 +14,8 @@ binaries="$(cat "$script_inputs_dir/released-executables")"
 deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"
 rpm_packages="$(find . -maxdepth 1 -name octez-\*.rpm)"
 
+octez_source_content="$script_inputs_dir/octez-source-content"
+
 ### Compute GitLab release names
 
 # Remove the 'v' in front
