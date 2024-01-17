@@ -528,9 +528,11 @@ impl CSRegister {
     /// Ensures WARL registers / fields are respected
     ///
     /// Section 2.3 - privileged spec
+    ///
+    /// If `None` is returned, then no update must take place
     #[inline(always)]
-    pub fn transform_warl_fields(self, new_value: CSRValue) -> CSRValue {
-        match self {
+    pub fn transform_warl_fields(self, new_value: CSRValue) -> Option<CSRValue> {
+        let write_value = match self {
             CSRegister::misa => CSRegister::WARL_MISA_VALUE,
             CSRegister::medeleg => new_value & CSRegister::WARL_MASK_MEDELEG,
             CSRegister::mideleg => new_value & CSRegister::WARL_MASK_MIDELEG,
@@ -538,8 +540,24 @@ impl CSRegister {
             CSRegister::mip | CSRegister::mie => new_value & CSRegister::WARL_MASK_MIP_MIE,
             CSRegister::sip | CSRegister::sie => new_value & CSRegister::WARL_MASK_SIP_SIE,
             CSRegister::mepc | CSRegister::sepc => new_value & CSRegister::WARL_MASK_XEPC,
+            CSRegister::satp => {
+                let satp_mode = new_value >> CSRegister::SATP_MODE_OFFSET;
+                match satp_mode {
+                    // when address translation for memory address is active, consider the other fields valid
+                    CSRegister::SATP_MODE_SV39
+                    | CSRegister::SATP_MODE_SV48
+                    | CSRegister::SATP_MODE_SV57 => new_value,
+                    // The RISC-V spec has UNSPECIFIED behaviour when Bare mode is selected
+                    // and any of the other fields contain non-zero values. (Section 4.1.11)
+                    // Therefore we set all other fields to 0.
+                    CSRegister::SATP_MODE_BARE => CSRegister::SATP_DEFAULT,
+                    // RISC-V spec explicitly mentions no update must take place
+                    _ => return None,
+                }
+            }
             _ => new_value,
-        }
+        };
+        Some(write_value)
     }
 
     /// See section 3.1.8 and table 3.6
@@ -611,6 +629,17 @@ impl CSRegister {
     ///
     /// Since extension C is supported, we only make the low bit read-only 0
     const WARL_MASK_XEPC: CSRValue = !1;
+
+    // allowed `MODE` for `satp` register.
+    // Section 4.1.11
+    /// `satp.MODE = satp[63:60]`
+    const SATP_MODE_OFFSET: u32 = 60;
+    const SATP_MODE_BARE: CSRValue = 0;
+    const SATP_MODE_SV39: CSRValue = 8;
+    const SATP_MODE_SV48: CSRValue = 9;
+    const SATP_MODE_SV57: CSRValue = 10;
+    /// We consider the default `SATP` value to be the `BARE` mode.
+    const SATP_DEFAULT: CSRValue = CSRegister::SATP_MODE_BARE << CSRegister::SATP_MODE_OFFSET;
 }
 
 /// Value in a CSR
@@ -720,7 +749,7 @@ impl<M: backend::Manager> CSRegisters<M> {
         // respect the reserved WPRI fields, setting them 0
         let value = reg.clear_wpri_fields(value);
         // apply WARL rules
-        let value = reg.transform_warl_fields(value);
+        let value = reg.transform_warl_fields(value)?;
         // check if value is legal w.r.t. WLRL fields
         reg.is_legal(value).then_some(value)
     }
@@ -844,7 +873,8 @@ pub mod tests {
     fn test_warl() {
         use crate::csregisters::CSRegister as csreg;
 
-        let check = |reg: csreg, value| reg.transform_warl_fields(value);
+        let check_wrapped = |reg: csreg, value| reg.transform_warl_fields(value);
+        let check = |reg: csreg, value| reg.transform_warl_fields(value).unwrap();
 
         // misa field
         assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
@@ -879,6 +909,15 @@ pub mod tests {
         assert!(check(csreg::mepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
         assert!(check(csreg::sepc, 0x0) == 0x0);
         assert!(check(csreg::sepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
+
+        // satp
+        assert_eq!(check_wrapped(csreg::satp, 0x0), Some(0x0));
+        assert_eq!(check_wrapped(csreg::satp, 0x0000_FFFF_0000_FFFF), Some(0x0));
+        assert_eq!(check_wrapped(csreg::satp, 0x4200_FFFF_FFFF_FFFF), None);
+        assert_eq!(
+            check_wrapped(csreg::satp, 0x90F0_0000_FFFF_0000),
+            Some(0x90F0_0000_FFFF_0000)
+        );
 
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
