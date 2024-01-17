@@ -25,6 +25,9 @@
 (*****************************************************************************)
 
 let () =
+  (* These tests do not run in the CI so we do not care about [~uses]. *)
+  Tezt_wrapper.error_mode_for_missing_use := Ignore ;
+  Tezt_wrapper.error_mode_for_useless_use := Ignore ;
   let path () = Cli.get_string ~default:"scenarios.json" "configuration" in
   let testnet () = Testnet.get_testnet_config (path ()) in
   Sc_rollup.register ~testnet ;

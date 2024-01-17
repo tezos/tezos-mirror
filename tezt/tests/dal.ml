@@ -2062,10 +2062,9 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm _protocol parameters dal_node
   Log.info "Originate rollup." ;
   let* {boot_sector; _} =
     Sc_rollup_helpers.prepare_installer_kernel
-      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      "dal_echo_kernel"
+      Constant.WASM.dal_echo_kernel
   in
   let* sc_rollup_address =
     Client.Sc_rollup.originate
@@ -3963,12 +3962,11 @@ module Tx_kernel_e2e = struct
     Log.info "Originate the tx kernel." ;
     let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
-        ~base_installee:"./"
         ~preimages_dir:
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        "tx_kernel_dal"
+        Constant.WASM.tx_kernel_dal
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -4144,10 +4142,9 @@ module Tx_kernel_e2e = struct
     Log.info "Originate the echo kernel." ;
     let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
-        ~base_installee:"./"
         ~preimages_dir:
           (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-        "dal_echo_kernel"
+        Constant.WASM.dal_echo_kernel
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate

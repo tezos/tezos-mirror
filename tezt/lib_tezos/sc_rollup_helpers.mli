@@ -70,11 +70,10 @@ type installer_result = {
   root_hash : string;  (** Root hash of the boot sector. *)
 }
 
-(** [prepare_installer_kernel ~base_installee ~preimages_dir ?config
-    installee] feeds the [smart-rollup-installer] with a kernel
+(** [prepare_installer_kernel ~preimages_dir ?config installee]
+    feeds the [smart-rollup-installer] with a kernel
     ([installee]), and returns the boot sector corresponding to the
-    installer for this specific kernel. [installee] is read from
-    [base_installee] on the disk.
+    installer for this specific kernel.
 
     A {!Installer_kernel_config.t} can optionally be provided to the installer
     via [config].
@@ -87,13 +86,12 @@ type installer_result = {
 *)
 val prepare_installer_kernel :
   ?runner:Runner.t ->
-  ?base_installee:string ->
   preimages_dir:string ->
   ?config:
     [< `Config of Installer_kernel_config.t
     | `Path of string
     | `Both of Installer_kernel_config.t * string ] ->
-  string ->
+  Uses.t ->
   installer_result Lwt.t
 
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
@@ -177,14 +175,13 @@ type bootstrap_smart_rollup_setup = {
           rollup is a bootstrap smart rollup. *)
 }
 
-(** [setup_bootstrap_smart_rollup ?name ~address ?parameters_ty ?base_installee
-    ~installee ?config ()] creates a {!bootstrap_smart_rollup_setup} that can
+(** [setup_bootstrap_smart_rollup ?name ~address ?parameters_ty ~installee ?config ()]
+    creates a {!bootstrap_smart_rollup_setup} that can
     be used to run a bootstrap smart rollup.
 
     [name] is the smart rollup node data-dir's name. Defaults to ["smart-rollup"].
     [address] is the smart rollup address.
     [parameters_ty] is the smart rollup type. Defaults to ["string"].
-    [base_installee] is the directory where [installee] (the kernel) can be found.
     [config] is the optional smart rollup installer configuration, see {!prepare_installer_kernel}.
 *)
 val setup_bootstrap_smart_rollup :
@@ -192,8 +189,7 @@ val setup_bootstrap_smart_rollup :
   address:string ->
   ?parameters_ty:string ->
   ?whitelist:string list ->
-  ?base_installee:string ->
-  installee:string ->
+  installee:Uses.t ->
   ?config:[< `Config of Installer_kernel_config.t | `Path of string] ->
   unit ->
   bootstrap_smart_rollup_setup Lwt.t

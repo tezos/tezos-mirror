@@ -4772,7 +4772,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
        ROLLUP_NODE_DATA_DIR, whereas the rollup node will try to look
        for the preimages in ROLLUP_NODE_DATA_DIR/wasm_2_0_0. *)
     let preimages_dir = Sc_rollup_node.data_dir rollup_node in
-    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir "echo"
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir Constant.WASM.echo
   in
   let* rollup_address =
     originate_sc_rollup

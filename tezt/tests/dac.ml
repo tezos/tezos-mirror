@@ -1962,7 +1962,7 @@ module Tx_kernel_e2e = struct
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        "tx-kernel-fixed-dac"
+        Constant.WASM.tx_kernel_fixed_dac
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -2122,7 +2122,7 @@ module Tx_kernel_e2e = struct
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        "tx-kernel-fixed-dac"
+        Constant.WASM.tx_kernel_fixed_dac
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate

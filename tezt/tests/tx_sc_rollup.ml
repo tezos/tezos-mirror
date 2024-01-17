@@ -284,10 +284,9 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   in
   let* {boot_sector; _} =
     prepare_installer_kernel
-      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      "tx_kernel"
+      Constant.WASM.tx_kernel
   in
   (* Initialise the sc rollup *)
   let* sc_rollup_address =
@@ -311,11 +310,10 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
          smart_rollup_node_extra_args;
        } =
     setup_bootstrap_smart_rollup
-      ~base_installee:"./"
       ~name:"tx_kernel"
       ~address:sc_rollup_address
       ~parameters_ty:"pair string (ticket string)"
-      ~installee:"tx_kernel"
+      ~installee:Constant.WASM.tx_kernel
       ()
   in
   let bootstrap1_key = Constant.bootstrap1.alias in

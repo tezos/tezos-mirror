@@ -256,8 +256,6 @@ let setup_l1_contracts ~admin client =
 
   return {exchanger; bridge; admin}
 
-type kernel_installee = {base_installee : string; installee : string}
-
 type setup_mode =
   | Setup_sequencer of {
       time_between_blocks : Evm_node.time_between_blocks option;
@@ -265,7 +263,7 @@ type setup_mode =
     }
   | Setup_proxy of {devmode : bool}
 
-let setup_evm_kernel ?config ?kernel_installee
+let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
@@ -322,12 +320,7 @@ let setup_evm_kernel ?config ?kernel_installee
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
   let* {output; _} =
-    let base_installee, installee =
-      match kernel_installee with
-      | Some {base_installee; installee} -> (base_installee, installee)
-      | None -> ("./", "evm_kernel")
-    in
-    prepare_installer_kernel ~base_installee ~preimages_dir ?config installee
+    prepare_installer_kernel ~preimages_dir ?config kernel_installee
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -2164,7 +2157,7 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
 let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
-    ~base_installee ~installee ?with_administrator ?expect_l1_failure
+    ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
          node;
@@ -2189,17 +2182,12 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel
-      ~preimages_dir
-      ~base_installee
-      installee
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
   in
   let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
     if should_fail then return kernel_boot_wasm_before_upgrade
-    else
-      return @@ Hex.show @@ Hex.of_string
-      @@ read_file (project_root // base_installee // (installee ^ ".wasm"))
+    else return @@ Hex.show @@ Hex.of_string @@ read_file (Uses.path installee)
   in
   let* () =
     let* () =
@@ -2233,9 +2221,9 @@ let test_kernel_upgrade_to_debug =
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
   @@ fun protocol ->
-  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
-  let installee = "debug_kernel" in
-  let* _ = gen_test_kernel_upgrade ~base_installee ~installee protocol in
+  let* _ =
+    gen_test_kernel_upgrade ~installee:Constant.WASM.debug_kernel protocol
+  in
   unit
 
 let test_kernel_upgrade_evm_to_evm =
@@ -2250,10 +2238,8 @@ let test_kernel_upgrade_evm_to_evm =
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to itself"
   @@ fun protocol ->
-  let base_installee = "./" in
-  let installee = "evm_kernel" in
   let* sc_rollup_node, node, client, evm_node, _ =
-    gen_test_kernel_upgrade ~base_installee ~installee protocol
+    gen_test_kernel_upgrade ~installee:Constant.WASM.evm_kernel protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
      blocks. *)
@@ -2278,14 +2264,11 @@ let test_kernel_upgrade_wrong_key =
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
-  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
-  let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
       ~expect_l1_failure:true
       ~should_fail:true
-      ~base_installee
-      ~installee
+      ~installee:Constant.WASM.debug_kernel
       ~admin:Constant.bootstrap1
       ~upgrador:Constant.bootstrap2
       protocol
@@ -2304,15 +2287,12 @@ let test_kernel_upgrade_wrong_rollup_address =
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
   @@ fun protocol ->
-  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
-  let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
       ~expect_l1_failure:true
       ~rollup_address:"sr1T13qeVewVm3tudQb8dwn8qRjptNo7KVkj"
       ~should_fail:true
-      ~base_installee
-      ~installee
+      ~installee:Constant.WASM.debug_kernel
       protocol
   in
   unit
@@ -2329,13 +2309,10 @@ let test_kernel_upgrade_no_administrator =
       ])
     ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
-  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
-  let installee = "debug_kernel" in
   let* _ =
     gen_test_kernel_upgrade
       ~should_fail:true
-      ~base_installee
-      ~installee
+      ~installee:Constant.WASM.debug_kernel
       ~with_administrator:false
       protocol
   in
@@ -2353,12 +2330,9 @@ let test_kernel_upgrade_failing_migration =
       ])
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
-  let base_installee = "etherlink/kernel_evm/kernel/tests/resources" in
-  let installee = "failed_migration" in
   let* sc_rollup_node, node, client, evm_node, _original_kernel_boot_wasm =
     gen_test_kernel_upgrade
-      ~base_installee
-      ~installee
+      ~installee:Constant.WASM.failed_migration
       ~should_fail:true
       protocol
   in
@@ -2566,18 +2540,10 @@ type storage_migration_results = {
      MUST be generated. *)
 let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
-  let current_kernel_base_installee =
-    "etherlink/kernel_evm/kernel/tests/resources"
-  in
-  let current_kernel_installee = "ghostnet_evm_kernel" in
   let* evm_setup =
     setup_evm_kernel
       ?config
-      ~kernel_installee:
-        {
-          base_installee = current_kernel_base_installee;
-          installee = current_kernel_installee;
-        }
+      ~kernel_installee:Constant.WASM.ghostnet_evm_kernel
       ~admin:(Some admin)
       protocol
   in
@@ -2590,13 +2556,10 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
     scenario_prior ~evm_setup:{evm_setup with evm_node; endpoint}
   in
   (* Upgrade the kernel. *)
-  let next_kernel_base_installee = "./" in
-  let next_kernel_installee = "evm_kernel" in
   let* _ =
     gen_test_kernel_upgrade
       ~evm_setup
-      ~base_installee:next_kernel_base_installee
-      ~installee:next_kernel_installee
+      ~installee:Constant.WASM.evm_kernel
       ~admin
       protocol
   in
@@ -2708,8 +2671,7 @@ let test_deposit_dailynet =
       ~name:"evm"
       ~address:rollup_address
       ~parameters_ty:evm_type
-      ~base_installee:"./"
-      ~installee:"evm_kernel"
+      ~installee:Constant.WASM.evm_kernel
       ~config:
         (`Path
           Base.(project_root // "etherlink/kernel_evm/config/dailynet.yaml"))

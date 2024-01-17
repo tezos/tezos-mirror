@@ -249,10 +249,9 @@ let simple_use_case_rollup ~(testnet : unit -> Testnet.t) () =
   let preimages_dir = Temp.dir "preimages" in
   let* {boot_sector; _} =
     Sc_rollup_helpers.prepare_installer_kernel
-      ~base_installee:"./"
       ~preimages_dir
       ~config:(`Path config_file)
-      "evm_kernel"
+      Constant.WASM.evm_kernel
   in
   let testnet = testnet () in
   let min_balance_operating = Tez.(of_mutez_int 11_000_000_000) in
