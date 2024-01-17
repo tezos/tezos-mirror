@@ -1,0 +1,10 @@
+docker:hadolint-before_merging:
+  extends:
+    - .docker:hadolint
+  stage: sanity
+  rules:
+    # Only run on merge requests when Dockerfiles have changed
+    - changes:
+        - build.Dockerfile
+        - Dockerfile
+      allow_failure: true

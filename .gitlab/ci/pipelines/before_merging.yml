@@ -4,7 +4,7 @@ include:
 
   # Stage: sanity
   - .gitlab/ci/jobs/sanity/sanity_ci.yml
-  - .gitlab/ci/jobs/sanity/docker:hadolint.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint-before_merging.yml
 
   # Stage: package
   - .gitlab/ci/jobs/packaging/opam:prepare.yml

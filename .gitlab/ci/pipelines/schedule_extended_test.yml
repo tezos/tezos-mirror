@@ -1,7 +1,7 @@
 include:
   # Stage: sanity
   - .gitlab/ci/jobs/sanity/sanity_ci.yml
-  - .gitlab/ci/jobs/sanity/docker:hadolint.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml
 
   # Stage: build
   - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml

@@ -1,0 +1,4 @@
+docker:hadolint-schedule_extended_test:
+  extends:
+    - .docker:hadolint
+  stage: sanity

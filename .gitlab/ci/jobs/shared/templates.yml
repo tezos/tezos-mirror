@@ -145,3 +145,11 @@
     - ./scripts/ci/docker_registry_auth.sh
   services:
     - docker:${DOCKER_VERSION}-dind
+
+.docker:hadolint:
+  extends:
+    - .default_settings_template
+  image: hadolint/hadolint:2.9.3-debian
+  script:
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile
