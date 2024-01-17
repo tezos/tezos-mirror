@@ -2909,4 +2909,40 @@ mod test {
         assert_eq!(code, vec![]);
         assert_eq!(balance, U256::zero());
     }
+
+    #[test]
+    fn create_contract_with_insufficient_funds() {
+        //Init
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::one(),
+        );
+
+        set_balance(&mut handler, &caller, U256::from(10000));
+
+        let scheme = CreateScheme::Legacy { caller };
+        let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
+
+        let result =
+            handler.execute_create(caller, scheme, U256::from(100000), code, true);
+
+        assert_eq!(
+            result.unwrap(),
+            (ExitReason::Error(ExitError::OutOfFund), None, vec![])
+        );
+    }
 }
