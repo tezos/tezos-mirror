@@ -13,6 +13,7 @@ use crate::account_storage::{
     CODE_HASH_DEFAULT,
 };
 use crate::transaction::TransactionContext;
+use crate::ArithmeticErrorKind::FeeOverflow;
 use crate::EthereumError;
 use crate::PrecompileSet;
 use crate::{storage, tick_model_opcodes};
@@ -458,23 +459,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
         effective_gas_price: U256,
     ) -> Result<bool, EthereumError> {
-        match gas_limit {
-            Some(gas_limit) => {
-                let amount = U256::from(gas_limit).saturating_mul(effective_gas_price);
-                log!(
-                    self.host,
-                    Debug,
-                    "{:?} pays {:?} for transaction",
-                    caller,
-                    amount
-                );
+        let Some(gas_limit) = gas_limit else { return Ok(true) };
 
-                self.get_or_create_account(caller)?
-                    .balance_remove(self.host, amount)
-                    .map_err(EthereumError::from)
-            }
-            None => Ok(true),
-        }
+        let amount = U256::from(gas_limit)
+            .checked_mul(effective_gas_price)
+            .ok_or(EthereumError::ArithmeticError(FeeOverflow))?;
+
+        log!(
+            self.host,
+            Debug,
+            "{caller:?} pays {amount:?} for transaction"
+        );
+
+        self.get_or_create_account(caller)?
+            .balance_remove(self.host, amount)
+            .map_err(EthereumError::from)
     }
 
     /// Repay unused gas
@@ -484,23 +483,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         unused_gas: Option<u64>,
         effective_gas_price: U256,
     ) -> Result<(), EthereumError> {
-        match unused_gas {
-            Some(unused_gas) => {
-                let amount = U256::from(unused_gas).saturating_mul(effective_gas_price);
-                log!(
-                    self.host,
-                    Debug,
-                    "{:?} refunded {:?} for transaction",
-                    caller,
-                    amount
-                );
+        let Some(unused_gas) = unused_gas else { return Ok(()) };
 
-                self.get_or_create_account(caller)?
-                    .balance_add(self.host, amount)
-                    .map_err(EthereumError::from)
-            }
-            None => Ok(()),
-        }
+        let amount = U256::from(unused_gas)
+            .checked_mul(effective_gas_price)
+            .ok_or(EthereumError::ArithmeticError(FeeOverflow))?;
+
+        log!(
+            self.host,
+            Debug,
+            "{caller:?} refunded {amount:?} for transaction"
+        );
+
+        self.get_or_create_account(caller)?
+            .balance_add(self.host, amount)
+            .map_err(EthereumError::from)
     }
 
     /// Account for the estimated ticks spent during the execution of the given opcode

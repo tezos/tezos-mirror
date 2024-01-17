@@ -331,10 +331,6 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "static_Call50000_ecrec.json"
         | "static_Call50000.json"
 
-        // The following test(s) is/are failing they need in depth debugging
-        // Reason: panicked at 'arithmetic operation overflow'
-        | "HighGasPrice.json"
-
         // Reason: this test rely on hot/cold access and as of right now
         // this feature will not be part of Etherlink
         | "sloadGasCost.json"
