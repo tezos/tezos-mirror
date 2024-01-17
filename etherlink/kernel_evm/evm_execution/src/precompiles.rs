@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,7 +11,7 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
-use std::{cmp::min, vec};
+use std::{cmp::min, str::FromStr, vec};
 
 use crate::abi;
 use crate::handler::EvmHandler;
@@ -339,7 +340,6 @@ fn ripemd160_precompile<Host: Runtime>(
 /// Implementation of Etherelink specific withdrawals precompiled contract.
 fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
-
     input: &[u8],
     _context: &Context,
     _is_static: bool,
@@ -439,7 +439,10 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             identity_precompile as PrecompileFn<Host>,
         ),
         (
-            H160::from_low_u64_be(32u64),
+            // Prefixed by 'ff' to make sure we will not conflict with any
+            // upcoming Ethereum upgrades.
+            // NB: The `unwrap()` here is safe.
+            H160::from_str("ff00000000000000000000000000000000000001").unwrap(),
             withdrawal_precompile as PrecompileFn<Host>,
         ),
     ])
@@ -639,7 +642,7 @@ mod tests {
         .unwrap();
 
         let source = H160::from_low_u64_be(118u64);
-        let target = H160::from_low_u64_be(32u64);
+        let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
         let value = U256::from(100);
 
         let transfer = Some(Transfer {
@@ -693,7 +696,7 @@ mod tests {
         .unwrap();
 
         let source = H160::from_low_u64_be(118u64);
-        let target = H160::from_low_u64_be(32u64);
+        let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
         let value = U256::from(100);
 
         let transfer = Some(Transfer {
@@ -743,7 +746,7 @@ mod tests {
 
         // 1. Fails with no transfer
 
-        let target = H160::from_low_u64_be(32u64);
+        let target = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
 
         let transfer: Option<Transfer> = None;
 
@@ -767,7 +770,6 @@ mod tests {
 
         // 2. Fails with transfer of 0 amount.
 
-        let target = H160::from_low_u64_be(32u64);
         let source = H160::from_low_u64_be(118u64);
 
         let transfer: Option<Transfer> = Some(Transfer {
