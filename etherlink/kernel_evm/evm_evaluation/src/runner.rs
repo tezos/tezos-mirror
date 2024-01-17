@@ -26,7 +26,7 @@ use crate::evalhost::EvalHost;
 use crate::fillers::{output_result, process, TestResult};
 use crate::helpers::{construct_folder_path, OutputOptions};
 use crate::models::{Env, FillerSource, SpecName, Test, TestSuite, TestUnit};
-use crate::{write_host, Opt, ReportValue};
+use crate::{write_host, DiffMap, Opt, ReportMap};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -274,12 +274,12 @@ fn check_results(
 #[allow(clippy::too_many_arguments)]
 pub fn run_test(
     path: &Path,
-    report_map: &mut HashMap<String, ReportValue>,
+    report_map: &mut ReportMap,
     report_key: String,
     opt: &Opt,
     output_file: &mut File,
     skip: bool,
-    diff_result_map: &mut Option<HashMap<String, (TestResult, Option<TestResult>)>>,
+    diff_result_map: &mut DiffMap,
     output: &OutputOptions,
 ) -> Result<(), TestError> {
     let suit = read_testsuite(path)?;
