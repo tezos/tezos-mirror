@@ -689,13 +689,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 Ok((sub_context_result, Some(address), vec![]))
             }
             Ok(sub_context_result @ ExitReason::Revert(_)) => {
-                Ok((sub_context_result, Some(address), vec![]))
+                // EIP-140: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
+                // In case of a REVERT in a context of a CREATE, CREATE2, the error message
+                // is available in the returndata buffer
+                Ok((sub_context_result, None, runtime.machine().return_value()))
             }
+            // Since the sub context failed, return address 0 (`None` in our case) (https://www.evm.codes/#f0?fork=shanghai)
             Ok(sub_context_result @ ExitReason::Error(_)) => {
-                Ok((sub_context_result, Some(address), vec![]))
+                Ok((sub_context_result, None, vec![]))
             }
             Ok(sub_context_result @ ExitReason::Fatal(_)) => {
-                Ok((sub_context_result, Some(address), vec![]))
+                Ok((sub_context_result, None, vec![]))
             }
             Err(err) => Err(err),
         }
