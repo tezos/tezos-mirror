@@ -4,13 +4,13 @@ Received request to exit with code 37
 rv64si-p-csr: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64si-p-dirty --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception EnvironmentCallFromMMode at 0x80000324: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64si-p-dirty: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64si-p-icache-alias --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception IllegalInstruction(0) at 0x8: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64si-p-icache-alias: fail
@@ -20,7 +20,7 @@ Received request to exit with code 0
 rv64si-p-ma_fetch: success
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64si-p-sbreak --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception Breakpoint at 0x800001ac: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64si-p-sbreak: fail
@@ -30,7 +30,7 @@ Error: "Failed to handle environment call at 800001cc: Unimplemented system call
 rv64si-p-scall: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64si-p-wfi --posix
-thread 'main' panicked at sandbox/src/main.rs:128:13:
+thread 'main' panicked at sandbox/src/main.rs:138:13:
 Stuck at 0x800001b4
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64si-p-wfi: fail

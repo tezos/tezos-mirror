@@ -106,4 +106,40 @@ External(
 Internal(
     EndOfLevel,
 )
+Internal(
+    StartOfLevel,
+)
+Internal(
+    InfoPerLevel(
+        InfoPerLevel {
+            predecessor_timestamp: [TIMESTAMP],
+            predecessor: BlockHash(
+                "[BLOCK_HASH]",
+            ),
+        },
+    ),
+)
+Internal(
+    Transfer(
+        Transfer {
+            payload: MichelsonUnit,
+            sender: ContractKt1Hash(
+                "[CONTRACT_HASH]",
+            ),
+            source: Ed25519(
+                ContractTz1Hash(
+                    "[PUBLIC_KEY_HASH]",
+                ),
+            ),
+            destination: SmartRollupAddress {
+                hash: SmartRollupHash(
+                    "[SMART_ROLLUP_HASH]",
+                ),
+            },
+        },
+    ),
+)
+Internal(
+    EndOfLevel,
+)
 Done

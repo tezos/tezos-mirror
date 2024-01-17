@@ -1,7 +1,10 @@
 use kernel_loader::Memory;
 use rvemu::{emulator::Emulator, exception::Exception};
 use std::{error::Error, fs};
-use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
+use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_smart_rollup_encoding::{
+    michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
+};
 
 mod boot;
 mod cli;
@@ -49,6 +52,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Prepare the boot procedure
     boot::configure(&mut emu, dtb_addr);
 
+    // Rollup metadata
+    let meta = syscall::RollupMetadata {
+        origination_level: cli.origination_level,
+        address: SmartRollupAddress::from_b58check(cli.address.as_str()).unwrap(),
+    };
+
     // Prepare inbox
     let mut inbox = inbox::InboxBuilder::new();
     inbox
@@ -57,14 +66,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         .next_level()
         .insert_external(vec![1, 1])
         .next_level()
-        .insert_external(vec![1, 2]);
+        .insert_external(vec![1, 2])
+        .next_level()
+        .insert_transfer(
+            ContractKt1Hash::from_base58_check("KT1EfTusMLoeCAAGd9MZJn5yKzFr6kJU5U91").unwrap(),
+            PublicKeyHash::from_b58check("tz1dJ21ejKD17t7HKcKkTPuwQphgcSiehTYi").unwrap(),
+            meta.address.clone(),
+            MichelsonUnit,
+        );
     let mut inbox = inbox.build();
-
-    // Rollup metadata
-    let meta = syscall::RollupMetadata {
-        origination_level: cli.origination_level,
-        address: SmartRollupAddress::from_b58check(cli.address.as_str()).unwrap(),
-    };
 
     let handle_syscall = if cli.posix {
         fn dummy(

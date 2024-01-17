@@ -48,73 +48,73 @@ Received request to exit with code 0
 rv64ud-p-structural: success
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fadd --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fclass --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fclass: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fcmp --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcmp: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fcvt --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcvt: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fcvt_w --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcvt_w: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fdiv --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fdiv: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fmadd --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fmadd: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-fmin --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fmin: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-ldst --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-ldst: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-move --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-move: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-recoding --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-recoding: fail
 
 ./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ud-v-structural --posix
-thread 'main' panicked at sandbox/src/main.rs:121:25:
+thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-structural: fail
