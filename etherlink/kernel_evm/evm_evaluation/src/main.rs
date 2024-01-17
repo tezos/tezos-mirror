@@ -311,11 +311,6 @@ fn generate_diff(
 pub fn check_skip(test_file_path: &Path) -> bool {
     let file_name = test_file_path.file_name().unwrap().to_str().unwrap();
 
-    // Reason: panicked at 'attempt to add with overflow'
-    if file_name.contains("DiffPlaces.json") {
-        return true;
-    }
-
     matches!(
         file_name,
         // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
@@ -336,26 +331,9 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "static_Call50000_ecrec.json"
         | "static_Call50000.json"
 
-        // Reason: panicked at 'attempt to multiply with overflow'
-        | "static_Call1024BalanceTooLow.json"
-        | "static_Call1024BalanceTooLow2.json"
-        | "static_Call1024PreCalls3.json"
-
-        // Reason: panicked at 'attempt to add with overflow'
-        | "static_Call1024PreCalls.json"
-        | "static_Call1024PreCalls2.json"
-        | "diffPlaces.json"
-
         // The following test(s) is/are failing they need in depth debugging
         // Reason: panicked at 'arithmetic operation overflow'
         | "HighGasPrice.json"
-        | "randomStatetest32.json"
-        | "randomStatetest7.json"
-        | "randomStatetest50.json"
-        | "randomStatetest468.json"
-        | "underflowTest.json"
-        | "randomStatetest384.json"
-        | "201503110226PYTHON_DUP6.json"
 
         // Reason: this test rely on hot/cold access and as of right now
         // this feature will not be part of Etherlink
