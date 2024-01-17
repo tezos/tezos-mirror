@@ -737,40 +737,44 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let result = self.execute(&mut runtime);
 
-        // FIXME should only be succeed with return value
-        // issue: https://gitlab.com/tezos/tezos/-/issues/4869
-        if let Ok(ExitReason::Succeed(_)) = result {
-            let code_out = runtime.machine().return_value();
+        match result {
+            Ok(result @ ExitReason::Succeed(_)) => {
+                let code_out = runtime.machine().return_value();
 
-            if code_out.first() == Some(&0xef) {
-                // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
-                return Ok((
-                    ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
-                    None,
-                    vec![],
-                ));
+                if code_out.first() == Some(&0xef) {
+                    // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
+                    return Ok((
+                        ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+                        None,
+                        vec![],
+                    ));
+                }
+
+                if code_out.len() > MAX_CODE_SIZE {
+                    // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
+                    return Ok((
+                        ExitReason::Error(ExitError::CreateContractLimit),
+                        None,
+                        vec![],
+                    ));
+                }
+
+                if let Err(err) = self.record_deposit(code_out.len()) {
+                    return Ok((ExitReason::Error(err), None, vec![]));
+                }
+
+                self.set_contract_code(address, code_out)?;
+                // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
+                // A created smart contract nonce must start at 1.
+                self.increment_nonce(address)?;
+
+                Ok((result, Some(address), vec![]))
             }
-
-            if code_out.len() > MAX_CODE_SIZE {
-                // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
-                return Ok((
-                    ExitReason::Error(ExitError::CreateContractLimit),
-                    None,
-                    vec![],
-                ));
-            }
-
-            if let Err(err) = self.record_deposit(code_out.len()) {
-                return Ok((ExitReason::Error(err), None, vec![]));
-            }
-
-            self.set_contract_code(address, code_out)?;
-            // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
-            // A created smart contract nonce must start at 1.
-            self.increment_nonce(address)?;
+            Ok(result @ ExitReason::Revert(_)) => Ok((result, Some(address), vec![])),
+            Ok(result @ ExitReason::Error(_)) => Ok((result, Some(address), vec![])),
+            Ok(result @ ExitReason::Fatal(_)) => Ok((result, Some(address), vec![])),
+            Err(err) => Err(err),
         }
-
-        Ok((result?, Some(address), vec![]))
     }
 
     /// Call a contract
