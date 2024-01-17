@@ -41,6 +41,9 @@ use tezos_evm_logging::{log, Level::*};
 /// value for `G_codedeposit`.
 const GAS_CODE_DEPOSIT: u64 = 200;
 
+/// Maximum allowed code size as specified by EIP-170
+const MAX_CODE_SIZE: usize = 0x6000;
+
 /// Outcome of making the [EvmHandler] run an Ethereum transaction
 ///
 /// Be it contract -call, -create or simple transfer, the handler will update the world
@@ -743,6 +746,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
                 return Ok((
                     ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+                    None,
+                    vec![],
+                ));
+            }
+
+            if code_out.len() > MAX_CODE_SIZE {
+                // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
+                return Ok((
+                    ExitReason::Error(ExitError::CreateContractLimit),
                     None,
                     vec![],
                 ));
