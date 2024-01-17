@@ -109,7 +109,9 @@ module Slots_handlers = struct
         (* [polynomial] was produced with the parameters from
            [cryptobox], thus we can always compute the proof from
            [polynomial] except if an error happens with the loading of the SRS. *)
-        | Error (`Invalid_degree_strictly_less_than_expected _) ->
+        | Error
+            ( `Invalid_degree_strictly_less_than_expected _
+            | `Prover_SRS_not_loaded ) ->
             tzfail
               (Cryptobox_error
                  ( "prove_commitment",

@@ -32,6 +32,7 @@ type error +=
   | Illformed_pages
   | Invalid_shards_commitment_association
   | Invalid_degree_strictly_less_than_expected of {given : int; expected : int}
+  | Prover_SRS_not_loaded
 
 let () =
   register_error_kind
@@ -75,7 +76,7 @@ let () =
     ~title:"Slot not found"
     ~description:"Slot not found at this slot header"
     ~pp:(fun ppf () -> Format.fprintf ppf "Slot not found on given slot header")
-    Data_encoding.(unit)
+    Data_encoding.unit
     (function Slot_not_found -> Some () | _ -> None)
     (fun () -> Slot_not_found) ;
   register_error_kind
@@ -84,7 +85,7 @@ let () =
     ~title:"Illformed shard"
     ~description:"Illformed shard found in the store"
     ~pp:(fun ppf () -> Format.fprintf ppf "Illformed shard found in the store")
-    Data_encoding.(unit)
+    Data_encoding.unit
     (function Illformed_shard -> Some () | _ -> None)
     (fun () -> Illformed_shard) ;
   register_error_kind
@@ -93,7 +94,7 @@ let () =
     ~title:"Illformed pages"
     ~description:"Illformed pages found in the store"
     ~pp:(fun ppf () -> Format.fprintf ppf "Illformed pages found in the store")
-    Data_encoding.(unit)
+    Data_encoding.unit
     (function Illformed_pages -> Some () | _ -> None)
     (fun () -> Illformed_pages) ;
   register_error_kind
@@ -103,7 +104,7 @@ let () =
     ~description:"Shards commit to a different slot header."
     ~pp:(fun ppf () ->
       Format.fprintf ppf "Association between shards and slot header is invalid")
-    Data_encoding.(unit)
+    Data_encoding.unit
     (function Invalid_shards_commitment_association -> Some () | _ -> None)
     (fun () -> Invalid_shards_commitment_association) ;
   register_error_kind
@@ -122,7 +123,16 @@ let () =
           Some (given, expected)
       | _ -> None)
     (fun (given, expected) ->
-      Invalid_degree_strictly_less_than_expected {given; expected})
+      Invalid_degree_strictly_less_than_expected {given; expected}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.prover_srs_not_loaded"
+    ~title:"Prover SRS not loaded"
+    ~description:"The SRS for the prover was not loaded."
+    ~pp:(fun ppf () -> Cryptobox.pp_commit_error ppf `Prover_SRS_not_loaded)
+    Data_encoding.unit
+    (function Prover_SRS_not_loaded -> Some () | _ -> None)
+    (fun () -> Prover_SRS_not_loaded)
 
 type slot = bytes
 
@@ -142,6 +152,7 @@ let commit cryptobox polynomial =
       (`Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected})
     ->
       Error [Invalid_degree_strictly_less_than_expected {given; expected}]
+  | Error `Prover_SRS_not_loaded -> Error [Prover_SRS_not_loaded]
 
 let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in

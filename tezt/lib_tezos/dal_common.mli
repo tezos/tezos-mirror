@@ -223,6 +223,7 @@ module Commitment : sig
     ?on_error:
       ([ `Invalid_degree_strictly_less_than_expected of
          (int, int) Cryptobox.error_container
+       | `Prover_SRS_not_loaded
        | `Slot_wrong_size of Helpers.slot ] ->
       Cryptobox.commitment * Cryptobox.commitment_proof) ->
     Cryptobox.t ->

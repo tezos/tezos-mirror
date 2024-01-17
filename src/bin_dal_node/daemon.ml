@@ -132,6 +132,7 @@ module Handler = struct
           | `Shard_index_out_of_range s ->
               Format.sprintf "Shard_index_out_of_range(%s)" s
           | `Shard_length_mismatch -> "Shard_length_mismatch"
+          | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
         in
         Event.(
           emit__dont_wait__use_with_care

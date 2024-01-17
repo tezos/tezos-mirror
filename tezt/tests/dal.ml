@@ -1520,7 +1520,9 @@ let commitment_of_slot cryptobox slot =
   in
   match Cryptobox.commit cryptobox polynomial with
   | Ok cm -> cm
-  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+  | Error
+      ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
+      as commit_error) ->
       Test.fail "%s" (Cryptobox.string_of_commit_error commit_error)
 
 let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
