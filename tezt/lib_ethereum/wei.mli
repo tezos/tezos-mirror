@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -67,10 +68,10 @@ val ( + ) : t -> t -> t
 val ( - ) : t -> t -> t
 
 (** Multiplication. This doesn't perform any bound checks. *)
-val ( * ) : t -> t -> t
+val ( * ) : t -> Z.t -> t
 
 (** Division. This doesn't perform any bound checks. *)
-val ( / ) : t -> t -> t
+val ( / ) : t -> Z.t -> t
 
 (** The wei {!Check.typ}. *)
 val typ : t Check.typ
