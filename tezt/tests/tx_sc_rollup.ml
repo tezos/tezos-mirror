@@ -531,7 +531,11 @@ let test_tx_kernel_e2e =
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"]
     ~uses:(fun _protocol ->
-      [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.tx_kernel;
+      ])
     ~title:(Printf.sprintf "wasm_2_0_0 - tx kernel should run e2e (kernel_e2e)")
     (tx_kernel_e2e setup_classic)
 
@@ -541,7 +545,11 @@ let test_bootstrapped_tx_kernel_e2e =
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "bootstrap"]
     ~uses:(fun _protocol ->
-      [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.tx_kernel;
+      ])
     ~title:
       (Printf.sprintf
          "wasm_2_0_0 - bootstrapped tx kernel should run e2e (kernel_e2e)")

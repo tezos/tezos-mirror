@@ -2291,7 +2291,11 @@ module Tx_kernel_e2e = struct
       ~__FILE__
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
       ~uses:(fun _protocol ->
-        [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.tx_kernel_fixed_dac;
+        ])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
       ~observers:1
@@ -2310,7 +2314,11 @@ module Tx_kernel_e2e = struct
       ~supports:Protocol.(From_protocol (number Nairobi + 1))
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
       ~uses:(fun _protocol ->
-        [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.tx_kernel_fixed_dac;
+        ])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
       ~observers:1

@@ -14,6 +14,7 @@ let uses _protocol =
     Constant.octez_smart_rollup_node;
     Constant.octez_evm_node;
     Constant.smart_rollup_installer;
+    Constant.WASM.evm_kernel;
   ]
 
 open Helpers

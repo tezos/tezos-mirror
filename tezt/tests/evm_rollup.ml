@@ -390,6 +390,7 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
           Constant.octez_smart_rollup_node;
           Constant.octez_evm_node;
           Constant.smart_rollup_installer;
+          Constant.WASM.evm_kernel;
         ])
       uses
   in
@@ -772,6 +773,7 @@ let test_consistent_block_hashes =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Check L2 blocks consistency of hashes"
   @@ fun protocol ->
@@ -2064,6 +2066,7 @@ let test_deposit_and_withdraw =
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
         Constant.octez_codec;
+        Constant.WASM.evm_kernel;
       ])
     ~commitment_period
     ~challenge_window
@@ -2218,6 +2221,8 @@ let test_kernel_upgrade_to_debug =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
   @@ fun protocol ->
@@ -2235,6 +2240,7 @@ let test_kernel_upgrade_evm_to_evm =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to itself"
   @@ fun protocol ->
@@ -2261,6 +2267,8 @@ let test_kernel_upgrade_wrong_key =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
@@ -2284,6 +2292,8 @@ let test_kernel_upgrade_wrong_rollup_address =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
   @@ fun protocol ->
@@ -2306,6 +2316,8 @@ let test_kernel_upgrade_no_administrator =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
@@ -2327,6 +2339,8 @@ let test_kernel_upgrade_failing_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.failed_migration;
       ])
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
@@ -2583,6 +2597,8 @@ let test_kernel_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
       ])
     ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
   @@ fun protocol ->
@@ -2623,7 +2639,13 @@ let test_deposit_dailynet =
     ~__FILE__
     ~tags:["evm"; "deposit"; "dailynet"]
     ~uses:(fun _protocol ->
-      Constant.[octez_smart_rollup_node; smart_rollup_installer; octez_evm_node])
+      Constant.
+        [
+          octez_smart_rollup_node;
+          smart_rollup_installer;
+          octez_evm_node;
+          Constant.WASM.evm_kernel;
+        ])
     ~title:"deposit on dailynet"
   @@ fun protocol ->
   let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
@@ -2777,6 +2799,8 @@ let test_deposit_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
       ])
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
@@ -2853,6 +2877,8 @@ let test_block_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
       ])
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
@@ -2883,6 +2909,7 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Returns an error if the chainId is not correct."
   @@ fun protocol ->
@@ -2915,6 +2942,8 @@ let test_kernel_upgrade_version_change =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
       ])
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
@@ -2936,6 +2965,8 @@ let test_transaction_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.ghostnet_evm_kernel;
       ])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
@@ -3447,6 +3478,7 @@ let test_l2_call_inter_contract =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Check L2 inter contract call"
   @@ fun protocol ->
@@ -3782,6 +3814,7 @@ let test_block_hash_regression =
         Constant.octez_evm_node;
         Constant.octez_smart_rollup_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Regression test for L2 block hash"
   @@ fun protocol ->
@@ -3983,6 +4016,7 @@ let test_keep_alive =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     (fun protocol ->
       let* {sc_rollup_node; sc_rollup_address; evm_node; endpoint = _; _} =
@@ -4033,6 +4067,7 @@ let test_regression_block_hash_gen =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
       ])
     ~title:"Random generation based on block hash and timestamp"
   @@ fun protocol ->

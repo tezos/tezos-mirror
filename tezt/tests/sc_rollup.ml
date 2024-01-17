@@ -4754,7 +4754,8 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
     ~__FILE__
     ~tags:["node"; "preimage"; "boot_sector"]
     ~uses:(fun _protocol ->
-      Constant.[octez_smart_rollup_node; smart_rollup_installer])
+      Constant.
+        [octez_smart_rollup_node; smart_rollup_installer; Constant.WASM.echo])
     ~title:
       "Rollup node exit if at initialisation, there is one or multiple \
        preimage(s) missing."
