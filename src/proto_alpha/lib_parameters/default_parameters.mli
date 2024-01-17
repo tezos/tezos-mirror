@@ -52,3 +52,8 @@ val parameters_of_constants :
 
 val json_of_parameters :
   ?chain_id:Chain_id.t -> Parameters.t -> Data_encoding.json
+
+module Internal_for_tests : sig
+  val make_sc_rollup_parameter :
+    dal_activation_level:Raw_level.t -> int -> Constants.Parametric.sc_rollup
+end

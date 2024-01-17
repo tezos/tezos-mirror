@@ -212,3 +212,9 @@ type t = {
 }
 
 val encoding : t Data_encoding.encoding
+
+val update_sc_rollup_parameter : block_time:int -> sc_rollup -> sc_rollup
+
+module Internal_for_tests : sig
+  val sc_rollup_encoding : sc_rollup Data_encoding.t
+end

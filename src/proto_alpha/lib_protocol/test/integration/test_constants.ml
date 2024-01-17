@@ -34,6 +34,33 @@
 
 open Test_tez
 
+let test_sc_rollup_constants_consistency () =
+  let open Protocol.Alpha_context in
+  let to_string c =
+    Data_encoding.Json.(
+      to_string ~minify:true
+      @@ construct Constants.Parametric.Internal_for_tests.sc_rollup_encoding c)
+  in
+  (* We do not necessarily need to update this value when the block time
+     changes. The goal is to witness the consistency of the “symbolic”
+     computations in [Default_parameters] and [Raw_context].. *)
+  let block_time = 10 in
+  let sc_rollup =
+    Default_parameters.Internal_for_tests.make_sc_rollup_parameter
+      ~dal_activation_level:Raw_level.root
+      block_time
+  in
+  let sc_rollup' =
+    Constants.Parametric.update_sc_rollup_parameter sc_rollup ~block_time
+  in
+  Assert.equal
+    ~loc:__LOC__
+    (fun s1 s2 -> String.equal (to_string s1) (to_string s2))
+    "sc_rollup_parameter update"
+    (fun fmt sc_rollup -> Format.pp_print_string fmt @@ to_string sc_rollup)
+    sc_rollup
+    sc_rollup'
+
 let test_constants_consistency () =
   let open Default_parameters in
   List.iter_es
@@ -214,6 +241,10 @@ let liquidity_baking_subsidy_param () =
 
 let tests =
   [
+    Tztest.tztest
+      "sc_rollup constants consistency"
+      `Quick
+      test_sc_rollup_constants_consistency;
     Tztest.tztest "constants consistency" `Quick test_constants_consistency;
     Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
     Tztest.tztest
