@@ -90,20 +90,21 @@ echo 'Upload tarball of source code and its checksums'
 
 source_tarball="${gitlab_octez_package_name}.tar.bz2"
 
-# We are using the export-subst feature of git onfigured in .gitattributes, requires git version >= 2.35
+# We are using the export-subst feature of git configured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive
 # https://git-scm.com/docs/gitattributes#_creating_an_archive
 git --version
 # Verify the placeholder %(describe:tags) is available
 git describe --tags
-# Create tarball
-git archive "${CI_COMMIT_TAG}" --format=tar | bzip2 > "${source_tarball}"
+# Pass '--worktree-attributes' to ensure that ignores written by <NAME OF THE create_octez_source.sh SCRIPT if you rename it>
+# are respected.
+git archive "${CI_COMMIT_TAG}" --format=tar --worktree-attributes --prefix "${gitlab_octez_source_package_name}/" | bzip2 > "${source_tarball}"
 
 # Check tarball is valid
 tar -tjf "${source_tarball}" > /dev/null
 
 # Verify git expanded placeholders in archive
-tar -Oxf "${source_tarball}" src/lib_version/exe/get_git_info.ml | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
+tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
 
 # Checksums
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
