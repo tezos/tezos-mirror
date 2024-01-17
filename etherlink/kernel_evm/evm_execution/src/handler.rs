@@ -2500,6 +2500,69 @@ mod test {
     }
 
     #[test]
+    fn contract_create_has_return_when_revert() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(117);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+        );
+
+        let value = U256::zero();
+        let create_scheme = CreateScheme::Legacy { caller };
+
+        // The code of the contract revert with 0x18 (equivalent to 24)
+        let initial_code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0x18,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x20,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::REVERT.as_u8(),
+        ];
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_create(caller, create_scheme, value, initial_code, false);
+
+        match result {
+            Ok(result) => {
+                // Expecting to revert with 0x18 in the return vector
+                let expected_result = (
+                    ExitReason::Revert(ExitRevert::Reverted),
+                    None,
+                    vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 24,
+                    ],
+                );
+                assert_eq!(result, expected_result);
+            }
+            Err(err) => {
+                panic!("Expected Ok, but got {:?}", err);
+            }
+        }
+    }
+
+    #[test]
     fn contract_call_does_transfer() {
         let mut mock_runtime = MockHost::default();
         let block = dummy_first_block();
