@@ -1386,7 +1386,7 @@ let transfer ?data ~evm_setup () =
        } =
     make_transfer
       ?data
-      ~value:Wei.(Configuration.default_bootstrap_account_balance - one)
+      ~value:Wei.(Configuration.default_bootstrap_account_balance - one_eth)
       ~sender
       ~receiver
       evm_setup
@@ -2118,14 +2118,9 @@ let test_deposit_and_withdraw =
   in
   let* () = check_balance ~receiver:receiver.address ~endpoint amount_mutez in
 
-  let amount_wei : Wei.t =
-    Tez.mutez_int64 amount_mutez
-    |> Z.of_int64
-    |> Z.mul Z.(pow (of_int 10) 12)
-    |> Wei.to_wei_z
-  in
+  let amount_wei = Wei.of_tez amount_mutez in
   (* Keep a small amount to pay for the gas. *)
-  let amount_wei = Wei.(amount_wei - one) in
+  let amount_wei = Wei.(amount_wei - one_eth) in
 
   let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
   let* _tx =
@@ -2634,7 +2629,7 @@ let test_kernel_migration =
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
-        ~value:Wei.(Configuration.default_bootstrap_account_balance - one)
+        ~value:Wei.(Configuration.default_bootstrap_account_balance - one_eth)
         ~sender
         ~receiver
         evm_setup
@@ -3432,11 +3427,11 @@ let test_accounts_double_indexing =
   let sender = Eth_account.bootstrap_accounts.(0) in
   let receiver = Eth_account.bootstrap_accounts.(1) in
   (* Send a first transaction, there must be 2 indexes. *)
-  let* _tx_hash = send ~sender ~receiver ~value:Wei.one full_evm_setup in
+  let* _tx_hash = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
   let* () = check_accounts_length 2 in
   (* After a second transaction with the same accounts, there still must
      be 2 indexes. *)
-  let* _tx_hash = send ~sender ~receiver ~value:Wei.one full_evm_setup in
+  let* _tx_hash = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
   let* () = check_accounts_length 2 in
   unit
 

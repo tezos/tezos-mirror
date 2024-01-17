@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -39,6 +40,9 @@ val zero : t
 (** 1 wei *)
 val one : t
 
+(** 1 eth, or 10^18 wei *)
+val one_eth : t
+
 (** Convert [t] to a string. *)
 val to_string : t -> string
 
@@ -50,6 +54,9 @@ val to_wei_z : Z.t -> t
 
 (** Converts a wei value to a [Z.t]. *)
 val of_wei_z : t -> Z.t
+
+(** Converts a tez value to the equivalent wei. **)
+val of_tez : Tez.t -> t
 
 (** Convert an [int] amount of eth to a wei one.
     This doesn't perform any bounds checks. *)
@@ -79,5 +86,5 @@ val typ : t Check.typ
 (** Convert {!t} to U256 little endian bytes. *)
 val to_le_bytes : t -> Bytes.t
 
-(** Truncate the Wei (10^18) to Mutez (10^9). *)
+(** Truncate the Wei (10^18) to Mutez (10^6). *)
 val truncate_to_mutez : t -> int
