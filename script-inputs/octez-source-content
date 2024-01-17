@@ -6,7 +6,6 @@ dune-project
 dune-workspace
 CHANGES.rst
 LICENSES
-vendors
 opam
 script-inputs
 scripts
