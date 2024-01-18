@@ -465,7 +465,7 @@ let timestamp_arg =
           | Some t -> return t
           | None ->
               failwith
-                "Timestamp must be either in RFC3399 format  (e.g., \
+                "Timestamp must be either in RFC3399 format (e.g., \
                  [\"1970-01-01T00:00:00Z\"]) or in number of seconds since the \
                  {!Time.Protocol.epoch}."))
   |> Tezos_clic.default_arg
@@ -488,12 +488,18 @@ let blueprint_number_arg =
 
 let secret_key_arg =
   let open Tezos_clic in
+  (* This is `Bootstrap.bootstrap1.secret_key` in
+     `tezt/lib_tezos/account.ml`. *)
+  let default_sk = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
   Params.secret_key
   |> default_arg
-       ~long:"Secret ley"
-       ~doc:"Secret key to sign the blueprints"
-       ~placeholder:"<secret-key>"
-       ~default:"edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz"
+       ~long:"secret-key"
+       ~doc:
+         (Format.sprintf
+            "Unencrypted secret key to sign the blueprints,. Defaults to %s."
+            default_sk)
+       ~placeholder:"edsk..."
+       ~default:default_sk
 
 let proxy_command =
   let open Tezos_clic in
