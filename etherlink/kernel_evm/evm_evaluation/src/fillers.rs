@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: MIT
 
 use crate::evalhost::EvalHost;
-use crate::helpers::{parse_and_get_cmp, purify_network, OutputOptions};
+use crate::helpers::{parse_and_get_cmp, purify_network, LabelIndexes, OutputOptions};
 use crate::models::spec::SpecId;
 use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
 };
 use crate::{write_host, DiffMap, ReportMap, ReportValue};
 
+use crate::models::TxPartIndices;
 use evm_execution::account_storage::EthereumAccount;
 
 use bytes::Bytes;
@@ -26,39 +27,51 @@ pub enum TestResult {
     Failure,
 }
 
-fn check_filler_constraints(
-    indexes: &FillerResultIndexes,
-    tx_label: Option<&String>,
-    tx_index: i64,
+fn check_kind(
+    all_kind: &[IndexKind],
+    kind_index: &i64,
+    kind_label: Option<&String>,
 ) -> bool {
-    // A transaction matches the constraints if:
-    // - there are no constraints
-    // - OR, if it has a label, it matches one of the label of the test
-    // - OR, its index is the range of those identified
-
-    if indexes.data.is_empty() {
+    if all_kind.is_empty() {
         return true;
     }
 
-    for index_kind in indexes.to_owned().data.into_iter() {
+    for index_kind in all_kind.iter() {
         match index_kind {
             IndexKind::Label(label) => {
-                if let Some(tx_label) = tx_label {
-                    if tx_label.eq(&label) {
+                if let Some(kind_label) = kind_label {
+                    if kind_label.eq(label) {
+                        // If the label that matches the test is the right, we can return.
                         return true;
                     }
                 }
             }
             IndexKind::Range(start, end) => {
-                if start <= tx_index && tx_index <= end {
+                if start <= kind_index && kind_index <= end {
                     return true;
                 }
             }
         }
     }
-
     // At this point, no constraint have been matched.
     false
+}
+
+fn check_filler_constraints(
+    indexes: &FillerResultIndexes,
+    tx_label: &LabelIndexes,
+    tx_index: &TxPartIndices,
+) -> bool {
+    // A transaction matches the constraints if:
+    //       its index.data is in the range or has the right label or has no constraints
+    //   AND its index.gas is in the range or has the right label or has no constraints
+    //   AND its index.value is in the range or has the right label or has no constraints
+    // Check if there is constraint on data
+    check_kind(&indexes.data, &(tx_index.data as i64), tx_label.data_label) &&
+    // Check if there is constraint on gas
+    check_kind(&indexes.gas, &(tx_index.gas as i64), tx_label.gas_label) &&
+    // Check if there is constraint on value
+    check_kind(&indexes.value, &(tx_index.value as i64), tx_label.value_label)
 }
 
 fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
@@ -305,8 +318,8 @@ pub fn process(
     report_map: &mut ReportMap,
     report_key: String,
     output_file: &mut File,
-    tx_label: Option<&String>,
-    tx_index: i64,
+    tx_label: LabelIndexes,
+    tx_indices: &TxPartIndices,
     output: &OutputOptions,
     test_name: &str,
     diff_result_map: &mut DiffMap,
@@ -314,13 +327,18 @@ pub fn process(
     let mut status = TestResult::Success;
 
     for (name, fillers) in filler_source.0.into_iter() {
-        write_host!(host, "Processing checks with filler: {}Filler\n", name);
+        write_host!(
+            host,
+            "Processing checks with filler: {}Filler and config: {}\n",
+            name,
+            tx_indices
+        );
         for filler_expectation in fillers.expect {
             for filler_network in filler_expectation.network {
                 if check_filler_constraints(
                     &filler_expectation.indexes,
-                    tx_label,
-                    tx_index,
+                    &tx_label,
+                    tx_indices,
                 ) && check_if_network_match(&filler_network, spec_name)
                 {
                     write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
@@ -332,7 +350,10 @@ pub fn process(
         }
     }
 
-    let full_name = format!("{}_{}_{}", &report_key, test_name, tx_index);
+    let full_name = format!(
+        "{}_{}_data_index_{}_gas_index_{}_value_index_{}",
+        &report_key, test_name, tx_indices.data, tx_indices.gas, tx_indices.value
+    );
 
     match status {
         TestResult::Success => {
