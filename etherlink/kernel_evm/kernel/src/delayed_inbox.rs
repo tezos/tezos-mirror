@@ -153,4 +153,66 @@ impl DelayedInbox {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::DelayedInbox;
+    use super::Hash;
+    use crate::inbox::Transaction;
+    use primitive_types::{H160, U256};
+
+    use crate::inbox::TransactionContent::Ethereum;
+    use tezos_ethereum::{
+        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    };
+
+    use tezos_smart_rollup_mock::MockHost;
+
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
+    }
+
+    fn tx_(i: u64) -> EthereumTransactionCommon {
+        EthereumTransactionCommon {
+            type_: tezos_ethereum::transaction::TransactionType::Legacy,
+            chain_id: Some(U256::one()),
+            nonce: U256::from(i),
+            max_priority_fee_per_gas: U256::from(40000000u64),
+            max_fee_per_gas: U256::from(40000000u64),
+            gas_limit: 21000u64,
+            to: address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
+            value: U256::from(500000000u64),
+            data: vec![],
+            access_list: vec![],
+            signature: None,
+        }
+    }
+
+    fn dummy_transaction(i: u8) -> Transaction {
+        Transaction {
+            tx_hash: [i; TRANSACTION_HASH_SIZE],
+            content: Ethereum(tx_(i.into())),
+        }
+    }
+
+    #[test]
+    fn test_delayed_inbox_roundtrip() {
+        let mut host = MockHost::default();
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+
+        let tx: Transaction = dummy_transaction(0);
+        delayed_inbox
+            .save_transaction(&mut host, tx.clone())
+            .expect("Tx should be saved in the delayed inbox");
+
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
+
+        let read_tx = delayed_inbox
+            .find_and_remove_transaction(&mut host, Hash(tx.tx_hash))
+            .expect("Reading from the delayed inbox should work")
+            .expect("Transaction should be in the delayed inbox");
+        assert_eq!(tx, read_tx)
+    }
 }
