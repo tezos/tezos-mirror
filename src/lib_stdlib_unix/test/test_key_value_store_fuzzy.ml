@@ -38,7 +38,7 @@ open Error_monad
    implementation (see module [R]) which is obviously correct.
 
    The main property tested is that the implementation agrees with the
-   reference implementation in a sequential and concurent
+   reference implementation in a sequential and concurrent
    setting. Because the reference implementation does not do I/Os, the
    property means that the key-value store is consistent with the
    order of the operations (ex: If for a given key, we write the value
@@ -48,11 +48,11 @@ open Error_monad
    function [write_values] is used (this is a reason why we do not
    expose it in the interface of [S]).
 
-   This property is tested on scenarios. In this case, a scenario is
-   roughly a list of actions and two consecutive actions can be either
-   bound sequentially or in parallel.
+   This property is tested on random scenarios, where a scenario is roughly a
+   list of actions and two consecutive actions can be bound either sequentially
+   or in parallel.
 
-   We check that both implementation return similar results on those
+   We check that both implementations return the same results on the generated
    scenarios. *)
 
 module type S = sig
@@ -578,7 +578,7 @@ let sequential_test =
     ~print
     ~name:"key-value store sequential writes/reads"
     ~count:10_000
-    ~max_fail:1 (*to stop shrinking after [max_fail] failures. *)
+    ~max_fail:1 (* to stop shrinking after [max_fail] failures. *)
     ~retries:1
     test_gen
     (fun (parameters, scenario) ->
@@ -604,7 +604,7 @@ let parallel_test =
     ~print
     ~name:"key-value store concurrent writes/reads"
     ~count:10_000
-    ~max_fail:1 (*to stop shrinking after [max_fail] failures. *)
+    ~max_fail:1 (* to stop shrinking after [max_fail] failures. *)
     ~retries:1
     test_gen
     (fun (parameters, scenario) ->

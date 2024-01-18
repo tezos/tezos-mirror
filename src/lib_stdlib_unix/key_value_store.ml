@@ -158,17 +158,20 @@ type ('key, 'value) layout = {
   value_size : int;
 }
 
-(** The module [Files] handles writing and reading into memory-mapped
-    files. A virtual file is backed by a physical file and a key is
-    an offset in this file.
+(** The module [Files] handles writing and reading into memory-mapped files. A
+    virtual file is backed by a physical file and a key is just an index (from 0
+    to [max_number_of_keys - 1]). As values within a file have a fixed size, the
+    index encodes the position of the associated value within the physical file.
 
-    Besides implementing a key-value store, this module must properly
-    handle resource utilization, especially file descriptors.
+    This module basically implements the key-value store, by grouping sets of
+    key-value pairs in files. Each file comes with its own layout, specifying in
+    particular the value size.
+
+    This module must properly handle resource utilization, especially file
+    descriptors.
 
     The structure {!Files.t} guarantees that no more than the specified
     [lru_size] file descriptors can be open at the same time.
-
-    This modules also enables each file to come with its own layout.
 *)
 module Files : sig
   type 'value t
@@ -225,46 +228,45 @@ end = struct
     let hash n = n
   end)
 
+  (* This datatype represents an opened virtual file. *)
   type 'value opened_file = {
     fd : Lwt_unix.file_descr;
-        (* The file descriptor of the file containing those
-           values. The file is always prefixed by the bitset indicated
-           the values it stores. *)
+    (* The file descriptor of the corresponding physical file. The file is
+       always prefixed by the bitset indicating the values stored in this file,
+       see the {bitset} field. *)
     bitset : Lwt_bytes.t;
-    (* This bitset encodes the values that are present. *)
+    (* This bitset encodes which values are present. *)
     cache : 'value Cache.t;
-        (* This cache keeps in memory values accessed recently. It is
-           bounded by the maximum number of values the file can
-           contain. It is cleaned up only once the file is removed from the LRU. *)
+    (* This cache keeps in memory values accessed recently. It is bounded by the
+       maximum number of values the file can contain. It is cleaned up only once
+       the file is removed from the LRU (see {lru}). *)
     lru_node : string LRU.node; (* LRU node associated with the current file. *)
   }
 
-  (* This type contains info related to a physical file loaded into
-     memory. *)
+  (* This datatype represents a virtual file and its current status (opening,
+     opened, closing). *)
   type 'value file =
     | Opening of 'value opened_file Lwt.t
-    (* The promise is fulfilled only once the file descriptor is
-       opened. *)
+    (* The promise is fulfilled only once the file descriptor is opened. *)
     | Closing of unit Lwt.t
-  (* The promise is fulfilled only once the file descriptor is
-     closed. *)
+  (* The promise is fulfilled only once the file descriptor is closed. *)
 
   (* This datatype encodes the promise returned by the current action
      performed by the store. *)
   type 'value action_output =
     | Close of unit Lwt.t (* The promise returns by [close] contains no data. *)
     | Read of ('value opened_file option * 'value tzresult) Lwt.t
-      (* The promise returned by [Read] contains the file read if it
-         exists as well as the value read if it exists or an error. *)
+      (* The promise returned by [read] contains the file read, if it
+         exists, as well as the value read if it exists, or an error. *)
     | Write of ('value opened_file * unit tzresult) Lwt.t
-      (* The promise returned by [Write] contains the file loaded or
-         created, and return nothing (except if an error occured
-         during the write. *)
+      (* The promise returned by [write] contains the file loaded or
+         created, and returns nothing (except if an error occured
+         during the write). *)
     | Value_exists of ('value opened_file option * bool tzresult) Lwt.t
-      (* The promise returned by [Value_exists] returned the file read
-         if it exists as well as the existence of the key. *)
+      (* The promise returned by [value_exists] contains the file read,
+         if it exists, as well as the existence of the key. *)
     | Remove of unit Lwt.t
-  (* The promise returned by [Remove] contains nothing. *)
+  (* The promise returned by [remove] contains nothing. *)
 
   (* The state of the store. *)
   type 'value t = {
@@ -272,14 +274,14 @@ end = struct
         (* [true] if the store was closed. Current actions will
            end, and any other actions will fail. *)
     last_actions : 'value action_output Table.t;
-    (* [last_actions] contains per file the last action performed. It must be
-       updated atomically when a new action is performed. *)
+        (* [last_actions] contains the last action performed, per file. It must be
+           updated atomically when a new action is performed. *)
     files : 'value file Table.t;
-    (* [files] contains per file data related to this file. It must be
-       updated atomically before opening or closing the associated
-       file descriptor. *)
+        (* [files] is the table of opened, opening, or closing files. It must be
+           updated atomically before opening or closing the associated file
+           descriptor. *)
     lru : string LRU.t;
-        (* [lru] contains a set of [filename] that are opened. It
+        (* [lru] contains the set of names of the files that are opened. It
            ensures there is a limited number of file descriptors opened. *)
   }
 
@@ -288,7 +290,7 @@ end = struct
      (A) filename \in lru -> filename \in files /\ filename \in last_actions
 
      (B) The number of file descriptors opened is bounded by the
-     capcity of the LRU
+     capacity of the LRU
 
      As a consequence, a read or write in the store can remove another
      file from the LRU. If an action was already performing on such a
@@ -306,9 +308,8 @@ end = struct
      by the close function will be fulfilled only once all the current
      actions will be completed.
 
-     The store ensures that any action performed on a given file are
-     done sequentially.
-  *)
+     The store ensures that actions performed on a given file are done
+     sequentially. *)
 
   let init ~lru_size =
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/6774
@@ -324,7 +325,7 @@ end = struct
     {closed; last_actions; files; lru}
 
   (* The promise returned by this function is fulfilled when the
-     current action is completed. The promise returned the opened file
+     current action is completed. The promise returns the opened file
      associated to the action if it exists once the action is
      completed. *)
   let wait_last_action =
@@ -438,8 +439,7 @@ end = struct
         | Error err -> return (opened_file, Error err)
         | Ok bytes ->
             let encoded_size = Bytes.length bytes in
-            (* If the [value_size] has been provided by the user, we
-               ensure the encoded size is the expected one. *)
+            (* We check that the encoded size is the expected one. *)
             if encoded_size <> layout.value_size then
               Lwt.return
                 ( opened_file,
@@ -464,7 +464,7 @@ end = struct
     let open Lwt_syntax in
     let* () = close_opened_file opened_file in
     (* It may happen that the node was already evicted by a concurrent
-       action. Hence the LRU.remove can fail. *)
+       action. Hence [LRU.remove] can fail. *)
     (try LRU.remove lru opened_file.lru_node with _ -> ()) ;
     Table.remove files filepath ;
     Lwt_unix.unlink filepath
@@ -489,7 +489,7 @@ end = struct
               Lwt.return_some opened_file)
       | Some action -> wait_last_action action
 
-    (* Any action on the key value store can be implemented that way. *)
+    (* Any action on the key value store can be implemented in this way. *)
     let generic_action files last_actions filepath ~on_file_closed
         ~on_file_opened =
       let open Lwt_syntax in
@@ -623,7 +623,7 @@ end = struct
         (* We want to ensure that the number of file descriptors opened
            is bounded by the size of the LRU. This is why we wait first
            for the eviction promise to be fulfilled that will close the
-           file evicted *)
+           file evicted. *)
         let* () = close_file files last_actions filepath in
         return lru_node
 
@@ -660,14 +660,14 @@ end = struct
     in
     return {fd; bitset; cache = Cache.create 101; lru_node}
 
-  (* This function is associated with the [Read] action. *)
+  (* This function is associated with the [Read] and [Value_exists] actions. *)
   let may_load_file files last_actions lru filepath =
     let open Lwt_syntax in
     let* b = Lwt_unix.file_exists filepath in
     if b then Lwt.return_some (load_file files last_actions lru filepath)
     else Lwt.return_none
 
-  (* This function is associated with the [Remove_file] action. *)
+  (* This function is associated with the [Remove] action. *)
   let may_remove_file filepath =
     let open Lwt_syntax in
     let* b = Lwt_unix.file_exists filepath in
@@ -788,7 +788,7 @@ end
 
 (* Main data-structure of the store.
 
-   Each phisycal file may have a different layout.
+   Each physical file may have a different layout.
 *)
 type ('file, 'key, 'value) t = {
   layout_of : 'file -> ('key, 'value) layout;

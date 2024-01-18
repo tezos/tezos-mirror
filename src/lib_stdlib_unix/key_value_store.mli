@@ -28,14 +28,11 @@ open Error_monad
 (** {1 Key-value store}
 
     This module defines a simple key-value store. The design is
-   minimal and aims to be:
+    minimal and aims to be:
 
     - easy to use
 
     - safe when used in a concurrent setting
-
-    This key-value store also features a best effort mechanism relying
-    on an LRU (least-recently used) cache to avoid I/Os.
 
     Each key-value pair is associated to a virtual file. Each virtual file has a
     layout, given by the user, which specifies, among other things, an
@@ -47,7 +44,15 @@ open Error_monad
     In a virtual file, all the stored values should the same size. Each key is
     associated with an index from 0 to some maximum value (see
     implementation). Different keys should be associated to different
-    indexes. *)
+    indexes.
+
+    A maximum of 4096 values can be stored in a file.
+
+    To avoid I/Os, the store keeps recently used values in memory, as
+    follows. It maintains an LRU (least-recently used) of a given maximum (see
+    {!init}) of open files. For each open file, there is an associated cache
+    containing all read/write values since the file was opened (only the most
+    recent value for a given key, of course). *)
 
 (** An abstract representation of a file-based key-value store. *)
 type ('file, 'key, 'value) t
@@ -84,9 +89,9 @@ val layout :
     [file]. All the keys/values associated to [file] are stored in a single
     physical file.
 
-    [lru_size] is a parameter that represents the number of different
-   values that can be in memory. It is up to the user of this
-   library to decide this number depending on the sizes of the values.
+    [lru_size] is a parameter that represents maximum number of open files. It
+    is up to the user of this library to decide this number depending on the
+    sizes of the values.
 *)
 val init :
   lru_size:int -> ('file -> ('key, 'value) layout) -> ('file, 'key, 'value) t
@@ -95,11 +100,9 @@ val init :
     and closes the key-value store. *)
 val close : ('file, 'key, 'value) t -> unit Lwt.t
 
-(** [write_value ?(override=false) t file key value] writes a value in
-    the [key] value store in file [file]. If a previous writing or
-    read failed, the function will try again to write the value. If
-    [override] is [true], the value will be written even though there
-    is already a written value for this key. *)
+(** [write_value ?(override=false) t file key value] writes a value in the [key]
+    value store in file [file]. If there is already a written value for this
+    key, then the value will be written if and only if [override] is [true]. *)
 val write_value :
   ?override:bool ->
   ('file, 'key, 'value) t ->
@@ -111,7 +114,7 @@ val write_value :
 (** [write_values ?(override=false) t seq] writes the sequence [seq]
     onto the store (see {!val:write_value}). If an error occurs, the
     first error is returned. This function guarantees that up to the
-    data for which the error occured, the values where stored onto the
+    data for which the error occured, the values were stored onto the
     disk. *)
 val write_values :
   ?override:bool ->
