@@ -17,10 +17,10 @@ pub struct DelayedInbox(LinkedList<Hash, DelayedTransaction>);
 pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
 
 // Tag that indicates the delayed transaction is a eth transaction.
-pub const DELAYED_TRANSACTION_TAG: u8 = 0x00;
+pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
 
 // Tag that indicates the delayed transaction is a deposit.
-pub const DELAYED_DEPOSIT_TAG: u8 = 0x01;
+pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 
 /// Hash of a transaction
 ///
