@@ -12,6 +12,9 @@
 
 ### Breaking changes
 
+- Prefix withdrawal precompiled contract by 'ff' to avoid any friction with upcoming Ethereum fork.
+  Withdrawal contract address is now 'ff00000000000000000000000000000000000001'. (!11556)
+
 ### Internal
 
 ## Version 9978f3a5f8bee0be78686c5c568109d2e6148f13
