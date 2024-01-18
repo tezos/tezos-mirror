@@ -54,6 +54,13 @@ module Misbehaviour_repr = struct
       pp
       misbehaviour
       (from_duplicate_operation duplicate_op)
+
+  let from_duplicate_block (b : Block.t) =
+    let open Result_wrap_syntax in
+    let open Result_syntax in
+    let*@ level = Protocol.Raw_level_repr.of_int32 b.header.shell.level in
+    let*@ round = Protocol.Fitness_repr.round_from_raw b.header.shell.fitness in
+    return {kind = Double_baking; level; round}
 end
 
 module Denunciations_repr = struct

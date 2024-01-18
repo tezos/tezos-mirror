@@ -166,6 +166,7 @@ type double_signing_state = {
   evidence : Context.t -> Protocol.Alpha_context.packed_operation;
   denounced : bool;
   level : Int32.t;
+  misbehaviour : Protocol.Misbehaviour_repr.t;
 }
 
 (** Module for the [State.t] type of asserted information about the system during a test. *)
@@ -1342,6 +1343,9 @@ let double_bake_ delegate_name (block, state) =
   (* includes pending operations *)
   let* main_branch, state = bake ~baker:delegate_name (block, state) in
   let evidence = op_double_baking main_branch.header forked_block.header in
+  let*? misbehaviour =
+    Slashing_helpers.Misbehaviour_repr.from_duplicate_block main_branch
+  in
   let dss =
     {
       culprit = delegate.pkh;
@@ -1349,6 +1353,7 @@ let double_bake_ delegate_name (block, state) =
       evidence;
       kind = Double_baking;
       level = block.header.shell.level;
+      misbehaviour;
     }
   in
   let state =
@@ -1405,6 +1410,9 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
       evidence;
       kind;
       level = block.header.shell.level;
+      misbehaviour =
+        Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+          attestation_a;
     }
   in
   let state =
@@ -1462,7 +1470,7 @@ let get_pending_slashed_pct_for_delegate (block, state) delegate =
   aux 0 state.State.pending_slashes
 
 let update_state_denunciation (block, state)
-    {culprit; denounced; evidence = _; kind; level} =
+    {culprit; denounced; evidence = _; kind = _; level; misbehaviour} =
   let open Lwt_result_syntax in
   if denounced then
     (* If the double signing has already been denounced, a second denunciation should fail *)
@@ -1490,14 +1498,6 @@ let update_state_denunciation (block, state)
            following cycle? *)
         return (state, denounced)
       else
-        let misbehaviour =
-          {
-            (* Fields level and round are unused for now. *)
-            level = Protocol.Raw_level_repr.of_int32_exn level;
-            round = Protocol.Round_repr.zero;
-            Protocol.Misbehaviour_repr.kind;
-          }
-        in
         (* for simplicity's sake (lol), the block producer and the payload producer are the same
            We also assume that the current state baking policy will be used for the next block *)
         let* rewarded, _, _, _ =

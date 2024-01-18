@@ -26,6 +26,10 @@ module Misbehaviour_repr : sig
     Tezos_raw_protocol_alpha.Misbehaviour_repr.t ->
     'kind Protocol.Alpha_context.Kind.consensus Protocol.Alpha_context.operation ->
     unit tzresult Lwt.t
+
+  (** Builds a misbehaviour object from either of the duplicate blocks
+      that constitute a double baking event. *)
+  val from_duplicate_block : Block.t -> Protocol.Misbehaviour_repr.t tzresult
 end
 
 (** Helpers about "full denunciations", that is, a denunciation item
