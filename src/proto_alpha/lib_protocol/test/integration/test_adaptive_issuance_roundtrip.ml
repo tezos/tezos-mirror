@@ -2141,7 +2141,23 @@ module Roundtrip = struct
     --> finalize_unstake "staker"
 
   let forbid_costaking =
-    let constants = init_constants ~autostaking_enable:false () in
+    let default_constants =
+      ("default protocol constants", init_constants ~autostaking_enable:false ())
+    in
+    let small_delegate_parameter_constants =
+      ( "small delegate parameters delay",
+        init_constants
+          ~delegate_parameters_activation_delay:0
+          ~autostaking_enable:false
+          () )
+    in
+    let large_delegate_parameter_constants =
+      ( "large delegate parameters delay",
+        init_constants
+          ~delegate_parameters_activation_delay:10
+          ~autostaking_enable:false
+          () )
+    in
     let init_params =
       {
         limit_of_staking_over_baking = Q.one;
@@ -2156,14 +2172,23 @@ module Roundtrip = struct
     in
     let amount = Amount (Tez.of_mutez 1_000_000L) in
     (* init *)
-    begin_test ~activate_ai:true ~constants ["delegate"]
+    begin_test
+      ~activate_ai:true
+      ~constants_list:
+        [
+          default_constants;
+          small_delegate_parameter_constants;
+          large_delegate_parameter_constants;
+        ]
+      ["delegate"]
     --> set_delegate_params "delegate" init_params
     --> add_account_with_funds
           "staker"
           "delegate"
           (Amount (Tez.of_mutez 2_000_000_000_000L))
     --> set_delegate "staker" (Some "delegate")
-    --> wait_ai_activation --> next_cycle
+    --> wait_cycle (`And (`AI_activation, `delegate_parameters_activation))
+    --> next_cycle
     (* try stake in normal conditions *)
     --> stake "staker" amount
     (* Change delegate parameters to forbid staking *)
@@ -2171,8 +2196,8 @@ module Roundtrip = struct
     (* The changes are not immediate *)
     --> stake "staker" amount
     (* The parameters change is applied exactly
-       [delegate_parameters_activation_delay + 1] after the request *)
-    --> wait_n_cycles (default_param_wait - 1)
+       [delegate_parameters_activation_delay] after the request *)
+    --> wait_delegate_parameters_activation
     (* Not yet... *)
     --> stake "staker" amount
     --> next_cycle
@@ -2186,7 +2211,7 @@ module Roundtrip = struct
     --> finalize_unstake "staker"
     (* Can authorize stake again *)
     --> set_delegate_params "delegate" init_params
-    --> wait_n_cycles (default_param_wait - 1)
+    --> wait_delegate_parameters_activation
     (* Not yet... *)
     --> assert_failure (stake "staker" amount)
     --> next_cycle
