@@ -788,16 +788,6 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
   let open Lwt_result_wrap_syntax in
-  Log.info
-    ~color:time_color
-    "Baking level %d"
-    (Int32.to_int (Int32.succ Block.(block.header.shell.level))) ;
-  let current_cycle = Block.current_cycle block in
-  let adaptive_issuance_vote =
-    if state.activate_ai then
-      Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
-    else Per_block_vote_pass
-  in
   let policy =
     match baker with
     | None -> state.baking_policy
@@ -816,6 +806,17 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* baker, _, _, _ = Block.get_next_baker ?policy block in
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
+  in
+  Log.info
+    ~color:time_color
+    "Baking level %d with %s"
+    (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
+    baker_name ;
+  let current_cycle = Block.current_cycle block in
+  let adaptive_issuance_vote =
+    if state.activate_ai then
+      Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+    else Per_block_vote_pass
   in
   let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
