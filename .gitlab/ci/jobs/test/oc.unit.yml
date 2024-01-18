@@ -51,6 +51,8 @@
     # except that we do not make the jobs [when: manual] -- if the
     # build jobs were manual and triggered, then there is no point in
     # having the user do another manual action to also run the tests.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always
     - changes:
         paths:
           - src/**/*
