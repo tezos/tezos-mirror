@@ -1,7 +1,7 @@
 misc_opam_checks:
   extends:
     - .test_template
-  needs: [trigger]
+    - .needs__trigger
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh

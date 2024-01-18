@@ -2,7 +2,7 @@ ocaml-check:
   extends:
     - .tags_template__build
     - .oc.build
-  needs: [trigger]
+    - .needs__trigger
   rules:
     - changes:
         paths:

@@ -2,8 +2,8 @@ oc.misc_checks:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
+    - .needs__trigger
   stage: "test"
-  needs: [trigger]
   before_script:
     - ./scripts/ci/take_ownership.sh
     - eval $(opam env)
@@ -33,6 +33,8 @@ oc.misc_checks:
 kaitai_checks:
   extends:
     - .test_template
+  needs:
+    - "oc.build_x86_64-released"
   rules:
     - changes:
         paths:
@@ -81,9 +83,9 @@ kaitai_e2e_checks:
 oc.check_lift_limits_patch:
   extends:
     - .test_template
+    - .needs__trigger
   # These tests are not flaky at all so we overwrite the retry value
   retry: 0
-  needs: [trigger]
   rules:
     - changes:
         - src/bin_tps_evaluation/lift_limits.patch
@@ -103,8 +105,8 @@ commit_titles:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies
+    - .needs__trigger
   stage: "test"
-  needs: [trigger]
   script:
     # Check commit messages
     - ./scripts/ci/check_commit_messages.sh || exit $?
