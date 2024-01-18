@@ -181,9 +181,15 @@ module Frozen_tez = struct
       String.Map.map f co_current
 
   (* For rewards, distribute equally *)
-  let add_tez_to_all_current tez a =
+  let add_tez_to_all_current ~edge tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
+    (* Baker's advantage for the mutez *)
     let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
+    let remains = Tez.(tez -! self_quantity) in
+    (* Baker's edge. Round up for the baker's advantage again *)
+    let bakers_edge = Tez.mul_q remains edge |> Tez.of_q ~round:`Up in
+    let self_quantity = Tez.(self_quantity +! bakers_edge) in
+    (* The remains are distributed equally *)
     let co_quantity = Partial_tez.of_tez Tez.(tez -! self_quantity) in
     let co_current = add_q_to_all_co_current co_quantity a.co_current in
     {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
@@ -227,6 +233,10 @@ module Frozen_tez = struct
 
   let add_current amount account a =
     add_current_q (Partial_tez.of_tez amount) account a
+
+  let add_self_current amount a =
+    let self_current = Tez.(a.self_current +! amount) in
+    {a with self_current}
 
   (* Adds frozen to account. Happens each unstake to unstaked frozen deposits *)
   let add_init amount account a = union a (init amount account a.delegate)
@@ -803,8 +813,17 @@ let add_liquid_rewards amount account_name account_map =
 
 let add_frozen_rewards amount account_name account_map =
   let f account =
+    let actual_edge =
+      Q.(
+        mul account.parameters.edge_of_baking_over_staking (1_000_000_000 // 1)
+        |> to_int |> of_int
+        |> mul (1 // 1_000_000_000))
+    in
     let frozen_deposits =
-      Frozen_tez.add_tez_to_all_current amount account.frozen_deposits
+      Frozen_tez.add_tez_to_all_current
+        ~edge:actual_edge
+        amount
+        account.frozen_deposits
     in
     {account with frozen_deposits}
   in
