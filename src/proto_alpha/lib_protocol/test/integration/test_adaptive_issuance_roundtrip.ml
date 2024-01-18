@@ -1810,6 +1810,23 @@ let wait_ai_activation =
       Log.info ~color:event_color "AI activated" ;
       return output)
 
+(** wait delegate_parameters_activation_delay cycles  *)
+let wait_delegate_parameters_activation =
+  let open Lwt_result_syntax in
+  let rec bake_n_cycles count input =
+    if count <= 0 then return input
+    else
+      let* output = bake_until_next_cycle input in
+      bake_n_cycles (count - 1) output
+  in
+  exec (fun ((_, (state : State.t)) as input) ->
+      Log.info
+        ~color:time_color
+        "Fast forward to delegate's parameters  activation" ;
+      let cycles = state.constants.delegate_parameters_activation_delay in
+      let* output = bake_n_cycles cycles input in
+      return output)
+
 (** Create an account and give an initial balance funded by [source] *)
 let add_account_with_funds name source amount =
   add_account name --> transfer source name amount --> reveal name
