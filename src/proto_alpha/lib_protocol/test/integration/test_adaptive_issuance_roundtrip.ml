@@ -318,89 +318,6 @@ module State = struct
       let* total_supply = Tez.(total_supply + delta_rewards) in
       return {state with last_level_rewards = current_level; total_supply}
 
-  (** [apply_staking_abstract_balance_updates] updates a state based on balance
-      updates (found in block application metadata).
-      It first collect all changes on pseudotokens, then apply them on
-      accounts. *)
-  let apply_staking_abstract_balance_updates balance_updates state =
-    let update_staking_delegator_numerator delta account_state =
-      let staking_delegator_numerator =
-        Z.add delta account_state.staking_delegator_numerator
-      in
-      {account_state with staking_delegator_numerator}
-    in
-    let update_staking_delegate_denominator delta account_state =
-      let staking_delegate_denominator =
-        Z.add delta account_state.staking_delegate_denominator
-      in
-      {account_state with staking_delegate_denominator}
-    in
-    let add_change pkh update ~f changes =
-      let delta_pt, delta_mul =
-        match
-          (update
-            : Protocol.Alpha_context.Staking_pseudotoken.t
-              Protocol.Alpha_context.Receipt.balance_update)
-        with
-        | Credited pt -> (pt, Z.one)
-        | Debited pt -> (pt, Z.minus_one)
-      in
-      let delta =
-        Z.mul delta_mul
-        @@ Protocol.Alpha_context.Staking_pseudotoken.Internal_for_tests.to_z
-             delta_pt
-      in
-      let f = f delta in
-      Signature.Public_key_hash.Map.update
-        pkh
-        (function
-          | None -> Some f
-          | Some existing_change ->
-              Some (fun account_state -> f (existing_change account_state)))
-        changes
-    in
-    let changes =
-      List.fold_left
-        (fun changes balance_update ->
-          let (Protocol.Alpha_context.Receipt.Balance_update_item
-                (balance, update, _origin)) =
-            balance_update
-          in
-          match balance with
-          | Staking_delegator_numerator {delegator} -> (
-              match delegator with
-              | Originated _ -> assert false
-              | Implicit pkh ->
-                  add_change
-                    pkh
-                    update
-                    changes
-                    ~f:update_staking_delegator_numerator)
-          | Staking_delegate_denominator {delegate} ->
-              add_change
-                delegate
-                update
-                changes
-                ~f:update_staking_delegate_denominator
-          | _ -> (
-              match Protocol.Alpha_context.Receipt.token_of_balance balance with
-              | Tez -> changes
-              | Staking_pseudotoken -> assert false))
-        Signature.Public_key_hash.Map.empty
-        balance_updates
-    in
-    let update_account account_state =
-      match Signature.Public_key_hash.Map.find account_state.pkh changes with
-      | None -> account_state
-      | Some f -> f account_state
-    in
-    let log_updates =
-      List.map
-        (fun (x, _) -> fst @@ find_account_from_pkh x state)
-        (Signature.Public_key_hash.Map.bindings changes)
-    in
-    update_map ~log_updates ~f:(String.Map.map update_account) state
-
   let apply_slashing
       ( culprit,
         Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
@@ -903,12 +820,8 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
   let* block, state =
-    let* block', metadata =
+    let* block', _metadata =
       Block.bake_with_metadata ?policy ~adaptive_issuance_vote ~operations block
-    in
-    let balance_updates = Block.get_balance_updates_from_metadata metadata in
-    let state =
-      State.apply_staking_abstract_balance_updates balance_updates state
     in
     if state.burn_rewards then
       (* Incremental mode *)
