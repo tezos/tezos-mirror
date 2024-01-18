@@ -675,3 +675,20 @@ let encoding =
                          (merge_objs
                             adaptive_issuance_encoding
                             (obj1 (req "direct_ticket_spending_enable" bool))))))))))
+
+let update_sc_rollup_parameter ~block_time c =
+  let seconds_in_a_day = 60 * 60 * 24 in
+  let seconds_in_a_week = seconds_in_a_day * 7 in
+  {
+    c with
+    challenge_window_in_blocks = seconds_in_a_week * 2 / block_time;
+    (* Same as challenge_window_in_blocks *)
+    max_active_outbox_levels = Int32.of_int (seconds_in_a_week * 2 / block_time);
+    commitment_period_in_blocks = 60 * 15 / block_time;
+    max_lookahead_in_blocks = Int32.of_int (seconds_in_a_day * 30 / block_time);
+    timeout_period_in_blocks = seconds_in_a_week / block_time;
+  }
+
+module Internal_for_tests = struct
+  let sc_rollup_encoding = sc_rollup_encoding
+end
