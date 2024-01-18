@@ -128,15 +128,15 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel ?runner
-    ?(base_installee =
-      "src/proto_alpha/lib_protocol/test/integration/wasm_kernel")
-    ~preimages_dir ?config installee =
+let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
-  let installer = installee ^ "-installer.hex" in
+  let installee = Uses.path installee in
+  let installer =
+    installee |> Filename.basename |> Filename.remove_extension |> fun base ->
+    base ^ "-installer.hex"
+  in
   let output = Temp.file installer in
-  let installee = (project_root // base_installee // installee) ^ ".wasm" in
   let setup_file_args =
     match config with
     | Some config ->
@@ -362,15 +362,13 @@ type bootstrap_smart_rollup_setup = {
 }
 
 let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
-    ?(parameters_ty = "string") ?whitelist ?base_installee ~installee ?config ()
-    =
+    ?(parameters_ty = "string") ?whitelist ~installee ?config () =
   (* Create a temporary directory to store the preimages. *)
   let smart_rollup_node_data_dir = Temp.dir (name ^ "-data-dir") in
 
   (* Create the installer boot sector. *)
   let* {boot_sector; output = boot_sector_file; _} =
     prepare_installer_kernel
-      ?base_installee
       ~preimages_dir:(Filename.concat smart_rollup_node_data_dir "wasm_2_0_0")
       ?config
       installee

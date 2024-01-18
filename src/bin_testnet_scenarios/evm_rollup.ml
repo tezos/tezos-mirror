@@ -100,10 +100,9 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
         in
         let* {boot_sector; _} =
           Sc_rollup_helpers.prepare_installer_kernel
-            ~base_installee:"./"
             ~preimages_dir
             ~config:setup_file
-            "evm_kernel"
+            Constant.WASM.evm_kernel
         in
         Log.info "EVM Kernel installer ready." ;
         let* rollup_address =

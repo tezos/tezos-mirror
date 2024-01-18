@@ -2062,10 +2062,9 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm _protocol parameters dal_node
   Log.info "Originate rollup." ;
   let* {boot_sector; _} =
     Sc_rollup_helpers.prepare_installer_kernel
-      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      "dal_echo_kernel"
+      Constant.WASM.dal_echo_kernel
   in
   let* sc_rollup_address =
     Client.Sc_rollup.originate
@@ -3963,12 +3962,11 @@ module Tx_kernel_e2e = struct
     Log.info "Originate the tx kernel." ;
     let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
-        ~base_installee:"./"
         ~preimages_dir:
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        "tx_kernel_dal"
+        Constant.WASM.tx_kernel_dal
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -4144,10 +4142,9 @@ module Tx_kernel_e2e = struct
     Log.info "Originate the echo kernel." ;
     let* {boot_sector; _} =
       Sc_rollup_helpers.prepare_installer_kernel
-        ~base_installee:"./"
         ~preimages_dir:
           (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-        "dal_echo_kernel"
+        Constant.WASM.dal_echo_kernel
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -4374,19 +4371,22 @@ let register ~protocols =
     protocols ;
   scenario_with_all_nodes
     "test reveal_dal_page in fast exec wasm pvm"
-    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
     ~pvm_name:"wasm_2_0_0"
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
     "test tx_kernel"
-    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes
     "test echo_kernel"
-    ~uses:(fun _protocol -> [Constant.smart_rollup_installer])
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
     ~pvm_name:"wasm_2_0_0"
     ~slot_size:2048
     ~page_size:256

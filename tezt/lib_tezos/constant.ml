@@ -72,6 +72,49 @@ let smart_rollup_installer =
 let _octez_smart_rollup_wasm_debugger =
   Uses.make ~tag:"wasm_debugger" ~path:"./octez-smart-rollup-wasm-debugger"
 
+module WASM = struct
+  let dal_echo_kernel =
+    Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm"
+
+  let debug_kernel =
+    Uses.make
+      ~tag:"debug_kernel"
+      ~path:"etherlink/kernel_evm/kernel/tests/resources/debug_kernel.wasm"
+
+  (* Note: this should probably depend on the protocol,
+     and thus be in the [Protocol] module? *)
+  let echo =
+    Uses.make
+      ~tag:"echo"
+      ~path:
+        "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm"
+
+  let evm_kernel = Uses.make ~tag:"evm_kernel" ~path:"evm_kernel.wasm"
+
+  let failed_migration =
+    Uses.make
+      ~tag:"failed_migration"
+      ~path:"etherlink/kernel_evm/kernel/tests/resources/failed_migration.wasm"
+
+  let ghostnet_evm_kernel =
+    Uses.make
+      ~tag:"ghostnet_evm_kernel"
+      ~path:
+        "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
+
+  let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm"
+
+  let tx_kernel_dal = Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm"
+
+  (* Note: this should probably depend on the protocol,
+     and thus be in the [Protocol] module? *)
+  let tx_kernel_fixed_dac =
+    Uses.make
+      ~tag:"tx_kernel_fixed_dac"
+      ~path:
+        "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/tx-kernel-fixed-dac.wasm"
+end
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)

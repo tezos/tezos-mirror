@@ -6,13 +6,13 @@
  (public_name octez-testnet-scenarios)
  (package octez-testnet-scenarios)
  (libraries
-  tezt
+  octez-libs.tezt-wrapper
   tezt-tezos
   tezt_ethereum)
  (flags
   (:standard)
-  -open Tezt
-  -open Tezt.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_ethereum))

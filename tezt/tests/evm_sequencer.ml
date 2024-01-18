@@ -14,6 +14,7 @@ let uses _protocol =
     Constant.octez_smart_rollup_node;
     Constant.octez_evm_node;
     Constant.smart_rollup_installer;
+    Constant.WASM.evm_kernel;
   ]
 
 open Helpers
@@ -93,11 +94,7 @@ let setup_sequencer ?time_between_blocks
       ()
   in
   let* {output; _} =
-    prepare_installer_kernel
-      ~base_installee:"./"
-      ~preimages_dir
-      ?config
-      "evm_kernel"
+    prepare_installer_kernel ~preimages_dir ?config Constant.WASM.evm_kernel
   in
   let* sc_rollup_address =
     originate_sc_rollup

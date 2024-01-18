@@ -284,10 +284,9 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   in
   let* {boot_sector; _} =
     prepare_installer_kernel
-      ~base_installee:"./"
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
-      "tx_kernel"
+      Constant.WASM.tx_kernel
   in
   (* Initialise the sc rollup *)
   let* sc_rollup_address =
@@ -311,11 +310,10 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
          smart_rollup_node_extra_args;
        } =
     setup_bootstrap_smart_rollup
-      ~base_installee:"./"
       ~name:"tx_kernel"
       ~address:sc_rollup_address
       ~parameters_ty:"pair string (ticket string)"
-      ~installee:"tx_kernel"
+      ~installee:Constant.WASM.tx_kernel
       ()
   in
   let bootstrap1_key = Constant.bootstrap1.alias in
@@ -533,7 +531,11 @@ let test_tx_kernel_e2e =
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"]
     ~uses:(fun _protocol ->
-      [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.tx_kernel;
+      ])
     ~title:(Printf.sprintf "wasm_2_0_0 - tx kernel should run e2e (kernel_e2e)")
     (tx_kernel_e2e setup_classic)
 
@@ -543,7 +545,11 @@ let test_bootstrapped_tx_kernel_e2e =
     ~__FILE__
     ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "bootstrap"]
     ~uses:(fun _protocol ->
-      [Constant.octez_smart_rollup_node; Constant.smart_rollup_installer])
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.tx_kernel;
+      ])
     ~title:
       (Printf.sprintf
          "wasm_2_0_0 - bootstrapped tx kernel should run e2e (kernel_e2e)")

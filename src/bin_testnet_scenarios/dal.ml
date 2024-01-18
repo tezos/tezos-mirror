@@ -280,10 +280,9 @@ let scenario_without_rollup_node node dal_node client _network_name
 
 let prepare_installer_kernel rollup_node =
   Sc_rollup_helpers.prepare_installer_kernel
-    ~base_installee:"./"
     ~preimages_dir:
       (Filename.concat (Sc_rollup_node.data_dir rollup_node) "wasm_2_0_0")
-    "dal_echo_kernel"
+    Constant.WASM.dal_echo_kernel
 
 (* Originate a rollup with alias [rollup_alias] running the "dal_echo_kernel" on
    the given [rollup_node]. *)

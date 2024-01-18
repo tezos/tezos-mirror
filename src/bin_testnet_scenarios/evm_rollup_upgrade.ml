@@ -149,15 +149,12 @@ let get_upgrade_message ~smart_rollup_node ~preimage_root_hash
   return @@ hex_smart_rollup_address ^ upgrade_kernel_tag ^ kernel_upgrade_nonce
   ^ preimage_root_hash ^ signature
 
-let replace_preimages ~smart_rollup_node ~kernel_dir ~new_kernel =
+let replace_preimages ~smart_rollup_node ~new_kernel =
   let preimages_dir =
     Sc_rollup_node.data_dir smart_rollup_node // "wasm_2_0_0"
   in
   let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel
-      ~preimages_dir
-      ~base_installee:kernel_dir
-      new_kernel
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir new_kernel
   in
   return root_hash
 
@@ -193,10 +190,15 @@ let upgrade_kernel ~configuration_path ~testnet () =
     // (upgrade_config.new_kernel ^ ".wasm")
   in
   let* preimage_root_hash =
-    replace_preimages
-      ~smart_rollup_node
-      ~kernel_dir:upgrade_config.kernel_dir
-      ~new_kernel:upgrade_config.new_kernel
+    let new_kernel =
+      (* [bin_testnet_scenarios] disables warnings from [~uses], so all we care about here
+         is to build the correct path from the configuration. *)
+      Tezt_wrapper.Uses.make
+        ~tag:"new_kernel"
+        ~path:
+          (upgrade_config.kernel_dir // (upgrade_config.new_kernel ^ ".wasm"))
+    in
+    replace_preimages ~smart_rollup_node ~new_kernel
   in
   let* upgrade_message =
     get_upgrade_message

@@ -4373,7 +4373,7 @@ let _tezt_testnet_scenarios =
     ~static:false
     ~deps:
       [
-        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_ethereum |> open_;
       ]
