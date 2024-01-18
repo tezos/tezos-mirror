@@ -58,14 +58,25 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** Record in the context that the given delegate has now been slashed
-    for double signing for the given misbehaviour for the given level and return the amounts to
-    burn and to reward. If the delegate has no remaining frozen
-    deposits, this will also forbid it to bake or attest until a new
-    deposit is frozen.
+(** Record in the context that the given delegate is now marked for
+    slashing for the given misbehaviour. If the past and pending
+    slashings for the delegate since the previous cycle exceed a fixed
+    threshold, then this function also records in the context that the
+    delegate is now forbidden from taking part in the consensus
+    process.
 
-    Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for the same misbehaviour for the given level.  *)
+    Return the updated context and a boolean indicating whether the
+    delegate is actually forbidden from baking/attesting.
+
+    [operation_hash] corresponds to the denunciation that prompted
+    this punishment. The level argument is the level of the duplicate
+    blocks, or the level that the duplicate (pre)attestations point
+    to, **not** the level of the block that contains the denunciation.
+
+    This function asserts that the delegate has not already been
+    denounced for the same misbehaviour at the same level. Indeed, if
+    this were the case, then the current denunciation operation should
+    have been rejected by {!Validate}. *)
 val punish_double_signing :
   Raw_context.t ->
   operation_hash:Operation_hash.t ->

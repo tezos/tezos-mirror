@@ -50,13 +50,6 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** [punish_double_signing ctxt misbehaviour delegate level] record
-    in the context that the given [delegate] has now been slashed for the
-    double signing event [misbehaviour] for the given [level] and return the amounts of the
-    frozen deposits to burn and to reward the denuncer.
-
-    The double signing event corresponds to a field in {!Storage.slashed_level}.
-*)
 let punish_double_signing ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
     ~rewarded : (Raw_context.t * bool) tzresult Lwt.t =
