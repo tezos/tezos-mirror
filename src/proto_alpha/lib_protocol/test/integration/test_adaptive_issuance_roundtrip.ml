@@ -1515,7 +1515,7 @@ let cycle_from_level blocks_per_cycle level =
   current_cycle
 
 let pct_from_kind (block : Block.t) = function
-  | Protocol.Misbehaviour.Double_baking ->
+  | Protocol.Misbehaviour_repr.Double_baking ->
       (block.constants.percentage_of_frozen_deposits_slashed_per_double_baking
         :> int)
   | Double_attesting ->

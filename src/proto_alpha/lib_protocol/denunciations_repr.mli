@@ -13,7 +13,7 @@ type misbehaviour_cycle = Current | Previous
 type item = {
   operation_hash : Operation_hash.t;
   rewarded : Signature.public_key_hash;
-  misbehaviour : Misbehaviour.t;
+  misbehaviour : Misbehaviour_repr.t;
   misbehaviour_cycle : misbehaviour_cycle;
 }
 
@@ -26,7 +26,7 @@ val encoding : t Data_encoding.t
 val add :
   Operation_hash.t ->
   Signature.public_key_hash ->
-  Misbehaviour.t ->
+  Misbehaviour_repr.t ->
   misbehaviour_cycle ->
   t ->
   t

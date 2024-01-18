@@ -58,8 +58,7 @@ let check_denunciations ~(cycle : Denunciations_repr.misbehaviour_cycle) b
   let* denunciations = Context.get_denunciations (B b) in
   match denunciations with
   | [(d, item)] when Signature.Public_key_hash.equal d delegate ->
-      assert (
-        item.Denunciations_repr.misbehaviour = Misbehaviour.Double_attesting) ;
+      assert (item.Denunciations_repr.misbehaviour = Double_attesting) ;
       assert (item.Denunciations_repr.misbehaviour_cycle = cycle) ;
       return_unit
   | _ -> assert false

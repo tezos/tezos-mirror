@@ -48,7 +48,6 @@
   Bitset
   Bounded_history_repr
   Context_binary_proof
-  Misbehaviour
   Ratio_repr
   Int_percentage
   Michelson_v1_primitives
@@ -151,6 +150,7 @@
   Carbonated_map_costs
   Carbonated_map
   Staking_parameters_repr
+  Misbehaviour_repr
   Denunciations_repr
   Raw_context_intf
   Raw_context
@@ -341,7 +341,6 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
   int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
@@ -447,6 +446,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
@@ -639,7 +639,6 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
   int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
@@ -745,6 +744,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
@@ -921,7 +921,6 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
-  misbehaviour.ml misbehaviour.mli
   ratio_repr.ml ratio_repr.mli
   int_percentage.ml int_percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
@@ -1027,6 +1026,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli

@@ -20,7 +20,7 @@ let misbehaviour_cycle_encoding =
 type item = {
   operation_hash : Operation_hash.t;
   rewarded : Signature.public_key_hash;
-  misbehaviour : Misbehaviour.t;
+  misbehaviour : Misbehaviour_repr.t;
   misbehaviour_cycle : misbehaviour_cycle;
 }
 
@@ -34,7 +34,7 @@ let item_encoding =
     (obj4
        (req "operation_hash" Operation_hash.encoding)
        (req "rewarded" Signature.Public_key_hash.encoding)
-       (req "misbehaviour" Misbehaviour.encoding)
+       (req "misbehaviour" Misbehaviour_repr.encoding)
        (req "misbehaviour_cycle" misbehaviour_cycle_encoding))
 
 type t = item list

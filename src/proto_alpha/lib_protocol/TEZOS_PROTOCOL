@@ -18,7 +18,6 @@
         "Bitset",
         "Bounded_history_repr",
         "Context_binary_proof",
-        "Misbehaviour",
         "Ratio_repr",
         "Int_percentage",
 
@@ -129,6 +128,7 @@
         "Carbonated_map_costs",
         "Carbonated_map",
         "Staking_parameters_repr",
+        "Misbehaviour_repr",
         "Denunciations_repr",
 
         "Raw_context_intf",
