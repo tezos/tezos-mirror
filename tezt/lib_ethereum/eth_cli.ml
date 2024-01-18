@@ -24,14 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let path = "eth"
+let spawn command = Process.spawn "npx" ("eth" :: command)
 
 let spawn_command_and_read_string ?expect_failure command =
-  let process = Process.spawn path command in
+  let process = spawn command in
   Process.check_and_read_stdout ?expect_failure process
 
 let spawn_command ?expect_failure command =
-  let process = Process.spawn path command in
+  let process = spawn command in
   let* output = Process.check ?expect_failure process in
   return output
 
