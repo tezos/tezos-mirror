@@ -319,6 +319,12 @@ let () =
   register
   @@ def
        "smart_rollup"
+       ["wasm_2_0_0"; "output"; "proof"]
+       Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation
+       .output_proof_encoding ;
+  register
+  @@ def
+       "smart_rollup"
        ["commmitment"]
        Protocol.Alpha_context.Sc_rollup.Commitment.encoding ;
   register
