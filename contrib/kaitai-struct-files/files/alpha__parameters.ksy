@@ -166,6 +166,9 @@ types:
     - id: feature_enable
       type: u1
       enum: bool
+    - id: incentives_enable
+      type: u1
+      enum: bool
     - id: number_of_slots
       type: s2
     - id: attestation_lag
