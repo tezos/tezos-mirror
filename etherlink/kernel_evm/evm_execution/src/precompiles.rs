@@ -620,7 +620,7 @@ mod tick_model {
     }
 
     pub fn ticks_of_blake2f(rounds: u32) -> u64 {
-        1_000_000 * rounds as u64 // TODO: determine the number of ticks
+        1_850_000 + 3_200 * rounds as u64
     }
 }
 
