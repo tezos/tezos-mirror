@@ -1089,7 +1089,7 @@ let exec_op f =
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ~activate_ai ?(burn_rewards = false)
-    (constants : Protocol.Alpha_context.Constants.Parametric.t)
+    ~(constants : Protocol.Alpha_context.Constants.Parametric.t)
     delegates_name_list : (unit, t) scenarios =
   exec (fun () ->
       let open Lwt_result_syntax in
@@ -1877,7 +1877,7 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
   in
   let begin_test ~activate_ai ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    begin_test ~activate_ai constants [name]
+    begin_test ~activate_ai ~constants [name]
     --> set_delegate_params name init_params
     --> set_baker "__bootstrap__"
   in
@@ -1941,7 +1941,7 @@ module Roundtrip = struct
     let constants = init_constants ~autostaking_enable:false () in
     let amount = Amount (Tez.of_mutez 333_000_000_000L) in
     let preserved_cycles = constants.preserved_cycles in
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> next_block --> wait_ai_activation
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> next_cycle
@@ -2042,7 +2042,7 @@ module Roundtrip = struct
         edge_of_baking_over_staking = Q.one;
       }
     in
-    begin_test ~activate_ai:true constants ["delegate1"; "delegate2"]
+    begin_test ~activate_ai:true ~constants ["delegate1"; "delegate2"]
     --> set_delegate_params "delegate1" init_params
     --> set_delegate_params "delegate2" init_params
     --> add_account_with_funds
@@ -2065,7 +2065,7 @@ module Roundtrip = struct
         edge_of_baking_over_staking = Q.one;
       }
     in
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> set_delegate_params "delegate" init_params
     --> add_account_with_funds
           "staker"
@@ -2101,7 +2101,7 @@ module Roundtrip = struct
     in
     let amount = Amount (Tez.of_mutez 1_000_000L) in
     (* init *)
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> set_delegate_params "delegate" init_params
     --> add_account_with_funds
           "staker"
@@ -2166,7 +2166,7 @@ module Rewards = struct
         ~autostaking_enable:false
         ()
     in
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> (Tag "block step" --> wait_n_blocks 200
         |+ Tag "cycle step" --> wait_n_cycles 20
         |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
@@ -2182,7 +2182,7 @@ module Rewards = struct
         ()
     in
     let pc = constants.preserved_cycles in
-    begin_test ~activate_ai:true ~burn_rewards:true constants [""]
+    begin_test ~activate_ai:true ~burn_rewards:true ~constants [""]
     --> next_block --> save_current_rate (* before AI rate *)
     --> wait_ai_activation
     (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
@@ -2221,7 +2221,7 @@ module Rewards = struct
     let cycle_stable =
       save_current_rate --> next_cycle --> check_rate_evolution Q.equal
     in
-    begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
+    begin_test ~activate_ai:true ~burn_rewards:true ~constants ["delegate"]
     --> set_delegate_params "delegate" init_params
     --> save_current_rate --> wait_ai_activation
     (* We stake about 50% of the total supply *)
@@ -2290,7 +2290,7 @@ module Autostaking = struct
 
   let setup ~activate_ai =
     let constants = init_constants ~autostaking_enable:true () in
-    begin_test ~activate_ai constants [delegate]
+    begin_test ~activate_ai ~constants [delegate]
     --> add_account_with_funds
           delegator1
           "__bootstrap__"
@@ -2381,7 +2381,7 @@ module Autostaking = struct
     let constants = init_constants ~autostaking_enable:true () in
     begin_test
       ~activate_ai:false
-      constants
+      ~constants
       ["delegate"; "faucet1"; "faucet2"; "faucet3"]
     --> add_account_with_funds
           "delegator_to_fund"
@@ -2432,7 +2432,7 @@ module Slashing = struct
     in
     begin_test
       ~activate_ai:true
-      constants
+      ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> (Tag "No AI" --> next_cycle
         |+ Tag "Yes AI" --> next_block --> wait_ai_activation)
@@ -2497,7 +2497,7 @@ module Slashing = struct
     in
     begin_test
       ~activate_ai:false
-      constants
+      ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> set_baker "bootstrap1"
     --> (Tag "Many double bakes"
@@ -2568,7 +2568,7 @@ module Slashing = struct
     let constants = init_constants ~autostaking_enable:false () in
     begin_test
       ~activate_ai:false
-      constants
+      ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
     --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -2581,7 +2581,7 @@ module Slashing = struct
       let constants =
         init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
       in
-      begin_test ~activate_ai:false constants ["delegate"]
+      begin_test ~activate_ai:false ~constants ["delegate"]
       --> next_cycle
       --> loop
             6
@@ -2605,7 +2605,7 @@ module Slashing = struct
     let constants =
       init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
     in
-    begin_test ~activate_ai:false constants ["delegate"]
+    begin_test ~activate_ai:false ~constants ["delegate"]
     --> next_cycle
     --> (Tag "stake" --> stake "delegate" Half
         |+ Tag "unstake" --> unstake "delegate" Half)
@@ -2637,7 +2637,7 @@ module Slashing = struct
         edge_of_baking_over_staking = Q.one;
       }
     in
-    begin_test ~activate_ai:true constants [delegate_name; faucet_name]
+    begin_test ~activate_ai:true ~constants [delegate_name; faucet_name]
     --> set_baker faucet_name
     --> set_delegate_params "delegate" init_params
     --> init_delegators delegators_list
@@ -2688,7 +2688,7 @@ module Slashing = struct
     let constants = init_constants ~autostaking_enable:false () in
     let amount = Amount (Tez.of_mutez 333_000_000_000L) in
     let preserved_cycles = constants.preserved_cycles in
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> next_block --> wait_ai_activation
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -2712,7 +2712,7 @@ module Slashing = struct
     let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
     let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
     let preserved_cycles = constants.preserved_cycles in
-    begin_test ~activate_ai:true constants ["delegate"]
+    begin_test ~activate_ai:true ~constants ["delegate"]
     --> next_block --> wait_ai_activation
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> next_cycle
@@ -2732,10 +2732,10 @@ module Slashing = struct
   let test_mini_slash =
     let constants = init_constants ~autostaking_enable:false () in
     (Tag "Yes AI"
-     --> begin_test ~activate_ai:true constants ["delegate"; "baker"]
+     --> begin_test ~activate_ai:true ~constants ["delegate"; "baker"]
      --> next_block --> wait_ai_activation
     |+ Tag "No AI"
-       --> begin_test ~activate_ai:false constants ["delegate"; "baker"])
+       --> begin_test ~activate_ai:false ~constants ["delegate"; "baker"])
     --> unstake "delegate" (Amount Tez.one_mutez)
     --> set_baker "baker" --> next_cycle
     --> ((Tag "7% slash" --> double_bake "delegate" --> make_denunciations ()
@@ -2748,7 +2748,7 @@ module Slashing = struct
 
   let test_slash_rounding =
     let constants = init_constants ~autostaking_enable:false () in
-    begin_test ~activate_ai:true constants ["delegate"; "baker"]
+    begin_test ~activate_ai:true ~constants ["delegate"; "baker"]
     --> set_baker "baker" --> next_block --> wait_ai_activation
     --> unstake "delegate" (Amount (Tez.of_mutez 2L))
     --> next_cycle --> double_bake "delegate" --> double_bake "delegate"
