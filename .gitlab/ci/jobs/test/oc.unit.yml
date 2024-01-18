@@ -112,8 +112,15 @@ oc.unit:webassembly-x86_64:
 
 oc.unit:js_components:
   extends:
-    - .oc.unit_test_template_x86_64
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies
+    - .rules__octez_changes
+  stage: test
+  needs:
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
+  # This is known to have been flaky
+  retry: 2
   variables:
     # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
     RUNTEZTALIAS: "true"
