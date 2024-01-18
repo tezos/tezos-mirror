@@ -216,7 +216,7 @@ let register ?(from_binary = false) ?(fail_on_stuck = true) ?ticks_per_snapshot
         kernel
   | None -> ()
 
-let register () =
+let () =
   let versions = List.map snd Tezos_scoru_wasm.Wasm_pvm_state.versions in
   register
     ~name:"echo"

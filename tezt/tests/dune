@@ -18,7 +18,6 @@
   octez-libs.base.unix
   octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
-  tezos_scoru_wasm_regressions
   tezt_self_tests_tezt_lib
   src_risc_v_pvm_test_tezt_lib
   src_proto_alpha_lib_sc_rollup_node_test_tezt_lib
@@ -82,6 +81,7 @@
   src_lib_shell_services_test_tezt_lib
   src_lib_shell_test_tezt_lib
   src_lib_scoru_wasm_test_tezt_lib
+  src_lib_scoru_wasm_regressions_tezt_lib
   src_lib_scoru_wasm_fast_test_tezt_lib
   src_lib_sapling_test_tezt_lib
   src_lib_rpc_http_test_tezt_lib

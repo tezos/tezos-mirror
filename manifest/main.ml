@@ -8474,9 +8474,9 @@ let _evm_node =
       ]
     ~bisect_ppx:Yes
 
-let octez_scoru_wasm_regressions =
-  private_lib
-    "tezos_scoru_wasm_regressions"
+let _octez_scoru_wasm_regressions =
+  tezt
+    ["tezos_scoru_wasm_regressions"]
     ~path:"src/lib_scoru_wasm/regressions"
     ~opam:"tezos-scoru-wasm-regressions"
     ~synopsis:"WASM PVM regressions"
@@ -8751,7 +8751,6 @@ let () =
       octez_base_unix;
       octez_stdlib_unix;
       Protocol.(main alpha);
-      octez_scoru_wasm_regressions;
     ]
   in
   let make_tezt_exe test_libs =
