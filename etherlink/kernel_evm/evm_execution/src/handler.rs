@@ -99,6 +99,11 @@ fn ethereum_error_to_exit_reason(exit_reason: &EthereumError) -> ExitReason {
     ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason))))
 }
 
+pub enum TransferExitReason {
+    Returned,
+    OutOfFund,
+}
+
 /// Data related to the current transaction layer
 struct TransactionLayerData<'config> {
     /// Gasometer for the current transaction layer. If this value is
@@ -600,7 +605,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         from: H160,
         to: H160,
         value: U256,
-    ) -> Result<ExitReason, EthereumError> {
+    ) -> Result<TransferExitReason, EthereumError> {
         log!(
             self.host,
             Debug,
@@ -612,7 +617,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if value == U256::zero() {
             // Nothing to transfer so succeeds by default
-            Ok(ExitReason::Succeed(ExitSucceed::Returned))
+            Ok(TransferExitReason::Returned)
         } else if let Some(mut from_account) = self.get_account(from) {
             let mut to_account = self.get_or_create_account(to)?;
 
@@ -620,23 +625,24 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 to_account
                     .balance_add(self.host, value)
                     .map_err(EthereumError::from)?;
-                Ok(ExitReason::Succeed(ExitSucceed::Returned))
+                Ok(TransferExitReason::Returned)
             } else {
                 log!(
                     self.host,
                     Debug,
-                    "Transaction failure - balance underflow on account {:?} - withdraw {:?}",
+                    "Failed transfer for create due to insufficient funds, value: {:?}, from: {:?}, to: {:?}",
+                    value,
                     from_account,
-                    value
+                    to
                 );
 
-                Ok(ExitReason::Error(ExitError::OutOfFund))
+                Ok(TransferExitReason::OutOfFund)
             }
         } else {
             log!(self.host, Debug, "'from' account {:?} is empty", from);
             // Accounts of zero balance by default, so this must be
             // an underflow.
-            Ok(ExitReason::Error(ExitError::OutOfFund))
+            Ok(TransferExitReason::OutOfFund)
         }
     }
 
@@ -707,16 +713,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             return Ok((ExitReason::Error(ExitError::CreateCollision), None, vec![]));
         }
 
-        if let Err(error) = self.execute_transfer(caller, address, value) {
-            log!(
-                self.host,
-                Debug,
-                "Failed transfer for create, funds: {:?}, from: {:?}, to: {:?}",
-                value,
-                caller,
-                address
-            );
-            return Err(error);
+        match self.execute_transfer(caller, address, value)? {
+            TransferExitReason::OutOfFund => {
+                return Ok((ExitReason::Error(ExitError::OutOfFund), None, vec![]))
+            }
+            TransferExitReason::Returned => (), // Otherwise result is ok and we do nothing and continue
         }
 
         if create_opcode {
@@ -811,22 +812,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 address,
                 transfer.value,
             )? {
-                r @ ExitReason::Fatal(_) => {
-                    return Ok((r, None, vec![]));
+                TransferExitReason::OutOfFund => {
+                    return Ok((ExitReason::Error(ExitError::OutOfFund), None, vec![]))
                 }
-                r @ ExitReason::Error(_) => {
-                    return Ok((r, None, vec![]));
-                }
-                _r @ ExitReason::Revert(_) => {
-                    // A transfer cannot revert - this implies internal error in
-                    // EVM execution
-                    return Err(EthereumError::InconsistentState(Cow::from(
-                        "Transfer returned revert",
-                    )));
-                }
-                ExitReason::Succeed(_) => {
-                    // Otherwise result is ok and we do nothing and continue
-                }
+                TransferExitReason::Returned => (), // Otherwise result is ok and we do nothing and continue
             }
         }
         #[cfg(feature = "benchmark")]
@@ -937,29 +926,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         );
 
         self.end_initial_transaction(result)
-    }
-
-    /// Perform a transfer transaction
-    pub fn transfer(
-        &mut self,
-        from: H160,
-        to: H160,
-        value: U256,
-        gas_limit: Option<u64>,
-    ) -> Result<ExecutionOutcome, EthereumError> {
-        self.begin_initial_transaction(false, gas_limit)?;
-
-        if let Err(err) = self.record_base_gas_cost(false, &[]) {
-            return self.end_initial_transaction(Ok((
-                ExitReason::Error(err),
-                None,
-                vec![],
-            )));
-        }
-
-        let result = self.execute_transfer(from, to, value)?;
-
-        self.end_initial_transaction(Ok((result, None, vec![])))
     }
 
     fn get_or_create_account(
@@ -2942,5 +2908,41 @@ mod test {
 
         assert_eq!(code, vec![]);
         assert_eq!(balance, U256::zero());
+    }
+
+    #[test]
+    fn create_contract_with_insufficient_funds() {
+        //Init
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::one(),
+        );
+
+        set_balance(&mut handler, &caller, U256::from(10000));
+
+        let scheme = CreateScheme::Legacy { caller };
+        let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
+
+        let result =
+            handler.execute_create(caller, scheme, U256::from(100000), code, true);
+
+        assert_eq!(
+            result.unwrap(),
+            (ExitReason::Error(ExitError::OutOfFund), None, vec![])
+        );
     }
 }

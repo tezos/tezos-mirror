@@ -455,12 +455,12 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Revert(ExitRevert::Reverted),
+            reason: ExitReason::Error(ExitError::OutOfFund),
             new_address: None,
             logs: vec![],
-            result: Some(vec![]),
+            result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 55427,
+            estimated_ticks_used: 0,
         }));
 
         assert_eq!(expected_result, result);
@@ -2655,5 +2655,64 @@ mod test {
         let smart_contract = EthereumAccount::from_address(&address).unwrap();
 
         assert_eq!(smart_contract.nonce(&host).unwrap(), U256::one())
+    }
+
+    #[test]
+    fn call_contract_create_contract_with_insufficient_funds() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let callee = H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &caller,
+            U256::from(1000000000),
+        );
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &callee,
+            U256::from(10000),
+        );
+
+        let code = hex::decode("74600c60005566602060406000f060205260076039f36000526015600b620186a0f060005500").unwrap();
+        set_account_code(&mut host, &mut evm_account_storage, &callee, &code);
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(callee),
+            caller,
+            vec![],
+            Some(20000000),
+            U256::one(),
+            Some(U256::zero()),
+            true,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let path = account_path(&caller).unwrap();
+        let account = evm_account_storage.get_or_create(&host, &path).unwrap();
+        let caller_nonce = account.nonce(&host).unwrap();
+
+        let path = account_path(&callee).unwrap();
+        let account = evm_account_storage.get_or_create(&host, &path).unwrap();
+        let callee_nonce = account.nonce(&host).unwrap();
+
+        assert_eq!(
+            ExitReason::Succeed(ExitSucceed::Stopped),
+            result.unwrap().unwrap().reason,
+        );
+        assert_eq!(callee_nonce, U256::zero());
+        assert_eq!(caller_nonce, U256::one());
     }
 }
