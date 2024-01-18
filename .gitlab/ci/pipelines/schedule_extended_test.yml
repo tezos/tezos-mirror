@@ -42,7 +42,10 @@ include:
   - .gitlab/ci/jobs/test/oc.semgrep.yml
   - .gitlab/ci/jobs/test/oc.unit.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
-  - .gitlab/ci/jobs/test/oc.script.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
+  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml
+  - .gitlab/ci/jobs/test/oc.script:test_release_versions.yml
+  - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/tezt:build-long.yml

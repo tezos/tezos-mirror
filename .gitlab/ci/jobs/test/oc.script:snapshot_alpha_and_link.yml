@@ -1,0 +1,32 @@
+# Note: this job actually probably doesn't need the oc.build_x86_64 job
+# to have finished, but we don't want to start before oc.build_x86_64 has finished either.
+# However, when oc.build_x86_64-* don't exist, we don't need to wait for them.
+oc.script:snapshot_alpha_and_link:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies
+  stage: test
+  before_script:
+    - ./scripts/ci/take_ownership.sh
+    - . ./scripts/version.sh
+    - eval $(opam env)
+  needs:
+    - job: trigger
+      optional: true
+    - job: "oc.build_x86_64-released"
+      optional: true
+    - job: "oc.build_x86_64-exp-dev-extra"
+      optional: true
+  script:
+    - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
+  rules:
+    # We only need to run this if protocol Alpha or if the scripts changed.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - src/proto_alpha/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+        - scripts/snapshot_alpha_and_link.sh
+        - scripts/snapshot_alpha.sh
+        - scripts/user_activated_upgrade.sh
+      when: on_success
