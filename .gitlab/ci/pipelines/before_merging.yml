@@ -26,7 +26,9 @@ include:
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/misc_checks.yml
+  - .gitlab/ci/jobs/test/kaitai_checks.yml
+  - .gitlab/ci/jobs/test/kaitai_e2e_checks.yml
+  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml
   - .gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
   - .gitlab/ci/jobs/test/commit_titles.yml
