@@ -405,3 +405,22 @@ let txpool_content evm_node =
              {address; transactions})
   in
   return (parse "pending", parse "queued")
+
+let upgrade_payload ~root_hash ~activation_timestamp =
+  let args =
+    [
+      "make";
+      "upgrade";
+      "payload";
+      "with";
+      "root";
+      "hash";
+      root_hash;
+      "at";
+      "activation";
+      "timestamp";
+      activation_timestamp;
+    ]
+  in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+  Process.check_and_read_stdout process
