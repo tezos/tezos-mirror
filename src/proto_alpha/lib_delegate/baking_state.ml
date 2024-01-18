@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Protocol_client_context
 
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
@@ -755,6 +754,61 @@ let create_cache () =
     known_timestamps = Timestamp_of_round_cache.create cache_size_limit;
     round_timestamps = Round_timestamp_interval_cache.create cache_size_limit;
   }
+
+(** Memoization wrapper for [Round.timestamp_of_round]. *)
+let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =
+  let open Result_syntax in
+  let open Baking_cache in
+  let known_timestamps = state.global_state.cache.known_timestamps in
+  match
+    Timestamp_of_round_cache.find_opt
+      known_timestamps
+      (predecessor_timestamp, predecessor_round, round)
+  with
+  (* Compute and register the timestamp if not already existing. *)
+  | None ->
+      let* ts =
+        Environment.wrap_tzresult
+        @@ Protocol.Alpha_context.Round.timestamp_of_round
+             state.global_state.round_durations
+             ~predecessor_timestamp
+             ~predecessor_round
+             ~round
+      in
+      Timestamp_of_round_cache.replace
+        known_timestamps
+        (predecessor_timestamp, predecessor_round, round)
+        ts ;
+      return ts
+  (* If it already exists, just fetch from the memoization table. *)
+  | Some ts -> return ts
+
+let compute_next_round_time state =
+  let proposal =
+    match state.level_state.attestable_payload with
+    | None -> state.level_state.latest_proposal
+    | Some {proposal; _} -> proposal
+  in
+  if is_first_block_in_protocol proposal then None
+  else
+    match state.level_state.next_level_proposed_round with
+    | Some _proposed_round ->
+        (* TODO? do something, if we don't, we won't be able to
+           repropose a block at next level. *)
+        None
+    | None -> (
+        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
+        let predecessor_round = proposal.predecessor.round in
+        let next_round = Round.succ state.round_state.current_round in
+        match
+          timestamp_of_round
+            state
+            ~predecessor_timestamp
+            ~predecessor_round
+            ~round:next_round
+        with
+        | Ok timestamp -> Some (timestamp, next_round)
+        | _ -> assert false)
 
 (* Pretty-printers *)
 
