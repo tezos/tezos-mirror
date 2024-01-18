@@ -86,6 +86,16 @@ oc.unit:proto-x86_64:
   variables:
     MAKE_TARGETS: test-proto-unit
 
+oc.unit:non-proto-arm64:
+  extends:
+    - .oc.unit_test_template_arm64
+    # The [lib_benchmark] unit tests require Python
+    - .image_template__runtime_build_test_dependencies
+  variables:
+    MAKE_TARGETS: test-nonproto-unit test-webassembly
+    DISTRIBUTE_TESTS_TO_PARALLELS: "true"
+  parallel: 2
+
 oc.unit:webassembly-x86_64:
   extends:
   - .oc.unit_test_template_x86_64
@@ -99,16 +109,6 @@ oc.unit:webassembly-x86_64:
   # underlying issue should be fixed eventually, turning this timeout
   # unnecessary.
   timeout: 20 min
-
-oc.unit:non-proto-arm64:
-  extends:
-    - .oc.unit_test_template_arm64
-    # The [lib_benchmark] unit tests require Python
-    - .image_template__runtime_build_test_dependencies
-  variables:
-    MAKE_TARGETS: test-nonproto-unit test-webassembly
-    DISTRIBUTE_TESTS_TO_PARALLELS: "true"
-  parallel: 2
 
 oc.unit:js_components:
   extends:
