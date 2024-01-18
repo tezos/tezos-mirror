@@ -1955,7 +1955,7 @@ let withdraw protocol ~commitment_period ~challenge_window ~amount_wei ~sender
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"withdraw"
-      ~address:"0x0000000000000000000000000000000000000020"
+      ~address:"0xff00000000000000000000000000000000000001"
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
       ~value:amount_wei
   in
