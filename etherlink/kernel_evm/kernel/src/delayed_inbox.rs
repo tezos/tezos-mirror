@@ -81,7 +81,7 @@ impl Decodable for DelayedTransaction {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if !decoder.item_count()? != 2 {
+        if decoder.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let tag: u8 = decoder.at(0)?.as_val()?;
