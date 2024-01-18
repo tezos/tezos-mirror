@@ -38,6 +38,11 @@
 (rule
  (alias runtest)
  (package tezos-scoru-wasm-regressions)
+ (deps
+  ../../proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wast
+  ../test/wasm_kernels/tx-kernel-no-verif.wasm
+  ../test/messages/deposit.out
+  ../test/messages/withdrawal.out)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

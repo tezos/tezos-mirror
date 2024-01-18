@@ -8491,6 +8491,13 @@ let _octez_scoru_wasm_regressions =
         Protocol.(parameters_exn alpha);
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
+    ~dep_files:
+      [
+        "../../proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wast";
+        "../test/wasm_kernels/tx-kernel-no-verif.wasm";
+        "../test/messages/deposit.out";
+        "../test/messages/withdrawal.out";
+      ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let kaitai =
