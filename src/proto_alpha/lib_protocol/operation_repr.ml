@@ -1012,6 +1012,14 @@ module Encoding = struct
       }
         -> 'b case
 
+  (* Encoding case that accepts legacy preattestation name : `preendorsement` in
+     JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
   let preendorsement_case =
     Case
       {
@@ -1036,6 +1044,13 @@ module Encoding = struct
         inj = (fun preattestation -> Preattestation preattestation);
       }
 
+  (* Encoding that accepts legacy preattestation name : `preendorsement` in JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
   let preendorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
@@ -1095,6 +1110,13 @@ module Encoding = struct
       (req "round" Round_repr.encoding)
       (req "block_payload_hash" Block_payload_hash.encoding)
 
+  (* Encoding case that accepts legacy attestation name : `endorsement` in JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
   let endorsement_case =
     Case
       {
@@ -1132,6 +1154,14 @@ module Encoding = struct
           (fun (slot, level, round, block_payload_hash) ->
             Attestation {slot; level; round; block_payload_hash});
       }
+
+  (* Encoding that accepts legacy attestation name : `endorsement` in JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
 
   let endorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
@@ -1230,6 +1260,14 @@ module Encoding = struct
         inj = (fun solution -> Vdf_revelation {solution});
       }
 
+  (* Encoding case that accepts legacy double preattestation evidence name :
+     `double_preendorsement_evidence` in JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
   let double_preendorsement_evidence_case :
       Kind.double_preattestation_evidence case =
     Case
@@ -1266,6 +1304,14 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
       }
 
+  (* Encoding case that accepts legacy double attestation evidence name :
+     `double_endorsement_evidence` in JSON
+
+     https://gitlab.com/tezos/tezos/-/issues/5529
+
+     This encoding is temporary and should be removed when the endorsements
+     kinds in JSON will not be accepted any more by the protocol (Planned for
+     protocol Q). *)
   let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
@@ -1579,6 +1625,14 @@ module Encoding = struct
     :: PCase double_preattestation_evidence_case
     :: PCase double_attestation_evidence_case :: common_cases
 
+  (** Encoding cases that accepts legacy attestation name : `endorsement` (and
+      preendorsement, double_<op>_evidence) in JSON
+
+      https://gitlab.com/tezos/tezos/-/issues/5529
+
+      This encoding is temporary and should be removed when the endorsements
+      kinds in JSON will not be accepted any more by the protocol (Planned for
+      protocol Q). *)
   let contents_cases_with_legacy_attestation_name =
     PCase preendorsement_case :: PCase endorsement_case
     :: PCase double_preendorsement_evidence_case
