@@ -98,17 +98,25 @@ oc.unit:non-proto-arm64:
 
 oc.unit:webassembly-x86_64:
   extends:
-  - .oc.unit_test_template_x86_64
+  - .default_settings_template
   # The wasm tests are written in Python
   - .image_template__runtime_build_test_dependencies
-  variables:
-    MAKE_TARGETS: test-webassembly
+  - .rules__octez_changes
+  needs:
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
+  stage: test
   # TODO: https://gitlab.com/tezos/tezos/-/issues/4663
   # This test takes around 2 to 4min to complete, but it sometimes
   # hangs. We use a timeout to retry the test in this case. The
   # underlying issue should be fixed eventually, turning this timeout
   # unnecessary.
   timeout: 20 minutes
+  before_script:
+    - . ./scripts/version.sh
+    - eval $(opam env)
+  script:
+    - make test-webassembly
 
 oc.unit:js_components:
   extends:
