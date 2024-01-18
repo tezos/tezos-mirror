@@ -1788,44 +1788,63 @@ let rec wait_n_blocks n =
   else if n = 1 then next_block
   else wait_n_blocks (n - 1) --> next_block
 
-(** Wait until AI activates.
-    Fails if AI is not set to be activated in the future. *)
-let wait_ai_activation =
+(** Wait until we are in a cycle satifying the given condition.
+    Fails if AI_activation is requested and AI is not set to be activated in the future. *)
+let wait_cycle condition =
   exec (fun (block, state) ->
       let open Lwt_result_syntax in
-      Log.info ~color:time_color "Fast forward to AI activation" ;
-      let* output =
-        if state.State.activate_ai then
-          let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
-          let rec bake_while (block, state) =
-            let current_cycle = Block.current_cycle block in
-            if Cycle.(current_cycle >= launch_cycle) then return (block, state)
-            else
-              let* input = bake_until_next_cycle (block, state) in
-              bake_while input
-          in
-          bake_while (block, state)
-        else assert false
+      let rec stopper condition =
+        match condition with
+        | `AI_activation ->
+            if state.State.activate_ai then
+              let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
+              return
+              @@ ( (fun block _state ->
+                     let current_cycle = Block.current_cycle block in
+                     Cycle.(current_cycle >= launch_cycle)),
+                   "AI activation",
+                   "AI activated" )
+            else assert false
+        | `delegate_parameters_activation ->
+            let init_cycle = Block.current_cycle block in
+            let cycles_to_wait =
+              state.constants.delegate_parameters_activation_delay
+            in
+            return
+            @@ ( (fun block _state ->
+                   Cycle.(
+                     Block.current_cycle block >= add init_cycle cycles_to_wait)),
+                 "delegate parameters activation",
+                 "delegate parameters activated" )
+        | `And (cond1, cond2) ->
+            let* stop1, to1, done1 = stopper cond1 in
+            let* stop2, to2, done2 = stopper cond2 in
+            return
+            @@ ( (fun block state -> stop1 block state && stop2 block state),
+                 to1 ^ " and " ^ to2,
+                 done1 ^ " and " ^ done2 )
       in
-      Log.info ~color:event_color "AI activated" ;
+      let* stopper, to_, done_ = stopper condition in
+      Log.info ~color:time_color "Fast forward to %s" to_ ;
+      let* output =
+        let rec bake_while (block, state) =
+          if stopper block state then return (block, state)
+          else
+            let* input = bake_until_next_cycle (block, state) in
+            bake_while input
+        in
+        bake_while (block, state)
+      in
+      Log.info ~color:event_color "%s" done_ ;
       return output)
+
+(** Wait until AI activates.
+    Fails if AI is not set to be activated in the future. *)
+let wait_ai_activation = wait_cycle `AI_activation
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
-  let open Lwt_result_syntax in
-  let rec bake_n_cycles count input =
-    if count <= 0 then return input
-    else
-      let* output = bake_until_next_cycle input in
-      bake_n_cycles (count - 1) output
-  in
-  exec (fun ((_, (state : State.t)) as input) ->
-      Log.info
-        ~color:time_color
-        "Fast forward to delegate's parameters  activation" ;
-      let cycles = state.constants.delegate_parameters_activation_delay in
-      let* output = bake_n_cycles cycles input in
-      return output)
+  wait_cycle `delegate_parameters_activation
 
 (** Create an account and give an initial balance funded by [source] *)
 let add_account_with_funds name source amount =
