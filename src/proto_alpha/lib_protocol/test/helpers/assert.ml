@@ -312,6 +312,20 @@ let assert_equal_list_opt ~loc eq msg pp =
     msg
     (Format.pp_print_option (pp_print_list pp))
 
+(** Checks that both lists have the same elements, not taking the
+    order of these elements into account, but taking their
+    multiplicity into account. *)
+let equal_list_any_order ~loc ~compare msg pp list1 list2 =
+  let ordered_list1 = List.sort compare list1 in
+  let ordered_list2 = List.sort compare list2 in
+  equal
+    ~loc
+    (List.equal (fun a b -> compare a b = 0))
+    msg
+    (pp_print_list pp)
+    ordered_list1
+    ordered_list2
+
 let to_json_string encoding x =
   x
   |> Data_encoding.Json.construct encoding

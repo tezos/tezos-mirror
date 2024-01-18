@@ -27,3 +27,21 @@ module Misbehaviour_repr : sig
     'kind Protocol.Alpha_context.Kind.consensus Protocol.Alpha_context.operation ->
     unit tzresult Lwt.t
 end
+
+(** Helpers about "full denunciations", that is, a denunciation item
+    and its culprit. See type [t] of this module. *)
+module Full_denunciation : sig
+  (** A denunciation item preceded by the culprit's pkh. Indeed, the
+      culprit isn't recorded inside the
+      {!Protocol.Denunciations_repr.item} because it serves as a key
+      in the protocol's storage instead. But we often need both
+      together in the tests. *)
+  type t = Signature.Public_key_hash.t * Protocol.Denunciations_repr.item
+
+  (** Asserts that both lists contain the same elements.
+
+      These elements may be ordered differently, but must have the
+      same multiplicity in both lists. *)
+  val check_same_lists_any_order :
+    loc:string -> t list -> t list -> unit tzresult Lwt.t
+end

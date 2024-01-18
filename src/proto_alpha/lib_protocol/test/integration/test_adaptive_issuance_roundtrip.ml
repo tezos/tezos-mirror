@@ -1292,55 +1292,13 @@ let finalize_unstake src_name : (t, t) scenarios =
 
 (* ======== Slashing ======== *)
 
-let check_pending_slashings (block, state) : unit tzresult Lwt.t =
+let check_pending_slashings ~loc (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let open Protocol.Denunciations_repr in
   let* denunciations_rpc = Context.get_denunciations (B block) in
-  let denunciations_obj_equal (pkh_1, {rewarded = r1; misbehaviour = m1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
-    Signature.Public_key_hash.equal pkh_1 pkh_2
-    && Signature.Public_key_hash.equal r1 r2
-    && Stdlib.(m1.kind = m2.kind)
-  in
-  let compare_denunciations (pkh_1, {rewarded = r1; misbehaviour = m1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
-    let c1 = Signature.Public_key_hash.compare pkh_1 pkh_2 in
-    if c1 <> 0 then c1
-    else
-      let c2 = Signature.Public_key_hash.compare r1 r2 in
-      if c2 <> 0 then c2
-      else Protocol.Misbehaviour_repr.compare_kind m1.kind m2.kind
-  in
-  let denunciations_rpc = List.sort compare_denunciations denunciations_rpc in
-  let denunciations_state =
-    List.sort compare_denunciations state.State.pending_slashes
-  in
-  let denunciations_equal = List.equal denunciations_obj_equal in
-  let denunciations_obj_pp fmt
-      (pkh, {rewarded; misbehaviour; operation_hash = _}) =
-    Format.fprintf
-      fmt
-      "slashed: %a; rewarded: %a; kind: %s@."
-      Signature.Public_key_hash.pp
-      pkh
-      Signature.Public_key_hash.pp
-      rewarded
-      (match misbehaviour.kind with
-      | Double_baking -> "double baking"
-      | Double_attesting -> "double attesting"
-      | Double_preattesting -> "double preattesting")
-  in
-  let denunciations_pp = Format.pp_print_list denunciations_obj_pp in
-  let* () =
-    Assert.equal
-      ~loc:__LOC__
-      denunciations_equal
-      "Denunciations are not equal"
-      denunciations_pp
-      denunciations_rpc
-      denunciations_state
-  in
-  return_unit
+  Slashing_helpers.Full_denunciation.check_same_lists_any_order
+    ~loc
+    denunciations_rpc
+    state.State.pending_slashes
 
 (** Double attestation helpers *)
 let order_attestations ~correct_order op1 op2 =
@@ -1584,7 +1542,7 @@ let update_state_denunciation (block, state)
 let make_denunciations_ ?(filter = fun {denounced; _} -> not denounced)
     (block, state) =
   let open Lwt_result_syntax in
-  let* () = check_pending_slashings (block, state) in
+  let* () = check_pending_slashings ~loc:__LOC__ (block, state) in
   let make_op state ({evidence; _} as dss) =
     if filter dss then
       let* state, denounced = update_state_denunciation (block, state) dss in
@@ -2510,7 +2468,7 @@ module Slashing = struct
                 (* bootstrap1 can be forbidden in this case, so we set another baker *)
                 --> exclude_bakers ["delegate"; "bootstrap1"])
          --> check_snapshot_balances "before slash"
-         --> exec_unit check_pending_slashings
+         --> exec_unit (check_pending_slashings ~loc:__LOC__)
          --> next_cycle
          --> assert_failure
                (exec_unit (fun (_block, state) ->
@@ -2518,7 +2476,7 @@ module Slashing = struct
                       failwith "ns_enable = true: slash not applied yet"
                     else return_unit)
                --> check_snapshot_balances "before slash")
-         --> exec_unit check_pending_slashings
+         --> exec_unit (check_pending_slashings ~loc:__LOC__)
          --> next_cycle
         |+ Tag "denounce too late" --> next_cycle --> next_cycle
            --> assert_failure
