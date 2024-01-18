@@ -244,6 +244,41 @@ let test_publish_blueprints =
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit
 
+let test_resilient_to_rollup_node_disconnect =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "data"]
+    ~title:"Sequencer is resilient to rollup node disconnection"
+    ~uses
+  @@ fun protocol ->
+  let* {evm_node; sc_rollup_node; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
+  (* Ask for the current block. *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  Check.((sequencer_head.number = 5l) int32)
+    ~error_msg:"Could not create 5 blocks" ;
+
+  (* Kill the rollup node *)
+  let* () = Sc_rollup_node.kill sc_rollup_node in
+
+  (* The sequencer node should keep producing blocks. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
+
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  Check.((sequencer_head.number = 10l) int32)
+    ~error_msg:"Could not create 5 more blocks" ;
+  unit
+
 let test_send_transaction_to_delayed_inbox =
   Protocol.register_test
     ~__FILE__
@@ -362,6 +397,7 @@ let test_rpc_produceBlock =
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
+  test_resilient_to_rollup_node_disconnect [Alpha] ;
   test_send_transaction_to_delayed_inbox [Alpha] ;
   test_send_deposit_to_delayed_inbox [Alpha] ;
   test_rpc_produceBlock [Alpha]

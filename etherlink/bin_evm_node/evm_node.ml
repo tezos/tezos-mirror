@@ -148,7 +148,9 @@ let install_finalizer_seq server private_server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:true) () in
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Evm_node_lib_dev.Tx_pool_events.shutdown ()
+  let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
+  let* () = Evm_node_lib_dev.Blueprints_publisher.shutdown () in
+  Evm_node_lib_dev.Blueprint_event.publisher_shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -698,8 +700,6 @@ let sequencer_command =
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
 
-        let rollup_node_endpoint = rollup_node_endpoint
-
         let secret_key = sequencer
       end) in
       (* Ignore the smart rollup address for now. *)
@@ -720,6 +720,7 @@ let sequencer_command =
       let* server, private_server =
         seq_start config ~directory ~private_directory
       in
+      let* () = Blueprints_publisher.start {rollup_node_endpoint} in
       let (_ : Lwt_exit.clean_up_callback_id) =
         install_finalizer_seq server private_server
       in
