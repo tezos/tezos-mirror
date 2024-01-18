@@ -1319,6 +1319,47 @@ let get_balance_from_context ctxt contract =
   in
   return (bd, total_balance)
 
+let assert_pseudotokens_consistency ~loc balance account account_name
+    account_map =
+  let open Lwt_result_syntax in
+  let {delegate; staking_delegator_numerator = num_pt; _} = account in
+  let exact_staking_balance = balance.staked_b in
+  match delegate with
+  | None -> return_unit
+  | Some delegate_name -> (
+      if account_name = delegate_name then return_unit
+      else
+        match String.Map.find delegate_name account_map with
+        | None -> raise Not_found
+        | Some delegate_account ->
+            let total_co =
+              Frozen_tez.total_co_current_q
+                delegate_account.frozen_deposits.co_current
+            in
+            let den_pt = delegate_account.staking_delegate_denominator in
+            if Z.(equal den_pt zero) then
+              Assert.equal
+                ~loc
+                Q.equal
+                (Format.asprintf
+                   "%s : Delegate should not have external stake with a 0 \
+                    staking denominator"
+                   account_name)
+                Q.pp_print
+                total_co
+                Q.zero
+            else
+              let expected = Q.(num_pt /// den_pt * total_co) in
+              Assert.equal
+                ~loc
+                Q.equal
+                (Format.asprintf
+                   "%s : Pseudotokens do not match exact staking balance"
+                   account_name)
+                Q.pp_print
+                exact_staking_balance
+                expected)
+
 let assert_balance_check ~loc ctxt account_name account_map =
   let open Lwt_result_syntax in
   match String.Map.find account_name account_map with
@@ -1330,7 +1371,16 @@ let assert_balance_check ~loc ctxt account_name account_map =
       let balance, total_balance =
         balance_and_total_balance_of_account account_name account_map
       in
+      let*! r0 =
+        assert_pseudotokens_consistency
+          ~loc
+          balance
+          account
+          account_name
+          account_map
+      in
       let*! r1 = assert_balance_equal ~loc account_name balance_ctxt balance in
+      let*! r1 = join_errors r0 r1 in
       let*! r2 =
         Assert.equal
           ~loc
