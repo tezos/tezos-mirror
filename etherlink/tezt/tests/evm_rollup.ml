@@ -2184,8 +2184,8 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
-    ~installee ?with_administrator ?expect_l1_failure
+let gen_test_kernel_upgrade ?(from_ghostnet = false) ?evm_setup ?rollup_address
+    ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
          node;
@@ -2209,8 +2209,15 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     Option.value ~default:sc_rollup_address rollup_address
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
+  let* payload =
+    let* {root_hash; _} =
+      Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
+    in
+    if from_ghostnet then return root_hash
+    else
+      (* In the general case we put 0, equivalent to epoch, it will upgrade
+         as soon as possible. *)
+      Evm_node.upgrade_payload ~root_hash ~activation_timestamp:"0"
   in
   let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
@@ -2224,7 +2231,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
         ~amount:Tez.zero
         ~giver:upgrador.public_key_hash
         ~receiver:l1_contracts.admin
-        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address root_hash)
+        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
         ~burn_cap:Tez.one
         client
     in
@@ -2597,6 +2604,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   (* Upgrade the kernel. *)
   let* _ =
     gen_test_kernel_upgrade
+      ~from_ghostnet:true
       ~evm_setup
       ~installee:Constant.WASM.evm_kernel
       ~admin
