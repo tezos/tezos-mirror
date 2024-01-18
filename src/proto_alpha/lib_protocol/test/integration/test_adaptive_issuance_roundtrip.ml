@@ -1828,13 +1828,19 @@ let test_expected_error =
            (exec (fun _ -> failwith "")))
 
 let init_constants ?reward_per_block ?(deactivate_dynamic = false)
-    ?blocks_per_cycle ~autostaking_enable () =
+    ?blocks_per_cycle ?delegate_parameters_activation_delay ~autostaking_enable
+    () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
   (* default for tests: 12 *)
   let blocks_per_cycle =
     Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
+  in
+  let delegate_parameters_activation_delay =
+    Option.value
+      ~default:default_constants.delegate_parameters_activation_delay
+      delegate_parameters_activation_delay
   in
   let issuance_weights =
     Protocol.Alpha_context.Constants.Parametric.
@@ -1866,6 +1872,7 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
   in
   {
     default_constants with
+    delegate_parameters_activation_delay;
     consensus_threshold;
     issuance_weights;
     minimal_block_delay;
