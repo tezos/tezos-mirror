@@ -7,9 +7,9 @@ use crate::{
 use anyhow::Result;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
-    rlp_helpers::FromRlpBytes, transaction::TRANSACTION_HASH_SIZE,
-    tx_common::EthereumTransactionCommon,
+    transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
 };
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedTransaction>);
@@ -93,9 +93,8 @@ impl Decodable for DelayedTransaction {
                 Ok(Self::Ethereum(delayed_tx))
             }
             DELAYED_DEPOSIT_TAG => {
-                let payload: Vec<u8> = payload.as_val()?;
-                let delayed_tx = FromRlpBytes::from_rlp_bytes(&payload)?;
-                Ok(DelayedTransaction::Deposit(delayed_tx))
+                let deposit = Deposit::decode(&payload)?;
+                Ok(DelayedTransaction::Deposit(deposit))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -119,6 +118,39 @@ impl DelayedInbox {
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
         };
         self.0.push(host, &Hash(tx_hash), &delayed_transaction)?;
+        log!(
+            host,
+            Info,
+            "Saved transaction {} in the delayed inbox",
+            hex::encode(tx_hash)
+        );
         Ok(())
     }
+
+    pub fn find_and_remove_transaction<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        tx_hash: Hash,
+    ) -> Result<Option<Transaction>> {
+        log!(
+            host,
+            Info,
+            "Removing transaction {} from the delayed inbox",
+            hex::encode(tx_hash)
+        );
+        let tx = self.0.remove(host, &tx_hash)?.map(|delayed| match delayed {
+            DelayedTransaction::Ethereum(tx) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Ethereum(tx),
+            },
+            DelayedTransaction::Deposit(deposit) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Deposit(deposit),
+            },
+        });
+
+        Ok(tx)
+    }
+}
+
 }
