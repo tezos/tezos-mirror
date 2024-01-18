@@ -363,7 +363,9 @@ let zarith =
     "zarith"
     V.(at_least "1.13" && less_than "1.14")
 
-let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
+(* The 0.16.1 release matches of the stubs matches the 1.13 release of zarith *)
+let zarith_stubs_js =
+  external_lib ~js_compatible:true "zarith_stubs_js" V.(at_least "0.16.1")
 
 let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
 

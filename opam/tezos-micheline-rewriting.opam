@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "zarith" { >= "1.13" & < "1.14" }
-  "zarith_stubs_js"
+  "zarith_stubs_js" { >= "0.16.1" }
   "octez-libs"
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "tezos-protocol-alpha" {with-test}
