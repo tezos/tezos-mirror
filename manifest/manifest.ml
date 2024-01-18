@@ -3935,9 +3935,11 @@ let generate_opam_ci opam_release_graph =
   write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
   (* Output one template per batch. *)
-  let marge_restriction_exec = "$CI_MERGE_REQUEST_ID" in
+  let marge_restriction_exec =
+    "$CI_PIPELINE_SOURCE == \"merge_request_event\""
+  in
   let marge_restriction_all =
-    "$CI_MERGE_REQUEST_ID && $GITLAB_USER_LOGIN == \"nomadic-margebot\""
+    marge_restriction_exec ^ " && $GITLAB_USER_LOGIN == \"nomadic-margebot\""
   in
   for batch_index = 1 to batch_count do
     print_opam_job_rules fmt batch_index "exec" marge_restriction_exec ;
