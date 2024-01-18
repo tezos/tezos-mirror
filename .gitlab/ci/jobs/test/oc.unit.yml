@@ -128,6 +128,16 @@ oc.unit:js_components:
     - make test-js
 
 oc.unit:protocol_compiles:
-  extends: .oc.unit_test_template_x86_64
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies
+    - .rules__octez_changes
+  stage: test
+  needs:
+    - "oc.build_x86_64-released"
+    - "oc.build_x86_64-exp-dev-extra"
+  before_script:
+    - . ./scripts/version.sh
+    - eval $(opam env)
   script:
     - dune build @runtest_compile_protocol
