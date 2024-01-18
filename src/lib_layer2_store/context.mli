@@ -120,6 +120,10 @@ val gc :
     GC run is currently ongoing. *)
 val wait_gc_completion : [`Read | `Write] t -> unit Lwt.t
 
+(** [export_snapshot index context_hash ~path] exports the context corresponding
+    to [context_hash], if found in [index], into the given folder path. *)
+val export_snapshot : _ t -> hash -> path:string -> unit tzresult Lwt.t
+
 (* Pvm_state that embeds the context_module embedded associated to pvm
    protocol_plugins *)
 type pvmstate =

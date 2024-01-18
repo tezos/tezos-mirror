@@ -195,7 +195,7 @@ let is_gc_finished index = IStore.Gc.is_finished index.repo
 
 let index context = context.index
 
-let export_snapshot {index = {path = _; repo}; _} context_hash ~path =
+let export_snapshot {path = _; repo} context_hash ~path =
   let open Lwt_result_syntax in
   let*! commit_opt =
     IStore.Commit.of_hash repo (hash_to_istore_hash context_hash)
