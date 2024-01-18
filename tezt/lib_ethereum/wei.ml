@@ -2,6 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,7 +33,9 @@ let wei_pow = String.make shift '0'
 
 let zero = Z.zero
 
-let one = Z.of_string @@ "1" ^ wei_pow
+let one = Z.one
+
+let one_eth = Z.of_string @@ "1" ^ wei_pow
 
 let to_string = Z.to_string
 
@@ -40,6 +44,9 @@ let of_string = Z.of_string
 let to_wei_z z = z
 
 let of_wei_z z = z
+
+let of_tez z =
+  z |> Tez.mutez_int64 |> Z.of_int64 |> Z.mul Z.(pow (of_int 10) 12) |> to_wei_z
 
 let of_eth_int eth = Z.of_string @@ Int.to_string eth ^ wei_pow
 
