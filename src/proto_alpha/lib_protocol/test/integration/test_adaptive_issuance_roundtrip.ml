@@ -1331,7 +1331,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2; _}) =
     Signature.Public_key_hash.equal pkh_1 pkh_2
     && Signature.Public_key_hash.equal r1 r2
-    && Stdlib.(m1 = m2)
+    && Stdlib.(m1.kind = m2.kind)
     && Stdlib.(mc1 = mc2)
   in
   let compare_denunciations
@@ -1344,7 +1344,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       if c2 <> 0 then c2
       else
         let c3 =
-          match (m1, m2) with
+          match (m1.kind, m2.kind) with
           | Double_baking, Double_attesting -> -1
           | x, y when x = y -> 0
           | _ -> 1
@@ -1370,7 +1370,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       pkh
       Signature.Public_key_hash.pp
       rewarded
-      (match misbehaviour with
+      (match misbehaviour.kind with
       | Double_baking -> "double baking"
       | Double_attesting -> "double attesting")
       (match misbehaviour_cycle with
@@ -1528,7 +1528,7 @@ let get_pending_slashed_pct_for_delegate (block, state) delegate =
     | [] -> r
     | (culprit, {Protocol.Denunciations_repr.misbehaviour; _}) :: t ->
         if Signature.Public_key_hash.equal delegate culprit then
-          let new_r = r + pct_from_kind block misbehaviour in
+          let new_r = r + pct_from_kind block misbehaviour.kind in
           if new_r >= 100 then 100 else aux new_r t
         else aux r t
   in
@@ -1569,11 +1569,20 @@ let update_state_denunciation (block, state)
           else if Cycle.(succ ds_cycle = inclusion_cycle) then Previous
           else assert false
         in
-        let misbehaviour =
+        let kind =
           match kind with
-          | Double_baking -> Protocol.Misbehaviour.Double_baking
+          | Double_baking -> Protocol.Misbehaviour_repr.Double_baking
           | Double_attesting -> Double_attesting
           | Double_preattesting -> Double_attesting
+        in
+        let misbehaviour =
+          {
+            Protocol.Misbehaviour_repr.kind;
+            (* Fields level, round, and slot are unused for now. *)
+            level = Protocol.Raw_level_repr.of_int32_exn level;
+            round = Protocol.Round_repr.zero;
+            slot = Protocol.Slot_repr.zero;
+          }
         in
         (* for simplicity's sake (lol), the block producer and the payload producer are the same
            We also assume that the current state baking policy will be used for the next block *)

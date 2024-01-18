@@ -62,7 +62,7 @@ let punish_double_signing ctxt ~operation_hash
   in
   let already_slashed, updated_slashed, slashing_percentage =
     let Storage.{for_double_baking; for_double_attesting} = slashed in
-    match misbehaviour with
+    match misbehaviour.kind with
     | Double_baking ->
         ( for_double_baking,
           {slashed with for_double_baking = true},
@@ -195,7 +195,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                  Denunciations_repr.
                    {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
               let slashing_percentage =
-                match misbehaviour with
+                match misbehaviour.kind with
                 | Double_baking ->
                     Constants_storage
                     .percentage_of_frozen_deposits_slashed_per_double_baking

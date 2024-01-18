@@ -1040,7 +1040,7 @@ let apply_slashing
         |> Option.value_f ~default:(fun _ -> assert false)
   in
   let slashed_pct =
-    match misbehaviour with
+    match misbehaviour.kind with
     | Double_baking ->
         constants
           .Protocol.Alpha_context.Constants.Parametric

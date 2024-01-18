@@ -2192,7 +2192,9 @@ end
 
 (** This module re-exports definitions from {!Misbehaviour_repr}. *)
 module Misbehaviour : sig
-  type t = Double_baking | Double_attesting
+  type kind = Double_baking | Double_attesting
+
+  type t = {kind : kind; level : Raw_level.t; round : Round.t; slot : Slot.t}
 end
 
 (** This module re-exports definitions from {!Delegate_storage},
