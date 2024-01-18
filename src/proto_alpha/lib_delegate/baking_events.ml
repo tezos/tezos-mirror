@@ -612,6 +612,19 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
+  let failed_to_get_dal_attestations_in_time =
+    declare_2
+      ~section
+      ~name:"failed_to_get_attestations_in_time"
+      ~level:Error
+      ~msg:
+        "unable to get DAL attestation for {delegate} within the {timeout}s \
+         timeout"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Format.pp_print_float
+      ("timeout", Data_encoding.float)
+
   let failed_to_inject_preattestation =
     declare_2
       ~section

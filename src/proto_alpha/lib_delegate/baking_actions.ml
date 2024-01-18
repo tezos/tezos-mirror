@@ -572,24 +572,57 @@ let sign_consensus_votes_aux state votes kind ~level ~round =
         let operation : Operation.packed = {shell; protocol_data} in
         return_some (delegate, operation, level, round)
   in
+  let compute_dal_rpc_timeout state =
+    (* We set the timeout to a certain percent of the remaining time till the
+       end of the round. *)
+    let default = 0.2 in
+    match compute_next_round_time state with
+    | None -> (* corner case; we pick some small default value *) default
+    | Some (timestamp, _next_round) -> (
+        let ts = Time.System.of_protocol_opt timestamp in
+        match ts with
+        | None -> default
+        | Some ts ->
+            let now = Time.System.now () in
+            let diff = Ptime.diff ts now |> Ptime.Span.to_float_s in
+            if diff < 0. then
+              (* We could output a warning, as this should not happen. *)
+              default
+            else diff *. 0.1)
+  in
   let get_dal_content delegate =
     only_if_dal_feature_enabled
       state
       ~default_value:None
       (fun dal_node_rpc_ctxt ->
-        let*! tz_res =
-          Node_rpc.get_attestable_slots
-            dal_node_rpc_ctxt
-            (fst delegate).public_key_hash
-            ~attested_level:(Int32.succ level)
+        let timeout = compute_dal_rpc_timeout state in
+        let*! result =
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep timeout in
+               Lwt.return `RPC_timeout);
+              (let*! tz_res =
+                 Node_rpc.get_attestable_slots
+                   dal_node_rpc_ctxt
+                   (fst delegate).public_key_hash
+                   ~attested_level:(Int32.succ level)
+               in
+               Lwt.return (`RPC_result tz_res));
+            ]
         in
-        match tz_res with
-        | Error errs ->
+        match result with
+        | `RPC_timeout ->
+            let*! () =
+              Events.(
+                emit failed_to_get_dal_attestations_in_time (delegate, timeout))
+            in
+            return_none
+        | `RPC_result (Error errs) ->
             let*! () =
               Events.(emit failed_to_get_dal_attestations (delegate, errs))
             in
             return_none
-        | Ok res -> (
+        | `RPC_result (Ok res) -> (
             match res with
             | Tezos_dal_node_services.Types.Not_in_committee -> return_none
             | Attestable_slots {slots = attestation_flags; published_level} ->
