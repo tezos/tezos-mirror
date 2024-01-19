@@ -182,7 +182,7 @@ let clean_frozen_deposits_for_p ctxt =
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
-  let* previous_protocol, ctxt =
+  let* previous_protocol, _previous_proto_constants, ctxt =
     Raw_context.prepare_first_block ~level ~timestamp chain_id ctxt
   in
   let parametric = Raw_context.constants ctxt in
