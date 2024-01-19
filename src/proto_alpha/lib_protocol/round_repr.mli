@@ -223,7 +223,7 @@ val round_of_timestamp :
 
 module Index : Storage_description.INDEX with type t = round
 
-module Internals_for_test : sig
+module Internal_for_tests : sig
   type round_and_offset_raw = {round : round; offset : Period_repr.t}
 
   (** [round_and_offset round_durations ~level_offset], where [level_offset]
