@@ -13,6 +13,7 @@ use crate::DelayedInbox;
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
@@ -233,10 +234,28 @@ fn read_all_chunks<Host: Runtime>(
     match config {
         Configuration::Proxy => Ok(None),
         Configuration::Sequencer { delayed_inbox, .. } => {
-            let blueprint_with_hashes: BlueprintWithDelayedHashes =
-                rlp::decode(&chunks.concat())?;
-            let blueprint =
-                fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)?;
+            // We flatten all reading/decoding errors into an Option
+            // Any such failure will be handled by removing the blueprint
+            let blueprint_with_hashes: Option<BlueprintWithDelayedHashes> =
+                rlp::decode(&chunks.concat()).ok();
+            let blueprint = blueprint_with_hashes.and_then(|blueprint| {
+                fetch_delayed_txs(host, blueprint, delayed_inbox)
+                    .ok()
+                    .flatten()
+            });
+            match blueprint {
+                Some(_) => (),
+                None => {
+                    log!(
+                        host,
+                        Info,
+                        "Deleting blueprint at path {} as it cannot be parsed",
+                        blueprint_path
+                    );
+                    // Remove invalid blueprint from storage
+                    host.store_delete(blueprint_path)?
+                }
+            };
             Ok(blueprint)
         }
     }
