@@ -44,7 +44,7 @@ include:
   # Only run on merge requests that do not have the label `ci--no-coverage`
   - local: .gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml
     rules:
-      - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
+      - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|,)ci--no-coverage(?:$|,)/'
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml

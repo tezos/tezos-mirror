@@ -3860,7 +3860,7 @@ let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
       when: delayed
       start_in: %d minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: %d minutes
     # Run on merge requests when opam changes are detected.
