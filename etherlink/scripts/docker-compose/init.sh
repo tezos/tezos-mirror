@@ -2,7 +2,7 @@
 
 set -e
 
-script_dir="$(dirname "$0")"
+script_dir=$(dirname "$0")
 
 #shellcheck source=etherlink/scripts/docker-compose/.env
 . "${script_dir}/.env"
@@ -30,12 +30,68 @@ create_chain_id() {
   echo "$padded_hex_le"
 }
 
-build_kernel() {
-  docker build -t etherlink_kernel:"${OCTEZ_TAG}" evm_kernel_builder/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}"
+add_kernel_config_set() {
+  file="$1"
+  key="$2"
+  value="$3"
+  comment="$4"
+  {
+    echo "  - set: # ${comment}"
+    echo "      value: ${value}"
+    echo "      to: ${key}"
+  } >> "$file"
+}
+
+add_kernel_config_contract() {
+  file="$1"
+  key="$2"
+  alias="$3"
+  label="$4"
+
+  if address=$(run_in_docker octez-client --endpoint "$ENDPOINT" show known contract "$alias"); then
+    hex=$(printf '%s' "${address}" | xxd -p -c 36)
+    add_kernel_config_set "$file" "$key" "$hex" "${label}: ${address}"
+  fi
+}
+
+create_kernel_config() {
+  file="$1"
+
+  # chain ID config
   evm_chain_id=$(create_chain_id "${EVM_CHAIN_ID}")
-  evm_chain_id_config="  - set:\n      # Chain ID: ${EVM_CHAIN_ID}\n      value: ${evm_chain_id}\n      to: /evm/chain_id\n"
+  add_kernel_config_set "$file" /evm/chain_id "${evm_chain_id}" "Chain ID: ${EVM_CHAIN_ID}"
+
+  # ticketer config
+  add_kernel_config_contract "$file" /evm/ticketer "${BRIDGE_ALIAS}" "BRIDGE"
+
+  # evm admin config
+  add_kernel_config_contract "$file" /evm/admin "${EVM_ADMIN_ALIAS}_contract" "ADMIN"
+
+  # sequencer admin config
+  add_kernel_config_contract "$file" /evm/sequencer_admin "${SEQUENCER_ADMIN_ALIAS}_contract" "SEQUENCER_ADMIN"
+
+  # delayed bridge config
+  add_kernel_config_contract "$file" /evm/delayed_bridge "${DELAYED_BRIDGE_ALIAS}" "DELAYED_BRIDGE"
+
+  # evm accounts config
+  for account in "${EVM_ACCOUNTS[@]}"; do
+    add_kernel_config_set "$file" "/evm/eth_accounts/${account}/balance" 0000dc0a0713000c1e0200000000000000000000000000000000000000000000 ""
+  done
+
+  # sequencer_config
+  if [[ -n $SEQUENCER_SECRET_KEY ]]; then
+    run_in_docker octez-client --endpoint "${ENDPOINT}" import secret key "${SEQUENCER_ALIAS}" unencrypted:"${SEQUENCER_SECRET_KEY}" --force
+    pubkey=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ALIAS}" | grep Public | grep -oE "edpk.*")
+    pubkey_hex=$(printf '%s' "${pubkey}" | xxd -p -c 54)
+    add_kernel_config_set "$file" "/evm/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
+  fi
+}
+
+build_kernel() {
+  cp "${SEQUENCER_CONFIG}" evm_kernel_builder/evm_config.yaml
+  create_kernel_config evm_kernel_builder/evm_config.yaml
   # build kernel in an image (e.g. tezos/tezos-bare:master) with new chain id
-  docker build -t etherlink_kernel:"${OCTEZ_TAG}" evm_kernel_builder/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}" --build-arg EVM_CHAIN_ID_CONFIG="${evm_chain_id_config}"
+  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" evm_kernel_builder/
   container_name=$(docker create etherlink_kernel:"${OCTEZ_TAG}")
   docker cp "${container_name}":/kernel/ "${HOST_TEZOS_DATA_DIR}/"
 }
@@ -84,21 +140,44 @@ init_rollup_node_config() {
   rollup_alias="$2"
   operators="$3"
   echo "create rollup node config and copy kernel preimage"
-  run_in_docker octez-smart-rollup-node init "${mode}" config for "${rollup_alias}" with operators "${operators[@]}" --rpc-addr 0.0.0.0 --rpc-port 8733
+  run_in_docker octez-smart-rollup-node init "${mode}" config for "${rollup_alias}" with operators "${operators[@]}" --rpc-addr 0.0.0.0 --rpc-port 8733 --cors-origins '*' --cors-headers '*'
   cp -R "${HOST_TEZOS_DATA_DIR}"/kernel/_evm_installer_preimages/ "${HOST_TEZOS_DATA_DIR}"/.tezos-smart-rollup-node/wasm_2_0_0
 }
 
 init_octez_node() {
   docker_update_images
-
+  mkdir -p "$HOST_TEZOS_DATA_DIR"
   # init octez node storage
-  docker run --log-driver=json-file -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}" /usr/local/bin/octez-node config init --network "${TZNETWORK}" --data-dir /home/tezos/.tezos-node
+  run_in_docker octez-node config init --network "${TZNETWORK_ADDRESS}"
   # download snapshot
   if [[ -n ${SNAPSHOT_URL} ]]; then
     wget -O "${HOST_TEZOS_DATA_DIR}/snapshot" "${SNAPSHOT_URL}"
-    docker run --log-driver=json-file -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}" /usr/local/bin/octez-node snapshot import /home/tezos/snapshot --data-dir /home/tezos/.tezos-node
+    run_in_docker octez-node snapshot import /home/tezos/snapshot
   fi
+}
 
+originate_contracts() {
+  generate_key "${ORIGINATOR_ALIAS}"
+  loop_until_balance_is_enough "${ORIGINATOR_ALIAS}" 100
+  if [[ -n ${EXCHANGER_ALIAS} ]]; then
+    originate_exchanger
+    if [[ -n ${BRIDGE_ALIAS} ]]; then
+      originate_bridge
+    fi
+  fi
+  if [[ -n ${EVM_ADMIN_ALIAS} ]]; then
+    generate_key "${EVM_ADMIN_ALIAS}"
+    evm_admin_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${EVM_ADMIN_ALIAS}" | grep Hash | grep -oE "tz.*")
+    originate_admin "${EVM_ADMIN_ALIAS}_contract" "${evm_admin_address}"
+  fi
+  if [[ -n ${SEQUENCER_ADMIN_ALIAS} ]]; then
+    generate_key "${SEQUENCER_ADMIN_ALIAS}"
+    sequencer_admin_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ADMIN_ALIAS}" | grep Hash | grep -oE "tz.*")
+    originate_admin "${SEQUENCER_ADMIN_ALIAS}_contract" "${sequencer_admin_address}"
+  fi
+  if [[ -n ${DELAYED_BRIDGE_ALIAS} ]]; then
+    originate_contract delayed_transaction_bridge.tz "${DELAYED_BRIDGE_ALIAS}" Unit
+  fi
 }
 
 # this function:
@@ -109,12 +188,9 @@ init_octez_node() {
 # 4/ initialise the octez-smart-rollup-node configuration
 init_rollup() {
   docker_update_images
-
   build_kernel
-
   KERNEL="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
   originate_evm_rollup "${ORIGINATOR_ALIAS}" "${ROLLUP_ALIAS}" "${KERNEL}"
-
   init_rollup_node_config "${ROLLUP_NODE_MODE}" "${ROLLUP_ALIAS}" "${OPERATOR_ALIAS}"
 }
 
@@ -122,10 +198,45 @@ loop_until_balance_is_enough() {
   alias=$1
   minimum_balance=$2
   address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${alias}" | grep Hash | grep -oE "tz.*")
-  echo "loop until ${alias} (e.g. ${address}) as at last a balance of ${minimum_balance}"
   until balance_account_is_enough "${address}" "${alias}" "${minimum_balance}"; do
+    if [[ -n $FAUCET ]] && command -v npx &> /dev/null; then
+      npx @tacoinfra/get-tez -a $((minimum_balance + 100)) -f "$FAUCET" "$address"
+    fi
     sleep 10.
   done
+}
+
+originate_contract() {
+  filename=$1
+  contract_alias=$2
+  storage=$3
+  mkdir -p "${HOST_TEZOS_DATA_DIR}"/contracts
+  cp "../../tezos_contracts/${filename}" "${HOST_TEZOS_DATA_DIR}/contracts"
+  echo "originate ${filename} contract (alias: ${contract_alias})"
+  run_in_docker octez-client --endpoint "${ENDPOINT}" originate contract "${contract_alias}" transferring 0 from "${ORIGINATOR_ALIAS}" running "contracts/${filename}" --init "$storage" --burn-cap 0.5
+}
+
+originate_exchanger() {
+  originate_contract exchanger.tz "${EXCHANGER_ALIAS}" Unit
+}
+
+originate_bridge() {
+  exchanger_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show known contract "${EXCHANGER_ALIAS}")
+  originate_contract evm_bridge.tz "${BRIDGE_ALIAS}" "Pair \"${exchanger_address}\" None"
+}
+
+originate_admin() {
+  admin_alias=$1
+  admin_address=$2
+  originate_contract admin.tz "${admin_alias}" "\"${admin_address}\""
+}
+
+deposit() {
+  amount=$1
+  src=$2
+  l2_address=$3
+  rollup_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show known smart rollup "${ROLLUP_ALIAS}")
+  run_in_docker octez-client --endpoint "${ENDPOINT}" transfer "$amount" from "$src" to "${BRIDGE_ALIAS}" --entrypoint deposit --arg "Pair \"${rollup_address}\" $l2_address" --burn-cap 0.03075
 }
 
 command=$1
@@ -155,16 +266,28 @@ init_rollup)
   generate_key "${ORIGINATOR_ALIAS}"
   loop_until_balance_is_enough "${ORIGINATOR_ALIAS}" 100
   init_rollup
-  echo "You can now start the docker with \"docker compose up -d\""
+  echo "You can now start the docker with \"./init.sh run\""
   ;;
 reset_rollup)
-  docker-compose stop smart-rollup-node sequencer blockscout blockscout-db blockscout-redis-db
+  docker compose stop smart-rollup-node sequencer blockscout blockscout-db blockscout-redis-db
 
   rm -r "${HOST_TEZOS_DATA_DIR}/.tezos-smart-rollup-node" "${HOST_TEZOS_DATA_DIR}/.octez-evm-node" "${HOST_TEZOS_DATA_DIR}/kernel"
 
   init_rollup
 
-  docker-compose up -d --remove-orphans
+  docker compose up -d --remove-orphans
+  ;;
+originate_contracts)
+  originate_contracts
+  ;;
+deposit)
+  deposit "$@"
+  ;;
+run)
+  docker compose up -d
+  ;;
+restart)
+  docker compose restart
   ;;
 *)
   cat << EOF
@@ -175,6 +298,8 @@ Available commands:
   - init_rollup_node_config <rollup_mode> <rollup_alias> <operators>
   - init_octez_node:
     download snapshot, and init octez-node config
+  - originate_contracts:
+    originate contracts
   - init_rollup:
     build lastest evm kernel, originate the rollup, create operator, wait until operator balance
      is topped then create rollup node config.
@@ -184,6 +309,12 @@ Available commands:
     Then build lastest evm kernel, originate a new rollup with it and
     initialise the rollup node config in:
      "${HOST_TEZOS_DATA_DIR}".
+  - run
+    execute docker compose up
+  - restart
+    execute docker compose restart
+  - deposit <amount> <source: tezos address> <target: evm address>
+    deposit xtz to etherlink via the ticketer
 EOF
   ;;
 esac
