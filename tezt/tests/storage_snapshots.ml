@@ -250,6 +250,20 @@ let export_import_and_check node ~export_level ~history_mode ~export_format
   let* () = Node.terminate final_node in
   unit
 
+let wait_for_complete_merge node target =
+  let wait_for_starting_merge target =
+    let filter json =
+      let level = JSON.(json |-> "stop" |> as_int) in
+      if level = target then Some () else None
+    in
+    Node.wait_for node "start_cementing_blocks.v0" filter
+  in
+  let wait_for_ending_merge () =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
+  in
+  let* () = wait_for_starting_merge target in
+  wait_for_ending_merge ()
+
 (* This test aims to:
    - start 3 nodes: an archive, a full and a rolling one,
    - bake few blocks using the archive node as a baker,
@@ -291,12 +305,22 @@ let test_export_import_snapshots =
      genesis anymore. To do so, we need to bake at least 3 cycles,
      after activating the protocol, i.e 3*8 = 24 blocks. *)
   let blocks_to_bake = (blocks_preservation_cycles + 1) * blocks_per_cycle in
+  let archive_level = blocks_to_bake + 1 in
+  (* Waiting for merges the second merge of the scenario, i.e, the
+     second cycle (starting at blocks_per_cycle + 1). *)
+  let await_merges =
+    List.map
+      (fun node -> wait_for_complete_merge node (blocks_per_cycle + 1))
+      cluster
+  in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let* archive_level = Node.get_level archive_node in
   let* () = sync_all_nodes cluster archive_level in
   (* Terminate all nodes to save resources. Note: we may consider
      that exporting a snapshot from a node that is running is an
      actual usecase (such exports are already done in other tests). *)
+  let* (_ : unit list) =
+    Lwt_list.map_p (fun p -> Lwt.bind p (fun () -> unit)) await_merges
+  in
   let* () = Lwt_list.iter_p Node.terminate cluster in
   let export_import_and_check =
     export_import_and_check ~max_op_ttl ~export_level:archive_level
@@ -317,20 +341,6 @@ let test_export_import_snapshots =
       Node.[Tar; Raw]
   in
   unit
-
-let wait_for_complete_merge node target =
-  let wait_for_starting_merge target =
-    let filter json =
-      let level = JSON.(json |-> "stop" |> as_int) in
-      if level = target then Some () else None
-    in
-    Node.wait_for node "start_cementing_blocks.v0" filter
-  in
-  let wait_for_ending_merge () =
-    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
-  in
-  let* () = wait_for_starting_merge target in
-  wait_for_ending_merge ()
 
 (* This test aims to export and import a rolling snapshot, bake some
    blocks and make sure that the checkpoint, savepoint and caboose are
