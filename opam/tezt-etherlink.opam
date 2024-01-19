@@ -13,10 +13,13 @@ depends: [
   "tezt" { >= "4.0.0" & < "5.0.0" }
   "tezt-tezos"
   "octez-libs"
+  "ppx_import" {with-test}
+  "ppx_deriving" {with-test}
+  "tezos-protocol-alpha" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Ethereum test framework based on Tezt"
+synopsis: "Tezt integration tests for Etherlink"

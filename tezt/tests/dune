@@ -10,7 +10,6 @@
   str
   bls12-381
   tezt-tezos
-  tezt_ethereum
   tezt_risc_v_sandbox
   tezt_tx_kernel
   data-encoding
@@ -118,6 +117,7 @@
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
   src_lib_base_unix_test_tezt_lib
   src_lib_base_test_tezt_lib
+  etherlink_tezt_tests_tezt_lib
   etherlink_bin_evm_node_test_tezt_lib)
  (link_flags
   (:standard)
@@ -128,5 +128,4 @@
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_ethereum))
+  -open Tezt_tezos.Runnable.Syntax))

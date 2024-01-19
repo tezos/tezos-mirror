@@ -138,7 +138,7 @@
 (package (name tezos-tooling))
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding-test)(allow_empty))
-(package (name tezt-ethereum)(allow_empty))
+(package (name tezt-etherlink)(allow_empty))
 (package (name tezt-risc-v-sandbox)(allow_empty))
 (package (name tezt-tezos))
 (package (name tezt-tx-kernel)(allow_empty))

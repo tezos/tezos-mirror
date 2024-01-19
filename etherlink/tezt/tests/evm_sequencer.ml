@@ -10,7 +10,7 @@
    Component:    Smart Optimistic Rollups: Etherlink Sequencer
    Requirement:  make -f kernels.mk build
                  npm install eth-cli
-   Invocation:   dune exec tezt/tests/main.exe -- --file evm_sequencer.ml
+   Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
 
 open Sc_rollup_helpers
@@ -359,9 +359,9 @@ let test_rpc_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
-let register ~protocols =
-  test_persistent_state protocols ;
-  test_publish_blueprints protocols ;
-  test_send_transaction_to_delayed_inbox protocols ;
-  test_send_deposit_to_delayed_inbox protocols ;
-  test_rpc_produceBlock protocols
+let () =
+  test_persistent_state [Alpha] ;
+  test_publish_blueprints [Alpha] ;
+  test_send_transaction_to_delayed_inbox [Alpha] ;
+  test_send_deposit_to_delayed_inbox [Alpha] ;
+  test_rpc_produceBlock [Alpha]
