@@ -97,6 +97,7 @@ type t = {
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
+  pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
   l1_blocks_cache_size : int;

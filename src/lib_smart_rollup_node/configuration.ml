@@ -64,6 +64,7 @@ type t = {
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
+  pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
   l1_blocks_cache_size : int;
@@ -417,6 +418,7 @@ let encoding : t Data_encoding.t =
            dal_node_endpoint;
            dac_observer_endpoint;
            dac_timeout;
+           pre_images_endpoint;
            batcher;
            injector;
            l1_blocks_cache_size;
@@ -444,6 +446,7 @@ let encoding : t Data_encoding.t =
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
+            pre_images_endpoint,
             batcher,
             injector,
             l1_blocks_cache_size,
@@ -470,6 +473,7 @@ let encoding : t Data_encoding.t =
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
+               pre_images_endpoint,
                batcher,
                injector,
                l1_blocks_cache_size,
@@ -497,6 +501,7 @@ let encoding : t Data_encoding.t =
         dal_node_endpoint;
         dac_observer_endpoint;
         dac_timeout;
+        pre_images_endpoint;
         batcher;
         injector;
         l1_blocks_cache_size;
@@ -551,10 +556,11 @@ let encoding : t Data_encoding.t =
              Loser_mode.encoding
              Loser_mode.no_failures))
        (merge_objs
-          (obj8
+          (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
              (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
              (opt "dac-timeout" Data_encoding.z)
+             (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
@@ -686,6 +692,7 @@ module Cli = struct
       dal_node_endpoint;
       dac_observer_endpoint;
       dac_timeout;
+      pre_images_endpoint = None;
       metrics_addr;
       fee_parameters = Operation_kind.Map.empty;
       mode;
