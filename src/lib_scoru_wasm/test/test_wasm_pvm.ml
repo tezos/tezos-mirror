@@ -878,8 +878,15 @@ let test_bulk_noops ~version () =
   let* base_tree = set_empty_inbox_step 0l base_tree in
 
   let rec goto_snapshot ticks tree_slow =
-    let* tree_fast, _ = Wasm.compute_step_many ~max_steps:ticks base_tree in
-    let* tree_slow = Wasm.compute_step tree_slow in
+    let* tree_fast, _ =
+      Wasm.compute_step_many
+        ~wasm_entrypoint:Constants.wasm_entrypoint
+        ~max_steps:ticks
+        base_tree
+    in
+    let* tree_slow =
+      Wasm.compute_step ~wasm_entrypoint:Constants.wasm_entrypoint tree_slow
+    in
     assert (Context_hash.(Encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
 
     let* stuck_flag = has_stuck_flag tree_fast in
@@ -1566,14 +1573,53 @@ let test_inbox_cleanup ~version () =
   (* Before executing: EOL, Info_per_level and SOL. *)
   let* () = check_messages_count tree 3 in
   (* Go to the very last [Padding] state. *)
-  let* tree, _ = Wasm.compute_step_many ~max_steps:Int64.(pred max_tick) tree in
+  let* tree, _ =
+    Wasm.compute_step_many
+      ~wasm_entrypoint:Constants.wasm_entrypoint
+      ~max_steps:Int64.(pred max_tick)
+      tree
+  in
   (* Before yielding: EOL, Info_per_level and SOL still, since the module does
      not read the content of the inbox. *)
   let* () = check_messages_count tree 3 in
   (* Yield with one more step. *)
-  let* tree = Wasm.compute_step tree in
+  let* tree =
+    Wasm.compute_step ~wasm_entrypoint:Constants.wasm_entrypoint tree
+  in
   (* After yielding, the inbox has been cleared. *)
   let* () = check_messages_count tree 0 in
+  Lwt_result_syntax.return_unit
+
+let test_wasm_entrypoint ~version () =
+  let open Lwt_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 0)
+        (export "mem" (memory 0))
+        (func (export "foo")
+          (nop)
+        )
+      )
+    |}
+  in
+  let max_tick = 1000L in
+  let* tree =
+    initial_tree
+      ~version
+      ~ticks_per_snapshot:max_tick
+      ~from_binary:false
+      module_
+  in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree, _ =
+    Wasm.compute_step_many
+      ~wasm_entrypoint:"foo"
+      ~max_steps:Int64.(pred max_tick)
+      tree
+  in
+  let* status = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck status) ;
   Lwt_result_syntax.return_unit
 
 let test_scheduling_multiple_inboxes ~version input_numbers =
@@ -1819,6 +1865,9 @@ let tests =
       ( "Test outbox validity period clean-up",
         `Quick,
         test_outbox_validity_period );
+      ( "Test can execute arbitrary WASM entrypoint",
+        `Quick,
+        test_wasm_entrypoint );
     ]
 
 let () =

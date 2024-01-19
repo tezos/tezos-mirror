@@ -37,7 +37,13 @@ let execute ~config evm_state inbox =
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
   let* evm_state, _, _, _ =
-    Wasm.Commands.eval 0l inbox config Inbox evm_state
+    Wasm.Commands.eval
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      0l
+      inbox
+      config
+      Inbox
+      evm_state
   in
   return evm_state
 

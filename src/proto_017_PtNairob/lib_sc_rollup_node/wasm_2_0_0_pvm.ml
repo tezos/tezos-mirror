@@ -65,6 +65,9 @@ end
 module Make_backend (Tree : TreeS) = struct
   include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
 
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+
   let reveal_exn reveal =
     match
       Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt reveal
@@ -191,7 +194,10 @@ module Impl : Pvm_sig.S = struct
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
 
   let eval_many ~reveal_builtins ~write_debug =
-    Backend.compute_step_many ~reveal_builtins ~write_debug
+    Backend.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
 end
 
 include Impl

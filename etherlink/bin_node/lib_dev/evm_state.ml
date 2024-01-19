@@ -32,12 +32,13 @@ module Wasm_utils =
   Wasm_utils.Make (Tezos_tree_encoding.Encodings_util.Make (Bare_context))
 module Wasm = Wasm_debugger.Make (Wasm_utils)
 
-let execute ~config evm_state inbox =
+let execute ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint)
+    ~config evm_state inbox =
   let open Lwt_result_syntax in
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
   let* evm_state, _, _, _ =
-    Wasm.Commands.eval 0l inbox config Inbox evm_state
+    Wasm.Commands.eval ~wasm_entrypoint 0l inbox config Inbox evm_state
   in
   return evm_state
 
@@ -82,7 +83,7 @@ let current_block_hash evm_state =
   | Some h -> return (decode_block_hash h)
   | None -> return genesis_parent_hash
 
-let execute_and_inspect ~config
+let execute_and_inspect ?wasm_entrypoint ~config
     ~input:Simulation.Encodings.{messages; insight_requests; _} ctxt =
   let open Lwt_result_syntax in
   let keys =
@@ -96,7 +97,7 @@ let execute_and_inspect ~config
   in
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
-  let* evm_state = execute ~config ctxt messages in
+  let* evm_state = execute ?wasm_entrypoint ~config ctxt messages in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
@@ -112,7 +113,13 @@ let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
       blueprint
   in
   let*! (Block_height before_height) = current_block_height evm_state in
-  let* evm_state = execute ~config evm_state exec_inputs in
+  let* evm_state =
+    execute
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~config
+      evm_state
+      exec_inputs
+  in
   let*! (Block_height after_height) = current_block_height evm_state in
   let* block_hash = current_block_hash evm_state in
   if Z.(equal (succ before_height) after_height) then

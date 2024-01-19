@@ -382,7 +382,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let open Lwt_syntax in
     trap_exn (fun () ->
         let+ tree =
-          Wasm.compute_step_with_debug ~write_debug:(write_debug config) tree
+          Wasm.compute_step_with_debug
+            ~wasm_entrypoint:Constants.wasm_entrypoint
+            ~write_debug:(write_debug config)
+            tree
         in
         (tree, 1L))
 
@@ -398,12 +401,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
-  let eval_kernel_run config tree =
+  let eval_kernel_run ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree, _ =
           Wasm_fast.compute_step_many
+            ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
             ~write_debug:(write_debug config)
             ~stop_at_snapshot:true
@@ -416,12 +420,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         ))
 
   (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-  let eval_until_input_requested config tree =
+  let eval_until_input_requested ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree =
           eval_until_input_requested
+            ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
             ~write_debug:(write_debug config)
@@ -562,7 +567,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval level inboxes config step tree =
+  let eval ~wasm_entrypoint level inboxes config step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
@@ -571,15 +576,18 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     match step with
     | Tick -> return' (compute_step config tree)
     | Result -> return' (eval_to_result config tree)
-    | Kernel_run -> return' (eval_kernel_run config tree)
+    | Kernel_run -> return' (eval_kernel_run ~wasm_entrypoint config tree)
     | Inbox -> (
         let*! status = check_input_request tree in
         match status with
         | Ok () ->
             let* tree, inboxes, level = load_inputs inboxes level tree in
-            let* tree, ticks = eval_until_input_requested config tree in
+            let* tree, ticks =
+              eval_until_input_requested ~wasm_entrypoint config tree
+            in
             return (tree, ticks, inboxes, level)
-        | Error _ -> return' (eval_until_input_requested config tree))
+        | Error _ ->
+            return' (eval_until_input_requested ~wasm_entrypoint config tree))
 
   let profile ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
@@ -655,9 +663,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [step level inboxes config kind tree] evals according to the step kind and
      prints the number of ticks elapsed and the new status. *)
-  let step level inboxes config kind tree =
+  let step ~wasm_entrypoint level inboxes config kind tree =
     let open Lwt_result_syntax in
-    let* tree, ticks, inboxes, level = eval level inboxes config kind tree in
+    let* tree, ticks, inboxes, level =
+      eval ~wasm_entrypoint level inboxes config kind tree
+    in
     let*! () = Lwt_fmt.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
     return_some (tree, inboxes, level)
@@ -979,7 +989,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Show_status ->
           let*! () = show_status tree in
           return ()
-      | Step kind -> step level inboxes config kind tree
+      | Step kind ->
+          step
+            ~wasm_entrypoint:Constants.wasm_entrypoint
+            level
+            inboxes
+            config
+            kind
+            tree
       | Show_inbox ->
           let*! () = show_inbox tree in
           return ()

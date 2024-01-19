@@ -58,11 +58,11 @@ let execution_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ()
 
-let execute ctxt inbox =
+let execute ?wasm_entrypoint ctxt inbox =
   let open Lwt_result_syntax in
   let config = execution_config ctxt in
   let*! evm_state = evm_state ctxt in
-  let* evm_state = Evm_state.execute ~config evm_state inbox in
+  let* evm_state = Evm_state.execute ?wasm_entrypoint ~config evm_state inbox in
   return (ctxt, evm_state)
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -240,11 +240,11 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   in
   return_unit
 
-let execute_and_inspect ~input ctxt =
+let execute_and_inspect ?wasm_entrypoint ~input ctxt =
   let open Lwt_result_syntax in
   let config = execution_config ctxt in
   let*! evm_state = evm_state ctxt in
-  Evm_state.execute_and_inspect ~config ~input evm_state
+  Evm_state.execute_and_inspect ?wasm_entrypoint ~config ~input evm_state
 
 let last_produced_blueprint (ctxt : t) =
   let open Lwt_result_syntax in

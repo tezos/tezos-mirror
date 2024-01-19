@@ -1145,6 +1145,9 @@ struct
 
       let initial_state = initial_state V0
 
+      let compute_step =
+        compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+
       let reveal_compat reveal =
         match
           Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt reveal

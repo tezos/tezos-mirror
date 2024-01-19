@@ -540,6 +540,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       let run () =
         let* tree, ticks =
           Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
+            ~wasm_entrypoint:Constants.wasm_entrypoint
             ?write_debug:instrumented_write_debug
             ?reveal_builtins
             ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)

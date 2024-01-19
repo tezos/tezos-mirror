@@ -1072,7 +1072,10 @@ struct
          the types of [Tezos_scoru_wasm] and [Environment_V6.Wasm_2_0_0].
       *)
 
-      let compute_step (tree : Tree.tree) = Wasm.compute_step tree
+      let compute_step (tree : Tree.tree) =
+        Wasm.compute_step
+          ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+          tree
 
       let set_input_step {inbox_level; message_counter} payload
           (tree : Tree.tree) =

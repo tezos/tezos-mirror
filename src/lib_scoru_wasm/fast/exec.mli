@@ -26,8 +26,10 @@
 open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
 
-(** [compute durable buffers] applies one call to [kernel_run]. *)
+(** [compute durable buffers] execute [wasm_entrypoint] once. Defaults to
+    {!Constants.wasm_entrypoint} when omitted. *)
 val compute :
+  ?wasm_entrypoint:string ->
   version:Wasm_pvm_state.version ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->

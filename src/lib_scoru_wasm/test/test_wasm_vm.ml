@@ -68,6 +68,7 @@ let test_padding_state ~version () =
   in
   let*! pvm_state, _ =
     Wasm_vm.compute_step_many_until
+      ~wasm_entrypoint:Constants.wasm_entrypoint
       ~write_debug:Noop
       ~max_steps:Int64.max_int
       should_continue
@@ -89,7 +90,12 @@ let test_set_input_step_in_padding ~version () =
   let open Lwt_result_syntax in
   let* tree = init_tree_with_empty_input ~version in
   (* Advance execution for relatively many steps in order to reach Padding tick_state *)
-  let*! tree, _ = Wasm.compute_step_many ~max_steps:(Int64.of_int 10000) tree in
+  let*! tree, _ =
+    Wasm.compute_step_many
+      ~wasm_entrypoint:Constants.wasm_entrypoint
+      ~max_steps:(Int64.of_int 10000)
+      tree
+  in
 
   (* Ensure we are in Padding state *)
   let*! tick_state = Wasm.Internal_for_tests.get_tick_state tree in
