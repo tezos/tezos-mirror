@@ -190,6 +190,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let* res =
         Reveals.get
           ~dac_client:node_ctxt.dac_client
+          ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
           ~data_dir:node_ctxt.data_dir
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash
