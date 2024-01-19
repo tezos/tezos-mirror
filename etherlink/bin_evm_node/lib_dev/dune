@@ -20,7 +20,8 @@
   octez-libs.tezos-context.encoding
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
-  octez-smart-rollup-wasm-debugger-lib)
+  octez-smart-rollup-wasm-debugger-lib
+  octez-l2-libs.layer2_store)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -30,4 +31,5 @@
   -open Evm_node_lib_dev_encoding
   -open Evm_node_config
   -open Tezos_scoru_wasm_helpers
-  -open Octez_smart_rollup_wasm_debugger_lib))
+  -open Octez_smart_rollup_wasm_debugger_lib
+  -open Tezos_layer2_store))

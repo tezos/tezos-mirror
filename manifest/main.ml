@@ -8445,6 +8445,7 @@ let evm_node_lib_dev =
         octez_scoru_wasm;
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_debugger_lib |> open_;
+        octez_layer2_store |> open_;
       ]
 
 let _octez_evm_node_tests =
