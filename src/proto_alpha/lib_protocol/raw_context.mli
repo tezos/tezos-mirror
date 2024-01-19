@@ -428,7 +428,7 @@ end
 module Dal : sig
   type cryptobox = Dal.t
 
-  val make : t -> cryptobox tzresult
+  val make : t -> (t * cryptobox) tzresult
 
   val number_of_slots : t -> int
 

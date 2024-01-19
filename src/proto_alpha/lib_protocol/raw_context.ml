@@ -1780,7 +1780,7 @@ module Dal = struct
       ctxt.back.constants
     in
     match Dal.make cryptobox_parameters with
-    | Ok cryptobox -> return cryptobox
+    | Ok cryptobox -> return (ctxt, cryptobox)
     | Error (`Fail explanation) ->
         tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation})
 
