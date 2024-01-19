@@ -235,17 +235,27 @@ where
         Ok(list)
     }
 
+    /// Path to the metadata that defines the list.
+    fn metadata_path(root: &impl Path) -> Result<OwnedPath> {
+        let meta_path: Vec<u8> = "/meta".into();
+        let meta_path = OwnedPath::try_from(meta_path)?;
+        let path = concat(root, &meta_path)?;
+        Ok(path)
+    }
+
     /// Saves the LinkedList in the durable storage.
     ///
     /// Only save the back and front pointers.
     fn save(&self, host: &mut impl Runtime) -> Result<()> {
-        storage::store_rlp(self, host, &self.path)
-            .context("cannot load linked list from the storage")
+        let path = Self::metadata_path(&self.path)?;
+        storage::store_rlp(self, host, &path)
+            .context("cannot save linked list from the storage")
     }
 
     /// Load the LinkedList from the durable storage.
     fn read(host: &impl Runtime, path: &impl Path) -> Result<Option<Self>> {
-        storage::read_optional_rlp(host, path)
+        let path = Self::metadata_path(path)?;
+        storage::read_optional_rlp(host, &path)
     }
 
     /// Returns true if the list contains no elements.
@@ -423,7 +433,7 @@ mod tests {
 
     impl Encodable for Hash {
         fn rlp_append(&self, s: &mut rlp::RlpStream) {
-            s.append(&self.0.to_vec());
+            s.encoder().encode_value(&self.0);
         }
     }
 
