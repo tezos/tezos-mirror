@@ -1,0 +1,27 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_sequencer_protobuf)
+ (public_name octez-evm-node-libs.evm_node_sequencer_protobuf)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ocaml-protoc-plugin))
+
+(rule
+ (target narwhal.ml)
+ (deps (:proto narwhal.proto))
+ (action
+  (run
+   protoc -I .
+   "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
+   %{proto})))
+
+(rule
+ (target exporter.ml)
+ (deps (:proto exporter.proto))
+ (action
+  (run
+   protoc -I .
+   "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
+   %{proto})))

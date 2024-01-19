@@ -256,6 +256,9 @@ module Dune : sig
     action:s_expr ->
     s_expr
 
+  (** Makes a rule for compiling protobuf files (.proto) into OCaml files (.ml). *)
+  val protobuf_rule : string -> s_expr
+
   (** Makes an [install] stanza.
 
       Example: [install files ~package ~section] creates a stanza of the form:

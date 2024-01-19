@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-smart-rollup-wasm-debugger-plugin"
+  "ocaml-protoc-plugin" { >= "4.5.0" }
   "octez-version"
   "lwt-exit"
   "octez-l2-libs"

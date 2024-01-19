@@ -456,6 +456,20 @@ module Dune = struct
       [S "target"; S target]
       ~action
 
+  let protobuf_rule filename_without_extension =
+    let proto_filename = filename_without_extension ^ ".proto" in
+    let compiled_filename = filename_without_extension ^ ".ml" in
+    target_rule
+      compiled_filename
+      ~deps:[[S ":proto"; S proto_filename]]
+      ~action:
+        [
+          S "run";
+          H [S "protoc"; S "-I"; S "."];
+          S "--ocaml_out=annot=[@@deriving show { with_path = false }]:.";
+          S "%{proto}";
+        ]
+
   let install ?package files ~section =
     [
       S "install";
