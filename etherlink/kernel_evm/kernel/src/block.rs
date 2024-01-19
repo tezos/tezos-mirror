@@ -22,6 +22,7 @@ use evm_execution::account_storage::{init_account_storage, EthereumAccountStorag
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use primitive_types::{H256, U256};
+use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
@@ -195,10 +196,8 @@ fn compute_bip<Host: KernelRuntime>(
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
-            *current_constants = new_block.constants(
-                current_constants.chain_id,
-                current_constants.base_fee_per_gas,
-            );
+            *current_constants = new_block
+                .constants(current_constants.chain_id, current_constants.block_fees);
             // Drop the processed blueprint from the storage
             drop_head_blueprint(host)?
         }
@@ -209,7 +208,7 @@ fn compute_bip<Host: KernelRuntime>(
 pub fn produce<Host: KernelRuntime>(
     host: &mut Host,
     chain_id: U256,
-    base_fee_per_gas: U256,
+    block_fees: BlockFees,
     config: &mut Configuration,
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -217,7 +216,7 @@ pub fn produce<Host: KernelRuntime>(
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
             Ok(block) => (
-                block.constants(chain_id, base_fee_per_gas),
+                block.constants(chain_id, block_fees),
                 block.number + 1,
                 block.hash,
             ),
@@ -225,7 +224,7 @@ pub fn produce<Host: KernelRuntime>(
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
                 (
-                    BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas),
+                    BlockConstants::first_block(timestamp, chain_id, block_fees),
                     U256::zero(),
                     H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
                 )
@@ -303,7 +302,7 @@ mod tests {
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
-    use crate::{retrieve_base_fee_per_gas, retrieve_chain_id};
+    use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
     };
@@ -371,6 +370,10 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
+
+    fn dummy_block_fees() -> BlockFees {
+        BlockFees::new(DUMMY_BASE_FEE_PER_GAS.into())
+    }
 
     fn dummy_eth_gen_transaction(
         nonce: U256,
@@ -506,7 +509,7 @@ mod tests {
         produce(
             host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -552,7 +555,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -595,7 +598,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -641,7 +644,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -719,7 +722,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -771,7 +774,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -838,7 +841,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -886,7 +889,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -925,7 +928,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -936,7 +939,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -987,7 +990,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -1026,17 +1029,10 @@ mod tests {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host);
+        let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        assert!(
-            base_fee_per_gas.is_ok(),
-            "base_fee_per_gas should be defined"
-        );
-        BlockConstants::first_block(
-            timestamp,
-            chain_id.unwrap(),
-            base_fee_per_gas.unwrap(),
-        )
+        assert!(block_fees.is_ok(), "block fees should be defined");
+        BlockConstants::first_block(timestamp, chain_id.unwrap(), block_fees.unwrap())
     }
 
     #[test]
@@ -1151,7 +1147,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");
@@ -1201,7 +1197,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("Empty block should have been produced");
@@ -1213,7 +1209,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("Empty block should have been produced");
@@ -1225,7 +1221,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("Empty block should have been produced");
@@ -1327,7 +1323,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("Should have produced");
@@ -1384,7 +1380,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("Should have produced");
@@ -1473,7 +1469,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            dummy_block_fees(),
             &mut Configuration::Proxy,
         )
         .expect("The block production failed.");

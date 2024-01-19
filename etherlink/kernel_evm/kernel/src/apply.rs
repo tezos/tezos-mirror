@@ -265,7 +265,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // EIP 1559 checks
     // ensure that the user was willing to at least pay the base fee
     // and that max is greater than both fees
-    if transaction.max_fee_per_gas < block_constant.base_fee_per_gas
+    if transaction.max_fee_per_gas < block_constant.base_fee_per_gas()
         || transaction.max_fee_per_gas < transaction.max_priority_fee_per_gas
     {
         log!(host, Debug, "Transaction status: ERROR_MAX_BASE_FEE");
@@ -291,7 +291,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     allocated_ticks: u64,
 ) -> Result<Option<TransactionResult>, anyhow::Error> {
     let effective_gas_price =
-        transaction.effective_gas_price(block_constants.base_fee_per_gas)?;
+        transaction.effective_gas_price(block_constants.base_fee_per_gas())?;
     let caller = match is_valid_ethereum_transaction_common(
         host,
         evm_account_storage,
@@ -519,7 +519,7 @@ pub fn apply_transaction<Host: Runtime>(
                 caller,
                 index,
                 gas_used,
-                block_constants.base_fee_per_gas,
+                block_constants.base_fee_per_gas(),
             )?;
 
             let receipt_info = make_receipt_info(
@@ -548,7 +548,7 @@ mod tests {
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
-        block::BlockConstants,
+        block::{BlockConstants, BlockFees},
         transaction::{TransactionType, TRANSACTION_HASH_SIZE},
         tx_common::EthereumTransactionCommon,
     };
@@ -562,10 +562,11 @@ mod tests {
     const CHAIN_ID: u32 = 1337;
 
     fn mock_block_constants() -> BlockConstants {
+        let block_fees = BlockFees::new(U256::from(12345));
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),
             CHAIN_ID.into(),
-            U256::from(21000),
+            block_fees,
         )
     }
 

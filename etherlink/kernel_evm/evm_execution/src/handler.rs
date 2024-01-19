@@ -1631,7 +1631,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_base_fee_per_gas(&self) -> U256 {
-        self.block.base_fee_per_gas
+        self.block.base_fee_per_gas()
     }
 
     fn block_randomness(&self) -> Option<H256> {
@@ -1843,6 +1843,7 @@ mod test {
     use primitive_types::{H160, H256};
     use std::cmp::Ordering;
     use std::str::FromStr;
+    use tezos_ethereum::block::BlockFees;
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000;
@@ -1895,7 +1896,8 @@ mod test {
     }
 
     fn dummy_first_block() -> BlockConstants {
-        BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000))
+        let block_fees = BlockFees::new(U256::from(12345));
+        BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 
     #[test]
@@ -2755,8 +2757,7 @@ mod test {
     #[test]
     fn return_hash_of_zero_for_unavailable_block() {
         let mut mock_runtime = MockHost::default();
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000));
+        let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::shanghai();

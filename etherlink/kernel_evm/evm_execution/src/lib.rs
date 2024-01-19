@@ -207,6 +207,7 @@ mod test {
     use primitive_types::{H160, H256};
     use std::str::FromStr;
     use std::vec;
+    use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -282,7 +283,8 @@ mod test {
     }
 
     fn dummy_first_block() -> BlockConstants {
-        BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000))
+        let block_fees = BlockFees::new(U256::from(12345));
+        BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 
     #[test]
@@ -1969,13 +1971,13 @@ mod test {
         let chain_id = U256::from(42);
         let mut chain_id_bytes = [0u8; 32];
         chain_id.to_big_endian(&mut chain_id_bytes);
-        let block =
-            BlockConstants::first_block(U256::zero(), chain_id, U256::from(21000));
+        let block_fees = BlockFees::new(U256::from(54321));
+        let block = BlockConstants::first_block(U256::zero(), chain_id, block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
-        let gas_price = U256::from(21000);
+        let gas_price = U256::from(12345);
         let code = vec![
             Opcode::CHAINID.as_u8(), // cost 2
             Opcode::PUSH1.as_u8(),   // push ost, cost 3
@@ -2041,8 +2043,8 @@ mod test {
         let base_fee_per_gas = U256::from(23000);
         let mut base_fee_per_gas_bytes = [0u8; 32];
         base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2285,10 +2287,8 @@ mod test {
         // Arrange
         let mut mock_runtime = MockHost::default();
         let base_fee_per_gas = U256::from(23000);
-        let mut base_fee_per_gas_bytes = [0u8; 32];
-        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2344,10 +2344,8 @@ mod test {
         // Arrange
         let mut mock_runtime = MockHost::default();
         let base_fee_per_gas = U256::from(23000);
-        let mut base_fee_per_gas_bytes = [0u8; 32];
-        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
@@ -2400,9 +2398,8 @@ mod test {
 
     fn first_block() -> BlockConstants {
         let base_fee_per_gas = U256::from(23000);
-        let mut base_fee_per_gas_bytes = [0u8; 32];
-        base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
-        BlockConstants::first_block(U256::zero(), U256::one(), base_fee_per_gas)
+        let block_fees = BlockFees::new(base_fee_per_gas);
+        BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 
     fn deploy(

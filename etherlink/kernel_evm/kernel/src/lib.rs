@@ -24,6 +24,7 @@ use storage::{
     STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
@@ -57,7 +58,9 @@ extern crate alloc;
 /// production.
 pub const CHAIN_ID: u32 = 1337;
 
-// Minimal base fee per gas
+/// Minimal base fee per gas
+///
+/// Distinct from 'intrinsic base fee' of a simple Eth transfer: which costs 21_000 gas.
 pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// The configuration for the EVM execution.
@@ -141,15 +144,19 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
         }
     }
 }
-fn retrieve_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) => Ok(base_fee_per_gas),
+fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+    let base_fee_per_gas = match read_base_fee_per_gas(host) {
+        Ok(base_fee_per_gas) => base_fee_per_gas,
         Err(_) => {
             let base_fee_per_gas = U256::from(BASE_FEE_PER_GAS);
             store_base_fee_per_gas(host, base_fee_per_gas)?;
-            Ok(base_fee_per_gas)
+            base_fee_per_gas
         }
-    }
+    };
+
+    let block_fees = BlockFees::new(base_fee_per_gas);
+
+    Ok(block_fees)
 }
 
 fn fetch_configuration<Host: Runtime>(host: &mut Host) -> anyhow::Result<Configuration> {
@@ -210,7 +217,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let ticketer = read_ticketer(host);
     let admin = read_admin(host);
     let mut configuration = fetch_configuration(host)?;
-    let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+    let block_fees = retrieve_block_fees(host)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
@@ -226,7 +233,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     .context("Failed during stage 1")?;
 
     // Start processing blueprints
-    block::produce(host, chain_id, base_fee_per_gas, &mut configuration)
+    block::produce(host, chain_id, block_fees, &mut configuration)
         .map(|_| ())
         .context("Failed during stage 2")
 }
@@ -323,6 +330,7 @@ mod tests {
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
     use primitive_types::{H160, U256};
+    use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::{
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
@@ -334,7 +342,7 @@ mod tests {
     use tezos_smart_rollup_mock::MockHost;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
-    const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
+    const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const TOO_MANY_TRANSACTIONS: u64 = 500;
 
     fn set_balance<Host: KernelRuntime>(
@@ -473,11 +481,13 @@ mod tests {
         crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
             .expect("Should be able to store kernel upgrade");
 
+        let block_fees = BlockFees::new(DUMMY_BASE_FEE_PER_GAS.into());
+
         // If the upgrade is started, it should raise an error
         crate::block::produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            block_fees,
             &mut Configuration::Proxy,
         )
         .expect("Should have produced");

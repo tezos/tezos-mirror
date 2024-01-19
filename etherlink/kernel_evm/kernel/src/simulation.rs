@@ -11,7 +11,7 @@ use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
-    current_timestamp, parsable, parsing, retrieve_base_fee_per_gas, retrieve_chain_id,
+    current_timestamp, parsable, parsing, retrieve_block_fees, retrieve_chain_id,
     tick_model, CONFIG,
 };
 
@@ -90,14 +90,14 @@ impl Evaluation {
         host: &mut Host,
     ) -> Result<Option<ExecutionOutcome>, Error> {
         let chain_id = retrieve_chain_id(host)?;
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+        let block_fees = retrieve_block_fees(host)?;
 
         let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, base_fee_per_gas),
+            Ok(block) => block.constants(chain_id, block_fees),
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(timestamp, chain_id, base_fee_per_gas)
+                BlockConstants::first_block(timestamp, chain_id, block_fees)
             }
         };
 
@@ -115,7 +115,7 @@ impl Evaluation {
         let gas_price = if let Some(gas_price) = self.gas_price {
             U256::from(gas_price)
         } else {
-            crate::retrieve_base_fee_per_gas(host)?
+            block_fees.base_fee_per_gas()
         };
 
         let outcome = evm_execution::run_transaction(
@@ -215,7 +215,7 @@ impl TxValidation {
             Some(account) => account.nonce(host)?,
             None => U256::zero(),
         };
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host)?;
+        let block_fees = retrieve_block_fees(host)?;
         // Get the chain_id
         let chain_id = storage::read_chain_id(host)?;
         // Check if nonce is too low
@@ -231,7 +231,7 @@ impl TxValidation {
             return Ok(TxValidationOutcome::GasLimitTooHigh);
         }
         // Check if the gas price is high enough
-        if tx.max_fee_per_gas < base_fee_per_gas
+        if tx.max_fee_per_gas < block_fees.base_fee_per_gas()
             || tx.max_fee_per_gas < tx.max_priority_fee_per_gas
         {
             return Ok(TxValidationOutcome::MaxGasFeeTooLow);
@@ -438,7 +438,7 @@ mod tests {
     };
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::{current_timestamp, retrieve_base_fee_per_gas, retrieve_chain_id};
+    use crate::{current_timestamp, retrieve_block_fees, retrieve_chain_id};
 
     use super::*;
 
@@ -524,16 +524,13 @@ mod tests {
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        let base_fee_per_gas = retrieve_base_fee_per_gas(host);
+        let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
-        assert!(
-            base_fee_per_gas.is_ok(),
-            "base_fee_per_gas should be defined"
-        );
+        assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(
             timestamp,
             chain_id.unwrap(),
-            base_fee_per_gas.unwrap(),
+            block_fees.unwrap(),
         );
         let precompiles = precompiles::precompile_set::<Host>();
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
