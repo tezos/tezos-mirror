@@ -1122,7 +1122,7 @@ opam:tezos-proxy-server-config:
 
 # Ignoring unreleased package tezos-tree-encoding-test.
 
-# Ignoring unreleased package tezt-ethereum.
+# Ignoring unreleased package tezt-etherlink.
 
 # Ignoring unreleased package tezt-risc-v-sandbox.
 

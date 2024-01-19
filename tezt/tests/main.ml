@@ -226,8 +226,6 @@ let register_protocol_tests_that_use_supports_correctly () =
 let register_protocol_specific_because_regression_tests () =
   Adaptive_issuance.register ~protocols:[Alpha] ;
   Dal.register ~protocols:[Alpha] ;
-  Evm_rollup.register ~protocols:[Alpha] ;
-  Evm_sequencer.register ~protocols:[Alpha] ;
   (* This can be safely removed after Nairobi is frozen *)
   Timelock_disabled.register ~protocols:[Nairobi]
 

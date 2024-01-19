@@ -13,7 +13,7 @@
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  make -f kernels.mk build
                  npm install eth-cli
-   Invocation:   dune exec tezt/tests/main.exe -- --file evm_rollup.ml
+   Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 open Sc_rollup_helpers
 open Helpers
@@ -22,7 +22,7 @@ open Contract_path
 
 let pvm_kind = "wasm_2_0_0"
 
-let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
+let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
 
 type l1_contracts = {exchanger : string; bridge : string; admin : string}
 
@@ -842,7 +842,7 @@ let test_consistent_block_hashes =
   unit
 
 (** The info for the "storage.sol" contract.
-    See [tezt/tests/evm_kernel_inputs/storage.*] *)
+    See [etherlink/tezt/tests/evm_kernel_inputs/storage.*] *)
 let simple_storage =
   {
     label = "simpleStorage";
@@ -851,7 +851,7 @@ let simple_storage =
   }
 
 (** The info for the "erc20tok.sol" contract.
-    See [tezt/tests/evm_kernel_inputs/erc20tok.*] *)
+    See [etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*] *)
 let erc20 =
   {
     label = "erc20tok";
@@ -860,7 +860,7 @@ let erc20 =
   }
 
 (** The info for the "loop.sol" contract.
-    See [tezt/tests/evm_kernel_inputs/loop.*] *)
+    See [etherlink/tezt/tests/evm_kernel_inputs/loop.*] *)
 let loop =
   {
     label = "loop";
@@ -869,7 +869,7 @@ let loop =
   }
 
 (** The info for the "mapping_storage.sol" contract.
-    See [tezt/tests/evm_kernel_inputs/mapping_storage*] *)
+    See [etherlink/tezt/tests/evm_kernel_inputs/mapping_storage*] *)
 let mapping_storage =
   {
     label = "mappingStorage";
@@ -878,7 +878,7 @@ let mapping_storage =
   }
 
 (** The info for the "storage.sol" contract, compiled for Shanghai.
-    See [tezt/tests/evm_kernel_inputs/shanghai_storage.*] *)
+    See [etherlink/tezt/tests/evm_kernel_inputs/shanghai_storage.*] *)
 let shanghai_storage =
   {
     label = "shanghai";
@@ -3872,7 +3872,7 @@ let test_l2_revert_returns_unused_gas =
   let* _revert_address, _tx = deploy ~contract:revert ~sender evm_setup in
   (* Tx data is constructed by:
      cd src/kernel_evm/benchmarks/scripts
-     node sign_tx.js ../../../../tezt/tests/evm_kernel_inputs/call_revert.json "9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0"
+     node sign_tx.js ../../../../etherlink/tezt/tests/evm_kernel_inputs/call_revert.json "9722f6cc9ff938e63f8ccb74c3daa6b45837e5c5e3835ac08c44c50ab5f39dc0"
   *)
   let tx =
     "0xf8690183010000830186a094d77420f73b4612a7a99dba8c2afd30a1886b03448084c0406226820a96a0869b3a97d2c87d41c22eaeafba2644c276e74267998dff3504d1d2b35fae0e2ba058f0661adcff7d2abd3c6eb4d663e4731c838f6ef15ebb797b88db87c4fee39b"
@@ -4178,6 +4178,6 @@ let register_evm_node ~protocols =
   test_keep_alive protocols ;
   test_regression_block_hash_gen protocols
 
-let register ~protocols =
-  register_evm_node ~protocols ;
-  register_evm_migration ~protocols
+let () =
+  register_evm_node ~protocols:[Alpha] ;
+  register_evm_migration ~protocols:[Alpha]

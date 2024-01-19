@@ -1,0 +1,43 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name etherlink_tezt_tests_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-libs.tezt-wrapper
+  tezt-tezos
+  tezt_ethereum
+  tezos-protocol-alpha.protocol)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_ethereum)
+ (modules evm_rollup evm_sequencer))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  etherlink_tezt_tests_tezt_lib
+  tezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezt-etherlink)
+ (deps etherlink/tezt/tests/evm_kernel_inputs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

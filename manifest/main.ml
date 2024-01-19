@@ -2812,9 +2812,8 @@ let _octez_p2p_tests =
 let tezt_ethereum =
   private_lib
     "tezt_ethereum"
-    ~path:"tezt/lib_ethereum"
-    ~opam:"tezt-ethereum"
-    ~synopsis:"Ethereum test framework based on Tezt"
+    ~path:"etherlink/tezt/lib_ethereum"
+    ~opam:"tezt-etherlink"
     ~bisect_ppx:No
     ~deps:
       [
@@ -8448,6 +8447,22 @@ let _octez_evm_node_tests =
         evm_node_lib_dev;
       ]
 
+let _tezt_etherlink =
+  tezt
+    ["evm_rollup"; "evm_sequencer"]
+    ~path:"etherlink/tezt/tests"
+    ~opam:"tezt-etherlink"
+    ~synopsis:"Tezt integration tests for Etherlink"
+    ~deps:
+      [
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_ethereum |> open_;
+        Protocol.(main alpha);
+      ]
+    ~dep_files:["etherlink/tezt/tests/evm_kernel_inputs"]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+
 let _evm_node =
   public_exe
     (sf "octez-evm-node")
@@ -8750,7 +8765,6 @@ let () =
       str;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-      tezt_ethereum |> open_;
       tezt_risc_v_sandbox;
       tezt_tx_kernel;
       data_encoding;
