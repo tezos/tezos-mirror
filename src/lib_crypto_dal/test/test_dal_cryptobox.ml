@@ -35,6 +35,26 @@ module Test = struct
     done ;
     indices
 
+  (* Generate an integer that is guaranteed to be different than [n] in the
+     range [lower_boud ; upper_bound] using [QCheck2.Gen.int_range] ;
+     note that this function does not run in constant time (the higher
+     [lower_bound - upper_bound] is, the smaller is the probability to loop) ;
+     in our tests this is fine because [upper_bound] >> [lower_bound].
+     This function fails if [n = lower_bound = upper_bound] *)
+  let rec generate_different_from n (lower_bound, upper_bound) =
+    assert (not (n = lower_bound && n = upper_bound)) ;
+    let open QCheck2.Gen in
+    let generated = int_range lower_bound upper_bound in
+    let* generated_int = generated in
+    if generated_int <> n then generated
+    else generate_different_from n (lower_bound, upper_bound)
+
+  let generate_bytes ~size_different_from:n
+      ~size_range:(lower_bound, upper_bound) =
+    QCheck2.Gen.(
+      generate1
+        (bytes_size (generate_different_from n (lower_bound, upper_bound))))
+
   (* The following bounds are chosen to fit the invariants of [ensure_validity] *)
 
   (* The maximum value for the slot size is chosen to trigger
@@ -726,8 +746,11 @@ module Test = struct
         init () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
-         let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length slot <> params.slot_size) ;
+         let slot =
+           generate_bytes
+             ~size_different_from:params.slot_size
+             ~size_range:(0, 1 lsl 10)
+         in
          Cryptobox.polynomial_from_slot t slot)
         |> function
         | Error (`Slot_wrong_size s) ->
@@ -749,14 +772,15 @@ module Test = struct
         init () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
-         let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length slot <> params.slot_size) ;
          let state = QCheck_base_runner.random_state () in
          let commitment =
            Cryptobox.Internal_for_tests.dummy_commitment ~state ()
          in
-         let page = Gen.(generate1 (bytes_size (int_range 1 (1 lsl 10)))) in
-         assume (Bytes.length page <> params.page_size) ;
+         let page =
+           generate_bytes
+             ~size_different_from:params.page_size
+             ~size_range:(1, 1 lsl 10)
+         in
          let page_proof =
            Cryptobox.Internal_for_tests.dummy_page_proof ~state ()
          in
@@ -785,8 +809,12 @@ module Test = struct
          let commitment =
            Cryptobox.Internal_for_tests.dummy_commitment ~state ()
          in
-         let length = randrange ~min:1 1000 in
-         assume (length <> Cryptobox.Internal_for_tests.shard_length t) ;
+         let length =
+           Gen.generate1
+           @@ generate_different_from
+                (Cryptobox.Internal_for_tests.shard_length t)
+                (1, 1000)
+         in
          let index = randrange params.number_of_shards in
          let shard =
            Cryptobox.Internal_for_tests.make_dummy_shard ~state ~index ~length
@@ -834,14 +862,15 @@ module Test = struct
         init () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
-         let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length slot <> params.slot_size) ;
          let state = QCheck_base_runner.random_state () in
          let commitment =
            Cryptobox.Internal_for_tests.dummy_commitment ~state ()
          in
-         let page = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length page <> params.page_size) ;
+         let page =
+           generate_bytes
+             ~size_different_from:params.page_size
+             ~size_range:(0, 1 lsl 10)
+         in
          let page_proof =
            Cryptobox.Internal_for_tests.dummy_page_proof ~state ()
          in
@@ -868,14 +897,10 @@ module Test = struct
         init () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
-         let slot = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length slot <> params.slot_size) ;
          let state = QCheck_base_runner.random_state () in
          let commitment =
            Cryptobox.Internal_for_tests.dummy_commitment ~state ()
          in
-         let page = Gen.(generate1 (bytes_size (int_range 0 (1 lsl 10)))) in
-         assume (Bytes.length page <> params.page_size) ;
          let shard_proof =
            Cryptobox.Internal_for_tests.dummy_shard_proof ~state ()
          in
