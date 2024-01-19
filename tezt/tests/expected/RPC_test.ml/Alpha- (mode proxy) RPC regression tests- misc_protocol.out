@@ -37,7 +37,8 @@
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 8,
   "cache_sampler_state_cycles": 8,
   "dal_parametric":
-    { "feature_enable": false, "number_of_slots": 16, "attestation_lag": 4,
+    { "feature_enable": false, "incentives_enable": false,
+      "number_of_slots": 16, "attestation_lag": 4,
       "attestation_threshold": 50, "blocks_per_epoch": 1,
       "redundancy_factor": 8, "page_size": 128, "slot_size": 32768,
       "number_of_shards": 64 }, "smart_rollup_arith_pvm_enable": false,

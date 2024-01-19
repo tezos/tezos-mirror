@@ -51,6 +51,7 @@ module Plugin = struct
     return
       {
         Dal_plugin.feature_enable;
+        incentives_enable = false;
         number_of_slots;
         attestation_lag;
         attestation_threshold;

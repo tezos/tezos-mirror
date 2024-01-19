@@ -29,6 +29,7 @@ module Cryptobox = Tezos_crypto_dal.Cryptobox
 module Parameters : sig
   type t = {
     feature_enabled : bool;
+    incentives_enabled : bool;
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;

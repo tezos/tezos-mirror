@@ -27,6 +27,7 @@
 
 type dal = {
   feature_enable : bool;
+  incentives_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
@@ -39,6 +40,7 @@ let dal_encoding =
   conv
     (fun {
            feature_enable;
+           incentives_enable;
            number_of_slots;
            attestation_lag;
            attestation_threshold;
@@ -46,12 +48,14 @@ let dal_encoding =
            blocks_per_epoch;
          } ->
       ( ( feature_enable,
+          incentives_enable,
           number_of_slots,
           attestation_lag,
           attestation_threshold,
           blocks_per_epoch ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
+             incentives_enable,
              number_of_slots,
              attestation_lag,
              attestation_threshold,
@@ -59,6 +63,7 @@ let dal_encoding =
            cryptobox_parameters ) ->
       {
         feature_enable;
+        incentives_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
@@ -66,8 +71,9 @@ let dal_encoding =
         cryptobox_parameters;
       })
     (merge_objs
-       (obj5
+       (obj6
           (req "feature_enable" bool)
+          (req "incentives_enable" bool)
           (req "number_of_slots" int16)
           (req "attestation_lag" int16)
           (req "attestation_threshold" int16)

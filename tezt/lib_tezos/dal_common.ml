@@ -29,6 +29,7 @@ module Cryptobox = Tezos_crypto_dal.Cryptobox
 module Parameters = struct
   type t = {
     feature_enabled : bool;
+    incentives_enabled : bool;
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
@@ -53,8 +54,13 @@ module Parameters = struct
     in
     let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
     let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
+    let incentives_enabled =
+      JSON.(json |-> "incentives_enable" |> as_bool_opt)
+      |> Option.value ~default:false
+    in
     {
       feature_enabled;
+      incentives_enabled;
       cryptobox =
         Cryptobox.Verifier.
           {number_of_shards; redundancy_factor; slot_size; page_size};
