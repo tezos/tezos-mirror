@@ -70,6 +70,13 @@ val clear_outdated_sampling_data :
 val select_distribution_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
+val cleanup_values_for_protocol_p :
+  Raw_context.t ->
+  preserved_cycles:int ->
+  consensus_rights_delay:int ->
+  new_cycle:Cycle_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)
