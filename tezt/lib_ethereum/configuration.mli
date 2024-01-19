@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -17,5 +18,6 @@ val make_config :
   ?administrator:string ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
+  ?base_fee:Wei.t ->
   unit ->
   [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option

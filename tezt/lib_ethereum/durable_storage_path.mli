@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -58,3 +59,6 @@ val kernel_boot_wasm : path
 
 (** [delayed_bridge_path] is the path to the delayed transaction bridge contract. *)
 val delayed_bridge_path : path
+
+(** [base_fee_path] is the path to the base fee, charged on every transaction. *)
+val base_fee_path : path
