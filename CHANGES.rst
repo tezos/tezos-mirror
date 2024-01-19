@@ -41,6 +41,9 @@ Client
 - Extended the support for the TZT format when using the ``run unit
   tests`` client command. (MR :gl:`!4474`)
 
+- The ``timelock create`` command now takes the message to lock in hexadecimal format. (MR :gl:`!11597`)
+
+
 Baker
 -----
 
