@@ -74,7 +74,7 @@ module Publish_slot_header : Benchmark.S = struct
          {slot_index; commitment; commitment_proof}
 
   let make_bench rng_state (config : config) () : workload Generator.benchmark =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     let bench_promise =
       let dal =
         {
@@ -90,7 +90,8 @@ module Publish_slot_header : Benchmark.S = struct
         | Error (`Fail msg) ->
             failwith "Dal_benchmarks: failed to initialize cryptobox (%s)" msg
       in
-
+      (* Memoize the cryptobox in the context *)
+      let*?@ ctxt, _abstract_cryptobox = Alpha_context.Dal.make ctxt in
       let* op =
         match operation_generator cryptobox rng_state with
         | Ok op -> return op

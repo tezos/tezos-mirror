@@ -32,6 +32,9 @@ Data Availability Layer (ongoing)
 - Introduced a ``round`` field in DAL attestations, with a similar meaning as
   for consensus attestations. (MR :gl:`!11285`)
 
+- Optimize the slot header publication operation by memoizing the
+  cryptobox. (MR :gl:`!11594`)
+
 Adaptive Issuance (ongoing)
 ----------------------------
 

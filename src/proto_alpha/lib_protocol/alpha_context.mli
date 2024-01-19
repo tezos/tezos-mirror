@@ -2655,7 +2655,7 @@ module Dal : sig
 
   type cryptobox
 
-  val make : context -> cryptobox tzresult
+  val make : context -> (context * cryptobox) tzresult
 
   val number_of_slots : context -> int
 
