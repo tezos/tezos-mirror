@@ -42,7 +42,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args22
+    (args23
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -53,6 +53,7 @@ let config_init_command =
        dal_node_endpoint_arg
        dac_observer_endpoint_arg
        dac_timeout_arg
+       pre_images_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
@@ -80,6 +81,7 @@ let config_init_command =
            dal_node_endpoint,
            dac_observer_endpoint,
            dac_timeout,
+           pre_images_endpoint,
            injector_retention_period,
            injector_attempts,
            injection_ttl,
@@ -106,6 +108,7 @@ let config_init_command =
           ~dal_node_endpoint
           ~dac_observer_endpoint
           ~dac_timeout
+          ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
           ~injection_ttl
@@ -137,7 +140,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args24
+    (args25
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -149,6 +152,7 @@ let legacy_run_command =
        dal_node_endpoint_arg
        dac_observer_endpoint_arg
        dac_timeout_arg
+       pre_images_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
@@ -174,6 +178,7 @@ let legacy_run_command =
            dal_node_endpoint,
            dac_observer_endpoint,
            dac_timeout,
+           pre_images_endpoint,
            injector_retention_period,
            injector_attempts,
            injection_ttl,
@@ -199,6 +204,7 @@ let legacy_run_command =
           ~dal_node_endpoint
           ~dac_observer_endpoint
           ~dac_timeout
+          ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
           ~injection_ttl
@@ -232,7 +238,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args22
+    (args23
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -242,6 +248,7 @@ let run_command =
        dal_node_endpoint_arg
        dac_observer_endpoint_arg
        dac_timeout_arg
+       pre_images_endpoint_arg
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
@@ -268,6 +275,7 @@ let run_command =
            dal_node_endpoint,
            dac_observer_endpoint,
            dac_timeout,
+           pre_images_endpoint,
            injector_retention_period,
            injector_attempts,
            injection_ttl,
@@ -296,6 +304,7 @@ let run_command =
           ~dal_node_endpoint
           ~dac_observer_endpoint
           ~dac_timeout
+          ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
           ~injection_ttl
