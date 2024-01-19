@@ -127,6 +127,7 @@ module Term = struct
     | Types.Attester pkh ->
         Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
     | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
+    | Observer {slot_index} -> Format.fprintf fmt "%d" slot_index
 
   let attester_profile_arg =
     let open Cmdliner in
@@ -143,7 +144,7 @@ module Term = struct
       let error () =
         Format.kasprintf
           (fun s -> Error (`Msg s))
-          "Unrecognized profile for producer (expected nonnegative integer, \
+          "Unrecognized profile for producer (expected non-negative integer, \
            got %s)"
           string
       in

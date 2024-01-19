@@ -227,6 +227,11 @@ type operator_profile =
             Used by bakers to attest availability of their assigned shards. *)
   | Producer of {slot_index : int}
       (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
+  | Observer of {slot_index : int}
+      (** [Observer {slot_index}] observes slot for slot index
+          [slot_index]: collects the shards corresponding to some slot
+          index, reconstructs slots when enough shards are seen, and
+          republishes missing shards. *)
 
 (** List of operator profiles. It may contain dupicates as it represents profiles
       provided by the user in unprocessed form. *)
@@ -236,9 +241,10 @@ type operator_profiles = operator_profile list
       that the DAL node would operate in. *)
 type profiles =
   | Bootstrap
-      (** The bootstrap profile facilitates peer discovery in the DAL network.
-            Note that bootstrap nodes are incompatible with attester/producer profiles
-            as bootstrap nodes are expected to connect to all the meshes with degree 0. *)
+      (** The bootstrap profile facilitates peer discovery in the DAL
+      network.  Note that bootstrap nodes are incompatible with
+      attester/producer/observer profiles as bootstrap nodes are
+      expected to connect to all the meshes with degree 0. *)
   | Operator of operator_profiles
 
 (** Information associated to a slot header in the RPC services of the DAL
