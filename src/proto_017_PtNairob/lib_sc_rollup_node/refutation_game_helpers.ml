@@ -170,6 +170,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let open Lwt_syntax in
       let* res =
         Reveals.get
+          ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
           ~data_dir:node_ctxt.data_dir
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           ~hash
