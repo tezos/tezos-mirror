@@ -155,6 +155,23 @@ module Term = struct
     in
     Arg.conv (decoder, operator_profile_printer)
 
+  let observer_profile_arg =
+    let open Cmdliner in
+    let decoder string =
+      let error () =
+        Format.kasprintf
+          (fun s -> Error (`Msg s))
+          "Unrecognized profile for observer (expected nonnegative integer, \
+           got %s)"
+          string
+      in
+      match int_of_string_opt string with
+      | None -> error ()
+      | Some i when i < 0 -> error ()
+      | Some slot_index -> Types.Observer {slot_index} |> Result.ok
+    in
+    Arg.conv (decoder, operator_profile_printer)
+
   let attester_profile =
     let open Cmdliner in
     let doc =
@@ -172,6 +189,14 @@ module Term = struct
       value
       & opt (list producer_profile_arg) []
       & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["producer-profiles"])
+
+  let observer_profile =
+    let open Cmdliner in
+    let doc = "The Octez DAL node observer profiles for given slot indexes." in
+    Arg.(
+      value
+      & opt (list observer_profile_arg) []
+      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["observer-profiles"])
 
   let bootstrap_profile =
     let open Cmdliner in
@@ -210,7 +235,7 @@ module Term = struct
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
-       $ producer_profile $ bootstrap_profile $ peers))
+       $ producer_profile $ observer_profile $ bootstrap_profile $ peers))
 end
 
 module Run = struct
@@ -286,7 +311,7 @@ type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint metrics_addr attesters producers bootstrap_flag peers =
+      endpoint metrics_addr attesters producers observers bootstrap_flag peers =
     let run profiles =
       run
         subcommand
@@ -302,7 +327,7 @@ let make ~run =
           peers;
         }
     in
-    match (bootstrap_flag, attesters @ producers) with
+    match (bootstrap_flag, attesters @ producers @ observers) with
     | false, [] -> run None
     | true, [] -> run @@ Some Types.Bootstrap
     | false, operator_profiles -> run @@ Some (Operator operator_profiles)
