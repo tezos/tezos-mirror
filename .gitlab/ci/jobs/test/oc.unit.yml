@@ -44,12 +44,18 @@
   tags:
     - arm64
   rules:
+    # These rules must be imply the rules for the [oc.build_arm64-*]
+    # jobs, such the build jobs always run if the test jobs are
+    # included.  Conversely, we want to run the test jobs whenever the
+    # build jobs are included, so we have mainly the same rules here,
+    # except that we do not make the jobs [when: manual] -- if the
+    # build jobs were manual and triggered, then there is no point in
+    # having the user do another manual action to also run the tests.
     - changes:
         paths:
           - src/**/*
           - .gitlab/**/*
           - .gitlab-ci.yml
-      when: manual
 
 
 oc.unit:non-proto-x86_64:

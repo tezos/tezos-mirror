@@ -24,6 +24,28 @@
     expire_in: 1 day
     when: on_success
 
+.oc.build_arm64:
+  extends:
+    - .oc.build
+    - .tags_template__build_arm64
+  variables:
+    ARCH: "arm64"
+    # Disable coverage for arm64
+    COVERAGE_OPTIONS: ""
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when there is label on the merge request
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
+      when: on_success
+    - changes:
+        paths:
+          - src/**/*
+          - .gitlab/**/*
+          - .gitlab-ci.yml
+      when: manual
+      allow_failure: true
+
 # similar to the build template above, this template
 # compiles all binaries using the static profile.
 .oc.build_static_binaries_template:
@@ -50,25 +72,14 @@
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
     IMAGE_ARCH_PREFIX: ""
-  rules:
-      - if: '$CI_COMMIT_BRANCH == "master"'
-        when: on_success
-      - changes:
-          - scripts/**/*
-          - script-inputs/**/*
-          - src/**/*
-          - tezt/**/*
-          - vendors/**/*
-          - dune
-          - dune-project
-          - dune-workspace
-          - opam
-          - Makefile
-          - kernels.mk
-          - build.Dockerfile
-          - Dockerfile
-          - .gitlab/**/*
-          - .gitlab-ci.yml
-        when: on_success
   script:
     - ./scripts/ci/docker_release.sh
+
+.oc.build_x86_64:
+  extends:
+    - .oc.build
+    # These job are the main bottleneck since a lot of tests depend on
+    # them.  So we start them even before sanity_ci.
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"

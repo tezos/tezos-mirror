@@ -21,11 +21,11 @@
   script:
     - ./docs/introduction/install-bin-ubuntu.sh
 
-oc.install_bin_focal:
+oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   extends: .oc.install_bin_ubuntu_template
 
-oc.install_bin_jammy:
+oc.install_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
   extends: .oc.install_bin_ubuntu_template
 
@@ -36,11 +36,11 @@ oc.install_bin_jammy:
   script:
     - ./docs/introduction/install-bin-ubuntu.sh rc
 
-oc.install_bin_rc_focal:
+oc.install_bin_rc_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   extends: .oc.install_bin_rc_ubuntu_template
 
-oc.install_bin_rc_jammy:
+oc.install_bin_rc_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
   extends: .oc.install_bin_rc_ubuntu_template
 

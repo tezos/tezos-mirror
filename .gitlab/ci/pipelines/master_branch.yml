@@ -2,7 +2,8 @@ include:
   # Stage: build
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
   - .gitlab/ci/jobs/build/oc.build:static-arm64-linux-binaries-experimental.yml
-  - .gitlab/ci/jobs/build/oc.build_arm64.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-experimental.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-experimental.yml
 

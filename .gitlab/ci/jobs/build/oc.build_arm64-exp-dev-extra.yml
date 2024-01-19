@@ -1,0 +1,14 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# The build_arm64 jobs are split in two to keep the artifact size
+# under the 1GB hard limit set by GitLab.
+
+# 'oc.build_arm64-exp-dev-extra' builds the developer and experimental
+# executables, as well as the tezt test suite and the TPS evaluation
+# tool.
+oc.build_arm64-exp-dev-extra:
+  extends:
+    - .oc.build_arm64
+  variables:
+    EXECUTABLE_FILES: "script-inputs/experimental-executables script-inputs/dev-executables"
+    BUILD_EXTRA: "src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe tezt/tests/main.exe"

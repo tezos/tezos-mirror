@@ -10,8 +10,10 @@ include:
   # Stage: build
   - .gitlab/ci/jobs/build/ocaml-check.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
-  - .gitlab/ci/jobs/build/oc.build_arm64.yml
-  - .gitlab/ci/jobs/build/oc.build_x86_64.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
   - .gitlab/ci/jobs/build/oc.build_kernels.yml
   - .gitlab/ci/jobs/build/build_get_contracts.yml
   - .gitlab/ci/jobs/doc/documentation:build_all.yml

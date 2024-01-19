@@ -11,7 +11,5 @@ oc.docker:amd64:
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
     DOCKER_BUILD_TARGET: "with-evm-artifacts"
   needs: []
-  # override the rules inherited from .oc.build_docker_release_template:
-  rules:
-  - when: manual
+  when: manual
   allow_failure: true
