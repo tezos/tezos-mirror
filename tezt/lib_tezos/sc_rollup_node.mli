@@ -72,6 +72,7 @@ type argument =
   | Dal_node of Dal_node.t
   | Mode of mode
   | Rollup of string
+  | Pre_images_endpoint of string
 
 type event = {name : string; value : JSON.t; timestamp : float}
 
