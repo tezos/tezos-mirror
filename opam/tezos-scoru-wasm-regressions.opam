@@ -10,13 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ppx_import"
-  "ppx_deriving"
-  "octez-libs"
-  "octez-l2-libs"
-  "tezos-protocol-alpha"
-  "octez-protocol-alpha-libs"
-  "tezt" { >= "4.0.0" & < "5.0.0" }
+  "ppx_import" {with-test}
+  "ppx_deriving" {with-test}
+  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
+  "octez-libs" {with-test}
+  "octez-l2-libs" {with-test}
+  "tezos-protocol-alpha" {with-test}
+  "octez-protocol-alpha-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

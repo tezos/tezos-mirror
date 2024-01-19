@@ -8474,9 +8474,9 @@ let _evm_node =
       ]
     ~bisect_ppx:Yes
 
-let octez_scoru_wasm_regressions =
-  private_lib
-    "tezos_scoru_wasm_regressions"
+let _octez_scoru_wasm_regressions =
+  tezt
+    ["tezos_scoru_wasm_regressions"]
     ~path:"src/lib_scoru_wasm/regressions"
     ~opam:"tezos-scoru-wasm-regressions"
     ~synopsis:"WASM PVM regressions"
@@ -8490,6 +8490,13 @@ let octez_scoru_wasm_regressions =
         Protocol.(octez_sc_rollup alpha) |> if_some |> open_;
         Protocol.(parameters_exn alpha);
         tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~dep_files:
+      [
+        "../../proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wast";
+        "../test/wasm_kernels/tx-kernel-no-verif.wasm";
+        "../test/messages/deposit.out";
+        "../test/messages/withdrawal.out";
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
@@ -8751,7 +8758,6 @@ let () =
       octez_base_unix;
       octez_stdlib_unix;
       Protocol.(main alpha);
-      octez_scoru_wasm_regressions;
     ]
   in
   let make_tezt_exe test_libs =

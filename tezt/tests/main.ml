@@ -237,7 +237,6 @@ let () =
   register_old_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
-  Tezos_scoru_wasm_regressions.register () ;
   Tezt_wrapper.Uses.register_meta_test () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

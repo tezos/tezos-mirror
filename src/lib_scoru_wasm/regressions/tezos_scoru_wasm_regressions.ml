@@ -63,6 +63,13 @@ let rec eval_and_capture_many ?(fail_on_stuck = true) ~bunk
         Test.fail ~__LOC__ "WASM PVM is stuck" ;
       return tree
 
+(* Note: if new files are read like this, they should be declared in the manifest,
+   with [~dep_files], so that Manifezt knows that those tests should be run if those
+   files are changed.
+
+   Another approach would be to link with [Tezt_wrapper] and use [Uses],
+   so that dependencies are known at the granularity of tests and not the whole module,
+   but this requires calling [read_file] in tests instead of at toplevel. *)
 let echo_kernel =
   read_file
   @@ project_root // "src" // "proto_alpha" // "lib_protocol" // "test"
@@ -216,7 +223,7 @@ let register ?(from_binary = false) ?(fail_on_stuck = true) ?ticks_per_snapshot
         kernel
   | None -> ()
 
-let register () =
+let () =
   let versions = List.map snd Tezos_scoru_wasm.Wasm_pvm_state.versions in
   register
     ~name:"echo"
