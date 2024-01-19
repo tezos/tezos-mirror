@@ -185,7 +185,11 @@ let checkout_context node_ctxt block_hash =
         tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
     | Some {context; _} -> return context
   in
-  let*! ctxt = Context.checkout node_ctxt.context context_hash in
+  let*! ctxt =
+    Context.checkout
+      node_ctxt.context
+      (Smart_rollup_context_hash.to_context_hash context_hash)
+  in
   match ctxt with
   | None ->
       tzfail
@@ -979,7 +983,11 @@ let gc node_ctxt ~(level : int32) =
           let*! () = Event.calling_gc ~gc_level ~head_level:level in
           let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
           (* Start both node and context gc asynchronously *)
-          let*! () = Context.gc node_ctxt.context context in
+          let*! () =
+            Context.gc
+              node_ctxt.context
+              (Smart_rollup_context_hash.to_context_hash context)
+          in
           let* () = Store.gc node_ctxt.store ~level:gc_level in
           let gc_waiter () =
             let open Lwt_syntax in

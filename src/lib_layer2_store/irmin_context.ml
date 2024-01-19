@@ -64,11 +64,11 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = Smart_rollup_context_hash.t
+type hash = Context_hash.t
 
 type path = string list
 
-let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
+let () = assert (Context_hash.size = IStore.Hash.hash_size)
 
 let impl_name = "Irmin"
 
@@ -76,10 +76,10 @@ let equality_witness : (repo, tree) Context_sigs.equality_witness =
   (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
 
 let hash_to_istore_hash h =
-  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+  Context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
+  IStore.Hash.to_raw_string h |> Context_hash.of_string_exn
 
 let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
  fun ~cache_size mode path ->
@@ -135,8 +135,7 @@ let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
   let istore_hash = hash_to_istore_hash hash in
   let* commit_opt = IStore.Commit.of_hash index.repo istore_hash in
   match commit_opt with
-  | None ->
-      Fmt.failwith "%a: unknown context hash" Smart_rollup_context_hash.pp hash
+  | None -> Fmt.failwith "%a: unknown context hash" Context_hash.pp hash
   | Some commit -> (
       let finished = function
         | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->

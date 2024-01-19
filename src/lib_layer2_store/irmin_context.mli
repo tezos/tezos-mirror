@@ -54,7 +54,7 @@ type ro = [`Read] t
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
-type hash = Smart_rollup_context_hash.t
+type hash = Context_hash.t
 
 (** The type of commits for the context. *)
 type commit

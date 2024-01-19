@@ -24,23 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
+(** [starting_context_gc hash] emits an event which indicates that a GC run
+    was launched for [hash]. *)
+val starting_context_gc : Context_hash.t -> unit Lwt.t
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Smart_rollup_context_hash"
+(** [context_gc_already_launched ()] emits an event which indicates that a GC
+    launch was attempted but resulted in no action because a GC run is already
+    in progress. *)
+val context_gc_already_launched : unit -> unit Lwt.t
 
-      let title = "A base58-check encoded hash of a Smart rollup node context"
+(** [ending_context_gc total_duration finalise_duration] emits an event which
+    indicates that a GC run has ended, providing its total duration and its
+    finalisation duration. *)
+val ending_context_gc : Ptime.span * Ptime.span -> unit Lwt.t
 
-      let b58check_prefix = "\008\209\216\166"
+(** [context_gc_failure err] emits an event which indicates a GC failure. *)
+val context_gc_failure : string -> unit Lwt.t
 
-      let size = None
-    end)
-
-let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54
-
-let to_context_hash hash = to_bytes hash |> Context_hash.of_bytes_exn
-
-let of_context_hash hash = Context_hash.to_bytes hash |> of_bytes_exn
+(** [context_gc_launch_failure err] emits an event which indicates a GC launch
+    error. *)
+val context_gc_launch_failure : string -> unit Lwt.t

@@ -21,7 +21,11 @@ let get_wasm_pvm_state (module Plugin : Protocol_plugin_sig.S)
       Tezos_layer2_store.Store_sigs.Read_only
       (Configuration.default_context_dir data_dir)
   in
-  let*! ctxt = Context.checkout context context_hash in
+  let*! ctxt =
+    Context.checkout
+      context
+      (Smart_rollup_context_hash.to_context_hash context_hash)
+  in
   let* ctxt =
     match ctxt with
     | None ->

@@ -42,7 +42,11 @@ let get_head (store : _ Store.t) =
 let check_head (head : Sc_rollup_block.t) context =
   let open Lwt_result_syntax in
   (* Ensure head context is available. *)
-  let*! head_ctxt = Context.checkout context head.header.context in
+  let*! head_ctxt =
+    Context.checkout
+      context
+      (Smart_rollup_context_hash.to_context_hash head.header.context)
+  in
   let*? () =
     error_when (Option.is_none head_ctxt)
     @@ error_of_fmt "Head context cannot be checkouted, won't produce snapshot."
@@ -127,7 +131,11 @@ let check_block_data_and_get_content (store : _ Store.t) context hash =
         return_some commitment
   in
   (* Ensure head context is available. *)
-  let*! head_ctxt = Context.checkout context header.context in
+  let*! head_ctxt =
+    Context.checkout
+      context
+      (Smart_rollup_context_hash.to_context_hash header.context)
+  in
   let*? head_ctxt = check_some hash "context" head_ctxt in
   return (header, inbox, commitment, head_ctxt)
 
