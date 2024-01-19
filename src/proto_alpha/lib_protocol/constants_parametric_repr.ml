@@ -144,8 +144,12 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  issuance_ratio_min : Q.t;
-  issuance_ratio_max : Q.t;
+  issuance_ratio_final_min : Q.t;
+  issuance_ratio_final_max : Q.t;
+  issuance_ratio_initial_min : Q.t;
+  issuance_ratio_initial_max : Q.t;
+  initial_period : int;
+  transition_period : int;
   max_bonus : Issuance_bonus_repr.max_bonus;
   growth_rate : Q.t;
   center_dz : Q.t;
@@ -368,36 +372,56 @@ let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
     (fun {
-           issuance_ratio_min;
-           issuance_ratio_max;
+           issuance_ratio_final_min;
+           issuance_ratio_final_max;
+           issuance_ratio_initial_min;
+           issuance_ratio_initial_max;
+           initial_period;
+           transition_period;
            max_bonus;
            growth_rate;
            center_dz;
            radius_dz;
          } ->
-      ( issuance_ratio_min,
-        issuance_ratio_max,
+      ( issuance_ratio_final_min,
+        issuance_ratio_final_max,
+        issuance_ratio_initial_min,
+        issuance_ratio_initial_max,
+        initial_period,
+        transition_period,
         max_bonus,
         growth_rate,
         center_dz,
         radius_dz ))
-    (fun ( issuance_ratio_min,
-           issuance_ratio_max,
+    (fun ( issuance_ratio_final_min,
+           issuance_ratio_final_max,
+           issuance_ratio_initial_min,
+           issuance_ratio_initial_max,
+           initial_period,
+           transition_period,
            max_bonus,
            growth_rate,
            center_dz,
            radius_dz ) ->
       {
-        issuance_ratio_min;
-        issuance_ratio_max;
+        issuance_ratio_final_min;
+        issuance_ratio_final_max;
+        issuance_ratio_initial_min;
+        issuance_ratio_initial_max;
+        initial_period;
+        transition_period;
         max_bonus;
         growth_rate;
         center_dz;
         radius_dz;
       })
-    (obj6
-       (req "issuance_ratio_min" extremum_encoding)
-       (req "issuance_ratio_max" extremum_encoding)
+    (obj10
+       (req "issuance_ratio_final_min" extremum_encoding)
+       (req "issuance_ratio_final_max" extremum_encoding)
+       (req "issuance_ratio_initial_min" extremum_encoding)
+       (req "issuance_ratio_initial_max" extremum_encoding)
+       (req "initial_period" uint8)
+       (req "transition_period" uint8)
        (req "max_bonus" Issuance_bonus_repr.max_bonus_encoding)
        (req "growth_rate" growth_rate_encoding)
        (req "center_dz" center_encoding)

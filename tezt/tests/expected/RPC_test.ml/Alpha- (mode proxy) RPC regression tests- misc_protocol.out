@@ -63,9 +63,13 @@
   "edge_of_staking_over_delegation": 2,
   "adaptive_issuance_launch_ema_threshold": 1600000000,
   "adaptive_rewards_params":
-    { "issuance_ratio_min": { "numerator": "1", "denominator": "2000" },
-      "issuance_ratio_max": { "numerator": "1", "denominator": "20" },
-      "max_bonus": "50000000000000",
+    { "issuance_ratio_final_min": { "numerator": "1", "denominator": "400" },
+      "issuance_ratio_final_max": { "numerator": "1", "denominator": "10" },
+      "issuance_ratio_initial_min":
+        { "numerator": "9", "denominator": "200" },
+      "issuance_ratio_initial_max":
+        { "numerator": "11", "denominator": "200" }, "initial_period": 10,
+      "transition_period": 50, "max_bonus": "50000000000000",
       "growth_rate": { "numerator": "1", "denominator": "100" },
       "center_dz": { "numerator": "1", "denominator": "2" },
       "radius_dz": { "numerator": "1", "denominator": "50" } },

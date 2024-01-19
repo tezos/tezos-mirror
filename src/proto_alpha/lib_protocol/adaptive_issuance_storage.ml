@@ -60,6 +60,8 @@ let () =
       | Undetermined_issuance_coeff_for_cycle cycle -> Some cycle | _ -> None)
     (fun cycle -> Undetermined_issuance_coeff_for_cycle cycle)
 
+let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
+
 let check_determined_cycle ctxt cycle =
   let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
@@ -106,6 +108,59 @@ let truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f =
   let f = Q.max f issuance_ratio_min in
   f
 
+let compute_extremum ~launch_cycle ~new_cycle ~initial_period ~transition_period
+    ~initial ~final =
+  match launch_cycle with
+  | None ->
+      (* This case shouldn't happen, but if it does this value is the most sensible *)
+      initial
+  | Some launch_cycle ->
+      let transition_period = transition_period + 1 in
+      assert (Compare.Int.(transition_period > 0)) ;
+      let t1 = Cycle_repr.add launch_cycle initial_period in
+      let t2 = Cycle_repr.add t1 transition_period in
+      if Cycle_repr.(new_cycle <= t1) then initial
+      else if Cycle_repr.(new_cycle >= t2) then final
+      else
+        let t = Cycle_repr.diff new_cycle t1 |> Q.of_int32 in
+        Q.(((final - initial) * t / of_int transition_period) + initial)
+
+let compute_min
+    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
+  let Constants_parametric_repr.
+        {
+          initial_period;
+          transition_period;
+          issuance_ratio_initial_min;
+          issuance_ratio_final_min;
+          _;
+        } =
+    reward_params
+  in
+  compute_extremum
+    ~initial_period
+    ~transition_period
+    ~initial:issuance_ratio_initial_min
+    ~final:issuance_ratio_final_min
+
+let compute_max
+    ~(reward_params : Constants_parametric_repr.adaptive_rewards_params) =
+  let Constants_parametric_repr.
+        {
+          initial_period;
+          transition_period;
+          issuance_ratio_initial_max;
+          issuance_ratio_final_max;
+          _;
+        } =
+    reward_params
+  in
+  compute_extremum
+    ~initial_period
+    ~transition_period
+    ~initial:issuance_ratio_initial_max
+    ~final:issuance_ratio_final_max
+
 let compute_reward_coeff_ratio_without_bonus =
   let q_1600 = Q.of_int 1600 in
   fun ~stake_ratio ~issuance_ratio_max ~issuance_ratio_min ->
@@ -114,12 +169,17 @@ let compute_reward_coeff_ratio_without_bonus =
     (* f is truncated so that 0.05% <= f <= 5% *)
     truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
-let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
-    ~(previous_bonus : Issuance_bonus_repr.t) ~reward_params =
+let compute_bonus ~issuance_ratio_max ~seconds_per_cycle ~stake_ratio
+    ~base_reward_coeff_ratio ~(previous_bonus : Issuance_bonus_repr.t)
+    ~reward_params =
   let Constants_parametric_repr.
         {
-          issuance_ratio_min = _;
-          issuance_ratio_max;
+          issuance_ratio_final_min = _;
+          issuance_ratio_final_max = _;
+          issuance_ratio_initial_min = _;
+          issuance_ratio_initial_max = _;
+          initial_period = _;
+          transition_period = _;
           max_bonus;
           growth_rate;
           center_dz;
@@ -156,17 +216,14 @@ let compute_bonus ~seconds_per_cycle ~stake_ratio ~base_reward_coeff_ratio
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_issued_per_minute
+  fun ~issuance_ratio_max
+      ~issuance_ratio_min
+      ~base_total_issued_per_minute
       ~base_reward_coeff_ratio
       ~q_total_supply
-      ~(bonus : Issuance_bonus_repr.t)
-      ~reward_params ->
+      ~(bonus : Issuance_bonus_repr.t) ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
-      let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
-          =
-        reward_params
-      in
       let q_base_total_issued_per_minute =
         Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
@@ -181,6 +238,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if not ai_enable then return ctxt
   else
+    let* launch_cycle = launch_cycle ctxt in
     let reward_params =
       Constants_storage.adaptive_issuance_rewards_params ctxt
     in
@@ -208,14 +266,21 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let stake_ratio =
       Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
     in
+    let issuance_ratio_min =
+      compute_min ~launch_cycle ~new_cycle ~reward_params
+    in
+    let issuance_ratio_max =
+      compute_max ~launch_cycle ~new_cycle ~reward_params
+    in
     let base_reward_coeff_ratio =
       compute_reward_coeff_ratio_without_bonus
         ~stake_ratio
-        ~issuance_ratio_max:reward_params.issuance_ratio_max
-        ~issuance_ratio_min:reward_params.issuance_ratio_min
+        ~issuance_ratio_max
+        ~issuance_ratio_min
     in
     let*? bonus =
       compute_bonus
+        ~issuance_ratio_max
         ~seconds_per_cycle
         ~stake_ratio
         ~base_reward_coeff_ratio
@@ -224,11 +289,12 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     in
     let coeff =
       compute_coeff
+        ~issuance_ratio_max
+        ~issuance_ratio_min
         ~base_total_issued_per_minute
         ~base_reward_coeff_ratio
         ~q_total_supply
         ~bonus
-        ~reward_params
     in
     let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
     let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
@@ -258,8 +324,6 @@ let init ctxt =
 
 let activate ctxt ~cycle =
   Storage.Adaptive_issuance.Activation.update ctxt (Some cycle)
-
-let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
 
 let set_adaptive_issuance_enable ctxt =
   let open Lwt_result_syntax in
@@ -327,4 +391,8 @@ module Internal_for_tests = struct
   let compute_bonus = compute_bonus
 
   let compute_coeff = compute_coeff
+
+  let compute_min = compute_min
+
+  let compute_max = compute_max
 end

@@ -279,8 +279,12 @@ let constants_mainnet =
         launch_ema_threshold = 1_600_000_000l;
         adaptive_rewards_params =
           {
-            issuance_ratio_min = Q.(5 // 10000);
-            issuance_ratio_max = Q.(1 // 20);
+            issuance_ratio_final_min = Q.(0_25 // 100_00);
+            issuance_ratio_final_max = Q.(10 // 100);
+            issuance_ratio_initial_min = Q.(45 // 1000);
+            issuance_ratio_initial_max = Q.(55 // 1000);
+            initial_period = 10;
+            transition_period = 50;
             max_bonus =
               Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn
                 Q.(5 // 100);

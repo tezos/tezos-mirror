@@ -855,8 +855,12 @@ module Constants : sig
     }
 
     type adaptive_rewards_params = {
-      issuance_ratio_min : Q.t;
-      issuance_ratio_max : Q.t;
+      issuance_ratio_final_min : Q.t;
+      issuance_ratio_final_max : Q.t;
+      issuance_ratio_initial_min : Q.t;
+      issuance_ratio_initial_max : Q.t;
+      initial_period : int;
+      transition_period : int;
       max_bonus : Issuance_bonus_repr.max_bonus;
       growth_rate : Q.t;
       center_dz : Q.t;
@@ -2363,6 +2367,7 @@ module Delegate : sig
         Q.t
 
       val compute_bonus :
+        issuance_ratio_max:Q.t ->
         seconds_per_cycle:int64 ->
         stake_ratio:Q.t ->
         base_reward_coeff_ratio:Q.t ->
@@ -2371,11 +2376,24 @@ module Delegate : sig
         Issuance_bonus_repr.t tzresult
 
       val compute_coeff :
+        issuance_ratio_max:Q.t ->
+        issuance_ratio_min:Q.t ->
         base_total_issued_per_minute:Tez_repr.t ->
         base_reward_coeff_ratio:Q.t ->
         q_total_supply:Q.t ->
         bonus:Issuance_bonus_repr.t ->
+        Q.t
+
+      val compute_min :
         reward_params:Constants.Parametric.adaptive_rewards_params ->
+        launch_cycle:Cycle_repr.t option ->
+        new_cycle:Cycle_repr.t ->
+        Q.t
+
+      val compute_max :
+        reward_params:Constants.Parametric.adaptive_rewards_params ->
+        launch_cycle:Cycle_repr.t option ->
+        new_cycle:Cycle_repr.t ->
         Q.t
     end
   end

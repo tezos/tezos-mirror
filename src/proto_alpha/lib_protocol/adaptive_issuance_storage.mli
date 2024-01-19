@@ -101,6 +101,7 @@ module Internal_for_tests : sig
     stake_ratio:Q.t -> issuance_ratio_max:Q.t -> issuance_ratio_min:Q.t -> Q.t
 
   val compute_bonus :
+    issuance_ratio_max:Q.t ->
     seconds_per_cycle:int64 ->
     stake_ratio:Q.t ->
     base_reward_coeff_ratio:Q.t ->
@@ -109,10 +110,23 @@ module Internal_for_tests : sig
     Issuance_bonus_repr.t tzresult
 
   val compute_coeff :
+    issuance_ratio_max:Q.t ->
+    issuance_ratio_min:Q.t ->
     base_total_issued_per_minute:Tez_repr.t ->
     base_reward_coeff_ratio:Q.t ->
     q_total_supply:Q.t ->
     bonus:Issuance_bonus_repr.t ->
+    Q.t
+
+  val compute_min :
     reward_params:Constants_parametric_repr.adaptive_rewards_params ->
+    launch_cycle:Cycle_repr.t option ->
+    new_cycle:Cycle_repr.t ->
+    Q.t
+
+  val compute_max :
+    reward_params:Constants_parametric_repr.adaptive_rewards_params ->
+    launch_cycle:Cycle_repr.t option ->
+    new_cycle:Cycle_repr.t ->
     Q.t
 end
