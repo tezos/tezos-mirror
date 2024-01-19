@@ -87,7 +87,7 @@ else {
 }}' src/lib_node_config/config_file.ml > tmp_file
   mv tmp_file src/lib_node_config/config_file.ml
 
-  sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/octez-init-sandboxed-client.sh
+  sed -i.old "s/\$bin_dir\/..\/..\/_build\/default\/src\/proto_alpha\/lib_parameters\/sandbox-parameters.json/\$bin_dir\/..\/..\/_build\/default\/src\/proto_${pred}_${pred_short_hash}\/lib_parameters\/sandbox-parameters.json/" src/bin_client/octez-init-sandboxed-client.sh
   sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/octez-init-sandboxed-client.sh
   sed -i.old "s/octez-activate-alpha/octez-activate-${pred}-${pred_short_hash}/" src/bin_client/octez-init-sandboxed-client.sh
   sed -i.old "s/activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK/activate protocol $pred_full_hash/" src/bin_client/octez-init-sandboxed-client.sh
