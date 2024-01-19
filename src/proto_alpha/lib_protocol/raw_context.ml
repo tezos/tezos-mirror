@@ -1190,10 +1190,14 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           }
         in
         let direct_ticket_spending_enable = false in
+        let consensus_rights_delay =
+          (* We change the consensus_rights_delay value only for mainnet *)
+          if Compare.Int.(c.preserved_cycles = 5) then 2 else c.preserved_cycles
+        in
         let constants =
           Constants_parametric_repr.
             {
-              consensus_rights_delay = c.preserved_cycles;
+              consensus_rights_delay;
               blocks_preservation_cycles = 1;
               delegate_parameters_activation_delay = c.preserved_cycles;
               blocks_per_cycle = c.blocks_per_cycle;
