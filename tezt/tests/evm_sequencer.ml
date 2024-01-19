@@ -5,6 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Smart Optimistic Rollups: Etherlink Sequencer
+   Requirement:  make -f kernels.mk build
+                 npm install eth-cli
+   Invocation:   dune exec tezt/tests/main.exe -- --file evm_sequencer.ml
+*)
+
 open Sc_rollup_helpers
 open Rpc.Syntax
 open Contract_path
