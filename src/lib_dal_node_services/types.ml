@@ -301,7 +301,7 @@ type operator_profile =
 
 type operator_profiles = operator_profile list
 
-type profiles = Bootstrap | Operator of operator_profiles
+type profiles = Bootstrap | Operator of operator_profiles | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -441,6 +441,12 @@ let profiles_encoding =
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)
         (function (), operator_profiles -> Operator operator_profiles);
+      case
+        ~title:"Random_observer"
+        (Tag 3)
+        (obj1 (req "kind" (constant "random_observer")))
+        (function Random_observer -> Some () | _ -> None)
+        (function () -> Random_observer);
     ]
 
 let with_proof_encoding =

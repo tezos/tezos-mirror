@@ -246,6 +246,7 @@ type profiles =
       attester/producer/observer profiles as bootstrap nodes are
       expected to connect to all the meshes with degree 0. *)
   | Operator of operator_profiles
+  | Random_observer
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
