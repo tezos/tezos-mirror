@@ -30,7 +30,7 @@ pub struct Hash([u8; TRANSACTION_HASH_SIZE]);
 
 impl Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.append(&self.0.to_vec());
+        s.encoder().encode_value(&self.0);
     }
 }
 
