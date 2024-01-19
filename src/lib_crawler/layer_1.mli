@@ -27,7 +27,9 @@
 (** This module allow to follow the layer 1 chain by subscribing to the head
     monitoring RPC offered by the Tezos node, reconnecting, etc. *)
 
-type error += Cannot_find_predecessor of Block_hash.t
+type error +=
+  | Cannot_find_predecessor of Block_hash.t
+  | Http_connection_error of (Cohttp.Code.status_code * string)
 
 (** The type of layer 1 followers. *)
 type t
