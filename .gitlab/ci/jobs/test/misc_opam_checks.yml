@@ -12,4 +12,4 @@ misc_opam_checks:
     when: always
     paths:
       - opam_repo.patch
-    expire_in: 1 days
+    expire_in: 1 day

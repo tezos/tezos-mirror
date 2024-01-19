@@ -108,7 +108,7 @@ oc.unit:webassembly-x86_64:
   # hangs. We use a timeout to retry the test in this case. The
   # underlying issue should be fixed eventually, turning this timeout
   # unnecessary.
-  timeout: 20 min
+  timeout: 20 minutes
 
 oc.unit:js_components:
   extends:
