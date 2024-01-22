@@ -24,6 +24,7 @@ include:
   - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml
   - .gitlab/ci/jobs/build/bin_packages_manual.yml
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
+  - .gitlab/ci/jobs/build/select_tezts.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/kaitai_checks.yml
