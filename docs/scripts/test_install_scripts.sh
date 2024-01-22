@@ -37,6 +37,7 @@ where <test-name> can be:
 * install-opam-focal
 * compile-release-sources-bullseye
 * compile-sources-bullseye
+* compile-sources-mantic
 * install-python-focal
 * install-python-jammy
 * install-python-bullseye
@@ -87,6 +88,9 @@ for test_case in "$@"; do
     ;;
   "compile-sources-bullseye")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos master
+    ;;
+  "compile-sources-mantic")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-23.10 /Scripts/compile-sources.sh tezos/tezos master
     ;;
   "install-python-focal")
     docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_FOCAL" /Scripts/install-python-debian-ubuntu.sh
