@@ -33,6 +33,10 @@
 (* --- Format/IO helper functions --- *)
 let bytes_to_string b = "0x" ^ Hex.(of_bytes b |> show)
 
+let head_hex = Bytes.of_string "head" |> bytes_to_string
+
+let tail_hex = Bytes.of_string "tail" |> bytes_to_string
+
 let chest_to_string chest =
   Data_encoding.Binary.to_bytes_exn Tezos_crypto.Timelock.chest_encoding chest
   |> bytes_to_string
@@ -251,7 +255,7 @@ let amount = Tez.zero
 let test_contract_correct_guess ~protocol () =
   let* client, receiver = originate_contract protocol "timelock_flip.tz" in
   (* bootstrap2 starts a coin toss game by submitting a chest *)
-  let str = "head" in
+  let str = head_hex in
   let* chest_file, chest, _, _ = create_timelock client path time str in
   let chest = chest_to_string chest in
   let giver = Constant.bootstrap2.alias in
@@ -260,7 +264,7 @@ let test_contract_correct_guess ~protocol () =
   let* b_init = assert_storage ~chest client receiver in
   (* bootstrap3 submits their guess *)
   let giver = Constant.bootstrap3.alias in
-  let guess = Bytes.of_string "head" |> bytes_to_string in
+  let guess = head_hex in
   let arg = "Right (Left " ^ guess ^ ")" in
   let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
   let* b_guess = assert_storage ~chest ~guess ~msg:"0xb0" client receiver in
@@ -276,7 +280,7 @@ let test_contract_correct_guess ~protocol () =
 let test_contract_incorrect_guess ~protocol () =
   let* client, receiver = originate_contract protocol "timelock_flip.tz" in
   (* bootstrap2 starts a coin toss game by submitting a chest *)
-  let str = "head" in
+  let str = head_hex in
   let* chest_file, chest, _, _ = create_timelock client path time str in
   let chest = chest_to_string chest in
   let giver = Constant.bootstrap2.alias in
@@ -285,7 +289,7 @@ let test_contract_incorrect_guess ~protocol () =
   let* b_init = assert_storage ~chest client receiver in
   (* bootstrap3 submits their guess *)
   let giver = Constant.bootstrap3.alias in
-  let guess = Bytes.of_string "tail" |> bytes_to_string in
+  let guess = tail_hex in
   let arg = "Right (Left " ^ guess ^ ")" in
   let* () = Client.transfer ~burn_cap ~amount ~giver ~receiver ~arg client in
   let* b_guess = assert_storage ~chest ~guess ~msg:"0xb0" client receiver in
@@ -304,7 +308,7 @@ let test_contract_guess_too_late ~protocol () =
     originate_contract ~mockup:false protocol "timelock_flip.tz"
   in
   (* bootstrap2 starts a coin toss game by submitting a chest *)
-  let str = "head" in
+  let str = head_hex in
   let* _chest_file, chest, _, _ = create_timelock client path time str in
   let chest_str = chest_to_string chest in
   let giver = Constant.bootstrap2.alias in
@@ -336,7 +340,7 @@ let test_contract_guess_too_late ~protocol () =
 let test_contract_error_opening ~protocol () =
   let* client, receiver = originate_contract protocol "timelock_flip.tz" in
   (* bootstrap2 starts a coin toss game by submitting a chest *)
-  let str = "head" in
+  let str = head_hex in
   let* chest_file, chest, _, _ = create_timelock client path time str in
   let chest = chest_to_string chest in
   let giver = Constant.bootstrap2.alias in

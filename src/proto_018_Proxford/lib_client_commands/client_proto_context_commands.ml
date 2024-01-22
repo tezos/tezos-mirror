@@ -3571,17 +3571,17 @@ let commands_rw () =
       @@ prefix "for"
       @@ param ~name:"time" ~desc:" timelock difficulty" int_parameter
       @@ prefix "with"
-      @@ param ~name:"payload" ~desc:" timelock message" string_parameter
+      @@ param ~name:"payload" ~desc:" timelock message" bytes_parameter
       @@ prefix "in"
       @@ param ~name:"file" ~desc:" updates dir" string_parameter
       @@ stop)
-      (fun () (time : int) (payload : string) (timelock_path : string) cctxt ->
+      (fun () (time : int) (payload : bytes) (timelock_path : string) cctxt ->
         let open Lwt_result_syntax in
         let open Tezos_crypto.Timelock in
         let chest, chest_key =
           create_chest_and_chest_key
             ~precompute_path:(Some timelock_path)
-            ~payload:(Bytes.of_string payload)
+            ~payload
             ~time
             ()
         in
