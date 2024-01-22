@@ -428,9 +428,11 @@ let rollup_address_arg =
 
 let kernel_arg =
   Tezos_clic.arg
-    ~long:"kernel"
+    ~long:"initial-kernel"
     ~placeholder:"evm_installer.wasm"
-    ~doc:"Path to the EVM kernel"
+    ~doc:
+      "Path to the EVM kernel used to launch the PVM, it will be loaded from \
+       storage afterward"
     Params.string
 
 let preimages_arg =

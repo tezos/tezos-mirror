@@ -37,7 +37,8 @@ type time_between_blocks =
 (** EVM node mode. *)
 type mode =
   | Sequencer of {
-      kernel : string;  (** Path to the kernel used by the sequencer. *)
+      initial_kernel : string;
+          (** Path to the initial kernel used by the sequencer. *)
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
       private_rpc_port : int;  (** Port for private RPC server*)

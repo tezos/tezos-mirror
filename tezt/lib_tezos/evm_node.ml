@@ -29,7 +29,7 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 
 type mode =
   | Sequencer of {
-      kernel : string;
+      initial_kernel : string;
       preimage_dir : string;
       private_rpc_port : int;
       time_between_blocks : time_between_blocks option;
@@ -274,8 +274,13 @@ let run_args evm_node =
         ]
         @ Cli_arg.optional_switch "devmode" devmode
     | Sequencer
-        {kernel; preimage_dir; private_rpc_port; time_between_blocks; sequencer}
-      ->
+        {
+          initial_kernel;
+          preimage_dir;
+          private_rpc_port;
+          time_between_blocks;
+          sequencer;
+        } ->
         [
           "run";
           "sequencer";
@@ -285,8 +290,8 @@ let run_args evm_node =
           "signing";
           "with";
           sequencer;
-          "--kernel";
-          kernel;
+          "--initial-kernel";
+          initial_kernel;
           "--preimage-dir";
           preimage_dir;
           "--private-rpc-port";

@@ -370,7 +370,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
         return
           (Evm_node.Sequencer
              {
-               kernel = output;
+               initial_kernel = output;
                preimage_dir = preimages_dir;
                private_rpc_port;
                time_between_blocks;
