@@ -1,5 +1,5 @@
-Version 19.0~rc1
-================
+Version 19.0
+============
 
 Version 19.0 contains a new version (V11) of the protocol environment,
 which is the set of functions that a protocol can call.
@@ -69,9 +69,10 @@ If you are using Docker instead, use the ``v19.0`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
-It is now also possible to download experimental Debian and Redhat packages on the `release page <https://gitlab.com/tezos/tezos/-/releases/v19.0-rc1>`_  and in the `package registry <https://gitlab.com/tezos/tezos/-/packages>`_.
+It is now also possible to download experimental Debian and Redhat packages on the `release page <https://gitlab.com/tezos/tezos/-/releases/v19.0>`_  and in the `package registry <https://gitlab.com/tezos/tezos/-/packages>`_.
 
 Changelog
 ---------
 
+- `Version 19.0 <../CHANGES.html#version-19-0>`_
 - `Version 19.0~rc1 <../CHANGES.html#version-19-0-rc1>`_

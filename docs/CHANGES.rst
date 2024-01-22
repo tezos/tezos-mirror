@@ -3,6 +3,14 @@
 Changelog
 '''''''''
 
+Version 19.0
+============
+
+Miscellaneous
+-------------
+
+- References to ``teztnets.xyz`` have been changed to ``teztnets.com``.
+
 Version 19.0-rc1
 ================
 

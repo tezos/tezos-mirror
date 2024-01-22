@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "18.1"
+    "version": "19.0 (10b119feab)"
   },
   "paths": {
     "/": {
@@ -13,6 +13,7 @@
           {
             "name": "version",
             "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -45,7 +46,7 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "block_info_encoding",
+                      "title": "block_info_encoding_v1",
                       "type": "object",
                       "properties": {
                         "protocol": {
@@ -85,7 +86,7 @@
                       ]
                     },
                     {
-                      "title": "block_info_encoding_with_legacy_attestation_name",
+                      "title": "block_info_encoding_v0",
                       "type": "object",
                       "properties": {
                         "protocol": {
@@ -104,7 +105,7 @@
                           "$ref": "#/components/schemas/raw_block_header"
                         },
                         "metadata": {
-                          "$ref": "#/components/schemas/block_header_metadata"
+                          "$ref": "#/components/schemas/block_header_metadata_with_legacy_attestation_name"
                         },
                         "operations": {
                           "type": "array",
@@ -5435,6 +5436,71 @@
         }
       }
     },
+    "/context/smart_rollups/smart_rollup/{Smart_rollup_hash}/ticket_balance": {
+      "post": {
+        "description": "Access the smart rollup's balance of ticket with specified ticketer, content type, and content.",
+        "parameters": [
+          {
+            "name": "Smart_rollup_hash",
+            "in": "path",
+            "description": "Smart_rollup_hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticketer": {
+                    "$ref": "#/components/schemas/017-PtNairob.contract_id"
+                  },
+                  "content_type": {
+                    "$ref": "#/components/schemas/micheline.017-PtNairob.michelson_v1.expression"
+                  },
+                  "content": {
+                    "$ref": "#/components/schemas/micheline.017-PtNairob.michelson_v1.expression"
+                  }
+                },
+                "required": [
+                  "ticketer",
+                  "content_type",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Positive big number",
+                  "description": "Decimal representation of a positive big number",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/tx_rollup/{tx_rollup_id}/commitment/{block_level}": {
       "get": {
         "description": "Return the commitment for a level, if any",
@@ -8054,6 +8120,7 @@
           {
             "name": "version",
             "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -8097,14 +8164,14 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "preapplied_operations_encoding",
+                      "title": "preapplied_operations_encoding_v1",
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/017-PtNairob.operation.alpha.operation_with_metadata"
                       }
                     },
                     {
-                      "title": "preapplied_operations_encoding_with_legacy_attestation_name",
+                      "title": "preapplied_operations_encoding_v0",
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/017-PtNairob.operation.alpha.operation_with_metadata"
@@ -9758,76 +9825,41 @@
     "/metadata": {
       "get": {
         "description": "All the metadata associated to the block.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "protocol": {
-                      "type": "string",
-                      "enum": [
-                        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                  "oneOf": [
+                    {
+                      "title": "block_metadata_encoding_encoding_v1",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/block_header_metadata"
+                        }
                       ]
                     },
-                    "next_protocol": {
-                      "type": "string",
-                      "enum": [
-                        "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                    {
+                      "title": "block_metadata_encoding_encoding_v0",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/block_header_metadata_with_legacy_attestation_name"
+                        }
                       ]
-                    },
-                    "test_chain_status": {
-                      "$ref": "#/components/schemas/test_chain_status"
-                    },
-                    "max_operations_ttl": {
-                      "type": "integer",
-                      "minimum": -1073741824,
-                      "maximum": 1073741823
-                    },
-                    "max_operation_data_length": {
-                      "type": "integer",
-                      "minimum": -1073741824,
-                      "maximum": 1073741823
-                    },
-                    "max_block_header_length": {
-                      "type": "integer",
-                      "minimum": -1073741824,
-                      "maximum": 1073741823
-                    },
-                    "max_operation_list_length": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "max_size": {
-                            "type": "integer",
-                            "minimum": -1073741824,
-                            "maximum": 1073741823
-                          },
-                          "max_op": {
-                            "type": "integer",
-                            "minimum": -1073741824,
-                            "maximum": 1073741823
-                          }
-                        },
-                        "required": [
-                          "max_size"
-                        ]
-                      }
                     }
-                  },
-                  "required": [
-                    "protocol",
-                    "next_protocol",
-                    "test_chain_status",
-                    "max_operations_ttl",
-                    "max_operation_data_length",
-                    "max_block_header_length",
-                    "max_operation_list_length"
-                  ],
-                  "additionalProperties": {}
+                  ]
                 }
               }
             }
@@ -10136,6 +10168,7 @@
           {
             "name": "version",
             "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -10168,7 +10201,7 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "operations_encoding",
+                      "title": "operations_encoding_v1",
                       "type": "array",
                       "items": {
                         "type": "array",
@@ -10178,7 +10211,7 @@
                       }
                     },
                     {
-                      "title": "operations_encoding_with_legacy_attestation_name",
+                      "title": "operations_encoding_v0",
                       "type": "array",
                       "items": {
                         "type": "array",
@@ -10221,6 +10254,7 @@
           {
             "name": "version",
             "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -10253,14 +10287,14 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "operations_in_pass_encoding",
+                      "title": "operations_in_pass_encoding_v1",
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/operation"
                       }
                     },
                     {
-                      "title": "operations_in_pass_encoding_with_legacy_attestation_name",
+                      "title": "operations_in_pass_encoding_v0",
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
@@ -10309,6 +10343,7 @@
           {
             "name": "version",
             "in": "query",
+            "description": "Supported RPC versions are version \"0\" (default but deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"1\"  that will output \"attestation\" in the \"kind\" field",
             "required": true,
             "schema": {
               "type": "string"
@@ -10341,7 +10376,7 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "operation_encoding",
+                      "title": "operation_encoding_v1",
                       "oneOf": [
                         {
                           "$ref": "#/components/schemas/operation"
@@ -10349,7 +10384,7 @@
                       ]
                     },
                     {
-                      "title": "operation_encoding_with_legacy_attestation_name",
+                      "title": "operation_encoding_v0",
                       "oneOf": [
                         {
                           "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
@@ -21636,6 +21671,72 @@
         ]
       },
       "block_header_metadata": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+            ]
+          },
+          "next_protocol": {
+            "type": "string",
+            "enum": [
+              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+            ]
+          },
+          "test_chain_status": {
+            "$ref": "#/components/schemas/test_chain_status"
+          },
+          "max_operations_ttl": {
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          },
+          "max_operation_data_length": {
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          },
+          "max_block_header_length": {
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          },
+          "max_operation_list_length": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "max_size": {
+                  "type": "integer",
+                  "minimum": -1073741824,
+                  "maximum": 1073741823
+                },
+                "max_op": {
+                  "type": "integer",
+                  "minimum": -1073741824,
+                  "maximum": 1073741823
+                }
+              },
+              "required": [
+                "max_size"
+              ]
+            }
+          }
+        },
+        "required": [
+          "protocol",
+          "next_protocol",
+          "test_chain_status",
+          "max_operations_ttl",
+          "max_operation_data_length",
+          "max_block_header_length",
+          "max_operation_list_length"
+        ],
+        "additionalProperties": {}
+      },
+      "block_header_metadata_with_legacy_attestation_name": {
         "type": "object",
         "properties": {
           "protocol": {
