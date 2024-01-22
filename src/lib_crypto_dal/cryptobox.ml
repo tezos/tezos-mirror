@@ -531,79 +531,101 @@ module Inner = struct
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
+  module Cache = Hashtbl.Make (struct
+    type t = parameters
+
+    let equal = ( = )
+
+    let hash = Hashtbl.hash
+  end)
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make
-      ({redundancy_factor; slot_size; page_size; number_of_shards} as
-      parameters) =
+  let make =
     let open Result_syntax in
-    let max_polynomial_length =
-      slot_as_polynomial_length ~slot_size ~page_size
+    let table = Cache.create 5 in
+    let with_cache parameters f =
+      match Cache.find_opt table parameters with
+      | Some x -> return x
+      | None ->
+          let* x = f () in
+          Cache.replace table parameters x ;
+          return x
     in
-    let erasure_encoded_polynomial_length =
-      redundancy_factor * max_polynomial_length
-    in
-    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
-    let* raw =
-      match !initialisation_parameters with
-      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialised.")
-      | Some srs -> return srs
-    in
-    let srs_g1, srs_g2 =
-      match raw with
-      | Prover_init_param {srs_g1; srs_g2} -> (srs_g1, srs_g2)
-      | Verifier_init_param {srs_g1; srs_g2} -> (srs_g1, srs_g2)
-    in
-    let* () =
-      ensure_validity
-        ~slot_size
-        ~page_size
-        ~redundancy_factor
-        ~number_of_shards
-        ~srs_g1_length:(Srs_g1.size srs_g1)
-        ~srs_g2_length:(Srs_g2.size srs_g2)
-    in
-    let page_length = page_length ~page_size in
-    let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-    let srs =
-      match raw with
-      | Prover_init_param raw ->
-          Prove
-            {
-              raw;
-              kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length;
-              kate_amortized_srs_g2_pages = Srs_g2.get srs_g2 page_length_domain;
-            }
-      | Verifier_init_param raw ->
-          Verify
-            {
-              raw;
-              kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length;
-              kate_amortized_srs_g2_pages = Srs_g2.get srs_g2 page_length_domain;
-            }
-    in
-    return
-      {
-        redundancy_factor;
-        slot_size;
-        page_size;
-        number_of_shards;
-        max_polynomial_length;
-        erasure_encoded_polynomial_length;
-        domain_polynomial_length = make_domain max_polynomial_length;
-        domain_2_times_polynomial_length =
-          make_domain (2 * max_polynomial_length);
-        domain_erasure_encoded_polynomial_length =
-          make_domain erasure_encoded_polynomial_length;
-        shard_length;
-        pages_per_slot = pages_per_slot parameters;
-        page_length;
-        page_length_domain;
-        remaining_bytes = page_size mod scalar_bytes_amount;
-        srs;
-        kate_amortized =
-          {max_polynomial_length; shard_length; srs_g1; number_of_shards};
-      }
+    fun ({redundancy_factor; slot_size; page_size; number_of_shards} as
+        parameters) ->
+      (* The cryptobox is deterministically computed from the DAL parameters and
+         this computation takes time (on the order of 10ms) so we cache it. *)
+      with_cache parameters @@ fun () ->
+      let max_polynomial_length =
+        slot_as_polynomial_length ~slot_size ~page_size
+      in
+      let erasure_encoded_polynomial_length =
+        redundancy_factor * max_polynomial_length
+      in
+      let shard_length = erasure_encoded_polynomial_length / number_of_shards in
+      let* raw =
+        match !initialisation_parameters with
+        | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialised.")
+        | Some srs -> return srs
+      in
+      let srs_g1, srs_g2 =
+        match raw with
+        | Prover_init_param {srs_g1; srs_g2} -> (srs_g1, srs_g2)
+        | Verifier_init_param {srs_g1; srs_g2} -> (srs_g1, srs_g2)
+      in
+      let* () =
+        ensure_validity
+          ~slot_size
+          ~page_size
+          ~redundancy_factor
+          ~number_of_shards
+          ~srs_g1_length:(Srs_g1.size srs_g1)
+          ~srs_g2_length:(Srs_g2.size srs_g2)
+      in
+      let page_length = page_length ~page_size in
+      let page_length_domain, _, _ = FFT.select_fft_domain page_length in
+      let srs =
+        match raw with
+        | Prover_init_param raw ->
+            Prove
+              {
+                raw;
+                kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length;
+                kate_amortized_srs_g2_pages =
+                  Srs_g2.get srs_g2 page_length_domain;
+              }
+        | Verifier_init_param raw ->
+            Verify
+              {
+                raw;
+                kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length;
+                kate_amortized_srs_g2_pages =
+                  Srs_g2.get srs_g2 page_length_domain;
+              }
+      in
+      return
+        {
+          redundancy_factor;
+          slot_size;
+          page_size;
+          number_of_shards;
+          max_polynomial_length;
+          erasure_encoded_polynomial_length;
+          domain_polynomial_length = make_domain max_polynomial_length;
+          domain_2_times_polynomial_length =
+            make_domain (2 * max_polynomial_length);
+          domain_erasure_encoded_polynomial_length =
+            make_domain erasure_encoded_polynomial_length;
+          shard_length;
+          pages_per_slot = pages_per_slot parameters;
+          page_length;
+          page_length_domain;
+          remaining_bytes = page_size mod scalar_bytes_amount;
+          srs;
+          kate_amortized =
+            {max_polynomial_length; shard_length; srs_g1; number_of_shards};
+        }
 
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
