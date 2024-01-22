@@ -65,6 +65,9 @@ type operation = {
           attester's first consensus slot at [level]. *)
 }
 
+(** The size of the encoding is not bounded. However, the size of a DAL
+    attestation bitset is checked during validation of an attestation; and there
+    is a bound on the size of a generic operation. *)
 val encoding : t Data_encoding.t
 
 (** [empty] returns an empty [slot_attestation] which commits that
