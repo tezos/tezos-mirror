@@ -8476,6 +8476,7 @@ let _tezt_etherlink =
         tezt_ethereum |> open_;
         Protocol.(main alpha);
       ]
+    ~with_macos_security_framework:true
     ~dep_files:["etherlink/tezt/tests/evm_kernel_inputs"]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 

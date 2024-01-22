@@ -29,6 +29,9 @@
   etherlink_tezt_tests_tezt_lib
   tezt)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
  (modules main))
 
 (rule
