@@ -2317,7 +2317,7 @@ type preattestation_infos = {round : round_infos; slot : int}
 type attestation_infos = {
   round_infos : round_infos;
   slot : int;
-  number_of_attested_slots : int;
+  number_of_dal_attested_slots : int;
 }
 
 (** [dal_attestation_infos] gives the weight of a DAL attestation. *)
@@ -2370,7 +2370,7 @@ let attestation_infos_from_content (c : consensus_content)
   {
     round_infos;
     slot;
-    number_of_attested_slots =
+    number_of_dal_attested_slots =
       Option.fold
         ~none:0
         ~some:(fun d ->
@@ -2390,7 +2390,7 @@ let dal_attestation_infos_from_dal_operation
   {
     round_infos;
     slot = Slot_repr.to_int slot;
-    number_of_attested_slots =
+    number_of_dal_attested_slots =
       Dal_attestation_repr.number_of_attested_slots attestation;
   }
 
@@ -2664,8 +2664,8 @@ let compare_baking_infos infos1 infos2 =
     smaller the better. When the slots are also equal they are compared
     according to the number of attested DAL slots: the more the better. *)
 let compare_attestation_infos
-    {round_infos = infos1; slot = slot1; number_of_attested_slots = n1}
-    {round_infos = infos2; slot = slot2; number_of_attested_slots = n2} =
+    {round_infos = infos1; slot = slot1; number_of_dal_attested_slots = n1}
+    {round_infos = infos2; slot = slot2; number_of_dal_attested_slots = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
