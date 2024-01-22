@@ -382,10 +382,7 @@ let data_dir_arg =
   Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the EVM node data directory. Default value is %s"
-         default)
+    ~doc:"The path to the EVM node data directory"
     ~default
     Params.string
 
