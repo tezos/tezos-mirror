@@ -496,10 +496,7 @@ let secret_key_arg =
   Params.secret_key
   |> default_arg
        ~long:"secret-key"
-       ~doc:
-         (Format.sprintf
-            "Unencrypted secret key to sign the blueprints,. Defaults to %s."
-            default_sk)
+       ~doc:"Unencrypted secret key to sign the blueprints."
        ~placeholder:"edsk..."
        ~default:default_sk
 
