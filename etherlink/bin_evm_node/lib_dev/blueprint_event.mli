@@ -17,6 +17,10 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
+(** [blueprint_produced level] advertizes that a blueprint for level
+    [level] has produced by the sequencer. *)
+val blueprint_produced : Z.t -> unit Lwt.t
+
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
 val blueprint_injected : Z.t -> unit Lwt.t

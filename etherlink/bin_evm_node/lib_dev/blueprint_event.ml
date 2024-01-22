@@ -25,6 +25,14 @@ let publisher_shutdown =
     ~level:Info
     ()
 
+let blueprint_production =
+  declare_1
+    ~section
+    ~name:"evm_node_dev_blueprint_production"
+    ~msg:"Production of a blueprint for level {level}"
+    ~level:Info
+    ("level", Data_encoding.n)
+
 let blueprint_injection =
   declare_1
     ~section
@@ -55,6 +63,8 @@ let publisher_is_ready () = emit publisher_ready ()
 let publisher_shutdown () = emit publisher_shutdown ()
 
 let blueprint_injected level = emit blueprint_injection level
+
+let blueprint_produced level = emit blueprint_production level
 
 let entered_degraded_mode level = emit worker_enters_degraded_mode level
 
