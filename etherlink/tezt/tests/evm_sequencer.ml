@@ -53,7 +53,7 @@ let setup_l1_contracts client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   (* Originates the exchanger. *)
   let* exchanger =
     Client.originate_contract
@@ -65,7 +65,7 @@ let setup_l1_contracts client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   (* Originates the bridge. *)
   let* bridge =
     Client.originate_contract
@@ -77,7 +77,7 @@ let setup_l1_contracts client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   return {delayed_transaction_bridge; exchanger; bridge}
 
 let setup_sequencer ?time_between_blocks
@@ -152,7 +152,7 @@ let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
       ?expect_failure
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
   Lwt.return expected_hash
 
@@ -168,7 +168,7 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
   unit
 

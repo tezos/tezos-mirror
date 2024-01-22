@@ -242,7 +242,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Originates the bridge. *)
   let* bridge =
@@ -255,7 +255,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Originates the administrator contract. *)
   let* admin =
@@ -268,7 +268,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   return {exchanger; bridge; admin}
 
@@ -342,6 +342,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
   in
   let* sc_rollup_address =
     originate_sc_rollup
+      ~keys:[]
       ~kind:pvm_kind
       ~boot_sector:("file:" ^ output)
       ~parameters_ty:evm_type
@@ -352,7 +353,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   (* EVM Kernel installation level. *)
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   let* mode =
@@ -593,7 +594,7 @@ let test_originate_evm_kernel =
   @@ fun ~protocol:_ ~evm_setup:{client; node; sc_rollup_node; _} ->
   (* First run of the installed EVM kernel, it will initialize the directory
      "eth_accounts". *)
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* first_evm_run_level = Node.get_level node in
   let* level =
     Sc_rollup_node.wait_for_level
@@ -1961,7 +1962,7 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~evm_node ~sc_rollup_node
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   unit
@@ -2750,7 +2751,7 @@ let test_deposit_dailynet =
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap1.public_key_hash
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   let* () =
     Sc_rollup_node.run
