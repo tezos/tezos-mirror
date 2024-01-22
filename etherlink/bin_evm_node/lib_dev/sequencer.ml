@@ -33,6 +33,7 @@ end) : Services_backend_sig.Backend = struct
   module Publisher = struct
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
+      let open Ethereum_types in
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
       (* Create the blueprint with the messages. *)
       let (Ethereum_types.(Qty next) as number) = ctxt.next_blueprint_number in
@@ -44,16 +45,29 @@ end) : Services_backend_sig.Backend = struct
           ~transactions:messages
           ~number
       in
-      let* () = Blueprints_publisher.publish next inputs in
-      ctxt.next_blueprint_number <- Qty (Z.succ next) ;
       (* Execute the blueprint. *)
-      let inputs =
+      let exec_inputs =
         List.map
           (function `External payload -> `Input ("\001" ^ payload))
           inputs
       in
-      let* _ctxt = Sequencer_state.execute ~commit:true ctxt inputs in
-      return_unit
+      let*! (Block_height before_height) =
+        Sequencer_state.current_block_height ctxt.Sequencer_context.evm_state
+      in
+      let* ctxt, evm_state = Sequencer_state.execute ctxt exec_inputs in
+      let*! (Block_height after_height) =
+        Sequencer_state.current_block_height evm_state
+      in
+
+      if Z.(equal (succ before_height) after_height) then (
+        ctxt.next_blueprint_number <- Qty (Z.succ after_height) ;
+        let _ = Sequencer_context.commit ctxt evm_state in
+        let* () = Blueprints_publisher.publish next inputs in
+        return_unit)
+      else
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
+        let*! () = Blueprint_event.invalid_blueprint_produced next in
+        return_unit
   end
 
   module SimulatorBackend = struct
