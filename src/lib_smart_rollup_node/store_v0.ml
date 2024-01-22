@@ -182,7 +182,7 @@ module Commitments_published_at_level = struct
   include
     Indexed_store.Make_indexable
       (struct
-        let name = "commitments"
+        let name = "commitments_published_at_level"
       end)
       (Make_hash_index_key (Octez_smart_rollup.Commitment.Hash))
       (Indexed_store.Make_index_value (Indexed_store.Make_fixed_encodable (struct

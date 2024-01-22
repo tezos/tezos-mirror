@@ -182,6 +182,9 @@ Smart Rollup client
   They can be imported with ``octez-client import secret key <sk_uri>``, or by merging the key files
   between the ``octez-client`` base directory and the ``smart-rollup-client-<proto>`` base directory.
 
+- Fix a critical bug that could lead to data loss when chain
+  reorganizations happen while a GC is running. (MR :gl:`!11358`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
