@@ -12,11 +12,10 @@
     - . ./scripts/version.sh
     - eval $(opam env)
 
-# Merge coverage files after the execution
+# Enable coverage output and store the traces as an artifact.
 .oc.template__coverage_files:
   extends:
     - .oc.template__coverage
-    - .rules__octez_changes
   artifacts:
     name: "coverage-files-$CI_JOB_ID"
     paths:

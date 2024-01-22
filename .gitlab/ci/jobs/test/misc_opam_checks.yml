@@ -4,6 +4,7 @@ misc_opam_checks:
     - .needs__trigger
     # This job is flaky due to e.g. network issues.
     - .oc.template__retry_flaky
+    - .rules__octez_changes
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
