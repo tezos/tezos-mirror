@@ -2,6 +2,8 @@
   extends: .oc.template__coverage
   stage: test_coverage
   coverage: '/Coverage: ([^%]+%)/'
+  variables:
+    SLACK_COVERAGE_CHANNEL: "C02PHBE7W73"
   artifacts:
     expose_as: 'Coverage report'
     reports:

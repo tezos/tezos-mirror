@@ -122,7 +122,6 @@
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
-    SLACK_COVERAGE_CHANNEL: "C02PHBE7W73"
 
 # Enables retries for flaky test jobs.
 .oc.template__retry_flaky:
