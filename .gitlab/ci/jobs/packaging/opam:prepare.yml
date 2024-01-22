@@ -4,13 +4,13 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies
+    # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
+    # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
+    # At the time of writing, the opam tests were quite flaky.
+    # Therefore, a retry was added. This should be removed once the
+    # underlying tests have been fixed.
+    - .oc.template__retry_flaky
   stage: packaging
-  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
-  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
-  # At the time of writing, the opam tests were quite flaky.
-  # Therefore, a retry was added. This should be removed once the
-  # underlying tests have been fixed.
-  retry: 2
   needs: [opam:prepare]
   dependencies: [opam:prepare]
   before_script:

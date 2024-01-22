@@ -2,6 +2,7 @@
   extends:
     - .test_template
     - .rules__octez_changes
+    - .oc.template__retry_flaky
   variables:
     ARCH: ""
     MAKE_TARGETS: ""
