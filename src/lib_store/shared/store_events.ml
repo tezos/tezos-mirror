@@ -244,9 +244,9 @@ let start_merging_stores =
     ~section
     ~level:Notice
     ~name:"start_merging_stores"
-    ~msg:"merging store up to block level {lafl}"
+    ~msg:"merging store up to block level {lpbl}"
     ~pp1:pp_int32
-    ("lafl", Data_encoding.int32)
+    ("lpbl", Data_encoding.int32)
 
 let end_merging_stores =
   declare_1

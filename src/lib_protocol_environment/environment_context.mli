@@ -221,13 +221,25 @@ module Register (C : S) : sig
   val ops : (C.t, C.tree) Context.ops
 end
 
-type validation_result = {
+type legacy_validation_result = {
   context : Context.t;
   fitness : Fitness.t;
   message : string option;
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
 }
+
+type validation_result = {
+  context : Context.t;
+  fitness : Fitness.t;
+  message : string option;
+  max_operations_ttl : int;
+  last_finalized_block_level : Int32.t;
+  last_preserved_block_level : Int32.t;
+}
+
+val lift_legacy_validation_result :
+  legacy_validation_result -> validation_result
 
 type quota = {max_size : int; max_op : int option}
 

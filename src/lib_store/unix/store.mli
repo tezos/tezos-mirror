@@ -58,13 +58,14 @@
 
    - Full <offset>: maintains every block that is part of the chain
      but prune the metadata for blocks that are below the following
-     threshold level: [last_allowed_fork_level] of the current head -
-     [offset] cycles.
+     threshold level: [last_preserved_block_level] of the current head
+     - [offset] cycles.
 
    - Rolling <offset>: maintains rolling windows which contain recent
      blocks that are part of the chain, along with their metadata. It
      prunes everything that is below the following threshold level:
-     [last_allowed_fork_level] of the current head - [offset] cycles.
+     [last_preserved_block_level] of the current head - [offset]
+     cycles.
 
    {2 Protocol store}
 
@@ -109,17 +110,17 @@
    - A check is made if this head is consistent (i.e. if it's not
      below the checkpoint);
 
-   - If the [last_allowed_fork_level] of the head is different from
+   - If the [last_preserved_block_level] of the head is different from
      the previous head's one, then we can establish that a cycle has
      been completed and we can start cementing this cycle by
      "triggering a merge".
 
    A merge phase consists of establishing the interval of blocks to
-   cement, which is trivially [last_allowed_fork_level(new_head)] to
-   [last_allowed_fork_level(prev_head)], but also, for Full and
+   cement, which is trivially [last_preserved_block_level(new_head)]
+   to [last_preserved_block_level(prev_head)], but also, for Full and
    Rolling history modes, keep some extra blocks so that we make sure
    to keep blocks above
-   max_operation_ttl(last_allowed_fork_level(checkpoint)). This is
+   max_operation_ttl(last_preserved_block_level(checkpoint)). This is
    done to make sure that we can export snapshots at the checkpoint
    level later on. This merging operation is asynchronous, the changes
    will be committed on disk only when the merge succeeds. Before
@@ -198,8 +199,8 @@ type chain_store
     @param history_mode the history mode used throughout the store. If
     a directory already exists and the given [history_mode] is
     different, the initialization will fail.
-      Default: {!History_mode.default} (which should correspond to full
-    with 5 extra preserved cycles.)
+      Default: {!History_mode.default} (which should correspond to
+    full with 5 extra preserved cycles.)
 
     @param block_cache_limit allows to override the size of the block
     cache to use. The minimal value is 1.
@@ -288,7 +289,7 @@ module Block : sig
   type metadata = Block_repr.metadata = {
     message : string option;
     max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
+    last_preserved_block_level : Int32.t;
     block_metadata : Bytes.t;
     operations_metadata : Block_validation.operation_metadata list list;
   }
@@ -561,7 +562,7 @@ module Block : sig
 
   val max_operations_ttl : metadata -> int
 
-  val last_allowed_fork_level : metadata -> int32
+  val last_preserved_block_level : metadata -> int32
 
   val block_metadata : metadata -> Bytes.t
 
@@ -642,15 +643,15 @@ module Chain : sig
         checkpoint's level.
 
       - The checkpoint is updated periodically such that the following
-        invariant holds:
-        [checkpoint.level >= all_head.last_allowed_fork_level]
+        invariant holds: [checkpoint.level >=
+        all_head.last_preserved_block_level]
 
       The checkpoint will tend to designate the highest block among
-      all chain head's [last_allowed_fork_level] in a normal mode. This
-      is not always true. i.e. after a snapshot import where the
-      checkpoint will be set as the imported block and when the
-      [target] block is reached, the checkpoint will be set at this
-      point. *)
+      all chain head's [last_preserved_block_level] in a normal
+      mode. This is not always true. i.e. after a snapshot import
+      where the checkpoint will be set as the imported block and when
+      the [target] block is reached, the checkpoint will be set at
+      this point. *)
   val checkpoint : chain_store -> block_descriptor Lwt.t
 
   (** [target chain_store] returns the target block associated to the
@@ -681,7 +682,8 @@ module Chain : sig
       For Full and Rolling history modes, the savepoint will be
       periodically updated at each store merge which happens when:
 
-      [pred(head).last_allowed_fork_level < head.last_allowed_fork_level]
+      [pred(head).last_preserved_block_level <
+      head.last_preserved_block_level]
 
       On Archive history mode: [savepoint = genesis]. *)
   val savepoint : chain_store -> block_descriptor Lwt.t
@@ -747,19 +749,19 @@ module Chain : sig
 
       After a merge:
 
-      - The checkpoint is updated to [lafl(new_head)] if it was below
+      - The checkpoint is updated to [lpbl(new_head)] if it was below
         this level or unchanged otherwise;
 
       - The savepoint will be updated to :
-        min(max_op_ttl(lafl(new_head)), lafl(new_head) -
+        min(max_op_ttl(lpbl(new_head)), lpbl(new_head) -
         <cycle_length> * <history_mode_offset>) or will remain 0 in
         Archive mode;
 
       - The caboose will be updated to the same value as the savepoint
         in Rolling mode.
 
-      Note: lafl(new_head) is the last allowed fork level of the new
-      head.
+      Note: lpbl(new_head) is the last preserved block level of the
+      new head.
 
       {b Warnings:}
 

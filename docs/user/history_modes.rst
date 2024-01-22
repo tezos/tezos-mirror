@@ -91,10 +91,9 @@ details.
 History modes use some markers which are used to describe the state
 of the storage:
 
-- *checkpoint*: the last allowed fork level of the chain (as defined
-  in the Tezos position paper),
-- *savepoint*: the last known block which contains metadata,
-- *caboose*: the last known block.
+- *checkpoint*: the most recently finalized block of the chain,
+- *savepoint*: the lowest level block that contains metadata,
+- *caboose*: the lowest level known block.
 
 For more details about what data are stored in each mode, refer to :doc:`../shell/storage`.
 
@@ -190,13 +189,10 @@ history. Indeed, at each new cycle, a garbage collection phase removes
 the ledger state and the block metadata (operation receipts, rewards
 updates, etc.) of blocks outside the offset of this sliding
 window. Depending on the network, a minimum number of cycles are
-kept. These cycles correspond to the ones above the last
-allowed fork level, containing blocks subjects to a potential chain
-reorganization (this minimal number of cycles is currently given by
-the :ref:`preserved_cycles<ps_constants>` protocol parameter, which
-on mainnet is currently set to 5 cycles). However, the
-node is able to keep an additional number of cycles that is
-configurable.
+kept. This number of cycles corresponds to the
+:ref:`preserved_cycles<ps_constants>` protocol parameter, which on
+mainnet is set to 5 cycles. However, the node is able to keep an
+additional number of cycles that is configurable.
 
 By default, 1 additional cycle is kept for both ``full`` and
 ``rolling`` nodes. It is possible to increase this parameter to keep

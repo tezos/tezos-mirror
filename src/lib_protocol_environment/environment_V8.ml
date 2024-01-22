@@ -1044,7 +1044,7 @@ struct
   end
 
   module Updater = struct
-    type nonrec validation_result = validation_result = {
+    type nonrec validation_result = legacy_validation_result = {
       context : Context.t;
       fitness : Fitness.t;
       message : string option;
@@ -1068,7 +1068,7 @@ struct
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
          and type quota := quota
-         and type validation_result := validation_result
+         and type validation_result := legacy_validation_result
          and type rpc_context := rpc_context
          and type tztrace := Error_monad.tztrace
          and type 'a tzresult := 'a Error_monad.tzresult
@@ -1280,13 +1280,18 @@ struct
 
     let finalize_application state shell_header =
       let open Lwt_syntax in
-      let+ res = finalize_application state shell_header in
-      wrap_tzresult res
+      let* r = finalize_application state shell_header in
+      match r with
+      | Ok (vr, metadata) ->
+          Lwt.return_ok (lift_legacy_validation_result vr, metadata)
+      | Error e -> Lwt.return (wrap_tzresult (Error e))
 
     let init chain_id c bh =
       let open Lwt_syntax in
-      let+ r = init chain_id c bh in
-      wrap_tzresult r
+      let* r = init chain_id c bh in
+      match r with
+      | Ok vr -> Lwt.return_ok (lift_legacy_validation_result vr)
+      | Error e -> Lwt.return (wrap_tzresult (Error e))
 
     let set_log_message_consumer f = Logging.logging_function := Some f
 

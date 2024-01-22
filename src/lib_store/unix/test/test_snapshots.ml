@@ -597,7 +597,7 @@ let make_tests_rolling speed =
 (* This test aims to check that the caboose and savepoint are well
    dragged when the first merge occurs, after a rolling snapshot
    import on a block which is not on a cycle's bound. Indeed, in such
-   a scenario, the merge procedure may remove blocks bellow the lafl
+   a scenario, the merge procedure may remove blocks bellow the lpbl
    without cementing them. It would result in non stored caboose
    (rolling issue) and savepoint (rolling and full issue).
    In this test, we need to increase the number of blocks per cycle to

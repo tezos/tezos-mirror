@@ -47,8 +47,9 @@ type validation_store = {
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_finalized_block_level : Int32.t;
       (** Oldest block for which reorganizations can happen *)
+  last_preserved_block_level : Int32.t;
 }
 
 val may_patch_protocol :

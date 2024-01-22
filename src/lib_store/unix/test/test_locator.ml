@@ -121,7 +121,8 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
               timestamp = header.shell.timestamp;
               message;
               max_operations_ttl;
-              last_allowed_fork_level = 0l;
+              last_finalized_block_level = 0l;
+              last_preserved_block_level = 0l;
             };
           block_metadata = (zero, None);
           ops_metadata = Block_validation.No_metadata_hash [];
@@ -163,7 +164,8 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
       timestamp = Time.Protocol.epoch;
       message = None;
       max_operations_ttl = 0;
-      last_allowed_fork_level = 0l;
+      last_finalized_block_level = 0l;
+      last_preserved_block_level = 0l;
     }
   in
   let rec loop remaining_fork_points lvl (pred_header : Block_header.t) =
@@ -194,13 +196,13 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
         Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
       in
       (* make some cycles *)
-      let last_allowed_fork_level =
+      let last_preserved_block_level =
         Int32.of_int (max 0 (20 * ((lvl - 10) / 20)))
       in
       let validation_result =
         {
           Block_validation.validation_store =
-            {empty_result with last_allowed_fork_level};
+            {empty_result with last_preserved_block_level};
           block_metadata = (zero, block_metadata_hash);
           ops_metadata = Block_validation.No_metadata_hash [];
           shell_header_hash = Block_validation.Shell_header_hash.zero;

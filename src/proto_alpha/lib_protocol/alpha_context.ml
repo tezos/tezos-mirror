@@ -663,7 +663,9 @@ let finalize ?commit_message:message c fitness =
     fitness;
     message;
     max_operations_ttl = (Raw_context.constants c).max_operations_time_to_live;
-    last_allowed_fork_level =
+    last_finalized_block_level =
+      Raw_level.to_int32 @@ Level.last_finalized_block_level c;
+    last_preserved_block_level =
       Raw_level.to_int32 @@ Level.last_preserved_block_level c;
   }
 

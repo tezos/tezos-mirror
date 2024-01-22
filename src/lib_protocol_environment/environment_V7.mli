@@ -170,7 +170,4 @@ module Make (Param : sig
   val name : string
 end)
 () :
-  T
-    with type Updater.validation_result = validation_result
-     and type Updater.quota = quota
-     and type Updater.rpc_context = rpc_context
+  T with type Updater.quota = quota and type Updater.rpc_context = rpc_context

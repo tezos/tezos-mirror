@@ -46,7 +46,7 @@ let equal_metadata ?msg m1 m2 =
            ({
               message;
               max_operations_ttl;
-              last_allowed_fork_level;
+              last_preserved_block_level;
               block_metadata = _;
               operations_metadata = _;
             } :
@@ -54,12 +54,12 @@ let equal_metadata ?msg m1 m2 =
          ->
            Format.fprintf
              ppf
-             "message: %a@.max_operations_ttl: %d@. last_allowed_fork_level: \
-              %ld@."
+             "message: %a@.max_operations_ttl: %d@. \
+              last_preserved_block_level: %ld@."
              (Format.pp_print_option ~none Format.pp_print_string)
              message
              max_operations_ttl
-             last_allowed_fork_level))
+             last_preserved_block_level))
       md
   in
   Assert.equal ?msg ~pp ~eq m1 m2
@@ -113,12 +113,12 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
       let expected_checkpoint_level =
         match expected_checkpoint with
         | Some l -> snd l
-        | None -> Block.last_allowed_fork_level head_metadata
+        | None -> Block.last_preserved_block_level head_metadata
       in
       Assert.assert_true
         (Format.sprintf
            "check_invariant: checkpoint.level(%ld) < \
-            head.last_allowed_fork_level(%ld)"
+            head.last_preserved_block_level(%ld)"
            (snd checkpoint)
            expected_checkpoint_level)
         Compare.Int32.(snd checkpoint >= expected_checkpoint_level) ;
@@ -361,7 +361,7 @@ let wrap_simple_store_init_test ?history_mode ?(speed = `Quick) ?patch_context
     speed
     (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir ?with_gc f)
 
-let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
+let make_raw_block ?min_lpbl ?(max_operations_ttl = default_max_operations_ttl)
     ?(constants = default_protocol_constants) ?(context = Context_hash.zero)
     (pred_block_hash, pred_block_level) =
   let level = Int32.succ pred_block_level in
@@ -385,7 +385,7 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
     }
   in
   let hash = Block_header.hash header in
-  let last_allowed_fork_level =
+  let last_preserved_block_level =
     let current_cycle = Int32.(div (pred level) constants.blocks_per_cycle) in
     Int32.(
       mul
@@ -394,10 +394,10 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
            0l
            (sub current_cycle (of_int constants.blocks_preservation_cycles))))
   in
-  let last_allowed_fork_level =
-    match min_lafl with
-    | Some min_lafl -> Compare.Int32.max min_lafl last_allowed_fork_level
-    | None -> last_allowed_fork_level
+  let last_preserved_block_level =
+    match min_lpbl with
+    | Some min_lpbl -> Compare.Int32.max min_lpbl last_preserved_block_level
+    | None -> last_preserved_block_level
   in
   let operations =
     List.map
@@ -417,7 +417,7 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
       {
         Block_repr.message = Some "message";
         max_operations_ttl;
-        last_allowed_fork_level;
+        last_preserved_block_level;
         block_metadata = Bytes.create 1;
         operations_metadata =
           List.map
@@ -494,7 +494,12 @@ let store_raw_block chain_store ?resulting_context (raw_block : Block_repr.t) =
           timestamp = Block_repr.timestamp raw_block;
           message = Block_repr.message metadata;
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
-          last_allowed_fork_level = Block_repr.last_allowed_fork_level metadata;
+          last_finalized_block_level =
+            (* Not yet implemented. We use the last_preserved_block_level by
+               default.*)
+            Block_repr.last_preserved_block_level metadata;
+          last_preserved_block_level =
+            Block_repr.last_preserved_block_level metadata;
         };
       block_metadata =
         ( Block_repr.block_metadata metadata,
@@ -536,13 +541,13 @@ let set_block_predecessor blk pred_hash =
       };
   }
 
-let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ?(kind = `Full)
+let make_raw_block_list ?min_lpbl ?constants ?max_operations_ttl ?(kind = `Full)
     (pred_hash, pred_level) n =
   List.fold_left
     (fun ((pred_hash, pred_level), acc) _ ->
       let raw_block =
         make_raw_block
-          ?min_lafl
+          ?min_lpbl
           ?constants
           ?max_operations_ttl
           (pred_hash, pred_level)
@@ -569,7 +574,7 @@ let incr_fitness b =
       [b]
   | _ -> assert false
 
-let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
+let append_blocks ?min_lpbl ?constants ?max_operations_ttl ?root ?(kind = `Full)
     ?(should_set_head = false) ?protocol_level ?set_protocol chain_store n =
   let open Lwt_result_syntax in
   let*! root =
@@ -581,7 +586,7 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   in
   let* root_b = Store.Block.read_block chain_store (fst root) in
   let*! blocks, _last =
-    make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
+    make_raw_block_list ?min_lpbl ?constants ?max_operations_ttl ~kind root n
   in
   let proto_level =
     match protocol_level with

@@ -11345,11 +11345,15 @@ type validation_result = {
       (** The "time-to-live" of operations for the next block: any
           operation whose 'branch' is older than 'ttl' blocks in the past
           cannot be included in the next block. *)
-  last_allowed_fork_level : Int32.t;
-      (** The level of the last block for which the node might consider an
-          alternate branch. The shell should consider as invalid any branch
-          whose fork point is older (has a lower level) than the
-          given value. *)
+  last_finalized_block_level : Int32.t;
+      (** The level of the last block for which the node might
+          consider an alternate branch. The shell should consider as
+          invalid any branch whose fork point is older (has a lower
+          level) than the given value. *)
+  last_preserved_block_level : Int32.t;
+      (** The level of the oldest block that is considered as
+          preserved. The shell uses it as an hint to perform
+          internal maintenance operations. *)
 }
 
 type quota = {
@@ -11578,7 +11582,7 @@ module type PROTOCOL = sig
       context and shell header of the predecessor block. Exceptionally
       in {!Partial_validation} mode, they may instead come from any
       ancestor block that is more recent (i.e. has a greater level)
-      than the current head's "last_allowed_fork_level".
+      than the current head's "last_finalized_block_level".
 
       [mode] specifies the circumstances of validation and also
       carries additional information: see {!mode}.

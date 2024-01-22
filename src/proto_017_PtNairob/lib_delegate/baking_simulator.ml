@@ -171,9 +171,23 @@ let finalize_construction inc =
       let** () = Protocol.finalize_validation validation_state in
       let** result =
         match application_state with
-        | Some application_state ->
+        | Some application_state -> (
             Protocol.finalize_application application_state (Some inc.header)
-            >>=? return_some
+            >>= function
+            | Ok (vr, metadata) ->
+                let new_vr =
+                  Tezos_protocol_environment.
+                    {
+                      context = vr.context;
+                      fitness = vr.fitness;
+                      message = vr.message;
+                      max_operations_ttl = vr.max_operations_ttl;
+                      last_finalized_block_level = vr.last_allowed_fork_level;
+                      last_preserved_block_level = vr.last_allowed_fork_level;
+                    }
+                in
+                return_some (new_vr, metadata)
+            | Error e -> Lwt.return (Error e))
         | None -> return_none
       in
       return result)

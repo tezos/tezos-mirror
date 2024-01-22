@@ -35,7 +35,7 @@ type contents = {
 type metadata = {
   message : string option;
   max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
+  last_preserved_block_level : Int32.t;
   block_metadata : Bytes.t;
   operations_metadata : Block_validation.operation_metadata list list;
 }
@@ -92,7 +92,7 @@ let create_genesis_block ~genesis context =
       {
         message = Some "Genesis";
         max_operations_ttl = 0;
-        last_allowed_fork_level = 0l;
+        last_preserved_block_level = 0l;
         block_metadata = Bytes.create 0;
         operations_metadata = [];
       }
@@ -128,31 +128,31 @@ let metadata_encoding : metadata Data_encoding.t =
        (fun {
               message;
               max_operations_ttl;
-              last_allowed_fork_level;
+              last_preserved_block_level;
               block_metadata;
               operations_metadata;
             } ->
          ( message,
            max_operations_ttl,
-           last_allowed_fork_level,
+           last_preserved_block_level,
            block_metadata,
            operations_metadata ))
        (fun ( message,
               max_operations_ttl,
-              last_allowed_fork_level,
+              last_preserved_block_level,
               block_metadata,
               operations_metadata ) ->
          {
            message;
            max_operations_ttl;
-           last_allowed_fork_level;
+           last_preserved_block_level;
            block_metadata;
            operations_metadata;
          })
        (obj5
           (opt "message" string)
           (req "max_operations_ttl" uint16)
-          (req "last_allowed_fork_level" int32)
+          (req "last_preserved_block_level" int32)
           (req "block_metadata" bytes)
           (req
              "operations_metadata"
@@ -230,14 +230,14 @@ let with_metadata
     {
       message;
       max_operations_ttl;
-      last_allowed_fork_level;
+      last_preserved_block_level;
       block_metadata;
       operations_metadata;
     } f =
   f
     message
     max_operations_ttl
-    last_allowed_fork_level
+    last_preserved_block_level
     block_metadata
     operations_metadata
   [@@ocaml.inline]
@@ -254,10 +254,10 @@ let contents_equal c1 c2 =
        omh2
 
 let metadata_equal m1 m2 =
-  with_metadata m1 @@ fun m1 mot1 lafl1 bm1 om1 ->
-  with_metadata m2 @@ fun m2 mot2 lafl2 bm2 om2 ->
+  with_metadata m1 @@ fun m1 mot1 lpbl1 bm1 om1 ->
+  with_metadata m2 @@ fun m2 mot2 lpbl2 bm2 om2 ->
   Option.equal String.equal m1 m2
-  && Int.equal mot1 mot2 && Int32.equal lafl1 lafl2 && Bytes.equal bm1 bm2
+  && Int.equal mot1 mot2 && Int32.equal lpbl1 lpbl2 && Bytes.equal bm1 bm2
   && List.equal (List.equal Block_validation.operation_metadata_equal) om1 om2
 
 let equal b1 b2 =
@@ -313,7 +313,7 @@ let message metadata = metadata.message
 
 let max_operations_ttl metadata = metadata.max_operations_ttl
 
-let last_allowed_fork_level metadata = metadata.last_allowed_fork_level
+let last_preserved_block_level metadata = metadata.last_preserved_block_level
 
 let block_metadata metadata = metadata.block_metadata
 
@@ -382,7 +382,7 @@ let convert_legacy_metadata (legacy_metadata : legacy_metadata) : metadata =
   {
     message = legacy_message;
     max_operations_ttl = legacy_max_operations_ttl;
-    last_allowed_fork_level = legacy_last_allowed_fork_level;
+    last_preserved_block_level = legacy_last_allowed_fork_level;
     block_metadata = legacy_block_metadata;
     operations_metadata =
       List.map

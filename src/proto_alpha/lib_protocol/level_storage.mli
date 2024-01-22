@@ -64,6 +64,8 @@ val levels_with_commitments_in_cycle :
 
 val last_preserved_block_level : Raw_context.t -> Raw_level_repr.t
 
+val last_finalized_block_level : Raw_context.t -> Raw_level_repr.t
+
 (** Returns [Some cycle] if the current level represents the last
    level of [cycle] and [None] if the level is not the last level of a
    cycle. *)
