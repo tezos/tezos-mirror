@@ -1004,7 +1004,7 @@ let pp_contents_and_result :
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
           consensus_power
-    | ( Attestation {level; _},
+    | ( Attestation {consensus_content = {level; _}; dal_content = _},
         Attestation_result
           {balance_updates; delegate; consensus_key; consensus_power} ) ->
         Format.fprintf

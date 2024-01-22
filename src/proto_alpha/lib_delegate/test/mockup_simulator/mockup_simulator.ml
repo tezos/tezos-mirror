@@ -1508,7 +1508,7 @@ let op_is_attestation ?level ?round (op_hash : Operation_hash.t)
       match d.contents with
       | Single op_contents -> (
           match op_contents with
-          | Attestation consensus_content ->
+          | Attestation {consensus_content; _} ->
               let right_level =
                 match level with
                 | None -> true

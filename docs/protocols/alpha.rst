@@ -35,6 +35,13 @@ Data Availability Layer (ongoing)
 - Optimize the slot header publication operation by memoizing the
   cryptobox. (MR :gl:`!11594`)
 
+- Introduced a new optional field ``dal_content`` to consensus attestation
+  operations. This is treated in the same way as the content of DAL attestation
+  operations, rendering these obsolete. The existing encoding of consensus
+  attestations remains unchanged when this field is not present. A new encoding
+  was introduced for the case when the field is present. The two cases are
+  distinguished via an encoding tag. (MR :gl:`!11462`)
+
 Adaptive Issuance (ongoing)
 ----------------------------
 

@@ -155,6 +155,8 @@ type consensus_content = {
          important but could make things easier for debugging *)
 }
 
+type dal_content = {attestation : Dal_attestation_repr.t}
+
 let consensus_content_encoding =
   let open Data_encoding in
   conv
@@ -238,7 +240,11 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Attestation : consensus_content -> Kind.attestation contents
+  | Attestation : {
+      consensus_content : consensus_content;
+      dal_content : dal_content option;
+    }
+      -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -1103,12 +1109,55 @@ module Encoding = struct
                   @@ union [make preattestation_case]))
                (varopt "signature" Signature.encoding)))
 
-  let endorsement_encoding =
+  let consensus_content_encoding =
     obj4
       (req "slot" Slot_repr.encoding)
       (req "level" Raw_level_repr.encoding)
       (req "round" Round_repr.encoding)
       (req "block_payload_hash" Block_payload_hash.encoding)
+
+  let dal_content_encoding =
+    obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
+
+  let endorsement_encoding = consensus_content_encoding
+
+  let endorsement_with_dal_encoding =
+    merge_objs consensus_content_encoding dal_content_encoding
+
+  (* Precondition: [dal_content = None]. *)
+  let attestation_encoding_proj
+      (Attestation {consensus_content; dal_content = _}) =
+    ( consensus_content.slot,
+      consensus_content.level,
+      consensus_content.round,
+      consensus_content.block_payload_hash )
+
+  let attestation_encoding_inj (slot, level, round, block_payload_hash) =
+    Attestation
+      {
+        consensus_content = {slot; level; round; block_payload_hash};
+        dal_content = None;
+      }
+
+  (* Precondition: [dal_content <> None]. Check usage! *)
+  let attestation_with_dal_encoding_proj
+      (Attestation {consensus_content; dal_content}) =
+    match dal_content with
+    | None -> assert false
+    | Some dal_content ->
+        ( ( consensus_content.slot,
+            consensus_content.level,
+            consensus_content.round,
+            consensus_content.block_payload_hash ),
+          dal_content.attestation )
+
+  let attestation_with_dal_encoding_inj
+      ((slot, level, round, block_payload_hash), attestation) =
+    Attestation
+      {
+        consensus_content = {slot; level; round; block_payload_hash};
+        dal_content = Some {attestation};
+      }
 
   (* Encoding case that accepts legacy attestation name : `endorsement` in JSON
 
@@ -1124,16 +1173,11 @@ module Encoding = struct
         name = "endorsement";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Attestation _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Attestation consensus_content) ->
-            ( consensus_content.slot,
-              consensus_content.level,
-              consensus_content.round,
-              consensus_content.block_payload_hash ));
-        inj =
-          (fun (slot, level, round, block_payload_hash) ->
-            Attestation {slot; level; round; block_payload_hash});
+          (function
+          | Contents (Attestation {dal_content = None; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_encoding_proj;
+        inj = attestation_encoding_inj;
       }
 
   let attestation_case =
@@ -1143,16 +1187,39 @@ module Encoding = struct
         name = "attestation";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Attestation _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Attestation consensus_content) ->
-            ( consensus_content.slot,
-              consensus_content.level,
-              consensus_content.round,
-              consensus_content.block_payload_hash ));
-        inj =
-          (fun (slot, level, round, block_payload_hash) ->
-            Attestation {slot; level; round; block_payload_hash});
+          (function
+          | Contents (Attestation {dal_content = None; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_encoding_proj;
+        inj = attestation_encoding_inj;
+      }
+
+  let endorsement_with_dal_case =
+    Case
+      {
+        tag = 23;
+        name = "endorsement_with_dal";
+        encoding = endorsement_with_dal_encoding;
+        select =
+          (function
+          | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_with_dal_encoding_proj;
+        inj = attestation_with_dal_encoding_inj;
+      }
+
+  let attestation_with_dal_case =
+    Case
+      {
+        tag = 23;
+        name = "attestation_with_dal";
+        encoding = endorsement_with_dal_encoding;
+        select =
+          (function
+          | Contents (Attestation {dal_content = Some _; _} as op) -> Some op
+          | _ -> None);
+        proj = attestation_with_dal_encoding_proj;
+        inj = attestation_with_dal_encoding_inj;
       }
 
   (* Encoding that accepts legacy attestation name : `endorsement` in JSON
@@ -1162,10 +1229,21 @@ module Encoding = struct
      This encoding is temporary and should be removed when the endorsements
      kinds in JSON will not be accepted any more by the protocol (Planned for
      protocol Q). *)
-
   let endorsement_encoding =
-    let make (Case {tag; name; encoding; select = _; proj; inj}) =
-      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | o -> (
+              match (kind, o) with
+              | `Simple, (Attestation {dal_content = None; _} as op) ->
+                  Some (proj op)
+              | `Full, (Attestation {dal_content = Some _; _} as op) ->
+                  Some (proj op)
+              | _ -> None))
+        (fun x -> inj x)
     in
     let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
     let of_list : Kind.attestation contents -> _ = fun o -> Single o in
@@ -1182,12 +1260,28 @@ module Encoding = struct
                   "operations"
                   (conv to_list of_list
                   @@ def "inlined.endorsement_mempool.contents"
-                  @@ union [make endorsement_case]))
+                  @@ union
+                       [
+                         make `Simple endorsement_case;
+                         make `Full endorsement_with_dal_case;
+                       ]))
                (varopt "signature" Signature.encoding)))
 
   let attestation_encoding =
-    let make (Case {tag; name; encoding; select = _; proj; inj}) =
-      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    let make kind (Case {tag; name; encoding; select = _; proj; inj}) =
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | o -> (
+              match (kind, o) with
+              | `Without_dal, (Attestation {dal_content = None; _} as op) ->
+                  Some (proj op)
+              | `With_dal, (Attestation {dal_content = Some _; _} as op) ->
+                  Some (proj op)
+              | _ -> None))
+        (fun x -> inj x)
     in
     let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
     let of_list : Kind.attestation contents -> _ = fun o -> Single o in
@@ -1204,7 +1298,11 @@ module Encoding = struct
                   "operations"
                   (conv to_list of_list
                   @@ def "inlined.attestation_mempool.contents"
-                  @@ union [make attestation_case]))
+                  @@ union
+                       [
+                         make `Without_dal attestation_case;
+                         make `With_dal attestation_with_dal_case;
+                       ]))
                (varopt "signature" Signature.encoding)))
 
   let dal_attestation_encoding =
@@ -1622,6 +1720,7 @@ module Encoding = struct
 
   let contents_cases =
     PCase preattestation_case :: PCase attestation_case
+    :: PCase attestation_with_dal_case
     :: PCase double_preattestation_evidence_case
     :: PCase double_attestation_evidence_case :: common_cases
 
@@ -1635,6 +1734,7 @@ module Encoding = struct
       protocol Q). *)
   let contents_cases_with_legacy_attestation_name =
     PCase preendorsement_case :: PCase endorsement_case
+    :: PCase endorsement_with_dal_case
     :: PCase double_preendorsement_evidence_case
     :: PCase double_endorsement_evidence_case :: common_cases
 
@@ -2208,16 +2308,20 @@ let compare_inner_pass : type a b. a pass -> b pass -> int =
    failed to convert in a {!int}, the value of [round] is (-1). *)
 type round_infos = {level : int32; round : int}
 
-(** [attestation_infos] is the pair of a {!round_infos} and a [slot]
+(** [preattestation_infos] is the pair of a {!round_infos} and a [slot]
    convert into an {!int}. *)
-type attestation_infos = {round : round_infos; slot : int}
+type preattestation_infos = {round : round_infos; slot : int}
 
-(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
-type dal_attestation_infos = {
+(** [attestation_infos] is the tuple consisting of a {!round_infos} value, a
+    [slot], and the number of DAL slots in the DAL attestation. *)
+type attestation_infos = {
   round_infos : round_infos;
   slot : int;
-  number_of_attested_slots : int;
+  number_of_dal_attested_slots : int;
 }
+
+(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
+type dal_attestation_infos = attestation_infos
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
@@ -2249,6 +2353,31 @@ let attestation_infos_from_consensus_content (c : consensus_content) =
   let round = round_infos_from_consensus_content c in
   {round; slot}
 
+(** Compute a {!attestation_infos} value from a {!consensus_content} value
+    and an optional {!dal_content} value. It is used to compute the weight of
+    an {!Attestation}.
+
+    An {!Attestation} with no DAL content or with a DAL content that has 0
+    attested DAL slots have the same weight (everything else being
+    equal). That's ok, because they are semantically equal, therefore it
+    does not matter which one is picked.
+
+    Precondition: [c] and [d] come from a valid operation.  *)
+let attestation_infos_from_content (c : consensus_content)
+    (d : dal_content option) =
+  let slot = Slot_repr.to_int c.slot in
+  let round_infos = round_infos_from_consensus_content c in
+  {
+    round_infos;
+    slot;
+    number_of_dal_attested_slots =
+      Option.fold
+        ~none:0
+        ~some:(fun d ->
+          Dal_attestation_repr.number_of_attested_slots d.attestation)
+        d;
+  }
+
 let dal_attestation_infos_from_dal_operation
     {Dal_attestation_repr.attestation; level; round; slot} =
   let round_infos =
@@ -2261,7 +2390,7 @@ let dal_attestation_infos_from_dal_operation
   {
     round_infos;
     slot = Slot_repr.to_int slot;
-    number_of_attested_slots =
+    number_of_dal_attested_slots =
       Dal_attestation_repr.number_of_attested_slots attestation;
   }
 
@@ -2294,12 +2423,12 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    is used to compare it to an operation of the same pass.
     Operation weight are defined by validation pass.
 
-    The [weight] of an {!Attestation} or {!Preattestation} depends on
-   its {!attestation_infos}.
+    The [weight] of an {!Attestation} or {!Preattestation} depends on its
+    {!attestation_infos}. For {!Attestation}s it also depends on the number of
+    attested DAL slots.
 
-    The [weight] of a {!Dal_attestation} depends on the pair of
-   the size of its bitset, {!Dal_attestation_repr.t}, and the
-   signature of its attester {! Signature.Public_key_hash.t}.
+    The [weight] of a {!Dal_attestation} is the same as that of an
+    {!Attestation}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2328,7 +2457,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
-  | Weight_preattestation : attestation_infos -> consensus_pass_type weight
+  | Weight_preattestation : preattestation_infos -> consensus_pass_type weight
   | Weight_dal_attestation : dal_attestation_infos -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
@@ -2423,11 +2552,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_preattestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Attestation consensus_content) ->
+  | Single (Attestation {consensus_content; dal_content}) ->
       W
         ( Consensus,
           Weight_attestation
-            (attestation_infos_from_consensus_content consensus_content) )
+            (attestation_infos_from_content consensus_content dal_content) )
   | Single (Dal_attestation content) ->
       W
         ( Consensus,
@@ -2443,7 +2572,7 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_vdf_revelation solution)
   | Single (Double_attestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Attestation consensus_content) ->
+      | Single (Attestation {consensus_content; dal_content = _}) ->
           W
             ( Anonymous,
               Weight_double_attestation
@@ -2471,33 +2600,30 @@ let weight_of : packed_operation -> operation_weight =
       let manweight, src = weight_manager ops in
       W (Manager, Weight_manager (manweight, src))
 
-(** {3 Comparisons of operations {!weight}} *)
+(** {3 Comparisons of operations' {!weight}} *)
 
 (** {4 Helpers} *)
 
-(** compare a pair of elements in lexicographic order. *)
+(** Compare a pair of elements in lexicographic order. *)
 let compare_pair_in_lexico_order ~cmp_fst ~cmp_snd (a1, b1) (a2, b2) =
   let resa = cmp_fst a1 a2 in
   if Compare.Int.(resa <> 0) then resa else cmp_snd b1 b2
 
-(** compare in reverse order. *)
+(** Compare in reverse order. *)
 let compare_reverse (cmp : 'a -> 'a -> int) a b = cmp b a
 
 (** {4 Comparison of {!consensus_infos}} *)
 
-(** Two {!round_infos} compares as the pair of [level, round] in
+(** Two {!round_infos} pairs [(level, round)] compare in
    lexicographic order: the one with the greater [level] being the
    greater [round_infos]. When levels are the same, the one with the
    greater [round] being the better.
 
-    The greater {!round_infos} is the farther to the current state
+    The better {!round_infos} is farther to the current state
    when part of the weight of a valid consensus operation.
 
-    The best {!round_infos} is the nearer to the current state when
+    The better {!round_infos} is nearer to the current state when
    part of the weight of a valid denunciation.
-
-    In both case, that is the greater according to the lexicographic
-   order.
 
    Precondition: the {!round_infos} are from valid operation. They
    have been computed by either {!round_infos_from_consensus_content}
@@ -2512,40 +2638,14 @@ let compare_round_infos (infos1 : round_infos) (infos2 : round_infos) =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** When comparing {!Attestation} to {!Preattestation} or
-   {!Double_attestation_evidence} to {!Double_preattestation}, in case
-   of {!round_infos} equality, the position is relevant to compute the
-   order. *)
-type prioritized_position = Nopos | Fstpos | Sndpos
-
-(** Comparison of two {!round_infos} with priority in case of
-   {!round_infos} equality. *)
-let compare_round_infos_with_prioritized_position ~prioritized_position infos1
-    infos2 =
-  let cmp = compare_round_infos infos1 infos2 in
-  if Compare.Int.(cmp <> 0) then cmp
-  else match prioritized_position with Fstpos -> 1 | Sndpos -> -1 | Nopos -> 0
-
-(** When comparing consensus operation with {!attestation_infos}, in
-   case of equality of their {!round_infos}, either they are of the
-   same kind and their [slot] have to be compared in the reverse
-   order, otherwise the {!Attestation} is better and
-   [prioritized_position] gives its position. *)
-let compare_prioritized_position_or_slot ~prioritized_position =
-  match prioritized_position with
-  | Nopos -> compare_reverse Compare.Int.compare
-  | Fstpos -> fun _ _ -> 1
-  | Sndpos -> fun _ _ -> -1
-
-(** Two {!attestation_infos} are compared by their {!round_infos}.
+(** Two {!Preattestation}s are compared by their {!preattestation_infos}.
    When their {!round_infos} are equal, they are compared according to
-   their priority or their [slot], see
-   {!compare_prioritized_position_or_slot} for more details. *)
-let compare_attestation_infos ~prioritized_position (infos1 : attestation_infos)
-    (infos2 : attestation_infos) =
+   their [slot]: the smaller the better. *)
+let compare_preattestation_infos (infos1 : preattestation_infos)
+    (infos2 : preattestation_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:compare_round_infos
-    ~cmp_snd:(compare_prioritized_position_or_slot ~prioritized_position)
+    ~cmp_snd:(compare_reverse Compare.Int.compare)
     (infos1.round, infos1.slot)
     (infos2.round, infos2.slot)
 
@@ -2559,13 +2659,13 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_attestation} are compared in the lexicographic order of
-    their level, round, reverse slot, and number of attested slots, meaning
-    that, in order, higher level is better, higher round is better, smaller slot
-    is better, higher number of attested slots is better. *)
-let compare_dal_attestation_infos
-    {round_infos = infos1; slot = slot1; number_of_attested_slots = n1}
-    {round_infos = infos2; slot = slot2; number_of_attested_slots = n2} =
+(** Two {!Attestation}s are compared by their {!attestation_infos}. When their
+    {!round_infos} are equal, they are compared according to their [slot]: the
+    smaller the better. When the slots are also equal they are compared
+    according to the number of attested DAL slots: the more the better. *)
+let compare_attestation_infos
+    {round_infos = infos1; slot = slot1; number_of_dal_attested_slots = n1}
+    {round_infos = infos2; slot = slot2; number_of_dal_attested_slots = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
@@ -2575,13 +2675,22 @@ let compare_dal_attestation_infos
     ((infos1, slot1), n1)
     ((infos2, slot2), n2)
 
+(** Two valid {!Dal_attestation} are compared in the lexicographic order of
+    their level, round, reverse slot, and number of attested slots, meaning
+    that, in order, higher level is better, higher round is better, smaller slot
+    is better, higher number of attested slots is better. *)
+let compare_dal_attestation_infos = compare_attestation_infos
+
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
 
-(** Comparing consensus operations by their [weight] uses the
-   comparison on {!attestation_infos} for {!Attestation} and
-   {!Preattestation}: see {!attestation_infos} for more details.
+(** Comparing consensus operations by their [weight] uses the comparison on
+    {!attestation_infos} for {!Attestation}s and {!Preattestation}s. In case of
+    equality of their {!round_infos}, either they are of the same kind and their
+    [slot]s have to be compared in the reverse order, otherwise the
+    {!Attestation}s are better. In case of {!Attestation}s, the number of
+    attested DAL slots is taken into account when all else is equal.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are
@@ -2589,13 +2698,17 @@ let compare_dal_attestation_infos
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
   | Weight_attestation infos1, Weight_attestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
+      compare_attestation_infos infos1 infos2
   | Weight_preattestation infos1, Weight_preattestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_attestation infos1, Weight_preattestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
-  | Weight_preattestation infos1, Weight_attestation infos2 ->
-      compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
+      compare_preattestation_infos infos1 infos2
+  | ( Weight_attestation {round_infos = round_infos1; _},
+      Weight_preattestation {round = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
+  | ( Weight_preattestation {round = round_infos1; _},
+      Weight_attestation {round_infos = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->
       compare_dal_attestation_infos infos1 infos2
   | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
@@ -2653,15 +2766,11 @@ let compare_anonymous_weight w1 w2 =
   | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
       compare_round_infos infos1 infos2
   | Weight_double_preattestation infos1, Weight_double_attestation infos2 ->
-      compare_round_infos_with_prioritized_position
-        ~prioritized_position:Fstpos
-        infos1
-        infos2
+      let cmp = compare_round_infos infos1 infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
   | Weight_double_attestation infos1, Weight_double_preattestation infos2 ->
-      compare_round_infos_with_prioritized_position
-        ~prioritized_position:Sndpos
-        infos1
-        infos2
+      let cmp = compare_round_infos infos1 infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_double_attestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos infos1 infos2
   | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _

@@ -242,7 +242,12 @@ let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
       | ( Operation_data
             {
               contents =
-                Single (Attestation {level; round; block_payload_hash; _});
+                Single
+                  (Attestation
+                    {
+                      consensus_content = {level; round; block_payload_hash; _};
+                      dal_content = _;
+                    });
               _;
             },
           _ ) ->
@@ -266,13 +271,6 @@ let unpack_attestation packed_attestation =
   match data with
   | {contents = Single (Attestation _); _} ->
       Some ({shell; protocol_data = data} : Kind.attestation Operation.t)
-  | _ -> None
-
-let unpack_dal_attestation packed_dal_attestation =
-  let {shell; protocol_data = Operation_data data} = packed_dal_attestation in
-  match data with
-  | {contents = Single (Dal_attestation _); _} ->
-      Some ({shell; protocol_data = data} : Kind.dal_attestation Operation.t)
   | _ -> None
 
 let filter_preattestations ops =
@@ -332,30 +330,21 @@ let ordered_pool_of_payload ~consensus_operations
 
 let extract_operations_of_list_list = function
   | [consensus; votes_payload; anonymous_payload; managers_payload] ->
-      let preattestations, attestations, dal_attestations =
+      let preattestations, attestations =
         List.fold_left
           (fun ( (preattestations : Kind.preattestation Operation.t list),
-                 (attestations : Kind.attestation Operation.t list),
-                 (dal_attestations : Kind.dal_attestation Operation.t list) )
+                 (attestations : Kind.attestation Operation.t list) )
                packed_op ->
             let {shell; protocol_data = Operation_data data} = packed_op in
             match data with
             | {contents = Single (Preattestation _); _} ->
-                ( {shell; protocol_data = data} :: preattestations,
-                  attestations,
-                  dal_attestations )
+                ({shell; protocol_data = data} :: preattestations, attestations)
             | {contents = Single (Attestation _); _} ->
-                ( preattestations,
-                  {shell; protocol_data = data} :: attestations,
-                  dal_attestations )
-            | {contents = Single (Dal_attestation _); _} ->
-                ( preattestations,
-                  attestations,
-                  {shell; protocol_data = data} :: dal_attestations )
+                (preattestations, {shell; protocol_data = data} :: attestations)
             | _ ->
                 (* unreachable *)
-                (preattestations, attestations, dal_attestations))
-          ([], [], [])
+                (preattestations, attestations))
+          ([], [])
           consensus
         (* N.b. the order doesn't matter *)
       in
@@ -363,7 +352,7 @@ let extract_operations_of_list_list = function
         if preattestations = [] then None else Some preattestations
       in
       let payload = {votes_payload; anonymous_payload; managers_payload} in
-      Some (preattestations, attestations, dal_attestations, payload)
+      Some (preattestations, attestations, payload)
   | _ -> None
 
 let filter_pool p {consensus; votes; anonymous; managers} =

@@ -65,7 +65,6 @@ type block_info = {
   round : Round.t;
   prequorum : prequorum option;
   quorum : Kind.attestation operation list;
-  dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
 
@@ -247,6 +246,19 @@ val compute_delegate_slots :
   delegate_slots tzresult Lwt.t
 
 val create_cache : unit -> cache
+
+(** Memoization wrapper for [Round.timestamp_of_round]. *)
+val timestamp_of_round :
+  state ->
+  predecessor_timestamp:Time.Protocol.t ->
+  predecessor_round:Round.t ->
+  round:Round.t ->
+  Time.Protocol.t tzresult
+
+(** From the current [state], the function returns an optional
+    association pair, which consists of the next round timestamp and its
+    round. *)
+val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
 
 val pp_validation_mode : Format.formatter -> validation_mode -> unit
 

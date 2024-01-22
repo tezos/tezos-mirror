@@ -86,33 +86,6 @@ let find_in_known_round_intervals known_round_intervals ~predecessor_timestamp
       known_round_intervals
       {predecessor_timestamp; predecessor_round; time_interval = (now, now)})
 
-(** Memoization wrapper for [Round.timestamp_of_round]. *)
-let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =
-  let open Result_syntax in
-  let open Baking_cache in
-  let known_timestamps = state.global_state.cache.known_timestamps in
-  match
-    Timestamp_of_round_cache.find_opt
-      known_timestamps
-      (predecessor_timestamp, predecessor_round, round)
-  with
-  (* Compute and register the timestamp if not already existing. *)
-  | None ->
-      let* ts =
-        Protocol.Alpha_context.Round.timestamp_of_round
-          state.global_state.round_durations
-          ~predecessor_timestamp
-          ~predecessor_round
-          ~round
-      in
-      Timestamp_of_round_cache.replace
-        known_timestamps
-        (predecessor_timestamp, predecessor_round, round)
-        ts ;
-      return ts
-  (* If it already exists, just fetch from the memoization table. *)
-  | Some ts -> return ts
-
 let sleep_until_ptime ptime =
   let delay = Ptime.diff ptime (Time.System.now ()) in
   if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
@@ -272,37 +245,6 @@ let rec wait_next_event ~timeout loop_state =
       loop_state.last_get_qc_event <- None ;
       return_some (Quorum_reached (candidate, attestation_qc))
   | `Timeout e -> return_some (Timeout e)
-
-(** From the current [state], the function returns an optional
-    association pair, which consists of the next round timestamp and its
-    round. *)
-let compute_next_round_time state =
-  let open Baking_state in
-  let proposal =
-    match state.level_state.attestable_payload with
-    | None -> state.level_state.latest_proposal
-    | Some {proposal; _} -> proposal
-  in
-  if Baking_state.is_first_block_in_protocol proposal then None
-  else
-    match state.level_state.next_level_proposed_round with
-    | Some _proposed_round ->
-        (* TODO? do something, if we don't, we won't be able to
-           repropose a block at next level. *)
-        None
-    | None -> (
-        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
-        let predecessor_round = proposal.predecessor.round in
-        let next_round = Round.succ state.round_state.current_round in
-        match
-          timestamp_of_round
-            state
-            ~predecessor_timestamp
-            ~predecessor_round
-            ~round:next_round
-        with
-        | Ok timestamp -> Some (timestamp, next_round)
-        | _ -> assert false)
 
 let rec first_own_round_in_range delegate_slots ~committee_size ~included_min
     ~excluded_max =

@@ -104,27 +104,11 @@ val sign_consensus_votes :
   tzresult
   Lwt.t
 
-val inject_consensus_vote :
+val inject_consensus_votes :
   state ->
   (consensus_key_and_delegate * consensus_content) list ->
   [`Preattestation | `Attestation] ->
   unit tzresult Lwt.t
-
-val sign_dal_attestations :
-  state ->
-  (consensus_key_and_delegate * Dal.Attestation.operation * int32) list ->
-  (consensus_key_and_delegate
-  * packed_operation
-  * Dal.Attestation.operation
-  * int32)
-  list
-  tzresult
-  Lwt.t
-
-val get_dal_attestations :
-  state ->
-  (consensus_key_and_delegate * Dal.Attestation.operation * int32) list tzresult
-  Lwt.t
 
 val prepare_waiting_for_quorum :
   state -> int * (slot:Slot.t -> int option) * Operation_worker.candidate

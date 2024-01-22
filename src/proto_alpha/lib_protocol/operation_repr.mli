@@ -190,6 +190,8 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
+type dal_content = {attestation : Dal_attestation_repr.t}
+
 type consensus_watermark =
   | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
@@ -236,7 +238,11 @@ and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
   (* Attestation: About consensus, attestation of a block held by a
      validator. *)
-  | Attestation : consensus_content -> Kind.attestation contents
+  | Attestation : {
+      consensus_content : consensus_content;
+      dal_content : dal_content option;
+    }
+      -> Kind.attestation contents
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying attestation encoding. *)
@@ -610,15 +616,14 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.
 
-   {!Attestation} and {!Preattestation} are compared by the pair of
-   their [level] and [round] such as the farther to the current state
-   [level] and [round] is greater; e.g. the greater pair in
-   lexicographic order being the better. When equal and both
-   operations being of the same kind, we compare their [slot]: the
-   The smaller being the better, assuming that the more slots an attester
-   has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Attestation} to a {!Preattestation}, the
-   {!Attestation} is better.
+   {!Attestation} and {!Preattestation} are compared by the pair of their
+   [level] and [round] such as the farther to the current state [level] and
+   [round] is greater; e.g. the greater pair in lexicographic order being the
+   better. When equal and both operations being of the same kind, we compare
+   their [slot], the smaller being the better (assuming that the more slots an
+   attester has, the smaller is its smallest [slot]), and then the number of the
+   DAL attested slots, the more the better. When the pair is equal and comparing
+   an {!Attestation} to a {!Preattestation}, the {!Attestation} is better.
 
    Two {!Dal_attestation} ops are compared in the lexicographic order of the
    tuple of their level, their slot, their number of slots attested as
@@ -686,6 +691,10 @@ module Encoding : sig
   val endorsement_case : Kind.attestation case
 
   val attestation_case : Kind.attestation case
+
+  val endorsement_with_dal_case : Kind.attestation case
+
+  val attestation_with_dal_case : Kind.attestation case
 
   val dal_attestation_case : Kind.dal_attestation case
 

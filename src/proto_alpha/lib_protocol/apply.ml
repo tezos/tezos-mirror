@@ -2265,7 +2265,8 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
       in
       return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
 
-let record_attestation ctxt (mode : mode) (content : consensus_content) :
+let record_attestation ctxt (mode : mode) (consensus : consensus_content)
+    (dal : dal_content option) :
     (context * Kind.attestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
@@ -2282,10 +2283,21 @@ let record_attestation ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content.slot (Consensus.allowed_attestations ctxt)
+        find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_attestation ctxt ~initial_slot:content.slot ~power
+        Consensus.record_attestation ctxt ~initial_slot:consensus.slot ~power
+      in
+      let*? ctxt =
+        Option.fold
+          ~none:(Result_syntax.return ctxt)
+          ~some:(fun dal ->
+            Dal_apply.apply_attestation
+              ctxt
+              consensus_key
+              consensus.level
+              dal.attestation)
+          dal
       in
       return (ctxt, mk_attestation_result consensus_key power)
   | Partial_construction _ ->
@@ -2297,8 +2309,8 @@ let record_attestation ctxt (mode : mode) (content : consensus_content) :
          attestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
-        let level = Level.from_raw ctxt content.level in
-        Stake_distribution.slot_owner ctxt level content.slot
+        let level = Level.from_raw ctxt consensus.level in
+        Stake_distribution.slot_owner ctxt level consensus.slot
       in
       return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
 
@@ -2374,7 +2386,8 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
         Double_attestation_evidence_result {forbidden_delegate; balance_updates}
   in
   match op1.protocol_data.contents with
-  | Single (Preattestation e1) | Single (Attestation e1) ->
+  | Single (Preattestation e1)
+  | Single (Attestation {consensus_content = e1; dal_content = _}) ->
       let level = Level.from_raw ctxt e1.level in
       let* ctxt, consensus_pk1 =
         Stake_distribution.slot_owner ctxt level e1.slot
@@ -2421,9 +2434,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   match contents_list with
   | Single (Preattestation consensus_content) ->
       record_preattestation ctxt mode consensus_content
-  | Single (Attestation consensus_content) ->
-      record_attestation ctxt mode consensus_content
-  | Single (Dal_attestation op) ->
+  | Single (Attestation {consensus_content; dal_content}) ->
+      record_attestation ctxt mode consensus_content dal_content
+  | Single (Dal_attestation {level; attestation; slot; _}) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
          This is a temporary operation. This is done in order to avoid modifying
@@ -2434,14 +2447,19 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         match mode with
         | Application _ | Full_construction _ ->
             let*? consensus_key, _power =
-              find_in_slot_map op.slot (Consensus.allowed_attestations ctxt)
+              find_in_slot_map slot (Consensus.allowed_attestations ctxt)
+            in
+            let*? ctxt =
+              Dal_apply.apply_attestation ctxt consensus_key level attestation
             in
             return (ctxt, consensus_key)
         | Partial_construction _ ->
-            let level = Level.from_raw ctxt op.level in
-            Stake_distribution.slot_owner ctxt level op.slot
+            (* We do not record the DAL attestation for the same reason, we do
+               not record the consensus attestation; see reasoning in
+               {record_attestation}. *)
+            let level = Level.from_raw ctxt level in
+            Stake_distribution.slot_owner ctxt level slot
       in
-      let*? ctxt = Dal_apply.apply_attestation ctxt consensus_key op in
       return
         ( ctxt,
           Single_result

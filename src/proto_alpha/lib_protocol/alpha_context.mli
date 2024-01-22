@@ -4445,6 +4445,8 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
+type dal_content = {attestation : Dal.Attestation.t}
+
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
@@ -4463,7 +4465,11 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Attestation : consensus_content -> Kind.attestation contents
+  | Attestation : {
+      consensus_content : consensus_content;
+      dal_content : dal_content option;
+    }
+      -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
@@ -4750,6 +4756,10 @@ module Operation : sig
     val endorsement_case : Kind.attestation case
 
     val attestation_case : Kind.attestation case
+
+    val endorsement_with_dal_case : Kind.attestation case
+
+    val attestation_with_dal_case : Kind.attestation case
 
     val dal_attestation_case : Kind.dal_attestation case
 

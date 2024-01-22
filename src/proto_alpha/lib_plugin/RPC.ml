@@ -3358,8 +3358,8 @@ module Forge = struct
       ()
       ({branch}, Contents_list (Single operation))
 
-  let attestation ctxt b ~branch ~consensus_content () =
-    operation ctxt b ~branch (Attestation consensus_content)
+  let attestation ctxt b ~branch ~consensus_content ?dal_content () =
+    operation ctxt b ~branch (Attestation {consensus_content; dal_content})
 
   let proposals ctxt b ~branch ~source ~period ~proposals () =
     operation ctxt b ~branch (Proposals {source; period; proposals})

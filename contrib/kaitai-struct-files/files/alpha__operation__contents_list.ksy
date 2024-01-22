@@ -88,6 +88,9 @@ types:
     - id: endorsement
       type: endorsement
       if: (alpha__inlined__endorsement_mempool__contents_tag == alpha__inlined__endorsement_mempool__contents_tag::endorsement)
+    - id: endorsement_with_dal
+      type: endorsement_with_dal
+      if: (alpha__inlined__endorsement_mempool__contents_tag == alpha__inlined__endorsement_mempool__contents_tag::endorsement_with_dal)
   alpha__inlined__preendorsement:
     seq:
     - id: alpha__inlined__preendorsement
@@ -132,6 +135,9 @@ types:
     - id: endorsement
       type: endorsement
       if: (alpha__operation_with_legacy_attestation_name__alpha__contents_tag == alpha__operation_with_legacy_attestation_name__alpha__contents_tag::endorsement)
+    - id: endorsement_with_dal
+      type: endorsement_with_dal
+      if: (alpha__operation_with_legacy_attestation_name__alpha__contents_tag == alpha__operation_with_legacy_attestation_name__alpha__contents_tag::endorsement_with_dal)
     - id: double_preendorsement_evidence
       type: double_preendorsement_evidence
       if: (alpha__operation_with_legacy_attestation_name__alpha__contents_tag == alpha__operation_with_legacy_attestation_name__alpha__contents_tag::double_preendorsement_evidence)
@@ -456,6 +462,18 @@ types:
       type: s4
     - id: block_payload_hash
       size: 32
+  endorsement_with_dal:
+    seq:
+    - id: slot
+      type: u2
+    - id: level
+      type: s4
+    - id: round
+      type: s4
+    - id: block_payload_hash
+      size: 32
+    - id: dal_attestation
+      type: z
   inbox__proof:
     seq:
     - id: level
@@ -1458,6 +1476,7 @@ enums:
     255: named
   alpha__inlined__endorsement_mempool__contents_tag:
     21: endorsement
+    23: endorsement_with_dal
   alpha__inlined__preendorsement__contents_tag:
     20: preendorsement
   alpha__michelson__v1__primitives:
@@ -1868,6 +1887,7 @@ enums:
     20: preendorsement
     21: endorsement
     22: dal_attestation
+    23: endorsement_with_dal
     107: reveal
     108: transaction
     109: origination

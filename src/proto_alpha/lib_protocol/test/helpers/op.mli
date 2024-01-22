@@ -54,7 +54,7 @@ val sign :
 (** Create an unpacked attestation that is expected for given [Block.t].
 
     Optional parameters allow to specify the attested values: [level],
-    [round] and/or [block_payload_hash].
+    [round], [block_payload_hash], and/or [dal_content].
 
     They also allow to specify the attester ([delegate]), and/or the
     [slot]. These default to the first slot and its delegate.
@@ -67,6 +67,7 @@ val raw_attestation :
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
+  ?dal_content:dal_content ->
   ?branch:Block_hash.t ->
   Block.t ->
   Kind.attestation Operation.t tzresult Lwt.t
@@ -93,6 +94,7 @@ val attestation :
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
+  ?dal_content:dal_content ->
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t

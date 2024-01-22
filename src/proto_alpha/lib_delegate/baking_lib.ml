@@ -90,7 +90,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
           Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Preattestation
+  Baking_actions.inject_consensus_votes state consensus_list `Preattestation
 
 let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
@@ -127,7 +127,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_consensus_vote state consensus_list `Attestation
+  Baking_actions.inject_consensus_votes state consensus_list `Attestation
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in
@@ -208,7 +208,11 @@ let state_attesting_power =
     Operation_pool.filter_attestations
     (fun
       ({
-         protocol_data = {contents = Single (Attestation consensus_content); _};
+         protocol_data =
+           {
+             contents = Single (Attestation {consensus_content; dal_content = _});
+             _;
+           };
          _;
        } :
         Kind.attestation operation)
@@ -500,7 +504,7 @@ let rec baking_minimal_timestamp ~count state
          (fun
            ({
               protocol_data =
-                {contents = Single (Attestation consensus_content); _};
+                {contents = Single (Attestation {consensus_content; _}); _};
               _;
             } :
              Kind.attestation operation)
@@ -548,17 +552,6 @@ let rec baking_minimal_timestamp ~count state
     Operation_pool.add_operations
       current_mempool
       (List.map (fun (_, x, _, _) -> x) signed_attestations)
-  in
-  let* own_dal_attestations = Baking_actions.get_dal_attestations state in
-  let* signed_dal_attestations =
-    Baking_actions.sign_dal_attestations state own_dal_attestations
-  in
-  let pool =
-    Operation_pool.add_operations
-      pool
-      (List.map
-         (fun (_delegate, op, _bitset, _published_level) -> op)
-         signed_dal_attestations)
   in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =

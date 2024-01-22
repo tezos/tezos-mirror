@@ -97,9 +97,6 @@ val unpack_preattestation :
 
 val unpack_attestation : packed_operation -> Kind.attestation operation option
 
-val unpack_dal_attestation :
-  packed_operation -> Kind.dal_attestation operation option
-
 val filter_preattestations :
   packed_operation list -> Kind.preattestation operation list
 
@@ -115,7 +112,6 @@ val extract_operations_of_list_list :
   packed_operation list list ->
   (Kind.preattestation operation list option
   * Kind.attestation operation list
-  * Kind.dal_attestation operation list
   * payload)
   option
 
