@@ -22,6 +22,22 @@ const external = require("./lib/external")
 const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
+const commander = require('commander');
+
+commander
+    .usage('[OPTIONS]')
+    .option('-i, --include <regex>', 'Only consider benchmark scripts matching <regex>')
+    .option('-e, --exclude <regex>', 'Exclude benchmark scripts matching <regex>')
+    .parse(process.argv);
+
+let INCLUDE_REGEX = commander.opts().include
+let EXCLUDE_REGEX = commander.opts().exclude
+function filter_name(name) {
+    return (INCLUDE_REGEX === undefined
+        || name.match(INCLUDE_REGEX))
+        && (EXCLUDE_REGEX === undefined
+            || !name.match(EXCLUDE_REGEX))
+}
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
@@ -428,7 +444,7 @@ function dump_opcodes(filename, opcodes) {
 
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
-    console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
+    console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
     var benchmark_fields = [
         "benchmark_name",
         "status",
@@ -496,4 +512,4 @@ async function run_all_benchmarks(benchmark_scripts) {
 }
 
 benchmark_scripts = require("./benchmarks_list.json")
-run_all_benchmarks(benchmark_scripts);
+run_all_benchmarks(benchmark_scripts.filter(filter_name));
