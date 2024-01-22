@@ -2736,6 +2736,86 @@ let test_reveals_4k =
   in
   Lwt.choose [sync; failure]
 
+(** Run simple http server on [port] that servers static files in the [root] directory. *)
+let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
+  let server =
+    Cohttp_lwt_unix.Server.make () ~callback:(fun _conn request _body ->
+        match request.meth with
+        | `GET ->
+            let fname =
+              Cohttp.Path.resolve_local_file
+                ~docroot:root
+                ~uri:(Cohttp.Request.uri request)
+            in
+            Log.debug ~prefix:name "Request file %s@." fname ;
+            on_request fname ;
+            Cohttp_lwt_unix.Server.respond_file ~fname ()
+        | _ ->
+            Cohttp_lwt_unix.Server.respond_error
+              ~status:`Method_not_allowed
+              ~body:"Static file server only answers GET"
+              ())
+  in
+  let stop, stopper = Lwt.task () in
+  let serve =
+    Cohttp_lwt_unix.Server.create ~stop ~mode:(`TCP (`Port port)) server
+  in
+  let stopper () =
+    Log.debug ~prefix:name "Stopping" ;
+    Lwt.wakeup_later stopper () ;
+    serve
+  in
+  Lwt.finalize f stopper
+
+let test_reveals_fetch_remote =
+  let kind = "arith" in
+  test_full_scenario
+    ~timeout:120
+    ~kind
+    {
+      tags = ["reveals"; "fetch"];
+      variant = None;
+      description = "reveal from remote service";
+    }
+  @@ fun protocol sc_rollup_node sc_rollup node client ->
+  let data = String.make 1024 '\202' in
+  let hash = reveal_hash ~protocol ~kind data in
+  let pre_images_dir = Temp.dir "preimages_remote_dir" in
+  let filename = Filename.concat pre_images_dir hash.filename in
+  let () = with_open_out filename @@ fun cout -> output_string cout data in
+  let provider_port = Port.fresh () in
+  Log.info "Starting webserver for static pre-images content." ;
+  let fetched = ref false in
+  serve_files
+    ~name:"pre_image_provider"
+    ~port:provider_port
+    ~root:pre_images_dir
+    ~on_request:(fun _ -> fetched := true)
+  @@ fun () ->
+  let pre_images_endpoint = sf "http://localhost:%d" provider_port in
+  Log.info "Run rollup node." ;
+  let* () =
+    Sc_rollup_node.run
+      sc_rollup_node
+      sc_rollup
+      [Pre_images_endpoint pre_images_endpoint]
+  in
+  let failure =
+    let* () =
+      Sc_rollup_node.process sc_rollup_node |> Option.get |> Process.check
+    in
+    Test.fail "Node terminated before reveal"
+  in
+  Log.info "Send reveal message %s." hash.message ;
+  let* () = send_text_messages client [hash.message] in
+  let sync =
+    let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
+    if not !fetched then
+      Test.fail ~__LOC__ "Pre-image was not fetched from remote server" ;
+    unit
+  in
+  Lwt.choose [sync; failure]
+
 let test_reveals_above_4k =
   let kind = "arith" in
   test_full_scenario
@@ -5717,6 +5797,7 @@ let register ~protocols =
     protocols ;
   test_reveals_4k protocols ;
   test_reveals_above_4k protocols ;
+  test_reveals_fetch_remote protocols ;
   (* Specific Wasm PVM tezts *)
   test_rollup_node_run_with_kernel
     protocols

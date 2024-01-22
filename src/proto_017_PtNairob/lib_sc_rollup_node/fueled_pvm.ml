@@ -34,7 +34,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
 
   type pvm_state = Irmin_context.tree
 
-  let get_reveal ~data_dir ~pvm_kind reveal_map hash =
+  let get_reveal ~pre_images_endpoint ~data_dir ~pvm_kind reveal_map hash =
     let found_in_map =
       match reveal_map with
       | None -> None
@@ -45,7 +45,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     in
     match found_in_map with
     | Some data -> return data
-    | None -> Reveals.get ~data_dir ~pvm_kind ~hash
+    | None -> Reveals.get ~pre_images_endpoint ~data_dir ~pvm_kind ~hash
 
   type eval_completion =
     | Aborted of {state : pvm_state; fuel : fuel; current_tick : int64}
@@ -102,6 +102,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Reveal_raw_data hash -> (
           let*! data =
             get_reveal
+              ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
               ~data_dir:node_ctxt.data_dir
               ~pvm_kind:node_ctxt.kind
               reveal_map
@@ -198,6 +199,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Needs_reveal (Reveal_raw_data hash) -> (
           let* data =
             get_reveal
+              ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
               ~data_dir:node_ctxt.data_dir
               ~pvm_kind:node_ctxt.kind
               reveal_map

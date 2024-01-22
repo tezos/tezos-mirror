@@ -97,6 +97,7 @@ type t = {
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
+  pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
   l1_blocks_cache_size : int;
@@ -251,6 +252,7 @@ module Cli : sig
     dal_node_endpoint:Uri.t option ->
     dac_observer_endpoint:Uri.t option ->
     dac_timeout:Z.t option ->
+    pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->
     injection_ttl:int option ->
@@ -281,6 +283,7 @@ module Cli : sig
     dal_node_endpoint:Uri.t option ->
     dac_observer_endpoint:Uri.t option ->
     dac_timeout:Z.t option ->
+    pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->
     injection_ttl:int option ->

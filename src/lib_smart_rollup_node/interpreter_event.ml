@@ -54,6 +54,28 @@ module Simple = struct
       ("message_index", Data_encoding.int31)
       ("message_tick", Data_encoding.int64)
       ("internal", Data_encoding.bool)
+
+  let missing_pre_image =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_interpreter_missing_pre_image"
+      ~msg:"The pre-image {hash} is missing locally"
+      ~level:Info
+      ("hash", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
+  let fetched_incorrect_pre_image =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_interpreter_fetched_incorrect_pre_image"
+      ~msg:
+        "Fetched pre-image for {content_hash} instead of {expected_hash} from \
+         pre-image-service"
+      ~level:Error
+      ("expected_hash", Data_encoding.string)
+      ("content_hash", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+      ~pp2:Format.pp_print_string
 end
 
 (** [transition_pvm inbox_level hash tick n] emits the event that a PVM
@@ -71,3 +93,8 @@ let transitioned_pvm inbox_level hash tick num_messages =
    to the PVM. *)
 let intended_failure ~level ~message_index ~message_tick ~internal =
   Simple.(emit intended_failure (level, message_index, message_tick, internal))
+
+let missing_pre_image ~hash = Simple.(emit missing_pre_image) hash
+
+let fetched_incorrect_pre_image ~expected_hash ~content_hash =
+  Simple.(emit fetched_incorrect_pre_image) (expected_hash, content_hash)

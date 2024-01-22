@@ -31,7 +31,9 @@
 
 *)
 
-type error += Cannot_find_predecessor of Block_hash.t
+type error +=
+  | Cannot_find_predecessor of Block_hash.t
+  | Http_connection_error of (Cohttp.Code.status_code * string)
 
 let () =
   register_error_kind
@@ -48,6 +50,29 @@ let () =
     Data_encoding.(obj1 (req "hash" Block_hash.encoding))
     (function Cannot_find_predecessor hash -> Some hash | _ -> None)
     (fun hash -> Cannot_find_predecessor hash)
+
+let () =
+  let http_status_enc =
+    let open Data_encoding in
+    let open Cohttp.Code in
+    conv code_of_status status_of_code int31
+  in
+  register_error_kind
+    `Permanent
+    ~id:"lib_crawler.http_error"
+    ~title:"HTTP error when fetching data"
+    ~description:"The node encountered an HTTP error when fetching data."
+    ~pp:(fun ppf (status, body) ->
+      Format.fprintf
+        ppf
+        "Downloading data resulted in: %s (%s)."
+        (Cohttp.Code.string_of_status status)
+        body)
+    Data_encoding.(
+      obj2 (req "status" http_status_enc) (req "body" Data_encoding.string))
+    (function
+      | Http_connection_error (status, body) -> Some (status, body) | _ -> None)
+    (fun (status, body) -> Http_connection_error (status, body))
 
 type error += RPC_timeout of {path : string; timeout : float}
 
@@ -164,6 +189,7 @@ let is_connection_error trace =
              shutdown but the request is still in the RPC worker. *)
           Re.Str.string_match regexp_ocaml_exception_connection_error s 0
       | RPC_timeout _ -> true
+      | Http_connection_error _ -> true
       | _ -> false)
     false
     trace

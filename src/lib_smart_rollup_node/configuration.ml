@@ -64,6 +64,7 @@ type t = {
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
+  pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
   l1_blocks_cache_size : int;
@@ -417,6 +418,7 @@ let encoding : t Data_encoding.t =
            dal_node_endpoint;
            dac_observer_endpoint;
            dac_timeout;
+           pre_images_endpoint;
            batcher;
            injector;
            l1_blocks_cache_size;
@@ -444,6 +446,7 @@ let encoding : t Data_encoding.t =
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
+            pre_images_endpoint,
             batcher,
             injector,
             l1_blocks_cache_size,
@@ -470,6 +473,7 @@ let encoding : t Data_encoding.t =
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
+               pre_images_endpoint,
                batcher,
                injector,
                l1_blocks_cache_size,
@@ -497,6 +501,7 @@ let encoding : t Data_encoding.t =
         dal_node_endpoint;
         dac_observer_endpoint;
         dac_timeout;
+        pre_images_endpoint;
         batcher;
         injector;
         l1_blocks_cache_size;
@@ -551,10 +556,11 @@ let encoding : t Data_encoding.t =
              Loser_mode.encoding
              Loser_mode.no_failures))
        (merge_objs
-          (obj8
+          (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
              (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
              (opt "dac-timeout" Data_encoding.z)
+             (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
@@ -660,10 +666,10 @@ module Cli = struct
 
   let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers =
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
     let open Result_syntax in
     let* purposed_operator, default_operator =
       get_purposed_and_default_operators operators
@@ -686,6 +692,7 @@ module Cli = struct
       dal_node_endpoint;
       dac_observer_endpoint;
       dac_timeout;
+      pre_images_endpoint;
       metrics_addr;
       fee_parameters = Operation_kind.Map.empty;
       mode;
@@ -731,11 +738,11 @@ module Cli = struct
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
       ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-      ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers =
+      ~dac_observer_endpoint ~dac_timeout ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers =
     let open Result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let* () = check_custom_mode mode in
@@ -769,6 +776,8 @@ module Cli = struct
             dac_observer_endpoint
             configuration.dac_observer_endpoint;
         dac_timeout = Option.either dac_timeout configuration.dac_timeout;
+        pre_images_endpoint =
+          Option.either pre_images_endpoint configuration.pre_images_endpoint;
         reconnection_delay =
           Option.value
             ~default:configuration.reconnection_delay
@@ -818,10 +827,11 @@ module Cli = struct
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
       ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
-      ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
-      ~mode ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers =
+      ~dac_timeout ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -852,6 +862,7 @@ module Cli = struct
           ~dal_node_endpoint
           ~dac_observer_endpoint
           ~dac_timeout
+          ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
           ~injection_ttl
@@ -899,6 +910,7 @@ module Cli = struct
           ~dal_node_endpoint
           ~dac_observer_endpoint
           ~dac_timeout
+          ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
           ~injection_ttl

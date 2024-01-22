@@ -96,7 +96,10 @@ Smart Rollup node
 - Snapshot export options. (MRs :gl:`!10812`, :gl:`!11078`, :gl:`!11256`,
   :gl:`!11454`)
 
-- Snapshot import. (MRs :gl:`!10803`)
+- Snapshot import. (MR :gl:`!10803`)
+
+- Pre-images endpoint (configurable on the CLI of the config file) to allow the rollup
+  node to fetch missing pre-images from a remote server. (MR :gl:`!11600`)
 
 Smart Rollup WASM Debugger
 --------------------------

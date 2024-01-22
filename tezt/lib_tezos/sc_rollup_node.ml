@@ -104,6 +104,7 @@ type argument =
   | Dal_node of Dal_node.t
   | Mode of mode
   | Rollup of string
+  | Pre_images_endpoint of string
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -122,6 +123,7 @@ let make_argument = function
   | Dal_node dal_node -> ["--dal-node"; Dal_node.rpc_endpoint dal_node]
   | Mode mode -> ["--mode"; string_of_mode mode]
   | Rollup addr -> ["--rollup"; addr]
+  | Pre_images_endpoint addr -> ["--pre-images-endpoint"; addr]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -138,7 +140,8 @@ let is_redundant = function
   | History_mode _, History_mode _
   | Dal_node _, Dal_node _
   | Mode _, Mode _
-  | Rollup _, Rollup _ ->
+  | Rollup _, Rollup _
+  | Pre_images_endpoint _, Pre_images_endpoint _ ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -156,7 +159,8 @@ let is_redundant = function
   | History_mode _, _
   | Dal_node _, _
   | Mode _, _
-  | Rollup _, _ ->
+  | Rollup _, _
+  | Pre_images_endpoint _, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)

@@ -129,6 +129,18 @@ let dal_node_endpoint_arg =
     (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
          Lwt.return_ok (Uri.of_string s)))
 
+let pre_images_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"pre-images-endpoint"
+    ~placeholder:"url"
+    ~doc:
+      (Format.sprintf
+         "The address of a service which provides pre-images for the rollup. \
+          Missing pre-images will be downloaded remotely if they are not \
+          already present on disk.")
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return_ok (Uri.of_string s)))
+
 let loser_mode_arg =
   Tezos_clic.arg
     ~long:"loser-mode"

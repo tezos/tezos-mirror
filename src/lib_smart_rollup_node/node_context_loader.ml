@@ -236,6 +236,7 @@ module Internal_for_tests = struct
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
+          pre_images_endpoint = None;
           batcher = Configuration.default_batcher;
           injector = Configuration.default_injector;
           l1_blocks_cache_size;
