@@ -766,6 +766,29 @@ this. For instance, one can classify pages into two categories: index
 pages that are hashes for other pages and leaf pages that contain
 actual payloads.
 
+In addition to data stored locally on disk in the data directory, the rollup
+node can also fetch missing pages to be revealed from an external source.
+Data fetched from a remote pre-images service will be cached on disk (in the
+``${ROLLUP_NODE_DIR}/wasm_2_0_0``).
+
+To configure a remote source (whose server can be contacted over HTTP at
+``${PRE_IMAGES_URL}``) for pre-images, one can either pass the option
+``--pre-images-endpoint ${PRE_IMAGES_URL}``
+to the ``run`` command or add the following in the configuration file
+``${ROLLUP_NODE_DIR}/config.json``:
+
+.. code:: json
+
+   {
+     "pre-images-endpoint" : "${PRE_IMAGES_URL}"
+   }
+
+.. note::
+
+   One does not need to trust the provider service for pre-images because the
+   rollup node will ensure that the content matches the requested hash before using
+   it.
+
 .. _configure_fast_exec:
 
 Configure WebAssembly fast execution
