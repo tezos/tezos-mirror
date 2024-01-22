@@ -297,6 +297,7 @@ mod tests {
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
     use crate::Timestamp;
+    use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_crypto_rs::hash::Signature;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -327,10 +328,17 @@ mod tests {
             transactions: vec![],
         };
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
+        let dummy_parent_hash = H256::from_slice(
+            &hex::decode(
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            )
+            .unwrap(),
+        );
 
         let blueprint_with_invalid_hash: BlueprintWithDelayedHashes =
             BlueprintWithDelayedHashes {
                 delayed_hashes: vec![dummy_tx_hash],
+                parent_hash: dummy_parent_hash,
                 blueprint: empty_bluerpint,
             };
         let chunk = rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
