@@ -25,10 +25,15 @@
 .oc.unit_test_template_x86_64_coverage:
   extends:
     - .oc.unit_test_template_x86_64
-    - .oc.template__coverage_files
+    # Enable coverage instrumentation, enable coverage trace output
+    # and store it in artifacts.
+    - .oc.template__coverage_instrumentation
+    - .oc.template__coverage_output_artifact
   script:
     - make $MAKE_TARGETS
     - ./scripts/ci/merge_coverage.sh
+  # Merge the [artifacts:] definition of [.oc.unit_test_template] and
+  # of [.oc.template__coverage_output_artifact].
   artifacts:
     when: always
     paths:

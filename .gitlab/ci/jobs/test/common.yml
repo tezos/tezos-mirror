@@ -11,17 +11,6 @@
     - . ./scripts/version.sh
     - eval $(opam env)
 
-# Enable coverage output and store the traces as an artifact.
-.oc.template__coverage_files:
-  extends:
-    - .oc.template__coverage
-  artifacts:
-    name: "coverage-files-$CI_JOB_ID"
-    paths:
-      - $BISECT_FILE
-    expire_in: 1 day
-    when: on_success
-
 # We use the --job option to split tests into jobs of roughly the same
 # duration. This is based on a file that contains timings of test results,
 # generated with --record. To rebalance jobs, update this record with:
@@ -101,7 +90,7 @@
   extends:
     - .test_template
     - .image_template__runtime_e2etest_dependencies
-    - .oc.template__coverage_files
+    - .oc.template__coverage_output_artifact
     - .tezt_template
     - .oc.template__retry_flaky
   variables:

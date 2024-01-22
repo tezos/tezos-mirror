@@ -82,6 +82,8 @@
 .oc.build_x86_64:
   extends:
     - .oc.build
+    # Add coverage instrumentation for the integration tests.
+    - .oc.template__coverage_instrumentation
     # These job are the main bottleneck since a lot of tests depend on
     # them.  So we start them even before sanity_ci.
     - .needs__trigger

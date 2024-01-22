@@ -117,11 +117,41 @@
           - .gitlab-ci.yml
         when: on_success
 
-# Add variables for bisect_ppx instrumentation
-.oc.template__coverage:
+# Add variable for bisect_ppx instrumentation.
+#
+# This template should be extended by jobs that build OCaml targets
+# that should be instrumented for coverage output. This set of job
+# includes build jobs (like [oc.build_x86_64_*]). It also includes
+# OCaml unit test jobs like [oc.unit:*-x86_64] as they build the test
+# runners before their execution.
+.oc.template__coverage_instrumentation:
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
+
+# Add variable specifying trace storage.
+#
+# This template should be extended by jobs that either produce (like
+# test jobs) or consume (like the [unified_coverage] job) coverage
+# traces. In addition to specifying the location of traces, setting
+# this variable also _enables_ coverage trace output for instrumented
+# binaries.
+.oc.template__coverage_location:
+  variables:
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
+
+# Add variables for bisect_ppx output and store the traces as an
+# artifact.
+#
+# This template should be extended by test jobs that produce coverage.
+.oc.template__coverage_output_artifact:
+  extends:
+    - .oc.template__coverage_location
+  artifacts:
+    name: "coverage-files-$CI_JOB_ID"
+    paths:
+      - $BISECT_FILE
+    expire_in: 1 day
+    when: on_success
 
 # Enables retries for flaky test jobs.
 .oc.template__retry_flaky:
@@ -131,7 +161,6 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
-    - .oc.template__coverage
   stage: build
   before_script:
     - ./scripts/ci/take_ownership.sh

@@ -1,5 +1,5 @@
 .oc.template__coverage_report:
-  extends: .oc.template__coverage
+  extends: .oc.template__coverage_location
   stage: test_coverage
   coverage: '/Coverage: ([^%]+%)/'
   variables:
