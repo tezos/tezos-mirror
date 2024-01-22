@@ -70,7 +70,7 @@ services:
     ports:
       - 8545:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run sequencer with endpoint http://rollup-node:8733 --rpc-addr 0.0.0.0 --rpc-port 8545 --kernel /home/tezos/kernel/sequencer.wasm --preimage-dir /home/tezos/kernel/_evm_installer_preimages --time-between-blocks 10
+    command: run sequencer with endpoint http://rollup-node:8733 signing with edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh --rpc-addr 0.0.0.0 --rpc-port 8545 --kernel /home/tezos/kernel/sequencer.wasm --preimage-dir /home/tezos/kernel/_evm_installer_preimages --time-between-blocks 10
 
   blockscout-redis-db:
     image: 'redis:alpine'
