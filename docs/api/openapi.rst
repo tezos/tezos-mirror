@@ -63,16 +63,12 @@ Nairobi RPCs
 The OpenAPI specifications for RPCs which are specific to the Nairobi (``PtNairob``)
 protocol can be found at:
 
-- `nairobi-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
-
-- `nairobi-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi-rc.json>`_
+- `nairobi-openapi.json (version 19.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Nairobi protocol can be found at:
 
-- `nairobi-mempool-openapi.json (version 18.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
-
-- `nairobi-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi-rc.json>`_
+- `nairobi-mempool-openapi.json (version 19.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
 
 Oxford RPCs
 -----------
@@ -80,12 +76,12 @@ Oxford RPCs
 The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `oxford-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
+- `oxford-openapi.json (version 19.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Oxford protocol can be found at:
 
-- `oxford-mempool-openapi-rc.json (version 19.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
+- `oxford-mempool-openapi.json (version 19.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
