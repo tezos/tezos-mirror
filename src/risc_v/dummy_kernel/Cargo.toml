@@ -19,3 +19,6 @@ features = [
   "alloc",
   "experimental-host-in-memory-store",
 ]
+
+[dependencies.tezos-smart-rollup-constants]
+path = "../../kernel_sdk/constants"

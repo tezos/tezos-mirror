@@ -8,6 +8,7 @@ goblin = "0.7.1"
 derive_more = "0.99.17"
 vm-fdt = "0.3.0"
 tezos_crypto_rs = "0.5.2"
+ed25519-dalek = "2.1.0"
 
 [dependencies.clap]
 version = "4.4.6"

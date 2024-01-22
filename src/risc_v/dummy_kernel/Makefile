@@ -2,11 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-NATIVE_TARGET ?= $(shell rustc -vV | grep 'host:' | awk '{print $$2}')
-ifneq ($(NATIVE_TARGET),)
-NATIVE_OPT := --target "$(NATIVE_TARGET)"
-endif
-
 .PHONY: all
 all: build test check
 
@@ -16,11 +11,7 @@ build:
 
 .PHONY: test
 test:
-	@cargo test --no-default-features $(NATIVE_OPT)
-
-.PHONY: run
-run:
-	@cargo run --no-default-features
+	@# This executable compiles to RISC-V. It should be run in the RISC-V sandbox.
 
 .PHONY: check
 check:
