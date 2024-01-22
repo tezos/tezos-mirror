@@ -11,3 +11,8 @@ instructions:
   - set:
       value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
       to: /evm/eth_accounts/9b49c988b5817be31dfb00f7a5a4671772dcce2b/balance
+  - set:
+      # edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav
+      # `Boostrap.bootstrap1.public_key` in `tezt/lib_tezos/account.ml`
+      value: 6564706b75426b6e5732386e5737324b4736526f48745957377031325436474b63376e4162775958356d385764397344564339796176
+      to: /evm/sequencer
