@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/not_binary.tz on storage None and input '(Right 8)' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/not_binary.tz on storage None and input '(Right 8)' --level 1 --trace-stack
 storage
   (Some -9)
 emitted operations
@@ -7,15 +7,15 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (just consumed gas: 6.965)
+  - location: 10 (just consumed gas: 6.822)
     [ (Pair (Right 8) None) ]
   - location: 10 (just consumed gas: 0.010)
     [ (Right 8) ]
-  - location: 11 (just consumed gas: 0)
+  - location: 11 (just consumed gas: 0.010)
     [ 8 ]
   - location: 15 (just consumed gas: 0.025)
     [ -9 ]
-  - location: 11 (just consumed gas: 0.015)
+  - location: 11 (just consumed gas: 0.025)
     [ -9 ]
   - location: 16 (just consumed gas: 0.010)
     [ (Some -9) ]

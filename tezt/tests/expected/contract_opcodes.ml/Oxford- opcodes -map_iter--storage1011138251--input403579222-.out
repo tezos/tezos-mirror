@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/map_iter.tz on storage '(Pair 0 0)' and input '{ Elt 1 1 ; Elt 2 100 }' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/map_iter.tz on storage '(Pair 0 0)' and input '{ Elt 1 1 ; Elt 2 100 }' --level 1 --trace-stack
 storage
   (Pair 3 101)
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (just consumed gas: 18.616)
+  - location: 11 (just consumed gas: 18.332)
     [ (Pair { Elt 1 1 ; Elt 2 100 } 0 0) ]
   - location: 11 (just consumed gas: 0.010)
     [ { Elt 1 1 ; Elt 2 100 } ]
@@ -24,10 +24,10 @@ trace
   - location: 19 (just consumed gas: 0.010)
     [ { Elt 1 1 ; Elt 2 100 }
       (Pair 0 0) ]
-  - location: 20 (just consumed gas: 0)
+  - location: 20 (just consumed gas: 0.075)
     [ (Pair 1 1)
       (Pair 0 0) ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [ (Pair 0 0) ]
   - location: 24 (just consumed gas: 0.010)
     [ (Pair 0 0)
@@ -35,14 +35,14 @@ trace
   - location: 25 (just consumed gas: 0.010)
     [ 0
       (Pair 0 0) ]
-  - location: 26 (just consumed gas: 0)
+  - location: 26 (just consumed gas: 0.010)
     [ (Pair 0 0) ]
   - location: 28 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 26 (just consumed gas: 0.025)
+  - location: 26 (just consumed gas: 0.035)
     [ 0
       0 ]
-  - location: 22 (just consumed gas: 0.025)
+  - location: 22 (just consumed gas: 0.035)
     [ (Pair 1 1)
       0
       0 ]
@@ -51,7 +51,7 @@ trace
       (Pair 1 1)
       0
       0 ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.010)
     [ (Pair 1 1)
       0
       0 ]
@@ -62,7 +62,7 @@ trace
   - location: 33 (just consumed gas: 0.035)
     [ 1
       0 ]
-  - location: 30 (just consumed gas: 0.025)
+  - location: 30 (just consumed gas: 0.035)
     [ (Pair 1 1)
       1
       0 ]
@@ -70,7 +70,7 @@ trace
     [ 1
       (Pair 1 1)
       0 ]
-  - location: 35 (just consumed gas: 0)
+  - location: 35 (just consumed gas: 0.010)
     [ (Pair 1 1)
       0 ]
   - location: 37 (just consumed gas: 0.010)
@@ -78,15 +78,15 @@ trace
       0 ]
   - location: 38 (just consumed gas: 0.035)
     [ 1 ]
-  - location: 35 (just consumed gas: 0.025)
+  - location: 35 (just consumed gas: 0.035)
     [ 1
       1 ]
   - location: 39 (just consumed gas: 0.010)
     [ (Pair 1 1) ]
-  - location: 20 (just consumed gas: 0.015)
+  - location: 20 (just consumed gas: 0.025)
     [ (Pair 2 100)
       (Pair 1 1) ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [ (Pair 1 1) ]
   - location: 24 (just consumed gas: 0.010)
     [ (Pair 1 1)
@@ -94,14 +94,14 @@ trace
   - location: 25 (just consumed gas: 0.010)
     [ 1
       (Pair 1 1) ]
-  - location: 26 (just consumed gas: 0)
+  - location: 26 (just consumed gas: 0.010)
     [ (Pair 1 1) ]
   - location: 28 (just consumed gas: 0.010)
     [ 1 ]
-  - location: 26 (just consumed gas: 0.025)
+  - location: 26 (just consumed gas: 0.035)
     [ 1
       1 ]
-  - location: 22 (just consumed gas: 0.025)
+  - location: 22 (just consumed gas: 0.035)
     [ (Pair 2 100)
       1
       1 ]
@@ -110,7 +110,7 @@ trace
       (Pair 2 100)
       1
       1 ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.010)
     [ (Pair 2 100)
       1
       1 ]
@@ -121,7 +121,7 @@ trace
   - location: 33 (just consumed gas: 0.035)
     [ 3
       1 ]
-  - location: 30 (just consumed gas: 0.025)
+  - location: 30 (just consumed gas: 0.035)
     [ (Pair 2 100)
       3
       1 ]
@@ -129,7 +129,7 @@ trace
     [ 3
       (Pair 2 100)
       1 ]
-  - location: 35 (just consumed gas: 0)
+  - location: 35 (just consumed gas: 0.010)
     [ (Pair 2 100)
       1 ]
   - location: 37 (just consumed gas: 0.010)
@@ -137,12 +137,12 @@ trace
       1 ]
   - location: 38 (just consumed gas: 0.035)
     [ 101 ]
-  - location: 35 (just consumed gas: 0.025)
+  - location: 35 (just consumed gas: 0.035)
     [ 3
       101 ]
   - location: 39 (just consumed gas: 0.010)
     [ (Pair 3 101) ]
-  - location: 20 (just consumed gas: 0.015)
+  - location: 20 (just consumed gas: 0.035)
     [ (Pair 3 101) ]
   - location: 40 (just consumed gas: 0.010)
     [ {}

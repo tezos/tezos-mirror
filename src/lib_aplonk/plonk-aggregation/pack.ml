@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Plonk
-open Utils
+open Kzg.Utils
 
 (* Our version of SnarkPack for PLONK *)
 
@@ -35,21 +35,19 @@ module type Aggregator = sig
   type verifier_public_parameters [@@deriving repr]
 
   (* Data to be aggregated *)
-  type data = Bls.G1.t
+  type data = Kzg.Bls.G1.t
 
   (* Commitment to the data *)
-  type commitment = {cmt_t : Bls.GT.t; cmt_len : int} [@@deriving repr]
+  type commitment = {cmt_t : Kzg.Bls.GT.t; cmt_len : int} [@@deriving repr]
 
   (* Randomness used to pack the data, usually derived from a commitment to it *)
-  type randomness = Bls.Scalar.t
+  type randomness = Kzg.Bls.Scalar.t
 
   (* Packed/aggregated data *)
-  type packed = Bls.G1.t [@@deriving repr]
+  type packed = Kzg.Bls.G1.t [@@deriving repr]
 
   (* Proof that the data was correctly aggregated *)
   type proof [@@deriving repr]
-
-  type transcript = Bytes.t
 
   type setup_params
 
@@ -76,37 +74,37 @@ module type Aggregator = sig
 
   val prove_single :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     randomness ->
     data array ->
-    (packed * proof) * transcript
+    (packed * proof) * Transcript.t
 
   val prove :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     randomness ->
     data array list ->
-    (packed list * proof) * transcript
+    (packed list * proof) * Transcript.t
 
   val verify_single :
     verifier_public_parameters ->
-    transcript ->
+    Transcript.t ->
     commitment ->
     randomness ->
     packed * proof ->
-    bool * transcript
+    bool * Transcript.t
 
   val verify :
     verifier_public_parameters ->
-    transcript ->
+    Transcript.t ->
     commitment list ->
     randomness ->
     packed list * proof ->
-    bool * transcript
+    bool * Transcript.t
 end
 
 module Pack_impl = struct
-  open Bls
+  open Kzg.Bls
 
   type scalar = Scalar.t
 
@@ -157,27 +155,17 @@ module Pack_impl = struct
 
   type proof = ipa_proof * kzg_proof [@@deriving repr]
 
-  type transcript = Bytes.t
-
   type setup_params = int
 
-  let hash ~transcript ~random ?(g1s = [[||]]) ?(g2s = [[||]]) ?(gts = [[||]])
+  let hash ~transcript ?(g1s = [[||]]) ?(g2s = [[||]]) ?(gts = [[||]])
       ?(scalars = [[||]]) () =
     let transcript =
-      let open Utils.Hash in
-      let st = init () in
-      update st transcript ;
-      List.iter (Array.iter (fun key -> update st (G1.to_bytes key))) g1s ;
-      List.iter (Array.iter (fun key -> update st (G2.to_bytes key))) g2s ;
-      List.iter (Array.iter (fun key -> update st (GT.to_bytes key))) gts ;
-      List.iter
-        (Array.iter (fun key -> update st (Scalar.to_bytes key)))
-        scalars ;
-      finish st
+      Transcript.list_expand G1.t Array.(concat g1s |> to_list) transcript
+      |> Transcript.list_expand G2.t Array.(concat g2s |> to_list)
+      |> Transcript.list_expand GT.t Array.(concat gts |> to_list)
+      |> Transcript.list_expand Scalar.t Array.(concat scalars |> to_list)
     in
-    let seed, _ = Utils.Hash.bytes_to_seed transcript in
-    let state = Some (Random.State.make seed) in
-    (random ?state (), transcript)
+    Fr_generation.random_fr transcript
 
   let ip_pairing array1 array2 =
     if Array.length array1 = 0 then GT.zero
@@ -203,12 +191,7 @@ module Pack_impl = struct
   let get_setup_params public_parameters = public_parameters.length
 
   let public_parameters_to_bytes {srs2_t; g1_t; _} =
-    hash
-      ~transcript:Bytes.empty
-      ~random:Scalar.random
-      ~g1s:[[|g1_t|]]
-      ~g2s:[srs2_t]
-      ()
+    hash ~transcript:Transcript.empty ~g1s:[[|g1_t|]] ~g2s:[srs2_t] ()
     |> fst |> Scalar.to_bytes
 
   let commit pp data =
@@ -286,7 +269,7 @@ module Pack_impl = struct
     in
     let data_length = next_2power in
     let rs = Fr_generation.powers data_length r in
-    let transcript = Bytes.cat transcript @@ G1.to_bytes packed in
+    let transcript = Transcript.expand G1.t packed transcript in
 
     let rec loop transcript g_poly ipa_proof a b t i =
       if i = nb_iter then
@@ -307,7 +290,7 @@ module Pack_impl = struct
         let u, transcript =
           let g1s = [[|r_L; r_R|]] in
           let gts = [[|t_L; t_R|]] in
-          Scalar.(hash ~transcript ~random ~g1s ~gts ())
+          hash ~transcript ~g1s ~gts ()
         in
         let u_inv = Scalar.inverse_exn u in
 
@@ -335,7 +318,7 @@ module Pack_impl = struct
     let gts = [ipa_proof.t_Ls; ipa_proof.t_Rs] in
     let g1s = [[|ipa_proof.a0|]; ipa_proof.r_Ls; ipa_proof.r_Rs] in
     let g2s = [[|ipa_proof.t0|]] in
-    let rho, transcript = Scalar.(hash ~transcript ~random ~g1s ~g2s ~gts ()) in
+    let rho, transcript = hash ~transcript ~g1s ~g2s ~gts () in
     let h =
       fst
       @@ Poly.(
@@ -367,7 +350,7 @@ module Pack_impl = struct
         (fun l -> array_padded_with_zero l max_length_datas G1.zero)
         data_list
     in
-    let delta, transcript = Scalar.(hash ~transcript ~random ()) in
+    let delta, transcript = hash ~transcript () in
     let deltas = Fr_generation.powers n delta |> Array.to_list in
     let data =
       (* data = delta^0·padded_datas.(0) +...+ delta^(n-1)·padded_datas.(n-1) *)
@@ -386,7 +369,7 @@ module Pack_impl = struct
     ((packed_list, proof), transcript)
 
   let verify_single pp transcript cmt r (packed, (ipa_proof, kzg_proof)) =
-    let transcript = Bytes.cat transcript @@ G1.to_bytes packed in
+    let transcript = Transcript.expand G1.t packed transcript in
     (* FIXME: assert that the length of these six arrays (or at least one of them)
        equals the log2 of cmt.cmt_len *)
     let us, transcript =
@@ -397,7 +380,7 @@ module Pack_impl = struct
         let u, transcript =
           let g1s = [[|ipa_proof.r_Ls.(i); ipa_proof.r_Rs.(i)|]] in
           let gts = [[|ipa_proof.t_Ls.(i); ipa_proof.t_Rs.(i)|]] in
-          Scalar.(hash ~transcript:!transcript_i ~random ~g1s ~gts ())
+          hash ~transcript:!transcript_i ~g1s ~gts ()
         in
         us.(i) <- u ;
         transcript_i := transcript
@@ -450,7 +433,7 @@ module Pack_impl = struct
     let gts = [ipa_proof.t_Ls; ipa_proof.t_Rs] in
     let g1s = [[|ipa_proof.a0|]; ipa_proof.r_Ls; ipa_proof.r_Rs] in
     let g2s = [[|ipa_proof.t0|]] in
-    let rho, transcript = Scalar.(hash ~transcript ~random ~g1s ~g2s ~gts ()) in
+    let rho, transcript = hash ~transcript ~g1s ~g2s ~gts () in
     let m_v = eval_g rho |> Scalar.negate |> G2.(mul one) in
     let st0 = ipa_proof.t0 in
     let rho_g1 = G1.mul G1.one @@ Scalar.negate rho in
@@ -463,7 +446,7 @@ module Pack_impl = struct
     (ipa_ok && kzg_ok, transcript)
 
   let verify pp transcript cmt_list r (packed_list, proof) =
-    let delta, transcript = Scalar.(hash ~transcript ~random ()) in
+    let delta, transcript = hash ~transcript () in
 
     let combine_cmt d c1 c2 =
       {

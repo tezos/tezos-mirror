@@ -110,49 +110,84 @@ let storage_invariant_broken published_level index =
     Raw_level.pp
     published_level
 
-let slot_pages ~dal_attestation_lag node_ctxt
+(** Should match the criteria defined in {!Sc_rollup_proof_repr.page_level_is_valid}. *)
+let page_level_is_valid ~dal_attestation_lag ~published_level ~origination_level
+    ~inbox_level =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6263
+     Share code with {!Sc_rollup_proof_repr.page_level_is_valid}. *)
+  let not_too_old = published_level > origination_level in
+  let not_too_recent =
+    Int32.(add published_level (of_int dal_attestation_lag) <= inbox_level)
+  in
+  not_too_old && not_too_recent
+
+let slot_pages ~dal_attestation_lag ~inbox_level node_ctxt
     Dal.Slot.Header.{published_level; index} =
   let open Lwt_result_syntax in
-  let* confirmed_in_block_hash =
-    store_entry_from_published_level
-      ~dal_attestation_lag
-      ~published_level
-      node_ctxt
+  let Node_context.{genesis_info = {level = origination_level; _}; _} =
+    node_ctxt
   in
-  let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-  let* processed =
-    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-  in
-  match processed with
-  | Some `Confirmed ->
-      let* pages =
-        download_confirmed_slot_pages node_ctxt ~published_level ~index
-      in
-      return (Some pages)
-  | Some `Unconfirmed -> return None
-  | None -> storage_invariant_broken published_level index
+  if
+    not
+    @@ page_level_is_valid
+         ~dal_attestation_lag
+         ~published_level:(Raw_level.to_int32 published_level)
+         ~origination_level
+         ~inbox_level
+  then return_none
+  else
+    let* confirmed_in_block_hash =
+      store_entry_from_published_level
+        ~dal_attestation_lag
+        ~published_level
+        node_ctxt
+    in
+    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
+    let* processed =
+      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
+    in
+    match processed with
+    | Some `Confirmed ->
+        let* pages =
+          download_confirmed_slot_pages node_ctxt ~published_level ~index
+        in
+        return (Some pages)
+    | Some `Unconfirmed -> return_none
+    | None -> storage_invariant_broken published_level index
 
-let page_content ~dal_attestation_lag node_ctxt page_id =
+let page_content ~dal_attestation_lag ~inbox_level node_ctxt page_id =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
-  let* confirmed_in_block_hash =
-    store_entry_from_published_level
-      ~dal_attestation_lag
-      ~published_level
-      node_ctxt
+  let Node_context.{genesis_info = {level = origination_level; _}; _} =
+    node_ctxt
   in
-  let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-  let* processed =
-    Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-  in
-  match processed with
-  | Some `Confirmed -> (
-      let* pages =
-        download_confirmed_slot_pages node_ctxt ~published_level ~index
-      in
-      match List.nth_opt pages page_index with
-      | Some page -> return @@ Some page
-      | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
-  | Some `Unconfirmed -> return None
-  | None -> storage_invariant_broken published_level index
+  if
+    not
+    @@ page_level_is_valid
+         ~dal_attestation_lag
+         ~published_level:(Raw_level.to_int32 published_level)
+         ~origination_level
+         ~inbox_level
+  then return_none
+  else
+    let* confirmed_in_block_hash =
+      store_entry_from_published_level
+        ~dal_attestation_lag
+        ~published_level
+        node_ctxt
+    in
+    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
+    let* processed =
+      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
+    in
+    match processed with
+    | Some `Confirmed -> (
+        let* pages =
+          download_confirmed_slot_pages node_ctxt ~published_level ~index
+        in
+        match List.nth_opt pages page_index with
+        | Some page -> return @@ Some page
+        | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
+    | Some `Unconfirmed -> return_none
+    | None -> storage_invariant_broken published_level index

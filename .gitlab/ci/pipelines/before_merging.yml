@@ -17,18 +17,19 @@ include:
   - .gitlab/ci/jobs/doc/build_all.yml
   - .gitlab/ci/jobs/build/docker_amd64_test_manual.yml
   - .gitlab/ci/jobs/build/docker_arm64_test_manual.yml
+  - .gitlab/ci/jobs/build/bin_packages_manual.yml
   - .gitlab/ci/jobs/build/tezt_fetch_records.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
-  - .gitlab/ci/jobs/test/ometrics_code_quality.yml
   - .gitlab/ci/jobs/test/semgrep.yml
   - .gitlab/ci/jobs/test/unit.yml
   - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
   - .gitlab/ci/jobs/test/check_scripts.yml
   - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
+  - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/tezt_build_long.yml
   - .gitlab/ci/jobs/test/kernels.yml
@@ -41,4 +42,4 @@ include:
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/tests.yml
+  - .gitlab/ci/jobs/doc/test_install_python.yml

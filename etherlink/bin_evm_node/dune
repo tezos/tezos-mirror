@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name evm_node)
+ (public_name octez-evm-node)
+ (package octez-evm-node)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-version.value
+  octez-evm-node-libs.evm_node_lib_prod
+  octez-evm-node-libs.evm_node_lib_dev
+  octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_config)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_rpc_http
+  -open Evm_node_lib_dev_encoding
+  -open Evm_node_config))

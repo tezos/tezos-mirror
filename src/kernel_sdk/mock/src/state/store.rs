@@ -136,7 +136,7 @@ impl Store {
     }
 
     pub fn set_value(&mut self, path: &str, value: Vec<u8>) {
-        if let Some(mut node) = self.node_from_path_mut(path) {
+        if let Some(node) = self.node_from_path_mut(path) {
             node.value = Some(value);
             node.inner.insert(VALUE_NAME.to_string(), Box::default());
         } else {
@@ -150,7 +150,7 @@ impl Store {
     }
 
     pub fn delete_value(&mut self, path: &str) {
-        if let Some(mut node) = self.node_from_path_mut(path) {
+        if let Some(node) = self.node_from_path_mut(path) {
             node.value = None;
             node.inner.remove(VALUE_NAME);
         };

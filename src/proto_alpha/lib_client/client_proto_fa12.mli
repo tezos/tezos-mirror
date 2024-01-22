@@ -152,11 +152,11 @@ val run_view_action :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?sender:Contract.t ->
+  sender:Contract.t option ->
   contract:Contract_hash.t ->
   action:action ->
-  ?payer:Signature.public_key_hash ->
-  ?gas:Gas.Arith.integral ->
+  payer:Signature.public_key_hash option ->
+  gas:Gas.Arith.integral option ->
   unparsing_mode:Script_ir_unparser.unparsing_mode ->
   unit ->
   Script.expr tzresult Lwt.t

@@ -30,6 +30,12 @@ open Encoding_benchmarks_helpers.Make (struct
 
   let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
+
+module No_codegen = Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+
+  let purpose = Benchmark.Other_purpose "Not used for codegen"
+end)
 (* ------------------------------------------------------------------------- *)
 
 module Make_elliptic_curve_encoding_benchmarks (A : sig
@@ -88,7 +94,7 @@ struct
   let () = Registration.register_simple_with_num public_key_hash_to_b58check
 
   let secret_key_encoding =
-    make_encode_fixed_size
+    No_codegen.make_encode_fixed_size
       ~name:("ENCODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Tezos_crypto.Signature.Public_key_hash.encoding
       ~generator:Sampler.pkh
@@ -97,7 +103,7 @@ struct
   let () = Registration.register_simple_with_num secret_key_encoding
 
   let secret_key_to_b58check =
-    make_encode_fixed_size_to_string
+    No_codegen.make_encode_fixed_size_to_string
       ~name:("B58CHECK_ENCODING_SECRET_KEY_" ^ algo_name)
       ~to_string:Tezos_crypto.Signature.Secret_key.to_b58check
       ~generator:Sampler.sk
@@ -164,7 +170,7 @@ struct
   let () = Registration.register_simple_with_num public_key_hash_from_b58check
 
   let secret_key_decoding =
-    make_decode_fixed_size
+    No_codegen.make_decode_fixed_size
       ~name:("DECODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Tezos_crypto.Signature.Secret_key.encoding
       ~generator:Sampler.sk
@@ -173,7 +179,7 @@ struct
   let () = Registration.register_simple_with_num secret_key_decoding
 
   let secret_key_from_b58check =
-    make_decode_fixed_size_from_string
+    No_codegen.make_decode_fixed_size_from_string
       ~name:("B58CHECK_DECODING_SECRET_KEY_" ^ algo_name)
       ~to_string:Tezos_crypto.Signature.Secret_key.to_b58check
       ~from_string:Tezos_crypto.Signature.Secret_key.of_b58check_exn
@@ -267,9 +273,14 @@ let () = Registration.register_simple_with_num chain_id_readable_decoding
     gas models but the inferred gas constants may be used for
     over-approximating other costs or simply as reference points. *)
 
+let purpose =
+  Tezos_benchmark.Benchmark.Other_purpose
+    "Used to over-approximate other costs or as reference point."
+
 let nat_encoding =
   make_encode_variable_size
     ~name:"ENCODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~generator:(fun rng_state ->
       let nbytes =
@@ -284,6 +295,7 @@ let () = Registration.register_simple_with_num nat_encoding
 let nat_decoding =
   make_decode_variable_size
     ~name:"DECODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~generator:(fun rng_state ->
       let nbytes =
@@ -298,6 +310,7 @@ let () = Registration.register_simple_with_num nat_decoding
 let nat_decoding_intercept =
   make_decode_variable_size
     ~name:"DECODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~intercept:true
     ~generator:(fun _ -> (Z.zero, {bytes = 0}))
@@ -308,6 +321,7 @@ let () = Registration.register_simple_with_num nat_decoding_intercept
 let int_encoding =
   make_encode_variable_size
     ~name:"ENCODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~generator:(fun rng_state ->
       let nbytes =
@@ -322,6 +336,7 @@ let () = Registration.register_simple_with_num int_encoding
 let int_decoding =
   make_decode_variable_size
     ~name:"DECODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~generator:(fun rng_state ->
       let nbytes =
@@ -336,6 +351,7 @@ let () = Registration.register_simple_with_num int_decoding
 let int_decoding_intercept =
   make_decode_variable_size
     ~name:"DECODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~intercept:true
     ~generator:(fun _ -> (Z.zero, {bytes = 0}))
@@ -346,6 +362,7 @@ let () = Registration.register_simple_with_num int_decoding_intercept
 let string_encoding =
   make_encode_variable_size
     ~name:"ENCODING_STRING"
+    ~purpose
     ~encoding:Data_encoding.string
     ~generator:(fun rng_state ->
       let nbytes =
@@ -360,6 +377,7 @@ let () = Registration.register_simple_with_num string_encoding
 let string_decoding =
   make_decode_variable_size
     ~name:"DECODING_STRING"
+    ~purpose
     ~encoding:Data_encoding.string
     ~generator:(fun rng_state ->
       let nbytes =
@@ -374,6 +392,7 @@ let () = Registration.register_simple_with_num string_decoding
 let adversarial_string_list_encoding =
   make_encode_variable_size
     ~name:"ENCODING_STRING_LIST_ADVERSARIAL"
+    ~purpose
     ~encoding:Data_encoding.(list string)
     ~generator:(fun rng_state ->
       let length =
@@ -391,6 +410,7 @@ let () = Registration.register_simple_with_num adversarial_string_list_encoding
 let adversarial_string_list_decoding =
   make_decode_variable_size
     ~name:"DECODING_STRING_LIST_ADVERSARIAL"
+    ~purpose
     ~encoding:Data_encoding.(list string)
     ~generator:(fun rng_state ->
       let length =

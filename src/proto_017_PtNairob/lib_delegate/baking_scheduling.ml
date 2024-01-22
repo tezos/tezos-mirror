@@ -130,8 +130,8 @@ let rec wait_next_event ~timeout loop_state =
     match loop_state.last_get_head_event with
     | None ->
         let t =
-          Lwt_stream.get loop_state.heads_stream >|= fun e ->
-          `New_head_proposal e
+          Lwt_stream.get loop_state.heads_stream >>= fun e ->
+          Lwt.return (`New_head_proposal e)
         in
         loop_state.last_get_head_event <- Some t ;
         t
@@ -704,13 +704,13 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
    create_round_durations constants >>? fun round_durations ->
    Baking_actions.compute_round current_proposal round_durations
    >>? fun current_round ->
-   ok {current_round; current_phase = Idle; delayed_prequorum = None}
+   ok {current_round; current_phase = Idle; delayed_quorum = None}
   else
     ok
       {
         Baking_state.current_round = Round.zero;
         current_phase = Idle;
-        delayed_prequorum = None;
+        delayed_quorum = None;
       })
   >>?= fun round_state ->
   let state = {global_state; level_state; round_state} in
@@ -741,7 +741,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
     match config.Baking_configuration.state_recorder with
     | Baking_configuration.Filesystem ->
         Baking_state.may_record_new_state ~previous_state:state ~new_state
-    | Baking_configuration.Disabled -> return_unit
+    | Baking_configuration.Memory -> return_unit
   in
   State_transitions.step state event >>= fun (state', action) ->
   (Baking_actions.perform_action ~state_recorder state' action >>= function

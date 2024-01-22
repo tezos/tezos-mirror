@@ -177,6 +177,8 @@ val resolve_metrics_addrs :
 val resolve_bootstrap_addrs :
   string list -> (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
 
+val rpc_encoding : rpc Data_encoding.t
+
 val encoding : t Data_encoding.t
 
 (** Return [p2p.bootstrap_peers] if not [None],

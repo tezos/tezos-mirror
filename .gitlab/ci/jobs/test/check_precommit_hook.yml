@@ -1,6 +1,8 @@
 check_precommit_hook:
   extends:
-    - .test_template
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies
+  stage: test
   needs: [trigger]
   before_script:
     - . ./scripts/version.sh
@@ -8,4 +10,6 @@ check_precommit_hook:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci check-precommit
+    - poetry run pylint scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle scripts/pre_commit/pre_commit.py
+    - poetry run mypy scripts/pre_commit/pre_commit.py

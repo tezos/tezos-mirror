@@ -1,0 +1,11 @@
+[
+  {
+    "type": "function",
+    "name": "withdraw_base58",
+    "constant": false,
+    "payable": true,
+    "inputs": [
+      { "type": "string", "name": "target" }
+    ]
+  }
+]

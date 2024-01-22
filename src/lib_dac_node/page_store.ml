@@ -141,7 +141,7 @@ let ensure_reveal_data_dir_exists reveal_data_dir =
   Lwt.catch
     (fun () ->
       let*! () = Lwt_utils_unix.create_dir ~perm:0o744 reveal_data_dir in
-      return ())
+      return_unit)
     (function
       | Failure s ->
           if String.equal s "Not a directory" then
@@ -189,7 +189,7 @@ module Filesystem : S with type configuration = string = struct
       Lwt_utils_unix.write_bytes chan content
     in
     match result with
-    | Ok () -> return ()
+    | Ok () -> return_unit
     | Error _ ->
         tzfail
         @@ Cannot_write_page_to_page_storage {hash = hash_string; content}
@@ -199,11 +199,11 @@ module Filesystem : S with type configuration = string = struct
     let hash_string = Plugin.to_hex hash in
     let path = path data_dir hash_string in
     let*! result =
-      Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return ())
+      Lwt_utils_unix.with_open_in path (fun _fd -> Lwt.return_unit)
     in
     match result with
-    | Ok () -> return true
-    | Error {unix_code = Unix.ENOENT; _} -> return false
+    | Ok () -> return_true
+    | Error {unix_code = Unix.ENOENT; _} -> return_false
     | Error _ -> tzfail @@ Cannot_read_page_from_page_storage hash_string
 
   let load ((module Plugin) : Dac_plugin.t) data_dir hash =
@@ -330,34 +330,28 @@ module Remote_with_flooding :
       (struct
         type remote_context = float * Dac_node_client.cctxt list
 
-        (** TODO: https://gitlab.com/tezos/tezos/-/issues/5673
-            Optimize flooding.
-        *)
         let fetch _dac_plugin (timeout, remote_cctxts) hash =
-          let open Lwt_result_syntax in
+          let open Lwt_syntax in
           let page_hash = Dac_plugin.hash_to_raw hash in
           let fetch_page cctxt =
             Lwt_unix.with_timeout timeout (fun () ->
                 Dac_node_client.V0.get_preimage cctxt ~page_hash)
           in
-          let*! results =
-            List.filter_map_p
-              (fun committee_member_cctxt ->
-                Lwt.catch
-                  (fun () ->
-                    let*! page_data = fetch_page committee_member_cctxt in
-                    match page_data with
-                    | Ok page_data -> Lwt.return (Some page_data)
-                    | Error _ -> Lwt.return_none)
-                  (fun _ -> Lwt.return_none))
+          let requests =
+            List.map
+              (fun cctxt ->
+                let* fetch_page_result = fetch_page cctxt in
+                match fetch_page_result with
+                | Ok page -> return_ok page
+                | Error _ -> Lwt.fail_with "Could not fetch page result.")
               remote_cctxts
           in
-          match List.hd results with
-          | Some a -> return a
-          | None ->
-              tzfail
+          Lwt.catch
+            (fun () -> Lwt_utils.pick_successful requests)
+            (fun _ ->
+              Lwt_result_syntax.tzfail
                 (Cannot_fetch_remote_page_with_flooding_strategy
-                   {hash = Dac_plugin.hash_to_raw hash})
+                   {hash = page_hash}))
       end)
       (F)
 

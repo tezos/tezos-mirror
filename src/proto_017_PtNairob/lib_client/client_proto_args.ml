@@ -410,6 +410,16 @@ let non_negative_parameter () = Tezos_clic.parameter non_negative_parser
 let non_negative_param ~name ~desc next =
   Tezos_clic.param ~name ~desc (non_negative_parameter ()) next
 
+let positive_int_parser (cctxt : #Client_context.io) s =
+  match int_of_string_opt s with
+  | Some i when i > 0 -> return i
+  | _ -> cctxt#error "Parameter should be a positive integer literal"
+
+let positive_int_parameter () = Tezos_clic.parameter positive_int_parser
+
+let positive_int_param ~name ~desc next =
+  Tezos_clic.param ~name ~desc (positive_int_parameter ()) next
+
 let fee_arg =
   Tezos_clic.arg
     ~long:"fee"

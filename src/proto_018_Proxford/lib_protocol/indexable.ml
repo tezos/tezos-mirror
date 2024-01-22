@@ -64,14 +64,16 @@ let value : 'a -> 'a value = fun v -> Value v
 let from_value : 'a -> 'a either = fun v -> Hidden_value v
 
 let index : int32 -> 'a index tzresult =
- fun i ->
-  if Compare.Int32.(0l <= i) then ok (Index i)
-  else error (Index_cannot_be_negative i)
+  let open Result_syntax in
+  fun i ->
+    if Compare.Int32.(0l <= i) then return (Index i)
+    else tzfail (Index_cannot_be_negative i)
 
 let from_index : int32 -> 'a either tzresult =
- fun i ->
-  if Compare.Int32.(0l <= i) then ok (Hidden_index i)
-  else error (Index_cannot_be_negative i)
+  let open Result_syntax in
+  fun i ->
+    if Compare.Int32.(0l <= i) then return (Hidden_index i)
+    else tzfail (Index_cannot_be_negative i)
 
 let index_exn : int32 -> 'a index =
  fun i ->
@@ -98,8 +100,7 @@ let to_int32 = function Index x -> x
 let to_value = function Value x -> x
 
 let is_value_e : error:'trace -> ('state, 'a) t -> ('a, 'trace) result =
- fun ~error v ->
-  match destruct v with Left _ -> Result.error error | Right v -> Result.ok v
+ fun ~error v -> match destruct v with Left _ -> Error error | Right v -> Ok v
 
 let compact val_encoding =
   Data_encoding.Compact.(

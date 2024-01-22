@@ -58,13 +58,14 @@ let to_seconds_string s = Int64.to_string (to_seconds s)
 let pp = pp_hum
 
 let ( +? ) x y =
+  let open Result_syntax in
   let span = Period_repr.to_seconds y in
   let t64 = Time.add x span in
   (* As long as span and time representations are int64, we cannont overflow if
      x is negative. *)
-  if x < Time.of_seconds 0L then ok t64
-  else if t64 < Time.of_seconds 0L then error Timestamp_add
-  else ok t64
+  if x < Time.of_seconds 0L then return t64
+  else if t64 < Time.of_seconds 0L then tzfail Timestamp_add
+  else return t64
 
 let ( -? ) x y =
   record_trace Timestamp_sub (Period_repr.of_seconds (Time.diff x y))

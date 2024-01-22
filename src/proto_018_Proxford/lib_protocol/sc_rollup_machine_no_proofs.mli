@@ -50,3 +50,5 @@ end
 module Arith : S
 
 module Wasm : S
+
+module Riscv : S

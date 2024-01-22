@@ -85,7 +85,7 @@ let get_storage client ~contract =
   return (String.trim storage)
 
 let get_storage_json client ~contract =
-  RPC.Client.call ~hooks client
+  Client.RPC.call ~hooks client
   @@ RPC.get_chain_block_context_contract_storage ~id:contract ()
 
 let check_storage ~__LOC__ client ~contract expected_storage =
@@ -151,7 +151,7 @@ let test_now protocol client =
        the minimum time between blocks. *)
     let* minimal_block_delay =
       let* constants =
-        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+        Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
       in
       return JSON.(constants |-> "minimal_block_delay" |> as_int)
     in
@@ -386,7 +386,7 @@ let test_level protocol client =
   let* contract =
     originate client ~storage:"9999999" protocol ["opcodes"; "level"]
   in
-  (* Note: we're using mockup mode so no need to wait. *)
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   let bake () = Client.bake_for ~minimal_timestamp:true client in
   (* Now at level 1 *)
   let* () = transfer client ~contract in

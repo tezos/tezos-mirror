@@ -42,94 +42,6 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-module Types : sig
-  (** A Tezos level. *)
-  type level = int32
-
-  (** An index of a DAL slot header. *)
-  type slot_index = int
-
-  (** An ID associated to a slot or to its commitment. *)
-  type slot_id = {slot_level : level; slot_index : slot_index}
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
-     Use a bitset instead, when available in the standard library. *)
-
-  (** A set of slots, represented by a list of 0s and 1s. It is used for
-      instance to record which slots are deemed available by an attestor. *)
-  type slot_set = bool list
-
-  (** The set of attestable slots of an attestor (which may not necessarily be
-      in the committee for a given level). *)
-  type attestable_slots = Attestable_slots of slot_set | Not_in_committee
-
-  (** An index of a DAL shard *)
-  type shard_index = int
-
-  (** The status of a header a DAL node is aware of: *)
-  type header_status =
-    [ `Waiting_attestation
-      (** The slot header was included and applied in a finalized L1 block
-          but remains to be attested. *)
-    | `Attested
-      (** The slot header was included in an L1 block and attested. *)
-    | `Unattested
-      (** The slot header was included in an L1 block but not timely attested. *)
-    | `Not_selected
-      (** The slot header was included in an L1 block but was not selected as
-          the slot header for that slot index. *)
-    | `Unseen_or_not_finalized
-      (** The slot header was not seen in a *final* L1 block. For instance, this
-          could happen if the RPC `PATCH /commitments/<commitment>` was called
-          but the corresponding slot header was never included into a block; or
-          the slot header was included in a non-final (ie not agreed upon)
-          block. This means that the publish operation was not sent (yet) to L1,
-          or sent but not included (yet) in a block, or included in a not (yet)
-          final block. *)
-    ]
-
-  (** Profiles that operate on shards/slots. *)
-  type operator_profile =
-    | Attestor of Tezos_crypto.Signature.public_key_hash
-        (** [Attestor pkh] downloads all shards assigned to [pkh].
-            Used by bakers to attest availability of their assigned shards. *)
-    | Producer of {slot_index : int}
-        (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
-
-  (** List of operator profiles. It may contain dupicates as it represents profiles
-      provided by the user in unprocessed form. *)
-  type operator_profiles = operator_profile list
-
-  (** DAL node can track one or many profiles that correspond to various modes
-      that the DAL node would operate in. *)
-  type profiles =
-    | Bootstrap
-        (** The bootstrap profile facilitates peer discovery in the DAL network.
-            Note that bootstrap nodes are incompatible with attestor/producer profiles
-            as bootstrap nodes are expected to connect to all the meshes with degree 0. *)
-    | Operator of operator_profiles
-
-  (** Information associated to a slot header in the RPC services of the DAL
-      node. *)
-  type slot_header = {
-    slot_id : slot_id;
-    commitment : Cryptobox.Commitment.t;
-    status : header_status;
-  }
-
-  (** The [with_proof] flag is associated to shards computation. It indicates
-      whether we also compute shards' proofs or not. *)
-  type with_proof = {with_proof : bool}
-
-  val slot_id_encoding : slot_id Data_encoding.t
-
-  val header_status_encoding : header_status Data_encoding.t
-
-  val profiles_encoding : profiles Data_encoding.t
-
-  val with_proof_encoding : with_proof Data_encoding.t
-end
-
 (** Add the given slot in the node if not already present. The corresponding
     commitment is returned. See {!val:
     Slot_manager.add_commitment} for more details. *)
@@ -270,3 +182,156 @@ val monitor_shards :
   ; params : unit
   ; query : unit >
   service
+
+val version :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.Version.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+module P2P : sig
+  (** A service to initiate a connection with another point. *)
+  val post_connect :
+    < meth : [`POST]
+    ; input : P2p_point.Id.t
+    ; output : unit
+    ; prefix : unit
+    ; params : unit
+    ; query : < timeout : Ptime.Span.t option > >
+    service
+
+  val delete_disconnect_point :
+    < meth : [`DELETE]
+    ; input : unit
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * P2p_point.Id.t
+    ; query : < wait : bool > >
+    service
+
+  val delete_disconnect_peer :
+    < meth : [`DELETE]
+    ; input : unit
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * P2p_peer.Id.t
+    ; query : < wait : bool > >
+    service
+
+  val get_points :
+    < meth : [`GET]
+    ; input : unit
+    ; output : P2p_point.Id.t list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
+  val get_points_info :
+    < meth : [`GET]
+    ; input : unit
+    ; output : (P2p_point.Id.t * P2p_point.Info.t) list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
+  module Points : sig
+    val get_point_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_point.Info.t
+      ; prefix : unit
+      ; params : unit * P2p_point.Id.t
+      ; query : unit >
+      service
+  end
+
+  val get_peers :
+    < meth : [`GET]
+    ; input : unit
+    ; output : P2p_peer.Id.t list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
+  val get_peers_info :
+    < meth : [`GET]
+    ; input : unit
+    ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
+    ; prefix : unit
+    ; params : unit
+    ; query : < connected : bool > >
+    service
+
+  module Peers : sig
+    val get_peer_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : Types.P2P.Peer.Info.t
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : unit >
+      service
+  end
+
+  module Gossipsub : sig
+    val get_topics :
+      < meth : [`GET]
+      ; input : unit
+      ; output : Types.Topic.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
+    val get_topics_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
+    val get_connections :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Peer.t * Types.Gossipsub.connection) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
+    val get_scores :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Peer.t * Types.Score.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
+    val get_backoffs :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * (Types.Peer.t * Types.Time.t) list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
+    val get_message_cache :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (int64 * (Types.Topic.t * int) list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+  end
+end

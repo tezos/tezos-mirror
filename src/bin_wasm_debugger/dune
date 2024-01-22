@@ -7,24 +7,11 @@
  (package octez-smart-rollup-wasm-debugger)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.base
-  octez-libs.clic
-  octez-libs.tree-encoding
-  octez-libs.base.unix
-  yaml
-  octez-protocol-alpha-libs.client
-  octez-l2-libs.scoru-wasm
-  octez-l2-libs.scoru-wasm-helpers
-  octez-l2-libs.webassembly-interpreter
-  octez-l2-libs.webassembly-interpreter-extra
-  octez-version.value)
+  octez-smart-rollup-wasm-debugger-lib)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_scoru_wasm_helpers
-  -open Tezos_webassembly_interpreter
-  -open Tezos_webassembly_interpreter_extra))
+  -open Octez_smart_rollup_wasm_debugger_lib))

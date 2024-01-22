@@ -6,11 +6,13 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-libs.test-helpers
-  tezt
+  octez-libs.tezt-wrapper
   str
   bls12-381
   tezt-tezos
   tezt_ethereum
+  tezt_risc_v_sandbox
+  tezt_tx_kernel
   data-encoding
   octez-libs.base
   octez-libs.base.unix
@@ -18,6 +20,7 @@
   tezos-protocol-alpha.protocol
   tezos_scoru_wasm_regressions
   tezt_self_tests_tezt_lib
+  src_risc_v_pvm_test_tezt_lib
   src_proto_alpha_lib_sc_rollup_node_test_tezt_lib
   src_proto_alpha_lib_protocol_test_unit_tezt_lib
   src_proto_alpha_lib_protocol_test_regression_tezt_lib
@@ -80,7 +83,6 @@
   src_lib_shell_test_tezt_lib
   src_lib_scoru_wasm_test_tezt_lib
   src_lib_scoru_wasm_fast_test_tezt_lib
-  src_lib_scoru_sequencer_test_tezt_lib
   src_lib_sapling_test_tezt_lib
   src_lib_rpc_http_test_tezt_lib
   src_lib_requester_test_tezt_lib
@@ -115,15 +117,16 @@
   src_lib_benchmark_test_tezt_lib
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
   src_lib_base_unix_test_tezt_lib
-  src_lib_base_test_tezt_lib)
+  src_lib_base_test_tezt_lib
+  etherlink_bin_evm_node_test_tezt_lib)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_test_helpers
-  -open Tezt
-  -open Tezt.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_ethereum))

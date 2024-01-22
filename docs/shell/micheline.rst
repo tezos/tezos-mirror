@@ -22,12 +22,13 @@ one of the five following constructs:
 Primitives
 ~~~~~~~~~~
 
-Micheline primitives are character strings containing only
-alphanumeric or underscore (``_``) characters. Additional restrictions
-on primitives can also be put to achieve the equivalent of JSON and
-XML schemas; for example each protocol specifies a fixed list of
-Michelson primitives. This restriction impacts the way Micheline nodes
-are serialized to binary format (see `Binary serialization`_).
+Micheline primitives are character strings starting by an alphabetic
+or underscore (``_``) characters and containing only alphanumeric or
+underscore (``_``) characters. Additional restrictions on primitives
+can also be put to achieve the equivalent of JSON and XML schemas; for
+example each protocol specifies a fixed list of Michelson
+primitives. This restriction impacts the way Micheline nodes are
+serialized to binary format (see `Binary serialization`_).
 
 Annotations
 ~~~~~~~~~~~
@@ -139,7 +140,7 @@ Formally, Micheline nodes have the following BNF grammar::
   <natural> ::= [0-9]+
   <char> ::= \" | \r | \n | \t | \b | \\ | [^"\]
   <hexadecimal> ::= [0-9a-fA-F][0-9a-fA-F]
-  <primitive> ::= [a-zA-Z_0-9]+
+  <primitive> ::= [a-zA-Z_][a-zA-Z_0-9]*
   <annotation> ::= [@:$&%!?][_0-9a-zA-Z\.%@]*
 
   <node> ::= <integer> | <string> | <bytes> | <primitive application> | <sequence>

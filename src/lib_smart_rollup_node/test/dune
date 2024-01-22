@@ -28,7 +28,7 @@
   -open Octez_smart_rollup_node
   -open Octez_smart_rollup_node_test_helpers
   -open Octez_alcotezt)
- (modules canary))
+ (modules canary test_context_gc test_store_gc))
 
 (executable
  (name main)

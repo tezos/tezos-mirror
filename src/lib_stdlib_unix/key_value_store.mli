@@ -128,3 +128,14 @@ val read_values :
   ('dir, 'file, 'value) t ->
   ('dir * 'file) Seq.t ->
   ('dir * 'file * 'value tzresult) Seq_s.t
+
+(** Same as {!read_value} expect that this function returns whether the given
+    entry exists without reading it. *)
+val value_exists : ('dir, 'file, 'value) t -> 'dir -> 'file -> bool Lwt.t
+
+(** Same as {!read_values} expect that this function returns whether the given
+    entries exist without reading them. *)
+val values_exist :
+  ('dir, 'file, 'value) t ->
+  ('dir * 'file) Seq.t ->
+  ('dir * 'file * bool) Seq_s.t

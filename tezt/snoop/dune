@@ -1,5 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name main)
  (libraries
-   tezt-tezos)
- (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))
+  tezt
+  tezt-tezos)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos))

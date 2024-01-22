@@ -734,13 +734,13 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       let*? current_round =
         Baking_actions.compute_round current_proposal round_durations
       in
-      return {current_round; current_phase = Idle; delayed_prequorum = None}
+      return {current_round; current_phase = Idle; delayed_quorum = None}
     else
       return
         {
           Baking_state.current_round = Round.zero;
           current_phase = Idle;
-          delayed_prequorum = None;
+          delayed_quorum = None;
         }
   in
   let state = {global_state; level_state; round_state} in
@@ -774,7 +774,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
     match config.Baking_configuration.state_recorder with
     | Baking_configuration.Filesystem ->
         Baking_state.may_record_new_state ~previous_state:state ~new_state
-    | Baking_configuration.Disabled -> return_unit
+    | Baking_configuration.Memory -> return_unit
   in
   let*! state', action = State_transitions.step state event in
   let* state'' =

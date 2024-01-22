@@ -263,7 +263,7 @@ module Make_no_enc (Key : KeyS) = struct
     (* The empty vector is not correctly taken into account otherwise, since
        `pred zero` = `-1`, which is an invalid key according to
        {!invalid_key}. *)
-    if map.num_elements = Key.zero then Lwt.return []
+    if map.num_elements = Key.zero then Lwt.return_nil
     else (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
 
   let concat lhs rhs =

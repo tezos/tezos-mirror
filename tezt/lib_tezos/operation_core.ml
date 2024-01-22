@@ -25,7 +25,7 @@
 
 open Runnable.Syntax
 
-type consensus_kind = Attestation | Preattestation
+type consensus_kind = Attestation | Preattestation | Dal_attestation
 
 type kind =
   | Consensus of {kind : consensus_kind; chain_id : string}
@@ -44,7 +44,7 @@ type t = {
 
 let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
-  RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
+  Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
 
 let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
@@ -57,7 +57,7 @@ let raw ?protocol t client =
       match protocol with
       | None ->
           let* raw =
-            RPC.Client.call client
+            Client.RPC.call client
             @@ RPC.post_chain_block_helpers_forge_operations
                  ~data:(Data (json t))
                  ()
@@ -101,7 +101,10 @@ let sign ?protocol ({kind; signer; _} as t) client =
                 (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
             in
             let prefix =
-              match kind with Preattestation -> "\x12" | Attestation -> "\x13"
+              match kind with
+              | Preattestation -> "\x12"
+              | Attestation -> "\x13"
+              | Dal_attestation -> "\x14"
             in
             Tezos_crypto.Signature.Custom
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
@@ -111,6 +114,18 @@ let sign ?protocol ({kind; signer; _} as t) client =
       let* hex = hex ?protocol t client in
       let bytes = Hex.to_bytes hex in
       return (Account.sign_bytes ~watermark ~signer bytes)
+
+let signed_hex ?protocol ?signature t client =
+  let* signature =
+    match signature with
+    | None -> sign t client
+    | Some signature -> return signature
+  in
+  hex ?protocol ~signature t client
+
+let byte_size ?protocol ?signature t client =
+  let* hex = signed_hex ?protocol ?signature t client in
+  return (Bytes.length (Hex.to_bytes hex))
 
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 
@@ -125,17 +140,12 @@ let hash t client : [`OpHash of string] Lwt.t =
   return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_b58check hash))
 
 let spawn_inject ?(force = false) ?protocol ?signature t client =
-  let* signature =
-    match signature with
-    | None -> sign t client
-    | Some signature -> return signature
-  in
-  let* (`Hex op) = hex ?protocol ~signature t client in
+  let* (`Hex op) = signed_hex ?protocol ?signature t client in
   let inject_rpc =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
   in
-  return (RPC.Client.spawn client @@ inject_rpc (Data (`String op)))
+  return (Client.RPC.spawn client @@ inject_rpc (Data (`String op)))
 
 let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
     [`OpHash of string] Lwt.t =
@@ -194,11 +204,11 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
   in
   match error with
   | None ->
-      let* ophs = RPC.Client.call client rpc in
+      let* ophs = Client.RPC.call client rpc in
       let* () = waiter in
       return ophs
   | Some msg ->
-      let*? process = RPC.Client.spawn client rpc in
+      let*? process = Client.RPC.spawn client rpc in
       let* () = Process.check_error ~msg process in
       Lwt_list.map_s (fun op -> hash op client) t
 
@@ -206,7 +216,7 @@ let make_run_operation_input ?chain_id t client =
   let* chain_id =
     match chain_id with
     | Some chain_id -> return chain_id
-    | None -> RPC.(Client.call client (get_chain_chain_id ()))
+    | None -> Client.RPC.call client (RPC.get_chain_chain_id ())
   in
   (* The [run_operation] RPC does not check the signature. *)
   let signature = Tezos_crypto.Signature.zero in
@@ -244,7 +254,7 @@ module Consensus = struct
         round : int;
         block_payload_hash : string;
       }
-    | Dal_attestation of {attestation : bool array; level : int}
+    | Dal_attestation of {attestation : bool array; level : int; slot : int}
 
   let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
     Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
@@ -253,15 +263,17 @@ module Consensus = struct
 
   let preattestation = consensus ~kind:Preattestation
 
-  let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
+  let dal_attestation ~attestation ~level ~slot =
+    Dal_attestation {attestation; level; slot}
 
   let kind_to_string kind use_legacy_name =
     let name = function true -> "endorsement" | false -> "attestation" in
     match kind with
     | Attestation -> name use_legacy_name
     | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
+    | Dal_attestation -> "dal_attestation"
 
-  let json signer = function
+  let json = function
     | Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
       ->
         `O
@@ -272,7 +284,7 @@ module Consensus = struct
             ("round", Ezjsonm.int round);
             ("block_payload_hash", Ezjsonm.string block_payload_hash);
           ]
-    | Dal_attestation {attestation; level} ->
+    | Dal_attestation {attestation; level; slot} ->
         let string_of_bool_vector attestation =
           let aux (acc, n) b =
             let bit = if b then 1 else 0 in
@@ -283,13 +295,13 @@ module Consensus = struct
         `O
           [
             ("kind", Ezjsonm.string "dal_attestation");
-            ("attestor", Ezjsonm.string signer.Account.public_key_hash);
             ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
             ("level", Ezjsonm.int level);
+            ("slot", Ezjsonm.int slot);
           ]
 
   let operation ?branch ?chain_id ~signer consensus_operation client =
-    let json = `A [json signer consensus_operation] in
+    let json = `A [json consensus_operation] in
     let* branch =
       match branch with
       | None -> get_branch ~offset:0 client
@@ -297,19 +309,45 @@ module Consensus = struct
     in
     let* chain_id =
       match chain_id with
-      | None -> RPC.Client.call client @@ RPC.get_chain_chain_id ()
+      | None -> Client.RPC.call client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
     let kind =
       match consensus_operation with
       | Consensus {kind; _} -> kind
-      | Dal_attestation _ -> Attestation
+      | Dal_attestation _ -> Dal_attestation
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
     inject ?request ?force ?error op client
+
+  let get_slots ~level client =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+
+  let first_slot ~slots_json (delegate : Account.key) =
+    let open JSON in
+    match
+      List.find_opt
+        (fun slots ->
+          String.equal
+            (slots |-> "delegate" |> as_string)
+            delegate.public_key_hash)
+        (as_list slots_json)
+    with
+    | Some slots -> List.hd (slots |-> "slots" |> as_list) |> as_int
+    | None ->
+        Test.fail
+          "No slots found for %s in: %s"
+          delegate.public_key_hash
+          (JSON.encode slots_json)
+
+  let get_block_payload_hash client =
+    let* block_header =
+      Client.RPC.call client @@ RPC.get_chain_block_header ()
+    in
+    return JSON.(block_header |-> "payload_hash" |> as_string)
 end
 
 module Anonymous = struct
@@ -453,7 +491,7 @@ module Manager = struct
 
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:source.Account.public_key_hash
            ()
@@ -706,7 +744,33 @@ module Manager = struct
 
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in
-    RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
+    Client.RPC.call client @@ RPC.get_chain_block_hash ?chain ~block ()
+
+  let mk_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit ?dest
+      ?amount ?branch ?signer client =
+    let payload =
+      make
+        ?source
+        ?counter
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        (transfer ?dest ?amount ())
+    in
+    operation ?branch ?signer [payload] client
+
+  let inject_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit
+      ?dest ?amount ?request ?force ?branch ?signer ?error client =
+    let payload =
+      make
+        ?source
+        ?counter
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        (transfer ?dest ?amount ())
+    in
+    inject ?request ?force ?branch ?signer ?error [payload] client
 end
 
 let gas_limit_exceeded =
@@ -718,6 +782,22 @@ let conflict_error_with_needed_fee =
   rex
     {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. To replace the latter, this particular operation would need a total fee of at least ([\d]+) mutez\.|}
 
+let conflict_error_no_possible_fee =
+  rex
+    {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. The pre-existing operation cannot be replaced with the new one, even if fees were increased\. Try again after the next block has been baked\.|}
+
 let rejected_by_full_mempool_with_needed_fee =
   rex
     {|Operation ([\w\d]+) has been rejected because the mempool is full\. This specific operation would need a total fee of at least ([\d]+) mutez to be considered and propagated by the mempool of this particular node right now\. Note that if the node receives operations with a better fee over gas limit ratio in the future, the operation may be rejected even with the indicated fee, or it may be successfully injected but removed at a later date\.|}
+
+let rejected_by_full_mempool_no_possible_fee =
+  rex
+    {|Operation ([\w\d]+) has been rejected because the mempool is full\. The operation cannot be accepted by this node at the moment, regardless of its fee\. Try again after the next block has been baked\.|}
+
+let inject_error_check_recommended_fee ~loc ~rex ~expected_fee op client =
+  let* _oph, needed_fee = inject_and_capture2_stderr ~rex op client in
+  Check.(
+    (int_of_string needed_fee = expected_fee)
+      int
+      ~error_msg:("The recommended fee is %L but expected %R at " ^ loc)) ;
+  unit

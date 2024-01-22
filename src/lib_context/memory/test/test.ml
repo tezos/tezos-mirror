@@ -107,7 +107,7 @@ let test_hash =
            ch
            Context_hash.pp
            mh)
-    else Lwt.return ()
+    else Lwt.return_unit
   in
   List.map
     (fun n ->

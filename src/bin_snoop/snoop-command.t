@@ -1,7 +1,7 @@
 Missing config file prints
-  $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
+  $ ./main_snoop.exe benchmark interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed -E "s/seed=[0-9]+;/seed=SEED;/g" | sed s'/stats over all benchmarks:.*/stats <hidden>/'
   Benchmarking interpreter/N_IBlake2b with the following options:
-    { options = { seed=self-init;
+    { options = { seed=SEED;
                   bench #=1;
                   nsamples/bench=500;
                   minor_heap_size=262144 words;
@@ -23,6 +23,7 @@ Missing config file prints
     "compare": { "type_size": { "min": 1, "max": 15 } } }
   benchmarking 1/1
   stats <hidden>
+benchmarking 1/1
 benchmarking 1/1
 
 Generate empty config
@@ -87,6 +88,51 @@ Generate default config
               }
             },
             "children": [
+              {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
               {
                 "namespace": "intercept",
                 "config": {
@@ -195,6 +241,51 @@ Modify empty config
               }
             },
             "children": [
+              {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
               {
                 "namespace": "intercept",
                 "config": {
@@ -319,6 +410,51 @@ Test merge
               }
             },
             "children": [
+              {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
               {
                 "namespace": "intercept",
                 "config": {

@@ -49,7 +49,7 @@ struct
               cont @@ Error e
           (* If it's another kind of exn:
              something went wrong, re-throw it*)
-          | _ -> raise e))
+          | _ -> Lwt.reraise e))
 
   (* Stress test doesn't care about exceptions
      thrown out of functions.

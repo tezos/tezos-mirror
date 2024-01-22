@@ -98,7 +98,7 @@ let wrap addr n f =
 
 let main () =
   let rules =
-    match Tezt.Cli.options.log_level with
+    match Tezt.Cli.Logs.level with
     | Quiet | Error | Warn | Report -> None
     | Info | Debug -> Some "test.p2p.node -> info;"
   in

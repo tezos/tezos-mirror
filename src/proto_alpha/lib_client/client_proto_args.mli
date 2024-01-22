@@ -64,7 +64,7 @@ val delegate_arg : (Signature.Public_key_hash.t option, full) Tezos_clic.arg
 
 val max_priority_arg : (int option, full) Tezos_clic.arg
 
-val minimal_fees_arg : (Tez.tez, full) Tezos_clic.arg
+val minimal_fees_arg : (Tez.t, full) Tezos_clic.arg
 
 val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Tezos_clic.arg
 
@@ -120,6 +120,15 @@ val non_negative_parameter :
   unit -> (int, #Client_context.io) Tezos_clic.parameter
 
 val non_negative_param :
+  name:string ->
+  desc:string ->
+  ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
+  (int -> 'a, 'b) Tezos_clic.params
+
+val positive_int_parameter :
+  unit -> (int, #Client_context.io) Tezos_clic.parameter
+
+val positive_int_param :
   name:string ->
   desc:string ->
   ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
@@ -210,7 +219,7 @@ val raw_level_param :
   (Raw_level.t -> 'a, 'b) Tezos_clic.params
 
 val micheline_parameter :
-  (Tezos_micheline.Micheline_parser.node * string, full) Tezos_clic.parameter
+  (string Michelson_v1_parser.parser_result, full) Tezos_clic.parameter
 
 val unparsing_mode_arg :
   default:string -> (Script_ir_unparser.unparsing_mode, full) Tezos_clic.arg
@@ -228,6 +237,12 @@ val limit_of_staking_over_baking_millionth_arg :
 
 val edge_of_baking_over_staking_billionth_arg :
   (int option, full) Tezos_clic.arg
+
+val other_contracts_arg :
+  (RPC.Scripts.S.other_contract_description list option, full) Tezos_clic.arg
+
+val extra_big_maps_arg :
+  (RPC.Scripts.S.extra_big_map_description list option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter

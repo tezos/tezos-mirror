@@ -245,10 +245,10 @@ let get_chain global_db chain_id =
 let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
 
-let disconnect {global_db = {p2p; _}; _} peer_id =
+let disconnect ~reason {global_db = {p2p; _}; _} peer_id =
   match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> Lwt.return_unit
-  | Some conn -> P2p.disconnect p2p conn
+  | Some conn -> P2p.disconnect ~reason p2p conn
 
 let shutdown {p2p_readers; active_chains; _} =
   let open Lwt_syntax in
@@ -441,6 +441,7 @@ module Request = struct
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     ignore
       (P2p.broadcast
+         chain_db.global_db.p2p
          chain_db.reader_chain_db.active_connections
          (Get_current_head chain_id))
 
@@ -455,6 +456,7 @@ module Advertise = struct
   let current_head chain_db ?(mempool = Mempool.empty) head =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     P2p.broadcast
+      chain_db.global_db.p2p
       ~alt:
         (let if_conn conn =
            let {Connection_metadata.disable_mempool; _} =
@@ -483,6 +485,7 @@ module Advertise = struct
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let msg = Message.Current_head (chain_id, header, mempool) in
     P2p.broadcast
+      chain_db.global_db.p2p
       ~except:(fun conn -> not (acceptable_version conn))
       chain_db.reader_chain_db.active_connections
       msg

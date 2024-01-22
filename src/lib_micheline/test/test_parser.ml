@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -162,13 +163,31 @@ let%expect_test "Basic tokenizing" =
   [%expect {| Cannot tokenize --0 |}] ;
   tokenize "+0" ;
   [%expect {| Cannot tokenize +0 |}] ;
+  (* Ident *)
   tokenize "a" ;
   [%expect {| Ident "a" |}] ;
   tokenize "0a" ;
   [%expect {| Cannot tokenize 0a |}] ;
-  (* Ident *)
+  tokenize "_" ;
+  [%expect {| Ident "_" |}] ;
   tokenize "string" ;
   [%expect {| Ident "string" |}] ;
+  tokenize "_string" ;
+  [%expect {| Ident "_string" |}] ;
+  tokenize "string_42" ;
+  [%expect {| Ident "string_42" |}] ;
+  tokenize "_string_42" ;
+  [%expect {| Ident "_string_42" |}] ;
+  tokenize "STRING" ;
+  [%expect {| Ident "STRING" |}] ;
+  tokenize "STRING_42" ;
+  [%expect {| Ident "STRING_42" |}] ;
+  tokenize "_STRING_42" ;
+  [%expect {| Ident "_STRING_42" |}] ;
+  tokenize "STRING42" ;
+  [%expect {| Ident "STRING42" |}] ;
+  tokenize "_STRING42" ;
+  [%expect {| Ident "_STRING42" |}] ;
   (* Annotation *)
   tokenize "@my_pair" ;
   [%expect {| Annot "@my_pair" |}] ;
@@ -218,8 +237,6 @@ let%expect_test "Basic tokenizing" =
   tokenize "$$t" ;
   [%expect {|
     Annot "$"; Annot "$t" |}] ;
-  tokenize "_from" ;
-  [%expect {| Cannot tokenize _from |}] ;
   tokenize ".from" ;
   [%expect {| Cannot tokenize .from |}] ;
   (*NOTE: the cases below fail because ':' is used in the middle of the

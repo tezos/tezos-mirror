@@ -106,7 +106,7 @@ let commands () =
             checkpoint_hash
             checkpoint_level
         in
-        return ());
+        return_unit);
     command
       ~group
       ~desc:
@@ -126,7 +126,7 @@ let commands () =
         let*! () =
           cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
         in
-        return ());
+        return_unit);
     command
       ~group
       ~desc:
@@ -149,7 +149,7 @@ let commands () =
             Operation_hash.pp
             op_hash
         in
-        return ());
+        return_unit);
     command
       ~group
       ~desc:"Clear the set of banned operations."
@@ -163,5 +163,5 @@ let commands () =
             ()
         in
         let*! () = cctxt#message "All operations are now unbanned." in
-        return ());
+        return_unit);
   ]

@@ -60,49 +60,34 @@ let test_encoding_retrocompatible name operation =
     ~__FILE__
     ~title:(sf "Test retro compatibility for format of %s" name)
     ~tags:["retro"; name]
-  @@ fun protocol ->
-  let* client = init_client protocol
-  and* client_prev =
-    match Protocol.previous_protocol protocol with
-    | None -> return None
-    | Some proto ->
-        let* c = init_client proto in
-        return (Some c)
-  and* client_next =
-    match Protocol.next_protocol protocol with
-    | None -> return None
-    | Some proto ->
-        let* c = init_client proto in
-        return (Some c)
+    ~uses:(fun _protocol -> [Constant.octez_codec])
+    ~supports:Has_predecessor
+  @@ Protocol.with_predecessor
+  @@ fun ~previous_protocol ~protocol ->
+  let* current = init_client protocol
+  and* previous = init_client previous_protocol in
+  let* operation = Operation_core.Manager.operation operation current.client in
+  Log.info
+    "Checking that unsigned %s encoded in protocol %s can be decoded by \
+     protocol %s"
+    name
+    (Protocol.name current.proto)
+    (Protocol.name previous.proto) ;
+  let* hex_unsigned_current =
+    encode current.proto "operation.unsigned" (Operation_core.json operation)
   in
-  let* operation = Operation_core.Manager.operation operation client.client in
-  let do_pair current next =
-    Log.info
-      "Checking that unsigned %s encoded in protocol %s can be decoded by \
-       protocol %s"
-      name
-      (Protocol.name next.proto)
-      (Protocol.name current.proto) ;
-    let* hex_unsigned_next =
-      encode next.proto "operation.unsigned" (Operation_core.json operation)
-    in
-    let* _ = decode current.proto "operation.unsigned" hex_unsigned_next in
-    Log.info
-      "Checking that signed %s encoded in protocol %s can be decoded by \
-       protocol %s"
-      name
-      (Protocol.name current.proto)
-      (Protocol.name next.proto) ;
-    let* hex_signed_current =
-      encode_and_sign_operation current.proto current.client operation
-    in
-    let* _ = decode next.proto "operation" hex_signed_current in
-    unit
+  let* _ = decode previous.proto "operation.unsigned" hex_unsigned_current in
+  Log.info
+    "Checking that signed %s encoded in protocol %s can be decoded by protocol \
+     %s"
+    name
+    (Protocol.name previous.proto)
+    (Protocol.name current.proto) ;
+  let* hex_signed_previous =
+    encode_and_sign_operation previous.proto previous.client operation
   in
-  let* () =
-    match client_prev with None -> unit | Some prev -> do_pair prev client
-  in
-  match client_next with None -> unit | Some next -> do_pair client next
+  let* _ = decode current.proto "operation" hex_signed_previous in
+  unit
 
 let simple_transfer =
   test_encoding_retrocompatible "transfer"

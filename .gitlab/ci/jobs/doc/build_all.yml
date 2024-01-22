@@ -5,14 +5,15 @@
 documentation:build_all:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
     - .tags_template__build
   stage: build
   needs: [trigger]
   before_script:
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-build-all
+    - ./.gitlab/ci/jobs/doc/documentation:build_all.sh
   artifacts:
     expose_as: 'Documentation - excluding old protocols'
     paths:

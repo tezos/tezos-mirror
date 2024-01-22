@@ -1,0 +1,6 @@
+Package: @PKG@
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINT@
+Description: The Octez Baker daemons
+Depends: bash, @DPKG@-node (>=@VERSION@), @DEPENDS@

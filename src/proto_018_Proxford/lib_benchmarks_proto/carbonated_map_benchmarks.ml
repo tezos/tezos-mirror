@@ -90,10 +90,9 @@ module Fold_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
-      ~model:
-        (Model.affine
-           ~intercept:(fv "fold_const")
-           ~coeff:(fv "fold_cost_per_item"))
+      (Model.affine
+         ~intercept:(fv "fold_const")
+         ~coeff:(fv "fold_cost_per_item"))
 
   let create_benchmark ~rng_state config =
     let module M = Carbonated_map.Make (Alpha_context_gas) (Int) in
@@ -122,7 +121,7 @@ module Fold_benchmark : Benchmark.S = struct
     in
     let workload = {size = M.size map} in
     let closure () =
-      ignore @@ M.fold_e ctxt (fun ctxt _ _ _ -> ok ((), ctxt)) () map
+      ignore @@ M.fold_e ctxt (fun ctxt _ _ _ -> Ok ((), ctxt)) () map
     in
     Generator.Plain {workload; closure}
 end
@@ -174,7 +173,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let model =
       Model.make
         ~conv:(fun () -> ())
-        ~model:(Model.unknown_const1 ~const:(compare_var CS.type_name))
+        (Model.unknown_const1 ~const:(compare_var CS.type_name))
 
     let create_benchmark ~rng_state _conf =
       let key = CS.sampler rng_state in
@@ -210,12 +209,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
        [intercept + (log2 size * compare_cost) + (log2 size * traversal_overhead)]
      *)
-    let find_model ?intercept ?traversal_overhead name =
+    let find_model name =
       let open Tezos_benchmark in
-      let traversal_overhead =
-        Option.value ~default:(ns "traversal_overhead") traversal_overhead
-      in
-      let intercept = Option.value ~default:fv_intercept intercept in
+      let traversal_overhead = ns "traversal_overhead" in
+      let intercept = fv_intercept in
       let module M = struct
         type arg_type = int * unit
 
@@ -242,7 +239,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
       end in
       (module M : Model.Model_impl with type arg_type = int * unit)
 
-    let model = Model.make ~conv:(fun {size} -> (size, ())) ~model:find_model
+    let model = Model.make ~conv:(fun {size} -> (size, ())) find_model
 
     let create_benchmark ~rng_state (config : config) =
       let _, list =
@@ -310,7 +307,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
     let model =
       Model.make
         ~conv:(fun () -> ())
-        ~model:(Model.unknown_const1 ~const:Find.fv_intercept)
+        (Model.unknown_const1 ~const:Find.fv_intercept)
 
     let create_benchmark ~rng_state (_config : config) =
       let ctxt = make_context ~rng_state in

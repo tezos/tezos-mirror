@@ -57,7 +57,7 @@ module Next : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "skip_list"
 
   let config_encoding =
     let open Data_encoding in
@@ -70,7 +70,8 @@ module Next : Benchmark.S = struct
   let workload_to_vector len =
     Sparse_vec.String.of_list [("len", float_of_int @@ len)]
 
-  let model = Model.make ~conv:(fun x -> (x, ())) ~model:Model.logn
+  let model =
+    Model.make ~conv:(fun x -> (x, ())) Model.logn ~takes_saturation_reprs:true
 
   let create_skip_list_of_len len =
     let rec go n cell =
@@ -111,7 +112,7 @@ module Hash_cell : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "skip_list"
 
   include Skip_list
   module Hash = Sc_rollup_inbox_repr.Hash
@@ -148,8 +149,9 @@ module Hash_cell : Benchmark.S = struct
 
   let model =
     Model.make
+      ~takes_saturation_reprs:true
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
-      ~model:Model.affine
+      Model.affine
 
   let create_benchmark ~rng_state conf =
     (* Since the model we want to infer is logarithmic in

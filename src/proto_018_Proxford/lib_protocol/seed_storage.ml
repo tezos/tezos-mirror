@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt_result_syntax
-
 type seed_computation_status =
   | Nonce_revelation_stage
   | Vdf_revelation_stage of {
@@ -108,9 +106,11 @@ let () =
     (fun () -> Already_accepted)
 
 let purge_nonces_and_get_unrevealed ctxt ~cycle =
+  let open Lwt_result_syntax in
   let levels = Level_storage.levels_with_commitments_in_cycle ctxt cycle in
   let combine (c, unrevealed) level =
-    Storage.Seed.Nonce.get c level >>=? function
+    let* seed = Storage.Seed.Nonce.get c level in
+    match seed with
     | Revealed _ ->
         let+ c = Storage.Seed.Nonce.remove_existing c level in
         (c, unrevealed)
@@ -121,6 +121,7 @@ let purge_nonces_and_get_unrevealed ctxt ~cycle =
   List.fold_left_es combine (ctxt, []) levels
 
 let compute_randao ctxt =
+  let open Lwt_result_syntax in
   let current_cycle = (Level_storage.current ctxt).cycle in
   let preserved = Constants_storage.preserved_cycles ctxt in
   let cycle_computed = Cycle_repr.add current_cycle (preserved + 1) in
@@ -136,7 +137,8 @@ let compute_randao ctxt =
       let* prev_seed = Storage.Seed.For_cycle.get ctxt prev_cycle_computed in
       (* Generate preserved seed by updating previous preserved seed with current revealed nonces. *)
       let combine (c, random_seed) level =
-        Storage.Seed.Nonce.get c level >>=? function
+        let* seed = Storage.Seed.Nonce.get c level in
+        match seed with
         | Revealed nonce -> return (c, Seed_repr.update_seed random_seed nonce)
         | Unrevealed _ -> return (c, random_seed)
       in
@@ -146,6 +148,7 @@ let compute_randao ctxt =
   | _, _ -> return ctxt
 
 let get_seed_computation_status ctxt =
+  let open Lwt_result_syntax in
   let current_level = Level_storage.current ctxt in
   let current_cycle = current_level.cycle in
   let nonce_revelation_threshold =
@@ -168,38 +171,36 @@ let get_seed_computation_status ctxt =
     | VDF_seed -> return Computation_finished
 
 let check_vdf ctxt vdf_solution =
+  let open Lwt_result_syntax in
   let* r = get_seed_computation_status ctxt in
-  let*? seed_discriminant, seed_challenge =
-    match r with
-    | Computation_finished -> error Already_accepted
-    | Nonce_revelation_stage -> error Too_early_revelation
-    | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-        ok (seed_discriminant, seed_challenge)
-  in
-  (* To avoid recomputing the discriminant and challenge for every (potentially
-   * invalid) submission in a cycle, we compute them once and store them *)
-  let* stored = Storage.Seed.VDF_setup.find ctxt in
-  let* ctxt, setup =
-    match stored with
-    | None ->
-        let setup =
-          Seed_repr.generate_vdf_setup ~seed_discriminant ~seed_challenge
-        in
-        let*! ctxt = Storage.Seed.VDF_setup.add ctxt setup in
-        return (ctxt, setup)
-    | Some setup -> return (ctxt, setup)
-  in
-  let*? () =
-    error_unless
-      (Option.value
-         ~default:false
-         (Seed_repr.verify
-            setup
-            (Constants_storage.vdf_difficulty ctxt)
-            vdf_solution))
-      Unverified_vdf
-  in
-  return ()
+  match r with
+  | Computation_finished -> tzfail Already_accepted
+  | Nonce_revelation_stage -> tzfail Too_early_revelation
+  | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
+      (* To avoid recomputing the discriminant and challenge for every (potentially
+         * invalid) submission in a cycle, we compute them once and store them *)
+      let* stored = Storage.Seed.VDF_setup.find ctxt in
+      let* ctxt, setup =
+        match stored with
+        | None ->
+            let setup =
+              Seed_repr.generate_vdf_setup ~seed_discriminant ~seed_challenge
+            in
+            let*! ctxt = Storage.Seed.VDF_setup.add ctxt setup in
+            return (ctxt, setup)
+        | Some setup -> return (ctxt, setup)
+      in
+      let*? () =
+        error_unless
+          (Option.value
+             ~default:false
+             (Seed_repr.verify
+                setup
+                (Constants_storage.vdf_difficulty ctxt)
+                vdf_solution))
+          Unverified_vdf
+      in
+      return_unit
 
 let update_seed ctxt vdf_solution =
   let open Lwt_result_syntax in
@@ -215,8 +216,9 @@ let update_seed ctxt vdf_solution =
 let raw_for_cycle = Storage.Seed.For_cycle.get
 
 let for_cycle ctxt cycle =
+  let open Lwt_result_syntax in
   let preserved = Constants_storage.preserved_cycles ctxt in
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+  let max_slashing_period = Constants_repr.max_slashing_period in
   let current_cycle = (Level_storage.current ctxt).cycle in
   let latest =
     if Cycle_repr.(current_cycle = root) then
@@ -236,18 +238,22 @@ let for_cycle ctxt cycle =
   Storage.Seed.For_cycle.get ctxt cycle
 
 let init ?initial_seed ctxt =
+  let open Lwt_result_syntax in
   let preserved = Constants_storage.preserved_cycles ctxt in
   let* ctxt = Storage.Seed_status.init ctxt Seed_repr.RANDAO_seed in
-  List.fold_left_es
-    (fun (c, ctxt) seed ->
-      let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
-      let+ ctxt = Storage.Seed.For_cycle.init ctxt cycle seed in
-      (c + 1, ctxt))
-    (0, ctxt)
-    (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
-  >|=? snd
+  let+ (_ : int), ctxt =
+    List.fold_left_es
+      (fun (c, ctxt) seed ->
+        let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
+        let+ ctxt = Storage.Seed.For_cycle.init ctxt cycle seed in
+        (c + 1, ctxt))
+      (0, ctxt)
+      (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
+  in
+  ctxt
 
 let cycle_end ctxt last_cycle =
+  let open Lwt_result_syntax in
   let*! ctxt = Storage.Seed.VDF_setup.remove ctxt in
   (* NB: the clearing of past seeds is done elsewhere by the caller *)
   match Cycle_repr.pred last_cycle with

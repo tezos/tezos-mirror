@@ -14,6 +14,8 @@
 .build_deb_packages:
   stage: publish_release
   image: ${CI_REGISTRY}/tezos/docker-images/ci-package:latest-ubuntu@sha256:76c894f509b84e106c9d056882c63cb497a2778f7c7dbbd1c73abe2568ee446e
+  extends:
+    - .tags_template__no_gcp
   needs:
     - "build:static-x86_64-linux-binaries"
   rules:
@@ -37,6 +39,8 @@
 .build_rpm_packages:
   stage: publish_release
   image: ${CI_REGISTRY}/tezos/docker-images/ci-package:latest-fedora@sha256:35bfacc001e4c5247679e2f79c36ab1c83bd893a1e909c5c1afd1beff44c6895
+  extends:
+    - .tags_template__no_gcp
   needs:
     - "build:static-x86_64-linux-binaries"
   variables:

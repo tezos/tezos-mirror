@@ -36,8 +36,9 @@ open Alpha_context
 open Script_interpreter
 
 let test_context () =
-  Context.init3 () >>=? fun (b, _cs) ->
-  Incremental.begin_construction b >>=? fun v ->
+  let open Lwt_result_syntax in
+  let* b, _cs = Context.init3 () in
+  let* v = Incremental.begin_construction b in
   return (Incremental.alpha_ctxt v)
 
 let logger =
@@ -51,16 +52,25 @@ let logger =
 
       let log_control _ = ()
 
-      let get_log () = Lwt.return (Ok None)
+      let get_log () = Lwt_result_syntax.return_none
     end)
 
 let run_step ctxt code accu stack =
+  let open Lwt_result_syntax in
   let open Script_interpreter in
   let open Contract_helpers in
-  Internals.step_descr None ctxt default_step_constants code accu stack
-  >>=? fun ((_, _, ctxt') as r) ->
-  Internals.step_descr (Some logger) ctxt default_step_constants code accu stack
-  >>=? fun (_, _, ctxt'') ->
+  let* ((_, _, ctxt') as r) =
+    Internals.step_descr None ctxt default_step_constants code accu stack
+  in
+  let* _, _, ctxt'' =
+    Internals.step_descr
+      (Some logger)
+      ctxt
+      default_step_constants
+      code
+      accu
+      stack
+  in
   if Gas.(remaining_operation_gas ctxt' <> remaining_operation_gas ctxt'') then
     Alcotest.failf "Logging should not have an impact on gas consumption." ;
   return r
@@ -68,15 +78,18 @@ let run_step ctxt code accu stack =
 (** Runs a script with an ill-typed parameter and verifies that a
     Bad_contract_parameter error is returned. *)
 let test_bad_contract_parameter () =
-  test_context () >>=? fun ctx ->
+  let open Lwt_result_syntax in
+  let* ctx = test_context () in
   (* Run script with a parameter of wrong type *)
-  Contract_helpers.run_script
-    ctx
-    "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
-    ~storage:"Unit"
-    ~parameter:"0"
-    ()
-  >>= function
+  let*! result =
+    Contract_helpers.run_script
+      ctx
+      "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
+      ~storage:"Unit"
+      ~parameter:"0"
+      ()
+  in
+  match result with
   | Ok _ -> Alcotest.fail "expected an error"
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
       Alcotest.(check Testable.contract)
@@ -88,17 +101,20 @@ let test_bad_contract_parameter () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let test_multiplication_close_to_overflow_passes () =
-  test_context () >>=? fun ctx ->
+  let open Lwt_result_syntax in
+  let* ctx = test_context () in
   (* Get sure that multiplication deals with numbers between 2^62 and
      2^63 without overflowing *)
-  Contract_helpers.run_script
-    ctx
-    "{parameter unit;storage unit;code {DROP; PUSH mutez 2944023901536524477; \
-     PUSH nat 2; MUL; DROP; UNIT; NIL operation; PAIR}}"
-    ~storage:"Unit"
-    ~parameter:"Unit"
-    ()
-  >>= function
+  let*! result =
+    Contract_helpers.run_script
+      ctx
+      "{parameter unit;storage unit;code {DROP; PUSH mutez \
+       2944023901536524477; PUSH nat 2; MUL; DROP; UNIT; NIL operation; PAIR}}"
+      ~storage:"Unit"
+      ~parameter:"Unit"
+      ()
+  in
+  match result with
   | Ok _ -> return_unit
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
@@ -117,8 +133,9 @@ let dummy_loc = -1
     calls which is larger than the stack size. *)
 
 let test_stack_overflow () =
+  let open Lwt_result_syntax in
   let open Script_typed_ir in
-  test_context () >>=? fun ctxt ->
+  let* ctxt = test_context () in
   (* Set the gas counter to the maximum value *)
   let ctxt =
     Gas.update_remaining_operation_gas ctxt
@@ -133,8 +150,10 @@ let test_stack_overflow () =
     in
     aux n (IHalt dummy_loc)
   in
-  run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
-  >>= function
+  let*! result =
+    run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
+  in
+  match result with
   | Ok _ -> return_unit
   | Error trace ->
       let trace_string =
@@ -147,8 +166,9 @@ let test_stack_overflow () =
     instruction (IBig_map_mem) for which the interpreter calls Lwt.bind. *)
 
 let test_stack_overflow_in_lwt () =
+  let open Lwt_result_syntax in
   let open Script_typed_ir in
-  test_context () >>=? fun ctxt ->
+  let* ctxt = test_context () in
   let ctxt =
     Gas.update_remaining_operation_gas ctxt
     @@ Gas.fp_of_milligas_int (Saturation_repr.saturated :> int)
@@ -173,7 +193,8 @@ let test_stack_overflow_in_lwt () =
     aux n (IDrop (dummy_loc, IHalt dummy_loc))
   in
   let script = push_empty_big_map (large_mem_seq 1_000_000) in
-  run_step ctxt (descr script) EmptyCell EmptyCell >>= function
+  let*! result = run_step ctxt (descr script) EmptyCell EmptyCell in
+  match result with
   | Ok _ -> return_unit
   | Error trace ->
       let trace_string =
@@ -241,6 +262,7 @@ module Test_map_instr_on_options = struct
       } |}
 
   let run_test_map_opt_script param {prev; total} =
+    let open Lwt_result_syntax in
     let storage =
       Option.fold
         ~none:(Format.sprintf "Pair None %d" total)
@@ -250,7 +272,7 @@ module Test_map_instr_on_options = struct
     let parameter =
       Option.fold ~none:"None" ~some:(Format.sprintf "Some %d") param
     in
-    test_context () >>=? fun ctxt ->
+    let* ctxt = test_context () in
     Contract_helpers.run_script
       ctxt
       test_map_option_script
@@ -269,33 +291,38 @@ module Test_map_instr_on_options = struct
         {prev = Some (Z.to_int prev); total = Z.to_int total}
     | _ -> QCheck2.assume_fail ()
 
-  let assertions storage_before storage_after = function
+  let assertions storage_before storage_after =
+    let open Lwt_result_syntax in
+    function
     | None ->
-        Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int storage_after.prev
-        >>=? fun () ->
+        let* () =
+          Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int storage_after.prev
+        in
         Assert.equal_int ~loc:__LOC__ storage_before.total storage_after.total
     | Some input ->
-        Assert.get_some ~loc:__LOC__ storage_after.prev >>=? fun prev_aft ->
-        Assert.equal_int ~loc:__LOC__ input prev_aft >>=? fun () ->
+        let* prev_aft = Assert.get_some ~loc:__LOC__ storage_after.prev in
+        let* () = Assert.equal_int ~loc:__LOC__ input prev_aft in
         Assert.equal_int
           ~loc:__LOC__
           (storage_before.total + input)
           storage_after.total
 
   let test_mapping (input, prev, total) =
+    let open Lwt_result_syntax in
     let storage_before = {prev; total} in
-    run_test_map_opt_script input storage_before >>=? fun ({storage; _}, _) ->
+    let* {storage; _}, _ = run_test_map_opt_script input storage_before in
     let new_storage = assume_storage_shape (Micheline.root storage) in
     assertions storage_before new_storage input
 end
 
 let test_contract path storage param ~entrypoint_str ~ok ~ko =
+  let open Lwt_result_syntax in
   let entrypoint =
     match entrypoint_str with
     | None -> Entrypoint.default
     | Some str -> Entrypoint.of_string_strict_exn str
   in
-  test_context () >>=? fun ctx ->
+  let* ctx = test_context () in
   let read_file filename =
     let ch = open_in filename in
     let s = really_input_string ch (in_channel_length ch) in
@@ -303,16 +330,16 @@ let test_contract path storage param ~entrypoint_str ~ok ~ko =
     s
   in
   let script = read_file path in
-  Contract_helpers.run_script
-    ctx
-    script
-    ~storage
-    ~parameter:param
-    ~entrypoint
-    ()
-  >>= function
-  | Ok (res, _) -> ok res
-  | Error t -> ko t
+  let*! result =
+    Contract_helpers.run_script
+      ctx
+      script
+      ~storage
+      ~parameter:param
+      ~entrypoint
+      ()
+  in
+  match result with Ok (res, _) -> ok res | Error t -> ko t
 
 let fail_with_trace trace =
   Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace trace

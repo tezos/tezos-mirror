@@ -41,16 +41,17 @@ let test_constants_consistency () =
     [constants_mainnet; constants_sandbox; constants_test]
 
 let test_max_operations_ttl () =
+  let open Lwt_result_wrap_syntax in
   let open Protocol in
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
 
      [minimal_time_between_blocks *  max_operations_time_to_live = 3600] *)
   let constants = Default_parameters.constants_mainnet in
-  Environment.wrap_tzresult
-    (Alpha_context.Period.mult
-       (Int32.of_int constants.max_operations_time_to_live)
-       constants.minimal_block_delay)
-  >>?= fun result ->
+  let*?@ result =
+    Alpha_context.Period.mult
+      (Int32.of_int constants.max_operations_time_to_live)
+      constants.minimal_block_delay
+  in
   Assert.equal
     ~loc:__LOC__
     (fun x y -> Alpha_context.Period.compare x y = 0)
@@ -121,11 +122,13 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
 let test_sc_rollup_max_commitment_storage_size () =
+  let open Lwt_result_syntax in
   let open Protocol in
-  Assert.get_some
-    ~loc:__LOC__
-    (Sc_rollup_repr.Number_of_ticks.of_value 1232909L)
-  >>=? fun number_of_ticks ->
+  let* number_of_ticks =
+    Assert.get_some
+      ~loc:__LOC__
+      (Sc_rollup_repr.Number_of_ticks.of_value 1232909L)
+  in
   let commitment =
     Sc_rollup_commitment_repr.
       {
@@ -177,6 +180,7 @@ let test_sc_rollup_max_commitment_storage_size () =
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
 let liquidity_baking_subsidy_param () =
+  let open Lwt_result_syntax in
   let constants = Default_parameters.constants_mainnet in
   let get_reward =
     Protocol.Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
@@ -185,24 +189,26 @@ let liquidity_baking_subsidy_param () =
   let baking_reward_bonus_per_slot =
     get_reward ~reward_kind:Baking_reward_bonus_per_slot
   in
-  baking_reward_bonus_per_slot
-  *? Int64.of_int (constants.consensus_committee_size / 3)
-  >>?= fun baking_reward_bonus ->
+  let*? baking_reward_bonus =
+    baking_reward_bonus_per_slot
+    *? Int64.of_int (constants.consensus_committee_size / 3)
+  in
   let baking_reward_fixed_portion =
     get_reward ~reward_kind:Baking_reward_fixed_portion
   in
-  baking_reward_fixed_portion +? baking_reward_bonus >>?= fun baking_rewards ->
+  let*? baking_rewards = baking_reward_fixed_portion +? baking_reward_bonus in
   let attesting_reward_per_slot =
     get_reward ~reward_kind:Attesting_reward_per_slot
   in
-  attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
-  >>?= fun validators_rewards ->
-  baking_rewards +? validators_rewards >>?= fun total_rewards ->
-  total_rewards /? 16L >>?= fun expected_subsidy ->
+  let*? validators_rewards =
+    attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
+  in
+  let*? total_rewards = baking_rewards +? validators_rewards in
+  let expected_subsidy = total_rewards /! 16L in
   let liquidity_baking_subsidy =
     get_reward ~reward_kind:Liquidity_baking_subsidy
   in
-  liquidity_baking_subsidy -? expected_subsidy >>?= fun diff ->
+  let*? diff = liquidity_baking_subsidy -? expected_subsidy in
   let max_diff = 1000 (* mutez *) in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff
 

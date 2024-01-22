@@ -101,17 +101,23 @@ module Handler = struct
     in
     return (go (), stopper)
 
-  (* [gossipsub_app_messages_validation cryptobox message message_id] allows
-     checking whether the given [message] identified by [message_id] is valid
-     with the current [cryptobox] parameters. The validity check is done by
-     verifying that the shard in the message effectively belongs to the
+  (* [gossipsub_app_message_payload_validation cryptobox message message_id]
+     allows checking whether the given [message] identified by [message_id] is
+     valid with the current [cryptobox] parameters. The validity check is done
+     by verifying that the shard in the message effectively belongs to the
      commitment given by [message_id]. *)
-  let gossipsub_app_messages_validation cryptobox message message_id =
-    let open Gossipsub in
-    let {share; shard_proof} = message in
-    let {commitment; shard_index; _} = message_id in
+  let gossipsub_app_message_payload_validation cryptobox message_id message =
+    let Types.Message.{share; shard_proof} = message in
+    let Types.Message_id.{commitment; shard_index; _} = message_id in
     let shard = Cryptobox.{share; index = shard_index} in
-    match Cryptobox.verify_shard cryptobox commitment shard shard_proof with
+    let res =
+      Dal_metrics.sample_time
+        ~sampling_frequency:Constants.shards_verification_sampling_frequency
+        ~metric_updater:Dal_metrics.update_shards_verification_time
+        ~to_sample:(fun () ->
+          Cryptobox.verify_shard cryptobox commitment shard shard_proof)
+    in
+    match res with
     | Ok () -> `Valid
     | Error err ->
         let err =
@@ -140,6 +146,70 @@ module Handler = struct
             message_validation_error
             (message_id, err)) ;
         `Invalid
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
+
+     We should check:
+
+     - That the commitment (slot index for the given level if the commitment
+       field is dropped from message id) is waiting for attestation;
+
+     - That the included shard index is indeed assigned to the included pkh;
+
+     - That the bounds on the slot/shard indexes are respected.
+  *)
+  let gossipsub_message_id_validation _ctxt _cryptobox _message_id = `Valid
+
+  (* [gossipsub_app_messages_validation ctxt cryptobox head_level
+     attestation_lag ?message ~message_id ()] checks for the validity of the
+     given message (if any) and message id.
+
+     First, the message id's validity is checked if the application cares about
+     it and is not outdated (Otherwise `Unknown or `Outdated is returned,
+     respectively). This is done thanks to
+     {!gossipsub_message_id_validation}. Then, if a message is given,
+     {!gossipsub_app_message_payload_validation} is used to check its
+     validity. *)
+  let gossipsub_app_messages_validation ctxt cryptobox head_level
+      attestation_lag ?message ~message_id () =
+    if
+      Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
+    then
+      (* 1. As bootstrap nodes advertise their profiles to attester and producer
+         nodes, they shouldn't receive messages or messages ids. If this
+         happens, received data are considered as spam (invalid), and the remote
+         peer might be punished, depending on the Gossipsub implementation. *)
+      `Invalid
+    else
+      (* Have some slack for outdated messages. *)
+      let slack = 4 in
+      if
+        Int32.(
+          sub head_level message_id.Types.Message_id.level
+          > of_int (attestation_lag + slack))
+      then
+        (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
+           should only be used for the dissemination of fresh data. Old data could
+           be retrieved using another method. *)
+        `Outdated
+      else
+        match gossipsub_message_id_validation ctxt cryptobox message_id with
+        | `Valid ->
+            (* 3. Only check for message validity if the message_id is valid. *)
+            Option.fold
+              message
+              ~none:`Valid
+              ~some:
+                (gossipsub_app_message_payload_validation cryptobox message_id)
+        | other ->
+            (* 4. In the case the message id is not Valid.
+
+               FIXME: https://gitlab.com/tezos/tezos/-/issues/6460
+
+               This probably include cases where the message is in the future, in
+               which case we might return `Unknown for the moment. But then, when is
+               the message revalidated? *)
+            other
 
   let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
@@ -176,18 +246,14 @@ module Handler = struct
             in
             return @@ Node_context.set_profile_ctxt ctxt pctxt
           in
-          Node_context.set_ready
-            ctxt
-            plugin
-            cryptobox
-            proto_parameters
-            block_header.Block_header.shell.proto_level ;
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
-
-             The hook below should be called each time cryptobox parameters
-             change. *)
-          Gossipsub.Worker.Validate_message_hook.set
-            (gossipsub_app_messages_validation cryptobox) ;
+          let*? () =
+            Node_context.set_ready
+              ctxt
+              plugin
+              cryptobox
+              proto_parameters
+              block_header.Block_header.shell.proto_level
+          in
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
@@ -234,6 +300,7 @@ module Handler = struct
       | Starting -> return_unit
       | Ready ready_ctxt ->
           let head_level = header.shell.level in
+          Dal_metrics.new_layer1_head ~head_level ;
           let*! () =
             Event.(emit layer1_node_new_head (head_hash, head_level))
           in
@@ -248,6 +315,13 @@ module Handler = struct
                 } =
             ready_ctxt
           in
+          Gossipsub.Worker.Validate_message_hook.set
+            (gossipsub_app_messages_validation
+               ctxt
+               cryptobox
+               head_level
+               proto_parameters.attestation_lag) ;
+
           let process_block block_proto block_level =
             let block = `Level block_level in
             let* block_info =
@@ -256,6 +330,7 @@ module Handler = struct
             let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
               Slot_manager.store_slot_headers
+                ~number_of_slots:proto_parameters.number_of_slots
                 ~block_level
                 slot_headers
                 (Node_context.get_store ctxt)
@@ -310,6 +385,7 @@ module Handler = struct
                 (Node_context.get_gs_worker ctxt)
                 committee
             in
+            Dal_metrics.layer1_block_finalized ~block_level ;
             let*! () = Event.(emit layer1_node_final_block block_level) in
             may_update_plugin
               cctxt
@@ -404,7 +480,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
     let save_and_notify =
       Store.Shards.save_and_notify shard_store shards_watcher
     in
-    fun ({share; _} : message) ({commitment; shard_index; _} : message_id) ->
+    fun Types.Message.{share; _} Types.Message_id.{commitment; shard_index; _} ->
       Seq.return {Cryptobox.share; index = shard_index}
       |> save_and_notify commitment |> Errors.to_tzresult
   in
@@ -426,10 +502,10 @@ let resolve peers =
        ~default_port:(Configuration_file.default.listen_addr |> snd))
     peers
 
-(* This function ensures the persistence of attestor profiles
+(* This function ensures the persistence of attester profiles
    to the configuration file at shutdown.
 
-   This is especially important for attestors as the pkh they track
+   This is especially important for attesters as the pkh they track
    is supplied by the baker through `PATCH /profile` API calls.
    As these profiles are added dynamically at run time, they do not exist
    in the initial configuration file. Therefore, in order to retain these
@@ -445,11 +521,11 @@ let store_profiles_finalizer ctxt data_dir =
   | Ok config -> (
       let* r = Configuration_file.save {config with profiles} in
       match r with
-      | Ok () -> return ()
+      | Ok () -> return_unit
       | Error e -> Event.(emit failed_to_persist_profiles (profiles, e)))
   | Error e ->
       let* () = Event.(emit failed_to_persist_profiles (profiles, e)) in
-      return ()
+      return_unit
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
@@ -467,8 +543,16 @@ let run ~data_dir configuration_override =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; peers; endpoint; profiles; listen_addr; _} as
-       config) =
+  let* ({
+          network_name;
+          rpc_addr;
+          peers;
+          endpoint;
+          profiles;
+          listen_addr;
+          public_addr;
+          _;
+        } as config) =
     let*! result = Configuration_file.load ~data_dir in
     match result with
     | Ok configuration -> return (configuration_override configuration)
@@ -492,12 +576,17 @@ let run ~data_dir configuration_override =
     let open Worker_parameters in
     let limits =
       match profiles with
-      | Services.Types.Bootstrap ->
+      | Types.Bootstrap ->
           (* Bootstrap nodes should always have a mesh size of zero.
              so all grafts are responded with prunes with PX. See:
-             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators *)
+             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
+
+             Additionally, we set [max_sent_iwant_per_heartbeat = 0]
+             so bootstrap nodes do not download any shards via IHave/IWant
+             transfers. *)
           {
             limits with
+            max_sent_iwant_per_heartbeat = 0;
             degree_low = 0;
             degree_high = 0;
             degree_out = 0;
@@ -506,15 +595,23 @@ let run ~data_dir configuration_override =
           }
       | Operator _ -> limits
     in
-    Gossipsub.Worker.(
-      make ~events_logging:Logging.event rng limits peer_filter_parameters
-      |> start [])
+    let gs_worker =
+      Gossipsub.Worker.(
+        make ~events_logging:Logging.event rng limits peer_filter_parameters)
+    in
+    Gossipsub.Worker.start [] gs_worker ;
+    gs_worker
   in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
     let open Transport_layer_parameters in
     let* p2p_config = p2p_config config in
-    Gossipsub.Transport_layer.create p2p_config p2p_limits ~network_name
+    Gossipsub.Transport_layer.create
+      ~public_addr
+      ~is_bootstrap_peer:(profiles = Types.Bootstrap)
+      p2p_config
+      p2p_limits
+      ~network_name
   in
   let* store = Store.init config in
   let cctxt = Rpc_context.make endpoint in
@@ -545,6 +642,8 @@ let run ~data_dir configuration_override =
   let*! () = Event.(emit p2p_server_is_ready listen_addr) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  (* Start collecting stats related to the Gossipsub worker. *)
+  Dal_metrics.collect_gossipsub_metrics gs_worker ;
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize
@@ -554,4 +653,4 @@ let run ~data_dir configuration_override =
   let* () =
     daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
   in
-  return ()
+  return_unit

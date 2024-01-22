@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/and_logical_1.tz on storage False and input '(Pair True False)' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/and_logical_1.tz on storage False and input '(Pair True False)' --level 1 --trace-stack
 storage
   False
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (just consumed gas: 5.366)
+  - location: 9 (just consumed gas: 5.330)
     [ (Pair (Pair True False) False) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Pair True False) ]

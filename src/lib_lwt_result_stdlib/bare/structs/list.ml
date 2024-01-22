@@ -729,7 +729,7 @@ let rev_mapi_es f l =
         (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
   in
   match l with
-  | [] -> return []
+  | [] -> return_nil
   | x :: xs ->
       let* y = lwt_apply2 f 0 x in
       aux 1 [y] xs
@@ -1052,7 +1052,7 @@ let rev_map2_es ~when_different_lengths f xs ys =
     | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   match (xs, ys) with
-  | [], [] -> return []
+  | [], [] -> return_nil
   | x :: xs, y :: ys ->
       let* z = lwt_apply2 f x y in
       aux [z] xs ys

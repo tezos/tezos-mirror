@@ -449,500 +449,55 @@ as well-typed. This is because the implementation uses a simple single
 pass typechecking algorithm, and does not handle any form of
 polymorphism.
 
-Core data types and notations
------------------------------
-
--  ``string``, ``nat``, ``int`` and ``bytes``: The core primitive
-   constant types.
-
--  ``bool``: The type for booleans whose values are ``True`` and
-   ``False``.
-
--  ``unit``: The type whose only value is ``Unit``, to use as a
-   placeholder when some result or parameter is not necessary. For
-   instance, when the only goal of a contract is to update its storage.
-
--  ``never``: The empty type. Since ``never`` has no inhabitant, no value of
-   this type is allowed to occur in a well-typed program.
-
--  ``list (t)``: A single, immutable, homogeneous linked list, whose
-   elements are of type ``(t)``, and that we write ``{}`` for the empty
-   list or ``{ first ; ... }``. In the semantics, we use chevrons to
-   denote a subsequence of elements. For instance: ``{ head ; <tail> }``.
-
--  ``pair (l) (r)``: A pair of values ``a`` and ``b`` of types ``(l)``
-   and ``(r)``, that we write ``(Pair a b)``.
-
--  ``pair (t{1}) ... (t{n})`` with ``n > 2``: A shorthand for ``pair (t{1}) (pair (t{2}) ... (pair (t{n-1}) (t{n})) ...)``.
-
--  ``option (t)``: Optional value of type ``(t)`` that we write ``None``
-   or ``(Some v)``.
-
--  ``or (l) (r)``: A union of two types: a value holding either a value
-   ``a`` of type ``(l)`` or a value ``b`` of type ``(r)``, that we write
-   ``(Left a)`` or ``(Right b)``.
-
--  ``set (t)``: Immutable sets of values of type ``(t)`` that we write as
-   lists ``{ item ; ... }``, of course with their elements unique, and
-   sorted.
-
--  ``map (k) (t)``: Immutable maps from keys of type ``(k)`` of values
-   of type ``(t)`` that we write ``{ Elt key value ; ... }``, with keys
-   sorted.
-
--  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)``.
-   These maps should be used if you intend to store large amounts of data in a map.
-   Using ``big_map`` can reduce gas costs significantly compared to standard maps, as data is lazily deserialized.
-   Note however that individual operations on ``big_map`` have higher gas costs than those over standard maps.
-   A ``big_map`` also has a lower storage cost than a standard map of the same size, when large keys are used, since only the hash of each key is stored in a ``big_map``.
-
-   A ``big_map`` cannot appear inside another ``big_map``.
-   See the section on :ref:`operations on big maps <OperationsOnBigMaps_oxford>` for a description of the syntax of values of type ``big_map (k) (t)`` and available operations.
-
-Core instructions
------------------
-
-Control structures
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``FAILWITH``: Explicitly abort the current program (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__).
--  ``{}``: Empty sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOOP>`__).
--  ``{ I ; C }``: Sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SEQ>`__).
--  ``IF bt bf``: Conditional branching (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF>`__).
--  ``LOOP body``: A generic loop (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP>`__).
--  ``LOOP_LEFT body``: A loop with an accumulator (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP_LEFT>`__).
--  ``DIP code``: Runs code protecting the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIP>`__).
--  ``DIP n code``: Runs code protecting the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIPN>`__).
--  ``EXEC``: Execute a function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EXEC>`__).
--  ``APPLY``: Partially apply a tuplified function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-APPLY>`__).
-
-Stack operations
-~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``DROP``: Drop the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROP>`__).
-- ``DROP n``: Drop the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROPN>`__).
--  ``DUP``: Duplicate the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__).
--  ``DUP n``: Duplicate the ``n``-th element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUPN>`__).
--  ``SWAP``: Exchange the top two elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SWAP>`__).
-- ``DIG n``: Take the element at depth ``n`` of the stack and move it
-  on top (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIG>`__).
-- ``DUG n``: Place the element on top of the stack at depth ``n`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUG>`__).
--  ``PUSH 'a x``: Push a constant value of a given type onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PUSH>`__).
--  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type ``'a`` and return type ``'b`` onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA>`__).
-- ``LAMBDA_REC 'a 'b code``: Push a recursive lambda onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA_REC>`__).
-
-Generic comparison
-~~~~~~~~~~~~~~~~~~
-
-Comparison only works on a class of types that we call comparable. A
-``COMPARE`` operation is defined in an ad hoc way for each comparable
-type, but the result of compare is always an ``int``, which can in turn
-be checked in a generic manner using the following combinators. The
-result of ``COMPARE`` is ``0`` if the top two elements of the stack are
-equal, negative if the first element in the stack is less than the
-second, and positive otherwise.
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``EQ``: Checks that the top element of the stack is equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EQ>`__).
--  ``NEQ``: Checks that the top element of the stack is not equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEQ>`__).
--  ``LT``: Checks that the top element of the stack is less than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LT>`__).
--  ``GT``: Checks that the top element of the stack is greater than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GT>`__).
--  ``LE``: Checks that the top element of the stack is less than or equal to
-   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LE>`__).
--  ``GE``: Checks that the top of the stack is greater than or equal to
-   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GE>`__).
-
-Operations
-----------
-
-Operations on unit
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``UNIT``: Push a unit value onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNIT>`__).
--  ``COMPARE``: Unit comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on type never
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``NEVER``: Close a forbidden branch (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEVER>`__).
--  ``COMPARE``: Trivial comparison on type ``never`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-
-Operations on booleans
-~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
--  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
--  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
--  ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
--  ``COMPARE``: Boolean comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on integers and natural numbers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``NEG`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEG>`__).
--  ``ABS`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ABS>`__).
--  ``ISNAT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ISNAT>`__).
--  ``INT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
--  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
--  ``SUB`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
--  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
--  ``EDIV``: Perform Euclidean division (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
--  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
--  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
--  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
--  ``NOT``: Two's complement (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
--  ``LSL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
--  ``LSR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
--  ``COMPARE``: Integer/natural comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on strings
-~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``CONCAT``: String concatenation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
--  ``SIZE``: number of characters in a string (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
--  ``SLICE``: String access (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
--  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on pairs and right combs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``PAIR``: Build a binary pair from the stack's top two elements (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIR>`__).
--  ``PAIR n``: Fold ``n`` values on the top of the stack in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIRN>`__).
--  ``UNPAIR``: Split a pair into its components (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPAIR>`__).
--  ``UNPAIR n``: Unfold ``n`` values from a right comb on the top of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPAIRN>`__).
--  ``CAR``: Access the left part of a pair (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CAR>`__).
--  ``CDR``: Access the right part of a pair (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CDR>`__).
-- ``GET k``: Access an element or a sub comb in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GETN>`__).
-- ``UPDATE k``: Update an element or a sub comb in a right comb (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATEN>`__).
--  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on sets
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``EMPTY_SET 'elt``: Build a new, empty set for elements of a given
-   type (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_SET>`__).
--  ``MEM``: Check for the presence of an element in a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
--  ``UPDATE``: Inserts or removes an element in a set, replacing a
-   previous value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
--  ``ITER body``: Apply the body expression to each element of a set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
--  ``SIZE``: Get the cardinality of the set (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
-
-Operations on maps
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``EMPTY_MAP 'key 'val``: Build a new, empty map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_MAP>`__).
--  ``GET``: Access an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
--  ``MEM``: Check for the presence of a binding for a key in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
--  ``UPDATE``: Add, update, or remove an element in a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
--  ``MAP body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
--  ``ITER body``: Apply the body expression to each element of a map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
--  ``SIZE``: Get the cardinality of the map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
-
-
-Operations on ``big_maps``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. _OperationsOnBigMaps_oxford:
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMPTY_BIG_MAP>`__).
--  ``GET``: Access an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET>`__).
--  ``MEM``: Check for the presence of an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MEM>`__).
--  ``UPDATE``: Add, update, or remove an element in a ``big_map`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UPDATE>`__).
--  ``GET_AND_UPDATE``: A combination of the ``GET`` and ``UPDATE`` instructions (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GET_AND_UPDATE>`__).
-
-
-Operations on optional values
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``SOME``: Pack a value as an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOME>`__).
--  ``NONE 'a``: The absent optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NONE>`__).
--  ``IF_NONE bt bf``: Inspect an optional value (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_NONE>`__).
--  ``COMPARE``: Optional values comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-- ``MAP body``: Apply the body expression to the value inside the option if there is one (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
-
-Operations on unions
-~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``LEFT 'b``: Pack a value in a union (left case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEFT>`__).
--  ``RIGHT 'a``: Pack a value in a union (right case) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-RIGHT>`__).
--  ``IF_LEFT bt bf``: Inspect a value of a union (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_LEFT>`__).
--  ``COMPARE``: Unions comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on lists
-~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``CONS``: Prepend an element to a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONS>`__).
--  ``NIL 'a``: Push an empty list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NIL>`__).
--  ``IF_CONS bt bf``: Inspect a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF_CONS>`__).
--  ``MAP body``: Apply the body expression to each element of the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MAP>`__).
--  ``SIZE``: Get the number of elements in the list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
--  ``ITER body``: Iterate the body expression over each element of a list (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ITER>`__).
-
-Domain specific data types
---------------------------
-
--  ``timestamp``: Dates in the real world.
-
--  ``mutez``: A specific type for manipulating tokens.
-
--  ``address``: An untyped address (implicit account or smart contract).
-
--  ``contract 'param``: A contract, with the type of its code,
-   ``contract unit`` for implicit accounts.
-
--  ``operation``: An internal operation emitted by a contract.
-
--  ``key``: A public cryptographic key.
-
--  ``key_hash``: The hash of a public cryptographic key.
-
--  ``signature``: A cryptographic signature.
-
--  ``chain_id``: An identifier for a chain, used to distinguish the test and the main chains.
-
--  ``bls12_381_g1``, ``bls12_381_g2`` : Points on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ , respectively.
-
--  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
-
--  ``sapling_transaction ms``: A :doc:`Sapling <sapling>` transaction
-
--  ``sapling_state ms``: A :doc:`Sapling <sapling>` state
-
--  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
-
--  ``chest``: a timelocked chest containing bytes and information to open it.
-   see :doc:`Timelock <timelock>` .
-
--  ``chest_key``: used to open a chest, also contains a proof
-   to check the correctness of the opening. see :doc:`Timelock <timelock>` .
-
-
-Domain specific operations
---------------------------
-
-Operations on timestamps
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``ADD`` Increment / decrement a timestamp of the given number of
-   seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
--  ``SUB`` Subtract a number of seconds from a timestamp (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
--  ``SUB`` Subtract two timestamps (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
--  ``COMPARE``: Timestamp comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-
-Operations on Mutez
-~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
--  ``SUB_MUTEZ`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB_MUTEZ>`__).
--  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
--  ``EDIV`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
--  ``COMPARE``: Mutez comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-Operations on contracts
-~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
-   Forge a new contract from a literal (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__).
--  ``TRANSFER_TOKENS``: Forge a transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TRANSFER_TOKENS>`__).
--  ``SET_DELEGATE``: Set or withdraw the contract's delegation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__).
--  ``BALANCE``: Push the current amount of mutez held by the executing
-   contract, including any mutez added by the calling transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__).
--  ``ADDRESS``: Cast the contract to its address (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADDRESS>`__).
--  ``CONTRACT 'p``: Cast the address to the given contract type if possible (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__).
--  ``SOURCE``: Push the contract that initiated the current
-   transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__).
--  ``SENDER``: Push the contract that initiated the current
-   internal transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__).
--  ``SELF``: Push the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__).
--  ``SELF_ADDRESS``: Push the address of the current contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__).
--  ``AMOUNT``: Push the amount of the current transaction (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__).
--  ``IMPLICIT_ACCOUNT``: Push on the stack the contract value corresponding to the implicit account of a public key hash (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IMPLICIT_ACCOUNT>`__).
-- ``VOTING_POWER``: Push the voting power of a given contract (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-VOTING_POWER>`__).
-
-Special operations
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
-- ``NOW``: Push the estimated injection time for the current block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__).
-- ``CHAIN_ID``: Push the chain identifier (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__).
-- ``COMPARE``: Chain identifier comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-- ``LEVEL``: Push the level of the current transaction's block (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LEVEL>`__).
-- ``TOTAL_VOTING_POWER``: Push the total voting power of all contracts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TOTAL_VOTING_POWER>`__).
-- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MIN_BLOCK_TIME>`__).
-
-Operations on bytes
-~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``PACK``: Serializes a piece of data to its optimized
-   binary representation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PACK>`__).
--  ``UNPACK 'a``: Deserializes a piece of data, if valid (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__).
--  ``CONCAT``: Concatenate two byte sequences or a list of byte sequences (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
--  ``SIZE``: Size of a sequence of bytes (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
--  ``SLICE``: Access a subsequence of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
--  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
--  ``OR``: Bitwise ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
--  ``AND``: Bitwise ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
--  ``XOR``: Bitwise ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
--  ``NOT``: Bitwise ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
--  ``LSL``: Logically left shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
--  ``LSR``: Logically right shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
-- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NAT>`__).
-- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
-- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BYTES>`__).
-
-Cryptographic primitives
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``HASH_KEY``: Compute the b58check of a public key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-HASH_KEY>`__).
--  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
-   Blake2b-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BLAKE2B>`__).
--  ``KECCAK``: Compute a cryptographic hash of the value contents using the
-   Keccak-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-KECCAK>`__).
--  ``SHA256``: Compute a cryptographic hash of the value contents using the
-   Sha256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA256>`__).
--  ``SHA512``: Compute a cryptographic hash of the value contents using the
-   Sha512 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA512>`__).
--  ``SHA3``: Compute a cryptographic hash of the value contents using the
-   SHA3-256 cryptographic hash function (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SHA3>`__).
--  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
-   with a given key (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CHECK_SIGNATURE>`__).
--  ``COMPARE``: Key hash, key and signature comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
-
-BLS12-381 primitives
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``NEG``: Negate a curve point or field element (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEG>`__).
--  ``ADD``: Add two curve points or field elements (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
--  ``MUL``: Multiply a curve point or scalar field element by an integer or a scalar field element (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
-- ``INT``: Convert a field element to type ``int`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
--  ``PAIRING_CHECK``: Verify that the product of pairings of the given list of points is equal to 1 in Fq12 (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PAIRING_CHECK>`__).
-
-
-Sapling operations
-~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
--  ``SAPLING_VERIFY_UPDATE``: Verify and apply a transaction on a Sapling state (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_VERIFY_UPDATE>`__).
--  ``SAPLING_EMPTY_STATE ms``: Push an empty state on the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_EMPTY_STATE>`__).
-
-.. _MichelsonTickets_oxford:
-
-Operations on tickets
-~~~~~~~~~~~~~~~~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
-- ``TICKET``: Create a ticket with the given content and amount (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-TICKET>`__).
-- ``READ_TICKET``: Retrieve the information stored in a ticket (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-READ_TICKET>`__).
-- ``SPLIT_TICKET``: Delete the given ticket and create two tickets with the
-  same content and ticketer as the original, but with the new provided amounts (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SPLIT_TICKET>`__).
-- ``JOIN_TICKETS``: The inverse of ``SPLIT_TICKET`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-JOIN_TICKETS>`__).
-
-Operations on timelock
-~~~~~~~~~~~~~~~~~~~~~~
-
-- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The
-  result is a byte option depending if the opening is correct or not. See
-  :doc:`Timelock <timelock>` for more information.
-
-::
-
-   ::  chest_key : chest : nat : 'S -> or bytes bool : 'S
-
-
-Events
-~~~~~~
-
-A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
-
-- ``EMIT %tag 'ty``: constructs an operation that will write an event into
-  the transaction receipt (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EMIT>`__).
-
+Types and instructions
+----------------------
+
+The complete sets of Michelson types and instructions are detailed in the
+`interactive Michelson reference page <https://tezos.gitlab.io/michelson-reference/>`__.
+
+- Specifically, it contains synthesis tables for `types <https://tezos.gitlab.io/michelson-reference/#types>`__
+  and for `instructions <https://tezos.gitlab.io/michelson-reference/#instructions>`_.
+- Instructions are also organized by `categories <https://tezos.gitlab.io/michelson-reference/#instructions-by-category>`__.
+- Each instruction is precisely defined using typing and semantic inference rules.
 
 Removed instructions and types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 :doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
--  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
+-  ``CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }``:
    Forge a new contract from a literal.
 
-::
+   ::
 
-    :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
-       -> operation : address : 'S
+      Γ ⊢ CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }
+      :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
+      ⇒ operation : address : 'S
 
-See the documentation of the new ``CREATE_CONTRACT`` instruction. The
-first, third, and fourth parameters are ignored.
+   There is a new version of this instruction, see its `documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__.
 
 -  ``CREATE_ACCOUNT``: Forge an account creation operation.
 
-::
+   ::
 
-    :: key_hash : option key_hash : bool : mutez : 'S
-       ->   operation : address : 'S
+      Γ ⊢ CREATE_ACCOUNT :: key_hash : option key_hash : bool : mutez : 'S
+      ⇒ operation : address : 'S
 
-Takes as argument the manager, optional delegate, the delegatable flag
-and finally the initial amount taken from the currently executed
-contract. This instruction originates a contract with two entrypoints;
-``%default`` of type ``unit`` that does nothing and ``%do`` of type
-``lambda unit (list operation)`` that executes and returns the
-parameter if the sender is the contract's manager.
+   Takes as argument the manager, optional delegate, the delegatable flag
+   and finally the initial amount taken from the currently executed
+   contract. This instruction originates a contract with two entrypoints;
+   ``%default`` of type ``unit`` that does nothing and ``%do`` of type
+   ``lambda unit (list operation)`` that executes and returns the
+   parameter if the sender is the contract's manager.
 
 -  ``STEPS_TO_QUOTA``: Push the remaining steps before the contract
    execution must terminate.
 
-::
+   ::
 
-    :: 'S   ->   nat : 'S
+      Γ ⊢ STEPS_TO_QUOTA :: 'S ⇒ nat : 'S
 
 :doc:`../protocols/016_mumbai` deprecated the following
 type. Because no smart contract used it on Mainnet before it got
@@ -954,108 +509,13 @@ reject any contract using it.
    used to authenticate layer-2 operations to transfer tickets from
    this account.
 
-.. _MichelsonViews_oxford:
-
-Operations on views
-~~~~~~~~~~~~~~~~~~~~
-
-Views are a mechanism for contract calls that:
-
-- are read-only: they may depend on the storage of the contract declaring the view but cannot modify it nor emit operations (but they can call other views),
-- take arguments as input in addition to the contract storage,
-- return results as output,
-- are synchronous: the result is immediately available on the stack of the caller contract.
-
-In other words, the execution of a view is included in the operation of caller's contract, but accesses the storage of the declarer's contract, in read-only mode.
-Thus, in terms of execution, views are more like lambda functions rather than contract entrypoints,
-Here is an example:
-
-::
-
-    code {
-    ...;
-    TRANSFER_TOKENS;
-    ...;
-    VIEW "view_ex" unit;
-    ...;
-    };
-
-This contract calls a contract ``TRANSFER_TOKENS``, and, later on, a view called "view_ex".
-No matter if the callee "view_ex" is defined in the same contract with this caller contract or not,
-this view will be executed immediately in the current operation,
-while the operations emitted by ``TRANSFER_TOKENS`` will be executed later on.
-As a result, although it may seem that "view_ex" receives the storage modified by ``TRANSFER_TOKENS``,
-this is not the case.
-In other words, the storage of the view is the same as when the current contract was called.
-In particular, in case of re-entrance, i.e., if a contract A calls a contract B that calls a view on A, the storage of the view will be the same as when B started, not when A started.
-
-Views are **declared** at the toplevel of the script of the contract on which they operate,
-alongside the contract parameter type, storage type, and code.
-To declare a view, the ``view`` keyword is used; its syntax is
-``view name 'arg 'return { instr; ... }`` where:
-
-- ``name`` is a string of at most 31 characters matching the regular expression ``[a-zA-Z0-9_.%@]*``; it is used to identify the view, hence it must be different from the names of the other views declared in the same script;
-- ``'arg`` is the type of the argument of the view;
-- ``'return`` is the type of the result returned by the view;
-- ``{ instr; ... }`` is a sequence of instructions of type ``lambda (pair 'arg 'storage_ty) 'return`` where ``'storage_ty`` is the type of the storage of the current contract. Certain specific instructions have different semantics in ``view``: ``BALANCE`` represents the current amount of mutez held by the contract where ``view`` is; ``SENDER`` represents the contract which is the caller of ``view``; ``SELF_ADDRESS`` represents the contract where ``view`` is; ``AMOUNT`` is always 0 mutez.
-
-Note that in both view input (type ``'arg``) and view output (type ``'return``), the following types are forbidden: ``ticket``, ``operation``, ``big_map`` and ``sapling_state``.
-
-Views are **called** using the following Michelson instruction:
-
--  ``VIEW name 'return``: Call the view named ``name`` from the contract whose address is the second element of the stack, sending it as input the top element of the stack.
-
-::
-
-    :: 'arg : address : 'S  ->  option 'return : 'S
-
-    > VIEW name 'return / x : addr : S  =>  Some y : S
-        iff addr is the address of a smart contract c with storage s
-        where c has a toplevel declaration of the form "view name 'arg 'return { code }"
-        and code / Pair x s : []  =>  y : []
-
-    > VIEW name 'return / _ : _ : S  =>  None : S
-        otherwise
-
-
-
-If the given address is nonexistent or if the contract at that address does not have a view of the expected name and type,
-``None`` will be returned.
-Otherwise, ``Some a`` will be returned where ``a`` is the result of the view call.
-Note that if a contract address containing an entrypoint ``address%entrypoint`` is provided,
-only the ``address`` part will be taken.
-``operation``, ``big_map`` and ``sapling_state`` and ``ticket`` types are forbidden for the ``'return`` type.
-
-
-Here is an example using views, consisting of two contracts.
-The first contract defines two views at toplevel that are named ``add_v`` and ``mul_v``.
-
-::
-
-    { parameter nat;
-      storage nat;
-      code { CAR; NIL operation ; PAIR };
-      view "add_v" nat nat { UNPAIR; ADD };
-      view "mul_v" nat nat { UNPAIR; MUL };
-    }
-
-
-The second contract calls the ``add_v`` view of the above contract and obtains a result immediately.
-
-::
-
-    { parameter (pair nat address) ;
-      storage nat ;
-      code { CAR ; UNPAIR; VIEW "add_v" nat ;
-             IF_SOME { } { FAIL }; NIL operation; PAIR }; }
-
 Macros
 ------
 
-In addition to the operations above, several extensions have been added
-to the language's concrete syntax. If you are interacting with the node
-via RPC, bypassing the client, which expands away these macros, you will
-need to desugar them yourself.
+In addition to the instructions listed in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__,
+several extensions have been added to the language's concrete syntax. If you are
+interacting with the node via RPC, bypassing the client, which expands away
+these macros, you will need to desugar them yourself.
 
 These macros are designed to be unambiguous and reversible, meaning that
 errors are reported in terms of desugared syntax. Below you'll see
@@ -1335,6 +795,8 @@ parameters require sequences in the concrete syntax.
 
     IF { instr1_true ; instr2_true ; ... }
        { instr1_false ; instr2_false ; ... }
+
+.. _syntax_of_scripts_oxford:
 
 Main program structure
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2029,8 +1491,40 @@ Micheline expressions are encoded in JSON like this:
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
+Development tools
+-----------------
+
+To ease the development of Michelson scripts, some tools are provided
+to Michelson developers.
+
+Emacs mode
+~~~~~~~~~~
+
+`Emacs <https://www.gnu.org/software/emacs/>`_ can be used as a practical environment for writing,
+editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
+configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
+
+Interactive toplevel
+~~~~~~~~~~~~~~~~~~~~
+
+An interactive Michelson toplevel (also known as a `REPL
+<https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop>`__)
+built on the :doc:`../user/mockup` mode of Octez client is available in
+``scripts/michelson_repl.sh``, the typical usage is:
+
+::
+
+   $ octez-client --mode mockup --base-dir /tmp/mockup create mockup
+   $ rlwrap scripts/michelson_repl.sh
+   > UNIT
+     { Stack_elt unit Unit }
+   > UNIT
+     { Stack_elt unit Unit ; Stack_elt unit Unit }
+   > COMPARE
+     { Stack_elt int 0 }
+
 Examples
----------
+--------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
@@ -2226,6 +1720,31 @@ using the Coq proof assistant.
                      # Change set of signatures
                      DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;
        PAIR }
+
+Views
+~~~~~
+
+Here is an example using views, consisting of two contracts.
+The first contract defines two views at toplevel that are named ``add_v`` and ``mul_v``.
+
+::
+
+    { parameter nat;
+      storage nat;
+      code { CAR; NIL operation ; PAIR };
+      view "add_v" nat nat { UNPAIR; ADD };
+      view "mul_v" nat nat { UNPAIR; MUL };
+    }
+
+
+The second contract calls the ``add_v`` view of the above contract and obtains a result immediately.
+
+::
+
+    { parameter (pair nat address) ;
+      storage nat ;
+      code { CAR ; UNPAIR; VIEW "add_v" nat ;
+             IF_SOME { } { FAIL }; NIL operation; PAIR }; }
 
 
 
@@ -2463,3 +1982,493 @@ The language is implemented in OCaml as follows:
    function is very simple, what we have to check is that we transform a
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
+
+.. michelson_tzt_oxford:
+
+TZT, a Syntax extension for writing unit tests
+----------------------------------------------
+
+This section describes the TZT format, an extension of the Michelson
+language allowing to run Michelson unit tests at a finer level than a
+full smart contract script. This extension adds syntax to specify an
+instruction (or sequence of instructions) to test, a concrete input
+stack and the expected output stack.
+
+These unit tests can be useful for both smart contract developers who
+need to independently test various parts of the smart contracts they
+develop and to the developers of new implementations of the Michelson
+interpreter who need to check that their new implementations behave as
+the reference implementation by passing `a conformance test suite
+<https://gitlab.com/tezos/tzt-reference-test-suite>`__.
+
+Similarly to Michelson scripts, the concrete syntax of TZT unit tests
+is :doc:`../shell/micheline`.
+
+TZT unit test files usually have the extension ``.tzt``. A unit test
+file describes a single unit test. It consists of a Micheline sequence
+of primitive applications (see :doc:`../shell/micheline`), in no particular order. This is
+:ref:`similar to Michelson scripts <syntax_of_scripts_oxford>` but
+the set of primitives allowed at the toplevel differ; in Michelson
+scripts, the allowed toplevel primitives are ``parameter``
+(mandatory), ``storage`` (mandatory), ``code`` (mandatory), and
+``view`` (optional and repeated). For TZT unit tests, the toplevel
+primitives which can be used are:
+
+ - ``input``,
+ - ``code``,
+ - ``output``,
+ - ``now``,
+ - ``sender``,
+ - ``source``,
+ - ``chain_id``,
+ - ``self``,
+ - ``parameter``,
+ - ``amount``,
+ - ``balance``,
+ - ``other_contracts``, and
+ - ``big_maps``.
+
+Mandatory primitives
+~~~~~~~~~~~~~~~~~~~~
+
+Each of the mandatory primitives ``input``, ``code``, and ``output``
+must occur exactly once in a unit test file in no particular order.
+
+The ``input`` primitive is used to declare the input stack (see the
+:ref:`syntax of concrete stacks <syntax_of_concrete_stacks_oxford>`).
+
+The ``code`` primitive is used to declare the instruction or sequence
+of instructions to execute.
+
+The ``output`` primitive is used to declare if the execution is
+expected to succeed or fail and what result is expected from the
+execution. For executions expected to succeed, the argument of the
+``output`` primitive is simply the expected output stack (see the
+:ref:`syntax of errors <syntax_of_errors_oxford>`). For executions
+expected to fail, the argument is the expected error. In both cases,
+the :ref:`wildcard pattern <omitting_parts_of_the_output_oxford>` can
+be used to omit part of the expected output.
+
+The simplest test which can be written asserts that executing no
+instruction on the empty stack successfully returns the empty stack:
+
+::
+
+   input {};
+   code {};
+   output {}
+
+Here is a slightly more involved test which demonstrates the effect of the `SWAP
+<https://tezos.gitlab.io/michelson-reference/#instr-SWAP>`__ instruction:
+
+::
+
+   input
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     };
+   code SWAP;
+   output
+     {
+       Stack_elt bool False ;
+       Stack_elt nat 8
+     }
+
+It is possible to test the effect of several instructions by wrapping them in a sequence:
+
+::
+
+   input
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     };
+   code { SWAP ; SWAP };
+   output
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     }
+
+Here is an example showing how to test the ``FAILWITH`` instruction:
+
+::
+
+   input {Stack_elt nat 2};
+   code FAILWITH;
+   output (Failed 2)
+
+Optional primitives
+~~~~~~~~~~~~~~~~~~~
+
+Optional primitives are used to set the execution context for the
+test. Each of the optional primitives can be used at most once, in no
+particular order.
+
+ - ``amount`` (optional, defaults to 0): the amount, expressed in
+   mutez, that should be pushed by the `AMOUNT
+   <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
+   instruction
+
+ - ``balance`` (optional, defaults to 0): the balance, expressed in
+   mutez, that should be pushed by the `BALANCE
+   <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
+   instruction
+
+ - ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
+   timestamp that should be pushed by the `NOW
+   <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+   instruction
+
+ - ``sender`` (optional, defaults to
+   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
+   that should be pushed by the `SENDER
+   <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
+   instruction
+
+ - ``source`` (optional, defaults to
+   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
+   that should be pushed by the `SOURCE
+   <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
+   instruction
+
+ - ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
+   chain identifier that should be pushed by the `CHAIN_ID
+   <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
+   instruction
+
+ - ``self`` (optional, defaults to
+   ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
+   should be pushed by the `SELF
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
+   `SELF_ADDRESS
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
+   instructions
+
+ - ``parameter`` (optional, defaults to ``unit``): the type of the
+   parameter of the contract pushed by the `SELF
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
+   instruction
+
+ - ``other_contracts`` (optional, defaults to ``{}``): mapping between
+   the contract addresses that are assumed to exist and their
+   parameter types (see the :ref:`syntax of other contracts
+   specifications <syntax_of_other_contracts_oxford>`)
+
+ - ``big_maps`` (optional, defaults to ``{}``): mapping between
+   integers representing ``big_map`` indices and descriptions of big
+   maps (see the :ref:`syntax of extra big maps specifications
+   <syntax_of_extra_big_maps_oxford>`)
+
+The following test example asserts that the default value for the `NOW
+<https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+instruction is the unix epoch:
+
+::
+
+   input {};
+   code NOW;
+   output { Stack_elt timestamp "1970-01-01T00:00:00Z" }
+
+The following example shows how to use the ``now`` toplevel primitive
+to make the `NOW
+<https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+instruction return a chosen timestamp:
+
+::
+
+   input {};
+   now "2020-01-08T07:13:51Z";
+   code NOW;
+   output { Stack_elt timestamp "2020-01-08T07:13:51Z" }
+
+.. _syntax_of_concrete_stacks_oxford:
+
+Syntax of concrete stacks
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A concrete stack is written as a Micheline sequence whose elements are
+of the form ``Stack_elt <ty> <x>`` where ``<x>`` is a Michelson value
+and ``<ty>`` is its type. For example, ``{ Stack_elt bool True ;
+Stack_elt nat 42 }`` is a concrete stack of length 2 whose top element
+is the boolean ``True`` and the bottom element is the natural number
+``42``.
+
+.. _omitting_parts_of_the_output_oxford:
+
+Omitting parts of the output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Any part of the ``output`` specification can be replaced with the
+wildcard pattern ``_``.
+
+For example, let's consider the following test of the ``PAIR`` instruction:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (Pair True "foo")}
+
+Omitting the ``True`` argument to the ``Pair`` primitive can be done as follows:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (Pair _ "foo")}
+
+Omitting the ``Pair`` primitive:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (_ True "foo")}
+
+Omitting the ``pair bool string`` type:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt _ (Pair True "foo")}
+
+Omitting the resulting stack element:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {_}
+
+Omitting all of the output:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output _
+
+The difference between the last two examples is that ``output {_}``
+means that the instruction is expected to successfully return a stack
+of length 1 while ``output _`` means that nothing in particular is
+expected from the execution of the instruction, not even being
+successful.
+
+The wildcard pattern is typically used to omit unspecified aspects of
+the Michelson language when writing portable tests; in particular the
+cryptographic nonces in values of type ``operation`` (see the
+:ref:`syntax of concrete operations
+<syntax_of_concrete_operations_oxford>`) or implementation-specific
+parts of error outputs (see the :ref:`syntax of errors
+<syntax_of_errors_oxford>`).
+
+.. _output_normalization_oxford:
+
+Output normalization
+~~~~~~~~~~~~~~~~~~~~
+
+The input and output stacks can use the readable and optimized formats
+for Michelson values and even mix the formats; for a test to pass, the
+expected output does not need to syntactically match the result of the
+execution but only to match up to conversion between optimized and
+readable formats; the TZT test runner is responsible for normalizing
+the actual output and the expected one to common format. This means in
+particular that conversion between readable and optimized formats can
+be tested by using ``{}`` as the ``code`` instruction sequence to
+test; for example these two tests pass:
+
+::
+
+   input {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c};
+   code {};
+   output {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
+
+::
+
+   input {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"};
+   code {};
+   output {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c}
+
+This normalization feature is however incompatible with using the
+:ref:`wildcard pattern <omitting_parts_of_the_output_oxford>` in the
+output; when using wildcards the output must be formatted using the
+readable format so the following test does not pass:
+
+::
+
+   input {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"};
+   code {};
+   output {Stack_elt _ 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c}
+
+but the following test does pass:
+
+::
+
+   input {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c};
+   code {};
+   output {Stack_elt _ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
+
+.. _syntax_of_errors_oxford:
+
+Syntax of errors
+~~~~~~~~~~~~~~~~
+
+To test that the execution of an instruction fails, the following
+syntaxes can be used instead of the output stack as the argument of the
+``output`` toplevel primitive to specify which error the instruction is expected to
+raise:
+
+ - ``(StaticError <error description>)``: an error occurred before the
+   instruction was executed; the error description format is
+   unspecified so consider using a :ref:`wildcard
+   <omitting_parts_of_the_output_oxford>` such as ``(StaticError _)``
+   to write portable tests;
+
+ - ``(Failed <value>)``: the execution reached a ``FAILWITH``
+   instruction and the topmost element of the stack at this point was
+   ``<value>``;
+
+ - ``MutezOverflow``: an addition or multiplication on type ``mutez``
+   produced a result which was too large to be represented as a value
+   of type ``mutez``;
+
+ - ``MutezUnderflow``: a mutez subtraction resulted in a negative
+   value. This should only happen in the case of the deprecated
+   ``mutez`` case of the ``SUB`` instruction;
+
+ - ``GeneralOverflow``: the number of bits to shift using the ``LSL``
+   or ``LSR`` instruction was too large;
+
+
+The following example shows how to test a runtime failure; it asserts
+that the `FAILWITH
+<https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__
+instruction produces a runtime error containing the top of the stack.
+
+::
+
+   input { Stack_elt nat 4 ; Stack_elt bytes 0x };
+   code FAILWITH;
+   output (Failed 4)
+
+The following example shows how to test type checking failure; it
+asserts that the `DUP
+<https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__
+instruction cannot be used on an empty stack.
+
+::
+
+   input {};
+   code DUP;
+   output (StaticError _)
+
+The following example shows another kind of static failure: a string
+cannot be passed as argument to the `DUP
+<https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__
+instruction.
+
+::
+
+   input { Stack_elt nat 8 };
+   code { DUP "foo" };
+   output (StaticError _)
+
+.. _syntax_of_concrete_operations_oxford:
+
+Syntax of concrete operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `operation type
+<https://tezos.gitlab.io/michelson-reference/#type-operation>`__ has
+no concrete syntax in Michelson. In order to specify the result of the
+operation forging instructions `TRANSFER_TOKENS
+<https://tezos.gitlab.io/michelson-reference/#instr-TRANSFER_TOKENS>`__,
+`CREATE_CONTRACT
+<https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__,
+and `SET_DELEGATE
+<https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ ,
+the following data constructors are added:
+
+ - ``Transfer_tokens``,
+ - ``Create_contract``, and
+ - ``Set_delegate``.
+
+They take as arguments the inputs of the corresponding operation
+forging instructions plus a cryptographic nonce represented as a byte
+sequence. The result of ``TRANSFER_TOKENS``, ``CREATE_CONTRACT``,
+and ``SET_DELEGATE`` have respectively the following shapes:
+
+ - ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
+ - ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
+ - ``Set_delegate <optional delegate> <nonce>``.
+
+The computation of the cryptographic nonce is not specified. To write
+portable tests, the nonces appearing in output stack expectations
+should be replaced by :ref:`a wildcard pattern
+<omitting_parts_of_the_output_oxford>`.
+
+Here is an example unit test for the ``SET_DELEGATE`` instruction used
+to set the delegate of the current contract to the account at address
+``tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z``:
+
+::
+
+  input { Stack_elt (option key_hash) (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") } ;
+  code SET_DELEGATE ;
+  output { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }
+
+.. _syntax_of_other_contracts_oxford:
+
+Syntax of other contracts specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of the `CONTRACT
+<https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__
+instruction depends on whether or not its input is the address of an
+originated contract accepting the expected type as parameter. To test
+it, the ``other_contract`` toplevel primitive can be used to specify
+which contracts are assumed to be originated and which type they
+accept as parameter.
+
+The mapping given to the ``other_contract`` toplevel primitive is a
+Micheline sequence whose elements have the form ``Contract "KT1..."
+<ty>`` where ``"KT1..."`` is a valid smart contract address and
+``<ty>`` is the type of its parameter. Each address should appear at
+most once and the order is irrelevant.
+
+.. _syntax_of_extra_big_maps_oxford:
+
+Syntax of extra big maps specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of the instructions operating on type `big_map
+<https://tezos.gitlab.io/michelson-reference/#type-big_map>`__ depend
+on the contents of big maps stored in the context. To test them, the
+``big_maps`` toplevel primitive can be used to specify the types and
+contents of the big maps which are assumed to be present.
+
+The mapping given to the ``big_maps`` toplevel primitive is a
+Micheline sequence whose elements have the form ``Big_map <i> <kty>
+<vty> { Elt <k1> <v1>; Elt <k2> <v2>; ...}`` where ``<i>`` is an
+integer (the identifier of the big map), ``<kty>`` is the comparable
+type of keys, ``<vty>`` is the type of values, each ``<ki>`` is of
+type ``<kty>`` and each ``<vi>`` is of type ``<vty>``. Each identifier
+should appear at most once and the order in which big maps are
+specified is irrelevant but each ``{ Elt <k1> <v1>; Elt <k2> <v2>;
+...}`` description of big map contents should be given in increasing
+order of keys.
+
+The following example tests the `GET
+<https://tezos.gitlab.io/michelson-reference/#instr-GET>`__
+instruction in the `big_map
+<https://tezos.gitlab.io/michelson-reference/#type-big_map>`__ case:
+
+::
+
+   big_maps { Big_map 4 string nat { Elt "bar" 42 } };
+   input { Stack_elt (big_map string nat) 4 };
+   code { PUSH string "foo"; GET };
+   output { Stack_elt (option nat) None }

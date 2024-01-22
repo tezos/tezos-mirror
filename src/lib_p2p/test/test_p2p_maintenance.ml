@@ -106,7 +106,7 @@ let rec connect ~timeout connect_handler pool point =
             P2p_point.Id.pp
             point)
   | Error
-      ((( Tezos_p2p_services.P2p_errors.Connection_refused
+      ((( Tezos_p2p_services.P2p_errors.Connection_failed
         | Tezos_p2p_services.P2p_errors.Pending_connection
         | Tezos_p2p_services.P2p_errors.Rejected_socket_connection
         | Tezos_p2p_services.P2p_errors.Rejected_by_nack _ | Canceled | Timeout
@@ -120,8 +120,8 @@ let rec connect ~timeout connect_handler pool point =
              point
              (fun ppf err ->
                match err with
-               | Tezos_p2p_services.P2p_errors.Connection_refused ->
-                   Format.fprintf ppf "connection refused"
+               | Tezos_p2p_services.P2p_errors.Connection_failed ->
+                   Format.fprintf ppf "connection failed"
                | Tezos_p2p_services.P2p_errors.Pending_connection ->
                    Format.fprintf ppf "pending connection"
                | Tezos_p2p_services.P2p_errors.Rejected_socket_connection ->
@@ -428,13 +428,16 @@ module Triggers = struct
       in
       let active_connections = P2p_pool.active_connections node.pool in
       let*! () = Event.(emit x_active_connections) active_connections in
-      (* Close connections to each min_connections. *)
+      (* Close connections to reach min_connections. *)
       let nb_connections_to_close = active_connections - min_connections + 1 in
       let*! () =
         Lwt_list.iteri_p
           (fun i (_, conn) ->
             if i < nb_connections_to_close then
-              P2p_conn.disconnect ~wait:true conn
+              P2p_conn.disconnect
+                ~wait:true
+                ~reason:(User "close connection to reach min_connections")
+                conn
             else Lwt.return_unit)
           (P2p_pool.Connection.list node.pool)
       in
@@ -520,7 +523,7 @@ let wrap addr n f =
 
 let main () =
   let rules =
-    match Tezt.Cli.options.log_level with
+    match Tezt.Cli.Logs.level with
     | Quiet | Error | Warn | Report | Info -> None
     | Debug ->
         Some

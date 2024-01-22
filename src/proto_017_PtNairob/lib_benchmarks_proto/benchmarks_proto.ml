@@ -110,7 +110,7 @@ end
 module Model = struct
   include Model
 
-  let make ~name ~conv ~model = make ~conv ~model:(model name)
+  let make ~name ~conv model = make ~conv (model name)
 
   let affine ?intercept ?coeff name =
     let ns s = Free_variable.of_namespace (Namespace.cons name s) in

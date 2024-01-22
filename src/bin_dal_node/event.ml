@@ -74,7 +74,7 @@ let failed_to_persist_profiles =
     ~name:"failed_to_persist_profiles"
     ~msg:"failed to persist the profiles to the config file"
     ~level:Error
-    ("profiles", Services.Types.profiles_encoding)
+    ("profiles", Types.profiles_encoding)
     ("error", Error_monad.trace_encoding)
 
 let fetched_slot =
@@ -169,16 +169,18 @@ let stored_slot_content =
     ~name:"stored_slot_content"
     ~msg:"slot stored: commitment {commitment}"
     ~level:Notice
+    ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
 
-let stored_slot_shards =
+let stored_slot_shard =
   declare_2
     ~section
-    ~name:"stored_slot_shards"
-    ~msg:"slot stored: commitment {commitment}, shards {shards}"
-    ~level:Notice
+    ~name:"stored_slot_shard"
+    ~msg:"stored shard {shard_index} for commitment {commitment}"
+    ~level:Debug
+    ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
-    ("shards", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
 
 let decoding_data_failed =
   declare_1
@@ -186,7 +188,7 @@ let decoding_data_failed =
     ~name:"decoding_failed"
     ~msg:"error while decoding a {data_kind} value"
     ~level:Warning
-    ("data_kind", Types.kind_encoding)
+    ("data_kind", Types.Store.encoding)
 
 let loading_shard_data_failed =
   declare_1
@@ -205,7 +207,7 @@ let message_validation_error =
        {validation_error}"
     ~level:Warning
     ~pp1:Gossipsub.Worker.GS.Message_id.pp
-    ("message_id", Gossipsub.message_id_encoding)
+    ("message_id", Types.Message_id.encoding)
     ("validation_error", Data_encoding.string)
 
 let p2p_server_is_ready =

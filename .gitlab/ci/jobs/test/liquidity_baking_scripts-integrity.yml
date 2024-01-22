@@ -1,7 +1,8 @@
 include: .gitlab/ci/jobs/test/common.yml
 
 test-liquidity-baking-scripts:
-  extends: .integration_template
-  stage: test
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-liquidity-baking-scripts
+  extends: .test_template
+  dependencies:
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
+  script: ./scripts/ci/test_liquidity_baking_scripts.sh

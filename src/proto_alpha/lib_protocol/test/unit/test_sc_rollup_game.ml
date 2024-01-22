@@ -182,12 +182,12 @@ let test_poorly_distributed_dissection () =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
   let choice, step = init_refutation ~size ~init_tick start_hash in
-  assert_fails_with_f
-    ~__LOC__
-    (wrap
-    @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~step ~choice
-    )
-    (function D.Dissection_invalid_distribution _ -> true | _ -> false)
+  let*!@ res =
+    R.game_move ctxt rollup ~player:refuter ~opponent:defender ~step ~choice
+  in
+  assert_fails_with_f ~__LOC__ (Lwt.return res) (function
+      | D.Dissection_invalid_distribution _ -> true
+      | _ -> false)
 
 let test_single_valid_game_move () =
   let open Lwt_result_wrap_syntax in
@@ -267,18 +267,18 @@ let test_invalid_serialized_inbox_proof () =
   let metadata =
     Sc_rollup.Metadata.{address = rollup; origination_level = level}
   in
-  let*! res =
-    wrap
-    @@ Sc_rollup.Proof.valid
-         ~pvm:(module Arith_pvm)
-         ~metadata
-         snapshot
-         Raw_level.root
-         dal_snapshot
-         dal_parameters.cryptobox_parameters
-         ~dal_attestation_lag:dal_parameters.attestation_lag
-         ~is_reveal_enabled
-         proof
+  let*!@ res =
+    Sc_rollup.Proof.valid
+      ~pvm:(module Arith_pvm)
+      ~metadata
+      snapshot
+      Raw_level.root
+      dal_snapshot
+      dal_parameters.cryptobox_parameters
+      ~dal_attestation_lag:dal_parameters.attestation_lag
+      ~dal_number_of_slots:dal_parameters.number_of_slots
+      ~is_reveal_enabled
+      proof
   in
   Assert.proto_error
     ~loc:__LOC__
@@ -300,13 +300,12 @@ let test_first_move_with_swapped_commitment () =
   and opponent = defender
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
-  let*! res =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(player, opponent_commitment_hash)
-         ~opponent:(opponent, player_commitment_hash)
+  let*!@ res =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(player, opponent_commitment_hash)
+      ~opponent:(opponent, player_commitment_hash)
   in
   Assert.proto_error
     ~loc:__LOC__
@@ -329,13 +328,12 @@ let test_first_move_from_invalid_player () =
   let opponent = defender
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
-  let*! res =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(staker3, player_commitment_hash)
-         ~opponent:(opponent, opponent_commitment_hash)
+  let*!@ res =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(staker3, player_commitment_hash)
+      ~opponent:(opponent, opponent_commitment_hash)
   in
   Assert.proto_error
     ~loc:__LOC__
@@ -358,13 +356,12 @@ let test_first_move_with_invalid_opponent () =
   let player = refuter
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
-  let*! res =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(player, player_commitment_hash)
-         ~opponent:(staker3, opponent_commitment_hash)
+  let*!@ res =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(player, player_commitment_hash)
+      ~opponent:(staker3, opponent_commitment_hash)
   in
   Assert.proto_error
     ~loc:__LOC__
@@ -406,21 +403,19 @@ let test_first_move_with_invalid_ancestor () =
       }
   in
   let ctxt = T.advance_level_for_commitment ctxt refuter_commitment in
-  let* _, _, ctxt, _ =
-    wrap
-    @@ Sc_rollup_stake_storage.publish_commitment
-         ctxt
-         rollup
-         refuter
-         refuter_commitment
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      refuter
+      refuter_commitment
   in
-  let* _, _, ctxt, _ =
-    wrap
-    @@ Sc_rollup_stake_storage.publish_commitment
-         ctxt
-         rollup
-         defender
-         defender_commitment
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      defender
+      defender_commitment
   in
   let refuter_commitment_hash =
     Sc_rollup_commitment_repr.hash_uncarbonated refuter_commitment
@@ -432,13 +427,12 @@ let test_first_move_with_invalid_ancestor () =
   and opponent = defender
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
-  let*! res =
-    wrap
-    @@ R.start_game
-         ctxt
-         rollup
-         ~player:(player, player_commitment_hash)
-         ~opponent:(opponent, opponent_commitment_hash)
+  let*!@ res =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(player, player_commitment_hash)
+      ~opponent:(opponent, opponent_commitment_hash)
   in
   Assert.proto_error
     ~loc:__LOC__

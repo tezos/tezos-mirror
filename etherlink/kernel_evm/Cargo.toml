@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "logging"]
+
+[workspace.dependencies]
+
+# error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# types
+primitive-types = { version = "0.12.1", default-features = false }
+num-bigint = "0.3"
+num-traits = "0.2.8"
+ethereum = { version = "0.14.0", default-features = false }
+ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
+
+# serialization
+hex = "0.4"
+hex-literal = "0.4.1"
+tezos_data_encoding = "0.5.2"
+const-decoder = { version = "0.3.0" }
+rlp = "0.5.2"
+
+# ethereum VM
+evm = { version = "0.39.1", default-features = false }
+
+# crypto stuff
+sha2 = { version = "0.10.6", default-features = false }
+sha3 = { version = "0.10.6", default-features = false }
+ripemd = { version = "0.1.3", default-features = false }
+tezos_crypto_rs = { version = "0.5.2", default-features = false }
+libsecp256k1 = { version = "0.7", default-features = false, features = [
+  "static-context",
+  "hmac",
+] }
+
+# kernel crates
+tezos_ethereum = { path = "./ethereum" }
+evm-execution = { path = "./evm_execution" }
+tezos-evm-logging = { path = "./logging" }
+
+# SDK
+tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core", features = [
+  "proto-nairobi",
+] }
+tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host", features = [
+  "proto-nairobi",
+] }
+tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
+tezos-smart-rollup-entrypoint = { path = "../../src/kernel_sdk/entrypoint" }
+tezos-smart-rollup-debug = { path = "../../src/kernel_sdk/debug" }
+tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-features = false, features = [
+  "alloc",
+  "tezos-encoding",
+  "crypto",
+] }
+tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
+tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock", features = [
+  "proto-nairobi",
+] }
+tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+
+# property based testing
+rand = { version = "0.8" }
+proptest = { version = "1.0" }

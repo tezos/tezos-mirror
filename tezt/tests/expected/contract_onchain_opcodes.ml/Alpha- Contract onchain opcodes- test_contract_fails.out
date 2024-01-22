@@ -1,7 +1,7 @@
 
 ./octez-client --mode mockup --wait none originate contract contract transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/contract.tz --burn-cap 10 --force
 Node is bootstrapped.
-Estimated gas: 589.146 units (will add 100 for safety)
+Estimated gas: 589.063 units (will add 100 for safety)
 Estimated storage: 329 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 72 bytes
         Paid storage size diff: 72 bytes
-        Consumed gas: 589.112
+        Consumed gas: 589.029
         Balance updates:
           [PUBLIC_KEY_HASH] ... -ꜩ0.018
           storage fees ........................... +ꜩ0.018

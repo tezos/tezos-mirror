@@ -156,7 +156,7 @@ let find_account public_key_hash' =
 
 let baker_at_round0 ?level client =
   let* json =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_baking_rights ?level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_baking_rights ?level ()
   in
   match JSON.(json |=> 0 |-> "delegate" |> as_string_opt) with
   | Some delegate_id -> return (find_account delegate_id)
@@ -228,7 +228,7 @@ let test_manual_bake =
   Log.info "Deposit" ;
   let* balance = Client.get_balance_for client ~account:recipient.alias in
   let* deposit =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_delegate_frozen_deposits
          recipient.public_key_hash
   in
@@ -279,7 +279,7 @@ let test_manual_bake =
 
   Log.info "Test that %s is pending" operation_hash ;
   let* pending_ops =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let op_hashes =
     JSON.(
@@ -305,7 +305,7 @@ let test_manual_bake =
   Log.info "Test balance" ;
   let* balance = Client.get_balance_for client ~account:recipient.alias in
   let* deposit =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_delegate_frozen_deposits
          recipient.public_key_hash
   in
@@ -391,7 +391,7 @@ let test_manual_bake_null_threshold =
   Log.info "Test balance" ;
   let* balance = Client.get_balance_for client ~account:recipient.alias in
   let* deposit =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_delegate_frozen_deposits
          recipient.public_key_hash
   in

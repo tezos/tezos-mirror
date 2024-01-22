@@ -26,7 +26,6 @@ DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
-CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
@@ -44,7 +43,7 @@ ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXE
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
-# build the TPS evaluation tool and the Tezt test suite in the
+# build the TPS evaluation tool, Octogram and the Tezt test suite in the
 # 'build_x86_64-dev-exp-misc' job.
 BUILD_EXTRA ?=
 
@@ -108,6 +107,10 @@ release:
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
 
+.PHONY: build-additional-tezt-test-dependency-executables
+build-additional-tezt-test-dependency-executables:
+	@dune build contrib/octez_injector_server/octez_injector_server.exe
+
 .PHONY: strip
 strip: all
 	@chmod +w $(ALL_EXECUTABLES)
@@ -126,6 +129,26 @@ build-parameters:
 $(ALL_EXECUTABLES):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
+
+.PHONY: kaitai-struct-files
+kaitai-struct-files:
+	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+	@$(MAKE) -C contrib/kaitai-struct-files/
+
+.PHONY: check-kaitai-struct-files
+check-kaitai-struct-files:
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
+	@dune build contrib/bin_codec_kaitai/codec.exe
+	@rm contrib/kaitai-struct-files/*.ksy
+	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
+	@git add contrib/kaitai-struct-files/*.ksy
+	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/ || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+
+.PHONY: validate-kaitai-struct-files
+validate-kaitai-struct-files:
+	@$(MAKE) check-kaitai-struct-files
+	@./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input 2>/dev/null || \
+	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/kaitai_e2e.sh contrib/kaitai-struct-files contrib/kaitai-struct-files/input\""; exit 1)
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -246,6 +269,7 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
@@ -273,8 +297,15 @@ test-nonproto-unit:
 		scripts/test_wrapper.sh test-nonproto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_DIRS)))
 
+.PHONY: test-other-unit
+test-other-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-other-unit \
+		$(addprefix @, $(addsuffix /runtest,$(OTHER_DIRS)))
+
 .PHONY: test-unit
-test-unit: test-nonproto-unit test-proto-unit
+test-unit: test-nonproto-unit test-proto-unit test-other-unit
 
 .PHONY: test-unit-alpha
 test-unit-alpha:
@@ -290,24 +321,31 @@ test-js:
 build-tezt:
 	@dune build tezt
 
+.PHONY: build-simulation-scenario
+build-simulation-scenario:
+	@dune build devtools/testnet_experiment_tools/
+	@mkdir -p $(OCTEZ_BIN_DIR)/
+	@cp -f _build/default/devtools/testnet_experiment_tools/simulation_scenario.exe $(OCTEZ_BIN_DIR)/simulation-scenario
+	@cp -f _build/default/devtools/testnet_experiment_tools/safety_checker.exe $(OCTEZ_BIN_DIR)/safety-checker
+
 .PHONY: test-tezt
-test-tezt:
+test-tezt: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
 
 .PHONY: test-tezt-i
-test-tezt-i:
+test-tezt-i: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
 
 .PHONY: test-tezt-c
-test-tezt-c:
+test-tezt-c: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 
 .PHONY: test-tezt-v
-test-tezt-v:
+test-tezt-v: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
 .PHONY: test-tezt-coverage
-test-tezt-coverage:
+test-tezt-coverage: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
@@ -346,32 +384,6 @@ lint-tests-pkg:
 TEST_DIRS := $(shell find src -name "test" -type d -print -o -name "test-*" -type d -print)
 EXCLUDE_TEST_DIRS := $(addprefix --exclude-file ,$(addsuffix /,${TEST_DIRS}))
 
-.PHONY: lint-ometrics
-lint-ometrics:
-	@echo "Running ometrics analysis in your changes"
-	@ometrics check ${EXCLUDE_TEST_DIRS} \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
-        --exclude-file "tezt/tests/" \
-        --exclude-entry-re "pp\|pp_.+" \
-        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
-        --exclude-entry-re "compare\|compare_.+\|.+_compare"
-
-.PHONY: lint-ometrics-gitlab
-lint-ometrics-gitlab:
-	@echo "Running ometrics analysis in your changes."
-	@mkdir -p _reports
-	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
-        ${EXCLUDE_TEST_DIRS} \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
-        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
-        --exclude-file "tezt/tests/" \
-        --exclude-entry-re "pp\|pp_.+" \
-        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
-        --exclude-entry-re "compare\|compare_.+\|.+_compare" \
-        --gitlab --output ${CODE_QUALITY_REPORT}
-	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
-
 .PHONY: test
 test: test-code
 
@@ -380,7 +392,6 @@ test: test-code
 check-linting:
 	@scripts/lint.sh --check-scripts
 	@scripts/lint.sh --check-ocamlformat
-	@scripts/lint.sh --check-coq-attributes
 	@scripts/lint.sh --check-rust-toolchain
 	@dune build --profile=$(PROFILE) @fmt
 
@@ -401,6 +412,15 @@ fmt-ocaml:
 
 fmt-python:
 	@$(MAKE) -C docs fmt
+
+.PHONY: dpkg
+dpkg:	all
+	@./scripts/dpkg/make_dpkg.sh
+
+.PHONY: rpm
+rpm:	all
+	@./scripts/rpm/make_rpm.sh
+
 
 .PHONY: build-deps
 build-deps:
@@ -426,6 +446,11 @@ build-tps: lift-protocol-limits-patch all build-tezt
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
+
+.PHONY: build-octogram
+build-octogram: all
+	@dune build ./src/bin_octogram
+	@cp -f ./_build/default/src/bin_octogram/octogram_main.exe octogram
 
 .PHONY: build-unreleased
 build-unreleased: all
@@ -490,8 +515,20 @@ uninstall:
 coverage-clean:
 	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
+.PHONY: pkg-common-clean
+pkg-common-clean:
+	@-rm -rf scripts/pkg-common/{baker,client,smartrollup}-binaries
+
+.PHONY: dpkg-clean
+dpkg-clean: pkg-common-clean
+	@-rm -rf _dpkgstage *.deb
+
+.PHONY: rpm-clean
+rpm-clean: pkg-common-clean
+	@-rm -rf _rpmbuild *.rpm
+
 .PHONY: clean
-clean: coverage-clean clean-old-names
+clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 	@-dune clean
 	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean

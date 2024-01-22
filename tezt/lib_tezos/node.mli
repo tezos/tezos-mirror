@@ -78,13 +78,14 @@ type argument =
   | Disable_p2p_swap  (** [--disable-p2p-swap] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
-  | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
   | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
   | Metrics_addr of string  (** [--metrics-addr] *)
   | Cors_origin of string  (** [--cors-origin] *)
   | Disable_mempool  (** [--disable-mempool] *)
   | Version  (** [--version] *)
+  | RPC_additional_addr of string  (** [--rpc-addr] *)
+  | RPC_additional_addr_local of string  (** [--local-rpc-addr] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -113,6 +114,9 @@ type t
     provided, or a value allowing the local Tezt program to connect to it
     if it is.
 
+    Default [rpc_local] is [false]. If [rpc_local] is [true], the node will not
+    spawn a process for non-blocking RPCs.
+
     Default values for [net_port] or [rpc_port] are chosen automatically
     with values starting from 16384 (configurable with `--starting-port`).
     They are used by [config_init]
@@ -140,6 +144,9 @@ val create :
   ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
+  ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?rpc_tls:tls_config ->
@@ -214,6 +221,9 @@ val advertised_net_port : t -> int option
 
     Returns [https] if node is started with [--rpc-tls], otherwise [http] *)
 val rpc_scheme : t -> string
+
+(** Returns [False] if RPCs are handled by a dedicated process. *)
+val rpc_local : t -> bool
 
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
@@ -321,7 +331,6 @@ module Config_file : sig
     ?operations_request_timeout:float ->
     ?max_refused_operations:int ->
     ?operations_batch_size:int ->
-    ?disable_operations_precheck:bool ->
     JSON.t ->
     JSON.t
 
@@ -457,16 +466,29 @@ val wait_for_ready : t -> unit Lwt.t
     already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
-(** Get the current known level of a node.
+(** Get the current known level of the node.
 
     Returns [0] if the node is not running or if no [head_increment] or
     [branch_switch] event was received yet. This makes this function equivalent
     to [wait_for_level node 0] except that it does not actually wait for the
     level to be known.
 
-    Note that, as the node's status is updated only on head
-    increments, this value is wrong just after a snapshot import. *)
-val get_level : t -> int
+    Note that, as the node's status is updated only on head increments, this
+    value is wrong for instance right after a node restart or snapshot
+    import. Therefore it is recommended to use the function {!get_level}
+    instead, which does not have this problem. A use case for this function is
+    to check for a level increase, when the exact level does not matter, and
+    {!get_level}'s promise may not resolve. *)
+val get_last_seen_level : t -> int
+
+(** Return a promise that is fulfilled as soon as the node is running and its
+    level is known, which is then the value of the promise.
+
+    If the node is not running or if no [head_increment] or [branch_switch]
+    event was received yet, then wait until one of these events occur. It is
+    equivalent to [wait_for_level node 0], and thus avoids the pitfalls of
+    getting a misleading 0 value. *)
+val get_level : t -> int Lwt.t
 
 (** Wait for the node to read its identity.
 
@@ -545,6 +567,9 @@ val init :
   ?event_pipe:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?metrics_addr:string ->
+  ?metrics_port:int ->
+  ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?rpc_tls:tls_config ->
@@ -564,3 +589,12 @@ val upgrade_storage : t -> unit Lwt.t
 
 (** Run [octez-node --version] and return the node's version. *)
 val get_version : t -> string Lwt.t
+
+(** Expose the RPC server address of this node as a foreign endpoint. *)
+val as_rpc_endpoint : t -> Endpoint.t
+
+module RPC : sig
+  include RPC_core.CALLERS with type uri_provider := t
+
+  include module type of RPC
+end

@@ -40,7 +40,7 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
 ./octez-client --wait none send smart rollup message '["dal:16:4:256:0:2:4:6"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 170.950 units (will add 100 for safety)
+Estimated gas: 170.941 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -60,34 +60,5 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.00028
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 170.884
+      Consumed gas: 170.875
 
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/slot_headers
-[ { "level": 4, "index": 0,
-    "commitment":
-      "[DAL_SLOT_HEADER]" },
-  { "level": 4, "index": 1,
-    "commitment":
-      "[DAL_SLOT_HEADER]" },
-  { "level": 4, "index": 2,
-    "commitment":
-      "[DAL_SLOT_HEADER]" } ]
-
-./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/processed_slots
-[ { "index": 0, "status": "unconfirmed" },
-  { "index": 1, "status": "confirmed" },
-  { "index": 2, "status": "confirmed" },
-  { "index": 3, "status": "unconfirmed" },
-  { "index": 4, "status": "unconfirmed" },
-  { "index": 5, "status": "unconfirmed" },
-  { "index": 6, "status": "unconfirmed" },
-  { "index": 7, "status": "unconfirmed" },
-  { "index": 8, "status": "unconfirmed" },
-  { "index": 9, "status": "unconfirmed" },
-  { "index": 10, "status": "unconfirmed" },
-  { "index": 11, "status": "unconfirmed" },
-  { "index": 12, "status": "unconfirmed" },
-  { "index": 13, "status": "unconfirmed" },
-  { "index": 14, "status": "unconfirmed" },
-  { "index": 15, "status": "unconfirmed" } ]

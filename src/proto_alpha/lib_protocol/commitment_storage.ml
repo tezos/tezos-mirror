@@ -26,19 +26,26 @@
 let exists = Storage.Commitments.mem
 
 let committed_amount ctxt bpkh =
-  Storage.Commitments.find ctxt bpkh >>=? fun balance ->
-  return (Option.value ~default:Tez_repr.zero balance)
+  let open Lwt_result_syntax in
+  let+ balance = Storage.Commitments.find ctxt bpkh in
+  Option.value ~default:Tez_repr.zero balance
 
 let increase_commitment_only_call_from_token ctxt bpkh amount =
+  let open Lwt_result_syntax in
   if Tez_repr.(amount = zero) then return ctxt
   else
-    committed_amount ctxt bpkh >>=? fun balance ->
-    Tez_repr.(amount +? balance) >>?= fun new_balance ->
-    Storage.Commitments.add ctxt bpkh new_balance >|= ok
+    let* balance = committed_amount ctxt bpkh in
+    let*? new_balance = Tez_repr.(amount +? balance) in
+    let*! result = Storage.Commitments.add ctxt bpkh new_balance in
+    return result
 
 let decrease_commitment_only_call_from_token ctxt bpkh amount =
-  committed_amount ctxt bpkh >>=? fun balance ->
-  Tez_repr.(balance -? amount) >>?= fun new_balance ->
-  if Tez_repr.(new_balance = Tez_repr.zero) then
-    Storage.Commitments.remove ctxt bpkh >|= ok
-  else Storage.Commitments.add ctxt bpkh new_balance >|= ok
+  let open Lwt_result_syntax in
+  let* balance = committed_amount ctxt bpkh in
+  let*? new_balance = Tez_repr.(balance -? amount) in
+  let*! result =
+    if Tez_repr.(new_balance = Tez_repr.zero) then
+      Storage.Commitments.remove ctxt bpkh
+    else Storage.Commitments.add ctxt bpkh new_balance
+  in
+  return result

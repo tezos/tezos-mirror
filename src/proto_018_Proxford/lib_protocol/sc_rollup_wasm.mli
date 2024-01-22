@@ -120,4 +120,11 @@ module V2_0_0 : sig
 
   (** The preimage of {!well_known_reveal_hash}. *)
   val well_known_reveal_preimage : string
+
+  (** Convert a raw reveal request of the WASM PVM into a typed reveal as
+      defined by the protocol.
+
+      If the decoding fails, fallback to requesting the preimage of the
+      {!well_known_reveal_hash}. *)
+  val decode_reveal : Wasm_2_0_0.reveal -> Sc_rollup_PVM_sig.reveal
 end

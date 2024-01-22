@@ -116,7 +116,7 @@ module List = struct
   let rec concat_map_s f l =
     let open Lwt.Syntax in
     match l with
-    | [] -> Lwt.return []
+    | [] -> Lwt.return_nil
     | x :: xs ->
         let* x' = f x in
         let+ xs' = concat_map_s f xs in
@@ -169,7 +169,7 @@ module List32 = struct
     let rec mapi_s' f i =
       let open Lwt.Syntax in
       function
-      | [] -> Lwt.return []
+      | [] -> Lwt.return_nil
       | x :: xs ->
           let* v = f i x in
           let+ xs' = mapi_s' f (Int32.succ i) xs in

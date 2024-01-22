@@ -250,6 +250,7 @@ let test_simple_baking_event =
   Log.info "Transferring %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   Client.bake_for ~keys:[giver] client
 
 let transfer_expected_to_fail ~giver ~receiver ~amount client =
@@ -337,6 +338,7 @@ let test_multiple_baking =
       let amount = Tez.of_int amount in
       let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
       let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
+      (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
       let* () = Client.bake_for ~keys:[baker] client in
       let* alice_balance = Client.get_balance_for ~account:alice client in
       let* bob_balance = Client.get_balance_for ~account:bob client in
@@ -370,20 +372,20 @@ let get_candidates_to_migration () =
     let transient = Client.create_with_mode Client.Mockup in
     Client.list_protocols `Mockup transient
   in
-  (* Find all registered mockup protocols which declare a next protocol *)
+  (* Find all registered mockup protocols which declare a previous protocol *)
   let result =
     List.filter_map
       (fun (protocol : Protocol.t) ->
-        match Protocol.next_protocol protocol with
+        match Protocol.previous_protocol protocol with
         | None -> None
-        | Some next ->
-            let next_hash = Protocol.hash next in
+        | Some previous ->
+            let previous_hash = Protocol.hash previous in
             if
               List.exists
                 (String.equal (Protocol.hash protocol))
                 mockup_protocols
-              && List.exists (String.equal next_hash) mockup_protocols
-            then Some (protocol, next)
+              && List.exists (String.equal previous_hash) mockup_protocols
+            then Some (previous, protocol)
             else None)
       Protocol.all
   in
@@ -528,14 +530,9 @@ let test_origination_from_unrevealed_fees =
   let* () =
     Client.import_secret_key
       client
-      {
-        alias = "originator";
-        public_key_hash = "";
-        public_key = "";
-        secret_key =
-          Unencrypted
-            "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
-      }
+      ~alias:"originator"
+      (Unencrypted
+         "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy")
   in
   let* () =
     Client.transfer
@@ -598,6 +595,7 @@ let test_empty_block_baking =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
   Log.info "Baking pending operations..." ;
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   Client.bake_for ~keys:[giver] client
 
 let test_storage_from_file =
@@ -922,7 +920,7 @@ let test_transfer_rpc =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let get_balance (key : Account.key) =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:key.public_key_hash ()
   in
   let giver = Account.Bootstrap.keys.(0) in
@@ -1134,13 +1132,13 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
     (* Fetch default values *)
     let* parametric_constants =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_constants_parametric ()
     in
     (* Fetch schema, used to move from default values *)
     let* parametric_constants_schema =
       let* json =
-        RPC.Client.schema client
+        Client.RPC.schema client
         @@ RPC.get_chain_block_context_constants_parametric ()
       in
       return JSON.(json |-> "output")
@@ -1159,6 +1157,25 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              ("consensus_threshold", `Float 0.0);
            ]
     in
+    (* To fulfill the requirement that [blocks_per_epoch] divides
+       [blocks_per_cycle], we set [blocks_per_cycle] to 1, for simplicity (even
+       if the default value is also 1). *)
+    let updated_dal_parametric =
+      let dal_parametric_constants_succ =
+        JSON.(parametric_constants_succ |-> "dal_parametric")
+      in
+      let constant_blocks_per_epoch =
+        JSON.annotate ~origin:"constant_blocks_per_epoch"
+        @@ `O [("blocks_per_epoch", `Float 1.0)]
+      in
+      let updated_dal =
+        JSON.merge_objects
+          dal_parametric_constants_succ
+          constant_blocks_per_epoch
+      in
+      JSON.annotate ~origin:"updated_dal_parametric"
+      @@ `O [("dal_parametric", JSON.unannotate updated_dal)]
+    in
     (* These are the mockup specific protocol parameters as per [src/proto_alpha/lib_client/mockup.ml] *)
     let mockup_constants : JSON.t =
       JSON.annotate ~origin:"mockup_constants"
@@ -1172,7 +1189,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       JSON.(
         merge_objects
           (merge_objects
-             parametric_constants_succ
+             (merge_objects parametric_constants_succ updated_dal_parametric)
              constant_parametric_constants)
           mockup_constants)
   in

@@ -1,8 +1,4 @@
-# integration:compiler-rejections does not
-# require access to the binaries like the "true" integration tests
-# below. Therefore, it does not extend the .integration_template.
-
 integration:compiler-rejections:
   extends: .test_template
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-compiler-rejections
+    - dune build @runtest_rejections

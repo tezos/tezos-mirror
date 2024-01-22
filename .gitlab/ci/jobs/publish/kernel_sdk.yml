@@ -6,8 +6,9 @@
 publish_kernel_sdk:
   extends:
     - .default_settings_template
+    - .image_template__rust_toolchain
+    - .tags_template__no_gcp
   stage: manual
-  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.3"
   rules:
   - when: manual
   allow_failure: true

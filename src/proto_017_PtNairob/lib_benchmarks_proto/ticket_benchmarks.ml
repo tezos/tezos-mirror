@@ -90,7 +90,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
   let compare_model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~name ~const:(fv "compare_ticket_hash"))
+      (Model.unknown_const1 ~name ~const:(fv "compare_ticket_hash"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -145,7 +145,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
   let compare_model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~name ~const:(fv "compare_contract"))
+      (Model.unknown_const1 ~name ~const:(fv "compare_contract"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -227,12 +227,10 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function {nodes} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
+      (Model.affine
+         ~name
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_has_tickets_model", size_model)]
 
@@ -299,12 +297,10 @@ module Collect_tickets_benchmark : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function {nodes} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
+      (Model.affine
+         ~name
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_collect_tickets_step_model", size_model)]
 

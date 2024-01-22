@@ -473,7 +473,10 @@ let on_close w =
      This is not a problem, and allows the reconnection with this peer
      using a different socket. *)
   let (_ : unit Lwt.t) =
-    Distributed_db.disconnect pv.parameters.chain_db pv.peer_id
+    Distributed_db.disconnect
+      ~reason:"peer validator shutdown"
+      pv.parameters.chain_db
+      pv.peer_id
   in
   pv.parameters.notify_termination () ;
   Lwt.return_unit

@@ -60,9 +60,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
       (** [P2p_point_state.Info.trusted] *)
   fd_connect :
-    P2p_fd.t ->
-    Unix.sockaddr ->
-    (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
+    P2p_fd.t -> Unix.sockaddr -> (unit, P2p_fd.connect_error) result Lwt.t;
       (** [P2p_fd.connect] *)
   socket_authenticate :
     canceler:Lwt_canceler.t ->
@@ -213,7 +211,10 @@ let create_connection t p2p_conn id_point point_info peer_info
         else Lwt.return_unit
       in
       Lwt_pipe.Maybe_bounded.close messages ;
-      P2p_conn.close conn) ;
+      let reason =
+        Option.value ~default:Unknown_reason (P2p_conn.disconnect_reason conn)
+      in
+      P2p_conn.close ~reason conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   let* () =
     (* DISCLAIMER: A similar check is also performed in [P2p_worker] before
@@ -371,6 +372,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   in
   (* Authentication correct! *)
   let*! () = Events.(emit authenticate_status) ("auth", point, info.peer_id) in
+  P2p_io_scheduler.set_peer_id ~peer_id:info.peer_id scheduled_conn ;
   let* () =
     fail_when
       (P2p_pool.Peers.banned t.pool info.peer_id)
@@ -430,7 +432,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         Events.(emit authenticate_status ("nack", point, info.peer_id))
       in
       let*! nack_point_list =
-        if t.config.disable_peer_discovery then Lwt.return []
+        if t.config.disable_peer_discovery then Lwt.return_nil
         else
           (* Never send more than 100 points, you would be greylisted *)
           P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
@@ -567,35 +569,55 @@ let authenticate t ?point_info canceler fd point =
   let*! r = raw_authenticate t ?point_info canceler scheduled_conn point in
   match r with
   | Ok connection -> return connection
-  | Error
-      (P2p_errors.Rejected {motive = P2p_rejection.Unknown_chain_name; _} :: _)
-    as err ->
+  | Error (P2p_errors.Rejected_no_common_protocol _ :: _) as result ->
       (* We don't register point that belong to another network.
          They are useless, and we don't want to advertize them.
          They are not greylisted as their might be node from our
          network on the same IP.
       *)
       P2p_pool.unregister_point t.pool point ;
-      let* () = P2p_io_scheduler.close scheduled_conn in
-      Lwt.return err
-  | Error _ as err ->
-      let* () = P2p_io_scheduler.close scheduled_conn in
-      Lwt.return err
+      let* () =
+        P2p_io_scheduler.close
+          ~reason:Authentication_rejected_no_common_protocol
+          scheduled_conn
+      in
+      Lwt.return result
+  | Error (P2p_errors.Rejected {motive; _} :: _) as result ->
+      let* () =
+        P2p_io_scheduler.close
+          ~reason:(Authentication_rejected motive)
+          scheduled_conn
+      in
+      Lwt.return result
+  | Error (P2p_errors.Rejected_by_nack {motive; _} :: _) as result ->
+      let* () =
+        P2p_io_scheduler.close
+          ~reason:(Authentication_rejected_by_peer motive)
+          scheduled_conn
+      in
+      Lwt.return result
+  | Error err as result ->
+      let* () =
+        P2p_io_scheduler.close
+          ~reason:(Authentication_rejected_error err)
+          scheduled_conn
+      in
+      Lwt.return result
 
 let accept t fd point =
   let open Lwt_syntax in
   t.log (Incoming_connection point) ;
-  if
-    t.config.max_incoming_connections <= P2p_point.Table.length t.incoming
-    (* silently ignore banned points *)
-    || P2p_pool.Points.banned t.pool point
-  then
-    Error_monad.dont_wait
-      (fun () -> P2p_fd.close fd)
-      (fun (`Unexpected_error ex) ->
-        Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
+  let reject ~reason =
+    Lwt.dont_wait
+      (fun () -> P2p_fd.close ~reason fd)
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+  in
+  if t.config.max_incoming_connections <= P2p_point.Table.length t.incoming then
+    reject ~reason:Incoming_connection_too_many
+  else if (* silently ignore banned points *)
+          P2p_pool.Points.banned t.pool point
+  then reject ~reason:Incoming_connection_banned
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add t.incoming point canceler ;
@@ -654,6 +676,7 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
       let timestamp = Time.System.now () in
       P2p_point_state.set_requested ~timestamp point_info canceler ;
       let*! fd = P2p_fd.socket () in
+      P2p_fd.set_point ~point fd ;
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
       let*! () = Events.(emit connect_status) ("start", point) in
       let* () =
@@ -667,14 +690,6 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                   ~timestamp
                   t.config.reconnection_config
                   point_info ;
-                let*! close_res = P2p_fd.close fd in
-                let*! () =
-                  match close_res with
-                  | Ok () -> Lwt.return_unit
-                  | Error (`Unexpected_error ex) ->
-                      Events.(emit connect_close_error)
-                        (point, lazy (Printexc.to_string ex))
-                in
                 match err with
                 | `Unexpected_error ex ->
                     let*! () =
@@ -682,12 +697,12 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                         (point, lazy (Printexc.to_string ex))
                     in
                     Lwt.return_error (TzTrace.make (error_of_exn ex))
-                | `Connection_refused ->
+                | `Connection_failed ->
                     let*! () =
                       Events.(emit connect_error)
-                        (point, lazy "connection_refused")
+                        (point, lazy "connection failed")
                     in
-                    tzfail P2p_errors.Connection_refused)
+                    tzfail P2p_errors.Connection_failed)
               r)
       in
       let*! () = Events.(emit connect_status) ("authenticate", point) in
@@ -718,9 +733,7 @@ module Internal_for_tests = struct
     point_state_info_trusted :
       ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
     fd_connect :
-      P2p_fd.t ->
-      Unix.sockaddr ->
-      (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
+      P2p_fd.t -> Unix.sockaddr -> (unit, P2p_fd.connect_error) result Lwt.t;
     socket_authenticate :
       canceler:Lwt_canceler.t ->
       proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->

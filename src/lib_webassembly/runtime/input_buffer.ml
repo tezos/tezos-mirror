@@ -16,7 +16,7 @@ exception Dequeue_from_empty_queue
 let reraise = function
   | Lazy_vector.Bounds -> raise Bounds
   | Lazy_vector.SizeOverflow -> raise SizeOverflow
-  | exn -> raise exn
+  | exn -> Lwt.reraise exn
 
 module Vector = Lazy_vector.Mutable.ZVector
 

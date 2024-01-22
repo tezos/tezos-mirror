@@ -79,6 +79,7 @@ let init config store gs_worker transport_layer cctxt metrics_server =
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
+  let open Result_syntax in
   match ctxt.status with
   | Starting ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
@@ -87,6 +88,11 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
          (for a given cryptobox). *)
       let shards_proofs_precomputation =
         Cryptobox.precompute_shards_proofs cryptobox
+      in
+      let* () =
+        Profile_manager.validate_slot_indexes
+          ctxt.profile_ctxt
+          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
       in
       ctxt.status <-
         Ready
@@ -97,7 +103,8 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
             shards_proofs_precomputation;
             plugin_proto;
             last_seen_head = None;
-          }
+          } ;
+      return_unit
   | Ready _ -> raise Status_already_ready
 
 let update_plugin_in_ready ctxt plugin proto =
@@ -178,3 +185,116 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
          Consider returning some abstract representation of [(s, n)]
          instead of [int list] *)
       Stdlib.List.init offset (fun i -> start_index + i)
+
+let version {config; _} =
+  let network_name = config.Configuration_file.network_name in
+  Types.Version.make ~network_version:(Gossipsub.version ~network_name)
+
+module P2P = struct
+  let connect {transport_layer; _} ?timeout point =
+    Gossipsub.Transport_layer.connect transport_layer ?timeout point
+
+  let disconnect_point {transport_layer; _} ?wait point =
+    Gossipsub.Transport_layer.disconnect_point transport_layer ?wait point
+
+  let disconnect_peer {transport_layer; _} ?wait peer =
+    Gossipsub.Transport_layer.disconnect_peer transport_layer ?wait peer
+
+  let get_points ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_points ?connected transport_layer
+
+  let get_points_info ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_points_info ?connected transport_layer
+
+  let get_point_info {transport_layer; _} point =
+    Gossipsub.Transport_layer.get_point_info transport_layer point
+
+  let get_peers ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_peers ?connected transport_layer
+
+  let get_peers_info ?connected {transport_layer; _} =
+    Gossipsub.Transport_layer.get_peers_info ?connected transport_layer
+
+  let get_peer_info {transport_layer; _} peer =
+    Gossipsub.Transport_layer.get_peer_info transport_layer peer
+
+  module Gossipsub = struct
+    let get_topics {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic _peers acc -> topic :: acc)
+        state.mesh
+        []
+
+    let get_topics_peers ~subscribed ctx =
+      let state = Gossipsub.Worker.state ctx.gs_worker in
+      let topic_to_peers_map =
+        Gossipsub.Worker.GS.Introspection.Connections.peers_per_topic_map
+          state.connections
+      in
+      let subscribed_topics = lazy (get_topics ctx) in
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic peers acc ->
+          if
+            (not subscribed)
+            || List.mem
+                 ~equal:Types.Topic.equal
+                 topic
+                 (Lazy.force subscribed_topics)
+          then (topic, Gossipsub.Worker.GS.Peer.Set.elements peers) :: acc
+          else acc)
+        topic_to_peers_map
+        []
+
+    let get_connections {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Introspection.Connections.fold
+        (fun peer connection acc ->
+          ( peer,
+            Types.Gossipsub.
+              {
+                topics = Gossipsub.Worker.GS.Topic.Set.elements connection.topics;
+                direct = connection.direct;
+                outbound = connection.outbound;
+              } )
+          :: acc)
+        state.connections
+        []
+
+    let get_scores {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Peer.Map.fold
+        (fun peer score acc ->
+          let v =
+            Gossipsub.Worker.GS.Score.value score
+            |> Gossipsub.Worker.GS.Score.Introspection.to_float
+          in
+          (peer, v) :: acc)
+        state.scores
+        []
+
+    let get_backoffs {gs_worker; _} =
+      let state = Gossipsub.Worker.state gs_worker in
+      Gossipsub.Worker.GS.Topic.Map.fold
+        (fun topic peer_map acc ->
+          (topic, Gossipsub.Worker.GS.Peer.Map.bindings peer_map) :: acc)
+        state.backoff
+        []
+
+    let get_message_cache {gs_worker; _} =
+      let module Cache = Gossipsub.Worker.GS.Introspection.Message_cache in
+      let state = Gossipsub.Worker.state gs_worker in
+      let map = Cache.Introspection.get_message_ids state.message_cache in
+      Cache.Introspection.Map.fold
+        (fun tick map acc ->
+          let list =
+            Cache.Topic.Map.fold
+              (fun topic ids acc -> (topic, List.length ids) :: acc)
+              map
+              []
+          in
+          (tick, list) :: acc)
+        map
+        []
+  end
+end

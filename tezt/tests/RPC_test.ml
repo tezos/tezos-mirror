@@ -43,12 +43,18 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-let title_tag_of_test_mode = function
-  | `Client -> (`Client, "client")
-  | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
-  | `Client_rpc_proxy_server -> (`Client, "proxy_server_rpc")
-  | `Light -> (`Light, "light")
-  | `Proxy -> (`Proxy, "proxy")
+(* From a test mode, return:
+   - the client mode to use;
+   - what to add in the test title;
+   - what ~uses to add to the test. *)
+let metadata_of_test_mode = function
+  | `Client -> (`Client, "client", [])
+  | `Client_data_dir_proxy_server ->
+      (`Client, "proxy_server_data_dir", [Constant.octez_proxy_server])
+  | `Client_rpc_proxy_server ->
+      (`Client, "proxy_server_rpc", [Constant.octez_proxy_server])
+  | `Light -> (`Light, "light", [])
+  | `Proxy -> (`Proxy, "proxy", [])
 
 let patch_protocol_parameters protocol = function
   | None -> Lwt.return_none
@@ -87,16 +93,18 @@ let endpoint_of_test_mode_tag node = function
    - [parameter_overrides] specifies protocol parameters to change from the default
      sandbox parameters.
    - [nodes_args] specifies additional parameters to pass to the node.
+   - [event_sections_levels] is passed to the node initialization.
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
 let check_rpc_regression ~test_mode_tag ~test_function ?supports
-    ?parameter_overrides ?nodes_args sub_group =
-  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
+    ?parameter_overrides ?nodes_args ?event_sections_levels sub_group =
+  let client_mode_tag, title_tag, uses = metadata_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ~uses:(fun _protocol -> uses)
     ?supports
   @@ fun protocol ->
   let* parameter_file =
@@ -108,6 +116,7 @@ let check_rpc_regression ~test_mode_tag ~test_function ?supports
     Client.init_with_protocol
       ?parameter_file
       ?nodes_args
+      ?event_sections_levels
       ~protocol
       client_mode_tag
       ()
@@ -120,11 +129,12 @@ let check_rpc_regression ~test_mode_tag ~test_function ?supports
 (* Like [check_rpc_regression], but does not register a regression tests *)
 let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
     sub_group =
-  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
+  let client_mode_tag, title_tag, uses = metadata_of_test_mode test_mode_tag in
   Protocol.register_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ~uses:(fun _protocol -> uses)
   @@ fun protocol ->
   let* parameter_file =
     patch_protocol_parameters protocol parameter_overrides
@@ -147,43 +157,43 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
 let test_contracts _test_mode_tag protocol ?endpoint client =
   let test_implicit_contract contract_id =
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract ~id:contract_id ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
     in
     let*! _ =
-      RPC.Client.spawn ?endpoint ~hooks client
+      Client.RPC.spawn ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     unit
   in
   let* _contracts =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contracts ()
   in
   let* contracts =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegates ()
   in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contract_delegate ~id:bootstrap ()
   in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:unallocated_implicit ()
   in
   Log.info "Test non-delegated implicit contract" ;
@@ -206,7 +216,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
     Lwt_list.iter_s
       (fun rpc ->
         let*? process =
-          RPC.Client.spawn ?endpoint ~hooks client
+          Client.RPC.spawn ?endpoint ~hooks client
           @@ rpc
                ?chain:None
                ?block:None
@@ -241,7 +251,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
   let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contract_delegate
          ~id:delegated_implicit_key.public_key_hash
          ()
@@ -250,7 +260,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
     Lwt_list.iter_s
       (fun rpc ->
         let*? process =
-          RPC.Client.spawn ?endpoint ~hooks client
+          Client.RPC.spawn ?endpoint ~hooks client
           @@ rpc
                ?chain:None
                ?block:None
@@ -266,20 +276,20 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
   in
   let test_originated_contract contract_id =
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract ~id:contract_id ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
     in
     let*? process =
-      RPC.Client.spawn ?endpoint ~hooks client
+      Client.RPC.spawn ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
     let*? process =
-      RPC.Client.spawn ?endpoint ~hooks client
+      Client.RPC.spawn ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
@@ -288,22 +298,22 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.post_chain_block_context_contract_big_map_get
            ~id:contract_id
            ~data:(Data big_map_key)
            ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_entrypoints ~id:contract_id ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
     in
     let* _ =
-      RPC.Client.call ?endpoint ~hooks client
+      Client.RPC.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
     in
     unit
@@ -342,7 +352,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
        }"
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
          ~data:(Data unique_big_map_key)
@@ -353,7 +363,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
       "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
          ~data:(Data duplicate_big_map_key)
@@ -366,74 +376,95 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   let bootstrap = List.hd contracts in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_delegate bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_full_balance bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_frozen_deposits bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_deactivated bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_delegated_balance bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_delegated_contracts bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_grace_period bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_staking_balance bootstrap
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_voting_power bootstrap
   in
-
   unit
 
-let test_adaptive_issuance_on_alpha ?endpoint client =
+let test_adaptive_issuance_on_oxford ~contracts ?endpoint client =
   Log.info "Test adaptive issuance parameters retrieval" ;
 
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_total_supply ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_total_frozen_stake ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_current_yearly_rate ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_current_yearly_rate_exact ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_issuance_per_minute ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client ~hooks
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_expected_issuance ()
+  in
+  let bootstrap = List.hd contracts in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_stakers bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate_details ()
+  in
+  let bootstrap = List.hd contracts in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_total_delegated_stake bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_staking_denominator bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_staking_numerator bootstrap
   in
   unit
 
@@ -442,52 +473,52 @@ let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
 
   let bootstrap = List.hd contracts in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_balance bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_frozen_balance bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_frozen_balance_by_cycle bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_staking_balance bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_delegated_contracts bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_delegated_balance bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_deactivated bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_grace_period bootstrap
   in
 
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_voting_power bootstrap
   in
 
@@ -500,7 +531,7 @@ let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
   let check_failure rpc =
-    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    let*? process = Client.RPC.spawn ?endpoint ~hooks client @@ rpc in
     Process.check ~expect_failure:true process
   in
   let* () =
@@ -549,7 +580,7 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
   assert (not @@ List.mem unregistered_baker contracts) ;
 
   let check_failure rpc =
-    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    let*? process = Client.RPC.spawn ?endpoint ~hooks client @@ rpc in
     Process.check ~expect_failure:true process
   in
 
@@ -599,11 +630,11 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
 
 let get_contracts ?endpoint client =
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contracts ()
   in
   let* contracts =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegates ()
   in
 
@@ -616,8 +647,9 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
 (* Test the adaptive issuance RPC. *)
-let test_adaptive_issuance _test_mode_tag _protocol ?endpoint client =
-  test_adaptive_issuance_on_alpha ?endpoint client
+let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =
+  let* contracts = get_contracts ?endpoint client in
+  test_adaptive_issuance_on_oxford ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -626,7 +658,7 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   let* () = Client.submit_proposals ~proto_hash client in
   let* () = Client.bake_for_and_wait client in
   (* RPC calls *)
-  let call rpc = RPC.Client.call ?endpoint ~hooks client rpc in
+  let call rpc = Client.RPC.call ?endpoint ~hooks client rpc in
   let* _ = call @@ RPC.get_chain_block_votes_ballot_list () in
   let* _ = call @@ RPC.get_chain_block_votes_ballots () in
   let* _ = call @@ RPC.get_chain_block_votes_current_period () in
@@ -657,50 +689,64 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
 (* Test the various other RPCs. *)
 let test_misc_protocol _test_mode_tag protocol ?endpoint client =
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_constants ()
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_baking_rights ()
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_baking_rights
          ~delegate:Constant.bootstrap5.public_key_hash
          ()
   in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_current_level ()
   in
-  let* _ =
-    RPC.Client.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_helper_endorsing_rights ()
-  in
-  let* _ =
-    RPC.Client.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_helper_endorsing_rights
-         ~delegate:Constant.bootstrap4.public_key_hash
-         ()
+  let* () =
+    if Protocol.(number protocol >= number Nairobi + 1) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_context_denunciations ()
+      in
+      unit
+    else unit
   in
   let* () =
-    if Protocol.(number protocol > number Nairobi) then
+    if Protocol.(number protocol <= number Nairobi + 1) then
       let* _ =
-        RPC.Client.call ?endpoint ~hooks client
-        @@ RPC.get_chain_block_helper_attestation_rights ()
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_endorsing_rights ()
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
+           This RPC helper should be removed once Oxford will be frozen. *)
       in
       let* _ =
-        RPC.Client.call ?endpoint ~hooks client
-        @@ RPC.get_chain_block_helper_attestation_rights
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_endorsing_rights
              ~delegate:Constant.bootstrap4.public_key_hash
              ()
       in
       unit
     else unit
   in
+  let* () =
+    let* _ =
+      Client.RPC.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_helper_attestation_rights ()
+    in
+    let* _ =
+      Client.RPC.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_helper_attestation_rights
+           ~delegate:Constant.bootstrap4.public_key_hash
+           ()
+    in
+    unit
+  in
   let* _ =
-    RPC.Client.call ?endpoint ~hooks client
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
   in
   unit
@@ -830,7 +876,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
   let* counter_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.Account.public_key_hash
          ()
@@ -841,7 +887,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     Operation.Manager.(inject ~force:true [make ~counter @@ transfer ()] client)
   in
   let* counter_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap2.Account.public_key_hash
          ()
@@ -990,49 +1036,163 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
-  (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
-  let get_filter_variations () =
-    let get_filter ?include_default client =
-      RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.get_chain_mempool_filter ?include_default ()
+
+  Log.info
+    ~color:Log.Color.BG.yellow
+    "## Test RPCs [GET|POST /chains/main/mempool/filter]" ;
+  let open Mempool.Config in
+  Log.info
+    "Check that GET filter returns the default configuration (the full default \
+     configuration when the query parameter [include_default] is either absent \
+     or set to [true], or an empty configuration when [include_default] is \
+     [false])." ;
+  let* () =
+    check_get_filter_all_variations
+      ~log:true
+      ?endpoint
+      ~hooks:mempool_hooks
+      default
+      client
+  in
+  Log.info
+    "For various configurations, call POST filter then check that GET filter \
+     returns the expected result (for all variations of [include_default)." ;
+  let set_config_and_check msg config =
+    Log.info "%s" msg ;
+    let* output =
+      post_filter ~log:true ?endpoint ~hooks:mempool_hooks config client
     in
-    let* _ = get_filter client in
-    let* _ = get_filter ~include_default:true client in
-    let* _ = get_filter ~include_default:false client in
+    check_equal (fill_with_default config) (of_json output) ;
+    check_get_filter_all_variations
+      ~log:true
+      ?endpoint
+      ~hooks:mempool_hooks
+      config
+      client
+  in
+  let* () =
+    set_config_and_check
+      "Config 1: all fields provided and distinct from default."
+      {
+        minimal_fees = Some 1;
+        minimal_nanotez_per_gas_unit = Some (2, 3);
+        minimal_nanotez_per_byte = Some (4, 5);
+        replace_by_fee_factor = Some (6, 7);
+        max_operations = Some 8;
+        max_total_bytes = Some 9;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 2: omitted fields (which should be set to default)."
+      {
+        minimal_fees = Some 25;
+        minimal_nanotez_per_gas_unit = None;
+        minimal_nanotez_per_byte = Some (1050, 1);
+        replace_by_fee_factor = None;
+        max_operations = Some 2000;
+        max_total_bytes = None;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 3: {} (ie. all fields should be set to default)."
+      {
+        minimal_fees = None;
+        minimal_nanotez_per_gas_unit = None;
+        minimal_nanotez_per_byte = None;
+        replace_by_fee_factor = None;
+        max_operations = None;
+        max_total_bytes = None;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 4: divide by zero. (Should this config be invalid?)"
+      {
+        minimal_fees = None;
+        minimal_nanotez_per_gas_unit = Some (100, 0);
+        minimal_nanotez_per_byte = None;
+        replace_by_fee_factor = None;
+        max_operations = None;
+        max_total_bytes = None;
+      }
+  in
+  let config5 =
+    {
+      minimal_fees = None;
+      minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
+      minimal_nanotez_per_byte = Some (max_int, 1);
+      replace_by_fee_factor = None;
+      max_operations = Some default_max_operations;
+      max_total_bytes = Some 0;
+    }
+  in
+  let* () =
+    set_config_and_check
+      "Config 5: some fields omitted, some provided and equal to default, some \
+       with extreme values."
+      config5
+  in
+  Log.info
+    "Post invalid configurations; check that the config is unchanged and that \
+     event [invalid_mempool_filter_configuration] is witnessed." ;
+  let config5_full = fill_with_default config5 in
+  let endpoint =
+    match endpoint with
+    | Some endpoint -> endpoint
+    | None -> Test.fail "This test requires an actual endpoint at %s" __LOC__
+  in
+  let test_invalid_config msg config_str =
+    Log.info "%s" msg ;
+    let waiter =
+      Client.endpoint_wait_for
+        endpoint
+        "invalid_mempool_filter_configuration.v0"
+        (Fun.const (Some ()))
+    in
+    let* output_post =
+      post_filter_str ~log:true ~endpoint ~hooks:mempool_hooks config_str client
+    in
+    check_equal config5_full (of_json output_post) ;
+    let* () = waiter in
+    let* output_get = call_get_filter ~endpoint ~hooks:mempool_hooks client in
+    check_equal config5_full (of_json output_get) ;
     unit
   in
-  let post_and_get_filter config_str =
-    let* _ =
-      RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.post_chain_mempool_filter
-           ~data:(Data (Ezjsonm.from_string config_str))
-           ()
-    in
-    get_filter_variations ()
-  in
-  let* () = get_filter_variations () in
   let* () =
-    (* valid configuration *)
-    post_and_get_filter
-      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-          "minimal_nanotez_per_byte": [ "56", "3" ],
-          "replace_by_fee_factor": ["21", "20"], "max_operations": 0,
-          "max_total_bytes": 100_000_000 }|}
+    test_invalid_config
+      "Invalid config 1: invalid field name"
+      {|{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "1050", "1" ], "minimal_nanotez_per_byte": [ "7", "5" ], "replace_by_fee_factor": ["21", "20"], "max_operations": 10, "max_total_bytes": 10_000_000, "invalid_field_name": 100 }|}
   in
   let* () =
-    (* valid configuration with omitted fields *)
-    post_and_get_filter
-      {|{ "minimal_fees": "200", "replace_by_fee_factor": ["1", "1"] }|}
+    test_invalid_config
+      "Invalid config 2: wrong type"
+      {|{ "minimal_fees": "true" }|}
   in
   let* () =
-    (* invalid field name *)
-    post_and_get_filter {|{ "max_operations": 100, "invalid_field_name": 100 }|}
+    test_invalid_config
+      "Invalid config 3: wrong type bis"
+      {|{ "max_operations": "1000" }|}
   in
   let* () =
-    (* ill-typed data *) post_and_get_filter {|{ "minimal_fees": "toto" }|}
+    test_invalid_config
+      "Invalid config 4: not enough elements in fraction"
+      {|{ "minimal_nanotez_per_gas_unit": [ "100" ] }|}
   in
-  let* () = (* back to default config *) post_and_get_filter "{}" in
-  unit
+  let* () =
+    test_invalid_config
+      "Invalid config 5: too many elements in fraction"
+      {|{ "minimal_nanotez_per_gas_unit": [ "100", "1", "10" ] }|}
+  in
+  let* () =
+    test_invalid_config
+      "Invalid config 6: negative"
+      {|{ "minimal_fees": "-1" }|}
+  in
+  test_invalid_config
+    "Invalid config 7: negative bis"
+    {|{ "max_operations": -1 }|}
 
 let start_with_acl address acl =
   let* node =
@@ -1046,7 +1206,7 @@ let start_with_acl address acl =
 
 let test_network test_mode_tag _protocol ?endpoint client =
   let test peer_id =
-    let call rpc = RPC.Client.call ?endpoint client rpc in
+    let call rpc = Client.RPC.call ?endpoint client rpc in
     let* _ = call @@ RPC.get_network_connection peer_id in
     let* _ = call RPC.get_network_greylist_clear in
     (* Peers *)
@@ -1081,7 +1241,7 @@ let test_network test_mode_tag _protocol ?endpoint client =
       unit
   | `Light ->
       (* In light mode, the node is already connected to another node: use that as peer *)
-      let* peers = RPC.Client.call ?endpoint client @@ RPC.get_network_peers in
+      let* peers = Client.RPC.call ?endpoint client @@ RPC.get_network_peers in
       let peer_id =
         match peers with
         | (p, _) :: _ -> p
@@ -1097,73 +1257,73 @@ let test_network test_mode_tag _protocol ?endpoint client =
       let* _ = Node.wait_for_level node 1 in
       let* client = Client.init ~endpoint:(Node node) () in
       let* peer_id =
-        RPC.Client.call ~endpoint:(Node node) client RPC.get_network_self
+        Client.RPC.call ~endpoint:(Node node) client RPC.get_network_self
       in
       test peer_id
 
 let test_workers _test_mode_tag _protocol ?endpoint client =
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_block_validator in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_worker_block_validator in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_workers_chain_validators
+    Client.RPC.call ?endpoint client @@ RPC.get_workers_chain_validators
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator ()
+    Client.RPC.call ?endpoint client @@ RPC.get_worker_chain_validator ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator_ddb ()
+    Client.RPC.call ?endpoint client @@ RPC.get_worker_chain_validator_ddb ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_worker_chain_validator_peers_validators ()
   in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_workers_prevalidators in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_prevalidator () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_workers_prevalidators in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_worker_prevalidator () in
   unit
 
 let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let protocol_hash = Protocol.hash protocol in
   (* Turn off logging to avoid polluting the logs with the error schema *)
   let* _ =
-    RPC.Client.call ?endpoint ~log_output:false client @@ RPC.get_errors
+    Client.RPC.call ?endpoint ~log_output:false client @@ RPC.get_errors
   in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocols in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_protocols in
   (* Turn off logging to avoid polluting the logs with full protocol
      source code *)
   let* _ =
-    RPC.Client.call ?endpoint ~log_output:false client
+    Client.RPC.call ?endpoint ~log_output:false client
     @@ RPC.get_protocol protocol_hash
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
+    Client.RPC.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
   in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_gc in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_memory in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_config in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_gc in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_memory in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_config in
   unit
 
 let test_chain _test_mode_tag _protocol ?endpoint client =
   let block_level = 3 in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_blocks () in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_chain_id () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_chain_blocks () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_chain_chain_id () in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
   in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_chain_block () in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_constants_errors ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_nonce block_level
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()
   in
   let* delegates =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_raw
          ~depth:2
          ~ctxt_type:Bytes
@@ -1190,7 +1350,7 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   let* () =
     let spawn_get_chain_block_context_raw ?depth ~error_msg value_path =
       let*? process =
-        RPC.Client.spawn ?endpoint client
+        Client.RPC.spawn ?endpoint client
         @@ RPC.get_chain_block_context_raw
              ?depth
              ~ctxt_type:Bytes
@@ -1215,23 +1375,23 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
       ["non-existent"]
       ~error_msg:"No service found at this URL"
   in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_chain_block_hash () in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_chain_block_header () in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data] *)
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_header_protocol_data ()
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data/raw] *)
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_header_protocol_data_raw ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
   in
   let* _ =
     let pkh = Constant.bootstrap1.public_key in
@@ -1241,13 +1401,13 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
        The result of this RPC endpoint is empty, but I guess it
        should be a list containing [pkh]. The original python
        test has the same result. *)
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_helper_complete prefix
   in
   let* _ =
     let* () = Client.bake_for_and_wait client in
     let* head_hash =
-      RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash ()
+      Client.RPC.call ?endpoint client @@ RPC.get_chain_block_hash ()
     in
     let prefix = String.sub head_hash 0 10 in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3234
@@ -1255,17 +1415,17 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
        The result of this RPC endpoint is empty, but I guess it
        should be a list containing [head_hash]. The original python
        test has the same result. *)
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_helper_complete prefix
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_live_blocks ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_block_live_blocks ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_metadata ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_block_metadata ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_operation_hashes ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_block_operation_hashes ()
   in
   let* () =
     let validation_pass = 3 in
@@ -1279,29 +1439,29 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     in
     let* () = Client.bake_for_and_wait client in
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_operation_hashes ()
     in
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_operation_hashes_of_validation_pass validation_pass
     in
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_operation_hash
            ~validation_pass
            ~operation_offset
            ()
     in
     let* _ =
-      RPC.Client.call ?endpoint client @@ RPC.get_chain_block_operations ()
+      Client.RPC.call ?endpoint client @@ RPC.get_chain_block_operations ()
     in
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_operations_validation_pass ~validation_pass ()
     in
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_operations_validation_pass
            ~validation_pass
            ~operation_offset
@@ -1313,7 +1473,7 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
 
 let test_deprecated _test_mode_tag protocol ?endpoint client =
   let check_rpc_not_found rpc =
-    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    let*? process = Client.RPC.spawn ?endpoint ~hooks client @@ rpc in
     Process.check_error
       ~msg:
         (rex
@@ -1323,15 +1483,7 @@ let test_deprecated _test_mode_tag protocol ?endpoint client =
   in
 
   let implicit_account = Account.Bootstrap.keys.(0).public_key_hash in
-  let make path =
-    RPC.make
-      ~get_host:Node.rpc_host
-      ~get_port:Node.rpc_port
-      ~get_scheme:Node.rpc_scheme
-      GET
-      path
-      Fun.id
-  in
+  let make path = RPC_core.make GET path Fun.id in
   let* () =
     check_rpc_not_found
     @@ make
@@ -1391,7 +1543,7 @@ let test_whitelist address () =
          ]
   in
   let* client = start_with_acl address whitelist in
-  let* success_resp = RPC.Client.call client @@ RPC.get_chain_blocks () in
+  let* success_resp = Client.RPC.call client @@ RPC.get_chain_blocks () in
   let block_hash = JSON.geti 0 success_resp |> JSON.geti 0 |> JSON.as_string in
   let* () =
     if block_hash = "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" then
@@ -1422,7 +1574,7 @@ let test_blacklist address () =
     Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
     |> Process.check_error ~exit_code:1
   in
-  let* _success_resp = RPC.Client.call client @@ RPC.get_network_connections in
+  let* _success_resp = Client.RPC.call client @@ RPC.get_network_connections in
   unit
 
 let binary_regression_test () =
@@ -1487,14 +1639,16 @@ let register protocols =
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
+    ~uses:[Constant.octez_codec]
     binary_regression_test ;
   let register protocols test_mode_tag =
     let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
-        ~test_function sub_group =
+        ?event_sections_levels ~test_function sub_group =
       check_rpc_regression
         ~test_mode_tag
         ?parameter_overrides
         ?nodes_args
+        ?event_sections_levels
         ~test_function
         sub_group
         ?supports
@@ -1545,7 +1699,10 @@ let register protocols =
         check_rpc_regression
           "mempool"
           ~test_function:test_mempool
-          ~nodes_args:mempool_node_flags) ;
+          ~nodes_args:mempool_node_flags
+          ~event_sections_levels:[("prevalidator", `Debug)]
+        (* Level [Debug] is needed to witness prevalidator event
+           [invalid_mempool_filter_configuration]. *)) ;
     check_rpc
       "network"
       ~test_function:test_network

@@ -81,6 +81,9 @@ module type Durable_state = sig
         for the [key] in the durable storage of the PVM state [state].
         Empty list in case if path doesn't exist. *)
   val list : state -> string -> string list Lwt.t
+
+  module Tree_encoding_runner :
+    Tezos_tree_encoding.Runner.S with type tree = state
 end
 
 module Make_durable_state
@@ -150,6 +153,8 @@ module Impl : Pvm_sig.S = struct
     | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
     | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
         Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
+    | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
+        "Waiting for DAL parameters"
     | Computing -> "Computing"
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)

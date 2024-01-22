@@ -39,7 +39,7 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
   let store_bytes memory address data =
     let address = I32.to_int_u address in
     Memory.set_string memory ~address ~data ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let to_bits (num : Tezos_webassembly_interpreter.Values.num) : int * int64 =
     let open Tezos_webassembly_interpreter in
@@ -68,7 +68,7 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
 
     loop num_bytes abs_addr bits ;
 
-    Lwt.return ()
+    Lwt.return_unit
 
   let bound (memory : Memory.t) = Int64.of_int (Memory.length memory)
 

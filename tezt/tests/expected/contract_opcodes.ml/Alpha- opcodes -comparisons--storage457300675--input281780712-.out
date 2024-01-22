@@ -12,52 +12,52 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (just consumed gas: 29.633)
+  - location: 10 (just consumed gas: 29.053)
     [ (Pair { -9999999 ; -1 ; 0 ; 1 ; 9999999 } {}) ]
   - location: 10 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 11 (just consumed gas: 0.010)
     [ {}
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 16 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0)
+  - location: 17 (just consumed gas: 0.050)
     [ -9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 19 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.055)
     [ -1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 19 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.055)
     [ 0
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 19 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.055)
     [ 1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 19 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.055)
     [ 9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 19 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.073)
     [ { False ; False ; True ; False ; False }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ {}
       { False ; False ; True ; False ; False }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
@@ -68,45 +68,45 @@ trace
   - location: 21 (just consumed gas: 0.010)
     [ { { False ; False ; True ; False ; False } }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 24 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0)
+  - location: 25 (just consumed gas: 0.050)
     [ -9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 27 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.055)
     [ -1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 27 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.055)
     [ 0
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 27 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.055)
     [ 1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 27 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.055)
     [ 9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 27 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.073)
     [ { True ; True ; False ; True ; True }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 22 (just consumed gas: 0.025)
+  - location: 22 (just consumed gas: 0.035)
     [ { { False ; False ; True ; False ; False } }
       { True ; True ; False ; True ; True }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
@@ -118,45 +118,45 @@ trace
     [ { { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 32 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0)
+  - location: 33 (just consumed gas: 0.050)
     [ -9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 35 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0.015)
+  - location: 33 (just consumed gas: 0.055)
     [ -1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 35 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0.015)
+  - location: 33 (just consumed gas: 0.055)
     [ 0
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 35 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0.015)
+  - location: 33 (just consumed gas: 0.055)
     [ 1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 35 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0.015)
+  - location: 33 (just consumed gas: 0.055)
     [ 9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 35 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 33 (just consumed gas: 0.015)
+  - location: 33 (just consumed gas: 0.073)
     [ { True ; True ; True ; False ; False }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 30 (just consumed gas: 0.025)
+  - location: 30 (just consumed gas: 0.035)
     [ { { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
       { True ; True ; True ; False ; False }
@@ -171,45 +171,45 @@ trace
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 38 (just consumed gas: 0)
+  - location: 38 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 40 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0)
+  - location: 41 (just consumed gas: 0.050)
     [ -9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 43 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.055)
     [ -1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 43 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.055)
     [ 0
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 43 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.055)
     [ 1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 43 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.055)
     [ 9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 43 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.073)
     [ { True ; True ; False ; False ; False }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 38 (just consumed gas: 0.025)
+  - location: 38 (just consumed gas: 0.035)
     [ { { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
@@ -227,45 +227,45 @@ trace
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 46 (just consumed gas: 0)
+  - location: 46 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 48 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0)
+  - location: 49 (just consumed gas: 0.050)
     [ -9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 51 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0.015)
+  - location: 49 (just consumed gas: 0.055)
     [ -1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 51 (just consumed gas: 0.010)
     [ False
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0.015)
+  - location: 49 (just consumed gas: 0.055)
     [ 0
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 51 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0.015)
+  - location: 49 (just consumed gas: 0.055)
     [ 1
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 51 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0.015)
+  - location: 49 (just consumed gas: 0.055)
     [ 9999999
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
   - location: 51 (just consumed gas: 0.010)
     [ True
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 49 (just consumed gas: 0.015)
+  - location: 49 (just consumed gas: 0.073)
     [ { False ; False ; True ; True ; True }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 46 (just consumed gas: 0.025)
+  - location: 46 (just consumed gas: 0.035)
     [ { { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;
         { True ; True ; False ; True ; True } ;
@@ -286,31 +286,31 @@ trace
         { True ; True ; False ; True ; True } ;
         { False ; False ; True ; False ; False } }
       { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 54 (just consumed gas: 0)
+  - location: 54 (just consumed gas: 0.010)
     [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 } ]
-  - location: 56 (just consumed gas: 0)
+  - location: 56 (just consumed gas: 0.050)
     [ -9999999 ]
   - location: 58 (just consumed gas: 0.010)
     [ False ]
-  - location: 56 (just consumed gas: 0.015)
+  - location: 56 (just consumed gas: 0.055)
     [ -1 ]
   - location: 58 (just consumed gas: 0.010)
     [ False ]
-  - location: 56 (just consumed gas: 0.015)
+  - location: 56 (just consumed gas: 0.055)
     [ 0 ]
   - location: 58 (just consumed gas: 0.010)
     [ False ]
-  - location: 56 (just consumed gas: 0.015)
+  - location: 56 (just consumed gas: 0.055)
     [ 1 ]
   - location: 58 (just consumed gas: 0.010)
     [ True ]
-  - location: 56 (just consumed gas: 0.015)
+  - location: 56 (just consumed gas: 0.055)
     [ 9999999 ]
   - location: 58 (just consumed gas: 0.010)
     [ True ]
-  - location: 56 (just consumed gas: 0.015)
+  - location: 56 (just consumed gas: 0.073)
     [ { False ; False ; False ; True ; True } ]
-  - location: 54 (just consumed gas: 0.025)
+  - location: 54 (just consumed gas: 0.035)
     [ { { False ; False ; True ; True ; True } ;
         { True ; True ; False ; False ; False } ;
         { True ; True ; True ; False ; False } ;

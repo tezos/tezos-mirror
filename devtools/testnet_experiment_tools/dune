@@ -7,6 +7,7 @@
   tezt
   tezt-tezos
   octez-shell-libs.client-base-unix
+  octez-node-config
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix
@@ -22,4 +23,135 @@
   -open Tezos_client_base_unix
   -open Tezos_stdlib_unix
   -open Tezos_protocol_alpha)
- (modules testnet_experiment_tools))
+ (modules testnet_experiment_tools format_baker_accounts))
+
+(library
+ (name simulation_scenario_lib)
+ (libraries
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-shell-libs.store
+  octez-shell-libs.store.shared
+  octez-libs.tezos-context
+  octez-protocol-017-PtNairob-libs.baking
+  octez-protocol-017-PtNairob-libs.client
+  octez-protocol-017-PtNairob-libs.client.commands
+  tezos-protocol-017-PtNairob.protocol
+  octez-protocol-018-Proxford-libs.baking
+  octez-protocol-018-Proxford-libs.client
+  octez-protocol-018-Proxford-libs.client.commands
+  tezos-protocol-018-Proxford.protocol
+  octez-protocol-alpha-libs.baking
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.client.commands
+  tezos-protocol-alpha.protocol)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_store
+  -open Tezos_store_shared
+  -open Tezos_context)
+ (modules sigs tool_017_PtNairob tool_018_Proxford tool_alpha))
+
+(executable
+ (name simulation_scenario)
+ (libraries
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.store
+  octez-libs.clic
+  octez-shell-libs.store.unix-snapshots
+  octez-shell-libs.store.shared
+  octez-node-config
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  simulation_scenario_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Tezos_store_unix_snapshots
+  -open Tezos_store_shared
+  -open Octez_node_config
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Simulation_scenario_lib)
+ (modules simulation_scenario))
+
+(executable
+ (name extract_data)
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.store
+  octez-libs.clic
+  octez-shell-libs.client-base-unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Tezos_client_base_unix)
+ (modules extract_data))
+
+(executable
+ (name safety_checker)
+ (libraries
+  octez-libs.base
+  octez-shell-libs.store
+  octez-libs.clic
+  octez-node-config
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Octez_node_config
+  -open Tezos_client_base
+  -open Tezos_client_base_unix)
+ (modules safety_checker))
+
+(executable
+ (name get_teztale_data)
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  caqti-lwt
+  caqti-dynload
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base
+  -open Tezos_client_base_unix)
+ (modules get_teztale_data teztale_sql_queries))

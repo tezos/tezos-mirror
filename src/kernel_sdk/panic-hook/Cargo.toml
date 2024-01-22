@@ -5,7 +5,7 @@
 
 [package]
 name = "tezos-smart-rollup-panic-hook"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -16,9 +16,11 @@ categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.2.1"
+version = "0.2.2"
 
 [features]
-default = ["abort", "debug"]
+default = ["abort", "debug", "std"]
 abort = []
 debug = []
+std = []
+proto-alpha=["tezos-smart-rollup-core/proto-alpha"]

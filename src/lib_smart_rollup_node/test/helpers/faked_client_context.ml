@@ -107,11 +107,12 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
 
     method load : type a.
         string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
+      let open Lwt_result_syntax in
       fun alias_name ~default encoding ->
         let filename = self#filename alias_name in
         if not (String.Hashtbl.mem filesystem filename) then return default
         else
-          self#read_file filename >>=? fun content ->
+          let* content = self#read_file filename in
           let json = (Ezjsonm.from_string content :> Data_encoding.json) in
           match Data_encoding.Json.destruct encoding json with
           | exception e ->

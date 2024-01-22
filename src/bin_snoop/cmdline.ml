@@ -48,6 +48,7 @@ type benchmark_options = {
 type codegen_options = {
   transform : Fixed_point_transform.options option;
   save_to : string option;
+  split : bool;
 }
 
 (* Infer command related types *)
@@ -94,6 +95,11 @@ type command =
       solver : string;
       infer_opts : infer_parameters_options;
     }
+  | Infer_all of {
+      workload_data : string;
+      solver : string;
+      infer_opts : infer_parameters_options;
+    }
   | Codegen of {
       solution : string;
       model_name : Namespace.t;
@@ -104,19 +110,15 @@ type command =
       matching : string;
       codegen_options : codegen_options;
     }
-  | Codegen_inferred of {
-      solution : string;
-      codegen_options : codegen_options;
-      exclusions : String.Set.t;
-    }
+  | Codegen_inferred of {solution : string; codegen_options : codegen_options}
   | Codegen_for_solutions of {
       solutions : string list;
       codegen_options : codegen_options;
-      exclusions : String.Set.t;
     }
   | Codegen_check_definitions of {files : string list}
   | Solution_print of string list
   | Auto_build of {
+      split : bool;
       targets : auto_build_targets;
       auto_build_options : auto_build_options;
     }

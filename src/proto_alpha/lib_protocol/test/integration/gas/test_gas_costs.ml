@@ -247,13 +247,14 @@ let cast_cost_to_s (c : Alpha_context.Gas.cost) : _ S.t =
 
 (** Checks that all costs are positive values. *)
 let test_cost_reprs_are_all_positive list () =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun (cost_name, cost) ->
       if S.(cost > S.zero) then return_unit
       else if S.equal cost S.zero && List.mem ~equal:String.equal cost_name free
       then return_unit
       else
-        fail
+        tzfail
           (Exn
              (Failure (Format.asprintf "Gas cost test \"%s\" failed" cost_name))))
     list

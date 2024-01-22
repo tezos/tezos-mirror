@@ -23,19 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type representing frozen deposits for a cycle.
-
-    It is used both for frozen deposits and unstaked frozen deposits with
-    slightly different behaviours.
+(** Type representing unstaked frozen deposits.
 
     [initial_amount] is the amount on which slashing should be based.
     [current_amount] is the current amount after slashing has happened. 
 
-    For frozen deposits, a single record is maintained with the invariant
-    [initial_amount = current_amount] at the beginning of a cycle.
+    There is a record per cycle.
 
-    For unstaked frozen deposits, there is a record per cycle. 
-    The values of all unslashable cycles are squashed together at cycle ends.
     The [initial_amount] may be increased during the current cycle only, when
     an unstake is requested.
 

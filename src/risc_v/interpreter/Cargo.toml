@@ -1,0 +1,7 @@
+[package]
+name = "risc-v-interpreter"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.risc-v-machine-state]
+path = "../machine_state"

@@ -35,19 +35,27 @@ module P2p_limits = struct
 
   let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *)
 
+  (* Some of the default values below taken from L1 node instantiation of
+     Octez-p2p library. We amplify the value by this constant. *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6391
+
+     Decide which default value we should choose for P2P parameters and wheter we
+     specialize them per profile kind. *)
+  let dal_amplification_factor = 8
+
   (* [maintenance_idle_time] is set to [None] to disable the internal maintenance
      mechanism of Octez-p2p. *)
   let maintenance_idle_time = None
 
   let min_connections = 10
 
-  let expected_connections = 50
+  let expected_connections = 50 * dal_amplification_factor
 
-  let max_connections = 100
+  let max_connections = 100 * dal_amplification_factor
 
   let backlog = 20
 
-  let max_incoming_connections = 20
+  let max_incoming_connections = 20 * dal_amplification_factor
 
   let max_download_speed = None
 
@@ -65,9 +73,11 @@ module P2p_limits = struct
 
   let outgoing_message_queue_size = None
 
-  let max_known_points = Some (400, 300)
+  let max_known_points =
+    Some (400 * dal_amplification_factor, 300 * dal_amplification_factor)
 
-  let max_known_peer_ids = Some (400, 300)
+  let max_known_peer_ids =
+    Some (400 * dal_amplification_factor, 300 * dal_amplification_factor)
 
   let peer_greylist_size = 1023 (* historical value *)
 
@@ -98,7 +108,7 @@ module P2p_config = struct
 
   let listening_port = 11732
 
-  let listening_addr = P2p_addr.of_string_exn "127.0.0.1"
+  let listening_addr = P2p_addr.of_string_exn "0.0.0.0"
 
   let discovery_port = None
 

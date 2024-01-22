@@ -56,6 +56,7 @@ type error +=
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
+  | Cannot_checkout_l2_header
   | No_batcher
   | No_publisher
   | Refutation_player_failed_to_start
@@ -75,6 +76,22 @@ type error +=
     }
 
 type error += Operator_not_in_whitelist
+
+type error += Operator_has_no_staked
+
+type error += Exit_bond_recovered_bailout_mode
+
+type error +=
+  | Access_below_first_available_level of {
+      first_available_level : int32;
+      accessed_level : int32;
+    }
+
+type error +=
+  | Unexpected_rollup of {
+      rollup_address : Octez_smart_rollup.Address.t;
+      saved_address : Octez_smart_rollup.Address.t;
+    }
 
 let () =
   register_error_kind
@@ -250,6 +267,17 @@ let () =
 
   register_error_kind
     `Permanent
+    ~id:"internal.cannot_checkout_l2_header"
+    ~title:"Internal error: Cannot checkout L2 header"
+    ~description:
+      "The rollup node cannot checkout the l2 header registered for the block."
+    ~pp:(fun ppf () -> Format.fprintf ppf "The l2 header cannot be checkouted")
+    Data_encoding.unit
+    (function Cannot_checkout_l2_header -> Some () | _ -> None)
+    (fun () -> Cannot_checkout_l2_header) ;
+
+  register_error_kind
+    `Permanent
     ~id:"sc_rollup.node.lost_game"
     ~title:"Lost refutation game"
     ~description:"The rollup node lost a refutation game."
@@ -395,8 +423,84 @@ let () =
     ~title:"The operator is not in the whitelist"
     ~description:"The operator is not in the whitelist."
     ~pp:(fun ppf () ->
-      Format.pp_print_string ppf "The operator is not in the whitelist")
+      Format.pp_print_string
+        ppf
+        "The operator is not in the whitelist. Please restart the rollup node \
+         in bailout mode if you still have stakes.")
     `Permanent
     Data_encoding.unit
     (function Operator_not_in_whitelist -> Some () | _ -> None)
-    (fun () -> Operator_not_in_whitelist)
+    (fun () -> Operator_not_in_whitelist) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.operator_has_no_staked"
+    ~title:"The operator does not has any stake"
+    ~description:"The operator does not has any stake."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "The operator does not has any stake.")
+    `Permanent
+    Data_encoding.unit
+    (function Operator_has_no_staked -> Some () | _ -> None)
+    (fun () -> Operator_has_no_staked) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.exiting_bailout_mode"
+    ~title:"The rollup node is exiting."
+    ~description:
+      "The rollup node is exiting after recovering the bond of the operator."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The rollup node is exiting after bailout mode.")
+    `Permanent
+    Data_encoding.unit
+    (function Exit_bond_recovered_bailout_mode -> Some () | _ -> None)
+    (fun () -> Exit_bond_recovered_bailout_mode) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.access_below_first_available_level"
+    ~title:"Rollup node access data that is garbage collected"
+    ~description:
+      "The rollup node attempts to access data that is garbage collected."
+    ~pp:(fun ppf (first, access) ->
+      Format.fprintf
+        ppf
+        "Attempting to access data for level %ld, which is before the first \
+         available level %ld"
+        access
+        first)
+    Data_encoding.(
+      obj2 (req "first_available_level" int32) (req "accessed_level" int32))
+    (function
+      | Access_below_first_available_level
+          {first_available_level; accessed_level} ->
+          Some (first_available_level, accessed_level)
+      | _ -> None)
+    (fun (first_available_level, accessed_level) ->
+      Access_below_first_available_level {first_available_level; accessed_level}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.unexpected_rollup"
+    ~title:"Unexpected rollup for rollup node"
+    ~description:"This rollup node is already set up for another rollup."
+    ~pp:(fun ppf (rollup_address, saved_address) ->
+      Format.fprintf
+        ppf
+        "This rollup node was already set up for rollup %a, it cannot be run \
+         for a different rollup %a."
+        Address.pp
+        saved_address
+        Address.pp
+        rollup_address)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "rollup_address" Address.encoding)
+        (req "saved_address" Address.encoding))
+    (function
+      | Unexpected_rollup {rollup_address; saved_address} ->
+          Some (rollup_address, saved_address)
+      | _ -> None)
+    (fun (rollup_address, saved_address) ->
+      Unexpected_rollup {rollup_address; saved_address})

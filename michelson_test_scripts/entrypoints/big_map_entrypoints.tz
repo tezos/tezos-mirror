@@ -23,8 +23,8 @@ code { UNPAIR ;
                  { DIP { UNPAIR ; SWAP } ; DIP { DUP } ; MEM ; ASSERT ; SWAP } }
              { IF_LEFT
                  { IF_LEFT
-                     { UNPAIR ; DIIP { UNPAIR } ; DIP { SOME } ; UPDATE }
-                     { UNPAIR ; DIIP { UNPAIR ; SWAP } ; DIP { SOME } ; UPDATE ; SWAP } }
+                     { UNPAIR ; DIP 2 { UNPAIR } ; DIP { SOME } ; UPDATE }
+                     { UNPAIR ; DIP 2 { UNPAIR ; SWAP } ; DIP { SOME } ; UPDATE ; SWAP } }
                  { IF_LEFT
                      { DIP { UNPAIR } ; DIP { NONE nat } ; UPDATE }
                      { DIP { UNPAIR ; SWAP } ; DIP { NONE nat } ; UPDATE ; SWAP } } } ;

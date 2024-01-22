@@ -205,7 +205,7 @@ let () =
       | [] -> None
       | str :: percentage :: _ when str = staking_share_opt_name ->
           let percentage = Int64.of_string percentage in
-          assert (0L < percentage && percentage < 100L) ;
+          assert (0L < percentage && percentage <= 100L) ;
           Some percentage
       | _ :: argv' -> aux argv'
     in

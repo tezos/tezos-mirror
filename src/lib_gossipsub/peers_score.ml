@@ -27,10 +27,6 @@ open Gossipsub_intf
 
 (** This module allows to compute a score for each peers. *)
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/4967
-
-   This is incomplete *)
-
 module Make
     (Span : SPAN)
     (Time : TIME with type span = Span.t)
@@ -526,10 +522,12 @@ struct
 
   let pp_value = Fmt.float
 
+  module Introspection = struct
+    let to_float = Fun.id
+  end
+
   module Internal_for_tests = struct
     let get_topic_params = get_topic_params
-
-    let to_float = Fun.id
 
     let is_active topic {stats; score = _} =
       match Topic.Map.find topic stats.topic_status with

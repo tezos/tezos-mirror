@@ -364,10 +364,12 @@ module Client_state = struct
     | Some contract_state -> return (contract_state, client_state)
 
   let register cctxt ~force ~default_memo_size contract vk =
-    load cctxt >>=? fun client_state ->
-    get_or_init ~default_memo_size contract client_state
-    >>=? fun (contract_state, client_state) ->
-    Contract_state.init ~force vk contract_state >>=? fun contract_state ->
+    let open Lwt_result_syntax in
+    let* client_state = load cctxt in
+    let* contract_state, client_state =
+      get_or_init ~default_memo_size contract client_state
+    in
+    let* contract_state = Contract_state.init ~force vk contract_state in
     let client_state = Map.add contract contract_state client_state in
     write cctxt client_state
 
@@ -390,41 +392,49 @@ module Client_state = struct
       ()
 
   let sync_and_scan cctxt contract =
-    load cctxt >>=? fun state ->
-    find cctxt contract state >>=? fun contract_state ->
+    let open Lwt_result_syntax in
+    let* state = load cctxt in
+    let* contract_state = find cctxt contract state in
     let cm_pos, nf_pos = Storage.size contract_state.storage in
-    get_diff cctxt contract cm_pos nf_pos >>=? fun diff ->
+    let* diff = get_diff cctxt contract cm_pos nf_pos in
     let contract_state = Contract_state.update_storage contract_state diff in
     let state = Map.add contract contract_state state in
-    write cctxt state >>=? fun () -> return contract_state
+    let* () = write cctxt state in
+    return contract_state
 end
 
 (** Truncate or pad the message to fit the memo_size *)
 let adjust_message_length (cctxt : #Client_context.full) ?message memo_size =
+  let open Lwt_syntax in
   match message with
   | None ->
-      cctxt#warning
-        "no message provided, adding a zeroes filled message of the required \
-         length: %d "
-        memo_size
-      >|= fun () -> Bytes.make memo_size '\000'
+      let+ () =
+        cctxt#warning
+          "no message provided, adding a zeroes filled message of the required \
+           length: %d "
+          memo_size
+      in
+      Bytes.make memo_size '\000'
   | Some message ->
       let message_length = Bytes.length message in
-      if message_length = memo_size then Lwt.return message
+      if message_length = memo_size then return message
       else if message_length > memo_size then
-        cctxt#warning
-          "Your message is too long (%d bytes) and will therefore be truncated \
-           to %d bytes"
-          message_length
-          memo_size
-        >|= fun () -> Bytes.sub message 0 memo_size
+        let+ () =
+          cctxt#warning
+            "Your message is too long (%d bytes) and will therefore be \
+             truncated to %d bytes"
+            message_length
+            memo_size
+        in
+        Bytes.sub message 0 memo_size
       else
-        cctxt#warning
-          "Your message is too short (%d bytes) and will therefore be \
-           right-padded with zero bytes to reach a %d-byte length"
-          message_length
-          memo_size
-        >|= fun () ->
+        let+ () =
+          cctxt#warning
+            "Your message is too short (%d bytes) and will therefore be \
+             right-padded with zero bytes to reach a %d-byte length"
+            message_length
+            memo_size
+        in
         Bytes.cat message (Bytes.make (memo_size - message_length) '\000')
 
 let create_payment ~message dst amount =
@@ -434,9 +444,11 @@ let create_payment ~message dst amount =
 (** Return a list of inputs belonging to an account sufficient to cover an
     amount, together with the change remaining. *)
 let get_shielded_amount amount account =
+  let open Result_syntax in
   let balance = Account.balance account in
-  error_unless (balance >= amount) (Balance_too_low (balance, amount))
-  >|? fun () ->
+  let+ () =
+    error_unless (balance >= amount) (Balance_too_low (balance, amount))
+  in
   let to_pay = Shielded_tez.to_mutez amount in
   let inputs_to_spend = [] in
   let rec loop to_pay chosen_inputs account =
@@ -465,12 +477,13 @@ let create_payback ~memo_size address amount =
 (* The caller should check that the account exists already *)
 let unshield ~src ~bound_data ~backdst amount (state : Contract_state.t)
     anti_replay =
+  let open Result_syntax in
   let vk = Viewing_key.of_sk src in
   let account =
     Contract_state.find_account vk state
     |> WithExceptions.Option.get ~loc:__LOC__
   in
-  get_shielded_amount amount account >|? fun (inputs, change) ->
+  let+ inputs, change = get_shielded_amount amount account in
   let memo_size = Storage.get_memo_size state.storage in
   let payback = create_payback ~memo_size backdst change in
   F.forge_transaction
@@ -482,9 +495,10 @@ let unshield ~src ~bound_data ~backdst amount (state : Contract_state.t)
     state.storage
 
 let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
+  let open Lwt_result_syntax in
   let shielded_amount = Shielded_tez.of_tez amount in
   let memo_size = Storage.get_memo_size Contract_state.(state.storage) in
-  adjust_message_length cctxt ?message memo_size >>= fun message ->
+  let*! message = adjust_message_length cctxt ?message memo_size in
   let payment = create_payment ~message dst shielded_amount in
   let negative_amount = Int64.neg (Tez.to_mutez amount) in
   return
@@ -498,14 +512,15 @@ let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
 (* The caller should check that the account exists already *)
 let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
     anti_replay =
+  let open Lwt_result_syntax in
   let vk = Viewing_key.of_sk src in
   let account =
     Contract_state.find_account vk state
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   let memo_size = Storage.get_memo_size state.storage in
-  adjust_message_length cctxt ?message memo_size >|= fun message ->
-  get_shielded_amount amount account >|? fun (inputs, change) ->
+  let*! message = adjust_message_length cctxt ?message memo_size in
+  let*? inputs, change = get_shielded_amount amount account in
   let payment = create_payment ~message dst amount in
   let payback = create_payback ~memo_size backdst change in
   let sapling_transaction =
@@ -517,4 +532,4 @@ let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
       ~bound_data:""
       state.storage
   in
-  sapling_transaction
+  return sapling_transaction

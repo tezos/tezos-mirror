@@ -97,7 +97,7 @@ let metadata_is_too_large client =
    recomputation of the operations metadata.*)
 let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   let* first_manager_operation =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_operations_validation_pass
          ~force_metadata
          ~validation_pass:3
@@ -120,7 +120,7 @@ let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
 
 let get_attestation client =
   let* _ =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_operations_validation_pass
          ~validation_pass:0
          ~operation_offset:0

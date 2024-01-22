@@ -27,6 +27,10 @@
 (* Declaration order must respect the version order. *)
 type t = Nairobi | Oxford | Alpha
 
+let encoding =
+  Data_encoding.string_enum
+    [("nairobi", Nairobi); ("oxford", Oxford); ("alpha", Alpha)]
+
 type constants =
   | Constants_sandbox
   | Constants_mainnet
@@ -41,23 +45,23 @@ let constants_to_string = function
 
 let name = function
   | Alpha -> "Alpha"
-  | Nairobi -> "Nairobi"
   | Oxford -> "Oxford"
+  | Nairobi -> "Nairobi"
 
 let number = function Nairobi -> 017 | Oxford -> 018 | Alpha -> 019
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Nairobi -> "proto_017_PtNairob"
   | Oxford -> "proto_018_Proxford"
+  | Nairobi -> "proto_017_PtNairob"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+  | Oxford -> "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
   | Nairobi -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
-  | Oxford -> "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -75,7 +79,11 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 
-let accuser proto = "./octez-accuser-" ^ daemon_name proto
+let protocol_dependent_uses ~tag ~path protocol =
+  let protocol = daemon_name protocol in
+  Uses.make ~tag:(tag ^ String.lowercase_ascii protocol) ~path:(path ^ protocol)
+
+let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
 let baker proto = "./octez-baker-" ^ daemon_name proto
 
@@ -103,13 +111,17 @@ type bootstrap_smart_rollup = {
   pvm_kind : string;
   boot_sector : string;
   parameters_ty : Ezjsonm.value;
+  whitelist : string list option;
 }
+
+let default_bootstrap_balance = 4_000_000_000_000
 
 let write_parameter_file :
     ?bootstrap_accounts:(Account.key * int option) list ->
     ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
     ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
     ?bootstrap_contracts:bootstrap_contract list ->
+    ?output_file:string ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
@@ -117,10 +129,10 @@ let write_parameter_file :
      ?(additional_bootstrap_accounts = [])
      ?(bootstrap_smart_rollups = [])
      ?(bootstrap_contracts = [])
+     ?(output_file = Temp.file "parameters.json")
      ~base
      parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
-  let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
     let file =
       Either.fold
@@ -142,7 +154,9 @@ let write_parameter_file :
                 `String account.public_key;
                 `String
                   (string_of_int
-                     (Option.value ~default:4000000000000 default_balance));
+                     (Option.value
+                        ~default:default_bootstrap_balance
+                        default_balance));
               ])
           bootstrap_accounts
       in
@@ -154,14 +168,22 @@ let write_parameter_file :
     else
       let bootstrap_smart_rollups =
         List.map
-          (fun {address; pvm_kind; boot_sector; parameters_ty} ->
+          (fun {address; pvm_kind; boot_sector; parameters_ty; whitelist} ->
             `O
-              [
-                ("address", `String address);
-                ("pvm_kind", `String pvm_kind);
-                ("kernel", `String boot_sector);
-                ("parameters_ty", parameters_ty);
-              ])
+              ([
+                 ("address", `String address);
+                 ("pvm_kind", `String pvm_kind);
+                 ("kernel", `String boot_sector);
+                 ("parameters_ty", parameters_ty);
+               ]
+              @
+              match whitelist with
+              | Some whitelist ->
+                  [
+                    ( "whitelist",
+                      `A (List.map (fun key -> `String key) whitelist) );
+                  ]
+              | None -> []))
           bootstrap_smart_rollups
       in
       match bootstrap_smart_rollups with
@@ -239,18 +261,15 @@ let write_parameter_file :
       path
       (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
-  JSON.encode_to_file_u overriden_parameters parameters ;
-  Lwt.return overriden_parameters
-
-let next_protocol = function
-  | Nairobi -> Some Alpha
-  | Oxford -> None
-  | Alpha -> None
+  JSON.encode_to_file_u output_file parameters ;
+  Lwt.return output_file
 
 let previous_protocol = function
   | Alpha -> Some Nairobi
   | Oxford -> Some Nairobi
   | Nairobi -> None
+
+let has_predecessor p = previous_protocol p <> None
 
 let all = [Nairobi; Oxford; Alpha]
 
@@ -259,8 +278,12 @@ type supported_protocols =
   | From_protocol of int
   | Until_protocol of int
   | Between_protocols of int * int
+  | Has_predecessor
+  | And of supported_protocols list
+  | Or of supported_protocols list
+  | Not of supported_protocols
 
-let is_supported supported_protocols protocol =
+let rec is_supported supported_protocols protocol =
   match supported_protocols with
   | Any_protocol -> true
   | From_protocol n -> number protocol >= n
@@ -268,12 +291,22 @@ let is_supported supported_protocols protocol =
   | Between_protocols (a, b) ->
       let n = number protocol in
       a <= n && n <= b
+  | Has_predecessor -> has_predecessor protocol
+  | And l -> List.for_all (fun sp -> is_supported sp protocol) l
+  | Or l -> List.exists (fun sp -> is_supported sp protocol) l
+  | Not sp -> not (is_supported sp protocol)
 
-let show_supported_protocols = function
+let rec show_supported_protocols = function
   | Any_protocol -> "Any_protocol"
   | From_protocol n -> sf "From_protocol %d" n
   | Until_protocol n -> sf "Until_protocol %d" n
   | Between_protocols (a, b) -> sf "Between_protocol (%d, %d)" a b
+  | Has_predecessor -> "Has_predecessor"
+  | And l ->
+      sf "And [%s]" (String.concat "; " (List.map show_supported_protocols l))
+  | Or l ->
+      sf "Or [%s]" (String.concat "; " (List.map show_supported_protocols l))
+  | Not sp -> sf "Not (%s)" (show_supported_protocols sp)
 
 let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
   match List.filter (is_supported supports) protocols with
@@ -289,22 +322,40 @@ let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
-let add_to_test_parameters protocol title tags =
-  (name protocol ^ ": " ^ title, tag protocol :: tags)
+let add_to_test_parameters protocol title tags uses =
+  let uses = match uses with None -> [] | Some uses -> uses protocol in
+  (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
 
-let register_test ~__FILE__ ~title ~tags ?supports body protocols =
+let register_test ~__FILE__ ~title ~tags ?uses ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Test.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
 
-let register_long_test ~__FILE__ ~title ~tags ?supports ?team ~executors
+let register_long_test ~__FILE__ ~title ~tags ?uses ?supports ?team ~executors
     ~timeout body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Long_test.register ~__FILE__ ~title ~tags ?team ~executors ~timeout (fun () ->
-      body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Long_test.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses
+    ?team
+    ~executors
+    ~timeout
+    (fun () -> body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ?supports body protocols =
+let register_regression_test ~__FILE__ ~title ~tags ?uses ?supports body
+    protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags = add_to_test_parameters protocol title tags in
-  Regression.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  Regression.register ~__FILE__ ~title ~tags ~uses (fun () -> body protocol)
+
+let with_predecessor f protocol =
+  match previous_protocol protocol with
+  | None ->
+      Test.fail
+        "protocol %s has no predecessor; you should probably annotate your \
+         test with ~supports:Has_predecessor"
+        (name protocol)
+  | Some previous_protocol -> f ~previous_protocol ~protocol

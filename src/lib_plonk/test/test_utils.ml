@@ -41,9 +41,9 @@ let list_tests () =
     21 * 21 = fold_left3 (fun acc a b c -> acc + (a * b * c)) 0 rng6 rng6 rng6)
 
 module Fr_generation = struct
-  module Scalar = Plonk.Bls.Scalar
-  module Fr_generation = Plonk.Utils.Fr_generation
+  module Scalar = Kzg.Bls.Scalar
   module Scalar_set = Set.Make (Scalar)
+  open Kzg.Utils
 
   let test_powers () =
     let n = 256 in
@@ -56,17 +56,19 @@ module Fr_generation = struct
     done
 
   let test_random_fr () =
-    let transcript = Random.int 1000 |> string_of_int |> Bytes.of_string in
+    let transcript =
+      Transcript.expand Scalar.t (Scalar.random ()) Transcript.empty
+    in
     (* check that the transcript changes after sampling *)
     let x, new_transcript = Fr_generation.random_fr transcript in
-    assert (not @@ Bytes.equal transcript new_transcript) ;
+    assert (not @@ Transcript.equal transcript new_transcript) ;
     (* check that different transcripts lead to different elements (w.h.p.) *)
     let y, _ = Fr_generation.random_fr new_transcript in
     assert (not @@ Scalar.eq x y) ;
     (* check that random_fr and random_fr_list are consistent when only
        one element is sampled *)
     let l, new_transcript' = Fr_generation.random_fr_list transcript 1 in
-    assert (Bytes.equal new_transcript new_transcript') ;
+    assert (Transcript.equal new_transcript new_transcript') ;
     (match l with [x'] -> assert (Scalar.eq x x') | _ -> assert false) ;
     (* check that all outputs of random_fr_list are different (w.h.p.) *)
     let n = 100 in

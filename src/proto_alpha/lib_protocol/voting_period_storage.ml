@@ -96,12 +96,14 @@ let get_current = Storage.Vote.Current_period.get
 let init = Storage.Vote.Current_period.init
 
 let init_first_period ctxt ~start_position =
-  init ctxt @@ Voting_period_repr.root ~start_position >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt = init ctxt @@ Voting_period_repr.root ~start_position in
   Storage.Vote.Pred_period_kind.init ctxt Voting_period_repr.Proposal
 
 let common ctxt =
-  get_current ctxt >>=? fun current_period ->
-  Storage.Vote.Pred_period_kind.update ctxt current_period.kind >|=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* current_period = get_current ctxt in
+  let+ ctxt = Storage.Vote.Pred_period_kind.update ctxt current_period.kind in
   let start_position =
     (* because we are preparing the voting period for the next block we need to
        use the next level. *)
@@ -110,18 +112,24 @@ let common ctxt =
   (ctxt, current_period, start_position)
 
 let reset ctxt =
-  common ctxt >>=? fun (ctxt, current_period, start_position) ->
+  let open Lwt_result_syntax in
+  let* ctxt, current_period, start_position = common ctxt in
   Voting_period_repr.raw_reset current_period ~start_position
   |> set_current ctxt
 
 let succ ctxt =
-  common ctxt >>=? fun (ctxt, current_period, start_position) ->
+  let open Lwt_result_syntax in
+  let* ctxt, current_period, start_position = common ctxt in
   Voting_period_repr.raw_succ current_period ~start_position |> set_current ctxt
 
-let get_current_kind ctxt = get_current ctxt >|=? fun {kind; _} -> kind
+let get_current_kind ctxt =
+  let open Lwt_result_syntax in
+  let+ {kind; _} = get_current ctxt in
+  kind
 
 let get_current_info ctxt =
-  get_current ctxt >|=? fun voting_period ->
+  let open Lwt_result_syntax in
+  let+ voting_period = get_current ctxt in
   let blocks_per_voting_period = blocks_per_voting_period ctxt in
   let level = Level_storage.current ctxt in
   let position = Voting_period_repr.position_since level voting_period in
@@ -134,7 +142,8 @@ let get_current_info ctxt =
   Voting_period_repr.{voting_period; position; remaining}
 
 let get_current_remaining ctxt =
-  get_current ctxt >|=? fun voting_period ->
+  let open Lwt_result_syntax in
+  let+ voting_period = get_current ctxt in
   let blocks_per_voting_period = blocks_per_voting_period ctxt in
   Voting_period_repr.remaining_blocks
     (Level_storage.current ctxt)
@@ -142,22 +151,28 @@ let get_current_remaining ctxt =
     ~blocks_per_voting_period
 
 let is_last_block ctxt =
-  get_current_remaining ctxt >|=? fun remaining ->
+  let open Lwt_result_syntax in
+  let+ remaining = get_current_remaining ctxt in
   Compare.Int32.(remaining = 0l)
 
 let blocks_before_activation ctxt =
-  get_current ctxt >>=? function
+  let open Lwt_result_syntax in
+  let* voting_period = get_current ctxt in
+  match voting_period with
   | Voting_period_repr.{kind = Adoption; _} ->
-      get_current_remaining ctxt >>=? return_some
+      let* result = get_current_remaining ctxt in
+      return_some result
   | _ -> return_none
 
 let get_rpc_current_info ctxt =
-  get_current_info ctxt
-  >>=? fun ({voting_period; position; _} as voting_period_info) ->
+  let open Lwt_result_syntax in
+  let* ({voting_period; position; _} as voting_period_info) =
+    get_current_info ctxt
+  in
   if Compare.Int32.(position = Int32.minus_one) then
     let level = Level_storage.current ctxt in
     let blocks_per_voting_period = blocks_per_voting_period ctxt in
-    Storage.Vote.Pred_period_kind.get ctxt >|=? fun pred_kind ->
+    let+ pred_kind = Storage.Vote.Pred_period_kind.get ctxt in
     let voting_period : Voting_period_repr.t =
       {
         index = Int32.pred voting_period.index;
@@ -177,12 +192,14 @@ let get_rpc_current_info ctxt =
   else return voting_period_info
 
 let get_rpc_succ_info ctxt =
-  Level_storage.from_raw_with_offset
-    ctxt
-    ~offset:1l
-    (Level_storage.current ctxt).level
-  >>?= fun level ->
-  get_current ctxt >|=? fun voting_period ->
+  let open Lwt_result_syntax in
+  let*? level =
+    Level_storage.from_raw_with_offset
+      ctxt
+      ~offset:1l
+      (Level_storage.current ctxt).level
+  in
+  let+ voting_period = get_current ctxt in
   let blocks_per_voting_period = blocks_per_voting_period ctxt in
   let position = Voting_period_repr.position_since level voting_period in
   let remaining =
@@ -200,11 +217,13 @@ module Testnet_dictator = struct
   type error += Forbidden_on_mainnet
 
   let overwrite_current_kind ctxt chain_id kind =
-    error_when
-      Chain_id.(chain_id = Constants_repr.mainnet_id)
-      Forbidden_on_mainnet
-    >>?= fun () ->
-    get_current ctxt >>=? fun current_period ->
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        Chain_id.(chain_id = Constants_repr.mainnet_id)
+        Forbidden_on_mainnet
+    in
+    let* current_period = get_current ctxt in
     let new_period = {current_period with kind} in
     set_current ctxt new_period
 end

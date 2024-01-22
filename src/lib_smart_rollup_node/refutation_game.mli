@@ -25,11 +25,10 @@
 
 (** This module implements the refutation game logic of the rollup node. *)
 
-(** [play_opening_move node_ctxt self conflict] injects the opening refutation
+(** [play_opening_move node_ctxt conflict] injects the opening refutation
     game move for [conflict]. *)
 val play_opening_move :
   [< `Read | `Write > `Read] Node_context.t ->
-  Signature.public_key_hash ->
   Octez_smart_rollup.Game.conflict ->
   (unit, tztrace) result Lwt.t
 

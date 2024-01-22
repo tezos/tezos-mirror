@@ -1,0 +1,110 @@
+#!/bin/bash
+# Start/stop the Octez VDF daemon
+#
+### BEGIN INIT INFO
+# Provides:          octez-vdf
+# Required-Start:    octez-node
+# Required-Stop:
+# Should-Start:      $network $named
+# Should-Stop:       $network $named
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: The Octez VDF daemon
+# Description:       The Octez VDF service inserts calculations into the
+#		     blockchain to improve randomness.
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export DESC="octez vdf"
+NAME=octez-vdf
+PIDDIR=/var/run/tezos
+PIDFILE=$PIDDIR/octez-vdf.pid
+export SCRIPTNAME=/etc/init.d/"$NAME"
+
+if [ -f "/lib/lsb/init-functions" ]; then
+        . /lib/lsb/init-functions
+else
+        . /etc/rc.d/init.d/functions
+fi
+
+# Defaults
+user=tezos
+group=tezos
+logdir=/var/log/tezos
+rotateonstart=yes
+protocols="@PROTOCOLS@"
+waitfornode=yes
+
+#shellcheck disable=SC1091
+[ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
+#shellcheck disable=SC1091
+[ -r /etc/octez/baker.conf ] && . /etc/octez/baker.conf
+
+logfile_base="${logdir}/vdf_"
+baker="/usr/bin/octez-baker"
+
+initial_checks()
+{
+	mkdir -p ${PIDDIR}
+	chown $user:$group ${PIDDIR}
+
+	mkdir -p ${logdir}
+
+}
+
+wait_for_bootstrap()
+{
+  echo "Waiting for node to be bootstrapped" >&2
+
+  while :; do
+    /usr/bin/octez-client bootstrapped >/dev/null 2>&1 && break
+    echo "Node not ready - sleeping for 30 seconds" >&2
+    sleep 30
+
+  done
+
+}
+
+rotate_logs ()
+{
+	if [ ${rotateonstart} = "yes" ]; then
+		for p in ${protocols}; do
+			mv -f "${logfile_base}${p}.log" "${logfile_base}${p}.log.1"
+		done
+	fi
+}
+
+case "$1" in
+start)	initial_checks
+	rotate_logs
+  [ "$waitfornode" == "yes" ] && wait_for_bootstrap
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+		su $user -c "${baker}-$p run vdf -K >> ${logfile_base}${p}.log 2>&1 & echo \$! > ${PIDFILE}-$p"
+	done
+	;;
+stop)
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+    kill "$(cat ${PIDFILE}-$p)"
+		rm -f ${PIDFILE}-$p
+	done
+        ;;
+restart)
+        $0 stop
+        $0 start
+        ;;
+reload|force-reload)
+        ;;
+status)
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+        	status_of_proc -p ${PIDFILE}-$p ${baker}-$p $NAME || exit $?
+	done
+	exit 0
+        ;;
+*)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
+        exit 2
+        ;;
+esac
+exit 0

@@ -193,7 +193,7 @@ module Config_init = struct
         "DAC node configuration written in %s"
         (Configuration.filename config)
     in
-    return ()
+    return_unit
 
   let coordinator_command =
     let open Tezos_clic in

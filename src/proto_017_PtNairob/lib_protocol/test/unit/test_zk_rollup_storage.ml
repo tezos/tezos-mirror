@@ -114,7 +114,7 @@ module Raw_context_tests = struct
     let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
     let state = Operator.init_state in
     let state_length = Array.length state in
-    let circuits_info = SMap.of_seq @@ Plonk.SMap.to_seq Operator.circuits in
+    let circuits_info = SMap.of_seq @@ Kzg.SMap.to_seq Operator.circuits in
     let nb_ops = 1 in
     let* ctx, rollup, _size =
       Zk_rollup_storage.originate

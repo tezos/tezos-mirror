@@ -30,14 +30,14 @@ open Cli_arg
 type endpoint =
   | Node of Node.t
   | Proxy_server of Proxy_server.t
-  | Foreign_endpoint of Foreign_endpoint.t
+  | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Proxy_server ps -> Proxy_server.rpc_port ps
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_port fe
+  | Foreign_endpoint fe -> Endpoint.rpc_port fe
 
 type mode =
   | Client of endpoint option * media_type option
@@ -48,6 +48,11 @@ type mode =
 type mockup_sync_mode = Asynchronous | Synchronous
 
 type normalize_mode = Readable | Optimized | Optimized_legacy
+
+let normalize_mode_to_string = function
+  | Readable -> "Readable"
+  | Optimized -> "Optimized"
+  | Optimized_legacy -> "Optimized_legacy"
 
 type t = {
   path : string;
@@ -81,6 +86,12 @@ let get_mode t = t.mode
 
 let set_mode mode t = t.mode <- mode
 
+let endpoint_wait_for ?where endpoint event filter =
+  match endpoint with
+  | Node node -> Node.wait_for ?where node event filter
+  | Proxy_server ps -> Proxy_server.wait_for ?where ps event filter
+  | Foreign_endpoint _ -> Test.fail "Cannot wait_for with a Foreign_endpoint"
+
 let next_name = ref 1
 
 let fresh_name () =
@@ -98,15 +109,15 @@ let runner endpoint =
 
 let scheme = function
   | Node n -> Node.rpc_scheme n
-  | Proxy_server _ -> "http"
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
+  | Proxy_server _ -> Proxy_server.rpc_scheme
+  | Foreign_endpoint fe -> Endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
   (* We locally overload the runner function to fake a runner for foreign
      endpoints. Because the API contract of the [Runner] module is to
      provide a way to connect to a remote host using SSH, we cannot return a
      runner for a foreign endpoint, because the module does not provide such
-     invariants (for instance, the public RPC endpoint of Mondaynet is a good
+     invariants (for instance, the public RPC endpoint of Weeklynet is a good
      candidate for a foreign endpoint to which we likely cannot connect to
      using SSH).
 
@@ -116,7 +127,7 @@ let address ?(hostname = false) ?from peer =
      in the case where [from] has the same address as [peer]. *)
   let runner = function
     | Foreign_endpoint endpoint ->
-        Some (Runner.create ~address:(Foreign_endpoint.rpc_host endpoint) ())
+        Some (Runner.create ~address:(Endpoint.rpc_host endpoint) ())
     | peer -> runner peer
   in
   match from with
@@ -124,8 +135,8 @@ let address ?(hostname = false) ?from peer =
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
-let create_with_mode ?runner ?(path = Constant.tezos_client)
-    ?(admin_path = Constant.tezos_admin_client) ?name
+let create_with_mode ?runner ?(path = Constant.octez_client)
+    ?(admin_path = Constant.octez_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
@@ -262,7 +273,9 @@ let url_encode str =
   Buffer.reset buffer ;
   result
 
-type meth = GET | PUT | POST | PATCH | DELETE
+type meth = RPC_core.verb = GET | PUT | POST | PATCH | DELETE
+
+type data = RPC_core.data
 
 let string_of_meth = function
   | GET -> "get"
@@ -283,8 +296,6 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
-type data = Data of JSON.u | File of string
-
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
@@ -297,7 +308,7 @@ module Spawn = struct
         Option.fold
           ~none:[]
           ~some:(function
-            | Data data -> ["with"; JSON.encode_u data]
+            | RPC_core.Data data -> ["with"; JSON.encode_u data]
             | File file -> ["with"; "file:" ^ file])
           data
       in
@@ -535,50 +546,68 @@ let spawn_version client = spawn_command client ["--version"]
 let version client = spawn_version client |> Process.check
 
 let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
-    (key : Account.key) =
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
-    match key.secret_key with
-    | Encrypted _ -> Account.uri_of_secret_key key.secret_key
+    match secret_key with
+    | Encrypted _ -> Account.uri_of_secret_key secret_key
     | Unencrypted _ -> Test.fail "Unencrypted key"
   in
   spawn_command_with_stdin
     ?hooks
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; sk_uri]
+    (["import"; "secret"; "key"; alias; sk_uri]
     @ if force then ["--force"] else [])
 
 let import_encrypted_secret_key ?hooks ?force ?endpoint client
-    (key : Account.key) ~password =
+    (secret_key : Account.secret_key) ~alias ~password =
   let process, output_channel =
-    spawn_import_encrypted_secret_key ?hooks ?force ?endpoint client key
+    spawn_import_encrypted_secret_key
+      ?hooks
+      ?force
+      ?endpoint
+      client
+      secret_key
+      ~alias
   in
   let* () = Lwt_io.write_line output_channel password in
   let* () = Lwt_io.close output_channel in
   Process.check process
 
-let spawn_import_secret_key ?endpoint client (key : Account.key) =
+let spawn_import_secret_key ?(force = false) ?endpoint client
+    (secret_key : Account.secret_key) ~alias =
   let sk_uri =
-    "unencrypted:"
-    ^ Account.require_unencrypted_secret_key ~__LOC__ key.secret_key
+    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ secret_key
   in
-  spawn_command ?endpoint client ["import"; "secret"; "key"; key.alias; sk_uri]
-
-let spawn_import_signer_key ?endpoint ?(force = false) client
-    (key : Account.key) signer_uri =
-  let uri = Uri.with_path signer_uri key.public_key_hash in
+  let force = if force then ["--force"] else [] in
   spawn_command
     ?endpoint
     client
-    (["import"; "secret"; "key"; key.alias; Uri.to_string uri]
+    (["import"; "secret"; "key"; alias; sk_uri] @ force)
+
+let spawn_import_signer_key ?endpoint ?(force = false) client ~public_key_hash
+    ~alias signer_uri =
+  let uri = Uri.with_path signer_uri public_key_hash in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "secret"; "key"; alias; Uri.to_string uri]
     @ if force then ["--force"] else [])
 
-let import_signer_key ?endpoint ?force client key signer_uri =
-  spawn_import_signer_key ?endpoint ?force client key signer_uri
+let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
+    =
+  spawn_import_signer_key
+    ?endpoint
+    ?force
+    client
+    ~public_key_hash
+    ~alias
+    signer_uri
   |> Process.check
 
-let import_secret_key ?endpoint client key =
-  spawn_import_secret_key ?endpoint client key |> Process.check
+let import_secret_key ?force ?endpoint client secret_key ~alias =
+  spawn_import_secret_key ?force ?endpoint client secret_key ~alias
+  |> Process.check
 
 let spawn_import_keys_from_mnemonic ?endpoint ?(force = false)
     ?(encrypt = false) client ~alias =
@@ -709,7 +738,7 @@ let activate_protocol_and_wait ?endpoint ?protocol ?protocol_hash ?fitness ?key
         | Some n -> n
         | None -> Test.fail "No node found for activate_protocol_and_wait")
   in
-  let level_before = Node.get_level node in
+  let level_before = Node.get_last_seen_level node in
   let* () =
     activate_protocol
       ?endpoint
@@ -732,8 +761,8 @@ let empty_mempool_file ?(filename = "mempool.json") () =
 
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?force
-    ?context_path ?dal_node_endpoint client =
+    ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
+    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
   spawn_command
     ?endpoint
     client
@@ -751,14 +780,16 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ optional_arg "operations-pool" Fun.id mempool
     @ (if ignore_node_mempool then ["--ignore-node-mempool"] else [])
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
+    @ optional_arg "count" string_of_int count
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
-    @ optional_arg "dal-node" Fun.id dal_node_endpoint)
+    @ optional_arg "dal-node" Fun.id dal_node_endpoint
+    @ optional_switch "record_state" state_recorder)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?dal_node_endpoint
-    ?expect_failure client =
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
+    ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -768,17 +799,19 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_timestamp
     ?mempool
     ?ignore_node_mempool
+    ?count
     ?force
     ?context_path
     ?protocol
     ?dal_node_endpoint
+    ?state_recorder
     client
   |> Process.check ?expect_failure
 
-let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?node ?dal_node_endpoint
-    client =
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
+    ?node ?dal_node_endpoint ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -787,7 +820,13 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
         | Some n -> n
         | None -> Test.fail "No node found for bake_for_and_wait")
   in
-  let level_before = Node.get_level node in
+  let actual_level_before = Node.get_last_seen_level node in
+  Option.iter
+    (fun level_before ->
+      Check.(actual_level_before = level_before)
+        Check.int
+        ~error_msg:"bake_for_and_wait: level before is %L, expected %R")
+    level_before ;
   let* () =
     bake_for
       ?endpoint
@@ -799,12 +838,38 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
       ?minimal_timestamp
       ?mempool
       ?ignore_node_mempool
+      ?count
       ?force
       ?context_path
       ?dal_node_endpoint
+      ?state_recorder
       client
   in
-  let* _lvl = Node.wait_for_level node (level_before + 1) in
+  Node.wait_for_level node (actual_level_before + 1)
+
+let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
+    ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
+    ?node ?dal_node_endpoint client =
+  let* (_level : int) =
+    bake_for_and_wait_level
+      ?endpoint
+      ?protocol
+      ?keys
+      ?minimal_fees
+      ?minimal_nanotez_per_gas_unit
+      ?minimal_nanotez_per_byte
+      ?minimal_timestamp
+      ?mempool
+      ?ignore_node_mempool
+      ?count
+      ?force
+      ?context_path
+      ?level_before
+      ?node
+      ?dal_node_endpoint
+      client
+  in
   unit
 
 (* Handle attesting and preattesting similarly *)
@@ -882,7 +947,7 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
 
 let id = ref 0
 
-let spawn_gen_keys ?alias ?sig_alg client =
+let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
   let alias =
     match alias with
     | None ->
@@ -890,12 +955,13 @@ let spawn_gen_keys ?alias ?sig_alg client =
         sf "tezt_%d" !id
     | Some alias -> alias
   in
-  ( spawn_command client @@ ["gen"; "keys"; alias]
+  let force = if force then ["--force"] else [] in
+  ( spawn_command client @@ ["gen"; "keys"; alias] @ force
     @ optional_arg "sig" Fun.id sig_alg,
     alias )
 
-let gen_keys ?alias ?sig_alg client =
-  let p, alias = spawn_gen_keys ?alias ?sig_alg client in
+let gen_keys ?force ?alias ?sig_alg client =
+  let p, alias = spawn_gen_keys ?force ?alias ?sig_alg client in
   let* () = Process.check p in
   return alias
 
@@ -1108,11 +1174,14 @@ let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
   in
   {value; run = Process.check}
 
-let spawn_register_delegate ?endpoint ~delegate client =
-  spawn_command ?endpoint client ["register"; "key"; delegate; "as"; "delegate"]
+let spawn_register_delegate ?endpoint ?(wait = "none") ~delegate client =
+  spawn_command
+    ?endpoint
+    client
+    (["--wait"; wait] @ ["register"; "key"; delegate; "as"; "delegate"])
 
-let register_delegate ?endpoint ~delegate client =
-  spawn_register_delegate ?endpoint ~delegate client
+let register_delegate ?endpoint ?wait ~delegate client =
+  spawn_register_delegate ?endpoint ?wait ~delegate client
   |> Process.check_and_read_stdout
 
 let spawn_get_delegate ?endpoint ~src client =
@@ -1427,7 +1496,7 @@ let convert_script ~script ~src_format ~dst_format ?typecheck client =
 let convert_data ~data ~src_format ~dst_format ?typecheck client =
   convert ~kind:Data ~input:data ~src_format ~dst_format ?typecheck client
 
-let convert_michelson_to_json ~kind ?endpoint ~input client =
+let convert_michelson_to_json ~kind ?endpoint ~input ?typecheck client =
   let* client_output =
     convert
       ?endpoint
@@ -1435,6 +1504,7 @@ let convert_michelson_to_json ~kind ?endpoint ~input client =
       ~input
       ~src_format:`Michelson
       ~dst_format:`Json
+      ?typecheck
       client
   in
   Lwt.return (Ezjsonm.from_string client_output)
@@ -1442,8 +1512,8 @@ let convert_michelson_to_json ~kind ?endpoint ~input client =
 let convert_script_to_json ?endpoint ~script client =
   convert_michelson_to_json ~kind:Script ?endpoint ~input:script client
 
-let convert_data_to_json ?endpoint ~data client =
-  convert_michelson_to_json ~kind:Data ?endpoint ~input:data client
+let convert_data_to_json ?endpoint ~data ?typecheck client =
+  convert_michelson_to_json ~kind:Data ?endpoint ~input:data ?typecheck client
 
 let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
     ?gas_limit ?dry_run ?force ~alias ~amount ~src ~prg client =
@@ -1680,8 +1750,8 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
   |> Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now ~prg
-    ~storage ~input client =
+    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now
+    ?other_contracts ?extra_big_maps ~prg ~storage ~input client =
   spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
   @@ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
   @ optional_arg "payer" Fun.id payer
@@ -1692,10 +1762,12 @@ let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
   @ optional_arg "now" Fun.id now
+  @ optional_arg "other-contracts" Fun.id other_contracts
+  @ optional_arg "extra-big-maps" Fun.id extra_big_maps
 
 let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
-    ?payer ?prefix ?now ?trace_stack ?level ~storage ~input client script_name
-    protocol =
+    ?payer ?prefix ?now ?trace_stack ?level ?other_contracts ?extra_big_maps
+    ~storage ~input client script_name protocol =
   let prg =
     Michelson_script.find ?prefix script_name protocol |> Michelson_script.path
   in
@@ -1709,10 +1781,29 @@ let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
     ?now
     ?trace_stack
     ?level
+    ?other_contracts
+    ?extra_big_maps
     ~prg
     ~storage
     ~input
     client
+
+let spawn_run_code ?hooks ?protocol_hash ?no_base_dir_warnings ?amount ?balance
+    ?source ?payer ?self_address ?gas ?mode ?level ?now ?other_contracts
+    ?extra_big_maps ~src ~stack client =
+  spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
+  @@ ["run"; "michelson"; "code"; src; "on"; "stack"; stack]
+  @ optional_arg "amount" Tez.to_string amount
+  @ optional_arg "balance" Tez.to_string balance
+  @ optional_arg "source" Fun.id source
+  @ optional_arg "payer" Fun.id payer
+  @ optional_arg "self-address" Fun.id self_address
+  @ optional_arg "gas" string_of_int gas
+  @ optional_arg "unparsing-mode" normalize_mode_to_string mode
+  @ optional_arg "now" Fun.id now
+  @ optional_arg "level" string_of_int level
+  @ optional_arg "other-contracts" Fun.id other_contracts
+  @ optional_arg "extra-big-maps" Fun.id extra_big_maps
 
 let stresstest_estimate_gas ?endpoint client =
   let* output =
@@ -1752,8 +1843,8 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
 type run_script_result = {storage : string; big_map_diff : string list}
 
 let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?trace_stack ?level ?now ~prg ~storage
-    ~input client =
+    ?self_address ?source ?payer ?gas ?trace_stack ?level ?now ?other_contracts
+    ?extra_big_maps ~prg ~storage ~input client =
   let* client_output =
     spawn_run_script
       ?hooks
@@ -1767,6 +1858,8 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       ?trace_stack
       ?level
       ?now
+      ?other_contracts
+      ?extra_big_maps
       ~prg
       ~storage
       ~input
@@ -1827,7 +1920,8 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
   return {storage; big_map_diff}
 
 let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
-    ?prefix ?now ?trace_stack ?level ~storage ~input client name protocol =
+    ?prefix ?now ?trace_stack ?level ?other_contracts ?extra_big_maps ~storage
+    ~input client name protocol =
   let prg =
     Michelson_script.find name ?prefix protocol |> Michelson_script.path
   in
@@ -1841,10 +1935,55 @@ let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
     ?now
     ?trace_stack
     ?level
+    ?other_contracts
+    ?extra_big_maps
     ~storage
     ~input
     ~prg
     client
+
+let run_code ?hooks ?protocol_hash ?no_base_dir_warnings ?amount ?balance
+    ?source ?payer ?self_address ?gas ?mode ?level ?now ?other_contracts
+    ?extra_big_maps ~src ~stack client =
+  let* client_output =
+    spawn_run_code
+      ?hooks
+      ?protocol_hash
+      ?no_base_dir_warnings
+      ?amount
+      ?balance
+      ?source
+      ?payer
+      ?self_address
+      ?gas
+      ?mode
+      ?level
+      ?now
+      ?other_contracts
+      ?extra_big_maps
+      ~src
+      ~stack
+      client
+    |> Process.check_and_read_stdout
+  in
+  (* Extract the final stack from [client_output].
+
+     The [client_ouput] has the following format:
+     Result
+       <stack>
+     Gas_remaining: <gas> units remaining *)
+  let client_output_lines = String.split_on_char '\n' client_output in
+  let stack, _tail =
+    span
+      (fun line -> not (String.starts_with ~prefix:"Gas remaining" line))
+      client_output_lines
+  in
+  match stack with
+  | "Result" :: stack -> return (String.trim (String.concat "\n" stack))
+  | _ ->
+      Test.fail
+        "Cannot extract resulting stack from client_output: %s,"
+        client_output
 
 let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
     =
@@ -1966,11 +2105,6 @@ let hash_data ?hooks ~data ~typ client =
       raw_sha512_hash = get "Raw Sha512 hash";
     }
 
-let normalize_mode_to_string = function
-  | Readable -> "Readable"
-  | Optimized -> "Optimized"
-  | Optimized_legacy -> "Optimized_legacy"
-
 let spawn_normalize_data ?hooks ?mode ?(legacy = false) ~data ~typ client =
   let mode_cmd =
     Option.map normalize_mode_to_string mode
@@ -2069,8 +2203,9 @@ let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     client
   |> Process.check
 
-let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
-    ~contract ?input ?(unlimited_gas = false) client =
+let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode
+    ?other_contracts ?extra_big_maps ~entrypoint ~contract ?input
+    ?(unlimited_gas = false) client =
   let input_params =
     match input with None -> [] | Some input -> ["with"; "input"; input]
   in
@@ -2083,16 +2218,20 @@ let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
     @ optional_arg "source" Fun.id source
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode
     @ optional_arg "gas" Int.to_string gas
-    @ optional_switch "unlimited-gas" unlimited_gas)
+    @ optional_switch "unlimited-gas" unlimited_gas
+    @ optional_arg "other-contracts" Fun.id other_contracts
+    @ optional_arg "extra-big-maps" Fun.id extra_big_maps)
 
-let run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
-    ~contract ?input ?unlimited_gas client =
+let run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ?other_contracts
+    ?extra_big_maps ~entrypoint ~contract ?input ?unlimited_gas client =
   spawn_run_tzip4_view
     ?hooks
     ?source
     ?payer
     ?gas
     ?unparsing_mode
+    ?other_contracts
+    ?extra_big_maps
     ~entrypoint
     ~contract
     ?input
@@ -2100,8 +2239,8 @@ let run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
     client
   |> Process.check_and_read_stdout
 
-let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
-    ?input ?(unlimited_gas = false) client =
+let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ?other_contracts
+    ?extra_big_maps ~view ~contract ?input ?(unlimited_gas = false) client =
   let input_params =
     match input with None -> [] | Some input -> ["with"; "input"; input]
   in
@@ -2114,16 +2253,20 @@ let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
     @ optional_arg "source" Fun.id source
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode
     @ optional_arg "gas" Int.to_string gas
+    @ optional_arg "other-contracts" Fun.id other_contracts
+    @ optional_arg "extra-big-maps" Fun.id extra_big_maps
     @ if unlimited_gas then ["--unlimited-gas"] else [])
 
-let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
-    ?unlimited_gas client =
+let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ?other_contracts
+    ?extra_big_maps ~view ~contract ?input ?unlimited_gas client =
   spawn_run_view
     ?hooks
     ?source
     ?payer
     ?gas
     ?unparsing_mode
+    ?other_contracts
+    ?extra_big_maps
     ~view
     ~contract
     ?input
@@ -2256,8 +2399,8 @@ let show_voting_period ?endpoint client =
   | Some period -> return period
 
 module Sc_rollup = struct
-  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ?whitelist ~alias ~src
-      ~kind ~parameters_ty ~boot_sector client =
+  let spawn_originate ?hooks ?(wait = "none") ?(force = false) ?burn_cap
+      ?whitelist ~alias ~src ~kind ~parameters_ty ~boot_sector client =
     spawn_command
       ?hooks
       client
@@ -2283,19 +2426,21 @@ module Sc_rollup = struct
           "whitelist"
           (fun v -> JSON.encode_u (`A (List.map (fun s -> `String s) v)))
           whitelist
-      @ optional_arg "burn-cap" Tez.to_string burn_cap)
+      @ optional_arg "burn-cap" Tez.to_string burn_cap
+      @ optional_switch "force" force)
 
   let parse_rollup_address_in_receipt output =
     match output =~* rex "Address: (.*)" with
     | None -> Test.fail "Cannot extract rollup address from receipt."
     | Some x -> return x
 
-  let originate ?hooks ?wait ?burn_cap ?whitelist ~alias ~src ~kind
+  let originate ?hooks ?wait ?force ?burn_cap ?whitelist ~alias ~src ~kind
       ~parameters_ty ~boot_sector client =
     let process =
       spawn_originate
         ?hooks
         ?wait
+        ?force
         ?burn_cap
         ?whitelist
         ~alias
@@ -2361,16 +2506,21 @@ module Sc_rollup = struct
     let parse process = Process.check_and_read_stdout process in
     {value = process; run = parse}
 
-  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src client =
+  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ?fee ?fee_cap ~msg
+      ~src client =
     spawn_command
       ?hooks
       client
       (["--wait"; wait]
       @ ["send"; "smart"; "rollup"; "message"; msg; "from"; src]
+      @ optional_arg "fee" Tez.to_string fee
+      @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
-  let send_message ?hooks ?wait ?burn_cap ~msg ~src client =
-    let process = spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src client in
+  let send_message ?hooks ?wait ?burn_cap ?fee ?fee_cap ~msg ~src client =
+    let process =
+      spawn_send_message ?hooks ?wait ?burn_cap ?fee ?fee_cap ~msg ~src client
+    in
     Process.check process
 
   let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
@@ -2761,10 +2911,12 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_local tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
-      let* node = Node.init ?event_level ?event_sections_levels nodes_args in
+      let* node =
+        Node.init ?event_level ?event_sections_levels ?rpc_local nodes_args
+      in
       let endpoint = Node node in
       let mode =
         match mode with
@@ -2785,7 +2937,7 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_local tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2797,6 +2949,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?event_sections_levels
       ?nodes_args
       ?keys
+      ?rpc_local
       tag
       ()
   in
@@ -4018,3 +4171,129 @@ let get_timestamp ?endpoint ?block ?seconds client =
     |> Process.check_and_read_stdout
   in
   return (String.trim output)
+
+let publish_dal_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~commitment
+    ~slot_index ~proof client =
+  let process =
+    spawn_command
+      ?hooks
+      client
+      (["--wait"; wait]
+      @ [
+          "publish";
+          "dal";
+          "commitment";
+          commitment;
+          "from";
+          src;
+          "for";
+          "slot";
+          string_of_int slot_index;
+          "with";
+          "proof";
+          proof;
+        ]
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  in
+  let parse process = Process.check process in
+  {value = process; run = parse}
+
+let as_foreign_endpoint = function
+  | Node node -> Node.as_rpc_endpoint node
+  | Foreign_endpoint fe -> fe
+  | Proxy_server ps ->
+      Endpoint.
+        {
+          scheme = Proxy_server.rpc_scheme;
+          host = Proxy_server.rpc_host;
+          port = Proxy_server.rpc_port ps;
+        }
+
+module RPC = struct
+  let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client
+      RPC_core.{verb; path; query_string; data; decode = _; _} =
+    (* No need to log here, the [Process] module already logs. *)
+    spawn_rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?protocol_hash
+      ~query_string
+      verb
+      path
+      client
+    |> Process.check_and_read_stdout
+
+  let call_json ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client rpc =
+    let* raw =
+      call_raw
+        ?log_command
+        ?log_status_on_exit
+        ?log_output
+        ?better_errors
+        ?endpoint
+        ?hooks
+        ?env
+        ?protocol_hash
+        client
+        rpc
+    in
+    return (JSON.parse ~origin:"RPC response" raw)
+
+  let call ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
+      ?hooks ?env ?protocol_hash client rpc =
+    let* json =
+      call_json
+        ?log_command
+        ?log_status_on_exit
+        ?log_output
+        ?better_errors
+        ?endpoint
+        ?hooks
+        ?env
+        ?protocol_hash
+        client
+        rpc
+    in
+    return (rpc.decode json)
+
+  let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client RPC_core.{verb; path; _} =
+    rpc_schema
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?protocol_hash
+      verb
+      path
+      client
+
+  let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client
+      RPC_core.{verb; path; query_string; data; decode = _; _} =
+    Spawn.rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?protocol_hash
+      ~query_string
+      verb
+      path
+      client
+end

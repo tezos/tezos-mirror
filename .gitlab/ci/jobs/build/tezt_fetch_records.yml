@@ -7,7 +7,9 @@ tezt:fetch-records:
     - .build_template
   stage: build
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-fetch-records
+    - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --test-arg from=last-merged-pipeline --info
+  after_script:
+    - ./scripts/ci/filter_corrupted_records.sh
   # Allow failure of this job, since Tezt can use the records stored
   # in the repo as backup for balancing.
   allow_failure: true
@@ -15,6 +17,8 @@ tezt:fetch-records:
     paths:
       - tezt-fetch-records.log
       - tezt/records/*.json
+      # Keep broken records for debugging
+      - tezt/records/*.json.broken
     # Always store artifacts to have the logs for debugging
     when: always
     # These artifacts are only used within this pipeline, so they

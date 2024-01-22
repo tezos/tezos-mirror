@@ -50,7 +50,7 @@ let assert_fails ~loc ?error m =
         Stdlib.failwith msg
     | _, None ->
         (* Any error is ok. *)
-        return ()
+        return_unit
   in
   match res with
   | Ok _ -> Stdlib.failwith "Expected failure"
@@ -152,7 +152,8 @@ let assert_contains_tickets ctxt ~loc ~include_lazy ~type_exp ~value_exp
   assert_equals_ex_tickets ctxt ~loc ex_tickets expected
 
 let assert_fail_non_empty_overlay ctxt ~loc ~include_lazy ~type_exp ~value_exp =
-  tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp >>= fun res ->
+  let open Lwt_result_syntax in
+  let*! res = tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp in
   match res with
   | Error [x] ->
       let x = Format.kasprintf Fun.id "%a" Error_monad.pp x in

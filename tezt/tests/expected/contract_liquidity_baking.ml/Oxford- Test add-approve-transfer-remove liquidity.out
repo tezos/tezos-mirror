@@ -11,24 +11,24 @@ Pair 1
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint mintOrBurn --arg '(Pair 100000000 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2388.634 units (will add 100 for safety)
+Estimated gas: 2375.517 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'ongN87ToSbYN8FBn1stmQPC3UVvgdHnuYoYStiz9oAdazJWJed8'
+Operation hash is 'opNV92qwY7YfY6exkBrJqnJyotKXFbxHdXEk7xNQFNsPRQ7TEjF'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for ongN87ToSbYN8FBn1stmQPC3UVvgdHnuYoYStiz9oAdazJWJed8 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for opNV92qwY7YfY6exkBrJqnJyotKXFbxHdXEk7xNQFNsPRQ7TEjF to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000561
+    Fee to the baker: ꜩ0.00056
     Expected counter: 1
-    Gas limit: 2489
+    Gas limit: 2476
     Storage limit: 91 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000561
-      payload fees(the block proposer) ....... +ꜩ0.000561
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00056
+      payload fees(the block proposer) ....... +ꜩ0.00056
     Transaction:
       Amount: ꜩ0
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -42,7 +42,7 @@ This sequence of operations was run:
         Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 100000000
       Storage size: 1982 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 2389.041
+      Consumed gas: 2375.881
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.01775
         storage fees ........................... +ꜩ0.01775
@@ -50,24 +50,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2390.337 units (will add 100 for safety)
+Estimated gas: 2377.220 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oop7ZhZMc2cUPc2HsLRTzY4jWjGFYrWjohV2PzAVdKkvPBL1WCd'
+Operation hash is 'op968yui6vHCCztECXMB24FEWbMUHed9jQkXbhL5WGM8wXJw96Q'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oop7ZhZMc2cUPc2HsLRTzY4jWjGFYrWjohV2PzAVdKkvPBL1WCd to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for op968yui6vHCCztECXMB24FEWbMUHed9jQkXbhL5WGM8wXJw96Q to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.00056
+    Fee to the baker: ꜩ0.000558
     Expected counter: 2
-    Gas limit: 2491
+    Gas limit: 2478
     Storage limit: 91 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00056
-      payload fees(the block proposer) ....... +ꜩ0.00056
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000558
+      payload fees(the block proposer) ....... +ꜩ0.000558
     Transaction:
       Amount: ꜩ0
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -82,7 +82,7 @@ This sequence of operations was run:
               0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
       Storage size: 2053 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 2390.744
+      Consumed gas: 2377.584
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.01775
         storage fees ........................... +ꜩ0.01775
@@ -90,24 +90,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap2 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2390.337 units (will add 100 for safety)
+Estimated gas: 2377.220 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oobmLSPx1d8uUyCPDKoVbcWm9PTbFrKd7Dr2oQcQ8kXDfaeu2Ti'
+Operation hash is 'op8vSFsuf9xDtpELfAXrAD31oBWvx4kvW2QWoEBUKqsiADKYgZB'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oobmLSPx1d8uUyCPDKoVbcWm9PTbFrKd7Dr2oQcQ8kXDfaeu2Ti to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for op8vSFsuf9xDtpELfAXrAD31oBWvx4kvW2QWoEBUKqsiADKYgZB to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.00056
+    Fee to the baker: ꜩ0.000558
     Expected counter: 1
-    Gas limit: 2491
+    Gas limit: 2478
     Storage limit: 91 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.00056
-      payload fees(the block proposer) ....... +ꜩ0.00056
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000558
+      payload fees(the block proposer) ....... +ꜩ0.000558
     Transaction:
       Amount: ꜩ0
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
@@ -122,7 +122,7 @@ This sequence of operations was run:
               0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
       Storage size: 2124 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 2390.744
+      Consumed gas: 2377.584
       Balance updates:
         tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.01775
         storage fees ........................... +ꜩ0.01775
@@ -130,24 +130,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap3 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2390.337 units (will add 100 for safety)
+Estimated gas: 2377.220 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oofp6BwSt7TqtaogYZGTMcWevnf8PYK1YGE43mBxmnLVgVv8XaX'
+Operation hash is 'opG2xrHRo7XfsfQ6ury6ArfyEJ7SbyhGtpuMS5nTuqjV78pJbh8'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oofp6BwSt7TqtaogYZGTMcWevnf8PYK1YGE43mBxmnLVgVv8XaX to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for opG2xrHRo7XfsfQ6ury6ArfyEJ7SbyhGtpuMS5nTuqjV78pJbh8 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
-    Fee to the baker: ꜩ0.00056
+    Fee to the baker: ꜩ0.000558
     Expected counter: 1
-    Gas limit: 2491
+    Gas limit: 2478
     Storage limit: 91 bytes
     Balance updates:
-      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.00056
-      payload fees(the block proposer) ....... +ꜩ0.00056
+      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.000558
+      payload fees(the block proposer) ....... +ꜩ0.000558
     Transaction:
       Amount: ꜩ0
       From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
@@ -162,7 +162,7 @@ This sequence of operations was run:
               0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
       Storage size: 2195 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 2390.744
+      Consumed gas: 2377.584
       Balance updates:
         tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.01775
         storage fees ........................... +ꜩ0.01775
@@ -170,24 +170,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 9001 from bootstrap1 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint addLiquidity --arg '(Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 1000000000 "2050-01-01T00:00:00Z")'
 Node is bootstrapped.
-Estimated gas: 9525.805 units (will add 100 for safety)
+Estimated gas: 9497.488 units (will add 100 for safety)
 Estimated storage: 147 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oogW2v1pKn3Dtvr1iu5VcnLcaaWeYSd6rjA8m9VjjTHWzw5Tnnb'
+Operation hash is 'onsvTjspvs6n3R9fbuQ1ZDvzEibrTJyZaxvrn4hwAEz135CrT5k'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oogW2v1pKn3Dtvr1iu5VcnLcaaWeYSd6rjA8m9VjjTHWzw5Tnnb to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for onsvTjspvs6n3R9fbuQ1ZDvzEibrTJyZaxvrn4hwAEz135CrT5k to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.001318
+    Fee to the baker: ꜩ0.001315
     Expected counter: 3
-    Gas limit: 9626
+    Gas limit: 9598
     Storage limit: 167 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.001318
-      payload fees(the block proposer) ....... +ꜩ0.001318
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.001315
+      payload fees(the block proposer) ....... +ꜩ0.001315
     Transaction:
       Amount: ꜩ9001
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -203,7 +203,7 @@ This sequence of operations was run:
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4635 bytes
       Paid storage size diff: 6 bytes
-      Consumed gas: 1450.824
+      Consumed gas: 1450.590
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.0015
         storage fees ........................... +ꜩ0.0015
@@ -227,7 +227,7 @@ This sequence of operations was run:
             Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 21598
           Storage size: 2264 bytes
           Paid storage size diff: 69 bytes
-          Consumed gas: 3704.271
+          Consumed gas: 3690.965
           Balance updates:
             tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.01725
             storage fees ........................... +ꜩ0.01725
@@ -244,7 +244,7 @@ This sequence of operations was run:
             Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 2159730
           Storage size: 2050 bytes
           Paid storage size diff: 72 bytes
-          Consumed gas: 2313.589
+          Consumed gas: 2300.350
           Balance updates:
             tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.018
             storage fees ........................... +ꜩ0.018
@@ -252,24 +252,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo from bootstrap1 --entrypoint approve --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 1000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2390.116 units (will add 100 for safety)
+Estimated gas: 2376.999 units (will add 100 for safety)
 Estimated storage: 68 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'opUDJbY5Df2cm1tW33WxWdC9t3FKKCRUWYv2Hgpr1xdF64BeStd'
+Operation hash is 'ootV3zW3k66DvpHiUBoAVhb5dvGaFXD1vFcjNiHvLTJhpSTvk41'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for opUDJbY5Df2cm1tW33WxWdC9t3FKKCRUWYv2Hgpr1xdF64BeStd to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for ootV3zW3k66DvpHiUBoAVhb5dvGaFXD1vFcjNiHvLTJhpSTvk41 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000557
+    Fee to the baker: ꜩ0.000555
     Expected counter: 4
-    Gas limit: 2491
+    Gas limit: 2477
     Storage limit: 88 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000557
-      payload fees(the block proposer) ....... +ꜩ0.000557
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000555
+      payload fees(the block proposer) ....... +ꜩ0.000555
     Transaction:
       Amount: ꜩ0
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -284,7 +284,7 @@ This sequence of operations was run:
               0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c)] to 1000
       Storage size: 2118 bytes
       Paid storage size diff: 68 bytes
-      Consumed gas: 2390.522
+      Consumed gas: 2377.362
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.017
         storage fees ........................... +ꜩ0.017
@@ -292,24 +292,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo from bootstrap2 --entrypoint transfer --arg '(Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 1000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 3754.960 units (will add 100 for safety)
+Estimated gas: 3741.852 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'opTGREPY311XcdRsrqjzWTLLL7dd3zAuyRDTdgAb1dDps2n9ZQg'
+Operation hash is 'oo8sACXKDiJJ27gt8kko7jDvywwUS3oLr8ZVEPJ2Kz8HtkQMBya'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for opTGREPY311XcdRsrqjzWTLLL7dd3zAuyRDTdgAb1dDps2n9ZQg to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oo8sACXKDiJJ27gt8kko7jDvywwUS3oLr8ZVEPJ2Kz8HtkQMBya to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.000743
+    Fee to the baker: ꜩ0.000742
     Expected counter: 2
-    Gas limit: 3855
+    Gas limit: 3842
     Storage limit: 0 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000743
-      payload fees(the block proposer) ....... +ꜩ0.000743
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000742
+      payload fees(the block proposer) ....... +ꜩ0.000742
     Transaction:
       Amount: ꜩ0
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
@@ -327,29 +327,29 @@ This sequence of operations was run:
         Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 2158730
         Set map(2)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 1000
       Storage size: 2118 bytes
-      Consumed gas: 3755.367
+      Consumed gas: 3742.216
 
 
 ./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap2 --entrypoint removeLiquidity --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 1000 0 0 "2050-01-01T00:00:00Z")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 9130.898 units (will add 100 for safety)
+Estimated gas: 9102.578 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'onxpVHHvvzyh4xFEMXTMyFMdpzrvmkd4MfgSwMpE5vtJRa4KzXn'
+Operation hash is 'oocZ2DJUHkYB3mFFwk3enBtC39BKNEu6pvyLC7dwnsa6NiDUbJA'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for onxpVHHvvzyh4xFEMXTMyFMdpzrvmkd4MfgSwMpE5vtJRa4KzXn to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oocZ2DJUHkYB3mFFwk3enBtC39BKNEu6pvyLC7dwnsa6NiDUbJA to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.001276
+    Fee to the baker: ꜩ0.001273
     Expected counter: 3
-    Gas limit: 9231
+    Gas limit: 9203
     Storage limit: 87 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001276
-      payload fees(the block proposer) ....... +ꜩ0.001276
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001273
+      payload fees(the block proposer) ....... +ꜩ0.001273
     Transaction:
       Amount: ꜩ0
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
@@ -364,7 +364,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4635 bytes
-      Consumed gas: 1452.329
+      Consumed gas: 1452.097
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -378,7 +378,7 @@ This sequence of operations was run:
           Updated big_maps:
             Unset map(2)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c]
           Storage size: 2050 bytes
-          Consumed gas: 2513.548
+          Consumed gas: 2500.309
         Internal Transaction:
           Amount: ꜩ0
           From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
@@ -394,7 +394,7 @@ This sequence of operations was run:
             Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 10
           Storage size: 2331 bytes
           Paid storage size diff: 67 bytes
-          Consumed gas: 3007.616
+          Consumed gas: 2994.305
           Balance updates:
             tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.01675
             storage fees ........................... +ꜩ0.01675

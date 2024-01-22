@@ -526,7 +526,7 @@ module Aux = struct
 
              The error stating the size exceeded is then correct. *)
           if size < Int32.zero then fail Error.Store_value_size_exceeded
-          else return ()
+          else return_unit
         in
         let* allocated_durable =
           guard (fun () ->
@@ -587,7 +587,7 @@ module Aux = struct
           (* Checks for overflow. *)
           if value_size > Int32.add value_size num_bytes then
             fail Error.Store_value_size_exceeded
-          else return ()
+          else return_unit
         in
         let value_offset = Int64.of_int32 value_offset in
         let num_bytes = Int32.to_int num_bytes in

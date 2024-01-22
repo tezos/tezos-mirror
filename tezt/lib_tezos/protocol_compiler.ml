@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let spawn_command ?(path = Constant.tezos_protocol_compiler) ?hooks arguments =
+let spawn_command ?(path = Uses.path Constant.octez_protocol_compiler) ?hooks
+    arguments =
   Process.spawn path ?hooks arguments
 
 let spawn_compile ?path ?hooks ?(hash_only = false) proto_dir =

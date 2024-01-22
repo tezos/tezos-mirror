@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,6 +42,15 @@ let get_outbox_proof cctxt serialized_output =
     cctxt
     ((), `Head)
     serialized_output
+    ()
+
+let get_outbox_proof_simple cctxt outbox_level message_index =
+  Block_services.(
+    make_call2 Sc_rollup_services.Block.Helpers.outbox_proof_simple)
+    cctxt
+    `Head
+    outbox_level
+    message_index
     ()
 
 let get_outbox cctxt block level =

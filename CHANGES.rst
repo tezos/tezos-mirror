@@ -28,293 +28,69 @@ General
 Node
 ----
 
-- Changed the bounding specification of valid operations in the mempool:
+- **Breaking change** Removed the deprecated ``endorsing_rights`` RPC,
+  use ``attestation_rights`` instead. (MR :gl:`!9849`)
 
-  + Before, the number of valid **manager operations** in the mempool
-    was at most ``max_prechecked_manager_operations`` (default 5_000),
-    with no other constraints. (Operations to keep were selected
-    according to a "weight" that consists in the ratio of fee over
-    "resources"; the latter is the maximum between the following
-    ratios: operation gas over maximal allowed gas, and operation size
-    over maximal allowed size. The baker uses the same notion of
-    "weight" to select operations.)
+- Added metrics about distributed data base messages sent, broadcasted or received
 
-  + Now, the number of valid **operations of any kind** is at most
-    ``max_operations`` (default 10_000), and also the **sum of the
-    sizes in bytes** of all valid operations is at most
-    ``max_total_bytes`` (default 10_000_000). See
-    [src/lib_shell/prevalidator_bounding.mli] for the reasoning behind
-    the default values. (Operations are selected according to the
-    protocol's ``compare_operations`` function, which currently orders
-    operations according to their validation pass (consensus is
-    highest and manager is lowest); note that two manager operations
-    are ordered using their fee over gas ratio.)
-
-  The values of ``max_operations`` and ``max_total_bytes`` can be
-  retrieved with ``GET /chains/<chain>/mempool/filter`` and configured
-  with ``POST /chains/<chain>/mempool/filter`` (just as
-  ``max_prechecked_manager_operations`` used to be). As a result, the
-  JSON format of the outputs of these two RPCs and the input of the
-  second one have slightly changed; see their updated descriptions.
-  (MR :gl:`!6787`)
-
-- Errors ``prefilter.fees_too_low_for_mempool`` and
-  ``plugin.removed_fees_too_low_for_mempool`` have been replaced with
-  ``node.mempool.rejected_by_full_mempool`` and
-  ``node.mempool.removed_from_full_mempool`` with different
-  descriptions and messages. The ``rejected_by_full_mempool`` error
-  still indicates the minimal fee that the operation would need to be
-  accepted by the full mempool, provided that such a fee exists. If
-  not, the error now states that the operation cannot be included no
-  matter its fee (e.g. if it is a non-manager operation). (MRs
-  :gl:`!6787`, :gl:`!8640`)
-
-- Updated the message of the mempool's
-  ``prevalidation.operation_conflict`` error. It now provides the
-  minimal fee that the operation would need to replace the
-  pre-existing conflicting operation, when such a fee exists. (This
-  fee indication used to be available before V16-rc1, where it had
-  been removed for technical reasons.) (MR :gl:`!9016`)
-
-- RPC ``/helpers/forge/operations`` can now take JSON formatted operations with
-  ``attestation``, ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds. Note that the existing kinds
-  ``endorsement``, ``preendorsement``, ``double_endorsement_evidence``, and
-  ``double_preendorsement_evidence`` are still accepted. (MR :gl:`!8746`)
-
-- Simplified the peer to peer messages at head switch. The node now
-  systematically broadcasts only its new head (instead of sometime
-  broadcasting a sparse history of the chain).
-
-- Added version ``1`` to RPC ``POST ../helpers/parse/operations``. It can be
-  used by calling the RPC with the parameter ``?version=1`` (default version is
-  still ``0``). Version ``1`` allows the RPC to output ``attestation``,
-  ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8840`)
-
-- Added version ``2`` to RPC ``GET ../mempool/pending_operations``. It can be
-  used by calling the RPC with the parameter ``?version=2`` (default version is
-  still ``1``). Version ``2`` allows the RPC to output ``attestation``,
-  ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds in the JSON result. This version
-  also renames the ``applied`` field of the result to ``validated``
-  (MRs :gl:`!8960`, :gl:`!9143`)
-
-- RPCs ``/helpers/scripts/run_operation`` and
-  ``/helpers/scripts/simulate_operation`` can now take JSON formatted operations
-  with ``double_attestation_evidence`` and ``double_preattestation_evidence``
-  kinds. Even though consensus operations are not supported by the RPCs,
-  ``attestation`` and ``preattestation`` are accepted in the input JSON. (MR
-  :gl:`!8768`)
-
-- Removed ``lwt-log`` from the dependencies. The default logger has been updated
-  to use the ``file-descriptor-stdout`` sink instead of the previous ``lwt-log``
-  sink. This change has resulted in the removal of certain features from the log
-  implementation that were specific to "lwt-log". Some features, such as log
-  rules, syslog, and the output format, have been replaced with alternative
-  implementations. Additionally, the previous implementation of "syslog" had
-  some issues, including duplicated log headers or cropped messages, depending
-  on the file output. These issues have been addressed, and the new
-  implementation should now work correctly.
-
-- Removed ``template`` field from ``log`` configuration with the removal of
-  ``lwt-log`` library. Since it was believed to have low usage, no alternative
-  implementation has been provided.
-
-- The configuration flag ``disable-mempool-precheck`` is now
-  deprecated, as well as the ``disable_precheck`` field of
-  ``prevalidator`` in the shell limits of the configuration file. They
-  already didn't do anything since V16-rc1. (MR :gl:`!8963`)
-
-- Added version ``1`` to RPCs ``POST ../helpers/scripts/run_operation`` and
-  ``POST ../helpers/scripts/simulate_operation``. It can be used by calling the
-  RPC with the parameter ``?version=1`` (default version is still ``0``).
-  Version ``1`` allows the RPC to output ``attestation``, ``preattestation``,
-  ``double_attestation_evidence`` and ``double_preattestation_evidence`` kinds
-  in the JSON result. (MR :gl:`!8949`)
-
-- The error message when the local injection of an operation fails now
-  begins with ``Error while validating injected operation`` instead of
-  ``Error while applying operation``. (MR :gl:`!8857`)
-
-- Updated the description of the ``ban_operation`` RPC to better
-  reflect its behavior, which is unchanged. (More precisely, removed
-  the "reverting its effect if it was applied" part since operations
-  are never applied.) (MR :gl:`!8857`)
-
-- Added version ``1`` to RPC ``GET ../mempool/monitor_operations``. It can be
-  used by calling the RPC with the parameter ``?version=1`` (default version is
-  still ``0``). Version ``1`` allows the RPC to output ``attestation``,
-  ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8980`)
-
-- Improved the performances of JSON RPC calls by optimizing the
-  serialization to JSON. (MR :gl:`!9072`)
-
-- Fixed the ``validation_pass`` argument usage of ``monitor_operations`` RPC.
-  Only operation that were in the mempool before the RPC call were filtered by
-  validation passes. (MR :gl:`!9012`)
-
-- **Breaking change** Removed the ``octez_mempool_pending_applied``
-  metric, and renamed the ``octez_mempool_pending_prechecked`` one to
-  ``octez_mempool_pending_validated``. (MR :gl:`!9137`)
-
-- Added version ``1`` to RPC ``POST ../helpers/preapply/operations``. It can be
-  used by calling the RPC with the parameter ``?version=1`` (default version is
-  still ``0``). Version ``1`` allows the RPC to output ``attestation``,
-  ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8891`)
-
-- Changed default stdout logs by adding simple coloration. The log header
-  header is now bold and warning and errors are highlighted. The
-  ``--log-coloring`` command line argument can be used to enable or
-  disable logs coloration on default stdout logs; it is enabled by
-  default. (MR :gl:`!8685`)
-
-- Improved the performance of block validation: the block validation time has
-  been reduced by half on average, resulting in a reduced propagation time
-  through the network. (MR :gl:`!9100`)
-
-- Added ``validated`` argument for ``GET ../mempool/monitor_operations`` and
-  ``GET ../mempool/pending_operations``. ``applied`` argument of these RPCs is
-  deprecated. (MR :gl:`!9143`)
-
-- Added version ``1`` to RPCs ``GET ../blocks/<block>``, and ``GET
-  ../blocks/<blocks>/operations``. It can be used by calling the RPC with the
-  parameter ``?version=1`` (default version is still ``0``). Version ``1``
-  allows the RPC to output ``attestation``, ``preattestation``,
-  ``double_attestation_evidence`` and ``double_preattestation_evidence`` kinds
-  in the JSON result. (MR :gl:`!9008`)
-
-- When an operation in the mempool gets replaced with a better
-  conflicting operation (e.g. an operation from the same manager with
-  higher fees), the replaced operation is now reclassified as
-  ``branch_delayed`` instead of ``outdated``. The associated error
-  ``prevalidation.operation_replacement`` is otherwise unchanged. This
-  makes it consistent with the reverse situation: when the new
-  operation is worse than the old conflicting one, the new operation
-  is classified as ``branch_delayed`` with the
-  ``prevalidation.operation_conflict`` error. (MR :gl:`!9314`)
-
-- In RPC ``/protocol_data``, ``"per_block_votes"`` replaces ``"liquidity_baking_toggle_vote"``;
-  ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_issuance_vote"``.
-  A vote is one of ``"on"``, ``"off"``, ``"pass"``.
-
-- Added version ``1`` to RPC ``GET ../blocks/<blocks>/metadata``. It can be used
-  by calling the RPC with the parameter ``?version=1`` (default version is still
-  ``0``). Version ``1`` of this RPC and ``GET ../blocks/<block>`` allow the RPC
-  to output ``attesting rewards`` and ``lost attesting rewards`` kinds in the
-  JSON result. (MR :gl:`!9253`)
-
-- Fixed a behavior where each time a new data was received from a
-  peer, a new p2p request would be triggered instead of waiting for
-  the delayed retry. (MR :gl:`!9470`)
-
-- Renamed RPC server events: Added section ``rpc_server`` and changed
-  names from ``legacy_logging_event-rpc_http_event-<level>`` into
-  ``rpc_http_event_<level>``.
-
-- Reduced the workload of the mempool by preventing unnecessary worker
-  requests to be made and fixed a data-race that would request a
-  resource that was already received. (MR :gl:`!9520`)
-
-- Event ``block.validation.protocol_filter_not_found`` renamed to
-  ``block.validation.validation_plugin_not_found`` with updated
-  message ``no validation plugin found for protocol
-  <protocol_hash>``. (MR :gl:`!9583`)
-
-- Add RPC to get smart rollup's balance of ticket with specified ticketer, content type, and content:
-  ``POST chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/ticket_balance``
-  (MR :gl:`!9535`)
-
-- **Breaking change** Removed ``mumbainet`` network alias. (MR :gl:`!9694`)
-
-- Removed Mumbai mempool plugin. (MR :gl:`!9696`)
-
-- Operations posting invalid WASM proofs are now discarded earlier by the
-  Nairobi mempool plugin. (MR :gl:`!`)
+- **Breaking change** Removed the deprecated
+  ``disable-mempool-precheck`` configuration flag and
+  ``disable_precheck`` field of ``prevalidator`` in the shell limits
+  of the configuration file. They already had no effect on the node
+  anymore. (MR :gl:`!10030`)
 
 - **Breaking change** Bumped the Octez snapshot version from ``5`` to
   ``6`` to explicit the incompatibility with previous version
   nodes. Also, improved the consistency of ``snapshot`` import errors
   messages (MR :gl:`!10138`)
 
-- **Breaking change** Bumped the Octez snapshot version from ``6`` to
-  ``7`` which fixes the corrupted generation of tar rolling and full
-  snapshots. It is still possible to import previous version snapshots
-  but snapshots in version 7 are not retro-compatible with previous
-  octez versions (MR :gl:`!10785`).
+- Add logs at ``Info`` level about the disconnection reasons in the p2p section.
+
+- Removed a spurious "missing validation plugin" warning message that
+  was emitted every time a block was applied using an old protocol
+  where its plugin was removed.
+
+- **Breaking change** Removed the deprecated ``/monitor/valid_blocks``
+  RPC. Instead, use the ``/monitor/applied_blocks`` RPC that has the
+  same behaviour.
 
 Client
 ------
-- Adding client commands to generate, open and verify a time-lock.
 
-- The ``typecheck script`` command can now be used to typecheck several scripts.
+- Fixed indentation of the stacks outputted by the ``normalize stack``
+  command. (MR :gl:`!9944`)
 
-- From protocol ``alpha`` operation receipt output ``attestation`` instead of
-  ``endorsement``. For example ``double preendorsement evidence`` become
-  ``double preattesation evidence``, ``lost endorsing rewards`` become ``lost
-  attesting rewards``. (MR :gl:`!9232`)
+- Added options to temporarily extend the context with other contracts
+  and extra big maps in Michelson commands. (MR :gl:`!9946`)
 
-- Add ``attest for`` and ``preattest for`` commands. ``endorse for`` and
-  ``preendorse for`` are now deprecated. (MR :gl:`!9494`)
+- Added a ``run_instruction`` RPC in the plugin and a ``run michelson code``
+  client command allowing to run a single Michelson instruction or a
+  sequence of Michelson instructions on a given stack. (MR :gl:`!9935`)
 
-- **Breaking change** Removed read-write commands specific to Mumbai (MR :gl:`!9695`)
+- The legacy unary macros for the ``DIP`` and ``DUP`` Michelson
+  instructions have been deprecated. Using them now displays a warning
+  message on stderr.
 
-- Added new client commands related to the new staking mechanisms:
-  ``stake``, ``unstake``, ``finalize unstake``, ``set delegate parameters``,
-  ``get full balance`` and ``get staked balance``. (MR :gl:`!9642`)
+- Added a ``run unit tests`` client command allowing to run one or
+  several Michelson unit tests in `TZT format
+  <http://tezos.gitlab.io/active/michelson.html#tzt-a-syntax-extension-for-writing-unit-tests>`__. (MR
+  :gl:`!10898`)
 
 Baker
 -----
 
-- Changed the baker liquidity baking vote file
-  ``per_block_votes.json`` lookup so that it also considers its client
-  data directory when searching an existing file. The previous
-  semantics, which looks for this file in the current working
-  directory, takes predecence.
-
-- Bakers are now asked (but not required) to set their votes for the adoption of the
-  adaptive issuance feature. They may use the CLI option ``--adaptive-issuance-vote``
-  or the per-block votes file (which is re-read at each block, and overrides the CLI option).
-  Absence of vote is equivalent to voting "pass".
-
-- **Breaking change** Rename ``liquidity_baking_toggle_vote`` into
-  ``read_liquidity_baking_toggle_vote`` (MR :gl:`!9464`)
-  and ``reading_per_block`` into ``reading_per_block_votes`` (MR :gl:`!8661`),
-  for baker events.
-
-- **Breaking change** Rename ``endorsement`` into ``attestation`` for baker errors and events.
-  (MR :gl:`!9195`)
-
-- Cached costly RPC calls made when checking if nonces need to be
-  revealed. (MR :gl:`!9601`)
+- Made the baker attest as soon as the pre-attestation quorum is
+  reached instead of waiting for the chain's head to be fully
+  applied (MR :gl:`!10554`)
 
 Accuser
 -------
 
-- **Breaking change** Rename ``endorsement`` into ``attestation`` for accuser errors and events.
-  (MR :gl:`!9196`)
-
-Signer
-------
-
 Proxy Server
 ------------
 
-- Redirected not found replies (HTTP 404 answers) to the underlying
-  octez-node itself. Public visibility of the node is not required
-  anymore.
-
 Protocol Compiler And Environment
 ---------------------------------
-
-- Added a new version of the protocol environment (V10)
-
-  - Exposed a limited API to manipulate an Irmin binary tree within the
-    protocol.
-
-  - Expose encoding with legacy attestation name. (MR :gl:`!8620`)
 
 Codec
 -----
@@ -322,33 +98,30 @@ Codec
 Docker Images
 -------------
 
--  Bump up base image to ``alpine:3.17``. In particular, this changes Rust
-   version to 1.64.0.
-
 - The rollup node is protocol agnostic and released as part of the Docker
   image. (MR :gl:`!10086`)
+
 
 Smart Rollup node
 -----------------
 
-- Faster bootstrapping process. (MR :gl:`!8618`, MR :gl:`!8767`)
-- Single, protocol-agnostic, rollup node binary. The rollup node
-  ``octez-smart-rollup-node`` works with any protocol and supports protocol
-  upgrades. The other protocol specific rollup nodes still exist but will be
-  deprecated. (MR :gl:`!9105`)
+- Now smart rollup node allows multiple batcher keys. Setting multiple
+  keys for the batching purpose allows to inject multiple operations
+  of the same kind per block by the rollup node. ( MR :gl:`!10512`, MR
+  :gl:`!10529`, MR :gl:`!10533`, MR :gl:`!10567`, MR :gl:`!10582`, MR
+  :gl:`!10584`, MR :gl:`!10588`, MR :gl:`!10597`, MR :gl:`!10601`, MR
+  :gl:`!10622`, MR :gl:`!10642`, MR :gl:`!10643`, MR :gl:`!10839`, MR
+  :gl:`!10842`, MR :gl:`!10861`, MR :gl:`!11008` )
 
-- Added a new metrics ``head_inbox_process_time`` to report the time the rollup
-  node spent to process a new Layer 1 head. (MR :gl:`!8971`)
+- A new bailout mode that solely cements and defends existing
+  commitments without publishing new ones. Recovers bonds when
+  possible, after which the node exits gracefully. (MR :gl:`!9721`, MR
+  :gl:`!9817`, MR :gl:`!9835`)
 
-- **Breaking change** Field ``"messages"`` of RPC ``/global/block/{block_id}``
-  now contains *serialized* messages (external messages start with ``01`` and
-  internal start with ``00``). (MR :gl:`!8876`)
-
-- **Breaking change** RPC ``/global/helpers/proof/outbox`` is moved to
-  ``/global/block/head/helpers/proof/outbox``. (MR :gl:`!9233`)
-
-- Fixed an issue where the rollup node could forget to update its L2 head for a
-  block. (MR :gl:`!9868`)
+- RPC ``/global/block/<block-id>/simulate`` accepts inputs with a new optional
+  field ``"log_kernel_debug_file"`` which allows to specify a file in which
+  kernel logs should be written (this file is in
+  ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
 
 - The protocol specific rollup nodes binaries are now deprecated and replaced
   by symbolic links to the protocol agnostic rollup node. In the future, the
@@ -357,46 +130,89 @@ Smart Rollup node
 - Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
   of the Octez distribution. (MR :gl:`!10086`)
 
-- RPC ``/global/block/<block-id>/simulate`` accepts inputs with a new optional
-  field ``"log_kernel_debug_file"`` which allows to specify a file in which
-  kernel logs should be written (this file is in
-  ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
-
 - Added the rollup node command inside the docker entrypoint (MR :gl:`!10253`)
+
+- Added the argument ``cors-headers`` and ``cors-origins`` to specify respectively the
+  allowed headers and origins. (MR :gl:`!10571`)
+
+- Fix header in messages store to use predecessor hash to avoid missing pointer
+  in case of reorganization and GC. (MR :gl:`!10847`)
+
+- Added a garbage collection mechanism that cleans historical data before the LCC.
+  (MRs :gl:`!10050`, :gl:`!10135`, :gl:`!10236`, :gl:`!10237`, :gl:`!10452`)
+
+- Added a ``history-mode`` option, which can be either ``archive`` or
+  ``full``. In ``archive``, the default, the rollup node has the whole L2 chain
+  history, no GC happens. In ``full`` the rollup node retains data for possible
+  refutations. (MRs :gl:`!10475`, :gl:`!10695`)
+
+- Snapshot export with integrity checks. (MR :gl:`!10704`)
 
 Smart Rollup client
 -------------------
 
+- **Breaking change** smart rollup client have been deprecated and
+  no longer exist, most commands have equivalents RPCs and ``octez-codec`` (MR :gl:`!11046`).
+
+- The following table outlines the deprecated of smart rollup client commands and
+  their corresponding replacements with new RPCs:
+
+  .. code-block:: rst
+
+    ==========================================  ====================================================
+    Command                                     RPC
+    ==========================================  ====================================================
+    get smart rollup address                    [GET global/smart_rollup_address]
+    ------------------------------------------  ----------------------------------------------------
+    get state value for <key> [-B --block       [GET global/block/<block>/state]
+    <block>]
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level> transferring               <outbox_level>/messages] with message index in query
+    <transactions>
+    ------------------------------------------  ----------------------------------------------------
+    get proof for message <index> of outbox     [GET /global/block/<block-id>/helpers/proofs/outbox/
+    at level <level>                            <outbox_level>/messages] with message index in query
+    ==========================================  ====================================================
+
+- The result of ``encode outbox message <transactions>`` can be achieved:
+  ``octez-codec encode alpha.smart_rollup.outbox.message from <transactions>``.
+
+- The keys in the smart rollup client use the same format as the ``octez-client``.
+  They can be imported with ``octez-client import secret key <sk_uri>``, or by merging the key files
+  between the ``octez-client`` base directory and the ``smart-rollup-client-<proto>`` base directory.
+
 Smart Rollup WASM Debugger
 --------------------------
-- Changed the syntax for the ``octez-smart-rollup-wasm-debugger`` to have the ``--kernel``
-  argument before the kernel file. (MR :gl:`!9318`)
 
-- ``profile`` commands now profiles the time spent in each steps of a PVM
-  execution. It can be disabled with the option ``--without-time`` (MR
-  :gl:`!9335`).
-- Added option ``--no-reboot`` to the ``profile`` command to profile a single
-  ``kernel_run``.
-- Improved profiling output for consecutive kernel runs.
-- Allow serialized messages in inputs: ``{ "serialized": "01..." }``, instead
-  of only external and internal transfers. This allows to inject arbitrary
-  messages in the rollup. (MR :gl:`!9613`)
+- Added flag ``--no-kernel-debug`` to deactivate the kernel debug messages. (MR
+  :gl:`!9813`)
+
+- Support special directives using ``write_debug`` host function in the
+  profiler, prefixed with ``__wasm_debugger__::``. Support
+  ``start_section(<data>)`` and ``end_section(<data>)`` to count ticks in
+
+- Partially support the installer configuration of the Smart Rollup SDK, i.e.
+  support only the instruction ``Set``. The configuration can be passed to
+  the debugger via the option ``--installer-config`` and will initialize the
+  storage with this configuration. (MR :gl:`!9641`)
+
+- The argument ``--kernel`` accepts hexadecimal files (suffixed by ``.hex``), it
+  is consired as an hexadecimal ``.wasm`` file. (MR :gl:`!11094`)
 
 Data Availability Committee (DAC)
-----------------------------------
-- Released Data Availability Committee executables which include ``octez-dac-node``
-  and ``octez-dac-client`` as part of an experimental release. Users can experiment
-  with operating and using DAC in their Smart Rollup workflow to achieve higher data
-  throughput. It is not recommended to use DAC on Mainnet but instead on testnets
-  and lower environments.
+---------------------------------
 
 Miscellaneous
 -------------
 
-- Updating and re-enabling the time-lock Michelson commands.
+- Beta scripts to build Debian and RedHat packages have been added to the tree.
 
-- Recommend rust version 1.64.0 instead of 1.60.0.
+- New Recommended Rust version 1.71.1 instead of 1.64.0.
 
-- Sapling parameters files are installed by ``make build-deps`` via opam
+- Extended the Micheline lexer to allow primitives starting with the
+  underscore symbol (``_``). (MR :gl:`!10782`)
 
-- Removed binaries of Mumbai (MR :gl:`!9693`)
+- Beta Debian and Redhat packages are now linked in gitlab releases.
+
+- Renamed package registries for releases from ``tezos-x.y`` to ``octez-x.y``.

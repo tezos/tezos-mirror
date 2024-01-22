@@ -26,17 +26,19 @@
 (* Check that each nullifier is not already present in the state and add it.
    Important to avoid spending the same input twice in a transaction. *)
 let rec check_and_update_nullifiers ctxt state inputs =
+  let open Lwt_result_syntax in
   match inputs with
   | [] -> return (ctxt, Some state)
-  | input :: inputs -> (
-      Sapling_storage.nullifiers_mem ctxt state Sapling.UTXO.(input.nf)
-      >>=? function
-      | ctxt, true -> return (ctxt, None)
-      | ctxt, false ->
-          let state =
-            Sapling_storage.nullifiers_add state Sapling.UTXO.(input.nf)
-          in
-          check_and_update_nullifiers ctxt state inputs)
+  | input :: inputs ->
+      let* ctxt, nullifier_in_state =
+        Sapling_storage.nullifiers_mem ctxt state Sapling.UTXO.(input.nf)
+      in
+      if nullifier_in_state then return (ctxt, None)
+      else
+        let state =
+          Sapling_storage.nullifiers_add state Sapling.UTXO.(input.nf)
+        in
+        check_and_update_nullifiers ctxt state inputs
 
 let verify_update :
     Raw_context.t ->
@@ -44,65 +46,70 @@ let verify_update :
     Sapling_repr.transaction ->
     string ->
     (Raw_context.t * (Int64.t * Sapling_storage.state) option) tzresult Lwt.t =
- fun ctxt state transaction key ->
-  (* Check the transaction *)
-  (* To avoid overflowing the balance, the number of inputs and outputs must be
-     bounded.
-     Ciphertexts' memo_size must match the state's memo_size.
-     These constraints are already enforced at the encoding level. *)
-  assert (Compare.Int.(List.compare_length_with transaction.inputs 5208 <= 0)) ;
-  assert (Compare.Int.(List.compare_length_with transaction.outputs 2019 <= 0)) ;
-  let pass =
-    List.for_all
-      (fun output ->
-        Compare.Int.(
-          Sapling.Ciphertext.get_memo_size Sapling.UTXO.(output.ciphertext)
-          = state.memo_size))
-      transaction.outputs
-  in
-  if not pass then return (ctxt, None)
-  else
-    (* Check the root is a recent state *)
-    Sapling_storage.root_mem ctxt state transaction.root >>=? fun pass ->
+  let open Lwt_result_syntax in
+  fun ctxt state transaction key ->
+    (* Check the transaction *)
+    (* To avoid overflowing the balance, the number of inputs and outputs must be
+       bounded.
+       Ciphertexts' memo_size must match the state's memo_size.
+       These constraints are already enforced at the encoding level. *)
+    assert (Compare.Int.(List.compare_length_with transaction.inputs 5208 <= 0)) ;
+    assert (Compare.Int.(List.compare_length_with transaction.outputs 2019 <= 0)) ;
+    let pass =
+      List.for_all
+        (fun output ->
+          Compare.Int.(
+            Sapling.Ciphertext.get_memo_size Sapling.UTXO.(output.ciphertext)
+            = state.memo_size))
+        transaction.outputs
+    in
     if not pass then return (ctxt, None)
     else
-      check_and_update_nullifiers ctxt state transaction.inputs >|=? function
-      | ctxt, None -> (ctxt, None)
-      | ctxt, Some state ->
-          Sapling.Verification.with_verification_ctx (fun vctx ->
-              let pass =
-                (* Check all the output ZK proofs *)
-                List.for_all
-                  (fun output -> Sapling.Verification.check_output vctx output)
-                  transaction.outputs
-              in
-              if not pass then (ctxt, None)
-              else
+      (* Check the root is a recent state *)
+      let* pass = Sapling_storage.root_mem ctxt state transaction.root in
+      if not pass then return (ctxt, None)
+      else
+        let+ ctxt, state_opt =
+          check_and_update_nullifiers ctxt state transaction.inputs
+        in
+        match state_opt with
+        | None -> (ctxt, None)
+        | Some state ->
+            Sapling.Verification.with_verification_ctx (fun vctx ->
                 let pass =
-                  (* Check all the input Zk proofs and signatures *)
+                  (* Check all the output ZK proofs *)
                   List.for_all
-                    (fun input ->
-                      Sapling.Verification.check_spend
-                        vctx
-                        input
-                        transaction.root
-                        key)
-                    transaction.inputs
+                    (fun output ->
+                      Sapling.Verification.check_output vctx output)
+                    transaction.outputs
                 in
                 if not pass then (ctxt, None)
                 else
                   let pass =
-                    (* Check the signature and balance of the whole transaction *)
-                    Sapling.Verification.final_check vctx transaction key
+                    (* Check all the input Zk proofs and signatures *)
+                    List.for_all
+                      (fun input ->
+                        Sapling.Verification.check_spend
+                          vctx
+                          input
+                          transaction.root
+                          key)
+                      transaction.inputs
                   in
                   if not pass then (ctxt, None)
                   else
-                    (* update tree *)
-                    let list_to_add =
-                      List.map
-                        (fun output ->
-                          Sapling.UTXO.(output.cm, output.ciphertext))
-                        transaction.outputs
+                    let pass =
+                      (* Check the signature and balance of the whole transaction *)
+                      Sapling.Verification.final_check vctx transaction key
                     in
-                    let state = Sapling_storage.add state list_to_add in
-                    (ctxt, Some (transaction.balance, state)))
+                    if not pass then (ctxt, None)
+                    else
+                      (* update tree *)
+                      let list_to_add =
+                        List.map
+                          (fun output ->
+                            Sapling.UTXO.(output.cm, output.ciphertext))
+                          transaction.outputs
+                      in
+                      let state = Sapling_storage.add state list_to_add in
+                      (ctxt, Some (transaction.balance, state)))

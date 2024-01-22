@@ -60,16 +60,24 @@ let turn ~self game ({alice; bob} as players) =
   | Alice, Bob -> Their_turn
   | Bob, Alice -> Their_turn
 
-(** [inject_next_move node_ctxt source ~refutation ~opponent ~commitment
-      ~opponent_commitment] submits an L1 operation (signed by [source]) to
+(** [inject_next_move node_ctxt ~refutation ~opponent ~commitment
+      ~opponent_commitment] submits an L1 operation to
       issue the next move in the refutation game. *)
-let inject_next_move node_ctxt source ~refutation ~opponent =
+let inject_next_move node_ctxt ~refutation ~opponent =
   let open Lwt_result_syntax in
   let refute_operation =
     L1_operation.Refute
-      {rollup = node_ctxt.Node_context.rollup_address; refutation; opponent}
+      {
+        rollup = node_ctxt.Node_context.config.sc_rollup_address;
+        refutation;
+        opponent;
+      }
   in
-  let* _hash = Injector.add_pending_operation ~source refute_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      refute_operation
+  in
   return_unit
 
 type pvm_intermediate_state =
@@ -223,17 +231,21 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt ~opponent
       let choice = agreed_start_chunk.tick in
       final_move choice
 
-let play_next_move plugin node_ctxt game self opponent =
+let play_next_move plugin node_ctxt game opponent =
   let open Lwt_result_syntax in
   let* refutation = next_move plugin node_ctxt ~opponent game in
-  inject_next_move node_ctxt self ~refutation ~opponent
+  inject_next_move node_ctxt ~refutation ~opponent
 
-let play_timeout (node_ctxt : _ Node_context.t) self stakers =
+let play_timeout (node_ctxt : _ Node_context.t) stakers =
   let open Lwt_result_syntax in
   let timeout_operation =
-    L1_operation.Timeout {rollup = node_ctxt.rollup_address; stakers}
+    L1_operation.Timeout {rollup = node_ctxt.config.sc_rollup_address; stakers}
   in
-  let* _hash = Injector.add_pending_operation ~source:self timeout_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      timeout_operation
+  in
   return_unit
 
 let play node_ctxt ~self game opponent =
@@ -241,7 +253,7 @@ let play node_ctxt ~self game opponent =
   let index = make_index self opponent in
   let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
   match turn ~self game index with
-  | Our_turn {opponent} -> play_next_move plugin node_ctxt game self opponent
+  | Our_turn {opponent} -> play_next_move plugin node_ctxt game opponent
   | Their_turn ->
       let module Plugin = (val plugin) in
       let* timeout_reached =
@@ -249,10 +261,9 @@ let play node_ctxt ~self game opponent =
       in
       when_ timeout_reached @@ fun () ->
       let*! () = Refutation_game_event.timeout_detected opponent in
-      play_timeout node_ctxt self index
+      play_timeout node_ctxt index
 
-let play_opening_move node_ctxt self
-    (conflict : Octez_smart_rollup.Game.conflict) =
+let play_opening_move node_ctxt (conflict : Octez_smart_rollup.Game.conflict) =
   let open Lwt_syntax in
   let* () = Refutation_game_event.conflict_detected conflict in
   let player_commitment_hash =
@@ -265,4 +276,4 @@ let play_opening_move node_ctxt self
     Octez_smart_rollup.Game.Start
       {player_commitment_hash; opponent_commitment_hash}
   in
-  inject_next_move node_ctxt self ~refutation ~opponent:conflict.other
+  inject_next_move node_ctxt ~refutation ~opponent:conflict.other

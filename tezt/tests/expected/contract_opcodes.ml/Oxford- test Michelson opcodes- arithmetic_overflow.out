@@ -23,11 +23,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 10 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.673)
     [ (Pair (Left (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 1 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 1 257) ]
   - location: 17 (just consumed gas: 0.010)
     [ 1
@@ -59,11 +59,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 10 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.673)
     [ (Pair (Left (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 123 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 123 257) ]
   - location: 17 (just consumed gas: 0.010)
     [ 123
@@ -95,11 +95,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 13 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.673)
     [ (Pair (Right (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 1 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 1 257) ]
   - location: 20 (just consumed gas: 0.010)
     [ 1
@@ -131,11 +131,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 13 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.673)
     [ (Pair (Right (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 123 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 123 257) ]
   - location: 20 (just consumed gas: 0.010)
     [ 123
@@ -167,11 +167,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 8 characters 11 to 14,
 unexpected arithmetic overflow
 trace
-  - location: 9 (just consumed gas: 11.246)
+  - location: 9 (just consumed gas: 11.154)
     [ (Pair (Left Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Left Unit) ]
-  - location: 10 (just consumed gas: 0)
+  - location: 10 (just consumed gas: 0.010)
     [ Unit ]
   - location: 12 (just consumed gas: 0.010)
     [ 922337203685477580700
@@ -207,11 +207,11 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 14 characters 11 to 14,
 unexpected arithmetic overflow
 trace
-  - location: 9 (just consumed gas: 11.246)
+  - location: 9 (just consumed gas: 11.154)
     [ (Pair (Right Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Right Unit) ]
-  - location: 10 (just consumed gas: 0)
+  - location: 10 (just consumed gas: 0.010)
     [ Unit ]
   - location: 21 (just consumed gas: 0.010)
     [ 10

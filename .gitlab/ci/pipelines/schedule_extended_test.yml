@@ -6,6 +6,9 @@ include:
   - .gitlab/ci/jobs/packaging/opam_prepare.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
+  # Stage: test
+  - .gitlab/ci/jobs/test/install_octez.yml
+
   # Stage: doc
   - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/tests.yml
+  - .gitlab/ci/jobs/doc/test_install_python.yml

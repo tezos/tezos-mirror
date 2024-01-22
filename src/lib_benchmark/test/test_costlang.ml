@@ -63,7 +63,10 @@ module Term (X : S) = struct
   *)
   let arg_list_test =
     app
-      ( lam ~name:"f" @@ fun f ->
+      ( lam'
+          ~name:"f"
+          (Ty.arrow size_ty (Ty.arrow size_ty (Ty.arrow size_ty size_ty)))
+      @@ fun f ->
         lam ~name:"w" @@ fun w -> app (app f (int 0)) w )
       ( lam ~name:"x" @@ fun x ->
         lam ~name:"y" @@ fun y ->
@@ -81,8 +84,8 @@ let test_pp_2 () =
 
 let test_pp_3 () =
   PP.applied_linear
-  = "((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + size2)))) \
-     10) 33"
+  = "((((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + \
+     size2)))) 10)) 33)"
 
 (* Test evaluation *)
 let test_eval1 () =

@@ -137,7 +137,7 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "cache_repr"
 
   let purpose = Benchmark.Generate_code "cache_repr"
 
@@ -159,9 +159,9 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
       let module M = struct
         let name = name
 
-        type arg_type = int * unit
-
         let takes_saturation_reprs = false
+
+        type arg_type = int * unit
 
         module Def (X : Costlang.S) = struct
           open X
@@ -181,7 +181,7 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
        In the interpreter, this would warrant a dedicated benchmark for the intercept. *)
     Benchmarks_proto.Model.make
       ~conv:(function {cache_cardinal} -> (cache_cardinal, ()))
-      ~model:affine_logn
+      affine_logn
 
   let cache_update_benchmark ctxt some_key_in_domain cache_cardinal =
     let workload = {cache_cardinal} in

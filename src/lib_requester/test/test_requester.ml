@@ -187,41 +187,49 @@ let test_full_requester_fetch_timeout _ () =
     is 5, and that "baz" is part of them.
 *)
 let test_full_fetch_issues_request _ () =
-  let open Lwt_syntax in
-  let requester = init_full_requester () in
-  Test_request.clear_registered_requests () ;
-  Alcotest.(
+  if true then
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/6635
+       The following test is flaky and is thus deactivated.
+       When run in opam tests in particular, it fails often.
+       It looks like it expects a number that depends on how long a timeout
+       actually takes in practice, which is inherently flaky. *)
+    Lwt.return_unit
+  else
+    let open Lwt_syntax in
+    let requester = init_full_requester () in
+    Test_request.clear_registered_requests () ;
+    Alcotest.(
+      check
+        (list (tuple3 unit p2p_peer_id (list testable_test_key)))
+        "should have no requests"
+        []
+        !Test_request.registered_requests) ;
+    let f1 =
+      Test_Requester.fetch
+        ~timeout:
+          (WithExceptions.Option.to_exn
+             ~none:Not_found
+             (Ptime.Span.of_float_s 0.1))
+        requester
+        "baz"
+        precheck_pass
+    in
+    let* _ = f1 in
+    (* expects 5 requests *)
     check
-      (list (tuple3 unit p2p_peer_id (list testable_test_key)))
-      "should have no requests"
-      []
-      !Test_request.registered_requests) ;
-  let f1 =
-    Test_Requester.fetch
-      ~timeout:
-        (WithExceptions.Option.to_exn
-           ~none:Not_found
-           (Ptime.Span.of_float_s 0.1))
-      requester
-      "baz"
-      precheck_pass
-  in
-  let* _ = f1 in
-  (* expects 5 requests *)
-  check
-    int
-    "expects 5 requests"
-    5
-    (List.length !Test_request.registered_requests) ;
-  Alcotest.(
-    check
-      (tuple3 unit p2p_peer_id (list testable_test_key))
-      "should have sent a request"
-      ((), P2p_peer.Id.zero, ["baz"])
-      (WithExceptions.Option.get ~loc:__LOC__
-      @@ List.hd !Test_request.registered_requests)) ;
-  Lwt.cancel f1 ;
-  Lwt.return_unit
+      int
+      "expects 5 requests"
+      5
+      (List.length !Test_request.registered_requests) ;
+    Alcotest.(
+      check
+        (tuple3 unit p2p_peer_id (list testable_test_key))
+        "should have sent a request"
+        ((), P2p_peer.Id.zero, ["baz"])
+        (WithExceptions.Option.get ~loc:__LOC__
+        @@ List.hd !Test_request.registered_requests)) ;
+    Lwt.cancel f1 ;
+    Lwt.return_unit
 
 (** Creates a requester. Injects ("foo", 1), key "foo" is known.
     Removes this data from the memory table. This key is now unknown.

@@ -30,8 +30,9 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
+    public_addr : string;
     metrics_addr : string;
-    node : Node.t;
+    l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -69,11 +70,9 @@ let rpc_endpoint dal_node =
 
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
+let public_addr dal_node = dal_node.persistent_state.public_addr
+
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
-
-let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
-
-let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
@@ -81,7 +80,7 @@ let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
-    ?(attestor_profiles = []) ?(producer_profiles = [])
+    ?(attester_profiles = []) ?(producer_profiles = [])
     ?(bootstrap_profile = false) dal_node =
   spawn_command dal_node
   @@ List.filter_map
@@ -95,14 +94,16 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
+         Some "--public-addr";
+         Some (public_addr dal_node);
          Some "--metrics-addr";
          Some (metrics_addr dal_node);
          Some "--expected-pow";
          Some (string_of_float expected_pow);
          Some "--peers";
          Some (String.concat "," peers);
-         Some "--attestor-profiles";
-         Some (String.concat "," attestor_profiles);
+         Some "--attester-profiles";
+         Some (String.concat "," attester_profiles);
          Some "--producer-profiles";
          Some (String.concat "," (List.map string_of_int producer_profiles));
          (if bootstrap_profile then Some "--bootstrap-profile" else None);
@@ -118,13 +119,13 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?expected_pow ?peers ?attestor_profiles ?producer_profiles
+let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
-      ?attestor_profiles
+      ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
       dal_node
@@ -176,8 +177,9 @@ let wait_for_ready dal_node =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
+let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
+    ?color ?data_dir ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port
+    ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -189,6 +191,9 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
     match listen_addr with
     | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
     | Some addr -> addr
+  in
+  let public_addr =
+    match public_addr with None -> listen_addr | Some addr -> addr
   in
   let metrics_addr =
     match metrics_addr with
@@ -206,27 +211,51 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
         rpc_host;
         rpc_port;
         listen_addr;
+        public_addr;
         metrics_addr;
         pending_ready = [];
-        node;
+        l1_node_endpoint;
       }
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
+(* TODO: have rpc_addr here, like for others. *)
+let create ?(path = Uses.path Constant.octez_dal_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ~node () =
+  create_from_endpoint
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?listen_addr
+    ?public_addr
+    ?metrics_addr
+    ~l1_node_endpoint:(Client.Node node)
+    ()
+
 let make_arguments node =
+  let l1_endpoint =
+    Client.as_foreign_endpoint node.persistent_state.l1_node_endpoint
+  in
   [
     "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    Endpoint.as_string l1_endpoint;
     "--rpc-addr";
     Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
     "--net-addr";
     listen_addr node;
+    "--public-addr";
+    public_addr node;
     "--metrics-addr";
     metrics_addr node;
   ]
 
-let do_runlike_command ?env node arguments =
+let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then
     Test.fail "DAL node %s is already running" node.name ;
   let on_terminate _status =
@@ -239,15 +268,21 @@ let do_runlike_command ?env node arguments =
      * [make_arguments] seems incomplete
      * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
-  run ?env node {ready = false} arguments ~on_terminate
+  run ?env ~event_level node {ready = false} arguments ~on_terminate
 
-let run ?env node =
+let run ?env ?event_level node =
   do_runlike_command
     ?env
+    ?event_level
     node
     ["run"; "--data-dir"; node.persistent_state.data_dir]
 
-let run ?(wait_ready = true) ?env node =
-  let* () = run ?env node in
+let run ?(wait_ready = true) ?env ?event_level node =
+  let* () = run ?env ?event_level node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
+
+let as_rpc_endpoint (t : t) =
+  let state = t.persistent_state in
+  let scheme = "http" in
+  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}

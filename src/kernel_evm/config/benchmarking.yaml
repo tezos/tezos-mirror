@@ -1,4 +1,0 @@
-instructions:
-  - set:
-      value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
-      to: /evm/eth_accounts/d9e5c94a12f78a96640757ac97ba0c257e8aa262/balance

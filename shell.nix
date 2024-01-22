@@ -7,23 +7,25 @@ let
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
 
-  kernelPackageSet = [
-    # Packages required to build & develop kernels
-    (pkgs.rust-bin.stable."1.66.0".default.override {
-      targets = ["wasm32-unknown-unknown"];
-    })
-    pkgs.rust-analyzer
-    pkgs.wabt
+  kernelPackageSet =
+    [
+      # Packages required to build & develop kernels
+      pkgs.rustup
+      pkgs.wabt
 
-    # Bring Clang into scope in case the stdenv doesn't come with it already.
-    pkgs.clang
+      # Bring Clang into scope in case the stdenv doesn't come with it already.
+      pkgs.clang_16
 
-    # This brings in things like llvm-ar which are needed for Rust WebAssembly
-    # compilation on Mac.
-    # It isn't used by default. Configure the AR environment variable to
-    # make rustc use it.
-    pkgs.llvmPackages.bintools
-  ];
+      # This brings in things like llvm-ar which are needed for Rust WebAssembly
+      # compilation on Mac.
+      # It isn't used by default. Configure the AR environment variable to
+      # make rustc use it.
+      pkgs.llvmPackages_16.bintools
+
+      # Cross-compilation for RISC-V
+      sources.riscv64Pkgs.clangStdenv.cc
+    ]
+    ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
 
   mainPackage = (import ./default.nix).overrideAttrs (old: {
     # This makes the shell load faster.
@@ -70,14 +72,28 @@ let
       )
     ]
   );
+
+  clangNoArch =
+    if pkgs.stdenv.isDarwin
+    then
+      pkgs.clang.overrideAttrs (old: {
+        postFixup = ''
+          ${old.postFixup or ""}
+
+          # On macOS this contains '-march' and '-mcpu' flags. These flags
+          # would be used for any invocation of Clang.
+          # Removing those makes the resulting Clang wrapper usable when
+          # cross-compiling where passing '-march' and '-mcpu' would not
+          # make sense.
+          echo > $out/nix-support/cc-cflags-before
+        '';
+      })
+    else pkgs.clang;
 in
   pkgs.mkShell {
     name = "tezos-shell";
 
-    hardeningDisable =
-      pkgs.lib.optionals
-      (pkgs.stdenv.isAarch64 && pkgs.stdenv.isDarwin)
-      ["stackprotector"];
+    hardeningDisable = ["stackprotector"];
 
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
@@ -90,6 +106,7 @@ in
         curl
         shellcheck
         poetry
+        kaitai-struct-compiler
         devPackageSet.ocaml-lsp-server
         devPackageSet.ocamlformat-rpc
         devPackageSet.ocp-indent
@@ -105,4 +122,10 @@ in
           inotify-tools
         ]
       );
+
+    # This tells the 'cc' Rust crate to build using this C compiler when
+    # targeting other architectures.
+    CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
   }

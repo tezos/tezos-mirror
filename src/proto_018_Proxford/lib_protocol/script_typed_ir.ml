@@ -290,9 +290,10 @@ module Type_size : TYPE_SIZE = struct
             trace_of_error @@ Script_tc_errors.Inconsistent_type_sizes (x, y))
 
   let of_int loc size =
+    let open Result_syntax in
     let max_size = Constants.michelson_maximum_type_size in
-    if Compare.Int.(size <= max_size) then ok size
-    else error (Script_tc_errors.Type_too_large (loc, max_size))
+    if Compare.Int.(size <= max_size) then return size
+    else tzfail (Script_tc_errors.Type_too_large (loc, max_size))
 
   let compound1 loc size = of_int loc (1 + size)
 
@@ -1712,11 +1713,15 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
 let meta_basic = {size = Type_size.one}
 
 let meta_compound1 loc ({size} : _ ty_metadata) : _ ty_metadata tzresult =
-  Type_size.compound1 loc size >|? fun size -> {size}
+  let open Result_syntax in
+  let+ size = Type_size.compound1 loc size in
+  {size}
 
 let meta_compound2 loc ({size = size1} : _ ty_metadata)
     ({size = size2} : _ ty_metadata) : _ ty_metadata tzresult =
-  Type_size.compound2 loc size1 size2 >|? fun size -> {size}
+  let open Result_syntax in
+  let+ size = Type_size.compound2 loc size1 size2 in
+  {size}
 
 let unit_metadata : unit ty_metadata = meta_basic
 
@@ -1936,18 +1941,25 @@ let pair_t :
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult
     =
  fun loc l r ->
-  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = pair_metadata loc (ty_metadata l) (ty_metadata r) in
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Pair_t (l, r, metadata, cmp))
 
-let pair_3_t loc l m r = pair_t loc m r >>? fun (Ty_ex_c r) -> pair_t loc l r
+let pair_3_t loc l m r =
+  let open Result_syntax in
+  let* (Ty_ex_c r) = pair_t loc m r in
+  pair_t loc l r
 
 let comparable_pair_t loc l r =
-  pair_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = pair_metadata loc (ty_metadata l) (ty_metadata r) in
   Pair_t (l, r, metadata, YesYes)
 
 let comparable_pair_3_t loc l m r =
-  comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
+  let open Result_syntax in
+  let* r = comparable_pair_t loc m r in
+  comparable_pair_t loc l r
 
 let pair_int_int_unit_t =
   let iu_metadata = assert_ok2 pair_metadata int_metadata unit_metadata in
@@ -1958,10 +1970,11 @@ let pair_int_int_unit_t =
 let or_t :
     type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
- fun loc l r ->
-  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
-  let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
-  Ty_ex_c (Or_t (l, r, metadata, cmp))
+  let open Result_syntax in
+  fun loc l r ->
+    let+ metadata = or_metadata loc (ty_metadata l) (ty_metadata r) in
+    let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
+    Ty_ex_c (Or_t (l, r, metadata, cmp))
 
 let or_bytes_bool_t =
   Or_t
@@ -1971,15 +1984,18 @@ let or_bytes_bool_t =
       YesYes )
 
 let comparable_or_t loc l r =
-  or_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = or_metadata loc (ty_metadata l) (ty_metadata r) in
   Or_t (l, r, metadata, YesYes)
 
 let lambda_t loc l r =
-  lambda_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = lambda_metadata loc (ty_metadata l) (ty_metadata r) in
   Lambda_t (l, r, metadata)
 
 let option_t loc t =
-  option_metadata loc (ty_metadata t) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = option_metadata loc (ty_metadata t) in
   let cmp = is_comparable t in
   Option_t (t, metadata, cmp)
 
@@ -2015,7 +2031,9 @@ let option_pair_int_nat_t =
   Option_t (Pair_t (int_t, nat_t, pmetadata, YesYes), ometadata, Yes)
 
 let list_t loc t =
-  list_metadata loc (ty_metadata t) >|? fun metadata -> List_t (t, metadata)
+  let open Result_syntax in
+  let+ metadata = list_metadata loc (ty_metadata t) in
+  List_t (t, metadata)
 
 let operation_t = Operation_t
 
@@ -2023,18 +2041,23 @@ let list_operation_t =
   List_t (operation_t, assert_ok1 list_metadata operation_metadata)
 
 let set_t loc t =
-  set_metadata loc (ty_metadata t) >|? fun metadata -> Set_t (t, metadata)
+  let open Result_syntax in
+  let+ metadata = set_metadata loc (ty_metadata t) in
+  Set_t (t, metadata)
 
 let map_t loc l r =
-  map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = map_metadata loc (ty_metadata l) (ty_metadata r) in
   Map_t (l, r, metadata)
 
 let big_map_t loc l r =
-  big_map_metadata loc (ty_metadata l) (ty_metadata r) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = big_map_metadata loc (ty_metadata l) (ty_metadata r) in
   Big_map_t (l, r, metadata)
 
 let contract_t loc t =
-  contract_metadata loc (ty_metadata t) >|? fun metadata ->
+  let open Result_syntax in
+  let+ metadata = contract_metadata loc (ty_metadata t) in
   Contract_t (t, metadata)
 
 let contract_unit_t =
@@ -2058,7 +2081,9 @@ let bls12_381_g2_t = Bls12_381_g2_t
 let bls12_381_fr_t = Bls12_381_fr_t
 
 let ticket_t loc t =
-  ticket_metadata loc (ty_metadata t) >|? fun metadata -> Ticket_t (t, metadata)
+  let open Result_syntax in
+  let+ metadata = ticket_metadata loc (ty_metadata t) in
+  Ticket_t (t, metadata)
 
 let chest_key_t = Chest_key_t
 

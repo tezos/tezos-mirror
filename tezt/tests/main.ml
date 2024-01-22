@@ -58,7 +58,9 @@ let register_protocol_independent_tests () =
   P2p.register_protocol_independent () ;
   Proxy.register_protocol_independent () ;
   Rpc_tls.register_protocol_independent () ;
-  Snoop_codegen.register_protocol_independent ()
+  Snoop_codegen.register_protocol_independent () ;
+  Snoop_protocol_codegen.register_protocol_independent () ;
+  Risc_v_sandbox.register ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
@@ -82,17 +84,17 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
-  Sc_rollup.register_migration ~migrate_from ~migrate_to ;
+  Sc_rollup_migration.register ~migrate_from ~migrate_to ;
   Dal.register_migration ~migrate_from ~migrate_to
 
 let register_old_protocol_migration_tests () =
   List.iter
     (fun p ->
-      match (p, Protocol.next_protocol p) with
-      | _, Some Alpha -> () (* Already in register_protocol_migration_tests *)
-      | _, None -> ()
-      | migrate_from, Some migrate_to ->
-          Sc_rollup.register_migration ~migrate_from ~migrate_to)
+      match (Protocol.previous_protocol p, p) with
+      | _, Alpha -> () (* Already in register_protocol_migration_tests *)
+      | None, _ -> ()
+      | Some migrate_from, migrate_to ->
+          Sc_rollup_migration.register ~migrate_from ~migrate_to)
     Protocol.all
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
@@ -151,6 +153,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Global_constants.register ~protocols ;
   Hash_data.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
+  Injector_test.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
   Liquidity_baking_per_block_votes.register ~protocols ;
@@ -164,7 +167,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Node_event_level.register ~protocols ;
   Nonce_seed_revelation.register ~protocols ;
   Normalize.register ~protocols ;
-  Operation_validation.register ~protocols ;
   Operation_size.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
@@ -181,6 +183,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Rpc_config_logging.register ~protocols ;
   Run_operation_RPC.register ~protocols ;
   Run_script.register ~protocols ;
+  Run_code.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
   Sapling.register ~protocols ;
   Script_annotations.register ~protocols ;
@@ -220,8 +223,7 @@ let register_protocol_tests_that_use_supports_correctly () =
 let register_protocol_specific_because_regression_tests () =
   Dal.register ~protocols:[Alpha] ;
   Evm_rollup.register ~protocols:[Alpha] ;
-  Sc_sequencer.register ~protocols:[Alpha] ;
-  Snoop_codegen.register ~protocols:[Alpha] ;
+  Evm_sequencer.register ~protocols:[Alpha] ;
   (* This can be safely removed after Nairobi is frozen *)
   Timelock_disabled.register ~protocols:[Nairobi]
 

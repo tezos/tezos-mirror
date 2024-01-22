@@ -24,17 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type tez = {mutez : int64}
-
-type fee_parameter = {
-  minimal_fees : tez;
-  minimal_nanotez_per_byte : Q.t;
-  minimal_nanotez_per_gas_unit : Q.t;
-  force_low_fee : bool;
-  fee_cap : tez;
-  burn_cap : tez;
-}
-
+(** Defines the strategy for a worker. *)
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
   | `Delay_block of float
@@ -166,7 +156,7 @@ module type PARAMETERS = sig
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter : state -> Operation.t -> fee_parameter
+  val fee_parameter : state -> Operation.t -> Injector_common.fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -223,7 +213,7 @@ module type PROTOCOL_CLIENT = sig
     source:Signature.public_key_hash ->
     src_pk:Signature.public_key ->
     successor_level:bool ->
-    fee_parameter:fee_parameter ->
+    fee_parameter:Injector_common.fee_parameter ->
     operation list ->
     ( unsigned_operation simulation_result,
       [`Exceeds_quotas of tztrace | `TzError of tztrace] )
@@ -290,13 +280,9 @@ module type S = sig
     | Included of included_info
         (** The operation has been included in a L1 block. *)
 
-  val injected_info_encoding : injected_info Data_encoding.t
-
-  val included_info_encoding : included_info Data_encoding.t
-
-  (** Initializes the injector with the rollup node state, for a list of
-      signers, and start the workers. Each signer has its own worker with a
-      queue of operations to inject.
+  (** Initializes the injector with the rollup node state, for a list
+      of signers, and start the workers. Each signer's list has its
+      own worker with a queue of operations to inject.
 
       [retention_period] is the number of blocks for which the injector keeps
       the included information for, must be positive or zero. By default (when
@@ -314,7 +300,8 @@ module type S = sig
       The injector monitors L1 heads to update the statuses of its operations
       accordingly. The argument [reconnection_delay] gives an initial value for
       the delay before attempting a reconnection (see {!Layer_1.init}).
-  *)
+
+      Each pkh's list and tag list of [signers] must be disjoint. *)
   val init :
     #Client_context.full ->
     data_dir:string ->
@@ -323,17 +310,13 @@ module type S = sig
     ?injection_ttl:int ->
     ?reconnection_delay:float ->
     state ->
-    signers:(Signature.public_key_hash * injection_strategy * tag list) list ->
+    signers:
+      (Signature.public_key_hash list * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
-  (** Add an operation as pending injection in the injector. If the source is
-      not provided, the operation is queued to the worker which handles the
-      corresponding tag. It returns the hash of the operation in the injector
-      queue. *)
-  val add_pending_operation :
-    ?source:Signature.public_key_hash ->
-    operation ->
-    Inj_operation.Hash.t tzresult Lwt.t
+  (** Add an operation as pending injection in the injector. It returns the hash
+      of the operation in the injector queue. *)
+  val add_pending_operation : operation -> Inj_operation.Hash.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending

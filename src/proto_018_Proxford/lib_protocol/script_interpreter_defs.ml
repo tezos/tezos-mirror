@@ -446,9 +446,7 @@ let consume_control local_gas_counter ks =
   consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
-let get_log = function
-  | None -> Lwt.return (Ok None)
-  | Some logger -> logger.get_log ()
+let get_log = function None -> return_none | Some logger -> logger.get_log ()
   [@@ocaml.inline always]
 
 (*
@@ -465,23 +463,24 @@ let rec kundip :
     (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
     c ->
     u ->
-    (d, w, b, t) kinstr ->
-    a * s * (e, z, b, t) kinstr =
- fun w accu stack k ->
+    (d, w, b, t) continuation ->
+    a * s * (e, z, b, t) continuation =
+ fun w accu stack ks ->
   match w with
-  | KPrefix (loc, ty, w) ->
-      let k = IPush (loc, ty, accu, k) in
+  | KPrefix (_loc, ty, w) ->
+      let ks = KUndip (accu, Some ty, ks) in
       let accu, stack = stack in
-      kundip w accu stack k
-  | KRest -> (accu, stack, k)
+      kundip w accu stack ks
+  | KRest -> (accu, stack, ks)
 
 (* [apply ctxt gas ty v lam] specializes [lam] by fixing its first
    formal argument to [v]. The type of [v] is represented by [ty]. *)
 let apply ctxt gas capture_ty capture lam =
+  let open Lwt_result_syntax in
   let loc = Micheline.dummy_location in
   let ctxt = update_context gas ctxt in
-  Script_ir_unparser.unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
-  unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
+  let*? ty_expr, ctxt = Script_ir_unparser.unparse_ty ~loc ctxt capture_ty in
+  let* const_expr, ctxt = unparse_data ctxt Optimized capture_ty capture in
   let make_expr expr =
     Micheline.(
       Seq
@@ -497,10 +496,12 @@ let apply ctxt gas capture_ty capture lam =
           descr.kbef
         in
         let (Item_t (ret_ty, Bot_t)) = descr.kaft in
-        Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
-        >>?= fun (arg_ty_expr, ctxt) ->
-        Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
-        >>?= fun (ret_ty_expr, ctxt) ->
+        let*? arg_ty_expr, ctxt =
+          Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
+        in
+        let*? ret_ty_expr, ctxt =
+          Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
+        in
         match full_arg_ty with
         | Pair_t (capture_ty, arg_ty, _, _) ->
             let arg_stack_ty = Item_t (arg_ty, Bot_t) in
@@ -564,21 +565,25 @@ let apply ctxt gas capture_ty capture lam =
             let full_expr = make_expr [expr] in
             return (Lam (full_descr, full_expr), ctxt))
   in
-  lam' >>=? fun (lam', ctxt) ->
+  let* lam', ctxt = lam' in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (lam', ctxt, gas)
 
 let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     ~parameters_ty ~parameters =
-  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
-  >>?= fun () ->
+  let open Lwt_result_syntax in
+  let*? () =
+    error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
      We currently don't support entrypoints as the entrypoint information
      for L1 to L2 messages is not propagated to the rollup. *)
-  error_unless (Entrypoint.is_default entrypoint) Rollup_invalid_entrypoint
-  >>?= fun () ->
-  unparse_data ctxt Optimized parameters_ty parameters
-  >|=? fun (unparsed_parameters, ctxt) ->
+  let*? () =
+    error_unless (Entrypoint.is_default entrypoint) Rollup_invalid_entrypoint
+  in
+  let+ unparsed_parameters, ctxt =
+    unparse_data ctxt Optimized parameters_ty parameters
+  in
   ( Transaction_to_sc_rollup
       {destination; entrypoint; parameters_ty; parameters; unparsed_parameters},
     ctxt )
@@ -587,12 +592,14 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     if the contract code returns this successfully. *)
 let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
     ~unparsed_ty ~tag ~(event_data : t) =
+  let open Lwt_result_syntax in
   let ctxt = update_context gas ctxt in
   (* No need to take care of lazy storage as only packable types are allowed *)
   let lazy_storage_diff = None in
-  unparse_data ctxt Optimized event_type event_data
-  >>=? fun (unparsed_data, ctxt) ->
-  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let* unparsed_data, ctxt =
+    unparse_data ctxt Optimized event_type event_data
+  in
+  let*? ctxt, nonce = fresh_internal_nonce ctxt in
   let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop =
     {
@@ -607,10 +614,13 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
 
 let make_transaction_to_zk_rollup (type t) ctxt ~destination ~amount
     ~(parameters_ty : ((t ticket, bytes) pair, _) ty) ~parameters =
-  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
-  >>?= fun () ->
-  unparse_data ctxt Optimized parameters_ty parameters
-  >|=? fun (unparsed_parameters, ctxt) ->
+  let open Lwt_result_syntax in
+  let*? () =
+    error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  in
+  let+ unparsed_parameters, ctxt =
+    unparse_data ctxt Optimized parameters_ty parameters
+  in
   ( Transaction_to_zk_rollup
       {destination; parameters_ty; parameters; unparsed_parameters},
     ctxt )
@@ -621,73 +631,83 @@ let make_transaction_to_zk_rollup (type t) ctxt ~destination ~amount
    [parameters_ty]. *)
 let transfer (type t) (ctxt, sc) gas amount location
     (typed_contract : t typed_contract) (parameters : t) =
+  let open Lwt_result_syntax in
   let ctxt = update_context gas ctxt in
-  (match typed_contract with
-  | Typed_implicit destination ->
-      let () = parameters in
-      return (Transaction_to_implicit {destination; amount}, None, ctxt)
-  | Typed_implicit_with_ticket {destination; ticket_ty} ->
-      unparse_data ctxt Optimized ticket_ty parameters
-      >>=? fun (unparsed_ticket, ctxt) ->
-      return
-        ( Transaction_to_implicit_with_ticket
+  let* operation, lazy_storage_diff, ctxt =
+    match typed_contract with
+    | Typed_implicit destination ->
+        let () = parameters in
+        return (Transaction_to_implicit {destination; amount}, None, ctxt)
+    | Typed_implicit_with_ticket {destination; ticket_ty} ->
+        let* unparsed_ticket, ctxt =
+          unparse_data ctxt Optimized ticket_ty parameters
+        in
+        return
+          ( Transaction_to_implicit_with_ticket
+              {
+                destination;
+                amount;
+                ticket_ty;
+                ticket = parameters;
+                unparsed_ticket = Script.lazy_expr unparsed_ticket;
+              },
+            None,
+            ctxt )
+    | Typed_originated
+        {arg_ty = parameters_ty; contract_hash = destination; entrypoint} ->
+        let*? to_duplicate, ctxt =
+          collect_lazy_storage ctxt parameters_ty parameters
+        in
+        let to_update = no_lazy_storage_id in
+        let* parameters, lazy_storage_diff, ctxt =
+          extract_lazy_storage_diff
+            ctxt
+            Optimized
+            parameters_ty
+            parameters
+            ~to_duplicate
+            ~to_update
+            ~temporary:true
+        in
+        let+ unparsed_parameters, ctxt =
+          unparse_data ctxt Optimized parameters_ty parameters
+        in
+        ( Transaction_to_smart_contract
             {
               destination;
               amount;
-              ticket_ty;
-              ticket = parameters;
-              unparsed_ticket = Script.lazy_expr unparsed_ticket;
+              entrypoint;
+              location;
+              parameters_ty;
+              parameters;
+              unparsed_parameters;
             },
-          None,
+          lazy_storage_diff,
           ctxt )
-  | Typed_originated
-      {arg_ty = parameters_ty; contract_hash = destination; entrypoint} ->
-      collect_lazy_storage ctxt parameters_ty parameters
-      >>?= fun (to_duplicate, ctxt) ->
-      let to_update = no_lazy_storage_id in
-      extract_lazy_storage_diff
-        ctxt
-        Optimized
-        parameters_ty
-        parameters
-        ~to_duplicate
-        ~to_update
-        ~temporary:true
-      >>=? fun (parameters, lazy_storage_diff, ctxt) ->
-      unparse_data ctxt Optimized parameters_ty parameters
-      >|=? fun (unparsed_parameters, ctxt) ->
-      ( Transaction_to_smart_contract
-          {
-            destination;
-            amount;
-            entrypoint;
-            location;
-            parameters_ty;
-            parameters;
-            unparsed_parameters;
-          },
-        lazy_storage_diff,
-        ctxt )
-  | Typed_sc_rollup
-      {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
-      make_transaction_to_sc_rollup
-        ctxt
-        ~destination
-        ~amount
-        ~entrypoint
-        ~parameters_ty
-        ~parameters
-      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
-  | Typed_zk_rollup {arg_ty = parameters_ty; zk_rollup = destination} ->
-      make_transaction_to_zk_rollup
-        ctxt
-        ~destination
-        ~amount
-        ~parameters_ty
-        ~parameters
-      >|=? fun (operation, ctxt) -> (operation, None, ctxt))
-  >>=? fun (operation, lazy_storage_diff, ctxt) ->
-  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+    | Typed_sc_rollup
+        {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
+        let+ operation, ctxt =
+          make_transaction_to_sc_rollup
+            ctxt
+            ~destination
+            ~amount
+            ~entrypoint
+            ~parameters_ty
+            ~parameters
+        in
+        (operation, None, ctxt)
+    | Typed_zk_rollup {arg_ty = parameters_ty; zk_rollup = destination} ->
+        let+ operation, ctxt =
+          make_transaction_to_zk_rollup
+            ctxt
+            ~destination
+            ~amount
+            ~parameters_ty
+            ~parameters
+        in
+        (operation, None, ctxt)
+  in
+  let*? ctxt, nonce = fresh_internal_nonce ctxt in
   let iop =
     {
       sender = Destination.Contract (Contract.Originated sc.self);
@@ -704,22 +724,24 @@ let transfer (type t) (ctxt, sc) gas amount location
     initial [credit] (withdrawn from the contract being executed), and an
     initial storage [init] of type [storage_ty]. *)
 let create_contract (ctxt, sc) gas storage_type code delegate credit init =
+  let open Lwt_result_syntax in
   let ctxt = update_context gas ctxt in
-  collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
+  let*? to_duplicate, ctxt = collect_lazy_storage ctxt storage_type init in
   let to_update = no_lazy_storage_id in
-  extract_lazy_storage_diff
-    ctxt
-    Optimized
-    storage_type
-    init
-    ~to_duplicate
-    ~to_update
-    ~temporary:true
-  >>=? fun (init, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized storage_type init
-  >>=? fun (unparsed_storage, ctxt) ->
-  Contract.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, preorigination) ->
+  let* init, lazy_storage_diff, ctxt =
+    extract_lazy_storage_diff
+      ctxt
+      Optimized
+      storage_type
+      init
+      ~to_duplicate
+      ~to_update
+      ~temporary:true
+  in
+  let* unparsed_storage, ctxt = unparse_data ctxt Optimized storage_type init in
+  let*? ctxt, preorigination =
+    Contract.fresh_contract_from_current_nonce ctxt
+  in
   let operation =
     Origination
       {
@@ -732,7 +754,7 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
         storage = init;
       }
   in
-  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let*? ctxt, nonce = fresh_internal_nonce ctxt in
   let sender = Destination.Contract (Contract.Originated sc.self) in
   let piop = Internal_operation {sender; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
@@ -741,10 +763,12 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
 let unpack ctxt ~ty ~bytes =
-  Gas.consume
-    ctxt
-    (Script.deserialization_cost_estimated_from_bytes (Bytes.length bytes))
-  >>?= fun ctxt ->
+  let open Lwt_result_syntax in
+  let*? ctxt =
+    Gas.consume
+      ctxt
+      (Script.deserialization_cost_estimated_from_bytes (Bytes.length bytes))
+  in
   if
     Compare.Int.(Bytes.length bytes >= 1)
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
@@ -752,21 +776,22 @@ let unpack ctxt ~ty ~bytes =
     let str = Bytes.sub_string bytes 1 (Bytes.length bytes - 1) in
     match Data_encoding.Binary.of_string_opt Script.expr_encoding str with
     | None ->
-        Lwt.return
-          ( Gas.consume ctxt (Interp_costs.unpack_failed str) >|? fun ctxt ->
-            (None, ctxt) )
+        let*? ctxt = Gas.consume ctxt (Interp_costs.unpack_failed str) in
+        return (None, ctxt)
     | Some expr -> (
-        parse_data
-          ctxt
-          ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-          ~allow_forged:false
-          ty
-          (Micheline.root expr)
-        >|= function
-        | Ok (value, ctxt) -> ok (Some value, ctxt)
+        let*! value_opt =
+          parse_data
+            ctxt
+            ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+            ~allow_forged:false
+            ty
+            (Micheline.root expr)
+        in
+        match value_opt with
+        | Ok (value, ctxt) -> return (Some value, ctxt)
         | Error _ignored ->
-            Gas.consume ctxt (Interp_costs.unpack_failed str) >|? fun ctxt ->
-            (None, ctxt))
+            let*? ctxt = Gas.consume ctxt (Interp_costs.unpack_failed str) in
+            return (None, ctxt))
   else return (None, ctxt)
 
 (* [interp_stack_prefix_preserving_operation f w accu stack] applies

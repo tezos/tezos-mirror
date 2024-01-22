@@ -127,7 +127,7 @@ let dir_exists path =
   Lwt.try_bind
     (fun () -> Lwt_unix.stat path)
     (fun {st_kind; _} -> Lwt.return (st_kind = S_DIR))
-    (function Unix.Unix_error _ -> Lwt.return_false | e -> raise e)
+    (function Unix.Unix_error _ -> Lwt.return_false | e -> Lwt.reraise e)
 
 let remove_dir dir =
   let open Lwt_syntax in
@@ -159,7 +159,7 @@ let rec create_dir ?(perm = 0o755) dir =
             (* This is the case where the directory has been created
                by another Lwt.t, after the call to Lwt_unix.file_exists. *)
             Lwt.return_unit
-        | e -> Lwt.fail e)
+        | e -> Lwt.reraise e)
   else
     let* {st_kind; _} = Lwt_unix.stat dir in
     match st_kind with
@@ -372,7 +372,7 @@ let with_open_file ~flags ?(perm = 0o640) filename task =
       (function
         | Unix.Unix_error (unix_code, caller, arg) ->
             Lwt.return (Error {action = `Open; unix_code; caller; arg})
-        | exn -> raise exn)
+        | exn -> Lwt.reraise exn)
   in
   match rfd with
   | Error _ as r -> Lwt.return r
@@ -385,7 +385,7 @@ let with_open_file ~flags ?(perm = 0o640) filename task =
         (function
           | Unix.Unix_error (unix_code, caller, arg) ->
               Lwt.return (Error {action = `Close; unix_code; caller; arg})
-          | exn -> raise exn)
+          | exn -> Lwt.reraise exn)
 
 let with_open_out ?(overwrite = true) file task =
   let flags =
@@ -413,4 +413,4 @@ let with_atomic_open_out ?(overwrite = true) filename
     (function
       | Unix.Unix_error (unix_code, caller, arg) ->
           Lwt.return (Error {action = `Rename; unix_code; caller; arg})
-      | exn -> raise exn)
+      | exn -> Lwt.reraise exn)

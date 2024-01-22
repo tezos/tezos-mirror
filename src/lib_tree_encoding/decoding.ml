@@ -215,8 +215,8 @@ let tagged_union ?default decode_tag cases =
             | Key_not_found _ as exn -> (
                 match default with
                 | Some default -> return (default ())
-                | None -> raise exn)
-            | exn -> raise exn));
+                | None -> Lwt.reraise exn)
+            | exn -> Lwt.reraise exn));
   }
 
 let wrapped_tree =

@@ -113,13 +113,13 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
     let fallback, total, measure = check_and_cleanup measure in
     let length = List.length measure in
     let n = Mass.of_int length in
-    let _, small, large =
-      List.fold_left
-        (fun (i, small, large) (_, p) ->
+    let small, large =
+      List.fold_left_i
+        (fun i (small, large) (_, p) ->
           let q = Mass.mul p n in
-          if Mass.(q < total) then (i + 1, (q, i) :: small, large)
-          else (i + 1, small, (q, i) :: large))
-        (0, [], [])
+          if Mass.(q < total) then ((q, i) :: small, large)
+          else (small, (q, i) :: large))
+        ([], [])
         measure
     in
     let support = support ~fallback measure in

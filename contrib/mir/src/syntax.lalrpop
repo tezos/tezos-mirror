@@ -1,0 +1,146 @@
+//****************************************************************************//
+//                                                                            //
+// SPDX-License-Identifier: MIT                                               //
+// Copyright (c) [2023] Serokell <hi@serokell.io>                             //
+//                                                                            //
+//****************************************************************************//
+
+#![allow(dead_code, unused_imports)]
+#![allow(clippy::all)]
+#![cfg(not(tarpaulin_include))]
+
+use crate::ast::*;
+use crate::parser::ParserError;
+use crate::lexer::{LexerError, Prim, PrimWithTzt, TztPrim as TzP, Tok};
+use crate::typechecker as TC;
+use crate::tzt::*;
+use PrimWithTzt::*;
+use PrimWithTzt as PT;
+use typed_arena::Arena;
+
+grammar<'a>(arena: &'a Arena<Micheline<'a>>);
+
+extern {
+    type Error = ParserError;
+    type Location = usize;
+
+    enum Tok {
+        "stack_elt" => Tok::Prim(TztPrim(TzP::Stack_elt)),
+        "input" => Tok::Prim(TztPrim(TzP::input)),
+        "output" => Tok::Prim(TztPrim(TzP::output)),
+        "failed" => Tok::Prim(TztPrim(TzP::Failed)),
+        "mutezOverflow" => Tok::Prim(TztPrim(TzP::MutezOverflow)),
+        "generalOverflow" => Tok::Prim(TztPrim(TzP::GeneralOverflow)),
+        "StaticError" => Tok::Prim(TztPrim(TzP::StaticError)),
+        "amount" => Tok::Prim(TztPrim(TzP::amount)),
+        "self" => Tok::Prim(TztPrim(TzP::self_)),
+        number => Tok::Number(<i128>),
+        string => Tok::String(<String>),
+        bytes => Tok::Bytes(<Vec<u8>>),
+        ann => Tok::Annotation,
+        // parameter, code and chain_id lexemes are special-cased because
+        // they're also used in the tzt syntax
+        "parameter" => Tok::Prim(PT::Prim(Prim::parameter)),
+        "code" => Tok::Prim(PT::Prim(Prim::code)),
+        "chain_id" => Tok::Prim(PT::Prim(Prim::chain_id)),
+        prim => Tok::Prim(PT::Prim(<Prim>)),
+        "(" => Tok::LParen,
+        ")" => Tok::RParen,
+        "{" => Tok::LBrace,
+        "}" => Tok::RBrace,
+        ";" => Tok::Semi,
+        "_" => Tok::Prim(PT::Underscore)
+    }
+}
+
+Prim: Prim = {
+  "parameter" => Prim::parameter,
+  "code" => Prim::code,
+  "chain_id" => Prim::chain_id,
+  prim => <>,
+}
+
+MichelineAtomic: Micheline<'a> = {
+  number => Micheline::Int(<>),
+  string => Micheline::String(<>),
+  bytes => Micheline::Bytes(<>),
+  Prim => Micheline::prim0(<>),
+}
+
+MichelineComplex: Micheline<'a> = {
+  <prim:Prim> ann+ => Micheline::App(prim, &[], vec![]),
+  <prim:Prim> ann* <args:Micheline+> => Micheline::App(prim, arena.alloc_extend(args), vec![]),
+}
+
+pub MichelineNaked: Micheline<'a> = {
+  MichelineComplex,
+  Micheline,
+}
+
+pub Micheline: Micheline<'a> = {
+  MichelineAtomic,
+  "(" <MichelineNaked> ")",
+  "{" <MichelineNakedSeq> "}",
+}
+
+MichelineNakedSeq: Micheline<'a> =
+  semicolonSepSeq<MichelineNaked> => Micheline::Seq(arena.alloc_extend(<>));
+
+pub MichelineTopLevel: Micheline<'a> = {
+  MichelineNakedSeq,
+}
+
+semicolonSepSeq<T>: Vec<T> = {
+  <mut tseq:(<T>";")*><i:T?> => {
+    // A sequence of T-followed-by-a-semicolon matched by
+    // `(<T>";")*` resulting in `Vec<T>` and bound to `ib`,
+    // which can be optionally followed by a single trailing T,
+    // matched by `<i:T?>.
+
+    match i {
+      Some(t) => {
+        tseq.push(t);
+        tseq
+      },
+      None => tseq
+    }
+  }
+}
+
+// For parsing TZT Tests
+
+use TztEntity::*;
+use TztOutput::*;
+
+tztStackElt : (Micheline<'a>, Micheline<'a>) = {
+  "stack_elt" <t:Micheline> <v:Micheline> => (t, v)
+}
+
+tztStackEltSeq = semicolonSepSeq<tztStackElt>;
+
+tztStack : Vec<(Micheline<'a>, Micheline<'a>)> = {
+  "{" <s:tztStackEltSeq> "}" => s
+}
+
+mutezAmount : i64 =
+  <n:number> =>? i64::try_from(n)
+    .map_err(|_| ParserError::LexerError(LexerError::NumericLiteral(n.to_string())).into() );
+
+use ErrorExpectation::*;
+use InterpreterErrorExpectation::*;
+tztEntity : TztEntity<'a> = {
+  "code" <Micheline> => Code(<>),
+  "input" <s:tztStack> => Input(s),
+  "output" <s:tztStack> => Output(TztSuccess(s)),
+  "output" "(" "failed" <v:Micheline> ")" => Output(TztError(InterpreterError(FailedWith(v)))),
+  "output" "(" "mutezOverflow" <a1:mutezAmount> <a2:mutezAmount> ")" => Output(TztError(InterpreterError(MutezOverflow(a1, a2)))),
+  "output" "(" "generalOverflow" <a1:number> <a2:number> ")" => Output(TztError(InterpreterError(GeneralOverflow(a1, a2)))),
+  "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
+  "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
+  "amount" <m:mutezAmount> => TztEntity::Amount(m),
+  "chain_id" <Micheline> => TztEntity::ChainId(<>),
+  "parameter" <Micheline> => TztEntity::Parameter(<>),
+  "self" <Micheline> => TztEntity::SelfAddr(<>),
+}
+
+pub tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;

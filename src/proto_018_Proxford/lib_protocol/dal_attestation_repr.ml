@@ -43,14 +43,7 @@
 (* A set of (attested) slot indexes. *)
 type t = Bitset.t
 
-type operation = {
-  attestor : Signature.Public_key_hash.t;
-      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4165
-         Compute the attester from the attested slots in [slot_attestation] below,
-         or provide a field `min_attester_slot : int / int32` *)
-  attestation : t;
-  level : Raw_level_repr.t;
-}
+type operation = {attestation : t; level : Raw_level_repr.t; slot : Slot_repr.t}
 
 let encoding = Bitset.encoding
 
@@ -86,6 +79,8 @@ let expected_size_in_bits ~max_index =
   match add empty @@ to_int max_index with
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
+
+let number_of_attested_slots = Bitset.hamming_weight
 
 type shard_index = int
 

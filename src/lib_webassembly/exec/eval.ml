@@ -452,7 +452,7 @@ let lookup_intmap category store x =
             x.at
             ("unexpected access in lazy map for " ^ category ^ " "
            ^ Int32.to_string x.it)
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 let type_ (inst : module_inst) x = lookup_intmap "type" inst.types x
 
@@ -477,7 +477,7 @@ let any_ref inst x i at =
       Table.load tbl i)
     (function
       | Table.Bounds -> Trap.error at ("undefined element " ^ Int32.to_string i)
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 let func_ref inst x i at =
   let+ value = any_ref inst x i at in
@@ -577,7 +577,8 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
                               fresh_frame = None;
                               remaining_ticks = Z.zero;
                             } )))
-            (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
+            (function
+              | Crash (_, msg) -> Crash.error at msg | exn -> Lwt.reraise exn))
   | Inv_prepare_locals
       {
         arity = n2;
@@ -835,7 +836,7 @@ let step_instr module_reg frame label vs at e' es_rst stack :
         (function
           | Global.NotMutable -> Crash.error at "write to immutable global"
           | Global.Type -> Crash.error at "type mismatch at global write"
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
   | TableGet x ->
       (* Num (I32 i) :: vs' *)
       let* i, vs' = vector_pop_map vs num_i32 at in
@@ -1675,7 +1676,7 @@ let invoke ?(stack_size_limit = 300) ~module_reg ~caller
       (durable, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 type eval_const_kont = EC_Next of config | EC_Stop of value
 
@@ -1803,7 +1804,7 @@ let run_data (inst : module_inst) i data =
   let at = data.it.dmode.at in
   let x = i @@ at in
   match data.it.dmode.it with
-  | Passive -> Lwt.return []
+  | Passive -> Lwt.return_nil
   | Active {index; offset} ->
       assert (index.it = 0l) ;
       let+ data = Ast.get_data data.it.dinit inst.allocations.datas in

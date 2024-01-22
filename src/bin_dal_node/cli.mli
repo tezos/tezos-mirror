@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 (** {2 Command-line options} *)
 
 (** This module declares the main commands of the DAL node. For each
@@ -38,9 +40,11 @@ type options = {
   expected_pow : float option;
       (** The expected proof of work for the P2P identity. *)
   listen_addr : P2p_point.Id.t option;
+      (** The TCP address and port at which this instance can be reached. *)
+  public_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
-  profiles : Services.Types.profiles option;
+  profiles : Types.profiles option;
       (** Profiles of the DAL node used for tracking shards. *)
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)

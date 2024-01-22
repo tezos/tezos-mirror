@@ -92,4 +92,11 @@ module Cache : sig
     int option shell_tzresult Lwt.t
 end
 
+module Denunciations : sig
+  val denunciations :
+    'a #RPC_context.simple ->
+    'a ->
+    (public_key_hash * Denunciations_repr.item) list shell_tzresult Lwt.t
+end
+
 val register : unit -> unit

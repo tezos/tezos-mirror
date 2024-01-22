@@ -4,6 +4,7 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -83,6 +84,8 @@ type message_status =
       first_published_at_level : int32;
       published_at_level : int32;
     }
+
+type gc_info = {last_gc_level : int32; first_available_level : int32}
 
 module Encodings = struct
   open Data_encoding
@@ -253,6 +256,14 @@ module Encodings = struct
 
   let message_status_output =
     merge_objs (obj1 (opt "content" (string' Hex))) message_status
+
+  let gc_info : gc_info Data_encoding.t =
+    conv
+      (fun {last_gc_level; first_available_level} ->
+        (last_gc_level, first_available_level))
+      (fun (last_gc_level, first_available_level) ->
+        {last_gc_level; first_available_level})
+    @@ obj2 (req "last_gc_level" int32) (req "first_available_level" int32)
 end
 
 module Arg = struct
@@ -295,6 +306,16 @@ module Arg = struct
       ~destruct:(fun s ->
         L2_message.Hash.of_b58check_opt s
         |> Option.to_result ~none:"Invalid L2 message hash")
+      ()
+
+  let commitment_hash : Commitment.Hash.t Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"A commitment hash."
+      ~name:"commitment_hash"
+      ~construct:Commitment.Hash.to_b58check
+      ~destruct:(fun s ->
+        Commitment.Hash.of_b58check_opt s
+        |> Option.to_result ~none:"Invalid commitment hash")
       ()
 end
 
@@ -355,6 +376,13 @@ module Global = struct
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash)
       (path / "last_stored_commitment")
+
+  let global_block_watcher =
+    Tezos_rpc.Service.get_service
+      ~description:"Monitor and streaming the L2 blocks"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Sc_rollup_block.encoding
+      (path / "monitor_blocks")
 end
 
 module Local = struct
@@ -383,6 +411,21 @@ module Local = struct
       ~output:
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "last_published_commitment")
+
+  let commitment =
+    Tezos_rpc.Service.get_service
+      ~description:"Commitment computed and published by the node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:
+        (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
+      (path / "commitments" /: Arg.commitment_hash)
+
+  let gc_info =
+    Tezos_rpc.Service.get_service
+      ~description:"Information about garbage collection"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.gc_info
+      (path / "gc_info")
 
   let injection =
     Tezos_rpc.Service.post_service

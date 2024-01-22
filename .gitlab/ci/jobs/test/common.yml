@@ -1,15 +1,15 @@
-.template__code_quality:
-  variables:
-    CODE_QUALITY_REPORT: "_reports/gl-code-quality-report.json"
-
 .test_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_dependencies
     - .template__coverage
+  needs:
+    - "build_x86_64-released"
+    - "build_x86_64-exp-dev-extra"
   stage: test
   before_script:
     - . ./scripts/version.sh
+    - eval $(opam env)
   retry: 2
 
 # Merge coverage files after the execution
@@ -21,28 +21,3 @@
       - $BISECT_FILE
     expire_in: 1 day
     when: on_success
-
-# Definition for the environment to run all integration tests.
-# This is also used by Tezt tests.
-# In general we do not have to run make, which takes a while,
-# because the binaries have been produced by the build job and are
-# in the cache. But if they are not, we need to build them.
-# Ideally we should also check that the baker / accuser / endorser
-# exist (some tests use them) but their actual name depend on the protocol.
-.integration_template:
-  extends:
-    - .test_template
-    - .image_template__runtime_build_e2etest_dependencies_template
-    - .template__coverage_files
-  dependencies:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
-    - "tezt:fetch-records"
-  # Start immediately after 'build_x86_64' and don't wait for
-  # intermediate stages to succeed
-  needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
-    - "tezt:fetch-records"
-
-

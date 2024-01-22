@@ -72,12 +72,13 @@ let contract_of_b58data data =
       | None -> None)
 
 let of_b58check_gen ~of_b58data s =
+  let open Result_syntax in
   match Base58.decode s with
   | Some data -> (
       match of_b58data data with
-      | Some c -> ok c
-      | None -> error (Invalid_contract_notation s))
-  | None -> error (Invalid_contract_notation s)
+      | Some c -> return c
+      | None -> tzfail (Invalid_contract_notation s))
+  | None -> tzfail (Invalid_contract_notation s)
 
 let of_b58check = of_b58check_gen ~of_b58data:contract_of_b58data
 

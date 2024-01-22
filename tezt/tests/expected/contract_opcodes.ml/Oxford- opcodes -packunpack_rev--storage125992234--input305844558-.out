@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/packunpack_rev.tz on storage Unit and input '(Pair -1 (Pair 1 (Pair "foobar" (Pair 0x00AABBCC (Pair 1000 (Pair False (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"))))))))' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/packunpack_rev.tz on storage Unit and input '(Pair -1 (Pair 1 (Pair "foobar" (Pair 0x00AABBCC (Pair 1000 (Pair False (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"))))))))' --level 1 --trace-stack
 storage
   Unit
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 16 (just consumed gas: 146.623)
+  - location: 16 (just consumed gas: 146.861)
     [ (Pair (Pair -1
                   1
                   "foobar"
@@ -58,7 +58,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 19 (just consumed gas: 0)
+  - location: 19 (just consumed gas: 0.010)
     [ (Pair -1
             1
             "foobar"
@@ -78,7 +78,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 19 (just consumed gas: 0.025)
+  - location: 19 (just consumed gas: 0.035)
     [ -1
       -1
       (Pair 1
@@ -111,7 +111,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 26 (just consumed gas: 0)
+  - location: 26 (just consumed gas: 0.010)
     [ -1
       -1
       (Pair 1
@@ -122,7 +122,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 26 (just consumed gas: 0.015)
+  - location: 26 (just consumed gas: 0.025)
     [ -1
       -1
       (Pair 1
@@ -153,7 +153,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 36 (just consumed gas: 0)
+  - location: 36 (just consumed gas: 0.010)
     [ (Pair 1
             "foobar"
             0x00aabbcc
@@ -162,7 +162,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 36 (just consumed gas: 0.015)
+  - location: 36 (just consumed gas: 0.025)
     [ (Pair 1
             "foobar"
             0x00aabbcc
@@ -198,7 +198,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 44 (just consumed gas: 0)
+  - location: 44 (just consumed gas: 0.010)
     [ (Pair 1
             "foobar"
             0x00aabbcc
@@ -216,7 +216,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 44 (just consumed gas: 0.025)
+  - location: 44 (just consumed gas: 0.035)
     [ 1
       1
       (Pair "foobar"
@@ -246,7 +246,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 51 (just consumed gas: 0)
+  - location: 51 (just consumed gas: 0.010)
     [ 1
       1
       (Pair "foobar"
@@ -256,7 +256,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 51 (just consumed gas: 0.015)
+  - location: 51 (just consumed gas: 0.025)
     [ 1
       1
       (Pair "foobar"
@@ -284,7 +284,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 61 (just consumed gas: 0)
+  - location: 61 (just consumed gas: 0.010)
     [ (Pair "foobar"
             0x00aabbcc
             1000
@@ -292,7 +292,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 61 (just consumed gas: 0.015)
+  - location: 61 (just consumed gas: 0.025)
     [ (Pair "foobar"
             0x00aabbcc
             1000
@@ -324,7 +324,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 69 (just consumed gas: 0)
+  - location: 69 (just consumed gas: 0.010)
     [ (Pair "foobar"
             0x00aabbcc
             1000
@@ -340,7 +340,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 69 (just consumed gas: 0.025)
+  - location: 69 (just consumed gas: 0.035)
     [ "foobar"
       "foobar"
       (Pair 0x00aabbcc
@@ -358,7 +358,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 73 (just consumed gas: 0.680)
+  - location: 73 (just consumed gas: 0.681)
     [ (Some "foobar")
       "foobar"
       (Pair 0x00aabbcc
@@ -367,7 +367,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 76 (just consumed gas: 0)
+  - location: 76 (just consumed gas: 0.010)
     [ "foobar"
       "foobar"
       (Pair 0x00aabbcc
@@ -376,7 +376,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 76 (just consumed gas: 0.015)
+  - location: 76 (just consumed gas: 0.025)
     [ "foobar"
       "foobar"
       (Pair 0x00aabbcc
@@ -401,14 +401,14 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 86 (just consumed gas: 0)
+  - location: 86 (just consumed gas: 0.010)
     [ (Pair 0x00aabbcc
             1000
             False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 86 (just consumed gas: 0.015)
+  - location: 86 (just consumed gas: 0.025)
     [ (Pair 0x00aabbcc
             1000
             False
@@ -436,7 +436,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 94 (just consumed gas: 0)
+  - location: 94 (just consumed gas: 0.010)
     [ (Pair 0x00aabbcc
             1000
             False
@@ -450,7 +450,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 94 (just consumed gas: 0.025)
+  - location: 94 (just consumed gas: 0.035)
     [ 0x00aabbcc
       0x00aabbcc
       (Pair 1000
@@ -474,7 +474,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 101 (just consumed gas: 0)
+  - location: 101 (just consumed gas: 0.010)
     [ 0x00aabbcc
       0x00aabbcc
       (Pair 1000
@@ -482,7 +482,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 101 (just consumed gas: 0.015)
+  - location: 101 (just consumed gas: 0.025)
     [ 0x00aabbcc
       0x00aabbcc
       (Pair 1000
@@ -504,13 +504,13 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 111 (just consumed gas: 0)
+  - location: 111 (just consumed gas: 0.010)
     [ (Pair 1000
             False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 111 (just consumed gas: 0.015)
+  - location: 111 (just consumed gas: 0.025)
     [ (Pair 1000
             False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
@@ -534,7 +534,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 119 (just consumed gas: 0)
+  - location: 119 (just consumed gas: 0.010)
     [ (Pair 1000
             False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
@@ -546,7 +546,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 119 (just consumed gas: 0.025)
+  - location: 119 (just consumed gas: 0.035)
     [ 1000
       1000
       (Pair False
@@ -567,14 +567,14 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 126 (just consumed gas: 0)
+  - location: 126 (just consumed gas: 0.010)
     [ 1000
       1000
       (Pair False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 126 (just consumed gas: 0.015)
+  - location: 126 (just consumed gas: 0.025)
     [ 1000
       1000
       (Pair False
@@ -593,12 +593,12 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 136 (just consumed gas: 0)
+  - location: 136 (just consumed gas: 0.010)
     [ (Pair False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 136 (just consumed gas: 0.015)
+  - location: 136 (just consumed gas: 0.025)
     [ (Pair False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
@@ -618,7 +618,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 144 (just consumed gas: 0)
+  - location: 144 (just consumed gas: 0.010)
     [ (Pair False
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
@@ -628,7 +628,7 @@ trace
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 144 (just consumed gas: 0.025)
+  - location: 144 (just consumed gas: 0.035)
     [ False
       False
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
@@ -646,13 +646,13 @@ trace
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 151 (just consumed gas: 0)
+  - location: 151 (just consumed gas: 0.010)
     [ False
       False
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 151 (just consumed gas: 0.015)
+  - location: 151 (just consumed gas: 0.025)
     [ False
       False
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
@@ -668,11 +668,11 @@ trace
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 161 (just consumed gas: 0)
+  - location: 161 (just consumed gas: 0.010)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 161 (just consumed gas: 0.015)
+  - location: 161 (just consumed gas: 0.025)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
@@ -688,14 +688,14 @@ trace
       (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 169 (just consumed gas: 0)
+  - location: 169 (just consumed gas: 0.010)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
   - location: 171 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 169 (just consumed gas: 0.025)
+  - location: 169 (just consumed gas: 0.035)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
@@ -707,11 +707,11 @@ trace
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 176 (just consumed gas: 0)
+  - location: 176 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 176 (just consumed gas: 0.015)
+  - location: 176 (just consumed gas: 0.025)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
@@ -721,9 +721,9 @@ trace
   - location: 185 (just consumed gas: 0.010)
     [ True
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 186 (just consumed gas: 0)
+  - location: 186 (just consumed gas: 0.010)
     [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 186 (just consumed gas: 0.015)
+  - location: 186 (just consumed gas: 0.025)
     [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
   - location: 192 (just consumed gas: 0.010)
     [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
@@ -731,12 +731,12 @@ trace
   - location: 193 (just consumed gas: 0.010)
     [ "2019-09-09T08:35:33Z"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 194 (just consumed gas: 0)
+  - location: 194 (just consumed gas: 0.010)
     [ (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
   - location: 196 (just consumed gas: 0.010)
     [ "2019-09-09T08:35:33Z"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 194 (just consumed gas: 0.025)
+  - location: 194 (just consumed gas: 0.035)
     [ "2019-09-09T08:35:33Z"
       "2019-09-09T08:35:33Z"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
@@ -748,11 +748,11 @@ trace
     [ (Some "2019-09-09T08:35:33Z")
       "2019-09-09T08:35:33Z"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 201 (just consumed gas: 0)
+  - location: 201 (just consumed gas: 0.010)
     [ "2019-09-09T08:35:33Z"
       "2019-09-09T08:35:33Z"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 201 (just consumed gas: 0.015)
+  - location: 201 (just consumed gas: 0.025)
     [ "2019-09-09T08:35:33Z"
       "2019-09-09T08:35:33Z"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
@@ -762,9 +762,9 @@ trace
   - location: 210 (just consumed gas: 0.010)
     [ True
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 211 (just consumed gas: 0)
+  - location: 211 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 211 (just consumed gas: 0.015)
+  - location: 211 (just consumed gas: 0.025)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
   - location: 217 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
@@ -775,19 +775,19 @@ trace
   - location: 219 (just consumed gas: 0.994)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 222 (just consumed gas: 0)
+  - location: 222 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 222 (just consumed gas: 0.015)
+  - location: 222 (just consumed gas: 0.025)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
   - location: 230 (just consumed gas: 0.036)
     [ 0 ]
   - location: 231 (just consumed gas: 0.010)
     [ True ]
-  - location: 232 (just consumed gas: 0)
+  - location: 232 (just consumed gas: 0.010)
     [  ]
-  - location: 232 (just consumed gas: 0.015)
+  - location: 232 (just consumed gas: 0.025)
     [  ]
   - location: 238 (just consumed gas: 0.010)
     [ 0 ]
@@ -795,9 +795,9 @@ trace
     [ 0x050000 ]
   - location: 242 (just consumed gas: 0.421)
     [ (Some 0) ]
-  - location: 245 (just consumed gas: 0)
+  - location: 245 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 245 (just consumed gas: 0.015)
+  - location: 245 (just consumed gas: 0.025)
     [ 0 ]
   - location: 251 (just consumed gas: 0.010)
     [  ]
@@ -807,33 +807,33 @@ trace
     [ 0x050041 ]
   - location: 256 (just consumed gas: 96.321)
     [ None ]
-  - location: 259 (just consumed gas: 0)
+  - location: 259 (just consumed gas: 0.010)
     [  ]
-  - location: 259 (just consumed gas: 0.015)
+  - location: 259 (just consumed gas: 0.025)
     [  ]
   - location: 265 (just consumed gas: 0.010)
     [ 0x ]
-  - location: 268 (just consumed gas: 0.260)
+  - location: 268 (just consumed gas: 0.270)
     [ None ]
-  - location: 271 (just consumed gas: 0)
+  - location: 271 (just consumed gas: 0.010)
     [  ]
-  - location: 271 (just consumed gas: 0.015)
+  - location: 271 (just consumed gas: 0.025)
     [  ]
   - location: 277 (just consumed gas: 0.010)
     [ 0x04 ]
   - location: 280 (just consumed gas: 0.280)
     [ None ]
-  - location: 283 (just consumed gas: 0)
+  - location: 283 (just consumed gas: 0.010)
     [  ]
-  - location: 283 (just consumed gas: 0.015)
+  - location: 283 (just consumed gas: 0.025)
     [  ]
   - location: 289 (just consumed gas: 0.010)
     [ 0x05 ]
   - location: 292 (just consumed gas: 0.280)
     [ None ]
-  - location: 295 (just consumed gas: 0)
+  - location: 295 (just consumed gas: 0.010)
     [  ]
-  - location: 295 (just consumed gas: 0.015)
+  - location: 295 (just consumed gas: 0.025)
     [  ]
   - location: 301 (just consumed gas: 0.010)
     [ Unit ]

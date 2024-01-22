@@ -48,24 +48,24 @@ let operation_conflict_encoding =
           (req "new_operation" Operation_hash.encoding))
 
 module Consensus = struct
-  type error += Zero_frozen_deposits of Signature.Public_key_hash.t
+  type error += Forbidden_delegate of Signature.Public_key_hash.t
 
   let () =
     register_error_kind
       `Permanent
-      ~id:"validate.zero_frozen_deposits"
-      ~title:"Zero frozen deposits"
-      ~description:"The delegate has zero frozen deposits."
+      ~id:"validate.temporarily_forbidden_delegate"
+      ~title:"Temporarily forbidden delegate"
+      ~description:"The delegate has committed too many misbehaviours."
       ~pp:(fun ppf delegate ->
         Format.fprintf
           ppf
-          "Delegate %a has zero frozen deposits; it is not allowed to \
-           bake/preattest/attest."
+          "Delegate %a has committed too many misbehaviours; it is temporarily \
+           not allowed to bake/preattest/attest."
           Signature.Public_key_hash.pp
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-      (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
-      (fun delegate -> Zero_frozen_deposits delegate)
+      (function Forbidden_delegate delegate -> Some delegate | _ -> None)
+      (fun delegate -> Forbidden_delegate delegate)
 
   (** This type is only used in consensus operation errors to make
       them more informative. *)
@@ -1113,8 +1113,8 @@ module Manager = struct
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
-    | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
+    | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
 
   let () =
@@ -1208,16 +1208,6 @@ module Manager = struct
       Data_encoding.empty
       (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
       (fun () -> Gas_quota_exceeded_init_deserialize) ;
-    let scoru_disabled_description = "Smart rollups are disabled." in
-    register_error_kind
-      `Permanent
-      ~id:"validate.operation.smart_rollup_disabled"
-      ~title:"Smart rollups are disabled"
-      ~description:scoru_disabled_description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" scoru_disabled_description)
-      Data_encoding.unit
-      (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sc_rollup_feature_disabled) ;
 
     let scoru_arith_pvm_disabled_description =
       "Arith PVM is disabled in this network."
@@ -1232,6 +1222,19 @@ module Manager = struct
       Data_encoding.unit
       (function Sc_rollup_arith_pvm_disabled -> Some () | _ -> None)
       (fun () -> Sc_rollup_arith_pvm_disabled) ;
+    let scoru_riscv_pvm_disabled_description =
+      "RISCV PVM is disabled in this network."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"operation.riscv_pvm_disabled"
+      ~title:"The RISCV PVM is disabled"
+      ~description:scoru_riscv_pvm_disabled_description
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "%s" scoru_riscv_pvm_disabled_description)
+      Data_encoding.unit
+      (function Sc_rollup_riscv_pvm_disabled -> Some () | _ -> None)
+      (fun () -> Sc_rollup_riscv_pvm_disabled) ;
     let zkru_disabled_description =
       "ZK rollups will be enabled in a future proposal."
     in

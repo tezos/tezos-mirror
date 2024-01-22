@@ -31,46 +31,27 @@
 *)
 
 let generate_code_using_solution_test () =
-  Test.register ~title:"snoop codegen" ~tags:["snoop"; "codegen"] ~__FILE__
+  Test.register
+    ~title:"snoop codegen"
+    ~tags:["codegen"]
+    ~uses:[Constant.octez_snoop]
+    ~__FILE__
   @@ fun () ->
   let open Lwt.Syntax in
   let snoop = Snoop.create () in
-  let* res =
-    Snoop.generate_code_using_solution
+  let outfn = Temp.file "codegen.ml" in
+  close_out @@ open_out outfn ;
+  let* _ =
+    Snoop.generate_code_for_solutions
       ~solution:"tezt/tests/snoop_codegen/lsl_bytes.sol"
       ~fixed_point:"tezt/tests/snoop_codegen/fp.json"
+      ~save_to:outfn
       snoop
   in
-  let outfn = Temp.file "codegen.ml" in
-  let oc = open_out outfn in
-  output_string oc res ;
-  close_out oc ;
-  let diff = Diff.files outfn "tezt/tests/snoop_codegen/lsl_bytes.ml.expect" in
+  let diff = Diff.files "tezt/tests/snoop_codegen/lsl_bytes.ml.expect" outfn in
   if diff.different then (
     Diff.log ~level:Error diff ;
     assert false)
   else Lwt.return_unit
 
 let register_protocol_independent () = generate_code_using_solution_test ()
-
-let perform_check_definitions snoop proto =
-  let files =
-    List.map
-      (fun fn ->
-        project_root
-        // Printf.sprintf "src/%s/lib_protocol/%s" (Protocol.directory proto) fn)
-      ["michelson_v1_gas_costs.ml"; "michelson_v1_gas_costs_generated.ml"]
-  in
-  Snoop.check_definitions ~files snoop
-
-let check_definitions_test =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"check of the cost function definitions"
-    ~tags:["snoop"; "codegen"]
-  @@ fun protocol ->
-  Log.info "Checking the cost function definitions" ;
-  let snoop = Snoop.create () in
-  perform_check_definitions snoop protocol
-
-let register ~protocols = check_definitions_test protocols

@@ -5,7 +5,7 @@
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
   "max_micheline_bytes_limit": 50000,
   "max_allowed_global_constants_depth": 10000, "cache_layout_size": 3,
-  "michelson_maximum_type_size": 2001,
+  "michelson_maximum_type_size": 2001, "max_slashing_period": 2,
   "smart_rollup_max_wrapped_proof_binary_size": 30000,
   "smart_rollup_message_size_limit": 4096,
   "smart_rollup_max_number_of_messages_per_level": "1000000",
@@ -29,17 +29,16 @@
   "delay_increment_per_round": "1", "consensus_committee_size": 256,
   "consensus_threshold": 0,
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
-  "max_slashing_period": 2, "limit_of_delegation_over_baking": 19,
-  "percentage_of_frozen_deposits_slashed_per_double_baking": 10,
+  "limit_of_delegation_over_baking": 19,
+  "percentage_of_frozen_deposits_slashed_per_double_baking": 5,
   "percentage_of_frozen_deposits_slashed_per_double_attestation": 50,
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 8,
   "cache_sampler_state_cycles": 8,
   "dal_parametric":
     { "feature_enable": false, "number_of_slots": 16, "attestation_lag": 4,
-      "attestation_threshold": 50, "blocks_per_epoch": 2,
+      "attestation_threshold": 50, "blocks_per_epoch": 1,
       "redundancy_factor": 8, "page_size": 128, "slot_size": 32768,
-      "number_of_shards": 64 }, "smart_rollup_enable": true,
-  "smart_rollup_arith_pvm_enable": false,
+      "number_of_shards": 64 }, "smart_rollup_arith_pvm_enable": false,
   "smart_rollup_origination_size": 6314,
   "smart_rollup_challenge_window_in_blocks": 80640,
   "smart_rollup_stake_amount": "10000000000",
@@ -52,9 +51,10 @@
   "smart_rollup_max_number_of_cemented_commitments": 5,
   "smart_rollup_max_number_of_parallel_games": 32,
   "smart_rollup_reveal_activation_level":
-    { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 2147483646 },
-  "zk_rollup_enable": false, "zk_rollup_origination_size": 4000,
-  "zk_rollup_min_pending_to_process": 10,
+    { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 2147483646,
+      "dal_parameters": 2147483646 }, "smart_rollup_private_enable": true,
+  "smart_rollup_riscv_pvm_enable": false, "zk_rollup_enable": false,
+  "zk_rollup_origination_size": 4000, "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,
   "global_limit_of_staking_over_baking": 5,
   "edge_of_staking_over_delegation": 2,
@@ -62,9 +62,12 @@
   "adaptive_rewards_params":
     { "issuance_ratio_min": { "numerator": "1", "denominator": "2000" },
       "issuance_ratio_max": { "numerator": "1", "denominator": "20" },
-      "max_bonus": "50000000000000", "growth_rate": "115740740",
+      "max_bonus": "50000000000000",
+      "growth_rate": { "numerator": "1", "denominator": "100" },
       "center_dz": { "numerator": "1", "denominator": "2" },
-      "radius_dz": { "numerator": "1", "denominator": "50" } } }
+      "radius_dz": { "numerator": "1", "denominator": "50" } },
+  "adaptive_issuance_activation_vote_enable": false,
+  "autostaking_enable": true }
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
@@ -91,6 +94,9 @@
 ./octez-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
 { "level": 2, "level_position": 1, "cycle": 0, "cycle_position": 1,
   "expected_commitment": false }
+
+./octez-client rpc get /chains/main/blocks/head/context/denunciations
+[]
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
 [ { "level": 2,

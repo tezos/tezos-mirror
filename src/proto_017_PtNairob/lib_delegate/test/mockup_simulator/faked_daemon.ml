@@ -7,7 +7,7 @@ module Baker = struct
       {
         default_config with
         validation = ContextIndex context_index;
-        state_recorder = Disabled;
+        state_recorder = Memory;
       }
     in
     (* By default errors are simply printed but the baker won't stop

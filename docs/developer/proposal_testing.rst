@@ -37,7 +37,7 @@ latest code and run unit tests::
 We can run a node and a client in sandboxed mode by invoking::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
+  $ eval $(./src/bin_client/octez-init-sandboxed-client.sh 1)
 
 By default, the sandbox starts from the ``genesis`` block at level 0, and the
 sandbox's active protocol is the ``Genesis protocol``. Once the sandbox is
@@ -72,20 +72,19 @@ block fixtures that can be used in tests requiring these components.
 
 Testing Migration Code
 ----------------------
-The remainder of the tutorial is organized as follows. Section `Manual migration
-testing`_ provides detailed indications on how to test a migration, and Section
-`Wrap up the manual migration procedure`_ summarizes these indications by
-collecting all the steps needed to test the migration. Section `Automatic
-migration testing with Tezt`_ describes how to test a migration automatically by
-using a test within the :doc:`Tezt <tezt>` framework, and Section `Wrap up the automatic
-migration procedure with Tezt`_ collects all the steps needed to automatically
-test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
-the shell to inspect the context, and Section `Anatomy of migration code`_
-contains a primer on how to read and write migration code.
+
+The remainder of the tutorial is organized as follows. Section
+`Migration testing`_ provides detailed indications on how to test a
+migration, and Section `Wrap up the migration procedure`_ summarizes
+these indications by collecting all the steps needed to test the
+migration. To conclude, Section `Tips and tricks`_ indicates how to
+use the shell to inspect the context, and Section `Anatomy of
+migration code`_ contains a primer on how to read and write migration
+code.
 
 
-Manual Migration Testing
-------------------------
+Migration Testing
+-----------------
 
 The most delicate part of migrating to a new protocol is to produce a new
 context from the context of its predecessor. The migration code takes care of
@@ -102,15 +101,11 @@ a node in sandboxed mode, and by activating the predecessor of the Alpha
 protocol on the genesis block. We refer to this procedure as "migration on the
 sandbox".
 
-This section describes a *manual migration procedure* in which the developer is
+This section describes a *migration procedure* in which the developer is
 in charge of setting up the migration environment and of manually baking the
 blocks that would eventually trigger the migration. For convenience, we have
 batched parts of this manual migration procedure by providing scripts that
 encompass some of its steps.
-
-We defer to Section `Automatic migration testing with Tezt`_ the description of
-an automatic migration procedure in which the migration is triggered within the
-Tezt framework.
 
 We will illustrate the migration procedure through an example where the version
 of the Alpha protocol to which we migrate is ``012``.
@@ -246,8 +241,7 @@ Alternatively, you can snapshot Alpha and link it with one single script:
 ``snapshot_alpha_and_link.sh``. This replaces steps 1 and 2. This script effectively
 runs ``snapshot_alpha.sh`` and ``link_protocol.sh`` for you. In particular
 it means you do not have to find the short hash of the protocol yourself
-to pass it to ``link_protocol.sh``. Finally, this script also updates ``.gitlab-ci.yml``
-to add unit tests, integration tests and opam tests for the new protocol.
+to pass it to ``link_protocol.sh``.
 To run it, pass the protocol version number and name as follows::
 
   $ ./scripts/snapshot_alpha_and_link.sh 012 d
@@ -425,12 +419,9 @@ attesting power for any given level.
 Batch Steps 1--7 Above
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The script ``scripts/prepare_migration_test.sh`` batches steps 1--7 above. The
-script first receives a parameter ``[manual | auto]``, which distinguishes
-whether the migration testing is manual or automatic. Here we focus on the case
-``manual``.
+The script ``scripts/prepare_migration_test.sh`` batches steps 1--7 above.
 
-The next parameter is optional and contains a name in the format
+The first parameter is optional and contains a name in the format
 ``<tag_starting_with_version_letter>_<version_number>``. If some name is passed,
 then the Alpha protocol is snapshot into
 ``src/proto_<version_number>_<short_hash>``. If the name is omitted, then the
@@ -443,7 +434,7 @@ an imported context based on this level. (Recall that a level less or equal than
 corresponds to an imported context.)  In our example, if we want to test the
 migration on the sandbox and want to trigger it at level three, we can use::
 
-  $ ./scripts/prepare_migration_test.sh manual d_012 3
+  $ ./scripts/prepare_migration_test.sh d_012 3
 
 If on the contrary we have imported a realistic context from the snapshot file
 ``~/snapshot-mainnet.rolling``
@@ -451,8 +442,7 @@ taken at level ``1617344``, and we want
 to trigger the migration three levels after the level at which the snapshot file
 was taken, we can use::
 
-  $ ./scripts/prepare_migration_test.sh manual d_012 1617347 \
-    ~/snapshot-mainnet.rolling
+  $ ./scripts/prepare_migration_test.sh d_012 1617347 ~/snapshot-mainnet.rolling
 
 In the latter case both the context and the yes-wallet folder will be placed in
 the system's temp directory. In our example the temp directory is ``/tmp``, and
@@ -487,24 +477,25 @@ Run the Migration on the Sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we run the migration on an empty context, then we would start a sandboxed
-node as usual. In our example we can run the following::
+node as usual after having prepared the migration test (see previous section).
+In our example we can run the following::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 
 We can also start the client::
 
-  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
+  $ eval $(./src/bin_client/octez-init-sandboxed-client.sh 1)
 
 Instead of command ``octez-activate-alpha``, the sandboxed client script
 ``src/bin_client/octez-init-sandboxed-client.sh`` now accepts a command
-``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
+``octez-activate-XXX-<short_hash>`` that activates the predecessor protocol with
 version number ``XXX`` and short hash ``<short_hash>``. In our example, the
 predecessor protocol is ``011`` with short hash ``PtHangz2``. (Check the folder
 ``src`` for the version number and short hash of the predecessor protocol for
 migrations to versions different from ``012``.) We can activate this protocol by
 invoking::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Activation of the predecessor protocol produces one block and increases the
 level by one. This unavoidable increase of the level has to be taken into
@@ -541,19 +532,19 @@ the node using the context imported from the snapshot file. Since importing a
 snapshot file is very time consuming, we will leave the original folder
 unchanged, and every time we want to run the test, we will copy its contents to
 a fresh test folder. In our example, we can do this by taking advantage of an
-environment variable ``test-directory`` and the tool ``mktemp`` as follows::
+environment variable ``test_directory`` and the tool ``mktemp`` as follows::
 
   $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 This command creates a fresh test folder in the system's temp directory (in our
 example ``/tmp``) whose name is ``octez-node-mainnet-XXXX``,
 where the ``XXXX`` are four random alphanumerical characters, and sets the
-environment variable ``test-directory`` to the path of the test folder, such
+environment variable ``test_directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
 of the original context folder into the test folder.
 
 Now, we can run the ``octez-node`` command by specifying the test folder
-``$test-directory`` as the data directory. We will also specify the RPC address
+``$test_directory`` as the data directory. We will also specify the RPC address
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
@@ -605,8 +596,8 @@ upgrade, with the command::
   $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 
-Wrap up the Manual Migration Procedure
---------------------------------------
+Wrap up the Migration Procedure
+-------------------------------
 
 For convenience, this section collects all the steps needed to test the
 migration, both on the sandbox and on a context imported from Mainnet.
@@ -632,7 +623,7 @@ Commit the feature::
 Prepare migration by snapshotting the Alpha protocol, linking it to the build
 system, setting user-activate upgrades, and compiling the project::
 
-  $ ./scripts/prepare_migration_test.sh manual d_012 3
+  $ ./scripts/prepare_migration_test.sh d_012 3
 
 (Alternatively, each of these steps could be performed individually by invoking
 the following fur commands)::
@@ -645,11 +636,11 @@ the following fur commands)::
 Run sandboxed node and client::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
+  $ eval $(./src/bin_client/octez-init-sandboxed-client.sh 1)
 
 Activate predecessor of the Alpha protocol and move chain one level forward::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Bake two more blocks::
 
@@ -664,11 +655,11 @@ To test again, restart the sandboxed node and client::
   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
   ^C
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
+  $ eval $(./src/bin_client/octez-init-sandboxed-client.sh 1)
 
 Activate predecessor of the Alpha protocol::
 
-  $ tezos-activate-011-PtHangz2
+  $ octez-activate-011-PtHangz2
 
 Bake two blocks::
 
@@ -703,7 +694,7 @@ setting user-activated upgrades, importing a context from Mainnet into the
 original context folder, generating an identity in the same folder, and
 compiling the project::
 
-  $ ./scripts/prepare_migration_test.sh manual d_012 1617344 ~/mainnet.rolling
+  $ ./scripts/prepare_migration_test.sh d_012 1617344 ~/mainnet.rolling
 
 (Alternatively, each of these steps could be performed individually by
 invoking the following eight commands)::
@@ -762,173 +753,6 @@ And bake three blocks::
   $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
-
-
-Automatic Migration Testing With Tezt
--------------------------------------
-
-The migration can be automatically tested inside the Tezt framework (see
-:doc:`tezt`) with the test file ``tezt/manual_tests/migration.ml``. The
-automatic migration runs on a context imported from Mainnet, and proceeds as
-follows. First, the migration needs to be prepared by applying steps analogous
-to the steps 1--7 of Section `Prepare the migration`_ above, but with the
-differences that we detail in the next paragraph. Then, the test file
-``tezt/manual_tests/migration.ml`` is executed: this test starts a node on the
-imported context, activates the new protocol on the next baked block, and then
-bakes blocks until a new cycle starts. Once the execution of the test file ends,
-the developer can manually run the node on the resulting context and inspect the
-storage manually to check that the migration code is correct.
-
-In the automatic test, the operations to the storage are internally triggered by
-the protocol, and some of these operations are only completed at the end of the
-cycle. Baking until a new cycle starts helps to check that the migration code is
-compatible with the actions triggered by the protocol at the end of a
-cycle. Consequently, the execution of the test file may take a significant
-amount of time (something between a few minutes and half an hour).
-
-Preparing the automatic migration with Tezt can be done with the script
-``scripts/prepare_migration_test.sh``, by passing the parameter ``auto`` as the
-first argument. As in Section `Batch steps 1--7 above`_, the developer can
-decide whether to snapshot the Alpha protocol by passing an optional second
-parameter to the script with a protocol name in the format
-``<tag_with_version_letter>_<version_number>``. Recall that snapshotting the
-Alpha protocol may be useful for producing a realistic hash of the protocol in
-the file
-``src/proto_<version_number>_<short_hash>/lib_protocol/TEZOS_PROTOCOL``.
-
-When passing ``auto`` as the first parameter, the script
-``scripts/prepare_migration_test.sh`` also receives a parameter
-``<path/to/snapshot.rolling>`` with the path to a snapshot file, and it proceeds
-as follows: since the automatic migration always runs on a context imported from
-Mainnet, the script patches the shell in order to obtain a yes-node and imports
-the context from the file ``<path/to/snapshot.rolling>``. It is enough to
-provide a snapshot file taken with the ``rolling`` history mode (extension
-``.rolling``), although the script also accepts snapshot files taken with the
-``full`` or the ``archive`` history mode (extensions ``.full`` and ``.archive``
-respectively). The script creates a folder under the system's temp directory (in
-our example ``/tmp``) with the same name as the snapshot file, and imports the
-context there.
-
-If a folder already exists in the system's temp directory with the same name as
-the snapshot file, then the script assumes that the context was already imported
-and uses it as the original folder for the migration.
-
-In our example, we can prepare the automatic migration with the following
-command::
-
-  $ ./scripts/prepare_migration_test.sh auto d_012 ~/mainnet.rolling
-
-This command snapshots the Alpha protocol into ``src/proto_012_<short_hash>``
-and links it in the build system, and then patches the shell in order to obtain
-a yes-node. If the folder ``/tmp/mainnet`` does not exist
-already, then it creates that folder and imports the context from the snapshot
-file ``~/mainnet.rolling`` into it. As explained in Section
-`Batch steps 1--7 above`_, the script ``scripts/prepare_migration_test.sh`` may
-receive an optional ``<block_hash>`` parameter as the last argument which, if
-present, will be used for the option ``--block <block_hash>`` of the command
-``./octez-node snapshot import`` when importing the context form Mainnet.
-
-If we opt for not snapshotting the Alpha protocol, we can prepare the automatic
-migration with the same command as above, but omitting the optional name
-parameter ``d_012``.
-
-The automatic test can be run by invoking::
-
-  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
-
-By default, the automatic test starts the node, activates the Alpha protocol
-when the first block is baked, and then bakes as many blocks as to complete a
-cycle. This behaviour can be personalized by modifying test file
-``tezt/manual_tests/migration.ml``.
-
-The developer will not see the ``STITCHING!`` message when the migration is
-triggered unless the option ``-v`` for "verbose" is passed to the command
-above. The option ``--color`` improves the output of the test by alternating
-colors for the output of each process. Nevertheless, if the developer wants to
-inspect the verbose output of the test, we strongly recommend to use a log file
-since the output of the whole migration test can be quite big. In our example,
-we can collect the logs into the file ``/tmp/tezt.log`` by passing the options
-``--log-buffer-size 5000 --log-file /tmp/tezt.log`` to the command above (notice
-that the option ``-v`` is not required when specifying a log file).
-
-Each time the automatic test is run, Tezt creates a temporary folder under the
-system's temp directory with name ``tezt-XXXXXX``, where the ``XXXXXX`` are six
-random decimal figures. The content of the original context folder is copied on
-the fly in the test folder ``tezt-XXXXXX/octez-node-test``, and a yes-wallet
-folder is created on the fly in ``tezt-XXXXXX/yes-wallet``. The option
-``--keep-temp`` in the command above keeps the temporary folder for the
-developer to be able to inspect the storage after the migration has been
-performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
-the developer can start the node with the migrated context by invoking::
-
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost &
-
-Once the node is up, it is possible to inspect the storage by using the Tezos
-client and/or the RPCs. New blocks can be baked with any of the accounts
-``foundation1`` to ``foundation8`` by using the following command::
-
-  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
-
-If the developer wishes not to start the node that results after the migration,
-the parameter ``--keep-temp`` can be omitted and the Tezt's temp folder will be
-automatically deleted when the migration test ends.
-
-The migration can be tested again by stopping the node (if it was up) and
-running the test file with::
-
-  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
-
-There is no need to prepare the migration again.
-
-
-Wrap up the Automatic Migration Procedure With Tezt
----------------------------------------------------
-
-Check out latest code::
-
-  $ git checkout master
-  $ git pull
-
-Tweak migration by checking that
-``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
-following lines::
-
-  | Hangzhou_011 ->
-      Logging.log_notice "\nSTITCHING!\n" ;
-
-Commit the feature::
-
-  $ git commit -am 'My awesome feature'
-
-Prepare migration by snapshotting the Alpha protocol, linking it in the build
-system, patching the shell in order to obtain a yes-node and compiling the
-project::
-
-  $ ./scripts/prepare_migration_test.sh auto d_012 ~/mainnet.rolling
-
-Run the migration test::
-
-  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
-
-Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
-
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost &
-
-Use the client, to manually inspect the storage, or for example to bake new
-blocks with the following command::
-
-  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
-
-To test again, kill the node::
-
-  $ fg
-  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost
-  ^C
-
-And run the migration test::
-
-  $ dune exec ./tezt/manual_tests/main.exe -- --keep-temp migration
-
 
 Tips and Tricks
 ---------------

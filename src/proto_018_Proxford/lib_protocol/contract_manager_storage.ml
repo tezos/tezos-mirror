@@ -109,8 +109,10 @@ let () =
 let init = Storage.Contract.Manager.init
 
 let is_manager_key_revealed c manager =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit manager in
-  Storage.Contract.Manager.find c contract >>=? function
+  let* key_opt = Storage.Contract.Manager.find c contract in
+  match key_opt with
   | None -> return_false
   | Some (Manager_repr.Hash _) -> return_false
   | Some (Manager_repr.Public_key _) -> return_true
@@ -122,15 +124,19 @@ let check_public_key public_key expected_hash =
     (Inconsistent_hash {public_key; expected_hash; provided_hash})
 
 let reveal_manager_key ?(check_consistency = true) c manager public_key =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit manager in
-  Storage.Contract.Manager.get c contract >>=? function
+  let* key_opt = Storage.Contract.Manager.get c contract in
+  match key_opt with
   | Public_key _ -> tzfail (Previously_revealed_key contract)
   | Hash expected_hash ->
       (* Ensure that the manager is equal to the retrieved hash. *)
-      error_unless
-        (Signature.Public_key_hash.equal manager expected_hash)
-        (Inconsistent_hash {public_key; expected_hash; provided_hash = manager})
-      >>?= fun () ->
+      let*? () =
+        error_unless
+          (Signature.Public_key_hash.equal manager expected_hash)
+          (Inconsistent_hash
+             {public_key; expected_hash; provided_hash = manager})
+      in
       (* TODO tezos/tezos#3078
 
          We keep the consistency check and the optional argument to
@@ -142,15 +148,18 @@ let reveal_manager_key ?(check_consistency = true) c manager public_key =
          ?check_consistency=false. Ultimately this parameter should go
          away, and the split check_publick_key / reveal_manager_key
          pattern has to be exported to usage outside apply.ml *)
-      when_ check_consistency (fun () ->
-          Lwt.return @@ check_public_key public_key expected_hash)
-      >>=? fun () ->
+      let* () =
+        when_ check_consistency (fun () ->
+            Lwt.return @@ check_public_key public_key expected_hash)
+      in
       let pk = Manager_repr.Public_key public_key in
       Storage.Contract.Manager.update c contract pk
 
 let get_manager_key ?error ctxt pkh =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit pkh in
-  Storage.Contract.Manager.find ctxt contract >>=? function
+  let* key_opt = Storage.Contract.Manager.find ctxt contract in
+  match key_opt with
   | None -> (
       match error with
       | None -> tzfail (Missing_manager_contract contract)

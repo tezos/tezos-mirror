@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_risc_v_sandbox)
+ (package tezt-risc-v-sandbox)
+ (libraries
+  octez-libs.tezt-wrapper)
+ (flags
+  (:standard)
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base))

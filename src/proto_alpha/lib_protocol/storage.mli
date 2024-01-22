@@ -52,7 +52,7 @@ module Block_round : Simple_single_data_storage with type value = Round_repr.t
 type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
-  type slashed_percentage = int
+  type slashed_percentage = Int_percentage.t
 
   type t = (Cycle_repr.t * slashed_percentage) list
 
@@ -64,6 +64,10 @@ module Slashed_deposits_history : sig
       at the beginning of the list.
   *)
   val add : Cycle_repr.t -> slashed_percentage -> t -> t
+
+  (** [get cycle history] returns the percentage for [cycle] in [history] or
+      0 if there is no such cycle. *)
+  val get : Cycle_repr.t -> t -> slashed_percentage
 end
 
 module Unstake_request : sig
@@ -178,13 +182,14 @@ module Contract : sig
      the initial frozen balance in frozen_deposits.initial_amount. We
      have current_amount <= initial_amount and current_amount <
      initial_amount iff the delegate was slashed. *)
-  module Frozen_deposits :
+  module Frozen_deposits_up_to_Nairobi :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Deposits_repr.t
        and type t := Raw_context.t
 
-  (** Tez that were part of {!Frozen_deposits} but have been requested to be
+  (** Tez that were part of frozen deposits (either [own_frozen] or
+      [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
       They won't be part of the stake for future distributions.
       For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
@@ -205,8 +210,8 @@ module Contract : sig
        and type value = Unstake_request.t
        and type t := Raw_context.t
 
-  (** The sum of all pseudotokens owned by stakers (the delegate included)
-      corresponding to shares of the {!Frozen_deposits} current amount. *)
+  (** The sum of all pseudotokens owned by stakers
+      corresponding to shares of the [staked_frozen] in {!Staking_balance}. *)
   module Frozen_deposits_pseudotokens :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -476,6 +481,14 @@ module Pending_consensus_keys :
      and type key = Contract_repr.t
      and type value = Signature.public_key
 
+(** All denunciations of the current cycle that will have an effect (slashing,
+    reward), i.e. all below 100%, deferred to the cycle end. *)
+module Current_cycle_denunciations :
+  Indexed_data_storage
+    with type t := Raw_context.t
+     and type key = Signature.public_key_hash
+     and type value = Denunciations_repr.t
+
 type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
 
 (** [slashed_level] with all fields being [false]. *)
@@ -511,7 +524,7 @@ module Stake : sig
   module Staking_balance :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Stake_repr.Full.t
+       and type value = Full_staking_balance_repr.t
        and type snapshot = int
        and type t := Raw_context.t
 
@@ -570,7 +583,7 @@ module Delegate_sampler_state :
 module Issuance_bonus :
   Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value = Int64.t
+     and type value = Issuance_bonus_repr.t
      and type t := Raw_context.t
 
 (** Multiplicative coefficient for rewards under Adaptive Issuance
@@ -1027,7 +1040,7 @@ module Sc_rollup : sig
     Non_iterable_indexed_carbonated_data_storage
       with type t = Raw_context.t
        and type key = Sc_rollup_repr.t
-       and type value = Raw_level_repr.t * Z.t
+       and type value = Sc_rollup_whitelist_repr.last_whitelist_update
 end
 
 module Dal : sig

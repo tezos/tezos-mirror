@@ -34,6 +34,8 @@ type repr = t
 
 type t = Tez_tag of repr [@@ocaml.unboxed]
 
+let wrap t = Tez_tag t [@@ocaml.inline always]
+
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
   | Subtraction_underflow of t * t (* `Temporary *)
@@ -79,7 +81,7 @@ let of_string s =
       String.init 6 (fun i -> if Compare.Int.(i < len) then s.[i] else '0')
     in
     let prepared = remove_commas left ^ pad_to_six (remove_commas right) in
-    Option.map (fun i -> Tez_tag i) (Int64.of_string_opt prepared)
+    Option.map wrap (Int64.of_string_opt prepared)
   in
   match String.split_on_char '.' s with
   | [left; right] ->
@@ -98,8 +100,8 @@ let of_string s =
 let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let rec left ppf amount =
-    let d, r = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
-    if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
+    let d, r = (Int64.div amount 1000L, Int64.rem amount 1000L) in
+    if Compare.Int64.(d > 0L) then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r
   in
   let right ppf amount =
@@ -113,7 +115,7 @@ let pp ppf (Tez_tag amount) =
     else Format.fprintf ppf "%03d%a" hi triplet lo
   in
   let ints, decs =
-    (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
+    (Int64.div amount mult_int, Int64.(to_int (rem amount mult_int)))
   in
   left ppf ints ;
   if Compare.Int.(decs > 0) then Format.fprintf ppf ".%a" right decs
@@ -121,61 +123,69 @@ let pp ppf (Tez_tag amount) =
 let to_string t = Format.asprintf "%a" pp t
 
 let ( -? ) tez1 tez2 =
+  let open Result_syntax in
   let (Tez_tag t1) = tez1 in
   let (Tez_tag t2) = tez2 in
-  if t2 <= t1 then ok (Tez_tag (Int64.sub t1 t2))
-  else error (Subtraction_underflow (tez1, tez2))
+  if t2 <= t1 then return (Tez_tag (Int64.sub t1 t2))
+  else tzfail (Subtraction_underflow (tez1, tez2))
 
 let sub_opt (Tez_tag t1) (Tez_tag t2) =
   if t2 <= t1 then Some (Tez_tag (Int64.sub t1 t2)) else None
 
 let ( +? ) tez1 tez2 =
+  let open Result_syntax in
   let (Tez_tag t1) = tez1 in
   let (Tez_tag t2) = tez2 in
   let t = Int64.add t1 t2 in
-  if t < t1 then error (Addition_overflow (tez1, tez2)) else ok (Tez_tag t)
+  if t < t1 then tzfail (Addition_overflow (tez1, tez2)) else return (Tez_tag t)
 
 let ( *? ) tez m =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if m < 0L then error (Negative_multiplicator (tez, m))
-  else if m = 0L then ok (Tez_tag 0L)
+  if m < 0L then tzfail (Negative_multiplicator (tez, m))
+  else if m = 0L then return (Tez_tag 0L)
   else if t > Int64.(div max_int m) then
-    error (Multiplication_overflow (tez, m))
-  else ok (Tez_tag (Int64.mul t m))
+    tzfail (Multiplication_overflow (tez, m))
+  else return (Tez_tag (Int64.mul t m))
 
 let ( /? ) tez d =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if d <= 0L then error (Invalid_divisor (tez, d))
-  else ok (Tez_tag (Int64.div t d))
+  if d <= 0L then tzfail (Invalid_divisor (tez, d))
+  else return (Tez_tag (Int64.div t d))
 
-let div2_sub tez =
-  let (Tez_tag t) = tez in
-  let quo = Int64.div t 2L in
-  (* t ≥ 0 ⇒ t / 2 ≥ 0 ⇒ quo ≥ 0 *)
-  (* t ≥ 0 ⇒ t / 2 ≤ t ⇒ t - t / 2 ≥ 0 ⇒ t - quo ≥ 0 *)
-  (Tez_tag quo, Tez_tag (Int64.sub t quo))
-
-let div2 tez = fst (div2_sub tez)
+let div2 (Tez_tag t) = Tez_tag (Int64.div t 2L)
 
 let mul_exn t m =
-  match t *? Int64.(of_int m) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "mul_exn"
+  match t *? Int64.of_int m with Ok v -> v | Error _ -> invalid_arg "mul_exn"
 
 let div_exn t d =
-  match t /? Int64.(of_int d) with
-  | Ok v -> v
-  | Error _ -> invalid_arg "div_exn"
+  match t /? Int64.of_int d with Ok v -> v | Error _ -> invalid_arg "div_exn"
 
-let mul_ratio tez ~num ~den =
+let mul_ratio ~rounding tez ~num ~den =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if num < 0L then error (Negative_multiplicator (tez, num))
-  else if den <= 0L then error (Invalid_divisor (tez, den))
-  else if num = 0L then ok zero
+  if num < 0L then tzfail (Negative_multiplicator (tez, num))
+  else if den <= 0L then tzfail (Invalid_divisor (tez, den))
+  else if num = 0L then return zero
   else
-    let z = Z.(div (mul (of_int64 t) (of_int64 num)) (of_int64 den)) in
-    if Z.fits_int64 z then ok (Tez_tag (Z.to_int64 z))
-    else error (Multiplication_overflow (tez, num))
+    let numerator = Z.(mul (of_int64 t) (of_int64 num)) in
+    let denominator = Z.of_int64 den in
+    let z =
+      match rounding with
+      | `Down -> Z.div numerator denominator
+      | `Up -> Z.cdiv numerator denominator
+    in
+    if Z.fits_int64 z then return (Tez_tag (Z.to_int64 z))
+    else tzfail (Multiplication_overflow (tez, num))
+
+let mul_percentage ~rounding =
+  let z100 = Z.of_int 100 in
+  fun (Tez_tag t) (percentage : Int_percentage.t) ->
+    (* Guaranteed to produce no errors by the invariants on {!Int_percentage.t}. *)
+    let div' = match rounding with `Down -> Z.div | `Up -> Z.cdiv in
+    Tez_tag
+      Z.(to_int64 (div' (mul (of_int64 t) (of_int (percentage :> int))) z100))
 
 let of_mutez t = if t < 0L then None else Some (Tez_tag t)
 
@@ -189,6 +199,16 @@ let encoding =
   let decode (Tez_tag t) = Z.of_int64 t in
   let encode = Json.wrap_error (fun i -> Tez_tag (Z.to_int64 i)) in
   Data_encoding.def name (check_size 10 (conv decode encode n))
+
+let balance_update_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | `Credited v -> to_mutez v | `Debited v -> Int64.neg (to_mutez v))
+    ( Json.wrap_error @@ fun v ->
+      if Compare.Int64.(v < 0L) then `Debited (Tez_tag (Int64.neg v))
+      else `Credited (Tez_tag v) )
+    int64
 
 let () =
   let open Data_encoding in
@@ -280,8 +300,6 @@ let () =
     (obj2 (req "amount" encoding) (req "divisor" int64))
     (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Invalid_divisor (a, b))
-
-type tez = t
 
 let compare (Tez_tag x) (Tez_tag y) = compare x y
 

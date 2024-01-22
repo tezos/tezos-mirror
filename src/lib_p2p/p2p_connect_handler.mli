@@ -166,9 +166,7 @@ module Internal_for_tests : sig
       ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t -> bool;
         (** [P2p_point_state.Info.trusted] *)
     fd_connect :
-      P2p_fd.t ->
-      Unix.sockaddr ->
-      (unit, [`Connection_refused | `Unexpected_error of exn]) result Lwt.t;
+      P2p_fd.t -> Unix.sockaddr -> (unit, P2p_fd.connect_error) result Lwt.t;
         (** [P2p_fd.connect] *)
     socket_authenticate :
       canceler:Lwt_canceler.t ->

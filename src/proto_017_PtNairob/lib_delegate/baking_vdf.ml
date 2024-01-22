@@ -51,11 +51,10 @@ type 'a state = {
 }
 
 let init_block_stream_with_stopper cctxt chain =
-  Client_baking_blocks.monitor_applied_blocks
+  Client_baking_blocks.monitor_heads
     ~next_protocols:(Some [Protocol.hash])
     cctxt
-    ~chains:[chain]
-    ()
+    chain
 
 let stop_block_stream state =
   Option.iter
@@ -354,10 +353,6 @@ let check_new_cycle state (level_info : Level.t) =
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; protocol; next_protocol; level; _} =
   let open Lwt_result_syntax in
-  let* level_info = get_level_info cctxt level in
-  (* If head is in a new cycle record it in [state.cycle] and reset
-   * [state.computation_status] to [Not_started]. *)
-  let* () = check_new_cycle state level_info in
   if Protocol_hash.(protocol <> next_protocol) then
     (* If the protocol has changed, emit an event on every new block and take
      * no further action. It is expected that the daemon corresponding to
@@ -365,6 +360,10 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
     let*! () = Delegate_events.Denunciator.(emit protocol_change_detected) () in
     return_unit
   else
+    let* level_info = get_level_info cctxt level in
+    (* If head is in a new cycle record it in [state.cycle] and reset
+     * [state.computation_status] to [Not_started]. *)
+    let* () = check_new_cycle state level_info in
     (* If the chain is in the nonce revelation stage, there is nothing to do. *)
     let* out = is_in_nonce_revelation_stage state.constants level_info in
     if out then

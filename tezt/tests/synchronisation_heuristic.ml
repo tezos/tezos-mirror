@@ -57,7 +57,7 @@ let wait_for_sync node =
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
     let* is_bootstrapped =
-      RPC.Client.call client @@ RPC.get_chain_is_bootstrapped ()
+      Client.RPC.call client @@ RPC.get_chain_is_bootstrapped ()
     in
     if is_bootstrapped.sync_state = Synced then Lwt.return_unit
     else fst @@ Lwt.task ()
@@ -77,7 +77,12 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
-        Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "node"; "sync";
+        Tag.ci_disabled;
+        "synchronisation_threshold";
+        "bootstrap";
+        "node";
+        "sync";
+        Tag.memory_3k;
       ]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
@@ -217,7 +222,7 @@ let sync_state_typ =
 
 let check_sync_state ?__LOC__ ?endpoint client expected_state =
   let* sync_state =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
   in
   Check.(sync_state.sync_state = expected_state)
     sync_state_typ
@@ -250,7 +255,7 @@ let test_threshold_zero =
 
 let check_is_bootstrapped ?__LOC__ ?endpoint client =
   let* sync_state =
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+    Client.RPC.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
   in
   if not sync_state.bootstrapped then
     Test.fail "Expected node to be bootstrapped" ;
@@ -350,7 +355,7 @@ let test_threshold_two =
      and hence bootstrapped.
   *)
   let* () =
-    let level = Node.get_level node in
+    let* level = Node.get_level node in
     Lwt_list.iter_p
       (fun n ->
         let* (_ : int) = Node.wait_for_level n (level + 1) in
@@ -390,7 +395,8 @@ let test_threshold_stuck =
   let* baker = Baker.init ~protocol node client in
 
   Log.info "Bake a few blocks and kill baker" ;
-  let* (level : int) = Node.wait_for_level node (Node.get_level node + 3) in
+  let* current_level = Node.get_level node in
+  let* (level : int) = Node.wait_for_level node (current_level + 3) in
   let* () = Baker.terminate baker in
 
   Log.info "Add two additional peers" ;
@@ -483,7 +489,8 @@ let test_threshold_split_view =
   in
 
   Log.info "Delay for a few blocks" ;
-  let* (_ : int) = Node.wait_for_level node (3 + Node.get_level node) in
+  let* current_level = Node.get_level node in
+  let* (_ : int) = Node.wait_for_level node (3 + current_level) in
 
   Log.info "Check that additional peers are bootstrapped and synced" ;
   let* () = check_sync_state client Synced in
@@ -498,8 +505,7 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"; Tag.memory_4k]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in

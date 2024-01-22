@@ -65,7 +65,7 @@ let check_client_force =
   in
   let* () = Client.bake_for_and_wait client in
   let* first_manager_operation =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_operations_validation_pass
          ~validation_pass:3
          ~operation_offset:0

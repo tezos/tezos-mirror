@@ -52,6 +52,7 @@ let rec worker_loop st =
               | Lwt_unix.ADDR_INET (addr, port) ->
                   (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
             in
+            P2p_fd.set_point ~point fd ;
             P2p_connect_handler.accept connect_handler fd point ;
             Lwt.return_ok ())
           ~error:(function
@@ -74,6 +75,8 @@ let rec worker_loop st =
                 in
                 Lwt.return (Ok ())
             | `Unexpected_error ex ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+                   Losing some information here... *)
                 Lwt.return_error (TzTrace.make (error_of_exn ex)))
           r)
   in

@@ -4,14 +4,13 @@
 The workers library: an event-driven task management abstraction somewhat akin
 to actors.
 
-
 ## API Documentation
 <!--
 - Link to the external API.
 -->
 
 The API documentation is available online:
-<https://tezos.gitlab.io/api/odoc/_html/tezos-workers/index.html>
+<https://tezos.gitlab.io/api/odoc/_html/octez-libs/tezos_workers.html>
 
 
 ## Overview

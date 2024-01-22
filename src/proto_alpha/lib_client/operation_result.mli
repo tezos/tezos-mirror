@@ -28,6 +28,12 @@ open Alpha_context
 
 val tez_sym : string
 
+val normalize_internal_operation :
+  Protocol_client_context.full ->
+  Script_ir_unparser.unparsing_mode ->
+  Apply_internal_results.packed_internal_operation ->
+  Apply_internal_results.packed_internal_operation tzresult Lwt.t
+
 val pp_internal_operation :
   Format.formatter -> Apply_internal_results.packed_internal_operation -> unit
 

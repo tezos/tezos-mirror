@@ -21,7 +21,7 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
-oxford_long   = ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8
+oxford_long   = ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 nairobi_short = PtNairob
@@ -53,7 +53,7 @@ full: odoc
 	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-smart-rollup-client.html:
 	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-	
+
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
@@ -74,20 +74,19 @@ manuals: \
 	@../octez-smart-rollup-node man -verbosity 3 -format html | \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
 
-# artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
-odoc: docexes
+odoc:
 	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
 	  RESULT=$$?; (grep '^Error:' docs/odoc.log || true); exit $$RESULT
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
 
-odoc-lite: docexes
+odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
-		../scripts ../script-inputs ../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
+		../scripts ../script-inputs ../src ../tezt ../vendors ../dune ../dune-project ../dune-workspace $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/remove-old-protocols.sh
 	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in $(TMPDOCDIR)/odoc.log"
 	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(TMPDOCDIR)/odoc.log 2>&1; \
@@ -120,19 +119,19 @@ xrefscheck:
 	$(CHECKXREFS) -l oxford
 	$(CHECKXREFS) -l alpha
 
-scriptsindoccheck:
-	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-jammy
-	scripts/test_doc_scripts.sh install-bin-fedora37
-	scripts/test_doc_scripts.sh install-bin-fedora38
-	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-jammy
-	scripts/test_doc_scripts.sh install-bin-rc-fedora37
-	scripts/test_doc_scripts.sh install-bin-rc-fedora38
-	scripts/test_doc_scripts.sh install-opam-scratch
-	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-release-sources-bullseye
-	scripts/test_doc_scripts.sh compile-sources-bullseye
+installcheck:
+	scripts/test_install_scripts.sh install-bin-focal
+	scripts/test_install_scripts.sh install-bin-jammy
+	scripts/test_install_scripts.sh install-bin-fedora37
+	scripts/test_install_scripts.sh install-bin-fedora38
+	scripts/test_install_scripts.sh install-bin-rc-focal
+	scripts/test_install_scripts.sh install-bin-rc-jammy
+	scripts/test_install_scripts.sh install-bin-rc-fedora37
+	scripts/test_install_scripts.sh install-bin-rc-fedora38
+	scripts/test_install_scripts.sh install-opam-scratch
+	scripts/test_install_scripts.sh install-opam-focal
+	scripts/test_install_scripts.sh compile-release-sources-bullseye
+	scripts/test_install_scripts.sh compile-sources-bullseye
 
 # build dune targets together to avoid concurrent dunes
 docexes:
@@ -148,8 +147,11 @@ $(P2PDOCEXE): docexes
 api/errors.rst: $(ERRDOCEXE)
 	$(ERRDOCEXE) > api/errors.rst
 
+shell/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index shell /shell/rpc_introduction.rst.inc > $@
+
 %/rpc.rst: $(RPCDOCEXE)
-	$(RPCDOCEXE) index $(@D) > $@
+	$(RPCDOCEXE) index $(@D) $($(@D)_long) /include/rpc_introduction.rst.inc > $@
 
 user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@
@@ -234,5 +236,6 @@ fmt: black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
+	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html

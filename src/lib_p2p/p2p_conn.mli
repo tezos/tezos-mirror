@@ -131,9 +131,17 @@ val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
    Properly document disconnect/close. Check they are properly used
    and if we really need both. *)
 
-val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
+val disconnect :
+  ?wait:bool ->
+  reason:P2p_disconnection_reason.t ->
+  ('msg, 'peer, 'conn) t ->
+  unit Lwt.t
 
-val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
+val disconnect_reason :
+  ('msg, 'peer, 'conn) t -> P2p_disconnection_reason.t option
+
+val close :
+  reason:P2p_disconnection_reason.t -> ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (** Returns the network version that will be used for this connection.
    This network version is the best version compatible with the versions

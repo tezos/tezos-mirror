@@ -72,8 +72,10 @@ let precheck_block =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let n1 = Node.create [Private_mode] in
-  let ring = Cluster.create ~name:"ring" 4 [Private_mode] in
+  let n1 = Node.create [Private_mode; Synchronisation_threshold 0] in
+  let ring =
+    Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
+  in
   let n2 = List.hd ring in
   Cluster.ring ring ;
   Cluster.connect [n1] [n2] ;
@@ -141,7 +143,7 @@ let forge_block ?client node ~key ~with_op =
     JSON.parse ~origin:"forge_fake_block" shell |> return
   in
   let* protocol_data =
-    RPC.Client.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
+    Client.RPC.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
   in
   Log.info
     "Sufficient information retrieved: shutting down second node, restarting \
@@ -161,7 +163,8 @@ let propagate_precheckable_bad_block =
   Protocol.register_test
     ~__FILE__
     ~title:"forge fake block"
-    ~tags:["precheck"; "fake_block"; "propagation"]
+    ~tags:["precheck"; "fake_block"; "propagation"; Tag.memory_3k]
+    ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -171,7 +174,7 @@ let propagate_precheckable_bad_block =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let node_client = Node.create [] in
+  let node_client = Node.create [Private_mode; Synchronisation_threshold 0] in
   let ring =
     Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
   in
@@ -274,7 +277,8 @@ let propagate_precheckable_bad_block_payload =
   Protocol.register_test
     ~__FILE__
     ~title:"forge block with wrong payload"
-    ~tags:["precheck"; "fake_block"; "propagation"; "payload"]
+    ~tags:["precheck"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
+    ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -284,7 +288,7 @@ let propagate_precheckable_bad_block_payload =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let node_client = Node.create [] in
+  let node_client = Node.create [Private_mode; Synchronisation_threshold 0] in
   let ring =
     Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
   in
@@ -380,7 +384,7 @@ let propagate_precheckable_bad_block_payload =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
     |> Process.check_error ~msg:(rex "Invalid payload hash")
   in
-  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
   Log.info
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;

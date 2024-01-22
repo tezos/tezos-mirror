@@ -1,0 +1,9 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_wrapper)
+ (public_name octez-libs.tezt-wrapper)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt))

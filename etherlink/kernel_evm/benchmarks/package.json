@@ -1,0 +1,21 @@
+{
+    "name": "evm-kernel-benchmarks",
+    "version": "1.0.0",
+    "license": "MIT",
+    "dependencies": {
+        "@warren-bank/ethereumjs-tx-sign": "2.0.0",
+        "bn.js": "^5.2.1",
+        "ethereumjs-wallet": "^1.0.2",
+        "ethers": "^6.7.1",
+        "keccak": "^3.0.3",
+        "rlp": "^2.2.7",
+        "solc": "^0.8.21",
+        "csv-parse": "5.5.0",
+        "csv-stringify": "^6.4.2",
+        "commander": "^11.0.0"
+    },
+    "optionalDependencies": {
+        "chartjs-node-canvas": "^4.1.6",
+        "chart.js": "^3.5.1"
+    }
+}

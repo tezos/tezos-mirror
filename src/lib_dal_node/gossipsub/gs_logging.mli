@@ -25,4 +25,4 @@
 (*****************************************************************************)
 
 (** [event e] logs the event [e] of the Gossipsub worker *)
-val event : Gs_interface.Worker_instance.event -> unit Gs_interface.Monad.t
+val event : Gs_interface.Worker_instance.event -> unit Lwt.t

@@ -41,6 +41,10 @@ val get : (_, 'a) t -> 'a
 (** [set r v] sets reference [r] to the value [v]. *)
 val set : 'a rw -> 'a -> unit
 
+(** [map r f] apply [f] to the current value [v] held in the reference
+    [r]. *)
+val map : ('a -> 'a) -> 'a rw -> unit
+
 (** [new_ v] creates a fresh reference holding value [v]. *)
 val new_ : 'a -> (_, 'a) t
 

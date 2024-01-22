@@ -217,13 +217,21 @@ let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
 
 open Sampling_helpers
 
-let uniform : 'a array -> 'a sampler =
- fun arr rng_state ->
+let uniform : ?blacklist:('a -> bool) -> 'a array -> 'a sampler =
+ fun ?blacklist arr rng_state ->
+  let arr =
+    match blacklist with
+    | None -> arr
+    | Some blacklist ->
+        Array.to_seq arr
+        |> Seq.filter (fun x -> not (blacklist x))
+        |> Array.of_seq
+  in
   let i = Random.State.int rng_state (Array.length arr) in
   arr.(i)
 
-let uniform_atomic_type_name : atomic_type_name sampler =
-  uniform all_atomic_type_names
+let uniform_atomic_type_name ?blacklist : atomic_type_name sampler =
+  uniform ?blacklist all_atomic_type_names
 
 let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
   uniform all_comparable_atomic_type_names
@@ -239,7 +247,11 @@ module type S = sig
   module Michelson_base : Michelson_samplers_base.S
 
   module Random_type : sig
-    val m_type : size:int -> Script_typed_ir.ex_ty sampler
+    val m_type :
+      size:int ->
+      ?blacklist:(type_name -> bool) ->
+      unit ->
+      Script_typed_ir.ex_ty sampler
 
     val m_comparable_type :
       size:int -> Script_ir_translator.ex_comparable_ty sampler
@@ -326,24 +338,30 @@ end)
       | `TKey -> Ex_comparable_ty key_t
       | `TChain_id -> Ex_comparable_ty chain_id_t
 
-    let rec m_type ~size : Script_typed_ir.ex_ty sampler =
+    let rec m_type ~size ?blacklist () : Script_typed_ir.ex_ty sampler =
       let open Script_ir_translator in
       let open M in
+      let blacklist =
+        match blacklist with
+        | None -> None
+        | Some blacklist -> Some (fun x -> blacklist (x :> type_name))
+      in
       if size <= 0 then Stdlib.failwith "m_type: size <= 0"
       else if size = 1 then
         (* only atomic types can have size 1 *)
-        let* at_tn = uniform_atomic_type_name in
+        let* at_tn = uniform_atomic_type_name ?blacklist in
         return (type_of_atomic_type_name at_tn)
       else if size = 2 then
-        bind (uniform [|`TOption; `TList; `TSet; `TTicket; `TContract|])
+        bind
+          (uniform [|`TOption; `TList; `TSet; `TTicket; `TContract|] ?blacklist)
         @@ function
         | `TOption -> (
-            let* (Ex_ty t) = m_type ~size:1 in
+            let* (Ex_ty t) = m_type ~size:1 ?blacklist () in
             match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
-            let* (Ex_ty t) = m_type ~size:1 in
+            let* (Ex_ty t) = m_type ~size:1 ?blacklist () in
             match list_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
@@ -358,42 +376,42 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
-            let* (Ex_ty t) = m_type ~size:1 in
+            let* (Ex_ty t) = m_type ~size:1 ?blacklist () in
             match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
       else
-        bind (uniform all_non_atomic_type_names) @@ function
+        bind (uniform all_non_atomic_type_names ?blacklist) @@ function
         | `TPair -> (
             let* lsize, rsize = pick_split (size - 1) in
-            let* (Ex_ty left) = m_type ~size:lsize in
-            let* (Ex_ty right) = m_type ~size:rsize in
+            let* (Ex_ty left) = m_type ~size:lsize ?blacklist () in
+            let* (Ex_ty right) = m_type ~size:rsize ?blacklist () in
             match pair_t (-1) left right with
             | Error _ -> assert false
             | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
             let* lsize, rsize = pick_split (size - 1) in
-            let* (Ex_ty domain) = m_type ~size:lsize in
-            let* (Ex_ty range) = m_type ~size:rsize in
+            let* (Ex_ty domain) = m_type ~size:lsize ?blacklist () in
+            let* (Ex_ty range) = m_type ~size:rsize ?blacklist () in
             match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TOr -> (
             let* lsize, rsize = pick_split (size - 1) in
-            let* (Ex_ty left) = m_type ~size:lsize in
-            let* (Ex_ty right) = m_type ~size:rsize in
+            let* (Ex_ty left) = m_type ~size:lsize ?blacklist () in
+            let* (Ex_ty right) = m_type ~size:rsize ?blacklist () in
             match or_t (-1) left right with
             | Error _ -> assert false
             | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TOption -> (
-            let* (Ex_ty t) = m_type ~size:(size - 1) in
+            let* (Ex_ty t) = m_type ~size:(size - 1) ?blacklist () in
             match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
             let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
-            let* (Ex_ty elt) = m_type ~size:rsize in
+            let* (Ex_ty elt) = m_type ~size:rsize ?blacklist () in
             match map_t (-1) key elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
@@ -405,7 +423,7 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
-            let* (Ex_ty elt) = m_type ~size:(size - 1) in
+            let* (Ex_ty elt) = m_type ~size:(size - 1) ?blacklist () in
             match list_t (-1) elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
@@ -417,13 +435,13 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
-            let* (Ex_ty t) = m_type ~size:(size - 1) in
+            let* (Ex_ty t) = m_type ~size:(size - 1) ?blacklist () in
             match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TBig_map ->
             (* Don't know what to do with theses. Redraw. *)
-            m_type ~size
+            m_type ~size ?blacklist ()
 
     and m_comparable_type ~size : Script_ir_translator.ex_comparable_ty sampler
         =

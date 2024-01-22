@@ -85,4 +85,4 @@ More details on the history of Tezos protocols, including their activation dates
 
 - https://tzstats.com/protocols (or on other block explores in :ref:`Tezos community <tezos_community>`)
 - https://opentezos.com/tezos-basics/history-of-amendments/
-- https://wiki.tezosagora.org/learn/governance/past-tezos-amendments
+- https://docs.tezos.com/architecture/governance/amendment-history

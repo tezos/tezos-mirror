@@ -565,7 +565,6 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
   in
   let* validation, block_header_metadata =
     let*! r =
-      let open Environment.Error_monad in
       let* vstate =
         begin_validation_and_application
           pred_ctxt

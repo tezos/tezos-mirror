@@ -13,11 +13,14 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub mod dal_parameters;
 pub mod input;
 pub mod metadata;
 pub mod path;
 pub mod runtime;
 
+/// The size of a DAL parameters in bytes: 4 * size(i64) = 32 bytes.
+pub use crate::dal_parameters::DAL_PARAMETERS_SIZE;
 /// The size of a metadata in bytes: 20 (rollup address) + 4 (origination level).
 pub use crate::metadata::METADATA_SIZE;
 use path::RefPath;

@@ -16,9 +16,6 @@
 
 .unit_test_template_x86_64:
   extends: .unit_test_template
-  needs:
-    - "build_x86_64-released"
-    - "build_x86_64-exp-dev-extra"
   variables:
     ARCH: "x86_64"
 
@@ -48,8 +45,17 @@
 unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64_coverage
+  - .tags_template__no_gcp
+  # The [lib_benchmark] unit tests require Python
+  - .image_template__runtime_build_test_dependencies
   variables:
     MAKE_TARGETS: test-nonproto-unit
+
+unit:other-x86_64:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  variables:
+    MAKE_TARGETS: test-other-unit
 
 unit:proto-x86_64:
   extends:
@@ -60,6 +66,8 @@ unit:proto-x86_64:
 unit:webassembly-x86_64:
   extends:
   - .unit_test_template_x86_64
+  # The wasm tests are written in Python
+  - .image_template__runtime_build_test_dependencies
   variables:
     MAKE_TARGETS: test-webassembly
   # TODO: https://gitlab.com/tezos/tezos/-/issues/4663
@@ -70,12 +78,21 @@ unit:webassembly-x86_64:
   timeout: 20 min
 
 unit:non-proto-arm64:
-  extends: .unit_test_template_arm64
+  extends:
+    - .unit_test_template_arm64
+    # The [lib_benchmark] unit tests require Python
+    - .image_template__runtime_build_test_dependencies
+    - .tags_template__no_gcp_arm64
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
 
 unit:js_components:
-  extends: .unit_test_template_x86_64
+  extends:
+    - .unit_test_template_x86_64
+    - .image_template__runtime_build_test_dependencies
+  variables:
+    # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
+    RUNTEZTALIAS: "true"
   script:
     - . ./scripts/install_build_deps.js.sh
     - make test-js
@@ -83,4 +100,4 @@ unit:js_components:
 unit:protocol_compiles:
   extends: .unit_test_template_x86_64
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-protocol-compiles
+    - dune build @runtest_compile_protocol

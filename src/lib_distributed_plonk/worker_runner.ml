@@ -62,6 +62,7 @@ let () =
         D.Remote_config.remote_nodes = [];
       }
   in
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt.(
     Lwt_main.run
       ( D.run_node

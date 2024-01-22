@@ -1,7 +1,7 @@
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '(Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")'
 Node is bootstrapped.
-Estimated gas: 7900.777 units (will add 100 for safety)
+Estimated gas: 7899.569 units (will add 100 for safety)
 Estimated storage: 475 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001139
+    Fee to the baker: ꜩ0.001138
     Expected counter: 1
-    Gas limit: 8001
+    Gas limit: 8000
     Storage limit: 495 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001139
-      payload fees(the block proposer) ....... +ꜩ0.001139
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001138
+      payload fees(the block proposer) ....... +ꜩ0.001138
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -31,7 +31,7 @@ This sequence of operations was run:
           Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "green" 1) }
       Storage size: 525 bytes
       Paid storage size diff: 325 bytes
-      Consumed gas: 3193.653
+      Consumed gas: 3193.024
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.08125
         storage fees ........................... +ꜩ0.08125
@@ -59,7 +59,7 @@ This sequence of operations was run:
             (Some (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1)))
           Storage size: 169 bytes
           Paid storage size diff: 108 bytes
-          Consumed gas: 2818.488
+          Consumed gas: 2818.019
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.027
             storage fees ........................... +ꜩ0.027
@@ -79,7 +79,7 @@ This sequence of operations was run:
             (Some (Pair 0x01c97ff8e547ecb335bdf832511361d68e928c6ec300 (Pair "blue" 1)))
           Storage size: 88 bytes
           Paid storage size diff: 42 bytes
-          Consumed gas: 1889.850
+          Consumed gas: 1889.697
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.0105
             storage fees ........................... +ꜩ0.0105

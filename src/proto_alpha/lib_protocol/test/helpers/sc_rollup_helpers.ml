@@ -77,8 +77,8 @@ struct
     | Some k ->
         let index = Context.index context in
         let* p = Context.produce_tree_proof index k step in
-        return (Some p)
-    | None -> return None
+        return_some p
+    | None -> return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
@@ -120,6 +120,7 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
     match kind with
     | Sc_rollups.Kind.Example_arith -> Sc_rollup.Kind.Example_arith
     | Sc_rollups.Kind.Wasm_2_0_0 -> Sc_rollup.Kind.Wasm_2_0_0
+    | Sc_rollups.Kind.Riscv -> Sc_rollup.Kind.Riscv
   in
   let* res = genesis_commitment ~boot_sector ~origination_level kind in
   let res =
@@ -572,7 +573,7 @@ module Node_inbox = struct
     return {inbox; history; payloads_histories}
 
   let fill_inbox ~inbox_creation_level node_inbox payloads_per_levels =
-    let open Result_syntax in
+    let open Result_wrap_syntax in
     let rec aux {inbox; history; payloads_histories} = function
       | [] -> return {inbox; history; payloads_histories}
       | ({
@@ -590,16 +591,14 @@ module Node_inbox = struct
               (fun message -> Sc_rollup.Inbox_message.External message)
               messages
           in
-          let* payloads_history, history, inbox, witness, _messages =
-            Environment.wrap_tzresult
-            @@ Sc_rollup.Inbox.add_all_messages
-                 ~first_block:
-                   Raw_level.(equal (succ inbox_creation_level) level)
-                 ~predecessor_timestamp
-                 ~predecessor
-                 history
-                 inbox
-                 messages
+          let*@ payloads_history, history, inbox, witness, _messages =
+            Sc_rollup.Inbox.add_all_messages
+              ~first_block:Raw_level.(equal (succ inbox_creation_level) level)
+              ~predecessor_timestamp
+              ~predecessor
+              history
+              inbox
+              messages
           in
           (* Store in the history this archived level. *)
           let witness_hash =
@@ -632,7 +631,8 @@ module Node_inbox = struct
 
   let produce_proof {payloads_histories; history; _} inbox_snapshot
       (level, message_counter) =
-    Lwt.map Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    wrap
     @@ Sc_rollup.Inbox.produce_proof
          ~get_payloads_history:(get_payloads_history payloads_histories)
          ~get_history:(get_history history)
@@ -651,14 +651,16 @@ module Node_inbox = struct
   let produce_payloads_proof {payloads_histories; _}
       (head_cell_hash : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t)
       message_counter =
-    Lwt.map Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    wrap
     @@ Sc_rollup.Inbox.Internal_for_tests.produce_payloads_proof
          (get_payloads_history payloads_histories)
          head_cell_hash
          ~index:message_counter
 
   let produce_inclusion_proof {history; _} inbox_snapshot level =
-    Lwt.map Environment.wrap_tzresult
+    let open Lwt_result_wrap_syntax in
+    wrap
     @@ Sc_rollup.Inbox.Internal_for_tests.produce_inclusion_proof
          (get_history history)
          inbox_snapshot
@@ -675,7 +677,7 @@ module Protocol_inbox = struct
       inbox_creation_level
 
   let fill_inbox ~inbox_creation_level inbox payloads_per_levels =
-    let open Result_syntax in
+    let open Result_wrap_syntax in
     let rec aux inbox = function
       | [] -> return inbox
       | ({
@@ -693,16 +695,14 @@ module Protocol_inbox = struct
               (fun message -> Sc_rollup.Inbox_message.(External message))
               messages
           in
-          let* _, _, inbox, _, _ =
-            Environment.wrap_tzresult
-            @@ Sc_rollup.Inbox.add_all_messages
-                 ~first_block:
-                   Raw_level.(equal (succ inbox_creation_level) level)
-                 ~predecessor_timestamp
-                 ~predecessor
-                 (Sc_rollup.Inbox.History.empty ~capacity:1000L)
-                 inbox
-                 payloads
+          let*@ _, _, inbox, _, _ =
+            Sc_rollup.Inbox.add_all_messages
+              ~first_block:Raw_level.(equal (succ inbox_creation_level) level)
+              ~predecessor_timestamp
+              ~predecessor
+              (Sc_rollup.Inbox.History.empty ~capacity:1000L)
+              inbox
+              payloads
           in
           aux inbox rst
     in
@@ -872,6 +872,7 @@ struct
               go ~our_states (consume_fuel fuel) (tick + 1) state
           | Needs_reveal (Reveal_raw_data _)
           | Needs_reveal Reveal_metadata
+          | Needs_reveal Reveal_dal_parameters
           | Initial | First_after _ ->
               return (state, fuel, tick, our_states))
     in
@@ -1002,5 +1003,8 @@ let make_pvm_with_context_and_state (type context state)
 
       let dal_attestation_lag =
         Default_parameters.constants_test.dal.attestation_lag
+
+      let dal_number_of_slots =
+        Default_parameters.constants_test.dal.number_of_slots
     end
   end)

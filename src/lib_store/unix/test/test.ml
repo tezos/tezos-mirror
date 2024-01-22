@@ -34,8 +34,8 @@
 let () =
   let open Lwt_syntax in
   Lwt_main.run
-    (* we init the internal event here once and for all modules *)
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
+    (* we init the internal event here once and for all modules. log level is set as per Tezt's log level. *)
+    (let* () = Tezt_sink.activate () in
      Alcotest_lwt.run
        ~__FILE__
        "tezos-store"

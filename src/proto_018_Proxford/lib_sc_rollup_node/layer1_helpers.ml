@@ -72,8 +72,8 @@ let get_last_cemented_commitment (cctxt : #Client_context.full) rollup_address :
     level = Protocol.Alpha_context.Raw_level.to_int32 level;
   }
 
-let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
-    operator =
+let get_last_published_commitment ?(allow_unstake = true)
+    (cctxt : #Client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
   let cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -88,14 +88,15 @@ let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
   in
   match res with
   | Error trace
-    when TzTrace.fold
-           (fun exists -> function
-             | Environment.Ecoproto_error
-                 Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
-                 true
-             | _ -> exists)
-           false
-           trace ->
+    when allow_unstake
+         && TzTrace.fold
+              (fun exists -> function
+                | Environment.Ecoproto_error
+                    Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
+                    true
+                | _ -> exists)
+              false
+              trace ->
       return_none
   | Error trace -> fail trace
   | Ok None -> return_none
@@ -133,9 +134,17 @@ let constants_of_parametric
             challenge_window_in_blocks;
             commitment_period_in_blocks;
             reveal_activation_level;
+            max_number_of_stored_cemented_commitments;
             _;
           };
-        dal = {feature_enable; attestation_lag; number_of_slots; _};
+        dal =
+          {
+            feature_enable;
+            attestation_lag;
+            number_of_slots;
+            cryptobox_parameters;
+            _;
+          };
         _;
       } =
   let open Protocol.Alpha_context in
@@ -151,8 +160,10 @@ let constants_of_parametric
             Some
               (Sc_rollup_proto_types.Constants.reveal_activation_level_to_octez
                  reveal_activation_level);
+          max_number_of_stored_cemented_commitments;
         };
-      dal = {feature_enable; attestation_lag; number_of_slots};
+      dal =
+        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
@@ -203,7 +214,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         match (operation, result) with
         | ( Sc_rollup_originate {boot_sector; _},
             Sc_rollup_originate_result {address; _} )
-          when node_ctxt.rollup_address = address ->
+          when node_ctxt.config.sc_rollup_address = address ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu
       in
@@ -225,6 +236,27 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
       | Found_boot_sector boot_sector -> return boot_sector
       | _ -> missing_boot_sector ())
 
-let find_whitelist _cctxt _rollup_address :
-    Signature.public_key_hash trace option tzresult Lwt.t =
-  return None
+let find_whitelist cctxt rollup_address =
+  Plugin.RPC.Sc_rollup.whitelist
+    (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
+    ( cctxt#chain,
+      `Head 0
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6152
+         Rollup node: investigate use cctxt#block instead of `Head 0 in RPC calls*)
+    )
+    rollup_address
+
+let find_last_whitelist_update cctxt rollup_address =
+  let open Lwt_result_syntax in
+  let* last_whitelist_update =
+    Plugin.RPC.Sc_rollup.last_whitelist_update
+      (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
+      (cctxt#chain, `Head 0)
+      rollup_address
+  in
+  Option.map
+    (fun Protocol.Alpha_context.Sc_rollup.Whitelist.
+           {message_index; outbox_level} ->
+      (message_index, Protocol.Alpha_context.Raw_level.to_int32 outbox_level))
+    last_whitelist_update
+  |> return

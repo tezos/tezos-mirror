@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# plots the output of 'dune build @runtest_locator'
+# plots the output of 'dune build @bench/bench.exe -- -f bench.ml'
 
 set -e
 
-size_chain=$(grep 'size_chain' $1 | awk '{print $2}')
-exp_limit=$(grep 'exp_limit' $1 | awk '{print $2}')
-locator_limit=$(grep 'locator_limit' $1 | awk '{print $2}')
-runs=$(grep 'runs' $1 | awk '{print $2}')
+size_chain=$(grep 'size_chain' "$1" | awk '{print $2}')
+exp_limit=$(grep 'exp_limit' "$1" | awk '{print $2}')
+locator_limit=$(grep 'locator_limit' "$1" | awk '{print $2}')
+runs=$(grep 'runs' "$1" | awk '{print $2}')
 
 echo "\
 input=\"${1}\";
@@ -20,4 +20,4 @@ set xlabel 'size locator';
 set ylabel 'time (seconds)';
 plot input using 1:2 ls 1 title 'exponential', \
      input using 1:3 ls 2 title 'linear'
-" | gnuplot > ${1}.svg
+" | gnuplot > "${1}".svg

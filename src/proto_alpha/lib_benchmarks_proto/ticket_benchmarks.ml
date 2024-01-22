@@ -89,12 +89,12 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Group "compare_tickets"
+  let group = Benchmark.Group "tickets"
 
   let model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~const:(fv "compare_ticket_hash"))
+      (Model.unknown_const1 ~const:(fv "compare_ticket_hash"))
 
   let create_benchmark ~rng_state _conf =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 1; max = 64} in
@@ -141,12 +141,12 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Group "compare_tickets"
+  let group = Benchmark.Group "tickets"
 
   let model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~const:(fv "compare_contract"))
+      (Model.unknown_const1 ~const:(fv "compare_contract"))
 
   let create_benchmark ~rng_state _conf =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
@@ -200,7 +200,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "tickets"
 
   let make_bench_helper rng_state config () =
     let open Result_syntax in
@@ -223,7 +223,10 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
         raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
   let model =
-    Model.make ~conv:(function {nodes} -> (nodes, ())) ~model:Model.affine
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(function {nodes} -> (nodes, ()))
+      Model.affine
 end
 
 let () = Registration.register (module Has_tickets_type_benchmark)
@@ -247,7 +250,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "tickets"
 
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in
@@ -284,8 +287,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     | Error trace ->
         raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
-  let model =
-    Model.make ~conv:(function {nodes} -> (nodes, ())) ~model:Model.affine
+  let model = Model.make ~conv:(function {nodes} -> (nodes, ())) Model.affine
 end
 
 let () = Registration.register (module Collect_tickets_benchmark)

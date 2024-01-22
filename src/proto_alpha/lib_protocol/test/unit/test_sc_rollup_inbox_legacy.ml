@@ -70,19 +70,18 @@ let payloads_from_messages =
       | Reveal _ -> assert false)
 
 let populate_inboxes level history inbox inboxes list_of_messages =
-  let open Result_syntax in
+  let open Result_wrap_syntax in
   let rec aux level history payloads_histories inbox inboxes witness = function
     | [] -> return (payloads_histories, witness, history, inbox, inboxes)
     | messages :: ps ->
-        let* payloads_history, history, inbox, witness, _messages =
-          Environment.wrap_tzresult
-          @@ add_all_messages
-               ~protocol_migration_message:None
-               ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Block_hash.zero
-               history
-               inbox
-               messages
+        let*@ payloads_history, history, inbox, witness, _messages =
+          add_all_messages
+            ~protocol_migration_message:None
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~predecessor:Block_hash.zero
+            history
+            inbox
+            messages
         in
         let witness_hash =
           Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness
@@ -109,12 +108,14 @@ let populate_inboxes level history inbox inboxes list_of_messages =
 let inbox = Sc_rollup_helpers.dumb_init_repr
 
 let setup_inbox_with_messages list_of_payloads f =
+  let open Lwt_result_syntax in
   let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
-  populate_inboxes first_level history inbox [] list_of_payloads
-  >>?= fun (payloads_histories, witness, history, inbox, inboxes) ->
+  let*? payloads_histories, witness, history, inbox, inboxes =
+    populate_inboxes first_level history inbox [] list_of_payloads
+  in
   match witness with
-  | None -> fail (err "setup_inbox_with_messages called with no messages")
+  | None -> tzfail (err "setup_inbox_with_messages called with no messages")
   | Some tree -> f payloads_histories tree history inbox inboxes
 
 (* An external message is prefixed with a tag whose length is one byte, and
@@ -124,8 +125,10 @@ let encode_external_message message =
   Bytes.of_string (prefix ^ message)
 
 let check_payload messages external_message =
-  Environment.Context.Tree.find messages ["payload"] >>= function
-  | None -> fail (err "No payload in messages")
+  let open Lwt_result_syntax in
+  let*! payload_opt = Environment.Context.Tree.find messages ["payload"] in
+  match payload_opt with
+  | None -> tzfail (err "No payload in messages")
   | Some payload ->
       let expected_payload = encode_external_message external_message in
       fail_unless
@@ -139,22 +142,21 @@ let check_payload messages external_message =
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
 let setup_node_inbox_with_messages list_of_messages f =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
   let payloads_histories = Payloads_histories.empty in
   let rec aux level history payloads_histories inbox inboxes witness = function
     | [] -> return (payloads_histories, witness, history, inbox, inboxes)
     | messages :: ps ->
-        let*? payloads_history, history, inbox, witness, _messages =
-          Environment.wrap_tzresult
-          @@ add_all_messages
-               ~protocol_migration_message:None
-               ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Block_hash.zero
-               history
-               inbox
-               messages
+        let*?@ payloads_history, history, inbox, witness, _messages =
+          add_all_messages
+            ~protocol_migration_message:None
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~predecessor:Block_hash.zero
+            history
+            inbox
+            messages
         in
         let witness_hash =
           Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness
@@ -227,7 +229,7 @@ let fail_with_proof_error_msg errors fail_msg =
       errors
   in
   let msg = Option.(msg |> map (fun s -> ": " ^ s) |> value ~default:"") in
-  fail (err (fail_msg ^ msg))
+  Lwt_result_syntax.tzfail (err (fail_msg ^ msg))
 
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
@@ -268,15 +270,15 @@ let init_inboxes_histories_with_different_capacities
     populate_inboxes first_level history inbox [] messages
   in
   (* Here, we have `~capacity:0L`. So no history is kept *)
-  mk_history ~capacity:0L () >>?= fun no_history ->
+  let*? no_history = mk_history ~capacity:0L () in
   (* Here, we set a [default_capacity] supposed to be greater than [nb_levels],
      and keep the default [next_index]. This history will serve as a witeness *)
-  mk_history ~capacity:default_capacity () >>?= fun big_history ->
+  let*? big_history = mk_history ~capacity:default_capacity () in
   (* Here, we choose a small capacity supposed to be smaller than [nb_levels] to
      cover cases where the history is full and older elements should be removed.
      We also set a non-default [next_index] value to cover cases where the
      incremented index may overflow or is negative. *)
-  mk_history ~next_index ~capacity:small_capacity () >>?= fun small_history ->
+  let*? small_history = mk_history ~next_index ~capacity:small_capacity () in
   return (no_history, small_history, big_history)
 
 (** In this test, we mainly check that the number of entries in histories
@@ -332,7 +334,7 @@ let test_history_length
       Int64.(default_capacity > of_int len)
       (err default_capacity len ~exact:true)
   in
-  return ()
+  return_unit
 
 (** In this test, we check that for two inboxes of the same content, the entries
     of the history with the lower capacity, taken in the insertion order, is a
@@ -385,7 +387,7 @@ let test_history_prefix params =
     inclusion proofs depending on histories' capacity. *)
 let test_inclusion_proofs_depending_on_history_capacity
     ((_nb_levels, _default_capacity, _small_capacity, _next_index) as params) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let module I = Sc_rollup_inbox_repr in
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
@@ -415,9 +417,8 @@ let test_inclusion_proofs_depending_on_history_capacity
           history.")
   in
   let proof s v =
-    let open Lwt_result_syntax in
-    let*! v in
-    match Environment.wrap_tzresult v with
+    let*!@ v in
+    match v with
     | Ok v -> return v
     | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))
   in
@@ -452,14 +453,8 @@ let test_inclusion_proofs_depending_on_history_capacity
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
-  let*? hp1'' =
-    I.Internal_for_tests.verify_inclusion_proof ip1 hp1
-    |> Environment.wrap_tzresult
-  in
-  let*? hp2'' =
-    I.Internal_for_tests.verify_inclusion_proof ip2 hp2
-    |> Environment.wrap_tzresult
-  in
+  let*?@ hp1'' = I.Internal_for_tests.verify_inclusion_proof ip1 hp1 in
+  let*?@ hp2'' = I.Internal_for_tests.verify_inclusion_proof ip2 hp2 in
   fail_unless
     (hp1' = hp1'' && hp2' = hp2'' && hp1' = hp2')
     (err "Inclusion proofs are expected to be valid.")

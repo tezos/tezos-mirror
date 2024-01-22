@@ -72,8 +72,8 @@ let get_last_cemented_commitment (cctxt : #Client_context.full) rollup_address :
     level = Protocol.Alpha_context.Raw_level.to_int32 level;
   }
 
-let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
-    operator =
+let get_last_published_commitment ?(allow_unstake = true)
+    (cctxt : #Client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
   let cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -88,14 +88,15 @@ let get_last_published_commitment (cctxt : #Client_context.full) rollup_address
   in
   match res with
   | Error trace
-    when TzTrace.fold
-           (fun exists -> function
-             | Environment.Ecoproto_error
-                 Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
-                 true
-             | _ -> exists)
-           false
-           trace ->
+    when allow_unstake
+         && TzTrace.fold
+              (fun exists -> function
+                | Environment.Ecoproto_error
+                    Protocol.Sc_rollup_errors.Sc_rollup_not_staked ->
+                    true
+                | _ -> exists)
+              false
+              trace ->
       return_none
   | Error trace -> fail trace
   | Ok None -> return_none
@@ -128,8 +129,21 @@ let constants_of_parametric
       {
         minimal_block_delay;
         delay_increment_per_round;
-        sc_rollup = {challenge_window_in_blocks; commitment_period_in_blocks; _};
-        dal = {feature_enable; attestation_lag; number_of_slots; _};
+        sc_rollup =
+          {
+            challenge_window_in_blocks;
+            commitment_period_in_blocks;
+            max_number_of_stored_cemented_commitments;
+            _;
+          };
+        dal =
+          {
+            feature_enable;
+            attestation_lag;
+            number_of_slots;
+            cryptobox_parameters;
+            _;
+          };
         _;
       } =
   let open Protocol.Alpha_context in
@@ -142,8 +156,10 @@ let constants_of_parametric
           challenge_window_in_blocks;
           commitment_period_in_blocks;
           reveal_activation_level = None;
+          max_number_of_stored_cemented_commitments;
         };
-      dal = {feature_enable; attestation_lag; number_of_slots};
+      dal =
+        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
@@ -198,7 +214,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
         | ( Sc_rollup_originate {boot_sector; _},
             Sc_rollup_originate_result {address; _} )
           when Octez_smart_rollup.Address.(
-                 node_ctxt.rollup_address
+                 node_ctxt.config.sc_rollup_address
                  = Sc_rollup_proto_types.Address.to_octez address) ->
             raise (Found_boot_sector boot_sector)
         | _ -> accu
@@ -224,3 +240,5 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
 let find_whitelist _cctxt _rollup_address :
     Signature.public_key_hash trace option tzresult Lwt.t =
   return None
+
+let find_last_whitelist_update _cctxt _rollup_address = return_none

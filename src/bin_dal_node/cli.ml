@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 module Term = struct
   let p2p_point_arg ~default_port =
     let open Cmdliner in
@@ -74,13 +76,27 @@ module Term = struct
     let default_port = Configuration_file.default.listen_addr |> snd in
     let doc =
       Format.asprintf
+        "The TCP address and port at which the socket is bound. If \
+         [public_addr] is not set, this is also the address and port at which \
+         this instance can be reached by other P2P nodes."
+    in
+    Arg.(
+      value
+      & opt (some (p2p_point_arg ~default_port)) None
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+
+  let public_addr =
+    let open Cmdliner in
+    let default_port = Configuration_file.default.public_addr |> snd in
+    let doc =
+      Format.asprintf
         "The TCP address and port at which this instance can be reached by \
          other P2P nodes."
     in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["public-addr"])
 
   let endpoint_arg =
     let open Cmdliner in
@@ -100,16 +116,16 @@ module Term = struct
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
   let operator_profile_printer fmt = function
-    | Services.Types.Attestor pkh ->
+    | Types.Attester pkh ->
         Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
     | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
 
-  let attestor_profile_arg =
+  let attester_profile_arg =
     let open Cmdliner in
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> Services.Types.Attestor pkh |> Result.ok
+      | Some pkh -> Types.Attester pkh |> Result.ok
     in
     Arg.conv (decoder, operator_profile_printer)
 
@@ -126,19 +142,19 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Services.Types.Producer {slot_index} |> Result.ok
+      | Some slot_index -> Types.Producer {slot_index} |> Result.ok
     in
     Arg.conv (decoder, operator_profile_printer)
 
-  let attestor_profile =
+  let attester_profile =
     let open Cmdliner in
     let doc =
-      "The Octez DAL node attestor profiles for given public key hashes."
+      "The Octez DAL node attester profiles for given public key hashes."
     in
     Arg.(
       value
-      & opt (list attestor_profile_arg) []
-      & info ~docs ~doc ~docv:"[PKH]" ["attestor-profiles"])
+      & opt (list attester_profile_arg) []
+      & info ~docs ~doc ~docv:"[PKH]" ["attester-profiles"])
 
   let producer_profile =
     let open Cmdliner in
@@ -152,7 +168,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
-       cannot also be an attestor/slot producer"
+       cannot also be an attester/slot producer"
     in
     Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
 
@@ -187,8 +203,8 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ metrics_addr $ attestor_profile $ producer_profile
-       $ bootstrap_profile $ peers))
+       $ public_addr $ endpoint $ metrics_addr $ attester_profile
+       $ producer_profile $ bootstrap_profile $ peers))
 end
 
 module Run = struct
@@ -246,8 +262,9 @@ type options = {
   rpc_addr : P2p_point.Id.t option;
   expected_pow : float option;
   listen_addr : P2p_point.Id.t option;
+  public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profiles : Services.Types.profiles option;
+  profiles : Types.profiles option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
 }
@@ -255,8 +272,8 @@ type options = {
 type t = Run | Config_init
 
 let make ~run =
-  let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
-      metrics_addr attestors producers bootstrap_flag peers =
+  let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
+      endpoint metrics_addr attesters producers bootstrap_flag peers =
     let run profiles =
       run
         subcommand
@@ -265,19 +282,20 @@ let make ~run =
           rpc_addr;
           expected_pow;
           listen_addr;
+          public_addr;
           endpoint;
           profiles;
           metrics_addr;
           peers;
         }
     in
-    match (bootstrap_flag, attestors @ producers) with
+    match (bootstrap_flag, attesters @ producers) with
     | false, [] -> run None
-    | true, [] -> run @@ Some Services.Types.Bootstrap
+    | true, [] -> run @@ Some Types.Bootstrap
     | false, operator_profiles -> run @@ Some (Operator operator_profiles)
     | true, _ :: _ ->
         `Error
-          (false, "A bootstrap node cannot also be an attestor/slot producer.")
+          (false, "A bootstrap node cannot also be an attester/slot producer.")
   in
   let default =
     Cmdliner.Term.(

@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
-module SMap = Plonk.SMap
+open Kzg.Bls
+open Kzg.Utils
+module SMap = Kzg.SMap
 
 module type S = sig
   module PP : Polynomial_protocol.S
@@ -138,7 +138,7 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     answers : Scalar.t SMap.t SMap.t list -> PP.Answers_commitment.t;
   }
 
-  let hash_pi (pp : prover_public_parameters) ic_funcs inputs =
+  let commit_pi (pp : prover_public_parameters) ic_funcs inputs =
     (* TODO: can we commit only to the hidden pi?*)
     let pi_infos =
       SMap.mapi
@@ -151,7 +151,8 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
               (fun s -> Array.sub s.witness ic_size c.public_input_size)
               inputs_list
           in
-          (pi, commit @@ Array.concat pi))
+          ( {nb_proofs = List.length inputs_list; public = pi; commitments = []},
+            commit @@ Array.concat pi ))
         inputs
     in
     (SMap.map fst pi_infos, SMap.map snd pi_infos)
@@ -199,7 +200,7 @@ module Make_impl (Super_PP : Polynomial_protocol.S) = struct
     }
 
   let prove_list (pp : prover_public_parameters) ~input_commit_funcs ~inputs =
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
+    let public_inputs_map, cms_pi = commit_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
     let ( ( pp_proof,

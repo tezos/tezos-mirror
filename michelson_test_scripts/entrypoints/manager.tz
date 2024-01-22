@@ -13,7 +13,7 @@ code
         AMOUNT ;
         ASSERT_CMPEQ ;
         # Assert that the sender is the manager
-        DUUP ;
+        DUP 2 ;
         IMPLICIT_ACCOUNT ;
         ADDRESS ;
         SENDER ;

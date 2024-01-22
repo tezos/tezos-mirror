@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name kzg)
+ (public_name octez-libs.kzg)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  repr
+  data-encoding
+  octez-libs.bls12-381-polynomial
+  octez-libs.crypto)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -open Data_encoding
+  -open Octez_bls12_381_polynomial))

@@ -144,30 +144,6 @@ module State_transitions = struct
       ~msg:"received valid proposal for a block already applied"
       ()
 
-  let unexpected_pqc_while_waiting_for_application =
-    declare_2
-      ~section
-      ~name:"unexpected_pqc_while_waiting_for_application"
-      ~level:Info
-      ~msg:
-        "received an unexpected prequorum for {prequorum} while waiting for \
-         the proposal's {proposal} application"
-      ~pp1:Block_hash.pp
-      ("prequorum", Block_hash.encoding)
-      ~pp2:Block_hash.pp
-      ("proposal", Block_hash.encoding)
-
-  let pqc_while_waiting_for_application =
-    declare_1
-      ~section
-      ~name:"pqc_while_waiting_for_application"
-      ~level:Info
-      ~msg:
-        "received expected prequorum for {prequorum} while waiting for the \
-         proposal's application"
-      ~pp1:Block_hash.pp
-      ("prequorum", Block_hash.encoding)
-
   let unexpected_proposal_round =
     declare_2
       ~section
@@ -358,14 +334,6 @@ module State_transitions = struct
       ("received_hash", Block_hash.encoding)
       ~pp2:Block_hash.pp
       ("expected_hash", Block_hash.encoding)
-
-  let handling_prequorum_on_non_applied_proposal =
-    declare_0
-      ~section
-      ~name:"handling_prequorum_on_non_applied_proposal"
-      ~level:Error
-      ~msg:"Handling prequorum on a non-applied proposal"
-      ()
 
   let step_current_phase =
     declare_2
@@ -681,18 +649,36 @@ module Actions = struct
       ("round", Round.encoding)
 
   let dal_attestation_injected =
-    declare_3
+    declare_5
       ~section
       ~name:"dal_attestation_injected"
       ~level:Notice
       ~msg:
-        "injected DAL attestation {ophash} with bitset {bitset} for {delegate}"
+        "injected DAL attestation {ophash} for level {attestation_level} with \
+         bitset {bitset} for {delegate} to attest slots published at level \
+         {published_level}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp3:Z.pp_print
       ("bitset", Data_encoding.n)
+      ("published_level", Data_encoding.int32)
+      ("attestation_level", Data_encoding.int32)
+
+  let dal_attestation_void =
+    declare_3
+      ~section
+      ~name:"dal_attestation_void"
+      ~level:Notice
+      ~msg:
+        "Skipping the injection of the DAL attestation for attestation level \
+         {attestation_level}, as no slot published at level {published_level} \
+         is attestable."
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ("attestation_level", Data_encoding.int32)
+      ("published_level", Data_encoding.int32)
 
   let synchronizing_round =
     declare_1

@@ -294,7 +294,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let sync index =
     if index.readonly then Store.reload index.repo ;
-    Lwt.return ()
+    Lwt.return_unit
 
   let exists index key =
     let open Lwt_syntax in
@@ -327,7 +327,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         List.iter_s
           (fun (s, k) ->
             match Store.Tree.destruct k with
-            | `Contents _ -> Lwt.return ()
+            | `Contents _ -> Lwt.return_unit
             | `Node _ ->
                 let* tree = Store.Tree.get_tree context.tree [s] in
                 let+ _ =

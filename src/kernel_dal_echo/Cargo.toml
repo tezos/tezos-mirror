@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+members = [
+  "kernel",
+]
+
+[workspace.dependencies]
+tezos-smart-rollup-core = { path = "../kernel_sdk/core", features = ["proto-alpha"] }
+tezos-smart-rollup-host = { path = "../kernel_sdk/host", features = ["proto-alpha"] }
+tezos-smart-rollup-debug = { path = "../kernel_sdk/debug" }
+tezos-smart-rollup-entrypoint = { path = "../kernel_sdk/entrypoint" }
+tezos-smart-rollup-storage = { path = "../kernel_sdk/storage" }
+tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding", default-features = false, features = ["alloc", "tezos-encoding", "crypto"] }
+tezos-smart-rollup-mock = { path = "../kernel_sdk/mock", features = ["proto-alpha"] }

@@ -55,7 +55,7 @@ val associate_slot_id_with_commitment :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  Services.Types.slot_id ->
+  Types.slot_id ->
   (unit, [Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [get_commitment_slot node_store cryptobox commitment] returns the slot
@@ -104,10 +104,11 @@ val publish_slot_data :
   int ->
   unit tzresult Lwt.t
 
-(** [store_slot_headers  ~block_level ~block_hash slot_headers node_store]
-    stores [slot_headers] onto the [node_store] associated to the given [block_hash]
-    baked at level [block_level]. *)
+(** [store_slot_headers ~number_of_slots ~block_level ~block_hash slot_headers
+    node_store] stores [slot_headers] onto the [node_store] associated to the
+    given [block_hash] baked at level [block_level]. *)
 val store_slot_headers :
+  number_of_slots:int ->
   block_level:int32 ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
@@ -141,33 +142,33 @@ val update_selected_slot_headers_statuses :
     [node_store].
 *)
 val get_commitment_by_published_level_and_index :
-  level:Services.Types.level ->
-  slot_index:Services.Types.slot_index ->
+  level:Types.level ->
+  slot_index:Types.slot_index ->
   Store.node_store ->
   (Cryptobox.commitment, [Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [get_commitment_headers commitment ?slot_level ?slot_index store] returns
-    the list of slot headers {!Services.Types.slot_header} known by the DAL.
+    the list of slot headers {!Types.slot_header} known by the DAL.
     The result is filtered by [slot_level] and [slot_index] if provided.
 
     The function may return an decoding error in case of failure.
 *)
 val get_commitment_headers :
   Cryptobox.commitment ->
-  ?slot_level:Services.Types.level ->
-  ?slot_index:Services.Types.slot_index ->
+  ?slot_level:Types.level ->
+  ?slot_index:Types.slot_index ->
   Store.node_store ->
-  (Services.Types.slot_header list, Errors.decoding) result Lwt.t
+  (Types.slot_header list, Errors.decoding) result Lwt.t
 
 (** [get_published_level_headers ~published_level ?header_status store] returns
-    the list of slot headers {!Services.Types.slot_header} that are published
+    the list of slot headers {!Types.slot_header} that are published
     for the given [published_level]. If a header status is given in
     [?header_status], the list is filtered accordingly.
 
     The function may return an decoding error in case of failure.
 *)
 val get_published_level_headers :
-  published_level:Services.Types.level ->
-  ?header_status:Services.Types.header_status ->
+  published_level:Types.level ->
+  ?header_status:Types.header_status ->
   Store.node_store ->
-  (Services.Types.slot_header list, Errors.decoding) result Lwt.t
+  (Types.slot_header list, Errors.decoding) result Lwt.t

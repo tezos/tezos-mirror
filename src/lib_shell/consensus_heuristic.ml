@@ -117,7 +117,7 @@ module Worker = struct
     {
       expire_time;
       state = Need_more_candidates (* only for initialisation *);
-      expired = Lwt.return ();
+      expired = Lwt.return_unit;
       job;
       result = Lwt.fail Lwt.Canceled (* only for initialisation *);
       restart_delay;

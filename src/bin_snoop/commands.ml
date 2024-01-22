@@ -53,7 +53,7 @@ module Benchmark_cmd = struct
   (* Handling the options of the benchmarker *)
   open Measure
 
-  let set_seed seed (options : options) = {options with seed = Some seed}
+  let set_seed seed (options : options) = {options with seed}
 
   let set_nsamples nsamples options = {options with nsamples}
 
@@ -74,7 +74,9 @@ module Benchmark_cmd = struct
   let default_benchmark_options =
     let options =
       {
-        seed = None;
+        seed =
+          (Random.self_init () ;
+           Random.bits ());
         nsamples = 500;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
@@ -333,7 +335,7 @@ module Infer_cmd = struct
   let set_empirical_plot empirical_plot options =
     {options with display = {options.display with empirical_plot}}
 
-  let infer_handler
+  let handle_options
       ( print_problem,
         csv,
         plot,
@@ -346,22 +348,23 @@ module Infer_cmd = struct
         dot_file,
         full_plot_verbosity,
         plot_raw_workload,
-        empirical_plot ) local_model_name workload_data solver () =
-    let options =
-      default_infer_parameters_options
-      |> set_print_problem print_problem
-      |> set_csv_export csv |> set_plot plot
-      |> lift_opt set_ridge_alpha ridge_alpha
-      |> lift_opt set_lasso_alpha lasso_alpha
-      |> set_lasso_positive lasso_positive
-      |> set_report report
-      |> set_override_files override_files
-      |> set_save_solution save_solution
-      |> set_dot_file dot_file
-      |> set_full_plot_verbosity full_plot_verbosity
-      |> set_plot_raw_workload plot_raw_workload
-      |> lift_opt set_empirical_plot empirical_plot
-    in
+        empirical_plot ) =
+    default_infer_parameters_options
+    |> set_print_problem print_problem
+    |> set_csv_export csv |> set_plot plot
+    |> lift_opt set_ridge_alpha ridge_alpha
+    |> lift_opt set_lasso_alpha lasso_alpha
+    |> set_lasso_positive lasso_positive
+    |> set_report report
+    |> set_override_files override_files
+    |> set_save_solution save_solution
+    |> set_dot_file dot_file
+    |> set_full_plot_verbosity full_plot_verbosity
+    |> set_plot_raw_workload plot_raw_workload
+    |> lift_opt set_empirical_plot empirical_plot
+
+  let infer_handler opts local_model_name workload_data solver () =
+    let options = handle_options opts in
     commandline_outcome_ref :=
       Some
         (Infer {local_model_name; workload_data; solver; infer_opts = options}) ;
@@ -571,6 +574,31 @@ module Infer_cmd = struct
       infer_handler
 end
 
+module Infer_all_cmd = struct
+  include Infer_cmd
+
+  let params =
+    Tezos_clic.(
+      prefixes ["infer"; "parameters"]
+      @@ prefixes ["on"; "data"]
+      @@ string ~name:"WORKLOAD-DATA" ~desc:"Directory containing workload data"
+      @@ prefix "using" @@ regression_param @@ stop)
+
+  let infer_handler opts workload_data solver () =
+    let options = handle_options opts in
+    commandline_outcome_ref :=
+      Some (Infer_all {workload_data; solver; infer_opts = options}) ;
+    Lwt.return_ok ()
+
+  let command =
+    Tezos_clic.command
+      ~desc:"Perform parameter inference on data set"
+      ~group
+      options
+      params
+      infer_handler
+end
+
 module Codegen_cmd = struct
   (* ------------------------------------------------------------------------- *)
   (* Handling options for the "generate code" command *)
@@ -599,7 +627,7 @@ module Codegen_cmd = struct
 
   let codegen_handler (fixed_point, save_to) solution model_name () =
     let transform = Option.map load_fixed_point_parameters fixed_point in
-    let codegen_options = {transform; save_to} in
+    let codegen_options = {transform; split = false; save_to} in
     let model_name = Namespace.of_string model_name in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
@@ -663,7 +691,7 @@ module Codegen_all_cmd = struct
 
   let codegen_all_handler (json, save_to) solution matching () =
     let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
+    let codegen_options = {transform; split = false; save_to} in
     commandline_outcome_ref :=
       Some (Codegen_all {solution; matching; codegen_options}) ;
     Lwt.return_ok ()
@@ -693,17 +721,11 @@ end
 module Codegen_inferred_cmd = struct
   include Codegen_cmd
 
-  let codegen_inferred_handler (json, exclusions, save_to) solution () =
+  let codegen_inferred_handler (json, save_to) solution () =
     let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
-    let exclusions =
-      Option.fold
-        ~none:String.Set.empty
-        ~some:Codegen.load_exclusions
-        exclusions
-    in
+    let codegen_options = {transform; split = false; save_to} in
     commandline_outcome_ref :=
-      Some (Codegen_inferred {solution; codegen_options; exclusions}) ;
+      Some (Codegen_inferred {solution; codegen_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -716,15 +738,7 @@ module Codegen_inferred_cmd = struct
               switch"
       @@ fixed ["for"; "inferred"; "models"])
 
-  let exclude_arg =
-    Tezos_clic.arg
-      ~doc:"A file containing the function names to exclude for the codegen"
-      ~long:"exclude-file"
-      ~placeholder:"filename"
-      (Tezos_clic.parameter (fun (_ : unit) filename -> Lwt.return_ok filename))
-
-  let options =
-    Tezos_clic.args3 Codegen_cmd.fixed_point_arg exclude_arg save_to_arg
+  let options = Tezos_clic.args2 Codegen_cmd.fixed_point_arg save_to_arg
 
   let command =
     Tezos_clic.command
@@ -765,18 +779,42 @@ end
 module Codegen_for_solutions_cmd = struct
   include Codegen_cmd
 
-  let codegen_for_solutions_handler (json, exclusions, save_to) solutions () =
-    let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
-    let exclusions =
-      Option.fold
-        ~none:String.Set.empty
-        ~some:Codegen.load_exclusions
-        exclusions
-    in
-    commandline_outcome_ref :=
-      Some (Codegen_for_solutions {solutions; codegen_options; exclusions}) ;
-    Lwt.return_ok ()
+  let split_to_dir =
+    Tezos_clic.arg
+      ~doc:
+        "Generated code is saved to \
+         DIR/<generated_code_destination>_costs_generated.ml (and \
+         __non_fp.ml)."
+      ~long:"split-to"
+      ~placeholder:"DIR"
+      (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
+
+  let save_to_arg =
+    Tezos_clic.arg
+      ~doc:
+        "Generated code is saved to FILE-NAME. Will also save code for models \
+         that dont have a codegen destination"
+      ~long:"save-to"
+      ~placeholder:"FILE-NAME"
+      (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
+
+  let options =
+    Tezos_clic.args3 Codegen_cmd.fixed_point_arg save_to_arg split_to_dir
+
+  let codegen_for_solutions_handler (json, save_to, split_to_dir) solutions () =
+    if Option.is_some save_to && Option.is_some split_to_dir then (
+      Format.eprintf
+        "Error: --save-to and --split-to are mutually exclusive params.@." ;
+      exit 1)
+    else
+      let transform = Option.map load_fixed_point_parameters json in
+      let split = Option.is_some split_to_dir in
+      let option = Option.to_list save_to @ Option.to_list split_to_dir in
+      let save_to = List.hd option in
+      let codegen_options = {transform; save_to; split} in
+      commandline_outcome_ref :=
+        Some (Codegen_for_solutions {solutions; codegen_options}) ;
+      Lwt.return_ok ()
 
   let params =
     Tezos_clic.(
@@ -785,10 +823,8 @@ module Codegen_for_solutions_cmd = struct
            (string
               ~name:"SOLUTION-FILE"
               ~desc:
-                "File containing solution, as obtained using the \
+                "File or Directory containing solutions, as obtained using the \
                  --save-solution switch"))
-
-  let options = Codegen_inferred_cmd.options
 
   let command =
     Tezos_clic.command
@@ -826,7 +862,8 @@ end
 
 module Auto_build_cmd = struct
   let build_options
-      ( destination_directory,
+      ( split,
+        destination_directory,
         nsamples,
         bench_number,
         print_problem,
@@ -853,10 +890,10 @@ module Auto_build_cmd = struct
         bench_number = Option.value bench_number ~default:opts.bench_number;
       }
     in
-    {destination_directory; infer_parameters; measure_options}
+    (split, {destination_directory; infer_parameters; measure_options})
 
   let handler opts bench_names () =
-    let auto_build_options = build_options opts in
+    let split, auto_build_options = build_options opts in
     let benchmarks =
       List.map
         (fun s ->
@@ -869,7 +906,8 @@ module Auto_build_cmd = struct
         bench_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Benchmarks benchmarks; auto_build_options}) ;
+      Some
+        (Auto_build {targets = Benchmarks benchmarks; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -885,8 +923,17 @@ module Auto_build_cmd = struct
       ~placeholder:"directory"
       (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
 
+  let switch =
+    Tezos_clic.switch
+      ~doc:
+        "Switch indicating that generated code should be split into submodules \
+         defined by Benchmark's generated code destination "
+      ~long:"split"
+      ()
+
   let options =
-    Tezos_clic.args9
+    Tezos_clic.args10
+      switch
       destination_directory_arg
       Benchmark_cmd.Options.nsamples_arg
       Benchmark_cmd.Options.bench_number_arg
@@ -910,7 +957,7 @@ end
 
 module Auto_build_for_models_cmd = struct
   let handler opts model_names () =
-    let auto_build_options = Auto_build_cmd.build_options opts in
+    let split, auto_build_options = Auto_build_cmd.build_options opts in
     let models =
       List.map
         (fun s ->
@@ -923,7 +970,7 @@ module Auto_build_for_models_cmd = struct
         model_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Models models; auto_build_options}) ;
+      Some (Auto_build {targets = Models models; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -945,7 +992,7 @@ end
 
 module Auto_build_for_parameters_cmd = struct
   let handler opts parameter_names () =
-    let auto_build_options = Auto_build_cmd.build_options opts in
+    let split, auto_build_options = Auto_build_cmd.build_options opts in
     let parameters =
       List.map
         (fun s ->
@@ -958,7 +1005,8 @@ module Auto_build_for_parameters_cmd = struct
         parameter_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Parameters parameters; auto_build_options}) ;
+      Some
+        (Auto_build {targets = Parameters parameters; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -1606,7 +1654,7 @@ module Display_info_cmd = struct
 
   let display_model_handler () s () =
     let s = Namespace.of_string s in
-    let {Registration.model = Model.Model m; from = l} =
+    let {Registration.model = Model.Model m; from = l; _} =
       Registration.find_model_exn s
     in
     Format.printf "@.%a@." pp_fancy_model (m, l) ;
@@ -1701,6 +1749,7 @@ let all_commands =
   [
     Benchmark_cmd.command;
     Infer_cmd.command;
+    Infer_all_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
     Codegen_inferred_cmd.command;

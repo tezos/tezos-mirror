@@ -144,10 +144,10 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
 let get_opt array i =
   if i >= 0 && i < Array.length array then Some array.(i) else None
 
-(** [shards_to_attestors committee] takes a committee [Committee_cache.committee]
+(** [shards_to_attesters committee] takes a committee [Committee_cache.committee]
       and returns a function that, given a shard index, yields the pkh of its
-      attestor for that level. *)
-let shards_to_attestors committee =
+      attester for that level. *)
+let shards_to_attesters committee =
   let rec do_n ~n f acc = if n <= 0 then acc else do_n ~n:(n - 1) f (f acc) in
   let to_array committee =
     (* We transform the map to a list *)
@@ -197,12 +197,13 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
   | Some shard_proofs ->
       let attestation_level =
         Int32.(
-          add
-            published_level
-            (of_int proto_parameters.Dal_plugin.attestation_lag))
+          pred
+          @@ add
+               published_level
+               (of_int proto_parameters.Dal_plugin.attestation_lag))
       in
       let* committee = level_committee ~level:attestation_level in
-      let attestor_of_shard = shards_to_attestors committee in
+      let attester_of_shard = shards_to_attesters committee in
       let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
       Store.Shards.read_all node_store.shard_store commitment ~number_of_shards
       |> Seq_s.iter_ep (function
@@ -222,22 +223,22 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                  return_unit
              | commitment, shard_index, Ok share -> (
                  match
-                   ( attestor_of_shard shard_index,
+                   ( attester_of_shard shard_index,
                      get_opt shard_proofs shard_index )
                  with
                  | None, _ ->
                      failwith
-                       "Invariant broken: no attestor found for shard %d"
+                       "Invariant broken: no attester found for shard %d"
                        shard_index
                  | _, None ->
                      failwith
                        "Invariant broken: no shard proof found for shard %d"
                        shard_index
                  | Some pkh, Some shard_proof ->
-                     let message = Gossipsub.{share; shard_proof} in
-                     let topic = Gossipsub.{slot_index; pkh} in
+                     let message = Types.Message.{share; shard_proof} in
+                     let topic = Types.Topic.{slot_index; pkh} in
                      let message_id =
-                       Gossipsub.
+                       Types.Message_id.
                          {
                            commitment;
                            level = published_level;
@@ -251,8 +252,12 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                        |> app_input gs_worker) ;
                      return_unit))
 
-let store_slot_headers ~block_level slot_headers node_store =
-  Store.Legacy.add_slot_headers ~block_level slot_headers node_store
+let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
+  Store.Legacy.add_slot_headers
+    ~number_of_slots
+    ~block_level
+    slot_headers
+    node_store
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =

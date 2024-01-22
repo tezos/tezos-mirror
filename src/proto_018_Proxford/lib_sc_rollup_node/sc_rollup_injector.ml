@@ -26,6 +26,7 @@
 
 open Protocol
 open Alpha_context
+open Injector_common
 open Injector_sigs
 module Block_cache =
   Aches_lwt.Lache.Make_result
@@ -51,6 +52,17 @@ let injector_operation_to_manager :
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_of_octez stakers in
       Manager (Sc_rollup_timeout {rollup; stakers})
+  | Recover_bond {rollup; staker} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
+  | Execute_outbox_message {rollup; cemented_commitment; output_proof} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let cemented_commitment =
+        Sc_rollup_proto_types.Commitment_hash.of_octez cemented_commitment
+      in
+      Manager
+        (Sc_rollup_execute_outbox_message
+           {rollup; cemented_commitment; output_proof})
 
 let injector_operation_of_manager :
     type kind.
@@ -76,6 +88,13 @@ let injector_operation_of_manager :
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
       Some (Timeout {rollup; stakers})
+  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
+    ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let cemented_commitment =
+        Sc_rollup_proto_types.Commitment_hash.to_octez cemented_commitment
+      in
+      Some (Execute_outbox_message {rollup; cemented_commitment; output_proof})
   | _ -> None
 
 module Proto_client = struct
@@ -194,6 +213,8 @@ module Proto_client = struct
         error_with "Cannot find operation status because metadata is missing"
     | Operation_metadata {contents} -> operation_contents_status contents ~index
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6339 *)
+  (* Don't make multiple calls to [operations_in_pass] RPC *)
   let get_block_operations =
     let ops_cache = Block_cache.create 32 in
     fun cctxt block_hash ->
@@ -393,19 +414,20 @@ module Proto_client = struct
           (Time.System.now ())
 
   let check_fee_parameters Injector.{fee_parameters; _} =
-    let check_value purpose name compare to_string mempool_default value =
+    let check_value operation_kind name compare to_string mempool_default value
+        =
       if compare mempool_default value > 0 then
         error_with
           "Bad configuration fee_parameter.%s for %s. It must be at least %s \
            for operations of the injector to be propagated."
           name
-          (Configuration.string_of_operation_kind purpose)
+          (Operation_kind.to_string operation_kind)
           (to_string mempool_default)
       else Ok ()
     in
     let check purpose
         {
-          Injector_sigs.minimal_fees;
+          minimal_fees;
           minimal_nanotez_per_byte;
           minimal_nanotez_per_gas_unit;
           force_low_fee = _;
@@ -441,7 +463,7 @@ module Proto_client = struct
       in
       ()
     in
-    Configuration.Operation_kind_map.iter_e check fee_parameters
+    Operation_kind.Map.iter_e check fee_parameters
 
   let checks state = check_fee_parameters state
 end

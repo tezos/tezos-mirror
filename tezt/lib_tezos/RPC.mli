@@ -23,18 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Octez RPCs. *)
-
-(** [RPC_core] contains functions to declare and call RPCs.
-    It does not contain any RPC definition: those are in this module. *)
-include module type of RPC_core
-
-(** [RPC_legacy] contains RPCs implemented using a deprecated approach
-    that does not allow to use cohttp. If you need to call functions
-    from [RPC_legacy], it is recommended to port them to this module
-    in order to be able to use cohttp, which is more efficient than using
-    the client. *)
-include module type of RPC_legacy
+(** RPCs for [octez-node] *)
 
 (** {2 Naming Conventions} *)
 
@@ -64,8 +53,9 @@ include module type of RPC_legacy
 
 (** {2 RPC Definitions} *)
 
-(** RPCs for [octez-node] *)
-type 'a t = (Node.t, 'a) RPC_core.t
+type 'result t = 'result RPC_core.t
+
+type data = RPC_core.data
 
 (** RPC: [GET /config] *)
 val get_config : JSON.t t
@@ -105,9 +95,24 @@ val get_chain_invalid_blocks : ?chain:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/nonces/<block_level>]
 
-    [chain] defaults to ["main"]. *)
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
 val get_chain_block_context_nonce :
   ?chain:string -> ?block:string -> int -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/seed]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_seed :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/seed_computation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_seed_computation :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/header/raw]
 
@@ -638,6 +643,22 @@ val get_chain_block_context_raw :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/bytes]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_raw_bytes :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/cache/contracts/all]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_cache_contracts_all :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/constants]
 
     [chain] defaults to ["main"].
@@ -676,6 +697,14 @@ val get_chain_block_context_contract_storage_used_space :
     [block] defaults to ["head"].
 *)
 val get_chain_block_context_contract_storage_paid_space :
+  ?chain:string -> ?block:string -> string -> int t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/storage/staking_numerator]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_staking_numerator :
   ?chain:string -> ?block:string -> string -> int t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_rights]
@@ -917,7 +946,7 @@ val get_chain_block_context_smart_rollups_smart_rollup_commitment :
   sc_rollup:string ->
   hash:string ->
   unit ->
-  JSON.t t
+  Sc_rollup_rpc.commitment option t
 
 (** RPC: [GET: chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<staker>/staked_on_commitment] *)
 val get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment :
@@ -992,6 +1021,27 @@ val get_chain_block_context_delegate_delegated_balance :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_delegated_contracts :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/stakers]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_stakers :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/total_delegated_stake]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_total_delegated_stake :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/staking_denominator]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_staking_denominator :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_deposits]
@@ -1083,6 +1133,13 @@ val get_chain_block_context_issuance_current_yearly_rate :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_issuance_current_yearly_rate_exact :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/current_yearly_rate_details]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_issuance_current_yearly_rate_details :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/issuance_per_minute]
@@ -1186,3 +1243,24 @@ val get_chain_block_votes_total_voting_power :
 (** RPC: [GET /chains/[chain]/blocks/[block]/context/dal/shards?level=[level]] *)
 val get_chain_block_context_dal_shards :
   ?chain:string -> ?block:string -> ?level:int -> unit -> JSON.t t
+
+(** RPC: [GET /monitor/applied_blocks] *)
+val get_monitor_applied_blocks : JSON.t t
+
+(** RPC: [GET /monitor/heads/<chain>]
+
+    [chain] defaults to ["main"]. *)
+val get_monitor_heads_chain : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /monitor/validated_blocks] *)
+val get_monitor_validated_blocks : JSON.t t
+
+(** A nonexistent RPC. *)
+val nonexistent_path : JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/denunciations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_denunciations :
+  ?chain:string -> ?block:string -> unit -> JSON.t t

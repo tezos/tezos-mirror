@@ -33,3 +33,6 @@ type error += No_worker_for_tag of string
 
 (** Error when a step of the injector failed. *)
 type error += Step_failed of string
+
+(** Error when multiple workers are assigned to the same operation. *)
+type error += Overlapping_operations

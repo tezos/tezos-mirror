@@ -82,20 +82,18 @@ let test_legacy_typecheck protocols =
               script)
          ~tags:["client"; "script"; "michelson"; "typechecking"]
      @@ fun protocol ->
-       if protocol = Protocol.Alpha then Lwt.return ()
-       else
-         let* client = Client.init_mockup ~protocol () in
-         let script_path =
-           Michelson_script.(find ["ill_typed"; script] protocol |> path)
-         in
-         let* () =
-           Client.spawn_typecheck_script
-             ~scripts:[script_path]
-             ~legacy:false
-             client
-           |> Process.check_error ~msg:(rex "Use of deprecated instruction")
-         in
-         Client.typecheck_script ~scripts:[script_path] ~legacy:true client )
+       let* client = Client.init_mockup ~protocol () in
+       let script_path =
+         Michelson_script.(find ["ill_typed"; script] protocol |> path)
+       in
+       let* () =
+         Client.spawn_typecheck_script
+           ~scripts:[script_path]
+           ~legacy:false
+           client
+         |> Process.check_error ~msg:(rex "Use of deprecated instruction")
+       in
+       Client.typecheck_script ~scripts:[script_path] ~legacy:true client )
        protocols
 
 let register ~protocols =

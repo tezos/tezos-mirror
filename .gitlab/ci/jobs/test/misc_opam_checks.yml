@@ -5,6 +5,10 @@ misc_opam_checks:
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6604
+  # We let this job fail for now due to an issue with ocamlfind
+  # in opam repos.
+  allow_failure: true
   artifacts:
     when: always
     paths:

@@ -52,3 +52,9 @@ val flaky : string
     You must provide a comment to explain why the test is disabled.
     For flaky tests, {!flaky} should be preferred to [ci_disabled]. *)
 val ci_disabled : string
+
+(** ["memory_3k"]: tag memory hungry tests ( >3 GB of memory ). *)
+val memory_3k : string
+
+(** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
+val memory_4k : string

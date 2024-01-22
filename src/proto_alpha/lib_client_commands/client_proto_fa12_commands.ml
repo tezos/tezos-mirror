@@ -176,9 +176,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~block:cctxt#block
               ~contract
               ~action
-              ~sender:addr
-              ?gas
-              ?payer
+              ~sender:(Some addr)
+              ~gas
+              ~payer
               ~unparsing_mode
               ()
           in
@@ -215,9 +215,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~block:cctxt#block
               ~contract
               ~action
-              ~sender
-              ?gas
-              ?payer
+              ~sender:(Some sender)
+              ~gas
+              ~payer
               ~unparsing_mode
               ()
           in
@@ -242,10 +242,11 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               cctxt
               ~chain:cctxt#chain
               ~block:cctxt#block
+              ~sender:None
               ~contract
               ~action
-              ?gas
-              ?payer
+              ~gas
+              ~payer
               ~unparsing_mode
               ()
           in

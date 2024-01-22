@@ -47,8 +47,9 @@ let encoding_length =
 let state_key = ["state"]
 
 let get_state context =
-  Context.find context state_key
-  >|= function
+  let open Lwt_syntax in
+  let+ state = Context.find context state_key in
+  match state with
   | None ->
       assert false
   | Some encoded_state -> (

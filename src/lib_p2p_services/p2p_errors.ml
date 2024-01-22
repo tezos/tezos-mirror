@@ -275,7 +275,7 @@ type error += Pending_connection
 
 type error += Connected
 
-type error += Connection_refused
+type error += Connection_failed
 
 type error += Rejected of {peer : P2p_peer.Id.t; motive : P2p_rejection.t}
 
@@ -324,16 +324,17 @@ let () =
     Data_encoding.empty
     (function Connected -> Some () | _ -> None)
     (fun () -> Connected) ;
-  (* Connected refused *)
+  (* Connected failed *)
   register_error_kind
     `Permanent
-    ~id:"node.p2p_pool.connection_refused"
-    ~title:"Connection refused"
-    ~description:"Connection was refused."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Connection was refused.")
+    ~id:"node.p2p_pool.connection_failed"
+    ~title:"TCP connection failed"
+    ~description:"TCP connection failed (refused or no route to host)."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "TCP connection failed (refused or no route to host.")
     Data_encoding.empty
-    (function Connection_refused -> Some () | _ -> None)
-    (fun () -> Connection_refused) ;
+    (function Connection_failed -> Some () | _ -> None)
+    (fun () -> Connection_failed) ;
   (* Rejected *)
   register_error_kind
     `Permanent

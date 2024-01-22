@@ -41,19 +41,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 8
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 8
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ {}
-          8
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ {}
         8
@@ -173,19 +160,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 3
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 3
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 8 }
-          3
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 8 }
         3
@@ -265,27 +239,6 @@ trace
     [ 3
       3
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 3
-        3
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 8
-          3
-          3
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 8
-        3
-        3
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 8
-          8
-          3
-          3
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 8
         8
@@ -489,19 +442,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 2
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 2
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 3 ; 8 }
-          2
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 3 ; 8 }
         2
@@ -581,27 +521,6 @@ trace
     [ 2
       2
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 2
-        2
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          2
-          2
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        2
-        2
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          2
-          2
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -805,19 +724,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 7
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 7
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 2 ; 3 ; 8 }
-          7
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 8 }
         7
@@ -897,27 +803,6 @@ trace
     [ 7
       7
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 7
-        7
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          7
-          7
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        7
-        7
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          7
-          7
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -1151,27 +1036,6 @@ trace
     [ 7
       7
       { 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 7
-        7
-        { 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          7
-          7
-          { 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        7
-        7
-        { 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          7
-          7
-          { 2 } ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -1405,27 +1269,6 @@ trace
     [ 7
       7
       { 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 7
-        7
-        { 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 8
-          7
-          7
-          { 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 8
-        7
-        7
-        { 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 8
-          8
-          7
-          7
-          { 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 8
         8
@@ -1651,19 +1494,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 6
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 6
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 2 ; 3 ; 7 ; 8 }
-          6
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 7 ; 8 }
         6
@@ -1743,27 +1573,6 @@ trace
     [ 6
       6
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 6
-        6
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          6
-          6
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        6
-        6
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          6
-          6
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -1997,27 +1806,6 @@ trace
     [ 6
       6
       { 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 6
-        6
-        { 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          6
-          6
-          { 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        6
-        6
-        { 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          6
-          6
-          { 2 } ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -2251,27 +2039,6 @@ trace
     [ 6
       6
       { 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 6
-        6
-        { 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 7
-          6
-          6
-          { 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 7
-        6
-        6
-        { 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 7
-          7
-          6
-          6
-          { 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 7
         7
@@ -2497,19 +2264,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 9
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 9
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 2 ; 3 ; 6 ; 7 ; 8 }
-          9
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 6 ; 7 ; 8 }
         9
@@ -2589,27 +2343,6 @@ trace
     [ 9
       9
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 9
-        9
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          9
-          9
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        9
-        9
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          9
-          9
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -2843,27 +2576,6 @@ trace
     [ 9
       9
       { 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 9
-        9
-        { 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          9
-          9
-          { 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        9
-        9
-        { 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          9
-          9
-          { 2 } ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -3097,27 +2809,6 @@ trace
     [ 9
       9
       { 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 9
-        9
-        { 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 6
-          9
-          9
-          { 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 6
-        9
-        9
-        { 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 6
-          6
-          9
-          9
-          { 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 6
         6
@@ -3351,27 +3042,6 @@ trace
     [ 9
       9
       { 6 ; 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 9
-        9
-        { 6 ; 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 7
-          9
-          9
-          { 6 ; 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 7
-        9
-        9
-        { 6 ; 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 7
-          7
-          9
-          9
-          { 6 ; 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 7
         7
@@ -3605,27 +3275,6 @@ trace
     [ 9
       9
       { 7 ; 6 ; 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 9
-        9
-        { 7 ; 6 ; 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 8
-          9
-          9
-          { 7 ; 6 ; 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 8
-        9
-        9
-        { 7 ; 6 ; 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 8
-          8
-          9
-          9
-          { 7 ; 6 ; 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 8
         8
@@ -3954,19 +3603,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 5
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 5
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
-          5
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
         5
@@ -4046,27 +3682,6 @@ trace
     [ 5
       5
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 5
-        5
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          5
-          5
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        5
-        5
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          5
-          5
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -4300,27 +3915,6 @@ trace
     [ 5
       5
       { 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 5
-        5
-        { 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          5
-          5
-          { 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        5
-        5
-        { 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          5
-          5
-          { 2 } ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -4554,27 +4148,6 @@ trace
     [ 5
       5
       { 3 ; 2 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 5
-        5
-        { 3 ; 2 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 6
-          5
-          5
-          { 3 ; 2 } ]
-    - PUSH (entry) @ location: 32
-      [ 6
-        5
-        5
-        { 3 ; 2 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 6
-          6
-          5
-          5
-          { 3 ; 2 } ]
     - log/DIP (exit) @ location: 32
       [ 6
         6
@@ -4800,19 +4373,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 1
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 1
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
-          1
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
@@ -4892,27 +4452,6 @@ trace
     [ 1
       1
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 1
-        1
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          1
-          1
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        1
-        1
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          1
-          1
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -5116,19 +4655,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 4
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 4
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
-          4
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
@@ -5208,27 +4734,6 @@ trace
     [ 4
       4
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 4
-        4
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 1
-          4
-          4
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 1
-        4
-        4
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 1
-          1
-          4
-          4
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 1
         1
@@ -5462,27 +4967,6 @@ trace
     [ 4
       4
       { 1 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 4
-        4
-        { 1 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 2
-          4
-          4
-          { 1 } ]
-    - PUSH (entry) @ location: 32
-      [ 2
-        4
-        4
-        { 1 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 2
-          2
-          4
-          4
-          { 1 } ]
     - log/DIP (exit) @ location: 32
       [ 2
         2
@@ -5716,27 +5200,6 @@ trace
     [ 4
       4
       { 2 ; 1 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 4
-        4
-        { 2 ; 1 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 3
-          4
-          4
-          { 2 ; 1 } ]
-    - PUSH (entry) @ location: 32
-      [ 3
-        4
-        4
-        { 2 ; 1 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 3
-          3
-          4
-          4
-          { 2 ; 1 } ]
     - log/DIP (exit) @ location: 32
       [ 3
         3
@@ -5970,27 +5433,6 @@ trace
     [ 4
       4
       { 3 ; 2 ; 1 } ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 4
-        4
-        { 3 ; 2 ; 1 } ]
-      - log/PUSH (exit) @ location: 32
-        [ 5
-          4
-          4
-          { 3 ; 2 ; 1 } ]
-    - PUSH (entry) @ location: 32
-      [ 5
-        4
-        4
-        { 3 ; 2 ; 1 } ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 5
-          5
-          4
-          4
-          { 3 ; 2 ; 1 } ]
     - log/DIP (exit) @ location: 32
       [ 5
         5
@@ -6227,19 +5669,6 @@ trace
       [ {} ]
   - [halt] (entry) @ location: 19
     [ {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 16
-      [ {} ]
-      - log/PUSH (exit) @ location: 16
-        [ 0
-          {} ]
-    - PUSH (entry) @ location: 16
-      [ 0
-        {} ]
-      - log/log/log/PUSH (exit) @ location: 16
-        [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
-          0
-          {} ]
     - log/PUSH (exit) @ location: 16
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
@@ -6319,27 +5748,6 @@ trace
     [ 0
       0
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 32
-      [ 0
-        0
-        {} ]
-      - log/PUSH (exit) @ location: 32
-        [ 1
-          0
-          0
-          {} ]
-    - PUSH (entry) @ location: 32
-      [ 1
-        0
-        0
-        {} ]
-      - log/log/log/DIP (exit) @ location: 32
-        [ 1
-          1
-          0
-          0
-          {} ]
     - log/DIP (exit) @ location: 32
       [ 1
         1

@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (just consumed gas: 14.357)
+  - location: 11 (just consumed gas: 14.070)
     [ (Pair "" { "Hello" ; "World" } None) ]
   - location: 11 (just consumed gas: 0.010)
     [ (Pair "" { "Hello" ; "World" } None)
@@ -20,7 +20,7 @@ trace
     [ ""
       (Pair "" { "Hello" ; "World" } None)
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair "" { "Hello" ; "World" } None)
       (Pair "" { "Hello" ; "World" } None) ]
   - location: 17 (just consumed gas: 0.010)
@@ -29,23 +29,23 @@ trace
   - location: 18 (just consumed gas: 0.010)
     [ { "Hello" ; "World" }
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ ""
       { "Hello" ; "World" }
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 19 (just consumed gas: 0.115)
+  - location: 19 (just consumed gas: 0.040)
     [ False
       (Pair "" { "Hello" ; "World" } None) ]
   - location: 20 (just consumed gas: 0.010)
     [ (Some False)
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 21 (just consumed gas: 0)
+  - location: 21 (just consumed gas: 0.010)
     [ (Pair "" { "Hello" ; "World" } None) ]
   - location: 24 (just consumed gas: 0.010)
     [ (Pair { "Hello" ; "World" } None) ]
   - location: 25 (just consumed gas: 0.010)
     [ { "Hello" ; "World" } ]
-  - location: 21 (just consumed gas: 0.025)
+  - location: 21 (just consumed gas: 0.035)
     [ (Some False)
       { "Hello" ; "World" } ]
   - location: 26 (just consumed gas: 0.010)

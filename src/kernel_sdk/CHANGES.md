@@ -4,14 +4,30 @@
 
 ### SDK
 
+### Installer client/kernel
+
+## Version 0.2.2
+
+### SDK
+
+- Add michelson `or` and `option`.
 - Add a feature flag `proto-alpha` to enable host functions introduced in
   unreleased protocols.
 - Add `Runtime::reveal_dal_page` to let a kernel request pages from Tezos’ Data
   Availability Layer (DAL).
 - Add a new case `WhitelistUpdate(OutboxMessageWhitelistUpdate)` to the
   `OutboxMessage<Expr: Michelson>` encoding, behind the `proto-alpha` feature flag.
+- The implementation of `write_debug` in the `MockHost` no longer prefixes the debug message
+  with `DEBUG:` and do not print a newline by default.
+- Correctly initialise `MockHost::reboots_remaining` flag for testing outside of `run_level` api.
+- Add `Runtime::reveal_dal_parameters` to let a kernel request DAL parameters from the L1.
+- Add experimental, partial support for RISC-V kernels behind the `proto-alpha`flag.
+- Add a `bls` feature flag, enabled by default, which allows disabling features which require
+  the `bls` feature from `tezos_crypto_rs`.
 
 ### Installer client/kernel
+
+- Remove unused dependency on `blst` crate, to simplify installation.
 
 ## Version 0.2.1
 

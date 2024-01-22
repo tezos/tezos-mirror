@@ -50,3 +50,7 @@ val hooks_custom :
 
     This is {!hooks_custom} with the default arguments. *)
 val hooks : Process.hooks
+
+(** PRC_hooks that replaces Tezos-specific values with constants and calls
+    Regression.capture on request and response. *)
+val rpc_hooks : RPC_core.rpc_hooks

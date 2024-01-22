@@ -33,7 +33,6 @@
 
 open Protocol
 open Alpha_context
-open Error_monad_operators
 
 exception Zk_rollup_test_error of string
 
@@ -55,7 +54,7 @@ let true_op l1_dst rollup_id =
       payload = [|Bls12_381.Fr.one|];
     }
 
-let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq s
+let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Kzg.SMap.to_seq s
 
 (* Operation with payload = 0 *)
 let false_op l1_dst rollup_id =
@@ -149,7 +148,7 @@ let test_origination_fees () =
     + Data_encoding.Binary.length Zk_rollup.pending_list_encoding init_pl
   in
   let expected_fees =
-    Tez.mul_exn constants.parametric.cost_per_byte expected_size
+    Test_tez.(constants.parametric.cost_per_byte *! Int64.of_int expected_size)
   in
   let* operation, _rollup =
     Op.zk_rollup_origination
@@ -315,20 +314,26 @@ let test_append_external_deposit () =
     of the ticket containing [contents] of type [ty], crafted by [ticketer] and
     owned by [zk_rollup]. *)
 let make_ticket_key ctxt ~ty ~contents ~ticketer zk_rollup =
-  (match ctxt with
-  | Context.B block -> Incremental.begin_construction block
-  | Context.I incr -> return incr)
-  >>=? fun incr ->
+  let open Lwt_result_wrap_syntax in
+  let* incr =
+    match ctxt with
+    | Context.B block -> Incremental.begin_construction block
+    | Context.I incr -> return incr
+  in
   let ctxt = Incremental.alpha_ctxt incr in
-  Script_ir_translator.parse_comparable_ty ctxt ty
-  >>??= fun (Ex_comparable_ty contents_type, ctxt) ->
-  Script_ir_translator.parse_comparable_data ctxt contents_type contents
-  >>=?? fun (contents, ctxt) ->
-  Ticket_balance_key.of_ex_token
-    ctxt
-    ~owner:(Zk_rollup zk_rollup)
-    (Ticket_token.Ex_token {ticketer; contents_type; contents})
-  >|=?? fst
+  let*?@ Ex_comparable_ty contents_type, ctxt =
+    Script_ir_translator.parse_comparable_ty ctxt ty
+  in
+  let*@ contents, ctxt =
+    Script_ir_translator.parse_comparable_data ctxt contents_type contents
+  in
+  let+@ ticket_key, _ =
+    Ticket_balance_key.of_ex_token
+      ctxt
+      ~owner:(Zk_rollup zk_rollup)
+      (Ticket_token.Ex_token {ticketer; contents_type; contents})
+  in
+  ticket_key
 
 module Make_ticket (T : sig
   val ty_str : string
@@ -435,10 +440,12 @@ struct
   (** Return an operation to originate a contract that will deposit [amount]
       tickets with l2 operation [op] on [zk_rollup] *)
   let init_deposit ~block ~amount ~zk_op ~zk_rollup ~account =
-    init_deposit_contract amount block account
-    >>=? fun (deposit_contract, _script, block) ->
-    deposit_op ~block ~zk_rollup ~zk_op ~account ~deposit_contract
-    >|=? fun op -> (block, op, deposit_contract)
+    let open Lwt_result_syntax in
+    let* deposit_contract, _script, block =
+      init_deposit_contract amount block account
+    in
+    let+ op = deposit_op ~block ~zk_rollup ~zk_op ~account ~deposit_contract in
+    (block, op, deposit_contract)
 end
 
 module Nat_ticket = Make_ticket (struct
@@ -552,15 +559,16 @@ let test_append_errors () =
   return_unit
 
 let assert_ticket_balance ~loc incr token owner expected =
+  let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  Ticket_balance_key.of_ex_token ctxt ~owner token >>=?? fun (key_hash, ctxt) ->
-  Ticket_balance.get_balance ctxt key_hash >>=?? fun (balance, _) ->
+  let*@ key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
+  let*@ balance, _ = Ticket_balance.get_balance ctxt key_hash in
   match (balance, expected) with
   | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
   | Some b, None ->
       failwith "%s: Expected no balance but got some %d" loc (Z.to_int b)
   | None, Some b -> failwith "%s: Expected balance %d but got none" loc b
-  | None, None -> return ()
+  | None, None -> return_unit
 
 let test_invalid_deposit () =
   let open Lwt_result_syntax in

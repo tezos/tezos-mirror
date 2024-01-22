@@ -72,8 +72,8 @@ module Wasm_context = struct
     match Context.Tree.kinded_key tree with
     | Some k ->
         let* p = Context.produce_tree_proof index k step in
-        return (Some p)
-    | None -> return None
+        return_some p
+    | None -> return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
@@ -134,11 +134,11 @@ let test_metadata_size () =
   Lwt_result_syntax.return_unit
 
 let test_l1_input_kind () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_inbox_message_repr in
   let open Tezos_scoru_wasm in
   let check_msg msg expected =
-    let*? msg = Environment.wrap_tzresult @@ serialize msg in
+    let*?@ msg = serialize msg in
     let msg = unsafe_to_string msg |> Pvm_input_kind.from_raw_input in
     assert (msg = expected) ;
     return_unit
@@ -178,7 +178,7 @@ let make_transactions () =
    Info_per_level, input, EOL) it receives. It uses the [write_output] host
    function and so it is used to test this function. *)
 let test_output () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let level_offset = 20 in
   let dst = 60 in
   let max_bytes = 3600 in
@@ -308,9 +308,7 @@ let test_output () =
       bytes_output_message
   in
   assert (message = out) ;
-  let*? outbox_level =
-    Environment.wrap_tzresult @@ Raw_level_repr.of_int32 last_outbox_level
-  in
+  let*?@ outbox_level = Raw_level_repr.of_int32 last_outbox_level in
   let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
 
   let*! pf = Full_Wasm.produce_output_proof dummy_context final_tree output in

@@ -35,15 +35,6 @@ val stopping : unit -> unit Lwt.t
 (** Section for commitment events. *)
 val section : string list
 
-(** [commitment_stored commitment_hash commitment] emits the event
-   that the [commitment] was stored. *)
-val commitment_stored : Commitment.Hash.t -> Commitment.t -> unit Lwt.t
-
-(** [commitment_will_not_be_published level commitment] emits the event that
-    [commitment] will not be published: its inbox level is less or equal than
-    the last cemented commitment [level]. *)
-val commitment_will_not_be_published : int32 -> Commitment.t -> unit Lwt.t
-
 (** [last_cemented_commitment_updated hash level] emits the event that the last
     cemented commitment was updated to the given [hash] at the given inbox
     [level]. *)
@@ -54,22 +45,25 @@ val last_cemented_commitment_updated : Commitment.Hash.t -> int32 -> unit Lwt.t
     [level]. *)
 val last_published_commitment_updated : Commitment.Hash.t -> int32 -> unit Lwt.t
 
-(** [commitment_parent_is_not_lcc predecessor_hash last_cemented_commitment_hash]
-    emits the event that a commitment at the given inbox [level] is being
-    published, whose parent is the last cemented commitment, but the
-    commitment's [predecessor_hash] differs from the
-    [last_cemented_commitment_hash].
-    This is a critical error, the rollup node will be terminated. *)
-val commitment_parent_is_not_lcc :
-  int32 -> Commitment.Hash.t -> Commitment.Hash.t -> unit Lwt.t
-
 (** [compute_commitment level] emits the event that a new commitment is being
     computed and stored for the block at the given [level]. *)
 val compute_commitment : int32 -> unit Lwt.t
 
+(** [new_commitment hash level] emits the event that a new commitment was built. *)
+val new_commitment : Commitment.Hash.t -> int32 -> unit Lwt.t
+
 (** [publish_commitment hash level] emits the event that a new commitment is
     being published. *)
 val publish_commitment : Commitment.Hash.t -> int32 -> unit Lwt.t
+
+(** [recover_bond staker] emits the event that a recover bond
+    operation is being submitted. *)
+val recover_bond : Signature.Public_key_hash.t -> unit Lwt.t
+
+(** [publish_execute_whitelist_update hash level index] emits the
+    event that a new execute whitelist update is being published. *)
+val publish_execute_whitelist_update :
+  Commitment.Hash.t -> int32 -> int -> unit Lwt.t
 
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig

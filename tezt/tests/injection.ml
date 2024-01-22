@@ -46,11 +46,14 @@ let test_injection_and_activation () : unit =
     ~__FILE__
     ~title:"protocol injection and activation"
     ~tags:["protocol"; "injection"; "activation"; "network"; "not_static"]
+    ~uses:[Constant.octez_protocol_compiler]
   @@ fun () ->
   Log.info "Check protocol compiler and protocol availability" ;
   Check.file_exists ~__LOC__ protocol_path ;
-  Check.file_exists ~__LOC__ Constant.tezos_protocol_compiler ;
-  let* compiler_is_static = is_static_binary Constant.tezos_protocol_compiler in
+  Check.file_exists ~__LOC__ (Uses.path Constant.octez_protocol_compiler) ;
+  let* compiler_is_static =
+    is_static_binary (Uses.path Constant.octez_protocol_compiler)
+  in
   Check.is_false
     ~__LOC__
     compiler_is_static
@@ -116,7 +119,7 @@ let test_injection_and_activation () : unit =
       client1
   in
 
-  let activation_block_level = Node.get_level node1 in
+  let* activation_block_level = Node.get_level node1 in
   Log.info
     "Wait for activation block propagation at level %d"
     activation_block_level ;
@@ -125,7 +128,7 @@ let test_injection_and_activation () : unit =
       (fun node ->
         let* (_ : int) = Node.wait_for_level node activation_block_level in
         let* (metadata : RPC.block_metadata) =
-          RPC.Client.call ~protocol_hash:Protocol.genesis_hash client1
+          Client.RPC.call ~protocol_hash:Protocol.genesis_hash client1
           @@ RPC.get_chain_block_metadata ()
         in
         Log.info
@@ -166,7 +169,7 @@ let test_activation () : unit =
 
   Log.info "Check that first protocol has the zeroth protocol hash" ;
   let* metadata =
-    RPC.Client.call ~protocol_hash:Protocol.genesis_hash client
+    Client.RPC.call ~protocol_hash:Protocol.genesis_hash client
     @@ RPC.get_chain_block_metadata ()
   in
   Check.(
@@ -190,7 +193,7 @@ let test_activation () : unit =
 
   Log.info "Check that protocol of activation block is genesis" ;
   let* metadata =
-    RPC.Client.call ~protocol_hash:Protocol.genesis_hash client
+    Client.RPC.call ~protocol_hash:Protocol.genesis_hash client
     @@ RPC.get_chain_block_metadata ()
   in
   Check.(

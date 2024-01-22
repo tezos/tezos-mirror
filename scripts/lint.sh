@@ -19,10 +19,6 @@ EOF
 }
 
 ## Testing for dependencies
-if ! type ocamlformat > /dev/null 2>&-; then
-  echo "ocamlformat is required but could not be found. Aborting."
-  exit 1
-fi
 if ! type find > /dev/null 2>&-; then
   echo "find is required but could not be found. Aborting."
   exit 1
@@ -38,9 +34,14 @@ say () {
 
 declare -a source_directories
 
-source_directories=(src docs/doc_gen tezt devtools)
+source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
 
 update_all_dot_ocamlformats () {
+    if ! type ocamlformat > /dev/null 2>&-; then
+        echo "ocamlformat is required but could not be found. Aborting."
+        exit 1
+    fi
+
     if git diff --name-only HEAD --exit-code
     then
         say "Repository clean :thumbsup:"
@@ -152,7 +153,7 @@ check_redirects () {
 }
 
 check_rust_toolchain_files () {
-    authorized_version=("1.66.0")
+    authorized_version=("1.66.0" "1.71.1" "1.73.0")
 
     declare -a rust_toolchain_files
     mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"
@@ -165,30 +166,52 @@ check_rust_toolchain_files () {
     done
 }
 
-update_gitlab_ci_yml () {
+check_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
-    # one being ignored. Gitlab linter doesn't warn for it
-    # Job key `unified_coverage` is allowed to be duplicated because we use a conditional include
-    # on files `.gitlab/ci/coverage/coverage.yml` and `.gitlab/ci/jobs/coverage_default.yml`
-    repeated=$(find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml -exec grep '^[^ #-]' \{\} \;  \
-                   | sort \
-                   | grep -v unified_coverage \
-                   | uniq --repeated)
-    if [ -n "$repeated" ]; then
-        echo ".gitlab-ci.yml contains repeated rules:"
-        echo "$repeated"
+    # one being ignored. Gitlab linter doesn't warn for it.
+    find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml | \
+        while read -r filename; do
+            repeated=$(grep '^[^ #-]' "$filename" \
+                           | sort \
+                           | grep -v include \
+                           | uniq --repeated)
+            if [ -n "$repeated" ]; then
+                echo "$filename contains repeated rules:"
+                echo "$repeated"
+                touch /tmp/repeated
+            fi
+        done
+
+    if [ -f /tmp/repeated ]; then
+        rm /tmp/repeated
         exit 1
     fi
 }
 
-check_coq_attributes () {
-    coq_attributes=$(find src/ \( -name "proto_0*" -prune \) -o -type f -exec grep -E "(\@|\@\@|\@\@\@)coq(.*)" {} \;)
-    if [ -n "$coq_attributes" ]; then
-        echo "coq attributes found, please remove them:";
-        echo "$coq_attributes";
-        exit 1
+check_licenses_git_new () {
+    if [ -z "${CHECK_LICENSES_DIFF_BASE:-}" ]; then
+        echo 'Action --check-licenses-git-new requires that CHECK_LICENSES_DIFF_BASE is set in the environment.'
+        echo 'The value of CHECK_LICENSES_DIFF_BASE should be a commit.'
+        echo 'It is used to discover files that have been added and whose license header should be checked.'
+        echo
+        echo "Typically, it should point to the merge base of the current branch, as given by \`git merge-base\`:"
+        echo
+        echo "  CHECK_LICENSES_DIFF_BASE=\$(git merge-base HEAD origin/master) $0 --check-licenses-git-new"
+        return 1
     fi
-    echo "No coq attributes found."
+
+    # Check that new ml(i) files have a valid license header.
+    if ! git diff-tree --no-commit-id --name-only -r --diff-filter=A \
+         "${CHECK_LICENSES_DIFF_BASE:-}" HEAD |
+            grep '\.ml\(i\|\)$' |
+            xargs --no-run-if-empty ocaml scripts/check_license/main.ml --verbose; then
+
+        echo "/!\\ Some files .ml(i) does not have a correct license header /!\\" ;
+        echo "/!\\ See https://tezos.gitlab.io/developer/guidelines.html#license /!\\" ;
+        exit 1 ;
+    else
+        echo "OCaml file license headers OK!"
+    fi
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
@@ -211,16 +234,15 @@ case "$action" in
         action=update_all_dot_ocamlformats
         check_clean=true ;;
     "--check-gitlab-ci-yml" )
-        action=update_gitlab_ci_yml
-        check_clean=true ;;
+        action=check_gitlab_ci_yml ;;
     "--check-scripts" )
         action=check_scripts ;;
     "--check-redirects" )
         action=check_redirects ;;
-    "--check-coq-attributes" )
-        action=check_coq_attributes ;;
     "--check-rust-toolchain" )
         action=check_rust_toolchain_files ;;
+    "--check-licenses-git-new" )
+        action=check_licenses_git_new ;;
     "help" | "-help" | "--help" | "-h" )
         usage
         exit 0 ;;

@@ -48,11 +48,11 @@ let () =
               ("Weierstrass", Test_weierstrass.tests);
               ("Serialization", Test_serialization.tests);
               ("Lookups", Test_lookup.tests);
-              ("InputCom", Test_input_com.tests);
               ("Range-checks", Test_range_checks.tests);
               ("Linear algebra", Test_linear_algebra.tests);
               ("Bench", Benchmark.bench);
               ("Bench Poseidon", Bench_poseidon.bench);
               ("Optimizer", Test_optimizer.tests);
               ("Encoding", Test_encoding.tests);
+              ("InputCom", Test_input_com.tests);
             ]))

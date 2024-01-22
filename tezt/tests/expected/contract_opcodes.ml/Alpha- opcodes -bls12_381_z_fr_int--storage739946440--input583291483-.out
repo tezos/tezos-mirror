@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (just consumed gas: 4.940)
+  - location: 7 (just consumed gas: 4.831)
     [ (Pair 17180093072794558806177035834397932205917577288483739652510482486858834123369
             0x8578be1766f92cd82c5e5135c374a03a8562e263ea953a3f9711b0153b7fcf2d) ]
   - location: 7 (just consumed gas: 0.010)

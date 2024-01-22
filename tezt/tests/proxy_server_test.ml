@@ -150,11 +150,11 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
   in
   let* _ =
-    RPC.Client.call ?endpoint client
+    Client.RPC.call ?endpoint client
     @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
   in
   let* indices_exprs =
@@ -178,7 +178,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let get_one_value key_hash =
     let* _ =
-      RPC.Client.call ?endpoint client
+      Client.RPC.call ?endpoint client
       @@ RPC.get_chain_block_context_big_map
            ~id:
              (* This big_map id can be found in origination response
@@ -199,18 +199,20 @@ let test_equivalence =
     ~__FILE__
     ~title:"(Vanilla, proxy_server endpoint) Compare RPC get"
     ~tags:(compare_tags alt_mode)
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _, alternative = init ~protocol () in
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
   let tz_log = [("proxy_rpc", "debug"); ("proxy_getter", "debug")] in
-  check_equivalence ~tz_log alt_mode clients
+  check_equivalence ~protocol ~tz_log alt_mode clients
 
 let test_wrong_data_dir =
   Protocol.register_test
     ~__FILE__
     ~title:"proxy_server wrong data_dir"
     ~tags:["data_dir"]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let wrong_data_dir = Temp.dir "empty" in
@@ -231,6 +233,7 @@ let test_proxy_server_serve_unsupported =
     ~__FILE__
     ~title:"proxy_server serve unsupported curl"
     ~tags:["redirect"]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let* _ps = Proxy_server.init node in
@@ -256,83 +259,84 @@ let test_multi_protocols =
     ~__FILE__
     ~title:"proxy_server multi protocols"
     ~tags:["multi_protocols"]
-  @@ fun to_protocol ->
-  match Protocol.previous_protocol to_protocol with
-  | None -> Lwt.return_unit
-  | Some from_protocol ->
-      (* Create a context with 3 blocks in [from_protocol] and 2 blocks in [to_protocol] *)
-      let patch_config =
-        Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-          [(4, to_protocol)]
+    ~uses:(fun _protocol -> [Constant.octez_proxy_server])
+    ~supports:Has_predecessor
+  @@ Protocol.with_predecessor
+  @@ fun ~previous_protocol:from_protocol ~protocol:to_protocol ->
+  (* Create a context with 3 blocks in [from_protocol] and 2 blocks in [to_protocol] *)
+  let patch_config =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(4, to_protocol)]
+  in
+  let* node = Node.init ~patch_config [Synchronisation_threshold 0] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol ~protocol:from_protocol client in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  (* Launch the proxy server and plug the client to it *)
+  let* proxy_server = Proxy_server.init node in
+  Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
+  let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
+    let check levels =
+      let returned_level = JSON.(levels |> geti 0 |> get "level" |> as_int) in
+      Check.(
+        (expected_level = returned_level)
+          int
+          ~error_msg:
+            (sf
+               "%s: Unexpected level returned in proxy_server multi protocol \
+                test, expected %%L instead of %%R"
+               __LOC__))
+    in
+    let* proto_attestation_rights =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_helper_attestation_rights ?block ()
+    in
+    check proto_attestation_rights ;
+    if Protocol.(number proto <= number Nairobi + 1) then (
+      let* proto_endorsing_rights =
+        Client.RPC.call client
+        @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
+           This RPC helper should be removed once Oxford will be frozen. *)
       in
-      let* node = Node.init ~patch_config [Synchronisation_threshold 0] in
-      let* client = Client.init ~endpoint:(Node node) () in
-      let* () = Client.activate_protocol ~protocol:from_protocol client in
-      let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
-      (* Launch the proxy server and plug the client to it *)
-      let* proxy_server = Proxy_server.init node in
-      Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
-      let check_attestation_levels ~__LOC__ ?block ~expected_level proto =
-        let check levels =
-          let returned_level =
-            JSON.(levels |> geti 0 |> get "level" |> as_int)
-          in
-          Check.(
-            (expected_level = returned_level)
-              int
-              ~error_msg:
-                (sf
-                   "%s: Unexpected level returned in proxy_server multi \
-                    protocol test, expected %%L instead of %%R"
-                   __LOC__))
-        in
-        let* () =
-          if Protocol.(number proto > number Nairobi) then (
-            let* proto_attestation_rights =
-              RPC.Client.call client
-              @@ RPC.get_chain_block_helper_attestation_rights ?block ()
-            in
-            check proto_attestation_rights ;
-            unit)
-          else unit
-        in
-        let* proto_endorsing_rights =
-          RPC.Client.call client
-          @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
-        in
-        check proto_endorsing_rights ;
-        unit
-      in
-      (* Ensure the proxy serves a query to a block in [to_protocol] *)
-      let* () =
-        check_attestation_levels
-          ~__LOC__
-          ~block:"3"
-          ~expected_level:3
-          from_protocol
-      in
-      (* Ensure the proxy serves a query to a block in [from_protocol] *)
-      let* () =
-        check_attestation_levels
-          ~__LOC__
-          ~block:"head~1"
-          ~expected_level:5
-          to_protocol
-      in
-      unit
+      check proto_endorsing_rights ;
+      unit)
+    else unit
+  in
+  (* Ensure the proxy serves a query to a block in [to_protocol] *)
+  let* () =
+    check_attestation_levels ~__LOC__ ~block:"3" ~expected_level:3 from_protocol
+  in
+  (* Ensure the proxy serves a query to a block in [from_protocol] *)
+  let* () =
+    check_attestation_levels
+      ~__LOC__
+      ~block:"head~1"
+      ~expected_level:5
+      to_protocol
+  in
+  unit
 
 let register ~protocols =
   let register mode =
-    let mode_tag =
+    let mode_string =
       match mode with
       | `Node -> "node"
       | `Proxy_server_rpc -> "proxy_server"
       | `Proxy_server_data_dir -> "proxy_server_data_dir"
     in
+    let mode_tags, uses =
+      match mode with
+      | `Node -> (["node"], [])
+      | `Proxy_server_rpc -> ([], [Constant.octez_proxy_server])
+      | `Proxy_server_data_dir ->
+          (["proxy_server_data_dir"], [Constant.octez_proxy_server])
+    in
     Protocol.register_test
       ~__FILE__
-      ~title:(sf "big_map_perf (%s)" mode_tag)
-      ~tags:["bigmapperf"; mode_tag]
+      ~title:(sf "big_map_perf (%s)" mode_string)
+      ~tags:("bigmapperf" :: mode_tags)
+      ~uses:(fun _protocol -> uses)
       (fun protocol -> big_map_get ~protocol mode ())
       protocols
   in

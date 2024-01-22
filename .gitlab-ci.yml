@@ -6,6 +6,7 @@ default:
 
 # Basic configuration to guard against double-pipelines
 workflow:
+  name: "[$PIPELINE_TYPE] $CI_COMMIT_TITLE"
   rules:
     # /!\ These rules should be mutually exclusive and kept in sync
     # with the corresponding 'if'-rules on the pipeline includes
@@ -13,27 +14,47 @@ workflow:
 
     # Allow 'Before merging' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"'
+      variables:
+        PIPELINE_TYPE: 'before_merging'
     # Allow 'Latest release' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "latest-release"'
+      variables:
+        PIPELINE_TYPE: 'latest_release'
     # Allow 'Test latest release' pipelines for dry running latest
     # release pipelines in the nomadic-labs/tezos CI.
     - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "latest-release-test"'
+      variables:
+        PIPELINE_TYPE: 'latest_release_test'
     # Allow 'Master branch' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
+      variables:
+        PIPELINE_TYPE: 'master_branch'
     # Allow 'Release tag' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/'
+      variables:
+        PIPELINE_TYPE: 'release_tag'
     # Allow 'Beta release tag' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/'
+      variables:
+        PIPELINE_TYPE: 'beta_release_tag'
     # Allow 'Test release tag' pipelines for dry running release tag
     # pipelines in the nomadic-labs/tezos CI.
     - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      variables:
+        PIPELINE_TYPE: 'release_tag_test'
     # Allow 'Non-release tag' pipelines
     - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      variables:
+        PIPELINE_TYPE: 'non_release_tag'
     # Allow 'Test non-release tag' pipelines for dry running non-release tag
     # pipelines in the nomadic-labs/tezos CI.
     - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      variables:
+        PIPELINE_TYPE: 'non_release_tag_test'
     # Allow 'Scheduled pipeline for extended tests' pipelines
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      variables:
+        PIPELINE_TYPE: 'schedule_extended_tests'
     # Disallow all other pipelines
     - when: never
 
@@ -41,7 +62,7 @@ variables:
   # /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
   # in GitLab namespaces `nomadic-labs` and `tezos`
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 14e619168449e86a5a8ff4029ab57174464e18bd
+  build_deps_image_version: f84b4412bf92f81fa4d554aed624fa0a6a72ec96
   build_deps_image_name: "${CI_REGISTRY}/tezos/opam-repository"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
@@ -55,24 +76,29 @@ variables:
   # this setting cuts cache creation time.
   FF_USE_FASTZIP: "true"
 
-  # If RUNTEZTALIAS is true, then Tezt tests are included in the @runtest
+  # If `RUNTEZTALIAS` is true, then Tezt tests are included in the @runtest
   # alias. We set it to false to deactivate these tests in the unit
   # test jobs, as they already run in the Tezt jobs. It is set to true
-  # in the opam jobs where we want to run the tests --with-test.
+  # in the opam jobs where we want to run the tests `--with-test`. It is set
+  # to true in the `unit:js_component`, as there is not global Tezt job
+  # for js tests.
   RUNTEZTALIAS: "false"
 
 # Image templates
-.image_template__runtime_build_e2etest_dependencies_template:
-  image: ${build_deps_image_name}:runtime-build-e2etest-dependencies--${build_deps_image_version}
+.image_template__runtime_e2etest_dependencies:
+  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
 
-.image_template__runtime_build_test_dependencies_template:
+.image_template__runtime_build_test_dependencies:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
 
-.image_template__runtime_build_dependencies_template:
+.image_template__runtime_build_dependencies:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
 
-.image_template__runtime_prebuild_dependencies_template:
+.image_template__runtime_prebuild_dependencies:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+
+.image_template__rust_toolchain:
+  image: ${build_deps_image_name}:rust-toolchain--${build_deps_image_version}
 
 # Match GitLab executors version and directly use the Docker socket
 # The Docker daemon is already configured, experimental features are enabled
@@ -84,6 +110,13 @@ variables:
 .image_template__docker:
   # https://gitlab.com/tezos/docker-images/ci-docker
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
+
+.image_template__alpine:
+  # The Alpine version should be kept up to date with the version used
+  # for the `build_deps_image_name` images and specified in the
+  # variable `alpine_version` in `scripts/version.sh`. This is checked
+  # by the jobs `trigger` and `sanity_ci`.
+  image: alpine:3.18
 
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
@@ -111,7 +144,8 @@ stages:
 # this error: 'Jobs config should contain at least one visible job'
 trigger:
   extends:
-    - .image_template__runtime_build_test_dependencies_template
+    - .default_settings_template
+    - .image_template__alpine
   stage: trigger
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == "tezos" && $CI_MERGE_REQUEST_ASSIGNEES !~ /nomadic-margebot/'
@@ -121,6 +155,9 @@ trigger:
   timeout: "10m"
   script:
     - echo 'Trigger pipeline 🤠'
+    # Check that the Alpine version of the trigger job's image
+    # corresponds to the value in scripts/version.sh.
+    - ./scripts/ci/check_alpine_version.sh
 
 include:
   # /!\ These rules should be be mutually exclusive and kept in sync

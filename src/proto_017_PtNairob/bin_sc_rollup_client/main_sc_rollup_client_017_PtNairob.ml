@@ -64,4 +64,6 @@ let handle_error = function
         errs ;
       Stdlib.exit 1
 
-let () = Lwt_main.run (Lwt.catch main fail_with_exn) |> handle_error
+let () =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
+  Lwt_main.run (Lwt.catch main fail_with_exn) |> handle_error

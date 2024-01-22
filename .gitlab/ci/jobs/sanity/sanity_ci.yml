@@ -1,7 +1,13 @@
 sanity_ci:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_prebuild_dependencies
   stage: sanity
   script:
-    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci sanity-ci
+    - eval $(opam env)
+    - ./scripts/ci/take_ownership.sh
+    - make -C manifest check
+    - ./scripts/lint.sh --check-gitlab-ci-yml
+    # Check that the opam-repo images' Alpine version corresponds to
+    # the value in scripts/version.sh.
+    - ./scripts/ci/check_alpine_version.sh

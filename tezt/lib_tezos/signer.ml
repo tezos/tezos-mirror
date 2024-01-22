@@ -34,8 +34,6 @@ module Parameters = struct
 
   type session_state = {mutable ready : bool}
 
-  let signer_path = "./octez-signer"
-
   let base_default_name = "signer"
 
   let default_uri () =
@@ -104,7 +102,7 @@ let create ?name ?color ?event_pipe ?base_dir ?uri ?runner
   in
   let signer =
     create
-      ~path:signer_path
+      ~path:(Uses.path Constant.octez_signer)
       ?name:(Some name)
       ?color
       ?event_pipe

@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (just consumed gas: 9.917)
+  - location: 9 (just consumed gas: 9.673)
     [ (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 }) ]
   - location: 9 (just consumed gas: 0.010)
     [ 15
@@ -15,50 +15,50 @@ trace
   - location: 10 (just consumed gas: 0.010)
     [ { Elt "bar" 5 ; Elt "foo" 1 }
       15 ]
-  - location: 11 (just consumed gas: 0)
+  - location: 11 (just consumed gas: 0.067)
     [ (Pair "bar" 5)
       15 ]
   - location: 13 (just consumed gas: 0.010)
     [ 5
       15 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ 15 ]
   - location: 16 (just consumed gas: 0.010)
     [ 15
       15 ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ 5
       15
       15 ]
   - location: 17 (just consumed gas: 0.035)
     [ 20
       15 ]
-  - location: 11 (just consumed gas: 0.015)
+  - location: 11 (just consumed gas: 0.150)
     [ (Pair "foo" 1)
       15 ]
   - location: 13 (just consumed gas: 0.010)
     [ 1
       15 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ 15 ]
   - location: 16 (just consumed gas: 0.010)
     [ 15
       15 ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ 1
       15
       15 ]
   - location: 17 (just consumed gas: 0.035)
     [ 16
       15 ]
-  - location: 11 (just consumed gas: 0.015)
+  - location: 11 (just consumed gas: 0.160)
     [ { Elt "bar" 20 ; Elt "foo" 16 }
       15 ]
-  - location: 18 (just consumed gas: 0)
+  - location: 18 (just consumed gas: 0.010)
     [ 15 ]
   - location: 20 (just consumed gas: 0.010)
     [  ]
-  - location: 18 (just consumed gas: 0.025)
+  - location: 18 (just consumed gas: 0.035)
     [ { Elt "bar" 20 ; Elt "foo" 16 } ]
   - location: 21 (just consumed gas: 0.010)
     [ {}

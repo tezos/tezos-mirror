@@ -423,11 +423,10 @@ module Sc_rollup_verify_output_proof_benchmark = struct
   let verify_output_proof_model =
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "verify_const")
-           ~coeff:(fv "verify_proof_length"))
+      (Model.affine
+         ~name
+         ~intercept:(fv "verify_const")
+         ~coeff:(fv "verify_proof_length"))
 
   let models = [("verify_output_proof", verify_output_proof_model)]
 
@@ -572,11 +571,10 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   let verify_output_proof_model =
     Model.make
       ~conv:(fun {proof_length} -> (proof_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "deserialize_const")
-           ~coeff:(fv "deserialize_proof_length"))
+      (Model.affine
+         ~name
+         ~intercept:(fv "deserialize_const")
+         ~coeff:(fv "deserialize_proof_length"))
 
   let models = [("deserialize_output_proof", verify_output_proof_model)]
 

@@ -84,7 +84,7 @@ module Slots_handlers = struct
                 | Error _ -> assert false
                 | Ok proof -> return_some proof)))
 
-  let put_commitment_shards ctxt commitment () Services.Types.{with_proof} =
+  let put_commitment_shards ctxt commitment () Types.{with_proof} =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; _} ->
@@ -157,12 +157,16 @@ module Profile_handlers = struct
 
   let get_attestable_slots ctxt pkh attested_level () () =
     call_handler2 ctxt (fun store {proto_parameters; _} ->
+        (* For retrieving the assigned shard indexes, we consider the committee
+           at [attested_level - 1], because the (DAL) attestations in the blocks
+           at level [attested_level] refer to the predecessor level. *)
+        let attestation_level = Int32.pred attested_level in
         (let open Lwt_result_syntax in
         let* shard_indices =
           Node_context.fetch_assigned_shard_indices
             ctxt
             ~pkh
-            ~level:attested_level
+            ~level:attestation_level
           |> Errors.other_lwt_result
         in
         Profile_manager.get_attestable_slots
@@ -171,6 +175,71 @@ module Profile_handlers = struct
           proto_parameters
           ~attested_level)
         |> Errors.to_tzresult)
+end
+
+let version ctxt () () =
+  let open Lwt_result_syntax in
+  Node_context.version ctxt |> return
+
+module P2P = struct
+  let connect ctxt q point =
+    Node_context.P2P.connect ctxt ?timeout:q#timeout point
+
+  let disconnect_point ctxt point q () =
+    let open Lwt_result_syntax in
+    let*! () = Node_context.P2P.disconnect_point ctxt ~wait:q#wait point in
+    return_unit
+
+  let disconnect_peer ctxt peer q () =
+    let open Lwt_result_syntax in
+    let*! () = Node_context.P2P.disconnect_peer ctxt ~wait:q#wait peer in
+    return_unit
+
+  let get_points ctxt q () =
+    Node_context.P2P.get_points ~connected:q#connected ctxt
+
+  let get_points_info ctxt q () =
+    Node_context.P2P.get_points_info ~connected:q#connected ctxt
+
+  let get_point_info ctxt point () () =
+    Node_context.P2P.get_point_info ctxt point
+
+  let get_peers ctxt q () =
+    Node_context.P2P.get_peers ~connected:q#connected ctxt
+
+  let get_peers_info ctxt q () =
+    Node_context.P2P.get_peers_info ~connected:q#connected ctxt
+
+  let get_peer_info ctxt peer () () = Node_context.P2P.get_peer_info ctxt peer
+
+  module Gossipsub = struct
+    let get_topics ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_topics ctxt
+
+    let get_topics_peers ctxt q () =
+      let open Lwt_result_syntax in
+      return
+      @@ Node_context.P2P.Gossipsub.get_topics_peers
+           ~subscribed:q#subscribed
+           ctxt
+
+    let get_connections ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_connections ctxt
+
+    let get_scores ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_scores ctxt
+
+    let get_backoffs ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_backoffs ctxt
+
+    let get_message_cache ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_message_cache ctxt
+  end
 end
 
 let add_service registerer service handler directory =
@@ -232,6 +301,67 @@ let register_new :
        Tezos_rpc.Directory.gen_register
        Services.monitor_shards
        (Slots_handlers.monitor_shards ctxt)
+  |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_topics
+       (P2P.Gossipsub.get_topics ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_topics_peers
+       (P2P.Gossipsub.get_topics_peers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_connections
+       (P2P.Gossipsub.get_connections ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_scores
+       (P2P.Gossipsub.get_scores ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_backoffs
+       (P2P.Gossipsub.get_backoffs ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_message_cache
+       (P2P.Gossipsub.get_message_cache ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.post_connect
+       (P2P.connect ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.P2P.delete_disconnect_point
+       (P2P.disconnect_point ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.P2P.delete_disconnect_peer
+       (P2P.disconnect_peer ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_points
+       (P2P.get_points ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_points_info
+       (P2P.get_points_info ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.P2P.Points.get_point_info
+       (P2P.get_point_info ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_peers
+       (P2P.get_peers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.get_peers_info
+       (P2P.get_peers_info ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.P2P.Peers.get_peer_info
+       (P2P.get_peer_info ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
@@ -246,6 +376,11 @@ let start configuration ctxt =
   let open Lwt_syntax in
   let Configuration_file.{rpc_addr; _} = configuration in
   let dir = register ctxt in
+  let dir =
+    Tezos_rpc.Directory.register_describe_directory_service
+      dir
+      Tezos_rpc.Service.description_service
+  in
   let rpc_port = snd rpc_addr in
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in

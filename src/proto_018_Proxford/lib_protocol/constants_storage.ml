@@ -128,10 +128,6 @@ let minimal_participation_ratio c =
   let constants = Raw_context.constants c in
   constants.minimal_participation_ratio
 
-let max_slashing_period c =
-  let constants = Raw_context.constants c in
-  constants.max_slashing_period
-
 let limit_of_delegation_over_baking c =
   let constants = Raw_context.constants c in
   constants.limit_of_delegation_over_baking
@@ -147,10 +143,6 @@ let percentage_of_frozen_deposits_slashed_per_double_attestation c =
 let testnet_dictator c =
   let constants = Raw_context.constants c in
   constants.testnet_dictator
-
-let sc_rollup_enable c =
-  let sc_rollup = Raw_context.sc_rollup c in
-  sc_rollup.enable
 
 let sc_rollup_arith_pvm_enable c =
   let sc_rollup = Raw_context.sc_rollup c in
@@ -204,6 +196,10 @@ let sc_rollup_reveal_activation_level c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.reveal_activation_level
 
+let sc_rollup_private_enable c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.private_enable
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots
@@ -243,3 +239,9 @@ let adaptive_issuance_launch_ema_threshold c =
 
 let adaptive_issuance_rewards_params c =
   (adaptive_issuance c).adaptive_rewards_params
+
+let adaptive_issuance_activation_vote_enable c =
+  (adaptive_issuance c).activation_vote_enable
+
+let adaptive_issuance_autostaking_enable c =
+  (adaptive_issuance c).autostaking_enable

@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5583
 
    Version this type to ease future migrations. *)
@@ -31,23 +33,20 @@ module P2p_message_V1 = struct
   type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
 
   type p2p_message =
-    | Graft of {topic : Gs_interface.topic}
+    | Graft of {topic : Types.Topic.t}
     | Prune of {
-        topic : Gs_interface.topic;
+        topic : Types.Topic.t;
         px : px_peer Seq.t;
-        backoff : Gs_interface.Span.t;
+        backoff : Types.Span.t;
       }
-    | IHave of {
-        topic : Gs_interface.topic;
-        message_ids : Gs_interface.message_id list;
-      }
-    | IWant of {message_ids : Gs_interface.message_id list}
-    | Subscribe of {topic : Gs_interface.topic}
-    | Unsubscribe of {topic : Gs_interface.topic}
+    | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
+    | IWant of {message_ids : Types.Message_id.t list}
+    | Subscribe of {topic : Types.Topic.t}
+    | Unsubscribe of {topic : Types.Topic.t}
     | Message_with_header of {
-        message : Gs_interface.message;
-        topic : Gs_interface.topic;
-        message_id : Gs_interface.message_id;
+        message : Types.Message.t;
+        topic : Types.Topic.t;
+        message_id : Types.Message_id.t;
       }
 
   let px_peer_encoding =
@@ -73,7 +72,7 @@ module P2p_message_V1 = struct
         ~title:"Graft"
         (obj2
            (req "kind" (constant "graft"))
-           (req "topic" Gs_interface.topic_encoding))
+           (req "topic" Types.Topic.encoding))
         (function Graft {topic} -> Some ((), topic) | _ -> None)
         (fun ((), topic) -> Graft {topic});
       case
@@ -81,9 +80,9 @@ module P2p_message_V1 = struct
         ~title:"Prune"
         (obj4
            (req "kind" (constant "prune"))
-           (req "topic" Gs_interface.topic_encoding)
+           (req "topic" Types.Topic.encoding)
            (req "px" (list px_peer_encoding))
-           (req "backoff" Gs_interface.span_encoding))
+           (req "backoff" Types.Span.encoding))
         (function
           | Prune {topic; px; backoff} ->
               Some ((), topic, List.of_seq px, backoff)
@@ -95,8 +94,8 @@ module P2p_message_V1 = struct
         ~title:"IHave"
         (obj3
            (req "kind" (constant "ihave"))
-           (req "topic" Gs_interface.topic_encoding)
-           (req "message_ids" (list Gs_interface.message_id_encoding)))
+           (req "topic" Types.Topic.encoding)
+           (req "message_ids" (list Types.Message_id.encoding)))
         (function
           | IHave {topic; message_ids} -> Some ((), topic, message_ids)
           | _ -> None)
@@ -106,7 +105,7 @@ module P2p_message_V1 = struct
         ~title:"IWant"
         (obj2
            (req "kind" (constant "iwant"))
-           (req "message_ids" (list Gs_interface.message_id_encoding)))
+           (req "message_ids" (list Types.Message_id.encoding)))
         (function IWant {message_ids} -> Some ((), message_ids) | _ -> None)
         (fun ((), message_ids) -> IWant {message_ids});
       case
@@ -114,7 +113,7 @@ module P2p_message_V1 = struct
         ~title:"Subscribe"
         (obj2
            (req "kind" (constant "subscribe"))
-           (req "topic" Gs_interface.topic_encoding))
+           (req "topic" Types.Topic.encoding))
         (function Subscribe {topic} -> Some ((), topic) | _ -> None)
         (fun ((), topic) -> Subscribe {topic});
       case
@@ -122,7 +121,7 @@ module P2p_message_V1 = struct
         ~title:"Unsubscribe"
         (obj2
            (req "kind" (constant "unsubscribe"))
-           (req "topic" Gs_interface.topic_encoding))
+           (req "topic" Types.Topic.encoding))
         (function Unsubscribe {topic} -> Some ((), topic) | _ -> None)
         (fun ((), topic) -> Unsubscribe {topic});
       case
@@ -130,9 +129,9 @@ module P2p_message_V1 = struct
         ~title:"Message_with_header"
         (obj4
            (req "kind" (constant "message_with_header"))
-           (req "message" Gs_interface.message_encoding)
-           (req "topic" Gs_interface.topic_encoding)
-           (req "message_id" Gs_interface.message_id_encoding))
+           (req "message" Types.Message.encoding)
+           (req "topic" Types.Topic.encoding)
+           (req "message_id" Types.Message_id.encoding))
         (function
           | Message_with_header {message; topic; message_id} ->
               Some ((), message, topic, message_id)
@@ -141,33 +140,26 @@ module P2p_message_V1 = struct
           Message_with_header {message; topic; message_id});
     ]
 
+  let distributed_db_version = Distributed_db_version.zero
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5638
 
      Decide how to safely choose the node db version. *)
-  let distributed_db_versions = [Distributed_db_version.zero]
+  let distributed_db_versions = [distributed_db_version]
 
   let message_config ~network_name : p2p_message P2p_params.message_config =
     let chain_name = Distributed_db_version.Name.of_string network_name in
     {encoding; chain_name; distributed_db_versions}
 end
 
+let version ~network_name =
+  Network_version.
+    {
+      chain_name = Distributed_db_version.Name.of_string network_name;
+      distributed_db_version = P2p_message_V1.distributed_db_version;
+      p2p_version = P2p_version.one;
+    }
+
 (* Exposed interface *)
 
 include P2p_message_V1
-
-type peer_metadata = unit
-
-let peer_meta_config : peer_metadata P2p_params.peer_meta_config =
-  let empty () = () in
-  let encoding = Data_encoding.unit in
-  let score (_ : peer_metadata) = 1.0 in
-  {peer_meta_encoding = encoding; peer_meta_initial = empty; score}
-
-type connection_metadata = unit
-
-let conn_meta_config : connection_metadata P2p_params.conn_meta_config =
-  {
-    conn_meta_encoding = Data_encoding.unit;
-    private_node = (fun () -> false);
-    conn_meta_value = (fun () -> ());
-  }

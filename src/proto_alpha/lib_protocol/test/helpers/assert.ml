@@ -146,6 +146,9 @@ let equal_bool ~loc (a : bool) (b : bool) =
 let not_equal_bool ~loc (a : bool) (b : bool) =
   not_equal ~loc Bool.equal "Booleans are equal" Format.pp_print_bool a b
 
+let is_true ~loc (a : bool) =
+  equal ~loc Bool.equal "Boolean is not true" Format.pp_print_bool a true
+
 (* string *)
 let equal_string ~loc (a : string) (b : string) =
   equal ~loc String.equal "Strings aren't equal" Format.pp_print_string a b
@@ -223,7 +226,9 @@ open Context
 (* Some asserts for account operations *)
 
 let contract_property_is property ~loc b contract expected =
-  property b contract >>=? fun balance -> equal_tez ~loc balance expected
+  let open Lwt_result_syntax in
+  let* balance = property b contract in
+  equal_tez ~loc balance expected
 
 (** [balance_is b c amount] checks that the current balance [b] of contract [c]
     is [amount].
@@ -237,7 +242,8 @@ let frozen_bonds_is = contract_property_is Contract.frozen_bonds
 
 let balance_or_frozen_bonds_was_operated ~is_balance ~operand ~loc b contract
     old_balance amount =
-  operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
+  let open Lwt_result_wrap_syntax in
+  let*?@ expected = operand old_balance amount in
   let f = if is_balance then balance_is else frozen_bonds_is in
   f ~loc b contract expected
 

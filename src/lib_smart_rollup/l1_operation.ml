@@ -33,6 +33,12 @@ type t =
       refutation : Game.refutation;
     }
   | Timeout of {rollup : Address.t; stakers : Game.index}
+  | Recover_bond of {rollup : Address.t; staker : Signature.Public_key_hash.t}
+  | Execute_outbox_message of {
+      rollup : Address.t;
+      cemented_commitment : Commitment.Hash.t;
+      output_proof : string;
+    }
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -95,6 +101,30 @@ let encoding : t Data_encoding.t =
            (function
              | Timeout {rollup; stakers} -> Some (rollup, stakers) | _ -> None)
            (fun (rollup, stakers) -> Timeout {rollup; stakers});
+         case
+           5
+           "recover"
+           (obj2
+              (req "rollup" Address.encoding)
+              (req "staker" Signature.Public_key_hash.encoding))
+           (function
+             | Recover_bond {rollup; staker} -> Some (rollup, staker)
+             | _ -> None)
+           (fun (rollup, staker) -> Recover_bond {rollup; staker});
+         case
+           6
+           "execute_outbox_message"
+           (obj3
+              (req "rollup" Address.encoding)
+              (req "cemented_commitment" Commitment.Hash.encoding)
+              (req "proof" (string' Hex)))
+           (function
+             | Execute_outbox_message
+                 {rollup; cemented_commitment; output_proof} ->
+                 Some (rollup, cemented_commitment, output_proof)
+             | _ -> None)
+           (fun (rollup, cemented_commitment, output_proof) ->
+             Execute_outbox_message {rollup; cemented_commitment; output_proof});
        ]
 
 let pp ppf = function
@@ -149,7 +179,13 @@ let pp ppf = function
         Signature.Public_key_hash.pp
         opponent
   | Timeout {rollup = _; stakers = _} -> Format.fprintf ppf "timeout"
+  | Recover_bond {rollup = _; staker = _} -> Format.fprintf ppf "recover"
+  | Execute_outbox_message
+      {rollup = _; cemented_commitment = _; output_proof = _} ->
+      Format.fprintf ppf "Execute outbox message"
 
 let unique = function
   | Add_messages _ | Cement _ -> false
-  | Publish _ | Refute _ | Timeout _ -> true
+  | Publish _ | Refute _ | Timeout _ | Recover_bond _ | Execute_outbox_message _
+    ->
+      true

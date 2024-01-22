@@ -1,0 +1,49 @@
+{
+  "infrastructure": {
+    "tags": [
+      "binaries"
+    ],
+    "path_patterns": [
+      "^devtools/yes_wallet"
+    ]
+  },
+  "layer1": {
+    "tags": [
+      "mempool",
+      "p2p",
+      "protocol",
+      "protocol_cache",
+      "protocol_table",
+      "stresstest",
+      "transaction",
+      "transfer"
+    ],
+    "path_patterns": [
+      "^src/lib_requester",
+      "^src/proto_.*/lib_protocol",
+      "^src/proto_.*/lib_delegate",
+      "^devtools/yes_wallet"
+    ]
+  },
+  "tezos2": {
+    "tags": [
+      "dac",
+      "dac_node",
+      "vdf"
+    ],
+    "path_patterns": [
+      "^src/lib_aplonk",
+      "^src/lib_distributed_plonk"
+    ]
+  },
+  "etherlink": {
+    "tags": [
+      "evm",
+      "sc_rollup",
+      "rollup_node",
+      "refutation",
+      "commitment"
+    ],
+    "path_patterns": []
+  }
+}

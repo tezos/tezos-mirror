@@ -30,12 +30,58 @@
    3. OCaml code is _generated_ from these terms after substituting the
       results of inference and performing the appropriate unit conversions. *)
 
+(** Int or float *)
+module Num : sig
+  type t = Int of int | Float of float
+
+  val pp : Format.formatter -> t -> unit
+
+  val add : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val compare : t -> t -> int
+end
+
+(** Runtime type *)
+module Ty : sig
+  type _ t =
+    | Unit : unit t
+    | Num : Num.t t
+    | Int : int t
+    | Float : float t
+    | String : string t
+    | Bool : bool t
+    | Arrow : 'a t * 'b t -> ('a -> 'b) t
+
+  val unit : unit t
+
+  val num : Num.t t
+
+  val int : int t
+
+  val bool : bool t
+
+  val float : float t
+
+  val string : string t
+
+  val arrow : 'a t -> 'b t -> ('a -> 'b) t
+
+  type (_, _) eq = Refl : ('a, 'a) eq
+
+  val equal : 'a t -> 'b t -> ('a, 'b) eq option
+end
+
 (* Signature of the DSL *)
 
 module type S = sig
   type 'a repr
 
   type size
+
+  (** Runtime type for [size] *)
+  val size_ty : size Ty.t
 
   val true_ : bool repr
 
@@ -71,13 +117,16 @@ module type S = sig
 
   val shift_right : size repr -> int -> size repr
 
-  val lam : name:string -> ('a repr -> 'b repr) -> ('a -> 'b) repr
+  val lam' : name:string -> 'a Ty.t -> ('a repr -> 'b repr) -> ('a -> 'b) repr
+
+  (** Instantiation of [lam'] for [size repr] argument *)
+  val lam : name:string -> (size repr -> 'a repr) -> (size -> 'a) repr
 
   val app : ('a -> 'b) repr -> 'a repr -> 'b repr
 
   val let_ : name:string -> 'a repr -> ('a repr -> 'b repr) -> 'b repr
 
-  val if_ : bool repr -> 'a repr -> 'a repr -> 'a repr
+  val if_ : bool repr -> size repr -> size repr -> size repr
 end
 
 (* ------------------------------------------------------------------------- *)
@@ -97,6 +146,9 @@ module Free_variables :
    present. Use the [Subst] implementation transformer to get rid of free
    variables. *)
 module Eval : S with type 'a repr = 'a and type size = float
+
+(* Obtain the type of the expression. *)
+module Type : S with type 'a repr = 'a Ty.t and type size = Num.t
 
 (* Collects names of unapplied arguments
    Use [arg_name] to acquire the name of argument, specified as [~name] of [lam]

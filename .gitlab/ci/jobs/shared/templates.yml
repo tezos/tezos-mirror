@@ -7,13 +7,22 @@
   # template requiring artifacts from preceeding jobs should declare
   # their dependencies locally.
   dependencies: []
+  tags: ["gcp"]
 
 # Default runner tags for jobs in the build stage
 .tags_template__build:
-  tags: []
+  tags: ["gcp"]
 
 # Default runner tags for arm64 jobs in the build stage
 .tags_template__build_arm64:
+  tags: ["gcp_arm64"]
+
+# Block the propagation of the GCP tag for standard jobs
+.tags_template__no_gcp:
+  tags: []
+
+# Block the propagation of the GCP tag for arm64 jobs
+.tags_template__no_gcp_arm64:
   tags: ["arm64"]
 
 # Add variables for bisect_ppx instrumentation
@@ -26,19 +35,20 @@
 .build_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_dependencies
     - .template__coverage
   stage: build
   before_script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - . ./scripts/version.sh
+    - eval $(opam env)
 
 .kernels_template:
   extends:
     - .default_settings_template
+    - .image_template__rust_toolchain
   stage: build
-  image: "${PROD_AWS_ECR}/rust-toolchain:v1.0.3"
   needs: [trigger]
   before_script:
     - make -f kernels.mk build-dev-deps
@@ -50,11 +60,3 @@
     - key: kernels
       paths:
         - cargo/
-  artifacts:
-    name: "build-kernels-$CI_COMMIT_REF_SLUG"
-    paths:
-      - evm_kernel.wasm
-      - sequenced_kernel.wasm
-      - smart-rollup-installer
-    expire_in: 1 day
-    when: on_success

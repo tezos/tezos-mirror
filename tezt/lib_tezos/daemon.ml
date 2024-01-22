@@ -405,7 +405,10 @@ module Make (X : PARAMETERS) = struct
       String_map.find_opt name daemon.one_shot_event_handlers
       |> Option.value ~default:[]
     in
-    Log.debug "Waiting for event [%s]" name ;
+    Log.debug
+      "Waiting for event [%s]%s"
+      name
+      (match where with None -> "" | Some where -> " where " ^ where) ;
     daemon.one_shot_event_handlers <-
       String_map.add
         name

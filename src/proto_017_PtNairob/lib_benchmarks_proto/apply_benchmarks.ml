@@ -89,11 +89,10 @@ module Take_fees_benchmark = struct
   let model =
     Model.make
       ~conv:(fun {batch_length} -> (batch_length, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "take_fees_const")
-           ~coeff:(fv "take_fees_coeff"))
+      (Model.affine
+         ~name
+         ~intercept:(fv "take_fees_const")
+         ~coeff:(fv "take_fees_coeff"))
 
   let models = [("take_fees", model)]
 

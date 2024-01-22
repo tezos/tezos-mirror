@@ -102,7 +102,7 @@ module Term = struct
             tzfail
               (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
-        | exc -> raise exc)
+        | exc -> Lwt.reraise exc)
 
   let root config_file data_dir =
     let open Lwt_result_syntax in

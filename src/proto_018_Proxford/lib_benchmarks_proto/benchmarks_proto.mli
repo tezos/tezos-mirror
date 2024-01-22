@@ -94,6 +94,9 @@ module Registration : sig
   (** Registers a benchmark with a model, model names are uniformely generated
   *)
   val register : Benchmark.t -> unit
+
+  val register_as_simple_with_num :
+    group:Benchmark.group -> Benchmark_base.t -> unit
 end
 
 module Model : sig
@@ -102,9 +105,10 @@ module Model : sig
   type 'workload t = 'workload Model.t
 
   val make :
+    ?takes_saturation_reprs:bool ->
     name:Namespace.t ->
     conv:('a -> 'b) ->
-    model:(Namespace.t -> 'b model) ->
+    (Namespace.t -> 'b model) ->
     'a t
 
   val unknown_const1 : ?const:Free_variable.t -> Namespace.t -> unit model

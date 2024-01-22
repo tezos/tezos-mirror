@@ -29,7 +29,8 @@ type t = {
   data_dir : string;  (** The path to the DAL node data directory *)
   rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
   neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
-  listen_addr : P2p_point.Id.t;
+  listen_addr : P2p_point.Id.t;  (** The TCP address bound by the DAL node. *)
+  public_addr : P2p_point.Id.t;
       (** The TCP address and port at which this instance can be reached. *)
   peers : string list;  (** A list of P2P peers to connect to at startup. *)
   expected_pow : float;  (** Expected P2P identity's PoW. *)
@@ -38,7 +39,7 @@ type t = {
   endpoint : Uri.t;  (** Endpoint of a Tezos node *)
   metrics_addr : P2p_point.Id.t;
       (** The metrics server used to export metrics *)
-  profiles : Services.Types.profiles;
+  profiles : Types.profiles;
       (** Profile allowing to know the topics of interest. *)
 }
 

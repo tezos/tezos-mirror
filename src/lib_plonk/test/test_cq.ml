@@ -23,8 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-module PC = Plonk.Polynomial_commitment
+open Kzg.Bls
+module PC = Kzg.Polynomial_commitment
+module Transcript = Kzg.Utils.Transcript
 
 let ( !! ) = Plonk_test.Cases.( !! )
 
@@ -48,27 +49,27 @@ let wires () =
   List.init nb_wires (fun i ->
       ( "w" ^ string_of_int i,
         Array.init wire_size (fun j -> (List.nth table i).(indexes.(j))) ))
-  |> Plonk.SMap.of_list
+  |> Kzg.SMap.of_list
 
 let f_map = List.init nb_proofs (fun _ -> wires ())
 
 let f_map_not_in_table =
-  Plonk.SMap.map
+  Kzg.SMap.map
     (fun _ -> Array.init wire_size (fun _ -> Scalar.random ()))
     (List.hd f_map)
   :: List.tl f_map
 
 let test_correctness () =
   let prv, vrf = Plonk.Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   let proof, prv_transcript = Plonk.Cq.prove prv transcript f_map in
   let vrf, vrf_transcript = Plonk.Cq.verify vrf transcript proof in
-  assert (Bytes.equal prv_transcript vrf_transcript) ;
+  assert (Transcript.equal prv_transcript vrf_transcript) ;
   assert vrf
 
 let test_not_in_table () =
   let prv, _ = Plonk.Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   try
     let _ = Plonk.Cq.prove prv transcript f_map_not_in_table in
     failwith
@@ -76,17 +77,17 @@ let test_not_in_table () =
   with Plonk.Cq.Entry_not_in_table -> ()
 
 let test_wrong_proof () =
-  let module Cq = Plonk.Cq.Make (PC) in
+  let module Cq = Plonk.Cq.Internal in
   let prv, vrf = Cq.setup ~srs ~wire_size ~table in
-  let transcript = Bytes.empty in
+  let transcript = Transcript.empty in
   let proof_f, _ = Cq.prove prv transcript [List.hd f_map] in
   let wrong_proof =
     let cm_f, _ =
-      PC.Commitment.commit
+      PC.commit
         Cq.(prv.pc)
-        (Plonk.SMap.map
+        (Kzg.SMap.map
            (fun f ->
-             Plonk.Bls.(
+             Kzg.Bls.(
                Evaluations.(
                  interpolation_fft
                    (Domain.build wire_size)

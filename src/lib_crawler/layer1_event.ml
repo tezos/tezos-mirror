@@ -103,7 +103,7 @@ module Simple = struct
     declare_2
       ~name:"lib_crawler_layer_1_new_head"
       ~msg:"Layer 1 node has switched to head {hash} at level {level}"
-      ~level:Notice
+      ~level:Info
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 end

@@ -192,7 +192,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
                     | Error err -> Lwt.fail (WrapError err))
                   stream)
               (function
-                | WrapError e -> Lwt.return_error e | exn -> Lwt.fail exn)
+                | WrapError e -> Lwt.return_error e | exn -> Lwt.reraise exn)
           in
           match o with
           | None -> failwith "..."

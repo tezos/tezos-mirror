@@ -55,7 +55,7 @@ let true_op l1_dst rollup_id =
       payload = [|Bls12_381.Fr.one|];
     }
 
-let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq s
+let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Kzg.SMap.to_seq s
 
 (* Operation with payload = 0 *)
 let false_op l1_dst rollup_id =

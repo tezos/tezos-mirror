@@ -149,7 +149,17 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
   let model elim = apply X.int arity model elim
 end
 
-let make ~conv ~model = Abstract {conv; model}
+let set_takes_saturation_reprs (type a) b ((module Model) : a model) : a model =
+  let module Model' = struct
+    include Model
+
+    let takes_saturation_reprs = b
+  end in
+  (module Model')
+
+let make ?(takes_saturation_reprs = false) ~conv model =
+  let model = set_takes_saturation_reprs takes_saturation_reprs model in
+  Abstract {conv; model}
 
 let make_aggregated ~model ~sub_models = Aggregate {model; sub_models}
 
@@ -243,20 +253,6 @@ let get_free_variable_set_applied (type workload) (model : workload t)
   let module R = M (T1) in
   T0.prj @@ T1.prj R.applied
 
-let set_takes_saturation_reprs' (type a) b ((module Model) : a model) : a model
-    =
-  let module Model' = struct
-    include Model
-
-    let takes_saturation_reprs = b
-  end in
-  (module Model')
-
-let set_takes_saturation_reprs b = function
-  | Abstract {conv; model} ->
-      Abstract {conv; model = set_takes_saturation_reprs' b model}
-  | _ -> invalid_arg "set_takes_saturation_reprs"
-
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)
 
@@ -299,6 +295,48 @@ let unknown_const1 ~name ~const =
     end
   end in
   (module M : Model_impl with type arg_type = unit)
+
+let unknown_const1_skip1 ~name ~const =
+  let module M = struct
+    type arg_type = int * unit
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model = lam ~name:"size" @@ fun (_ : size repr) -> free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
+let unknown_const1_skip2 ~name ~const =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun (_ : size repr) ->
+        lam ~name:"size2" @@ fun (_ : size repr) -> free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
 
 let linear ~name ~coeff =
   let module M = struct
@@ -473,6 +511,29 @@ let linear_sum ~name ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))
 
+let linear_sat_sub ~name ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept + (free ~name:coeff * sat_sub size1 size2)
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
 let linear_max ~name ~intercept ~coeff =
   let module M = struct
     type arg_type = int * (int * unit)
@@ -610,6 +671,29 @@ let bilinear_affine ~name ~intercept ~coeff1 ~coeff2 =
         free ~name:intercept
         + (free ~name:coeff1 * size1)
         + (free ~name:coeff2 * size2)
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
+let affine_skip1 ~name ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun (_size1 : size repr) ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept + (free ~name:coeff * size2)
     end
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))

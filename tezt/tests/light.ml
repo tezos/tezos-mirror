@@ -53,7 +53,7 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let level = Node.get_level node0 in
+  let* level = Node.get_level node0 in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in
@@ -81,7 +81,7 @@ let test_no_endpoint () =
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
   let*? process =
-    RPC.Client.spawn client @@ RPC.get_chain_block_context_contracts ()
+    Client.RPC.spawn client @@ RPC.get_chain_block_context_contracts ()
   in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
@@ -116,7 +116,7 @@ let test_endpoint_not_in_sources () =
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
   let*? process =
-    RPC.Client.spawn ~endpoint client
+    Client.RPC.spawn ~endpoint client
     @@ RPC.get_chain_block_context_contracts ()
   in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
@@ -224,7 +224,7 @@ module NoUselessRpc = struct
         (["helpers"; "baking_rights"], [("all", "true")]);
         (["context"; "delegates"], []);
         (["context"; "nonces"; "3"], []);
-        (["helpers"; "endorsing_rights"], []);
+        (["helpers"; "attestation_rights"], []);
         (["votes"; "ballot_list"], []);
         (["votes"; "ballots"], []);
         (["votes"; "current_period"], []);
@@ -235,8 +235,8 @@ module NoUselessRpc = struct
       ]
     in
     let paths =
-      if Protocol.(number protocol > number Nairobi) then
-        (["helpers"; "attestation_rights"], []) :: paths
+      if Protocol.(number protocol <= number Nairobi + 1) then
+        (["helpers"; "endorsing_rights"], []) :: paths
       else paths
     in
     Lwt_list.iter_s
@@ -286,7 +286,7 @@ let test_compare_light =
   let tz_log =
     [("proxy_rpc", "debug"); ("light_mode", "debug"); ("proxy_getter", "debug")]
   in
-  check_equivalence ~tz_log alt_mode clients
+  check_equivalence ~protocol ~tz_log alt_mode clients
 
 let register_protocol_independent () =
   test_no_endpoint () ;

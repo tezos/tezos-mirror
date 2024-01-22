@@ -6,9 +6,6 @@ include:
   - .gitlab/ci/jobs/build/docker_amd64_experimental.yml
   - .gitlab/ci/jobs/build/docker_arm64_experimental.yml
 
-  # Stage: test
-  - .gitlab/ci/jobs/test/ometrics_code_quality_default.yml
-
   # Stage: test_coverage
   - .gitlab/ci/jobs/coverage/coverage_default.yml
 

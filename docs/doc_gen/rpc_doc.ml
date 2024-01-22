@@ -23,30 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols =
-  (* version, title that appears in the doc, an optional path to an introduction, protocol hash *)
-  (* the optional introduction is inserted between the title "RPCs index"
-     and the generated directory description *)
-  [
-    ( "alpha",
-      "Alpha",
-      Some "/include/rpc_introduction.rst.inc",
-      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-    (* TODO tezos/tezos#2170: adapt rest of this list *)
-    ( "mumbai",
-      "Mumbai",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
-    ( "nairobi",
-      "Nairobi",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf" );
-    ( "oxford",
-      "Oxford",
-      Some "/include/rpc_introduction.rst.inc",
-      "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8" );
-  ]
-
 let pp_name ppf = function
   | [] | [""] -> Format.pp_print_string ppf "/"
   | prefix -> Format.pp_print_string ppf (String.concat "/" prefix)
@@ -374,55 +350,54 @@ let pp_document ppf _name intro prefix rpc_dir version =
   Format.pp_set_max_indent ppf 76 ;
   Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir
 
-let make_index node required_version =
+let make_index_shell ?introduction_path node =
   let open Lwt_syntax in
-  let version = Tezos_version_value.Current_git_info.version in
-  let commit_info =
-    ({
-       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-       commit_date = Tezos_version_value.Current_git_info.committer_date;
-     }
-      : Tezos_version.Node_version.commit_info)
+  let* shell_dir =
+    let commit_info =
+      ({
+         commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+         commit_date = Tezos_version_value.Current_git_info.committer_date;
+       }
+        : Tezos_version.Node_version.commit_info)
+    in
+    let node_version = Node.get_version node in
+    let shell_dir = Node.build_rpc_directory ~node_version ~commit_info node in
+    let shell_dir =
+      Tezos_rpc.Directory.register0
+        shell_dir
+        Node_services.S.config
+        (fun () () -> Lwt.return_ok Config_file.default_config)
+    in
+    Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() shell_dir
   in
-  let shell_dir = Node.build_rpc_directory ~version ~commit_info node in
-  let protocol_dirs =
-    List.map
-      (fun (version, name, intro, hash) ->
-        let hash = Protocol_hash.of_b58check_exn hash in
-        let (module Proto) =
-          match Registered_protocol.get hash with
-          | None ->
-              (* This is probably an indication that a line for the
-                 requested protocol is missing in the dune file of
-                 this repository *)
-              Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
-              assert false
-          | Some proto -> proto
-        in
-        ( version,
-          "Protocol " ^ name,
-          intro,
-          [".."; "<block_id>"],
-          Tezos_rpc.Directory.map (fun () -> assert false)
-          @@ Block_directory.build_raw_rpc_directory
-               (module Proto)
-               (module Proto) ))
-      protocols
-  in
-  let dirs =
-    ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
-    :: protocol_dirs
-  in
-  let _version, name, intro, path, dir =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun (version, _name, _intro, _path, _dir) ->
-           version = required_version)
-         dirs
-  in
-  let* dir = Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir in
   let ppf = Format.std_formatter in
-  pp_document ppf name intro path dir required_version ;
+  pp_document ppf "Shell" introduction_path [""] shell_dir "shell" ;
+  return_ok ()
+
+let make_index ?introduction_path ~required_version ~hash () =
+  let open Lwt_syntax in
+  let name = "Protocol " ^ String.capitalize_ascii required_version in
+  let path = [".."; "<block_id>"] in
+  let* dir =
+    let dir =
+      let hash = Protocol_hash.of_b58check_exn hash in
+      let (module Proto) =
+        match Registered_protocol.get hash with
+        | None ->
+            (* This is probably an indication that a line for the
+               requested protocol is missing in the dune file of
+               this repository *)
+            Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
+            assert false
+        | Some proto -> proto
+      in
+      Tezos_rpc.Directory.map (fun () -> assert false)
+      @@ Block_directory.build_raw_rpc_directory (module Proto) (module Proto)
+    in
+    Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir
+  in
+  let ppf = Format.std_formatter in
+  pp_document ppf name introduction_path path dir required_version ;
   return_ok ()
 
 let make_default_acl _node =
@@ -437,10 +412,19 @@ let make_default_acl _node =
   Lwt.return_ok ()
 
 let main node =
-  let cmd = Sys.argv.(1) in
-  match cmd with
-  | "index" -> make_index node Sys.argv.(2)
-  | "acl" -> make_default_acl node
-  | _ -> raise (Invalid_argument cmd)
+  match Sys.argv |> Array.to_list with
+  | [_; "acl"] -> make_default_acl node
+  | [_; "index"; "shell"] -> make_index_shell node
+  | [_; "index"; "shell"; introduction_path] ->
+      make_index_shell ~introduction_path node
+  | [_; "index"; required_version; hash] ->
+      make_index ~required_version ~hash ()
+  | [_; "index"; required_version; hash; introduction_path] ->
+      make_index ~required_version ~hash ~introduction_path ()
+  | _ ->
+      raise
+        (Invalid_argument
+           "Unrecognized arguments: must be either 'acl' or 'index \
+            <required_version> <protocol_hash> [<introduction_path>]")
 
 let () = Lwt_main.run (Node_helpers.with_node main)

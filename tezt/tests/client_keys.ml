@@ -178,7 +178,10 @@ module BLS_normal_wallet = struct
       ~title:"Import BLS secret key"
       (fun () ->
         let* client = Client.init () in
-        let* () = Client.import_secret_key client Constant.tz4_account in
+        let* () =
+          let Account.{alias; secret_key; _} = Constant.tz4_account in
+          Client.import_secret_key client ~alias secret_key
+        in
         let* shown_account =
           Client.show_address ~alias:Constant.tz4_account.Account.alias client
         in
@@ -191,7 +194,10 @@ module BLS_normal_wallet = struct
       ~title:"Shows the address of a registered BLS account"
       (fun () ->
         let* client = Client.init () in
-        let* () = Client.import_secret_key client Constant.tz4_account in
+        let* () =
+          let Account.{alias; secret_key; _} = Constant.tz4_account in
+          Client.import_secret_key client ~alias secret_key
+        in
         let* shown_account =
           Client.show_address ~alias:Constant.tz4_account.Account.alias client
         in

@@ -37,6 +37,7 @@ let get_deposit_parameters :
     deposit_parameters tzresult =
  fun ty contents ->
   let open Script_typed_ir in
+  let open Result_syntax in
   match (ty, contents) with
   | Pair_t (Ticket_t (ty, _), Bytes_t, _, _), (ticket, op_bytes) -> (
       match
@@ -44,7 +45,7 @@ let get_deposit_parameters :
           Alpha_context.Zk_rollup.Operation.encoding
           op_bytes
       with
-      | None -> error Alpha_context.Zk_rollup.Errors.Wrong_deposit_parameters
+      | None -> tzfail Alpha_context.Zk_rollup.Errors.Wrong_deposit_parameters
       | Some zkru_operation ->
-          ok {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); zkru_operation}
-      )
+          return
+            {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); zkru_operation})

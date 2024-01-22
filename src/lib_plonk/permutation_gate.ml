@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
 open Identities
 module L = Plompiler.LibCircuit
 
@@ -577,8 +577,13 @@ module Permutation_gate_impl (PP : Polynomial_protocol.S) = struct
       let zg = get_answer answers GX (circuit_prefix z_name) in
       (* compute the first identity: (Z(x) - 1) * L1(x) *)
       let res1 =
-        Scalar.(
-          sub z one * Fr_generation.evaluate_l1 ~domain_size:n ~generator x)
+        let l1 =
+          let n = Z.of_int n in
+          let l1_num = Scalar.(generator * sub (pow x n) one) in
+          let l1_den = Scalar.(of_z n * sub x generator) in
+          Scalar.div_exn l1_num l1_den
+        in
+        Scalar.(sub z one * l1)
       in
       (* compute the second identity *)
       let res2 =

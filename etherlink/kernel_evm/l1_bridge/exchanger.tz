@@ -1,0 +1,57 @@
+{ parameter (or (pair %burn address (ticket (pair nat (option bytes)))) (address %mint)) ;
+  storage unit ;
+  code { CAR ;
+         IF_LEFT
+           { UNPAIR ;
+             PUSH mutez 0 ;
+             AMOUNT ;
+             COMPARE ;
+             GT ;
+             IF { DROP 2 ; PUSH string "Burn does not accept tez." ; FAILWITH }
+                { SWAP ;
+                  READ_TICKET ;
+                  SWAP ;
+                  DROP ;
+                  UNPAIR ;
+                  SWAP ;
+                  CDR ;
+                  SELF_ADDRESS ;
+                  DIG 2 ;
+                  COMPARE ;
+                  NEQ ;
+                  IF { DROP 2 ; PUSH string "Burn only accepts tez tickets." ; FAILWITH }
+                     { SWAP ;
+                       CONTRACT unit ;
+                       IF_NONE { PUSH string "Invalid callback" ; FAILWITH } {} ;
+                       PUSH mutez 1 ;
+                       DIG 2 ;
+                       MUL ;
+                       UNIT ;
+                       NIL operation ;
+                       DIG 3 ;
+                       DIG 3 ;
+                       UNIT ;
+                       TRANSFER_TOKENS ;
+                       CONS ;
+                       PAIR } } }
+           { CONTRACT (ticket (pair nat (option bytes))) ;
+             IF_NONE { PUSH string "Invalid callback" ; FAILWITH } {} ;
+             PUSH mutez 1 ;
+             AMOUNT ;
+             EDIV ;
+             IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
+             CAR ;
+             NONE bytes ;
+             PUSH nat 0 ;
+             PAIR ;
+             TICKET ;
+             IF_NONE { PUSH string "Could not mint ticket." ; FAILWITH } {} ;
+             UNIT ;
+             NIL operation ;
+             DIG 3 ;
+             PUSH mutez 0 ;
+             DIG 4 ;
+             TRANSFER_TOKENS ;
+             CONS ;
+             PAIR } } }
+

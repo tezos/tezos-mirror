@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (just consumed gas: 50.169)
+  - location: 7 (just consumed gas: 50.763)
     [ (Pair Unit Unit) ]
   - location: 7 (just consumed gas: 0.010)
     [ Unit ]
@@ -18,7 +18,7 @@ trace
   - location: 12 (just consumed gas: 0.010)
     [ 10
       7987 ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.050)
     [ 79870 ]
   - location: 16 (just consumed gas: 0.010)
     [ 79870
@@ -27,16 +27,16 @@ trace
     [ 0 ]
   - location: 21 (just consumed gas: 0.010)
     [ True ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [  ]
-  - location: 22 (just consumed gas: 0.015)
+  - location: 22 (just consumed gas: 0.025)
     [  ]
   - location: 28 (just consumed gas: 0.010)
     [ 10 ]
   - location: 31 (just consumed gas: 0.010)
     [ 7987
       10 ]
-  - location: 34 (just consumed gas: 0)
+  - location: 34 (just consumed gas: 0.050)
     [ 79870 ]
   - location: 35 (just consumed gas: 0.010)
     [ 79870
@@ -45,16 +45,16 @@ trace
     [ 0 ]
   - location: 40 (just consumed gas: 0.010)
     [ True ]
-  - location: 41 (just consumed gas: 0)
+  - location: 41 (just consumed gas: 0.010)
     [  ]
-  - location: 41 (just consumed gas: 0.015)
+  - location: 41 (just consumed gas: 0.025)
     [  ]
   - location: 47 (just consumed gas: 0.010)
     [ 10 ]
   - location: 50 (just consumed gas: 0.010)
     [ -7987
       10 ]
-  - location: 53 (just consumed gas: 0.061)
+  - location: 53 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 54 (just consumed gas: 0.010)
     [ -79870
@@ -63,16 +63,16 @@ trace
     [ 0 ]
   - location: 59 (just consumed gas: 0.010)
     [ True ]
-  - location: 60 (just consumed gas: 0)
+  - location: 60 (just consumed gas: 0.010)
     [  ]
-  - location: 60 (just consumed gas: 0.015)
+  - location: 60 (just consumed gas: 0.025)
     [  ]
   - location: 66 (just consumed gas: 0.010)
     [ 10 ]
   - location: 69 (just consumed gas: 0.010)
     [ -7987
       10 ]
-  - location: 72 (just consumed gas: 0.061)
+  - location: 72 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 73 (just consumed gas: 0.010)
     [ -79870
@@ -81,16 +81,16 @@ trace
     [ 0 ]
   - location: 78 (just consumed gas: 0.010)
     [ True ]
-  - location: 79 (just consumed gas: 0)
+  - location: 79 (just consumed gas: 0.010)
     [  ]
-  - location: 79 (just consumed gas: 0.015)
+  - location: 79 (just consumed gas: 0.025)
     [  ]
   - location: 85 (just consumed gas: 0.010)
     [ -10 ]
   - location: 88 (just consumed gas: 0.010)
     [ 7987
       -10 ]
-  - location: 91 (just consumed gas: 0.061)
+  - location: 91 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 92 (just consumed gas: 0.010)
     [ -79870
@@ -99,16 +99,16 @@ trace
     [ 0 ]
   - location: 97 (just consumed gas: 0.010)
     [ True ]
-  - location: 98 (just consumed gas: 0)
+  - location: 98 (just consumed gas: 0.010)
     [  ]
-  - location: 98 (just consumed gas: 0.015)
+  - location: 98 (just consumed gas: 0.025)
     [  ]
   - location: 104 (just consumed gas: 0.010)
     [ 10 ]
   - location: 107 (just consumed gas: 0.010)
     [ 7987
       10 ]
-  - location: 110 (just consumed gas: 0.061)
+  - location: 110 (just consumed gas: 0.064)
     [ 79870 ]
   - location: 111 (just consumed gas: 0.010)
     [ 79870
@@ -117,9 +117,9 @@ trace
     [ 0 ]
   - location: 116 (just consumed gas: 0.010)
     [ True ]
-  - location: 117 (just consumed gas: 0)
+  - location: 117 (just consumed gas: 0.010)
     [  ]
-  - location: 117 (just consumed gas: 0.015)
+  - location: 117 (just consumed gas: 0.025)
     [  ]
   - location: 123 (just consumed gas: 0.010)
     [ Unit ]

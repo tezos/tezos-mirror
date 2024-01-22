@@ -118,7 +118,7 @@ module Default_answerer = struct
         let* () = Events.(emit swap_succeeded) new_point in
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
         | None -> return_unit
-        | Some conn -> P2p_conn.disconnect conn)
+        | Some conn -> P2p_conn.disconnect ~reason:Peer_swapped conn)
     | Error err -> (
         t.latest_accepted_swap <- t.latest_successful_swap ;
         t.log (Swap_failure {source = source_peer_id}) ;

@@ -15,6 +15,9 @@
   cohttp-lwt-unix
   octez-node-config
   prometheus-app
+  camlzip
+  tar
+  tar-unix
   tezos-dal-node-lib
   tezos-dac-lib
   tezos-dac-client-lib

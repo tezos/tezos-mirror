@@ -305,7 +305,6 @@ let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
 
 let init_fresh_sapling_state ctxt =
   let open Lwt_result_syntax in
-  let open Environment.Error_monad in
   let* ctxt, id =
     Protocol.Lazy_storage_diff.fresh
       Protocol.Lazy_storage_kind.Sapling_state
@@ -603,6 +602,5 @@ let generate (save_to : string) (tx_count : int)
 
 let apply_diff ctxt id diff =
   let open Lwt_result_syntax in
-  let open Environment.Error_monad in
   let* ctxt, size = Sapling_storage.apply_diff (alpha_to_raw ctxt) id diff in
   return (raw_to_alpha ctxt, size)

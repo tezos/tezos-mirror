@@ -76,7 +76,7 @@ let read_block_metadata block_store key =
   let open Lwt_result_syntax in
   let* block_opt = read_block ~read_metadata:true block_store key in
   match block_opt with
-  | None -> return None
+  | None -> return_none
   | Some block -> return (Block_repr.metadata block)
 
 let resulting_context_hash block_store ~expect_predecessor_context:_ key =

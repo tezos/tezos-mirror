@@ -59,7 +59,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
 
   let metadata (node_ctxt : _ Node_context.t) =
     let address =
-      Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+      Sc_rollup_proto_types.Address.of_octez node_ctxt.config.sc_rollup_address
     in
     let origination_level =
       Raw_level.of_int32_exn node_ctxt.genesis_info.level
@@ -77,18 +77,28 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-       Use constants for correct protocol. *)
+    let* constants =
+      Protocol_plugins.get_constants_of_level node_ctxt (Int32.of_int level)
+    in
     let is_reveal_enabled =
-      node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
-      |> WithExceptions.Option.get ~loc:__LOC__
-      |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-      |> Sc_rollup.is_reveal_enabled_predicate
+      match constants.sc_rollup.reveal_activation_level with
+      | None -> fun ~current_block_level:_ _ -> true
+      | Some reveal_activation_level ->
+          reveal_activation_level
+          |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+          |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
     in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.current_protocol.constants.dal.attestation_lag
+    let dal_attestation_lag = constants.dal.attestation_lag in
+    let dal_parameters =
+      Sc_rollup.Dal_parameters.
+        {
+          number_of_slots = Int64.of_int constants.dal.number_of_slots;
+          attestation_lag = Int64.of_int dal_attestation_lag;
+          slot_size = Int64.of_int constants.dal.cryptobox_parameters.slot_size;
+          page_size = Int64.of_int constants.dal.cryptobox_parameters.page_size;
+        }
     in
     let reveal_builtins request =
       match Sc_rollup.Wasm_2_0_0PVM.decode_reveal request with
@@ -112,10 +122,32 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Metadata.encoding
                metadata)
-      | Request_dal_page _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3927
-             Support DAL in WASM PVM. *)
-          assert false
+      | Request_dal_page dal_page -> (
+          let*! content =
+            Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
+              ~dal_attestation_lag
+              node_ctxt
+              dal_page
+          in
+          match content with
+          | Error error ->
+              (* The [Error_wrapper] must be caught upstream and converted into
+                 a tzresult. *)
+              (* This happens when, for example, the kernel requests a page from a future level. *)
+              Lwt.fail (Error_wrapper error)
+          | Ok None ->
+              (* The page was not confirmed by L1.
+                 We return empty string in this case, as done in the slow executon. *)
+              Lwt.return ""
+          | Ok (Some b) -> Lwt.return (Bytes.to_string b))
+      | Reveal_dal_parameters ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
+          Lwt.return
+            (Data_encoding.Binary.to_string_exn
+               Sc_rollup.Dal_parameters.encoding
+               dal_parameters)
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
@@ -132,7 +164,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             in
             return (state, executed_ticks, failing_ticks))
           (function
-            | Error_wrapper error -> Lwt.return (Error error) | exn -> raise exn)
+            | Error_wrapper error -> Lwt.return (Error error)
+            | exn -> Lwt.reraise exn)
       in
       let failure_insertion_eval state tick failing_ticks' =
         let*! () =
@@ -213,12 +246,23 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Needs_reveal (Request_dal_page page_id) -> (
           let* content_opt =
             Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
               ~dal_attestation_lag
               node_ctxt
               page_id
           in
           let*! next_state =
             PVM.set_input (Reveal (Dal_page content_opt)) state
+          in
+          match F.consume F.one_tick_consumption fuel with
+          | None -> abort state fuel current_tick
+          | Some fuel ->
+              go fuel (Int64.succ current_tick) failing_ticks next_state)
+      | Needs_reveal Reveal_dal_parameters -> (
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
+             Consider supporting revealing of historical DAL parameters. *)
+          let*! next_state =
+            PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
           in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
@@ -329,7 +373,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in
@@ -418,7 +462,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           let message_index = message_counter_offset - 1 in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in

@@ -63,6 +63,7 @@ let ensure_kind infos kind =
       | Delegation _, K_Undelegation
       | Delegation _, K_Self_delegation
       | Register_global_constant _, K_Register_global_constant
+      | Set_deposits_limit _, K_Set_deposits_limit
       | Update_consensus_key _, K_Update_consensus_key
       | Increase_paid_storage _, K_Increase_paid_storage
       | Transfer_ticket _, K_Transfer_ticket
@@ -80,10 +81,10 @@ let ensure_kind infos kind =
       | Zk_rollup_update _, K_Zk_rollup_update ->
           return_unit
       | ( ( Transaction _ | Origination _ | Register_global_constant _
-          | Delegation _ | Update_consensus_key _ | Increase_paid_storage _
-          | Reveal _ | Transfer_ticket _ | Sc_rollup_originate _
-          | Sc_rollup_publish _ | Sc_rollup_cement _ | Sc_rollup_add_messages _
-          | Sc_rollup_refute _ | Sc_rollup_timeout _
+          | Delegation _ | Set_deposits_limit _ | Update_consensus_key _
+          | Increase_paid_storage _ | Reveal _ | Transfer_ticket _
+          | Sc_rollup_originate _ | Sc_rollup_publish _ | Sc_rollup_cement _
+          | Sc_rollup_add_messages _ | Sc_rollup_refute _ | Sc_rollup_timeout _
           | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
           | Dal_publish_slot_header _ | Zk_rollup_origination _
           | Zk_rollup_publish _ | Zk_rollup_update _ ),

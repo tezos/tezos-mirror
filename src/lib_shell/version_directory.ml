@@ -22,13 +22,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rpc_directory ~version ~(commit_info : Node_version.commit_info) net =
+let rpc_directory (node_version : Node_version.t) =
   let dir = Tezos_rpc.Directory.empty in
-  let network_version = P2p.announced_version net in
   Tezos_rpc.Directory.gen_register
     dir
     Version_services.S.version
-    (fun () () () ->
-      Tezos_rpc.Answer.return
-      @@ ({version; network_version; commit_info = Some commit_info}
-           : Node_version.t))
+    (fun () () () -> Tezos_rpc.Answer.return @@ (node_version : Node_version.t))

@@ -91,9 +91,8 @@ let rec raw_context_size = function
 let rec raw_context_to_tree (raw : Proof.raw_context) : Local.tree option Lwt.t
     =
   match raw with
-  | Key (bytes : Bytes.t) ->
-      Lwt.return (Some (Local.Tree.of_raw (`Value bytes)))
-  | Cut -> Lwt.return None
+  | Key (bytes : Bytes.t) -> Lwt.return_some (Local.Tree.of_raw (`Value bytes))
+  | Cut -> Lwt.return_none
   | Dir map ->
       let open Lwt_syntax in
       let add_to_tree tree (string, raw_context) =

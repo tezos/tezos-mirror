@@ -55,6 +55,11 @@ type reveal_proof =
     }
       (** The existence or not of a confirmed slot for a given page ID when the
           [input_requested] is the [Needs_reveal Request_dal_page]. *)
+  | Dal_parameters_proof
+      (** Proof for revealing DAL parameters that were used for the slots
+          published at [published_level]. The [published_level] parameter
+          enables the kernel to retrieve historical DAL parameters,
+          eliminating the need for each kernel to store past DAL parameters. *)
 
 (** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
@@ -148,8 +153,8 @@ val stop_of_pvm_step :
         output from the [input] proof is too recent to be allowed into
         the PVM proof ;
 
-      - DAL parameters and [dal_attestation_lag], to be able to check the page
-        content membership to a slot if needed ;
+      - DAL related parameters, to be able to check the page content membership to a slot
+        or check the revealed parameters if needed ;
 
       - the [pvm_name], used to check that the proof given has the right
         PVM kind.
@@ -165,6 +170,7 @@ val valid :
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
+  dal_number_of_slots:int ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   'proof t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
@@ -225,6 +231,9 @@ module type PVM_with_context_and_state = sig
     (** The lag between the time an attestation is published on L1
         (its published_level) and the level it should be confirmed. *)
     val dal_attestation_lag : int
+
+    (** The number of DAL slots provided by the L1. *)
+    val dal_number_of_slots : int
   end
 end
 

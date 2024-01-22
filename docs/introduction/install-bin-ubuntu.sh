@@ -22,6 +22,14 @@ else
   exit 1
 fi
 
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6552
+# Tezos ubuntu packages cannot be installed in a k8s pod.
+if [ -n "${FF_KUBERNETES_HONOR_ENTRYPOINT}" ]; then
+  echo "Container orchestrated by Kubernetes detected, need to create the file /.dockerenv."
+  echo "See https://github.com/serokell/tezos-packaging/issues/734 for further explanation."
+  echo "Note: Remove this workaround when the issue above is fixed."
+  touch /.dockerenv
+fi
 # TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 set -e
 set -x

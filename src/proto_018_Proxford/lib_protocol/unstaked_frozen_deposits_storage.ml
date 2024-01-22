@@ -26,8 +26,8 @@
 let current_unslashable_cycle ctxt =
   let cycle = (Raw_context.current_level ctxt).cycle in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let max_slashing_period = Constants_storage.max_slashing_period ctxt in
-  Cycle_repr.sub cycle (preserved_cycles + max_slashing_period - 1)
+  let max_slashing_period = Constants_repr.max_slashing_period in
+  Cycle_repr.sub cycle (preserved_cycles + max_slashing_period)
 
 let get_all ctxt contract =
   let open Lwt_result_syntax in
@@ -70,7 +70,7 @@ let update_balance ~f ctxt delegate_contract cycle =
 
 let credit_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
+  let delegate = Unstaked_frozen_staker_repr.delegate staker in
   let delegate_contract = Contract_repr.Implicit delegate in
   let f deposits = Deposits_repr.(deposits +? amount) in
   let* ctxt = Stake_storage.add_delegated_stake ctxt delegate amount in
@@ -78,7 +78,7 @@ let credit_only_call_from_token ctxt staker cycle amount =
 
 let spend_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
+  let delegate = Unstaked_frozen_staker_repr.delegate staker in
   let delegate_contract = Contract_repr.Implicit delegate in
   let f Deposits_repr.{initial_amount; current_amount} =
     let open Result_syntax in
@@ -86,4 +86,14 @@ let spend_only_call_from_token ctxt staker cycle amount =
     Deposits_repr.{initial_amount; current_amount}
   in
   let* ctxt = Stake_storage.remove_delegated_stake ctxt delegate amount in
+  update_balance ~f ctxt delegate_contract cycle
+
+let decrease_initial_amount_only_for_stake_from_unstake ctxt delegate cycle
+    amount =
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let f Deposits_repr.{initial_amount; current_amount} =
+    let open Result_syntax in
+    let+ initial_amount = Tez_repr.(initial_amount -? amount) in
+    Deposits_repr.{initial_amount; current_amount}
+  in
   update_balance ~f ctxt delegate_contract cycle

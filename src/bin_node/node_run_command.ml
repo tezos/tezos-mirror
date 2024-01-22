@@ -103,15 +103,14 @@ module Event = struct
       ~level:Warning
       ()
 
-  let starting_rpc_server =
-    declare_4
+  let starting_local_rpc_server =
+    declare_3
       ~section
-      ~name:"starting_rpc_server"
+      ~name:"starting_local_rpc_server"
       ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)
-      ("tls", Data_encoding.bool)
       ("acl_policy", Data_encoding.string)
 
   let starting_metrics_server =
@@ -150,12 +149,12 @@ module Event = struct
       ~level:Notice
       ()
 
-  let shutting_down_rpc_server =
+  let shutting_down_local_rpc_server =
     declare_0
       ~section
-      ~name:"shutting_down_rpc_server"
-      ~msg:"shutting down the RPC server"
-      ~level:Notice
+      ~name:"shutting_down_local_rpc_server"
+      ~msg:"shutting down the local RPC server"
+      ~level:Info
       ()
 
   let bye =
@@ -351,13 +350,6 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     config.shell.chain_validator_limits
     config.shell.history_mode
 
-(* Add default accepted CORS headers *)
-let sanitize_cors_headers ~default headers =
-  List.map String.lowercase_ascii headers
-  |> String.Set.of_list
-  |> String.Set.(union (of_list default))
-  |> String.Set.elements
-
 let rpc_metrics =
   Prometheus.Summary.v_labels
     ~label_names:["endpoint"; "method"]
@@ -368,45 +360,48 @@ let rpc_metrics =
 
 module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
-let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
-    (addr, port) =
+type port = int
+
+type single_server_kind = Local of Conduit_lwt_unix.server * port
+
+let extract_mode = function Local (mode, _) -> mode
+
+(* Add default accepted CORS headers *)
+let sanitize_cors_headers ~default headers =
+  List.map String.lowercase_ascii headers
+  |> String.Set.of_list
+  |> String.Set.(union (of_list default))
+  |> String.Set.elements
+
+(* Launches an RPC server depending on the given server kind *)
+let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
+  let media_types = rpc_config.media_type in
   let host = Ipaddr.V6.to_string addr in
-  let version = Tezos_version_value.Current_git_info.version in
-  let commit_info =
-    ({
-       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-       commit_date = Tezos_version_value.Current_git_info.committer_date;
-     }
-      : Tezos_version.Node_version.commit_info)
-  in
-  let dir = Node.build_rpc_directory ~version ~commit_info node in
-  let dir = Node_directory.build_node_directory config dir in
-  let dir =
-    Tezos_rpc.Directory.register_describe_directory_service
-      dir
-      Tezos_rpc.Service.description_service
-  in
-  let mode =
-    match rpc_config.tls with
-    | None -> `TCP (`Port port)
-    | Some {cert; key} ->
-        `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
-  in
-  let acl =
-    let open RPC_server.Acl in
-    find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
-    |> Option.value_f ~default:(fun () -> default addr)
-  in
-  let*! () =
-    Event.(emit starting_rpc_server)
-      (host, port, rpc_config.tls <> None, RPC_server.Acl.policy_type acl)
-  in
-  let cors_headers =
-    sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
+  let* acl =
+    (* Also emits events depending on server kind *)
+    match rpc_server_kind with
+    | Local (mode, port) ->
+        let*! acl_policy = RPC_server.Acl.resolve_domain_names rpc_config.acl in
+        let acl =
+          let open RPC_server.Acl in
+          find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
+          |> Option.value_f ~default:(fun () -> default addr)
+        in
+        let*! () =
+          match (mode : Conduit_lwt_unix.server) with
+          | `TCP _ | `TLS _ | `Unix_domain_socket _ ->
+              Event.(emit starting_local_rpc_server)
+                (host, port, RPC_server.Acl.policy_type acl)
+          | _ -> Lwt.return_unit
+        in
+        return_some acl
   in
   let cors =
+    let cors_headers =
+      sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
+    in
     Resto_cohttp.Cors.
       {
         allowed_origins = rpc_config.cors_origins;
@@ -416,7 +411,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
   let server =
     RPC_server.init_server
       ~cors
-      ~acl
+      ?acl
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
@@ -433,6 +428,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
   let callback =
     RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
   in
+  let mode = extract_mode rpc_server_kind in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -441,27 +437,44 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
          This exception seems to be unreachable.
       *)
-      | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-          tzfail (RPC_Port_already_in_use [(addr, port)])
+      | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") -> (
+          match rpc_server_kind with
+          | Local (_, port) -> tzfail (RPC_Port_already_in_use [(addr, port)]))
       | exn -> fail_with_exn exn)
 
-let init_rpc (config : Config_file.t) node =
+(* Describes the kind of servers that can be handled by the node.
+   - Local_rpc_server: RPC server is run by the node itself
+     (this may block the node in case of heavy RPC load),
+   - No_server: the node is not responding to any RPC. *)
+type rpc_server_kind = Local_rpc_server of RPC_server.server list | No_server
+
+(* Initializes an RPC server handled by the node main process. *)
+let init_local_rpc_server (config : Config_file.t) dir =
   let open Lwt_result_syntax in
-  let media_types = config.rpc.media_type in
-  List.concat_map_es
-    (fun addr ->
-      let* addrs = Config_file.resolve_rpc_listening_addrs addr in
-      match addrs with
-      | [] -> failwith "Cannot resolve listening address: %S" addr
-      | addrs ->
-          let*! acl_policy =
-            RPC_server.Acl.resolve_domain_names config.rpc.acl
-          in
-          List.map_es
-            (fun addr ->
-              launch_rpc_server ~acl_policy ~media_types config node addr)
-            addrs)
-    config.rpc.listen_addrs
+  let* servers =
+    List.concat_map_es
+      (fun addr ->
+        let* addrs = Config_file.resolve_rpc_listening_addrs addr in
+        match addrs with
+        | [] -> failwith "Cannot resolve listening address: %S" addr
+        | addrs ->
+            List.map_es
+              (fun (addr, port) ->
+                let mode =
+                  match config.rpc.tls with
+                  | None -> `TCP (`Port port)
+                  | Some {cert; key} ->
+                      `TLS
+                        ( `Crt_file_path cert,
+                          `Key_file_path key,
+                          `No_password,
+                          `Port port )
+                in
+                launch_rpc_server config dir (Local (mode, port)) addr)
+              addrs)
+      config.rpc.listen_addrs
+  in
+  return (Local_rpc_server servers)
 
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
@@ -499,6 +512,34 @@ let init_zcash () =
       (Printf.sprintf
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
+
+let init_rpc (config : Config_file.t) (node : Node.t) _internal_events =
+  let open Lwt_result_syntax in
+  (* Start local RPC server (handled by the node main process) only
+     when at least one local listen addr is given. *)
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let node_version = Node.get_version node in
+
+  let dir = Node.build_rpc_directory ~node_version ~commit_info node in
+  let dir = Node_directory.build_node_directory config dir in
+  let dir =
+    Tezos_rpc.Directory.register_describe_directory_service
+      dir
+      Tezos_rpc.Service.description_service
+  in
+
+  (* Start RPC process only when at least one listen addr is given. *)
+  let* rpc_server =
+    if config.rpc.listen_addrs = [] then return No_server
+    else init_local_rpc_server config dir
+  in
+  return [rpc_server]
 
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
@@ -568,14 +609,19 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Event.(emit shutting_down_node) ())
   in
-  let* rpc = init_rpc config node in
+  let* rpc_servers = init_rpc config node internal_events in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[log_node_downer]
       (fun _ ->
-        let*! () = Event.(emit shutting_down_rpc_server) () in
-        List.iter_p RPC_server.shutdown rpc)
+        let*! () = Event.(emit shutting_down_local_rpc_server) () in
+        List.iter_s
+          (function
+            | No_server -> Lwt.return_unit
+            | Local_rpc_server rpc_server ->
+                List.iter_p RPC_server.shutdown rpc_server)
+          rpc_servers)
   in
   let node_downer =
     Lwt_exit.register_clean_up_callback
@@ -667,6 +713,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           config)
       (function exn -> fail_with_exn exn)
   in
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt_main.run
     (let*! r = Lwt_exit.wrap_and_exit main_promise in
      match r with

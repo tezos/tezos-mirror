@@ -124,7 +124,7 @@ let get_hash op = JSON.(op |-> "hash" |> as_string)
    the operations in the mempool). *)
 let get_applied_operation_hash_list client =
   let* pending_ops =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   return (List.map get_hash JSON.(pending_ops |-> "applied" |> as_list))
 
@@ -169,7 +169,7 @@ let test_debug_level_misc =
   let endpoint_1 = Client.(Node node_1) in
   let* client_1 = Client.init ~endpoint:endpoint_1 () in
   let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  let level = Node.get_level node_1 in
+  let* level = Node.get_level node_1 in
   Log.info "Node at level %d" level ;
   Log.info "Step 2: Inject a transfer operation, test RPCs." ;
   let* () =
@@ -191,7 +191,7 @@ let test_debug_level_misc =
   in
   Log.info "Hash of injected operation: %s" oph1 ;
   Log.info "2b) operations in block should be empty." ;
-  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
+  let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
   Log.info "RPC.get_operations done." ;
   check_json_is_empty_list
     ?fail_msg:
@@ -210,7 +210,7 @@ let test_debug_level_misc =
   | _ -> Test.fail "List of applied operations in mempool should be empty.") ;
   Log.info
     "3b) operations in block should contain the previously pending operation." ;
-  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
+  let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
   Log.info "RPC.get_operations done." ;
   (match JSON.(ops |> as_list_opt) with
   | Some [x1; x2; x3; x4] -> (

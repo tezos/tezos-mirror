@@ -70,6 +70,6 @@ val error : tztrace -> unit Lwt.t
     refutations. *)
 val degraded_mode : unit -> unit Lwt.t
 
-(** Emit an event for when the node enters the bailout mode to only defends and 
-    cements, does not publish any new commitment. *)
-val bailout_mode : unit -> unit Lwt.t
+(** Emit an event when the node exits after recovering the operator's
+    stakes. *)
+val exit_bailout_mode : unit -> unit Lwt.t

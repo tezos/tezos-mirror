@@ -60,7 +60,7 @@ let some_false_es = Lwt.return some_false_e
 
 let some_e v = Ok (Some v)
 
-let some_s v = Lwt.return (Some v)
+let some_s v = Lwt.return_some v
 
 let some_es v = Lwt.return (Ok (Some v))
 
@@ -200,21 +200,21 @@ let of_result = function Ok v -> Some v | Error _ -> None
 let catch ?(catch_only = fun _ -> true) f =
   match f () with
   | v -> Some v
-  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
-  | exception e -> if catch_only e then None else raise e
+  | exception ((Stack_overflow | Out_of_memory) as e) -> Lwt.reraise e
+  | exception e -> if catch_only e then None else Lwt.reraise e
 
 let catch_o ?(catch_only = fun _ -> true) f =
   match f () with
   | v -> v
-  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
-  | exception e -> if catch_only e then None else raise e
+  | exception ((Stack_overflow | Out_of_memory) as e) -> Lwt.reraise e
+  | exception e -> if catch_only e then None else Lwt.reraise e
 
 let catch_s ?(catch_only = fun _ -> true) f =
   Lwt.try_bind f Lwt.return_some (function
-      | (Stack_overflow | Out_of_memory) as e -> raise e
-      | e -> if catch_only e then Lwt.return_none else raise e)
+      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+      | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)
 
 let catch_os ?(catch_only = fun _ -> true) f =
   Lwt.catch f (function
-      | (Stack_overflow | Out_of_memory) as e -> raise e
-      | e -> if catch_only e then Lwt.return_none else raise e)
+      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+      | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)

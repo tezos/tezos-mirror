@@ -89,15 +89,7 @@ module Shards = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
   let are_shards_available store commitment shard_indexes =
-    let open Lwt_result_syntax in
-    List.for_all_es
-      (fun index ->
-        let*! value = read_value store commitment index in
-        match value with
-        | Ok _ -> return true
-        | Error [Missing_stored_kvs_data _] -> return false
-        | Error e -> fail e)
-      shard_indexes
+    List.for_all_s (value_exists store commitment) shard_indexes
 
   let save_and_notify shards_store shards_watcher commitment shards =
     let open Lwt_result_syntax in
@@ -108,7 +100,10 @@ module Shards = struct
     in
     let* () = write_values shards_store shards |> Errors.other_lwt_result in
     let*! () =
-      Event.(emit stored_slot_shards (commitment, Seq.length shards))
+      List.of_seq shards
+      |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
+             Dal_metrics.shard_stored () ;
+             Event.(emit stored_slot_shard (commitment, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
 
@@ -199,31 +194,31 @@ let encode_commitment = Cryptobox.Commitment.to_b58check
 
 let decode_commitment v =
   trace_decoding_error
-    ~data_kind:Types.Commitment
+    ~data_kind:Types.Store.Commitment
     ~tztrace_of_error:(fun tztrace -> tztrace)
   @@ Cryptobox.Commitment.of_b58check v
 
 let encode_header_status =
-  Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+  Data_encoding.Binary.to_string_exn Types.header_status_encoding
 
 let decode_header_status v =
   trace_decoding_error
-    ~data_kind:Types.Header_status
+    ~data_kind:Types.Store.Header_status
     ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Services.Types.header_status_encoding v
+  @@ Data_encoding.Binary.of_string Types.header_status_encoding v
 
 let decode_slot_id v =
   trace_decoding_error
-    ~data_kind:Types.Slot_id
+    ~data_kind:Types.Store.Slot_id
     ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Services.Types.slot_id_encoding v
+  @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
 
 let encode_slot slot_size =
   Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
 
 let decode_slot slot_size v =
   trace_decoding_error
-    ~data_kind:Types.Slot
+    ~data_kind:Types.Store.Slot
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
 
@@ -242,7 +237,7 @@ module Legacy = struct
 
       val headers : Cryptobox.commitment -> Path.t
 
-      val header : Cryptobox.commitment -> Services.Types.slot_id -> Path.t
+      val header : Cryptobox.commitment -> Types.slot_id -> Path.t
 
       val shards : Cryptobox.commitment -> Path.t
 
@@ -267,16 +262,15 @@ module Legacy = struct
          "Others" path(s) are used to store information of slots headers when
          their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
 
-      val slots_indices : Services.Types.level -> Path.t
+      val slots_indices : Types.level -> Path.t
 
-      val accepted_header_commitment : Services.Types.slot_id -> Path.t
+      val accepted_header_commitment : Types.slot_id -> Path.t
 
-      val accepted_header_status : Services.Types.slot_id -> Path.t
+      val accepted_header_status : Types.slot_id -> Path.t
 
-      val others : Services.Types.slot_id -> Path.t
+      val others : Types.slot_id -> Path.t
 
-      val other_header_status :
-        Services.Types.slot_id -> Cryptobox.commitment -> Path.t
+      val other_header_status : Types.slot_id -> Cryptobox.commitment -> Path.t
     end
   end = struct
     type t = string list
@@ -301,7 +295,7 @@ module Legacy = struct
         root / commitment_repr / "headers"
 
       let header commitment index =
-        let open Services.Types in
+        let open Types in
         let prefix = headers commitment in
         prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
 
@@ -323,7 +317,7 @@ module Legacy = struct
       let slots_indices slot_level = root / Int32.to_string slot_level
 
       let headers index =
-        let open Services.Types in
+        let open Types in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
       let accepted_header index =
@@ -408,7 +402,8 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level slot_headers node_store =
+  let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
+    let module SI = Set.Make (Int) in
     let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
@@ -416,63 +411,73 @@ module Legacy = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
              https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
-    List.iter_es
-      (fun (slot_header, status) ->
-        let Dal_plugin.{slot_index; commitment; published_level} =
-          slot_header
-        in
-        (* This invariant should hold. *)
-        assert (Int32.equal published_level block_level) ;
-        let index = Services.Types.{slot_level = published_level; slot_index} in
-        let header_path = Path.Commitment.header commitment index in
-        let*! () =
-          set
-            ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
-            slots_store
-            header_path
-            ""
-        in
-        let others_path = Path.Level.other_header_status index commitment in
-        match status with
-        | Dal_plugin.Succeeded ->
-            let commitment_path = Path.Level.accepted_header_commitment index in
-            let status_path = Path.Level.accepted_header_status index in
-            let data = encode_commitment commitment in
-            (* Before adding the item in accepted path, we should remove it from
-               others path, as it may appear there with an
-               Unseen_or_not_finalized status. *)
-            let*! () =
-              remove
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                slots_store
-                others_path
-            in
-            let*! () =
-              set
-                ~msg:
-                  (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
-                slots_store
-                commitment_path
-                data
-            in
-            let*! () =
-              set
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-                slots_store
-                status_path
-                (encode_header_status `Waiting_attestation)
-            in
-            return_unit
-        | Dal_plugin.Failed ->
-            let*! () =
-              set
-                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                slots_store
-                others_path
-                (encode_header_status `Not_selected)
-            in
-            return_unit)
-      slot_headers
+    let* waiting =
+      List.fold_left_es
+        (fun waiting (slot_header, status) ->
+          let Dal_plugin.{slot_index; commitment; published_level} =
+            slot_header
+          in
+          (* This invariant should hold. *)
+          assert (Int32.equal published_level block_level) ;
+          let index = Types.{slot_level = published_level; slot_index} in
+          let header_path = Path.Commitment.header commitment index in
+          let*! () =
+            set
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
+              slots_store
+              header_path
+              ""
+          in
+          let others_path = Path.Level.other_header_status index commitment in
+          match status with
+          | Dal_plugin.Succeeded ->
+              let commitment_path =
+                Path.Level.accepted_header_commitment index
+              in
+              let status_path = Path.Level.accepted_header_status index in
+              let data = encode_commitment commitment in
+              (* Before adding the item in accepted path, we should remove it from
+                 others path, as it may appear there with an
+                 Unseen_or_not_finalized status. *)
+              let*! () =
+                remove
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                  slots_store
+                  others_path
+              in
+              let*! () =
+                set
+                  ~msg:
+                    (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
+                  slots_store
+                  commitment_path
+                  data
+              in
+              let*! () =
+                set
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
+                  slots_store
+                  status_path
+                  (encode_header_status `Waiting_attestation)
+              in
+              return (SI.add slot_index waiting)
+          | Dal_plugin.Failed ->
+              let*! () =
+                set
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                  slots_store
+                  others_path
+                  (encode_header_status `Not_selected)
+              in
+              return waiting)
+        SI.empty
+        slot_headers
+    in
+    List.iter
+      (fun i ->
+        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+      (0 -- (number_of_slots - 1)) ;
+    return_unit
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
       attested =
@@ -483,15 +488,17 @@ module Legacy = struct
     let unattested_str = encode_header_status `Unattested in
     List.iter_s
       (fun slot_index ->
-        let index = Services.Types.{slot_level = published_level; slot_index} in
+        let index = Types.{slot_level = published_level; slot_index} in
         let status_path = Path.Level.accepted_header_status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
         in
-        if S.mem slot_index attested then
-          set ~msg store status_path attested_str
+        if S.mem slot_index attested then (
+          Dal_metrics.slot_attested ~set:true slot_index ;
+          set ~msg store status_path attested_str)
         else
           let* old_data_opt = find store status_path in
+          Dal_metrics.slot_attested ~set:false slot_index ;
           if Option.is_some old_data_opt then
             set ~msg store status_path unattested_str
           else
@@ -514,7 +521,7 @@ module Legacy = struct
   let get_commitment_by_published_level_and_index ~level ~slot_index node_store
       =
     let open Lwt_result_syntax in
-    let index = Services.Types.{slot_level = level; slot_index} in
+    let index = Types.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
       find node_store.store @@ Path.Level.accepted_header_commitment index
     in
@@ -533,7 +540,7 @@ module Legacy = struct
         List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
       in
       List.filter
-        (fun {Services.Types.slot_level = l; slot_index = i} ->
+        (fun {Types.slot_level = l; slot_index = i} ->
           keep_field l slot_level && keep_field i slot_index)
         indexes
       |> return
@@ -561,9 +568,9 @@ module Legacy = struct
                     let*? status = decode_header_status status_str in
                     return
                     @@ {
-                         Services.Types.slot_id;
+                         Types.slot_id;
                          commitment;
-                         status = (status :> Services.Types.header_status);
+                         status = (status :> Types.header_status);
                        }
                        :: acc)))
       accu
@@ -592,7 +599,7 @@ module Legacy = struct
     | None -> return acc
     | Some status_str ->
         let*? status = decode_header_status status_str in
-        return @@ ({Services.Types.slot_id; commitment; status} :: acc)
+        return @@ ({Types.slot_id; commitment; status} :: acc)
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
@@ -649,10 +656,7 @@ module Legacy = struct
     let slot_ids =
       List.rev_map
         (fun (index, _tree) ->
-          {
-            Services.Types.slot_level = published_level;
-            slot_index = int_of_string index;
-          })
+          {Types.slot_level = published_level; slot_index = int_of_string index})
         slots_indices
     in
     let* accu = get_other_headers slot_ids store [] in
@@ -674,8 +678,7 @@ module Legacy = struct
     | None -> accu
     | Some hs ->
         List.filter_map
-          (fun header ->
-            if header.Services.Types.status = hs then Some header else None)
+          (fun header -> if header.Types.status = hs then Some header else None)
           accu
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641

@@ -29,23 +29,23 @@ module type BLAKE2S = functor (L : LIB) -> sig
   open L
 
   val mixing_g :
-    Bytes.bl repr Array.t ->
+    Bytes.tl repr Array.t ->
     int ->
     int ->
     int ->
     int ->
-    Bytes.bl repr ->
-    Bytes.bl repr ->
-    Bytes.bl repr Array.t t
+    Bytes.tl repr ->
+    Bytes.tl repr ->
+    Bytes.tl repr Array.t t
 
   val compression :
-    Bytes.bl repr Array.t ->
-    Bytes.bl repr Array.t ->
+    Bytes.tl repr Array.t ->
+    Bytes.tl repr Array.t ->
     Stdint.Uint64.t ->
     bool ->
-    Bytes.bl repr Array.t t
+    Bytes.tl repr Array.t t
 
-  val blake2s : Bytes.bl repr -> bytes -> Bytes.bl repr t
+  val blake2s : Bytes.tl repr -> bytes -> Bytes.tl repr t
 end
 
 module Blake2s : BLAKE2S =

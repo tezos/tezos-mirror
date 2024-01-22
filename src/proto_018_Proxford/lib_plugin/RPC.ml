@@ -28,7 +28,6 @@
 open Protocol
 open Environment
 open Alpha_context
-open Environment.Error_monad
 
 type version = Version_0 | Version_1
 
@@ -100,21 +99,24 @@ module Registration = struct
     ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
   let register0_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.register ~chunked !patched_services s (fun ctxt q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt q i)
 
   let register0 ~chunked s f =
     register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
   let register0_fullctxt_successor_level ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.register ~chunked !patched_services s (fun ctxt q i ->
           let mode =
             if q#successor_level then `Successor_level else `Head_level
           in
-          Services_registration.rpc_init ctxt mode >>=? fun ctxt -> f ctxt q i)
+          let* ctxt = Services_registration.rpc_init ctxt mode in
+          f ctxt q i)
 
   let register0_successor_level ~chunked s f =
     register0_fullctxt_successor_level ~chunked s (fun {context; _} ->
@@ -125,32 +127,35 @@ module Registration = struct
       RPC_directory.register ~chunked !patched_services s (fun _ q i -> f q i)
 
   let opt_register0_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.opt_register ~chunked !patched_services s (fun ctxt q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt q i)
 
   let opt_register0 ~chunked s f =
     opt_register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
   let register1_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.register
         ~chunked
         !patched_services
         s
         (fun (ctxt, arg) q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt arg q i)
 
   let opt_register1_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.opt_register
         ~chunked
         !patched_services
         s
         (fun (ctxt, arg) q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt arg q i)
 
   let register1 ~chunked s f =
@@ -160,13 +165,14 @@ module Registration = struct
     opt_register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
   let register2_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.register
         ~chunked
         !patched_services
         s
         (fun ((ctxt, arg1), arg2) q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt arg1 arg2 q i)
 
   let register2 ~chunked s f =
@@ -174,13 +180,14 @@ module Registration = struct
         f context a1 a2 q i)
 
   let register3_fullctxt ~chunked s f =
+    let open Lwt_result_syntax in
     patched_services :=
       RPC_directory.register
         ~chunked
         !patched_services
         s
         (fun (((ctxt, arg1), arg2), arg3) q i ->
-          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          let* ctxt = Services_registration.rpc_init ctxt `Head_level in
           f ctxt arg1 arg2 arg3 q i)
 
   let register3 ~chunked s f =
@@ -220,6 +227,38 @@ module Scripts = struct
 
     let path = RPC_path.(path / "scripts")
 
+    type other_contract_description = {
+      address : Contract_hash.t;
+      ty : Script.expr;
+    }
+
+    let other_contracts_encoding =
+      list
+        (conv
+           (fun {address; ty} -> (address, ty))
+           (fun (address, ty) -> {address; ty})
+           (obj2
+              (req "address" Contract_hash.encoding)
+              (req "type" Script.expr_encoding)))
+
+    type extra_big_map_description = {
+      id : Big_map.Id.t;
+      kty : Script.expr;
+      vty : Script.expr;
+      items : Script.expr;
+    }
+
+    let extra_big_maps_encoding =
+      list
+        (conv
+           (fun {id; kty; vty; items} -> (id, kty, vty, items))
+           (fun (id, kty, vty, items) -> {id; kty; vty; items})
+           (obj4
+              (req "id" Big_map.Id.encoding)
+              (req "key_type" Script.expr_encoding)
+              (req "val_type" Script.expr_encoding)
+              (req "map_literal" Script.expr_encoding)))
+
     let run_code_input_encoding =
       merge_objs
         (obj10
@@ -235,11 +274,13 @@ module Scripts = struct
            (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
            (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
-        (obj4
+        (obj6
            (opt "unparsing_mode" unparsing_mode_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
            (opt "now" Script_timestamp.encoding)
-           (opt "level" Script_int.n_encoding))
+           (opt "level" Script_int.n_encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let run_code_output_encoding =
       conv
@@ -283,21 +324,49 @@ module Scripts = struct
            (req "type" Script.expr_encoding)
            (req "val" Script.expr_encoding))
 
+    let run_instr_input_encoding =
+      merge_objs
+        (obj10
+           (req "input" stack_encoding)
+           (req "code" Script.expr_encoding)
+           (req "chain_id" Chain_id.encoding)
+           (opt "gas" Gas.Arith.z_integral_encoding)
+           (opt "now" Script_timestamp.encoding)
+           (opt "level" Script_int.n_encoding)
+           (opt "sender" Contract.encoding)
+           (opt "source" Contract.implicit_encoding)
+           (opt "self" Contract.originated_encoding)
+           (opt "parameter" Script.expr_encoding))
+        (obj6
+           (req "amount" Tez.encoding)
+           (opt "balance" Tez.encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "big_maps" extra_big_maps_encoding)
+           (opt "unparsing_mode" unparsing_mode_encoding)
+           (dft "legacy" bool false))
+
+    let run_instr_output_encoding =
+      obj2 (req "output" stack_encoding) (req "gas" Gas.encoding)
+
     let run_tzip4_view_encoding =
       let open Data_encoding in
-      obj10
-        (req "contract" Contract.originated_encoding)
-        (req "entrypoint" Entrypoint.simple_encoding)
-        (req "input" Script.expr_encoding)
-        (req "chain_id" Chain_id.encoding)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
-           Rename the "source" field into "sender" *)
-        (opt "source" Contract.encoding)
-        (opt "payer" Contract.implicit_encoding)
-        (opt "gas" Gas.Arith.z_integral_encoding)
-        (req "unparsing_mode" unparsing_mode_encoding)
-        (opt "now" Script_timestamp.encoding)
-        (opt "level" Script_int.n_encoding)
+      merge_objs
+        (obj10
+           (req "contract" Contract.originated_encoding)
+           (req "entrypoint" Entrypoint.simple_encoding)
+           (req "input" Script.expr_encoding)
+           (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
+           (opt "source" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
+           (opt "gas" Gas.Arith.z_integral_encoding)
+           (req "unparsing_mode" unparsing_mode_encoding)
+           (opt "now" Script_timestamp.encoding)
+           (opt "level" Script_int.n_encoding))
+        (obj2
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let run_script_view_encoding =
       let open Data_encoding in
@@ -315,19 +384,24 @@ module Scripts = struct
            (opt "gas" Gas.Arith.z_integral_encoding)
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
-        (obj1 (opt "level" Script_int.n_encoding))
+        (obj3
+           (opt "level" Script_int.n_encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let normalize_stack_input_encoding =
-      obj3
+      obj5
         (req "input" stack_encoding)
         (req "unparsing_mode" unparsing_mode_encoding)
-        (opt "legacy" bool)
+        (dft "legacy" bool false)
+        (opt "other_contracts" other_contracts_encoding)
+        (opt "extra_big_maps" extra_big_maps_encoding)
 
     let normalize_stack_output_encoding = obj1 (req "output" stack_encoding)
 
     let run_code =
       RPC_service.post_service
-        ~description:"Run a piece of code in the current context"
+        ~description:"Run a Michelson script in the current context"
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:run_code_output_encoding
@@ -336,7 +410,7 @@ module Scripts = struct
     let trace_code =
       RPC_service.post_service
         ~description:
-          "Run a piece of code in the current context, keeping a trace"
+          "Run a Michelson script in the current context, keeping a trace"
         ~query:RPC_query.empty
         ~input:trace_code_input_encoding
         ~output:trace_code_output_encoding
@@ -361,6 +435,14 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "run_script_view")
 
+    let run_instr =
+      RPC_service.post_service
+        ~description:"Run a single Michelson instruction"
+        ~query:RPC_query.empty
+        ~input:run_instr_input_encoding
+        ~output:run_instr_output_encoding
+        RPC_path.(path / "run_instruction")
+
     let typecheck_code =
       RPC_service.post_service
         ~description:"Typecheck a piece of code in the current context"
@@ -369,8 +451,8 @@ module Scripts = struct
           (obj4
              (req "program" Script.expr_encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (opt "legacy" bool)
-             (opt "show_types" bool))
+             (dft "legacy" bool false)
+             (dft "show_types" bool true))
         ~output:
           (obj2
              (req "type_map" Script_tc_errors_registration.type_map_enc)
@@ -386,7 +468,7 @@ module Scripts = struct
              (req "program" Script.expr_encoding)
              (req "storage" Script.expr_encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (opt "legacy" bool))
+             (dft "legacy" bool false))
         ~output:(obj1 (req "script_size" int31))
         RPC_path.(path / "script_size")
 
@@ -401,7 +483,7 @@ module Scripts = struct
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (opt "legacy" bool))
+             (dft "legacy" bool false))
         ~output:(obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
@@ -424,11 +506,13 @@ module Scripts = struct
         ~description:
           "Normalizes some data expression using the requested unparsing mode"
         ~input:
-          (obj4
+          (obj6
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
              (req "unparsing_mode" unparsing_mode_encoding)
-             (opt "legacy" bool))
+             (dft "legacy" bool false)
+             (opt "other_contracts" other_contracts_encoding)
+             (opt "extra_big_maps" extra_big_maps_encoding))
         ~output:(obj1 (req "normalized" Script.expr_encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_data")
@@ -602,25 +686,29 @@ module Scripts = struct
           -> log_element
 
     let unparse_stack ctxt (stack, stack_ty) =
+      let open Lwt_result_syntax in
       (* We drop the gas limit as this function is only used for debugging/errors. *)
       let ctxt = Gas.set_unlimited ctxt in
       let rec unparse_stack :
           type a s.
           (a, s) Script_typed_ir.stack_ty * (a * s) ->
-          Script.expr list tzresult Lwt.t = function
+          Script.expr list Environment.Error_monad.tzresult Lwt.t = function
         | Bot_t, (EmptyCell, EmptyCell) -> return_nil
         | Item_t (ty, rest_ty), (v, rest) ->
-            Script_ir_translator.unparse_data
-              ctxt
-              Unparsing_mode.unparsing_mode
-              ty
-              v
-            >>=? fun (data, _ctxt) ->
-            unparse_stack (rest_ty, rest) >|=? fun rest -> data :: rest
+            let* data, _ctxt =
+              Script_ir_translator.unparse_data
+                ctxt
+                Unparsing_mode.unparsing_mode
+                ty
+                v
+            in
+            let+ rest = unparse_stack (rest_ty, rest) in
+            data :: rest
       in
       unparse_stack (stack_ty, stack)
 
     let trace_logger ctxt : Script_typed_ir.logger =
+      let open Lwt_result_syntax in
       Script_interpreter_logging.make
         (module struct
           let log : log_element list ref = ref []
@@ -636,32 +724,38 @@ module Scripts = struct
           let log_control _ = ()
 
           let get_log () =
-            List.fold_left_es
-              (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
-                let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
-                trace
-                  Plugin_errors.Cannot_serialize_log
-                  (unparse_stack ctxt (stack, stack_ty))
-                >>=? fun stack -> return (ctxt, (loc, consumed_gas, stack) :: l))
-              (ctxt, [])
-              (List.rev !log)
-            >>=? fun (_ctxt, res) -> return (Some (List.rev res))
+            let+ _ctxt, res =
+              List.fold_left_es
+                (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
+                  let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
+                  let+ stack =
+                    Environment.Error_monad.trace
+                      Plugin_errors.Cannot_serialize_log
+                      (unparse_stack ctxt (stack, stack_ty))
+                  in
+                  (ctxt, (loc, consumed_gas, stack) :: l))
+                (ctxt, [])
+                (List.rev !log)
+            in
+            Some (List.rev res)
         end)
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
+      let open Lwt_result_syntax in
       let logger = trace_logger ctxt in
-      Script_interpreter.execute
-        ~logger
-        ~cached_script:None
-        ctxt
-        Unparsing_mode.unparsing_mode
-        step_constants
-        ~script
-        ~entrypoint
-        ~parameter
-        ~internal:true
-      >>=? fun res ->
-      logger.get_log () >|=? fun trace ->
+      let* res =
+        Script_interpreter.execute
+          ~logger
+          ~cached_script:None
+          ctxt
+          Unparsing_mode.unparsing_mode
+          step_constants
+          ~script
+          ~entrypoint
+          ~parameter
+          ~internal:true
+      in
+      let+ trace = logger.get_log () in
       let trace = Option.value ~default:[] trace in
       (res, trace)
   end
@@ -670,30 +764,34 @@ module Scripts = struct
       legacy:bool ->
       context ->
       Script.expr * Script.expr ->
-      context tzresult Lwt.t =
-   fun ~legacy ctxt (data, exp_ty) ->
-    record_trace
-      (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
-      (Script_ir_translator.parse_passable_ty
-         ctxt
-         ~legacy
-         (Micheline.root exp_ty))
-    >>?= fun (Ex_ty exp_ty, ctxt) ->
-    trace_eval
-      (fun () ->
-        let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
-        Script_tc_errors.Ill_typed_data (None, data, exp_ty))
-      (let allow_forged =
-         true
-         (* Safe since we ignore the value afterwards. *)
-       in
-       Script_ir_translator.parse_data
-         ctxt
-         ~elab_conf:(elab_conf ~legacy ())
-         ~allow_forged
-         exp_ty
-         (Micheline.root data))
-    >|=? fun (_, ctxt) -> ctxt
+      context Environment.Error_monad.tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    fun ~legacy ctxt (data, exp_ty) ->
+      let*? Ex_ty exp_ty, ctxt =
+        Environment.Error_monad.record_trace
+          (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
+          (Script_ir_translator.parse_passable_ty
+             ctxt
+             ~legacy
+             (Micheline.root exp_ty))
+      in
+      let+ _, ctxt =
+        Environment.Error_monad.trace_eval
+          (fun () ->
+            let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
+            Script_tc_errors.Ill_typed_data (None, data, exp_ty))
+          (let allow_forged =
+             true
+             (* Safe since we ignore the value afterwards. *)
+           in
+           Script_ir_translator.parse_data
+             ctxt
+             ~elab_conf:(elab_conf ~legacy ())
+             ~allow_forged
+             exp_ty
+             (Micheline.root data))
+      in
+      ctxt
 
   module Unparse_types = struct
     (* Same as the unparsing functions for types in Script_ir_translator but
@@ -790,31 +888,33 @@ module Scripts = struct
         context ->
         legacy:bool ->
         (Script.node * Script.node) list ->
-        (ex_stack * context) tzresult Lwt.t =
-     fun ctxt ~legacy l ->
-      match l with
-      | [] -> return (Ex_stack (Bot_t, EmptyCell, EmptyCell), ctxt)
-      | (ty_node, data_node) :: l ->
-          Lwt.return
-          @@ Script_ir_translator.parse_ty
-               ctxt
-               ~legacy
-               ~allow_lazy_storage:true
-               ~allow_operation:true
-               ~allow_contract:true
-               ~allow_ticket:true
-               ty_node
-          >>=? fun (Ex_ty ty, ctxt) ->
-          let elab_conf = elab_conf ~legacy () in
-          Script_ir_translator.parse_data
-            ctxt
-            ~elab_conf
-            ~allow_forged:true
-            ty
-            data_node
-          >>=? fun (x, ctxt) ->
-          parse_stack ctxt ~legacy l >>=? fun (Ex_stack (sty, y, st), ctxt) ->
-          return (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
+        (ex_stack * context) Environment.Error_monad.tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      fun ctxt ~legacy l ->
+        match l with
+        | [] -> return (Ex_stack (Bot_t, EmptyCell, EmptyCell), ctxt)
+        | (ty_node, data_node) :: l ->
+            let*? Ex_ty ty, ctxt =
+              Script_ir_translator.parse_ty
+                ctxt
+                ~legacy
+                ~allow_lazy_storage:true
+                ~allow_operation:true
+                ~allow_contract:true
+                ~allow_ticket:true
+                ty_node
+            in
+            let elab_conf = elab_conf ~legacy () in
+            let* x, ctxt =
+              Script_ir_translator.parse_data
+                ctxt
+                ~elab_conf
+                ~allow_forged:true
+                ty
+                data_node
+            in
+            let+ Ex_stack (sty, y, st), ctxt = parse_stack ctxt ~legacy l in
+            (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
 
     let rec unparse_stack :
         type a s.
@@ -823,18 +923,21 @@ module Scripts = struct
         (a, s) Script_typed_ir.stack_ty ->
         a ->
         s ->
-        ((Script.expr * Script.expr) list * context) tzresult Lwt.t =
+        ((Script.expr * Script.expr) list * context)
+        Environment.Error_monad.tzresult
+        Lwt.t =
+      let open Lwt_result_syntax in
       let loc = Micheline.dummy_location in
       fun ctxt unparsing_mode sty x st ->
         match (sty, x, st) with
         | Bot_t, EmptyCell, EmptyCell -> return ([], ctxt)
         | Item_t (ty, sty), x, (y, st) ->
-            Script_ir_unparser.unparse_ty ~loc ctxt ty
-            >>?= fun (ty_node, ctxt) ->
-            Script_ir_translator.unparse_data ctxt unparsing_mode ty x
-            >>=? fun (data_node, ctxt) ->
-            unparse_stack ctxt unparsing_mode sty y st >>=? fun (l, ctxt) ->
-            return ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
+            let*? ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc ctxt ty in
+            let* data_node, ctxt =
+              Script_ir_translator.unparse_data ctxt unparsing_mode ty x
+            in
+            let+ l, ctxt = unparse_stack ctxt unparsing_mode sty y st in
+            ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
   end
 
   let rec pp_instr_name :
@@ -1007,13 +1110,14 @@ module Scripts = struct
       | ILog (_, _, _, _, instr) ->
           Format.fprintf fmt "log/%a" pp_instr_name instr
 
-  type error += Run_operation_does_not_support_consensus_operations
+  type Environment.Error_monad.error +=
+    | Run_operation_does_not_support_consensus_operations
 
   let () =
     let description =
       "The run_operation RPC does not support consensus operations."
     in
-    register_error_kind
+    Environment.Error_monad.register_error_kind
       `Permanent
       ~id:"run_operation_does_not_support_consensus_operations"
       ~title:"Run operation does not support consensus operations"
@@ -1039,8 +1143,9 @@ module Scripts = struct
       | Operation_data {contents = Single (Preattestation _); _}
       | Operation_data {contents = Single (Attestation _); _}
       | Operation_data {contents = Single (Dal_attestation _); _} ->
-          error Run_operation_does_not_support_consensus_operations
-      | _ -> ok ()
+          Environment.Error_monad.Result_syntax.tzfail
+            Run_operation_does_not_support_consensus_operations
+      | _ -> Result_syntax.return_unit
     in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
@@ -1123,24 +1228,107 @@ module Scripts = struct
   let default_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
   let register () =
+    let open Lwt_result_syntax in
     let originate_dummy_contract ctxt script balance =
       let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
-      Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, dummy_contract_hash) ->
+      let*? ctxt, dummy_contract_hash =
+        Contract.fresh_contract_from_current_nonce ctxt
+      in
       let dummy_contract = Contract.Originated dummy_contract_hash in
-      Contract.raw_originate
+      let* ctxt =
+        Contract.raw_originate
+          ctxt
+          ~prepaid_bootstrap_storage:false
+          dummy_contract_hash
+          ~script:(script, None)
+      in
+      let+ ctxt, _ =
+        Token.transfer
+          ~origin:Simulation
+          ctxt
+          `Minted
+          (`Contract dummy_contract)
+          balance
+      in
+      (ctxt, dummy_contract_hash)
+    in
+    let originate_dummy_contracts ctxt =
+      List.fold_left_es
+        (fun ctxt {S.address; ty} ->
+          Contract.raw_originate
+            ctxt
+            ~prepaid_bootstrap_storage:false
+            address
+            (* We reuse the default script from View_helpers because
+               the purpose is the same; we only care about having a
+               script declaring the correct parameter type but we will
+               never actually run the script. *)
+            ~script:(View_helpers.make_tzip4_viewer_script ty, None))
         ctxt
-        ~prepaid_bootstrap_storage:false
-        dummy_contract_hash
-        ~script:(script, None)
-      >>=? fun ctxt ->
-      Token.transfer
-        ~origin:Simulation
-        ctxt
-        `Minted
-        (`Contract dummy_contract)
-        balance
-      >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
+    in
+    let initialize_big_maps ctxt big_maps =
+      let* ctxt, (big_map_diff : Lazy_storage.diffs) =
+        List.fold_left_es
+          (fun (ctxt, big_map_diff_tl) {S.id; kty; vty; items} ->
+            let open Script_ir_translator in
+            let items = Micheline.root items in
+            let init =
+              Lazy_storage.(Alloc Big_map.{key_type = kty; value_type = vty})
+            in
+            let*? Ex_comparable_ty key_comparable_type, ctxt =
+              parse_comparable_ty ctxt (Micheline.root kty)
+            in
+            let*? Ex_ty value_type, ctxt =
+              parse_big_map_value_ty ctxt ~legacy:false (Micheline.root vty)
+            in
+            (* Typecheck the update seq to check that the values are well-typed and the keys are sorted *)
+            let*? map_ty =
+              Script_typed_ir.map_t (-1) key_comparable_type value_type
+            in
+            let* _, ctxt =
+              parse_data
+                ctxt
+                ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+                ~allow_forged:true
+                map_ty
+                items
+            in
+            let items =
+              match items with
+              | Micheline.Seq (_, items) -> items
+              | _ -> assert false
+            in
+            (* Build a big_map_diff *)
+            let+ ctxt, updates =
+              List.fold_left_es
+                (fun (ctxt, acc) key_value ->
+                  let open Micheline in
+                  let key, value =
+                    match key_value with
+                    | Prim (_, Michelson_v1_primitives.D_Elt, [key; value], _)
+                      ->
+                        (key, value)
+                    | _ -> assert false
+                  in
+                  let* k, ctxt =
+                    parse_comparable_data ctxt key_comparable_type key
+                  in
+                  let+ key_hash, ctxt = hash_data ctxt key_comparable_type k in
+                  let key = Micheline.strip_locations key in
+                  let value = Some (Micheline.strip_locations value) in
+                  (ctxt, Big_map.{key; key_hash; value} :: acc))
+                (ctxt, [])
+                items
+            in
+            ( ctxt,
+              Lazy_storage.(
+                make Big_map id (Update {init; updates = List.rev updates}))
+              :: big_map_diff_tl ))
+          (ctxt, [])
+          big_maps
+      in
+      let+ ctxt, _size_change = Lazy_storage.apply ctxt big_map_diff in
+      ctxt
     in
     let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
       match (sender_opt, payer_opt) with
@@ -1150,53 +1338,89 @@ module Scripts = struct
       | None, Some c -> (Contract.Implicit c, c)
       | Some sender, Some payer -> (sender, payer)
     in
-    let configure_contracts ctxt script balance ~sender_opt ~payer_opt ~self_opt
-        =
-      (match self_opt with
-      | None ->
-          let balance = Option.value ~default:default_balance balance in
-          originate_dummy_contract ctxt script balance >>=? fun (ctxt, addr) ->
-          return (ctxt, addr, balance)
-      | Some addr ->
-          default_from_context
-            ctxt
-            (fun c -> Contract.get_balance c @@ Contract.Originated addr)
-            balance
-          >>=? fun bal -> return (ctxt, addr, bal))
-      >>=? fun (ctxt, self, balance) ->
+    let compute_step_constants ctxt ~balance ~amount ~chain_id ~sender_opt
+        ~payer_opt ~self ~now_opt ~level_opt =
       let sender, payer =
         sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
       in
-      return (ctxt, {balance; self; sender; payer})
+      let now =
+        match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
+      in
+      let level =
+        match level_opt with
+        | None ->
+            (Level.current ctxt).level |> Raw_level.to_int32
+            |> Script_int.of_int32 |> Script_int.abs
+        | Some z -> z
+      in
+      let open Script_interpreter in
+      let sender = Destination.Contract sender in
+      (ctxt, {sender; payer; self; amount; balance; chain_id; now; level})
+    in
+    let configure_gas_and_step_constants ctxt ~script ~gas_opt ~balance ~amount
+        ~chain_id ~sender_opt ~payer_opt ~self_opt ~now_opt ~level_opt =
+      let gas =
+        match gas_opt with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt
+      in
+      let ctxt = Gas.set_limit ctxt gas in
+      let+ ctxt, self, balance =
+        match self_opt with
+        | None ->
+            let balance = Option.value ~default:default_balance balance in
+            let+ ctxt, addr = originate_dummy_contract ctxt script balance in
+            (ctxt, addr, balance)
+        | Some addr ->
+            let+ bal =
+              default_from_context
+                ctxt
+                (fun c -> Contract.get_balance c @@ Contract.Originated addr)
+                balance
+            in
+            (ctxt, addr, bal)
+      in
+      compute_step_constants
+        ctxt
+        ~balance
+        ~amount
+        ~chain_id
+        ~sender_opt
+        ~payer_opt
+        ~self
+        ~now_opt
+        ~level_opt
     in
     let script_entrypoint_type ctxt expr entrypoint =
       let ctxt = Gas.set_unlimited ctxt in
       let legacy = false in
       let open Script_ir_translator in
-      parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
-      Lwt.return
-        ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-        >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _) ->
-          Gas_monad.run ctxt
-          @@ Script_ir_translator.find_entrypoint
-               ~error_details:(Informative ())
-               arg_type
-               entrypoints
-               entrypoint
-          >>? fun (r, _ctxt) ->
-          r >|? fun (Ex_ty_cstr {original_type_expr; _}) ->
-          Micheline.strip_locations original_type_expr )
+      let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+        parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+      in
+      let*? r, _ctxt =
+        Gas_monad.run ctxt
+        @@ Script_ir_translator.find_entrypoint
+             ~error_details:(Informative ())
+             arg_type
+             entrypoints
+             entrypoint
+      in
+      let*? (Ex_ty_cstr {original_type_expr; _}) = r in
+      return @@ Micheline.strip_locations original_type_expr
     in
     let script_view_type ctxt contract expr view =
       let ctxt = Gas.set_unlimited ctxt in
       let open Script_ir_translator in
-      parse_toplevel ctxt expr >>=? fun ({views; _}, _) ->
-      Lwt.return
-        ( Script_string.of_string view >>? fun view_name ->
-          match Script_map.get view_name views with
-          | None -> error (View_helpers.View_not_found (contract, view))
-          | Some Script_typed_ir.{input_ty; output_ty; _} ->
-              ok (input_ty, output_ty) )
+      let* {views; _}, _ = parse_toplevel ctxt expr in
+      let*? view_name = Script_string.of_string view in
+      match Script_map.get view_name views with
+      | None ->
+          Environment.Error_monad.tzfail
+            (View_helpers.View_not_found (contract, view))
+      | Some Script_typed_ir.{input_ty; output_ty; _} ->
+          return (input_ty, output_ty)
     in
     Registration.register0
       ~chunked:true
@@ -1214,59 +1438,54 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas, now, level) )
+          ( unparsing_mode,
+            gas_opt,
+            now_opt,
+            level_opt,
+            other_contracts,
+            extra_big_maps ) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        configure_contracts
-          ctxt
-          {storage; code}
-          balance
-          ~sender_opt
-          ~payer_opt
-          ~self_opt
-        >>=? fun (ctxt, {self; sender; payer; balance}) ->
-        let gas =
-          match gas with
-          | Some gas -> gas
-          | None -> Constants.hard_gas_limit_per_operation ctxt
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
+            ctxt
+            ~script:{storage; code}
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self_opt
+            ~now_opt
+            ~level_opt
         in
-        let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+        let+ ( {
+                 script = _;
+                 code_size = _;
+                 Script_interpreter.storage;
+                 operations;
+                 lazy_storage_diff;
+                 ticket_diffs = _;
+                 ticket_receipt = _;
+               },
+               _ ) =
+          Script_interpreter.execute
+            ctxt
+            unparsing_mode
+            step_constants
+            ~cached_script:None
+            ~script:{storage; code}
+            ~entrypoint
+            ~parameter
+            ~internal:true
         in
-        let level =
-          match level with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {sender; payer; self; amount; balance; chain_id; now; level}
-        in
-        Script_interpreter.execute
-          ctxt
-          unparsing_mode
-          step_constants
-          ~cached_script:None
-          ~script:{storage; code}
-          ~entrypoint
-          ~parameter
-          ~internal:true
-        >|=? fun ( {
-                     script = _;
-                     code_size = _;
-                     Script_interpreter.storage;
-                     operations;
-                     lazy_storage_diff;
-                     ticket_diffs = _;
-                     ticket_receipt = _;
-                   },
-                   _ ) ->
         ( storage,
           Apply_internal_results.packed_internal_operations operations,
           lazy_storage_diff )) ;
@@ -1286,61 +1505,56 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas, now, level) )
+          ( unparsing_mode,
+            gas_opt,
+            now_opt,
+            level_opt,
+            other_contracts,
+            extra_big_maps ) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        configure_contracts
-          ctxt
-          {storage; code}
-          balance
-          ~sender_opt
-          ~payer_opt
-          ~self_opt
-        >>=? fun (ctxt, {self; sender; payer; balance}) ->
-        let gas =
-          match gas with
-          | Some gas -> gas
-          | None -> Constants.hard_gas_limit_per_operation ctxt
-        in
-        let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
-        in
-        let level =
-          match level with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {sender; payer; self; amount; balance; chain_id; now; level}
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
+            ctxt
+            ~script:{storage; code}
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self_opt
+            ~now_opt
+            ~level_opt
         in
         let module Unparsing_mode = struct
           let unparsing_mode = unparsing_mode
         end in
         let module Interp = Traced_interpreter (Unparsing_mode) in
-        Interp.execute
-          ctxt
-          step_constants
-          ~script:{storage; code}
-          ~entrypoint
-          ~parameter
-        >|=? fun ( ( {
-                       script = _;
-                       code_size = _;
-                       Script_interpreter.storage;
-                       operations;
-                       lazy_storage_diff;
-                       ticket_diffs = _;
-                       ticket_receipt = _;
-                     },
-                     _ctxt ),
-                   trace ) ->
+        let+ ( ( {
+                   script = _;
+                   code_size = _;
+                   Script_interpreter.storage;
+                   operations;
+                   lazy_storage_diff;
+                   ticket_diffs = _;
+                   ticket_receipt = _;
+                 },
+                 _ctxt ),
+               trace ) =
+          Interp.execute
+            ctxt
+            step_constants
+            ~script:{storage; code}
+            ~entrypoint
+            ~parameter
+        in
         ( storage,
           Apply_internal_results.packed_internal_operations operations,
           trace,
@@ -1351,37 +1565,54 @@ module Scripts = struct
       (fun
         ctxt
         ()
-        ( contract_hash,
-          entrypoint,
-          input,
-          chain_id,
-          sender_opt,
-          payer_opt,
-          gas,
-          unparsing_mode,
-          now,
-          level )
+        ( ( contract_hash,
+            entrypoint,
+            input,
+            chain_id,
+            sender_opt,
+            payer_opt,
+            gas,
+            unparsing_mode,
+            now_opt,
+            level_opt ),
+          (other_contracts, extra_big_maps) )
       ->
-        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
-        Option.fold
-          ~some:ok
-          ~none:(error View_helpers.Viewed_contract_has_no_script)
-          script_opt
-        >>?= fun script ->
-        Script_repr.(force_decode script.code) >>?= fun decoded_script ->
-        script_entrypoint_type ctxt decoded_script entrypoint
-        >>=? fun view_ty ->
-        View_helpers.extract_view_output_type entrypoint view_ty >>?= fun ty ->
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
+        let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
+        let*? script =
+          Option.fold
+            ~some:Result_syntax.return
+            ~none:
+              (Environment.Error_monad.Result_syntax.tzfail
+                 View_helpers.Viewed_contract_has_no_script)
+            script_opt
+        in
+        let*? decoded_script = Script_repr.(force_decode script.code) in
+        let* view_ty = script_entrypoint_type ctxt decoded_script entrypoint in
+        let*? ty = View_helpers.extract_view_output_type entrypoint view_ty in
         let contract = Contract.Originated contract_hash in
-        Contract.get_balance ctxt contract >>=? fun balance ->
-        Error_monad.trace View_helpers.View_callback_origination_failed
-        @@ originate_dummy_contract
-             ctxt
-             (View_helpers.make_tzip4_viewer_script ty)
-             Tez.zero
-        >>=? fun (ctxt, viewer_contract) ->
-        let sender, payer =
-          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
+        let* balance = Contract.get_balance ctxt contract in
+        let* ctxt, viewer_contract =
+          Error_monad.trace View_helpers.View_callback_origination_failed
+          @@ originate_dummy_contract
+               ctxt
+               (View_helpers.make_tzip4_viewer_script ty)
+               Tez.zero
+        in
+        let ctxt, step_constants =
+          compute_step_constants
+            ctxt
+            ~balance
+            ~amount:Tez.zero
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self:contract_hash
+            ~now_opt
+            ~level_opt
         in
         let gas =
           Option.value
@@ -1389,54 +1620,31 @@ module Scripts = struct
             gas
         in
         let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
-        in
-        let level =
-          match level with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {
-            sender;
-            payer;
-            self = contract_hash;
-            amount = Tez.zero;
-            balance;
-            chain_id;
-            now;
-            level;
-          }
-        in
         let parameter =
           View_helpers.make_view_parameter
             (Micheline.root input)
             (Contract.Originated viewer_contract)
         in
-        Script_interpreter.execute
-          ctxt
-          unparsing_mode
-          step_constants
-          ~script
-          ~cached_script:None
-          ~entrypoint
-          ~parameter
-          ~internal:true
-        >>=? fun ( {
-                     Script_interpreter.operations;
-                     script = _;
-                     code_size = _;
-                     storage = _;
-                     lazy_storage_diff = _;
-                     ticket_diffs = _;
-                     ticket_receipt = _;
-                   },
-                   _ctxt ) ->
+        let* ( {
+                 Script_interpreter.operations;
+                 script = _;
+                 code_size = _;
+                 storage = _;
+                 lazy_storage_diff = _;
+                 ticket_diffs = _;
+                 ticket_receipt = _;
+               },
+               _ctxt ) =
+          Script_interpreter.execute
+            ctxt
+            unparsing_mode
+            step_constants
+            ~script
+            ~cached_script:None
+            ~entrypoint
+            ~parameter
+            ~internal:true
+        in
         Lwt.return
           (View_helpers.extract_parameter_from_operations
              entrypoint
@@ -1457,25 +1665,37 @@ module Scripts = struct
             payer_opt,
             gas,
             unparsing_mode,
-            now ),
-          level )
+            now_opt ),
+          (level_opt, other_contracts, extra_big_maps) )
       ->
-        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
-        Option.fold
-          ~some:ok
-          ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
-          script_opt
-        >>?= fun script ->
-        Script_repr.(force_decode script.code) >>?= fun decoded_script ->
-        let contract = Contract.Originated contract_hash in
-        script_view_type ctxt contract_hash decoded_script view
-        >>=? fun (input_ty, output_ty) ->
-        Contract.get_balance ctxt contract >>=? fun balance ->
-        let sender, payer =
-          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
+        let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
+        let*? script =
+          Option.fold
+            ~some:Result_syntax.return
+            ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
+            script_opt
         in
-        let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+        let*? decoded_script = Script_repr.(force_decode script.code) in
+        let contract = Contract.Originated contract_hash in
+        let* input_ty, output_ty =
+          script_view_type ctxt contract_hash decoded_script view
+        in
+        let* balance = Contract.get_balance ctxt contract in
+        let ctxt, step_constants =
+          compute_step_constants
+            ctxt
+            ~balance
+            ~amount:Tez.zero
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self:contract_hash
+            ~now_opt
+            ~level_opt
         in
         (* Using [Gas.set_unlimited] won't work, since the interpreter doesn't
            use this mode (see !4034#note_774734253) and still consumes gas.
@@ -1492,26 +1712,6 @@ module Scripts = struct
           if unlimited_gas then Gas.set_limit ctxt max_gas
           else Gas.set_limit ctxt gas
         in
-        let level =
-          Option.value
-            level
-            ~default:
-              ((Level.current ctxt).level |> Raw_level.to_int32
-             |> Script_int.of_int32 |> Script_int.abs)
-        in
-        let step_constants =
-          let sender = Destination.Contract sender in
-          {
-            Script_interpreter.sender;
-            payer;
-            self = contract_hash;
-            amount = Tez.zero;
-            balance;
-            chain_id;
-            now;
-            level;
-          }
-        in
         let viewer_script =
           View_helpers.make_michelson_viewer_script
             contract
@@ -1523,45 +1723,45 @@ module Scripts = struct
         let parameter =
           Micheline.(strip_locations (Prim (0, Script.D_Unit, [], [])))
         in
-        Script_interpreter.execute
-          ctxt
-          unparsing_mode
-          step_constants
-          ~script:viewer_script
-          ~cached_script:None
-          ~entrypoint:Entrypoint.default
-          ~parameter
-          ~internal:true
-        >>=? fun ( {
-                     Script_interpreter.operations = _;
-                     script = _;
-                     code_size = _;
-                     storage;
-                     lazy_storage_diff = _;
-                     ticket_diffs = _;
-                     ticket_receipt = _;
-                   },
-                   _ctxt ) ->
-        View_helpers.extract_value_from_storage storage >>?= fun value ->
+        let* ( {
+                 Script_interpreter.operations = _;
+                 script = _;
+                 code_size = _;
+                 storage;
+                 lazy_storage_diff = _;
+                 ticket_diffs = _;
+                 ticket_receipt = _;
+               },
+               _ctxt ) =
+          Script_interpreter.execute
+            ctxt
+            unparsing_mode
+            step_constants
+            ~script:viewer_script
+            ~cached_script:None
+            ~entrypoint:Entrypoint.default
+            ~parameter
+            ~internal:true
+        in
+        let*? value = View_helpers.extract_value_from_storage storage in
         return (Micheline.strip_locations value)) ;
     Registration.register0
       ~chunked:false
       S.typecheck_code
       (fun ctxt () (expr, maybe_gas, legacy, show_types) ->
-        let legacy = Option.value ~default:false legacy in
-        let show_types = Option.value ~default:true show_types in
         let ctxt =
           match maybe_gas with
           | None -> Gas.set_unlimited ctxt
           | Some gas -> Gas.set_limit ctxt gas
         in
-        Script_ir_translator.typecheck_code ~legacy ~show_types ctxt expr
-        >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
+        let+ res, ctxt =
+          Script_ir_translator.typecheck_code ~legacy ~show_types ctxt expr
+        in
+        (res, Gas.level ctxt)) ;
     Registration.register0
       ~chunked:false
       S.script_size
       (fun ctxt () (expr, storage, maybe_gas, legacy) ->
-        let legacy = Option.value ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None -> Gas.set_unlimited ctxt
@@ -1569,25 +1769,20 @@ module Scripts = struct
         in
         let elab_conf = elab_conf ~legacy () in
         let code = Script.lazy_expr expr in
-        Script_ir_translator.parse_code ~elab_conf ctxt ~code
-        >>=? fun ( Ex_code
-                     (Code
-                       {
-                         code;
-                         arg_type;
-                         storage_type;
-                         views;
-                         entrypoints;
-                         code_size;
-                       }),
-                   ctxt ) ->
-        Script_ir_translator.parse_data
-          ~elab_conf
-          ~allow_forged:true
-          ctxt
-          storage_type
-          (Micheline.root storage)
-        >>=? fun (storage, _) ->
+        let* ( Ex_code
+                 (Code
+                   {code; arg_type; storage_type; views; entrypoints; code_size}),
+               ctxt ) =
+          Script_ir_translator.parse_code ~elab_conf ctxt ~code
+        in
+        let* storage, _ =
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ~allow_forged:true
+            ctxt
+            storage_type
+            (Micheline.root storage)
+        in
         let script =
           Script_ir_translator.Ex_script
             (Script
@@ -1602,19 +1797,20 @@ module Scripts = struct
                })
         in
         let size, cost = Script_ir_translator.script_size script in
-        Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;
+        let*? _ctxt = Gas.consume ctxt cost in
+        return size) ;
 
     Registration.register0
       ~chunked:false
       S.typecheck_data
       (fun ctxt () (data, ty, maybe_gas, legacy) ->
-        let legacy = Option.value ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None -> Gas.set_unlimited ctxt
           | Some gas -> Gas.set_limit ctxt gas
         in
-        typecheck_data ~legacy ctxt (data, ty) >|=? fun ctxt -> Gas.level ctxt) ;
+        let+ ctxt = typecheck_data ~legacy ctxt (data, ty) in
+        Gas.level ctxt) ;
     Registration.register0
       ~chunked:true
       S.pack_data
@@ -1625,73 +1821,208 @@ module Scripts = struct
           | None -> Gas.set_unlimited ctxt
           | Some gas -> Gas.set_limit ctxt gas
         in
-        parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
-        >>?= fun (Ex_ty typ, ctxt) ->
-        parse_data
-          ctxt
-          ~elab_conf:(elab_conf ~legacy:true ())
-          ~allow_forged:true
-          typ
-          (Micheline.root expr)
-        >>=? fun (data, ctxt) ->
-        Script_ir_translator.pack_data ctxt typ data >|=? fun (bytes, ctxt) ->
+        let*? Ex_ty typ, ctxt =
+          parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
+        in
+        let* data, ctxt =
+          parse_data
+            ctxt
+            ~elab_conf:(elab_conf ~legacy:true ())
+            ~allow_forged:true
+            typ
+            (Micheline.root expr)
+        in
+        let+ bytes, ctxt = Script_ir_translator.pack_data ctxt typ data in
         (bytes, Gas.level ctxt)) ;
     Registration.register0
       ~chunked:true
       S.normalize_data
-      (fun ctxt () (expr, typ, unparsing_mode, legacy) ->
+      (fun
+        ctxt
+        ()
+        (expr, typ, unparsing_mode, legacy, other_contracts, extra_big_maps)
+      ->
         let open Script_ir_translator in
-        let legacy = Option.value ~default:false legacy in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let ctxt = Gas.set_unlimited ctxt in
-        Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
-        >>?= fun (Ex_ty typ, ctxt) ->
-        parse_data
-          ctxt
-          ~elab_conf:(elab_conf ~legacy ())
-          ~allow_forged:true
-          typ
-          (Micheline.root expr)
-        >>=? fun (data, ctxt) ->
-        Script_ir_translator.unparse_data ctxt unparsing_mode typ data
-        >|=? fun (normalized, _ctxt) -> normalized) ;
+        let*? Ex_ty typ, ctxt =
+          Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
+        in
+        let* data, ctxt =
+          parse_data
+            ctxt
+            ~elab_conf:(elab_conf ~legacy ())
+            ~allow_forged:true
+            typ
+            (Micheline.root expr)
+        in
+        let+ normalized, _ctxt =
+          Script_ir_translator.unparse_data ctxt unparsing_mode typ data
+        in
+        normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_stack
-      (fun ctxt () (stack, unparsing_mode, legacy) ->
-        let legacy = Option.value ~default:false legacy in
+      (fun
+        ctxt
+        ()
+        (stack, unparsing_mode, legacy, other_contracts, extra_big_maps)
+      ->
         let ctxt = Gas.set_unlimited ctxt in
         let nodes =
           List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) stack
         in
-        Normalize_stack.parse_stack ctxt ~legacy nodes
-        >>=? fun (Normalize_stack.Ex_stack (st_ty, x, st), ctxt) ->
-        Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
-        >|=? fun (normalized, _ctxt) -> normalized) ;
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
+        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
+          Normalize_stack.parse_stack ctxt ~legacy nodes
+        in
+        let+ normalized, _ctxt =
+          Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
+        in
+        normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_script
       (fun ctxt () (script, unparsing_mode) ->
         let ctxt = Gas.set_unlimited ctxt in
-        Script_ir_translator.unparse_code
-          ctxt
-          unparsing_mode
-          (Micheline.root script)
-        >|=? fun (normalized, _ctxt) -> normalized) ;
+        let+ normalized, _ctxt =
+          Script_ir_translator.unparse_code
+            ctxt
+            unparsing_mode
+            (Micheline.root script)
+        in
+        normalized) ;
     Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
         let open Script_typed_ir in
         let ctxt = Gas.set_unlimited ctxt in
         (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
-        Script_ir_translator.parse_ty
-          ctxt
-          ~legacy:true
-          ~allow_lazy_storage:true
-          ~allow_operation:true
-          ~allow_contract:true
-          ~allow_ticket:true
-          (Micheline.root typ)
-        >>?= fun (Ex_ty typ, _ctxt) ->
+        let*? Ex_ty typ, _ctxt =
+          Script_ir_translator.parse_ty
+            ctxt
+            ~legacy:true
+            ~allow_lazy_storage:true
+            ~allow_operation:true
+            ~allow_contract:true
+            ~allow_ticket:true
+            (Micheline.root typ)
+        in
         let normalized = Unparse_types.unparse_ty ~loc:() typ in
         return @@ Micheline.strip_locations normalized) ;
+    Registration.register0
+      ~chunked:true
+      S.run_instr
+      (fun
+        ctxt
+        ()
+        ( ( input,
+            code,
+            chain_id,
+            gas_opt,
+            now_opt,
+            level_opt,
+            sender_opt,
+            source_opt,
+            self_opt,
+            parameter_opt ),
+          ( amount,
+            balance,
+            other_contracts,
+            extra_big_maps,
+            unparsing_mode,
+            legacy ) )
+      ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
+        let parameter =
+          Option.value
+            ~default:
+              (Micheline.strip_locations
+                 (Prim (0, Michelson_v1_primitives.T_unit, [], [])))
+            parameter_opt
+        in
+        let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt =
+          Script_ir_translator.parse_parameter_ty_and_entrypoints
+            ctxt
+            ~legacy
+            (Micheline.root parameter)
+        in
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
+            ctxt
+            ~script:(View_helpers.make_tzip4_viewer_script parameter)
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
+            ~sender_opt
+            ~payer_opt:source_opt
+            ~self_opt
+            ~now_opt
+            ~level_opt
+        in
+        let input_nodes =
+          List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) input
+        in
+        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
+          Normalize_stack.parse_stack ctxt ~legacy input_nodes
+        in
+        let* j, ctxt =
+          Script_ir_translator.parse_instr
+            ~elab_conf:(Script_ir_translator_config.make ~legacy ())
+            (Script_tc_context.toplevel
+               ~storage_type:Script_typed_ir.unit_t
+               ~param_type:arg_type
+               ~entrypoints)
+            ctxt
+            (Micheline.root code)
+            st_ty
+        in
+        match j with
+        | Failed {descr} -> (
+            let impossible_stack_ty =
+              Script_typed_ir.(Item_t (never_t, Bot_t))
+            in
+            let descr = descr impossible_stack_ty in
+            let descr = Script_ir_translator.close_descr descr in
+            let* absurd =
+              Script_interpreter.Internals.step_descr
+                None
+                ctxt
+                step_constants
+                descr
+                x
+                st
+            in
+            match absurd with _ -> .)
+        | Typed descr ->
+            let descr = Script_ir_translator.close_descr descr in
+            let* y, output_st, _ctxt =
+              Script_interpreter.Internals.step_descr
+                None
+                ctxt
+                step_constants
+                descr
+                x
+                st
+            in
+            let+ output, ctxt =
+              Normalize_stack.unparse_stack
+                ctxt
+                unparsing_mode
+                descr.kaft
+                y
+                output_st
+            in
+            (output, Gas.level ctxt)) ;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3364
 
        Should [run_operation] be registered at successor level? *)
@@ -1712,28 +2043,29 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
-        Lwt.return
-          ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-          >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
-            ->
-            let unreachable_entrypoint, map =
-              Script_ir_translator.list_entrypoints_uncarbonated
-                arg_type
-                entrypoints
-            in
-            ( unreachable_entrypoint,
-              Entrypoint.Map.fold
-                (fun entry (_ex_ty, original_type_expr) acc ->
-                  ( Entrypoint.to_string entry,
-                    Micheline.strip_locations original_type_expr )
-                  :: acc)
-                map
-                [] ) ))
+        let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+        let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+          parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+        in
+        return
+        @@
+        let unreachable_entrypoint, map =
+          Script_ir_translator.list_entrypoints_uncarbonated
+            arg_type
+            entrypoints
+        in
+        ( unreachable_entrypoint,
+          Entrypoint.Map.fold
+            (fun entry (_ex_ty, original_type_expr) acc ->
+              ( Entrypoint.to_string entry,
+                Micheline.strip_locations original_type_expr )
+              :: acc)
+            map
+            [] ))
 
-  let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ?balance
-      ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self ~now ~level
-      ctxt block =
+  let run_code ~unparsing_mode ~gas ~entrypoint ~balance ~other_contracts
+      ~extra_big_maps ~script ~storage ~input ~amount ~chain_id ~sender ~payer
+      ~self ~now ~level ctxt block =
     RPC_context.make_call0
       S.run_code
       ctxt
@@ -1749,11 +2081,11 @@ module Scripts = struct
           payer,
           self,
           entrypoint ),
-        (unparsing_mode, gas, now, level) )
+        (unparsing_mode, gas, now, level, other_contracts, extra_big_maps) )
 
-  let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-      ?balance ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self
-      ~now ~level ctxt block =
+  let trace_code ~unparsing_mode ~gas ~entrypoint ~balance ~other_contracts
+      ~extra_big_maps ~script ~storage ~input ~amount ~chain_id ~sender ~payer
+      ~self ~now ~level ctxt block =
     RPC_context.make_call0
       S.trace_code
       ctxt
@@ -1769,30 +2101,32 @@ module Scripts = struct
           payer,
           self,
           entrypoint ),
-        (unparsing_mode, gas, now, level) )
+        (unparsing_mode, gas, now, level, other_contracts, extra_big_maps) )
 
-  let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
-      ?sender ?payer ~unparsing_mode ctxt block =
+  let run_tzip4_view ~gas ~other_contracts ~extra_big_maps ~contract ~entrypoint
+      ~input ~chain_id ~now ~level ~sender ~payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_tzip4_view
       ctxt
       block
       ()
-      ( contract,
-        entrypoint,
-        input,
-        chain_id,
-        sender,
-        payer,
-        gas,
-        unparsing_mode,
-        now,
-        level )
+      ( ( contract,
+          entrypoint,
+          input,
+          chain_id,
+          sender,
+          payer,
+          gas,
+          unparsing_mode,
+          now,
+          level ),
+        (other_contracts, extra_big_maps) )
 
   (** [run_script_view] is an helper function to call the corresponding
-        RPC. [unlimited_gas] is set to [false] by default. *)
-  let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
-      ~chain_id ~now ~level ?sender ?payer ~unparsing_mode ctxt block =
+        RPC. *)
+  let run_script_view ~gas ~other_contracts ~extra_big_maps ~contract ~view
+      ~input ~unlimited_gas ~chain_id ~now ~level ~sender ~payer ~unparsing_mode
+      ctxt block =
     RPC_context.make_call0
       S.run_script_view
       ctxt
@@ -1808,9 +2142,25 @@ module Scripts = struct
           gas,
           unparsing_mode,
           now ),
-        level )
+        (level, other_contracts, extra_big_maps) )
 
-  let typecheck_code ?gas ?legacy ~script ?show_types ctxt block =
+  let run_instr ~gas ~legacy ~input ~code ~chain_id ~now ~level ~unparsing_mode
+      ~source ~sender ~self ~parameter ~amount ~balance ~other_contracts
+      ~extra_big_maps ctxt block =
+    RPC_context.make_call0
+      S.run_instr
+      ctxt
+      block
+      ()
+      ( (input, code, chain_id, gas, now, level, sender, source, self, parameter),
+        ( amount,
+          balance,
+          other_contracts,
+          extra_big_maps,
+          unparsing_mode,
+          legacy ) )
+
+  let typecheck_code ~gas ~legacy ~script ~show_types ctxt block =
     RPC_context.make_call0
       S.typecheck_code
       ctxt
@@ -1818,7 +2168,7 @@ module Scripts = struct
       ()
       (script, gas, legacy, show_types)
 
-  let script_size ?gas ?legacy ~script ~storage ctxt block =
+  let script_size ~gas ~legacy ~script ~storage ctxt block =
     RPC_context.make_call0
       S.script_size
       ctxt
@@ -1826,27 +2176,29 @@ module Scripts = struct
       ()
       (script, storage, gas, legacy)
 
-  let typecheck_data ?gas ?legacy ~data ~ty ctxt block =
+  let typecheck_data ~gas ~legacy ~data ~ty ctxt block =
     RPC_context.make_call0 S.typecheck_data ctxt block () (data, ty, gas, legacy)
 
-  let pack_data ?gas ~data ~ty ctxt block =
+  let pack_data ~gas ~data ~ty ctxt block =
     RPC_context.make_call0 S.pack_data ctxt block () (data, ty, gas)
 
-  let normalize_data ?legacy ~data ~ty ~unparsing_mode ctxt block =
+  let normalize_data ~legacy ~other_contracts ~extra_big_maps ~data ~ty
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.normalize_data
       ctxt
       block
       ()
-      (data, ty, unparsing_mode, legacy)
+      (data, ty, unparsing_mode, legacy, other_contracts, extra_big_maps)
 
-  let normalize_stack ?legacy ~stack ~unparsing_mode ctxt block =
+  let normalize_stack ~legacy ~other_contracts ~extra_big_maps ~stack
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.normalize_stack
       ctxt
       block
       ()
-      (stack, unparsing_mode, legacy)
+      (stack, unparsing_mode, legacy, other_contracts, extra_big_maps)
 
   let normalize_script ~script ~unparsing_mode ctxt block =
     RPC_context.make_call0
@@ -1978,62 +2330,69 @@ module Contract = struct
     | Contract.Originated contract -> f contract
 
   let register () =
+    let open Lwt_result_syntax in
     (* Patched RPC: get_storage *)
     Registration.register1
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
         get_contract contract @@ fun contract ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        let* ctxt, script = Contract.get_script ctxt contract in
         match script with
         | None -> return_none
         | Some script ->
             let ctxt = Gas.set_unlimited ctxt in
             let open Script_ir_translator in
-            parse_script
-              ctxt
-              ~elab_conf:(elab_conf ~legacy:true ())
-              ~allow_forged_in_storage:true
-              script
-            >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-            unparse_data ctxt unparsing_mode storage_type storage
-            >|=? fun (storage, _ctxt) -> Some storage) ;
+            let* Ex_script (Script {storage; storage_type; _}), ctxt =
+              parse_script
+                ctxt
+                ~elab_conf:(elab_conf ~legacy:true ())
+                ~allow_forged_in_storage:true
+                script
+            in
+            let+ storage, _ctxt =
+              unparse_data ctxt unparsing_mode storage_type storage
+            in
+            Some storage) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
         get_contract contract @@ fun contract ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        let* ctxt, script = Contract.get_script ctxt contract in
         match script with
         | None -> return_none
         | Some script ->
             let ctxt = Gas.set_unlimited ctxt in
-            Script_ir_translator.parse_and_unparse_script_unaccounted
-              ctxt
-              ~legacy:true
-              ~allow_forged_in_storage:true
-              unparsing_mode
-              ~normalize_types
-              script
-            >>=? fun (script, _ctxt) -> return_some script) ;
+            let+ script, _ctxt =
+              Script_ir_translator.parse_and_unparse_script_unaccounted
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                unparsing_mode
+                ~normalize_types
+                script
+            in
+            Some script) ;
     Registration.register1
       ~chunked:false
       S.get_used_storage_space
       (fun ctxt contract () () ->
         get_contract contract @@ fun _ ->
-        Contract.used_storage_space ctxt contract >>=? return_some) ;
+        let+ x = Contract.used_storage_space ctxt contract in
+        Some x) ;
     Registration.register1
       ~chunked:false
       S.get_paid_storage_space
       (fun ctxt contract () () ->
         get_contract contract @@ fun _ ->
-        Contract.paid_storage_space ctxt contract >>=? return_some) ;
+        let+ x = Contract.paid_storage_space ctxt contract in
+        Some x) ;
     Registration.register1
       ~chunked:false
       S.ticket_balance
       (fun ctxt contract () Ticket_token.{ticketer; contents_type; contents} ->
-        let open Lwt_result_syntax in
         let* ticket_hash, ctxt =
           Ticket_balance_key.make
             ctxt
@@ -2042,14 +2401,13 @@ module Contract = struct
             ~contents_type:(Micheline.root contents_type)
             ~contents:(Micheline.root contents)
         in
-        let* amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
-        return @@ Option.value amount ~default:Z.zero) ;
+        let+ amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
+        Option.value amount ~default:Z.zero) ;
     Registration.opt_register1
       ~chunked:false
       S.all_ticket_balances
       (fun ctxt contract () () ->
         get_contract contract @@ fun contract ->
-        let open Lwt_result_syntax in
         let* ctxt, script = Contract.get_script ctxt contract in
         match script with
         | None -> return_none
@@ -2071,18 +2429,18 @@ module Contract = struct
                 has_tickets
                 storage
             in
-            let* ticket_balances, _ctxt =
+            let+ ticket_balances, _ctxt =
               Ticket_token_map.fold_es
                 ctxt
                 (fun ctxt acc ex_token amount ->
-                  let* unparsed_token, ctxt =
+                  let+ unparsed_token, ctxt =
                     Ticket_token_unparser.unparse ctxt ex_token
                   in
-                  return ((unparsed_token, amount) :: acc, ctxt))
+                  ((unparsed_token, amount) :: acc, ctxt))
                 []
                 ticket_token_map
             in
-            return_some ticket_balances)
+            Some ticket_balances)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -2154,31 +2512,39 @@ module Big_map = struct
   end
 
   let register () =
+    let open Lwt_result_syntax in
     Registration.register2
       ~chunked:true
       S.big_map_get_normalized
       (fun ctxt id key () unparsing_mode ->
         let open Script_ir_translator in
         let ctxt = Gas.set_unlimited ctxt in
-        Big_map.exists ctxt id >>=? fun (ctxt, types) ->
+        let* ctxt, types = Big_map.exists ctxt id in
         match types with
         | None -> raise Not_found
         | Some (_, value_type) -> (
-            parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
-            >>?= fun (Ex_ty value_type, ctxt) ->
-            Big_map.get_opt ctxt id key >>=? fun (_ctxt, value) ->
+            let*? Ex_ty value_type, ctxt =
+              parse_big_map_value_ty
+                ctxt
+                ~legacy:true
+                (Micheline.root value_type)
+            in
+            let* _ctxt, value = Big_map.get_opt ctxt id key in
             match value with
             | None -> raise Not_found
             | Some value ->
-                parse_data
-                  ctxt
-                  ~elab_conf:(elab_conf ~legacy:true ())
-                  ~allow_forged:true
-                  value_type
-                  (Micheline.root value)
-                >>=? fun (value, ctxt) ->
-                unparse_data ctxt unparsing_mode value_type value
-                >|=? fun (value, _ctxt) -> value))
+                let* value, ctxt =
+                  parse_data
+                    ctxt
+                    ~elab_conf:(elab_conf ~legacy:true ())
+                    ~allow_forged:true
+                    value_type
+                    (Micheline.root value)
+                in
+                let+ value, _ctxt =
+                  unparse_data ctxt unparsing_mode value_type value
+                in
+                value))
 
   let big_map_get_normalized ctxt block id key ~unparsing_mode =
     RPC_context.make_call2
@@ -2396,29 +2762,73 @@ module Sc_rollup = struct
         ~input:Ticket_token.unparsed_token_encoding
         ~output:n
         RPC_path.(path_sc_rollup / "ticket_balance")
+
+    let whitelist =
+      RPC_service.get_service
+        ~description:
+          "Whitelist for private smart rollups. If the output is None then the \
+           rollup is public."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(option Sc_rollup.Whitelist.encoding)
+        RPC_path.(path_sc_rollup / "whitelist")
+
+    let last_whitelist_update =
+      RPC_service.get_service
+        ~description:
+          "Last whitelist update for private smart rollups. If the output is \
+           None then the rollup is public."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            option Sc_rollup.Whitelist.last_whitelist_update_encoding)
+        RPC_path.(path_sc_rollup / "last_whitelist_update")
   end
 
   let kind ctxt block sc_rollup_address =
     RPC_context.make_call1 S.kind ctxt block sc_rollup_address ()
 
   let register_inbox () =
+    let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.inbox (fun ctxt () () ->
-        Sc_rollup.Inbox.get_inbox ctxt >>=? fun (inbox, _ctxt) -> return inbox)
+        let+ inbox, _ctxt = Sc_rollup.Inbox.get_inbox ctxt in
+        inbox)
+
+  let register_whitelist () =
+    Registration.register1 ~chunked:true S.whitelist (fun ctxt address () () ->
+        Sc_rollup.Whitelist.find_whitelist_uncarbonated ctxt address)
+
+  let register_last_whitelist_update () =
+    let open Lwt_result_syntax in
+    Registration.register1
+      ~chunked:true
+      S.last_whitelist_update
+      (fun ctxt address () () ->
+        let* ctxt, is_private = Sc_rollup.Whitelist.is_private ctxt address in
+        if is_private then
+          let* _ctxt, last_whitelist_update =
+            Sc_rollup.Whitelist.get_last_whitelist_update ctxt address
+          in
+          return_some last_whitelist_update
+        else return_none)
 
   let register_kind () =
+    let open Lwt_result_syntax in
     Registration.opt_register1 ~chunked:true S.kind @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.kind ctxt address >|=? fun (_ctxt, kind) ->
+    let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
     Some kind
 
   let register_initial_pvm_state_hash () =
+    let open Lwt_result_syntax in
     Registration.opt_register1 ~chunked:true S.initial_pvm_state_hash
     @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.kind ctxt address >|=? fun (_ctxt, kind) ->
+    let+ _ctxt, kind = Alpha_context.Sc_rollup.kind ctxt address in
     match kind with
     | Sc_rollup.Kind.Example_arith ->
         Some Sc_rollup.ArithPVM.reference_initial_state_hash
     | Sc_rollup.Kind.Wasm_2_0_0 ->
         Some Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash
+    | Sc_rollup.Kind.Riscv ->
+        Some Sc_rollup.Riscv_PVM.reference_initial_state_hash
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_genesis_info () =
@@ -2431,11 +2841,11 @@ module Sc_rollup = struct
     genesis_info
 
   let register_last_cemented_commitment_hash_with_level () =
+    let open Lwt_result_syntax in
     Registration.register1
       ~chunked:false
       S.last_cemented_commitment_hash_with_level
     @@ fun ctxt address () () ->
-    let open Lwt_result_syntax in
     let+ last_cemented_commitment, level, _ctxt =
       Alpha_context.Sc_rollup.Commitment
       .last_cemented_commitment_hash_with_level
@@ -2445,27 +2855,27 @@ module Sc_rollup = struct
     (last_cemented_commitment, level)
 
   let register_staked_on_commitment () =
+    let open Lwt_result_syntax in
     Registration.register2 ~chunked:false S.staked_on_commitment
     @@ fun ctxt address staker () () ->
-    let open Lwt_result_syntax in
     let* ctxt, commitment_hash =
       Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
     in
     match commitment_hash with
     | None -> return_none
     | Some commitment_hash ->
-        let* commitment, _ctxt =
+        let+ commitment, _ctxt =
           Alpha_context.Sc_rollup.Commitment.get_commitment
             ctxt
             address
             commitment_hash
         in
-        return_some (commitment_hash, commitment)
+        Some (commitment_hash, commitment)
 
   let register_commitment () =
+    let open Lwt_result_syntax in
     Registration.register2 ~chunked:false S.commitment
     @@ fun ctxt address commitment_hash () () ->
-    let open Lwt_result_syntax in
     let+ commitment, _ =
       Alpha_context.Sc_rollup.Commitment.get_commitment
         ctxt
@@ -2479,18 +2889,15 @@ module Sc_rollup = struct
         Sc_rollup.list_unaccounted context)
 
   let register_ongoing_refutation_games () =
+    let open Lwt_result_syntax in
     Registration.register2
       ~chunked:false
       S.ongoing_refutation_games
       (fun context rollup staker () () ->
-        let open Lwt_result_syntax in
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
-        let* game, _ = get_ongoing_games_for_staker context rollup staker in
-        let game =
-          List.map (fun (game, index) -> (game, index.alice, index.bob)) game
-        in
-        return game)
+        let+ game, _ = get_ongoing_games_for_staker context rollup staker in
+        List.map (fun (game, index) -> (game, index.alice, index.bob)) game)
 
   let register_commitments () =
     Registration.register2
@@ -2520,8 +2927,8 @@ module Sc_rollup = struct
         Sc_rollup.Stake_storage.staker_id_uncarbonated context ~rollup ~pkh)
 
   let register_stakers () =
+    let open Lwt_result_syntax in
     Registration.register1 ~chunked:false S.stakers (fun context rollup () () ->
-        let open Lwt_result_syntax in
         let*! stakers_pkhs =
           Sc_rollup.Stake_storage.stakers_pkhs_uncarbonated context ~rollup
         in
@@ -2538,11 +2945,11 @@ module Sc_rollup = struct
           staker)
 
   let register_timeout () =
+    let open Lwt_result_syntax in
     Registration.register3
       ~chunked:false
       S.timeout
       (fun context rollup staker1 staker2 () () ->
-        let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res =
           Sc_rollup.Refutation_storage.get_timeout context rollup index
@@ -2552,11 +2959,11 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_timeout_reached () =
+    let open Lwt_result_syntax in
     Registration.register3
       ~chunked:false
       S.timeout_reached
       (fun context rollup staker1 staker2 () () ->
-        let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
         match res with
@@ -2564,11 +2971,11 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_can_be_cemented () =
+    let open Lwt_result_syntax in
     Registration.register2
       ~chunked:false
       S.can_be_cemented
       (fun context rollup commitment_hash () () ->
-        let open Lwt_result_syntax in
         let*! res = Sc_rollup.Stake_storage.cement_commitment context rollup in
         match res with
         | Ok (_context, _cemented_commitment, cemented_commitment_hash)
@@ -2598,6 +3005,8 @@ module Sc_rollup = struct
   let register () =
     register_kind () ;
     register_inbox () ;
+    register_whitelist () ;
+    register_last_whitelist_update () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -2618,6 +3027,18 @@ module Sc_rollup = struct
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
   let inbox ctxt block = RPC_context.make_call0 S.inbox ctxt block () ()
+
+  let whitelist ctxt block sc_rollup_address =
+    RPC_context.make_call1 S.whitelist ctxt block sc_rollup_address () ()
+
+  let last_whitelist_update ctxt block sc_rollup_address =
+    RPC_context.make_call1
+      S.last_whitelist_update
+      ctxt
+      block
+      sc_rollup_address
+      ()
+      ()
 
   let genesis_info ctxt block sc_rollup_address =
     RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()
@@ -2744,13 +3165,15 @@ module Dal = struct
   end
 
   let register_dal_confirmed_slot_headers_history () =
+    let open Lwt_result_syntax in
     Registration.register0
       ~chunked:false
       S.dal_confirmed_slot_headers_history
       (fun ctxt () () ->
         if (Constants.parametric ctxt).dal.feature_enable then
-          Dal.Slots_storage.get_slot_headers_history ctxt >|=? Option.some
-        else return None)
+          let+ result = Dal.Slots_storage.get_slot_headers_history ctxt in
+          Option.some result
+        else return_none)
 
   let dal_confirmed_slots_history ctxt block =
     RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
@@ -2863,7 +3286,9 @@ module Forge = struct
   module Manager = struct
     let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         ~gas_limit ~storage_limit operations =
-      Contract_services.manager_key ctxt block source >>= function
+      let open Lwt_result_syntax in
+      let*! result = Contract_services.manager_key ctxt block source in
+      match result with
       | Error _ as e -> Lwt.return e
       | Ok revealed ->
           let ops =
@@ -2884,7 +3309,7 @@ module Forge = struct
                      {source; counter; operation; fee; gas_limit; storage_limit})
                 :: ops
           in
-          Environment.wrap_tzresult @@ Operation.of_list ops >>?= fun ops ->
+          let*? ops = Environment.wrap_tzresult @@ Operation.of_list ops in
           RPC_context.make_call0 S.operations ctxt block () ({branch}, ops)
 
     let reveal ctxt block ~branch ~source ~sourcePubKey ~counter ~fee () =
@@ -3068,13 +3493,14 @@ module Parse = struct
     | Some protocol_data -> protocol_data
 
   let parse_operation (op : Operation.raw) =
+    let open Result_syntax in
     match
       Data_encoding.Binary.of_bytes_opt
         Operation.protocol_data_encoding_with_legacy_attestation_name
         op.proto
     with
-    | Some protocol_data -> ok {shell = op.shell; protocol_data}
-    | None -> error Plugin_errors.Cannot_parse_operation
+    | Some protocol_data -> return {shell = op.shell; protocol_data}
+    | None -> Environment.Error_monad.error Plugin_errors.Cannot_parse_operation
 
   let register () =
     let open Lwt_result_syntax in
@@ -3118,7 +3544,7 @@ module Parse = struct
         (operations, check)
     in
     match v with
-    | Error e -> fail e
+    | Error e -> tzfail e
     | Ok ((Version_0 | Version_1), parse_operation) -> return parse_operation
 
   let block ctxt block shell protocol_data =
@@ -3136,19 +3562,21 @@ end
    intermediate levels are produced at round 0. *)
 let estimated_time round_durations ~current_level ~current_round
     ~current_timestamp ~level ~round =
-  if Level.(level <= current_level) then Result.return_none
+  let open Result_syntax in
+  if Level.(level <= current_level) then return_none
   else
-    Round.timestamp_of_round
-      round_durations
-      ~round
-      ~predecessor_timestamp:current_timestamp
-      ~predecessor_round:current_round
-    >>? fun round_start_at_next_level ->
+    let* round_start_at_next_level =
+      Round.timestamp_of_round
+        round_durations
+        ~round
+        ~predecessor_timestamp:current_timestamp
+        ~predecessor_round:current_round
+    in
     let step = Round.round_duration round_durations Round.zero in
     let diff = Level.diff level current_level in
-    Period.mult (Int32.pred diff) step >>? fun delay ->
-    Timestamp.(round_start_at_next_level +? delay) >>? fun timestamp ->
-    Result.return_some timestamp
+    let* delay = Period.mult (Int32.pred diff) step in
+    let* timestamp = Timestamp.(round_start_at_next_level +? delay) in
+    return_some timestamp
 
 let requested_levels ~default_level ctxt cycles levels =
   match (levels, cycles) with
@@ -3249,7 +3677,8 @@ module Baking_rights = struct
   end
 
   let baking_rights_at_level ctxt max_round level =
-    Round.get ctxt >>=? fun current_round ->
+    let open Lwt_result_syntax in
+    let* current_round = Round.get ctxt in
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
     let round_durations = Alpha_context.Constants.round_durations ctxt in
@@ -3258,19 +3687,20 @@ module Baking_rights = struct
         (* returns the ctxt with an updated cache of slot holders *)
         return (ctxt, List.rev acc)
       else
-        Stake_distribution.baking_rights_owner ctxt level ~round
-        >>=? fun ( ctxt,
-                   _slot,
-                   {Consensus_key.consensus_pkh; delegate; consensus_pk = _} )
-          ->
-        estimated_time
-          round_durations
-          ~current_level
-          ~current_round
-          ~current_timestamp
-          ~level
-          ~round
-        >>?= fun timestamp ->
+        let* ( ctxt,
+               _slot,
+               {Consensus_key.consensus_pkh; delegate; consensus_pk = _} ) =
+          Stake_distribution.baking_rights_owner ctxt level ~round
+        in
+        let*? timestamp =
+          estimated_time
+            round_durations
+            ~current_level
+            ~current_round
+            ~current_timestamp
+            ~level
+            ~round
+        in
         let acc =
           {
             level = level.level;
@@ -3299,6 +3729,7 @@ module Baking_rights = struct
          rights
 
   let register () =
+    let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.baking_rights (fun ctxt q () ->
         let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
         let levels =
@@ -3308,19 +3739,21 @@ module Baking_rights = struct
             cycles
             q.levels
         in
-        Round.of_int
-          (match q.max_round with
-          | None -> default_max_round
-          | Some max_round ->
-              Compare.Int.min
-                max_round
-                (Constants.consensus_committee_size ctxt))
-        >>?= fun max_round ->
-        List.fold_left_map_es
-          (fun ctxt l -> baking_rights_at_level ctxt max_round l)
-          ctxt
-          levels
-        >|=? fun (_ctxt, rights) ->
+        let*? max_round =
+          Round.of_int
+            (match q.max_round with
+            | None -> default_max_round
+            | Some max_round ->
+                Compare.Int.min
+                  max_round
+                  (Constants.consensus_committee_size ctxt))
+        in
+        let+ _ctxt, rights =
+          List.fold_left_map_es
+            (fun ctxt l -> baking_rights_at_level ctxt max_round l)
+            ctxt
+            levels
+        in
         let rights =
           if q.all then List.concat rights
           else List.concat_map remove_duplicated_delegates rights
@@ -3479,19 +3912,21 @@ module Attestation_rights = struct
   end
 
   let attestation_rights_at_level ctxt level =
-    Baking.attesting_rights_by_first_slot ctxt level >>=? fun (ctxt, rights) ->
-    Round.get ctxt >>=? fun current_round ->
+    let open Lwt_result_syntax in
+    let* ctxt, rights = Baking.attesting_rights_by_first_slot ctxt level in
+    let* current_round = Round.get ctxt in
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
     let round_durations = Alpha_context.Constants.round_durations ctxt in
-    estimated_time
-      round_durations
-      ~current_level
-      ~current_round
-      ~current_timestamp
-      ~level
-      ~round:Round.zero
-    >>?= fun estimated_time ->
+    let*? estimated_time =
+      estimated_time
+        round_durations
+        ~current_level
+        ~current_round
+        ~current_timestamp
+        ~level
+        ~round:Round.zero
+    in
     let rights =
       Slot.Map.fold
         (fun first_slot
@@ -3511,12 +3946,14 @@ module Attestation_rights = struct
       (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
 
   let get_attestation_rights ctxt (q : S.attestation_rights_query) =
+    let open Lwt_result_syntax in
     let cycles = match q.cycle with None -> [] | Some cycle -> [cycle] in
     let levels =
       requested_levels ~default_level:(Level.current ctxt) ctxt cycles q.levels
     in
-    List.fold_left_map_es attestation_rights_at_level ctxt levels
-    >|=? fun (_ctxt, rights_per_level) ->
+    let+ _ctxt, rights_per_level =
+      List.fold_left_map_es attestation_rights_at_level ctxt levels
+    in
     let rights_per_level =
       match (q.consensus_keys, q.delegates) with
       | [], [] -> rights_per_level
@@ -3616,7 +4053,8 @@ module Validators = struct
   end
 
   let add_attestation_slots_at_level (ctxt, acc) level =
-    Baking.attesting_rights ctxt level >|=? fun (ctxt, rights) ->
+    let open Lwt_result_syntax in
+    let+ ctxt, rights = Baking.attesting_rights ctxt level in
     ( ctxt,
       Signature.Public_key_hash.Map.fold
         (fun _pkh {Baking.delegate; consensus_key; slots} acc ->
@@ -3625,15 +4063,17 @@ module Validators = struct
         acc )
 
   let register () =
+    let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.validators (fun ctxt q () ->
         let levels =
           requested_levels ~default_level:(Level.current ctxt) ctxt [] q.levels
         in
-        List.fold_left_es
-          add_attestation_slots_at_level
-          (ctxt, [])
-          (List.rev levels)
-        >|=? fun (_ctxt, rights) ->
+        let+ _ctxt, rights =
+          List.fold_left_es
+            add_attestation_slots_at_level
+            (ctxt, [])
+            (List.rev levels)
+        in
         let rights =
           match q.delegates with
           | [] -> rights
@@ -3665,6 +4105,70 @@ module Validators = struct
       block
       {levels; delegates; consensus_keys}
       ()
+end
+
+module Staking = struct
+  let path =
+    RPC_path.(
+      open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
+
+  let stakers_encoding =
+    let open Data_encoding in
+    let staker_enconding =
+      obj2
+        (req "staker" Alpha_context.Contract.implicit_encoding)
+        (req "frozen_deposits" Tez.encoding)
+    in
+    list staker_enconding
+
+  module S = struct
+    let stakers =
+      RPC_service.get_service
+        ~description:
+          "Returns the list of accounts that stake to a given delegate \
+           together with their share of the frozen deposits."
+        ~query:RPC_query.empty
+        ~output:stakers_encoding
+        RPC_path.(path / "stakers")
+  end
+
+  let contract_stake ctxt ~delegator_contract ~delegate =
+    let open Alpha_context in
+    let open Lwt_result_syntax in
+    let* staked_balance =
+      Staking_pseudotokens.For_RPC.staked_balance
+        ctxt
+        ~contract:delegator_contract
+        ~delegate
+    in
+    if not Tez.(staked_balance = zero) then
+      let delegator_pkh =
+        match delegator_contract with
+        | Contract.Implicit pkh -> pkh
+        | Contract.Originated _ -> assert false
+        (* Originated contracts cannot stake *)
+      in
+      return @@ Some (delegator_pkh, staked_balance)
+    else return_none
+
+  let check_delegate_registered ctxt pkh =
+    Delegate.registered ctxt pkh >>= function
+    | true -> return_unit
+    | false ->
+        Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
+
+  let register () =
+    Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
+        let open Lwt_result_syntax in
+        let* () = check_delegate_registered ctxt pkh in
+        let*! delegators = Delegate.delegated_contracts ctxt pkh in
+        List.filter_map_es
+          (fun delegator_contract ->
+            contract_stake ctxt ~delegator_contract ~delegate:pkh)
+          delegators)
+
+  let stakers ctxt block pkh =
+    RPC_context.make_call1 S.stakers ctxt block pkh () ()
 end
 
 module S = struct
@@ -3732,8 +4236,9 @@ let register () =
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
+  Staking.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
-      if q.offset < 0l then tzfail Negative_level_offset
+      if q.offset < 0l then Environment.Error_monad.tzfail Negative_level_offset
       else
         Lwt.return
           (Level.from_raw_with_offset
@@ -3747,11 +4252,11 @@ let register () =
       let rev_levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
       match rev_levels with
       | [] -> return_none
-      | [level] -> return (Some (level.level, level.level))
+      | [level] -> return_some (level.level, level.level)
       | last :: default_first :: rest ->
           (* The [rev_levels] list is reversed, the last level is the head *)
           let first = List.last default_first rest in
-          return (Some (first.level, last.level))) ;
+          return_some (first.level, last.level)) ;
   Registration.register0 ~chunked:false S.round (fun ctxt () () ->
       Round.get ctxt)
 

@@ -9,11 +9,12 @@ It contains the following libraries:
 - {{!module-Bls12_381_signature}Bls12_381_signature}
 - {{!module-Distributed_plonk}Distributed_plonk}
 - {{!module-Epoxy_tx}Epoxy_tx}
+- {{!module-Kzg}Kzg}: Toolbox for KZG polynomial commitment
 - {{!module-Mec}Mec}
 - {{!module-Octez_bls12_381_polynomial}Octez_bls12_381_polynomial}: Polynomials over BLS12-381 finite field - Temporary vendored version of Octez
 - {{!module-Octez_srs_extraction}Octez_srs_extraction}
 - {{!module-Plompiler}Plompiler}
-- {{!module-Plonk}Plonk}
+- {{!module-Plonk}Plonk}: Plonk zero-knowledge proving system
 - {{!module-Polynomial}Polynomial}: Polynomials over finite fields
 - {{!module-Tezos_base}Tezos_base}: Meta-package and pervasive type definitions for Tezos
 - {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}: Octez base test helpers
@@ -44,3 +45,4 @@ It contains the following libraries:
 - {{!module-Tezos_tree_encoding}Tezos_tree_encoding}: A general-purpose library to encode arbitrary data in Merkle trees
 - {{!module-Tezos_version}Tezos_version}: Version information generated from Git
 - {{!page-tezos_workers}Tezos_workers}: Worker library
+- {{!module-Tezt_wrapper}Tezt_wrapper}

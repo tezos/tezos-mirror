@@ -74,6 +74,7 @@ let run () =
   let main_promise = External_validator.main ?socket_dir ~readonly () in
   Stdlib.exit
     (let open Lwt_syntax in
+    Lwt.Exception_filter.(set handle_all_except_runtime) ;
     Lwt_main.run
       (let* r = Lwt_exit.wrap_and_exit main_promise in
        match r with

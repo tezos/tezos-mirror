@@ -24,9 +24,16 @@
 
 open Utils
 
+(* The [~jsoo] argument is used to generate smaller test inputs when
+   running with js_of_ocaml so that testing time stays reasonable. *)
+let random_int ~jsoo n =
+  match Sys.backend_type with
+  | Other "js_of_ocaml" -> Random.int jsoo
+  | Native | Bytecode | Other _ -> Random.int n
+
 module MakeBulkOperations (G : Bls12_381.CURVE) = struct
   let test_bulk_add () =
-    let n = 10 + Random.int 1_000 in
+    let n = 10 + random_int ~jsoo:50 1_000 in
     let xs = List.init n (fun _ -> G.random ()) in
     assert (G.(eq (List.fold_left G.add G.zero xs) (G.add_bulk xs)))
 
@@ -61,7 +68,7 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
     assert (G.(eq left right))
 
   let test_to_affine_array () =
-    let n = 1 + Random.int 1000 in
+    let n = 1 + random_int 1000 ~jsoo:50 in
     let p = Array.init n (fun _ -> G.random ()) in
     let p' = G.of_affine_array (G.to_affine_array p) in
     let p = Array.to_list p in
@@ -69,7 +76,7 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
     assert (List.for_all2 G.eq p p')
 
   let test_size_of_affine_array () =
-    let n = 1 + Random.int 1000 in
+    let n = 1 + random_int 1000 ~jsoo:50 in
     let p = Array.init n (fun _ -> G.random ()) in
     let p = G.to_affine_array p in
     assert (G.size_of_affine_array p = n)
@@ -92,7 +99,7 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
         (Hex.show (Hex.of_bytes (G.to_bytes right)))
 
   let test_pippenger_contiguous_chunk () =
-    let n = 10 + Random.int 1_000 in
+    let n = 10 + random_int 1000 ~jsoo:50 in
     let nb_chunks = 1 + Random.int 10 in
     let chunk_size = n / nb_chunks in
     let rest = n mod nb_chunks in
@@ -493,7 +500,7 @@ module MakeECProperties (G : Bls12_381.CURVE) = struct
     assert (G.(eq (double s) (add s s)))
 
   let test_bulk_add () =
-    let n = 10 + Random.int 1_000 in
+    let n = 10 + random_int 1000 ~jsoo:50 in
     let xs = List.init n (fun _ -> G.random ()) in
     assert (G.(eq (List.fold_left G.add G.zero xs) (G.add_bulk xs)))
 

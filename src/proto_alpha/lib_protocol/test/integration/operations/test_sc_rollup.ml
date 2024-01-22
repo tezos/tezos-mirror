@@ -68,7 +68,7 @@ let assert_fails ~loc ?error m =
           Stdlib.failwith msg
       | _, None ->
           (* Any error is ok. *)
-          return ())
+          return_unit)
 
 let assert_equal_z ~loc x y =
   Assert.equal ~loc Z.equal "Compare Z.t" Z.pp_print x y
@@ -181,7 +181,6 @@ let context_init ?commitment_period_in_blocks
       sc_rollup =
         {
           Context.default_test_constants.sc_rollup with
-          enable = true;
           arith_pvm_enable = true;
           private_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
@@ -194,26 +193,6 @@ let context_init ?commitment_period_in_blocks
           timeout_period_in_blocks;
         };
     }
-
-(** [test_disable_feature_flag ()] tries to originate a smart contract
-    rollup when the feature flag is deactivated and checks that it
-    fails. *)
-let test_disable_feature_flag () =
-  let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_enable:false () in
-  let* i = Incremental.begin_construction b in
-  let kind = Sc_rollup.Kind.Example_arith in
-  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
-  let expect_failure = function
-    | Environment.Ecoproto_error
-        (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
-  in
-  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
-  return_unit
 
 (** [test_disable_arith_pvm_feature_flag ()] tries to originate a Arith smart
     rollup when the Arith PVM feature flag is deactivated and checks that it
@@ -230,7 +209,27 @@ let test_disable_arith_pvm_feature_flag () =
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
+    | _ -> failwith "It should have failed with [Sc_rollup_arith_pvm_disabled]"
+  in
+  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
+  return_unit
+
+(** [test_disable_riscv_pvm_feature_flag ()] tries to originate a Riscv smart
+    rollup when the Riscv PVM feature flag is deactivated and checks that it
+    fails. *)
+let test_disable_riscv_pvm_feature_flag () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 ~sc_rollup_riscv_pvm_enable:false () in
+  let* i = Incremental.begin_construction b in
+  let kind = Sc_rollup.Kind.Riscv in
+  let* op, _ = Sc_rollup_helpers.origination_op (B b) contract kind in
+  let expect_failure = function
+    | Environment.Ecoproto_error
+        (Validate_errors.Manager.Sc_rollup_riscv_pvm_disabled as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Sc_rollup_riscv_pvm_disabled]"
   in
   let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
   return_unit
@@ -429,34 +428,30 @@ let verify_execute_outbox_message_operations ctxt rollup ~loc ~operations
           | None -> failwith "Could not load script at %s" loc
         in
         (* Find the script parameters ty of the script. *)
-        let*? entrypoint_res, ctxt =
-          Environment.wrap_tzresult
-            (Gas_monad.run
-               ctxt
-               (Script_ir_translator.find_entrypoint
-                  ~error_details:(Informative ())
-                  arg_type
-                  entrypoints
-                  entrypoint))
+        let*?@ entrypoint_res, ctxt =
+          Gas_monad.run
+            ctxt
+            (Script_ir_translator.find_entrypoint
+               ~error_details:(Informative ())
+               arg_type
+               entrypoints
+               entrypoint)
         in
-        let*? (Ex_ty_cstr {ty = script_parameters_ty; _}) =
-          Environment.wrap_tzresult entrypoint_res
-        in
+        let*?@ (Ex_ty_cstr {ty = script_parameters_ty; _}) = entrypoint_res in
         (* Check that the script parameters type matches the one from the
            transaction. *)
-        let*? ctxt =
-          Environment.wrap_tzresult
-            (let open Result_syntax in
-            let* eq, ctxt =
-              Gas_monad.run
-                ctxt
-                (Script_ir_translator.ty_eq
-                   ~error_details:(Informative (-1))
-                   script_parameters_ty
-                   parameters_ty)
-            in
-            let+ Eq = eq in
-            ctxt)
+        let*?@ ctxt =
+          let open Result_syntax in
+          let* eq, ctxt =
+            Gas_monad.run
+              ctxt
+              (Script_ir_translator.ty_eq
+                 ~error_details:(Informative (-1))
+                 script_parameters_ty
+                 parameters_ty)
+          in
+          let+ Eq = eq in
+          ctxt
         in
         return (ctxt, (destination, entrypoint, unparsed_parameters))
     | _ ->
@@ -540,12 +535,12 @@ let make_whitelist_update_output ~outbox_level ~message_index
   @@ Sc_rollup.Outbox.Message.Whitelist_update whitelist_opt
 
 let string_ticket_token ticketer content =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
     @@ Script_string.of_string content
   in
-  let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
+  let*?@ ticketer = Contract.of_b58check ticketer in
   return
     (Ticket_token.Ex_token
        {ticketer; contents_type = Script_typed_ir.string_t; contents})
@@ -710,7 +705,7 @@ let assert_ticket_token_balance ~loc ctxt token owner expected =
   | Some b, None ->
       failwith "%s: Expected no balance but got some %d" loc (Z.to_int b)
   | None, Some b -> failwith "%s: Expected balance %d but got none" loc b
-  | None, None -> return ()
+  | None, None -> return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~__LOC__ k expected_err =
@@ -754,7 +749,7 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
   in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_liquid liquid in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_frozen frozen in
-  return ()
+  return_unit
 
 (* Generates a list of cemented dummy commitments. *)
 let gen_commitments ctxt rollup ~predecessor ~num_commitments =
@@ -1007,12 +1002,11 @@ let test_originating_with_valid_type () =
     let ctxt = Incremental.alpha_ctxt incr in
     let*@ expr, _ctxt = Sc_rollup.parameters_type ctxt rollup in
     let expr = WithExceptions.Option.get ~loc:__LOC__ expr in
-    let*? expr, _ctxt =
-      Environment.wrap_tzresult
-      @@ Script.force_decode_in_context
-           ~consume_deserialization_gas:When_needed
-           ctxt
-           expr
+    let*?@ expr, _ctxt =
+      Script.force_decode_in_context
+        ~consume_deserialization_gas:When_needed
+        ctxt
+        expr
     in
     assert_equal_expr ~loc:__LOC__ (Expr.from_string parameters_ty) expr
   in
@@ -1609,7 +1603,12 @@ let test_execute_message_override_applied_messages_slot () =
       make_transaction_output ~outbox_level ~message_index transactions
     in
     let* ( Sc_rollup_operations.
-             {operations = _; ticket_receipt = _; paid_storage_size_diff},
+             {
+               operations = _;
+               ticket_receipt = _;
+               whitelist_update = _;
+               paid_storage_size_diff;
+             },
            incr ) =
       execute_outbox_message_without_proof_validation
         incr
@@ -1926,7 +1925,7 @@ let test_number_of_parallel_games_bounded () =
       opponents
       opponents_commitments
   in
-  return ()
+  return_unit
 
 (** [test_timeout] test multiple cases of the timeout logic.
 - Test to timeout a player before it's allowed and fails.
@@ -2097,19 +2096,18 @@ let init_with_conflict () =
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 let dumb_proof ~choice =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let context_arith_pvm = Arith_pvm.make_empty_context () in
   let empty = Arith_pvm.make_empty_state () in
   let*! arith_state = Arith_pvm.initial_state ~empty in
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
   let input = Sc_rollup_helpers.make_external_input "c4c4" in
-  let* pvm_step =
+  let*@ pvm_step =
     Arith_pvm.produce_proof
       context_arith_pvm
       ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
       (Some input)
       arith_state
-    >|= Environment.wrap_tzresult
   in
   let pvm_step =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -2652,24 +2650,22 @@ let full_history_inbox (genesis_predecessor_timestamp, genesis_predecessor)
     payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_helpers in
   let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
     full_history_inbox
   in
   let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
-  let* proof, _ =
+  let*@ proof, _ =
     Sc_rollup.Inbox.produce_proof
       ~get_payloads_history:(get_payloads_history payloads_histories)
       ~get_history:(get_history history)
       history_proof
       (l, n)
-    >|= Environment.wrap_tzresult
   in
-  let*? inbox_message_verified =
+  let*?@ inbox_message_verified =
     Sc_rollup.Inbox.verify_proof (l, n) snapshot proof
-    |> Environment.wrap_tzresult
   in
   return
   @@ Option.map
@@ -3104,18 +3100,17 @@ let init_with_4_conflicts () =
   return (block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh))
 
 let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* ctxt =
     let+ incr = Incremental.begin_construction block in
     Incremental.alpha_ctxt incr
   in
-  let* (p1_point, p2_point), _ctxt =
+  let*@ (p1_point, p2_point), _ctxt =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup
       p1_pkh
       p2_pkh
-    >|= Environment.wrap_tzresult
   in
   let refutation =
     Sc_rollup.Game.Start
@@ -3258,7 +3253,7 @@ let test_winner_by_forfeit_with_draw () =
   return_unit
 
 let test_conflict_point_on_a_branch () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block, (pA, pB), rollup =
     init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
   in
@@ -3286,19 +3281,18 @@ let test_conflict_point_on_a_branch () =
       } )
   in
   let* block = publish_commitments block pB rollup [pB_commitment] in
-  let* ( ( {commitment = _; hash = conflict_pA_hash},
-           {commitment = _; hash = conflict_pB_hash} ),
-         _ctxt ) =
-    let* ctxt =
-      let+ incr = Incremental.begin_construction block in
-      Incremental.alpha_ctxt incr
-    in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let*@ ( ( {commitment = _; hash = conflict_pA_hash},
+            {commitment = _; hash = conflict_pB_hash} ),
+          _ctxt ) =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup
       pA_pkh
       pB_pkh
-    >|= Environment.wrap_tzresult
   in
   let pA_hash = hash_commitment pA_commitment in
   let pB_hash = hash_commitment pB_commitment in
@@ -3407,7 +3401,12 @@ let test_start_game_on_cemented_commitment () =
 
 let test_origination_fails_with_empty_whitelist () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, _rollup =
     Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
@@ -3418,9 +3417,14 @@ let test_origination_fails_with_empty_whitelist () =
     b
     "Invalid whitelist: whitelist cannot be empty"
 
-let test_private_rollup_is_deactivated_by_default () =
+let test_private_rollup_can_be_deactivated () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:false
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, _rollup =
     Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
@@ -3433,7 +3437,12 @@ let test_private_rollup_is_deactivated_by_default () =
 
 let test_private_rollup_publish_succeeds_with_whitelisted_staker () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let* b, contract =
+    Context.init1
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
+  in
   let kind = Sc_rollup.Kind.Example_arith in
   let staker_pkh = Account.pkh_of_contract_exn contract in
   let* operation, rollup =
@@ -3448,7 +3457,10 @@ let test_private_rollup_publish_succeeds_with_whitelisted_staker () =
 let test_private_rollup_publish_fails_with_non_whitelisted_staker () =
   let open Lwt_result_syntax in
   let* b, (contract1, contract2) =
-    Context.init2 ~sc_rollup_private_enable:true ()
+    Context.init2
+      ~sc_rollup_arith_pvm_enable:true
+      ~sc_rollup_private_enable:true
+      ()
   in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
@@ -3484,13 +3496,13 @@ let test_private_rollup_whitelist_cannot_contain_key_duplication () =
     block_rollup_res
     Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
 
-let update_whitelist ?(message_index = 0)
+let update_whitelist ?(message_index = 1)
     ~(genesis_info : Sc_rollup.Commitment.genesis_info) block rollup
     updated_whitelist =
   let open Lwt_result_syntax in
   let output =
     make_whitelist_update_output
-      ~outbox_level:0
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
       ~message_index
       updated_whitelist
   in
@@ -3609,7 +3621,7 @@ let test_whitelist_update_make_rollup_public () =
   let* block =
     update_whitelist
       ~genesis_info
-      ~message_index:1
+      ~message_index:2
       block
       rollup
       updated_whitelist
@@ -3625,10 +3637,6 @@ let test_whitelist_update_make_rollup_public () =
 
 let tests =
   [
-    Tztest.tztest
-      "check effect of disabled feature flag"
-      `Quick
-      test_disable_feature_flag;
     Tztest.tztest
       "check effect of disabled arith pvm flag"
       `Quick
@@ -3769,9 +3777,9 @@ let tests =
       `Quick
       test_origination_fails_with_empty_whitelist;
     Tztest.tztest
-      "Origination fails when whitelist is set and the feature is deactivated"
+      "Origination can be deactivated"
       `Quick
-      test_private_rollup_is_deactivated_by_default;
+      test_private_rollup_can_be_deactivated;
     Tztest.tztest
       "Submit a commitment with a whitelisted staker"
       `Quick

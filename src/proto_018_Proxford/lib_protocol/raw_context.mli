@@ -284,6 +284,11 @@ val sampler_for_cycle :
 val stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t tzresult
 
+(** Like [stake_distribution_for_current_cycle] but returns [None] rather than
+    an error. *)
+val find_stake_distribution_for_current_cycle :
+  t -> Stake_repr.t Signature.Public_key_hash.Map.t option
+
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
 
@@ -429,7 +434,7 @@ module Dal : sig
 
   (** [record_attested_shards ctxt attestation shards] records that the
      list of shards [shards] were attested (declared available by some
-     attestor). The function assumes that a shard belongs to the
+     attester). The function assumes that a shard belongs to the
      interval [0; number_of_shards - 1]. Otherwise, for each shard
      outside this interval, it is a no-op. *)
   val record_attested_shards : t -> Dal_attestation_repr.t -> int list -> t
@@ -452,11 +457,11 @@ module Dal : sig
      [0;number_of_slots - 1], returns [false]. *)
   val is_slot_index_attested : t -> Dal_slot_index_repr.t -> bool
 
-  (** [shards_of_attestor ctxt ~attestor] returns the shard assignment
-     of the DAL committee of the current level for [attestor]. This
+  (** [shards_of_attester ctxt ~attester] returns the shard assignment
+     of the DAL committee of the current level for [attester]. This
      function never returns an empty list. *)
-  val shards_of_attestor :
-    t -> attestor:Signature.Public_key_hash.t -> int list option
+  val shards_of_attester :
+    t -> attester:Signature.Public_key_hash.t -> int list option
 
   (** The DAL committee is a subset of the Tenderbake committee.  A
      shard from [0;number_of_shards] is associated to a public key
@@ -479,7 +484,7 @@ module Dal : sig
      \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
      start <= shard <= start + n - 1
 
-      - Given an attestor, all its shard assignments are contiguous
+      - Given an attester, all its shard assignments are contiguous
      *)
   type committee = {
     pkh_to_shards :

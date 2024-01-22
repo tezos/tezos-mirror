@@ -26,7 +26,7 @@
 
 open Runnable.Syntax
 
-type endpoint = Node of Dac_node.t | Foreign_endpoint of Foreign_endpoint.t
+type endpoint = Node of Dac_node.t | Foreign_endpoint of Endpoint.t
 
 type t = {
   name : string;
@@ -39,15 +39,13 @@ type t = {
 
 let rpc_host = function
   | Node dac_node -> Dac_node.rpc_host dac_node
-  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_host foreign
+  | Foreign_endpoint foreign -> Endpoint.rpc_host foreign
 
 let rpc_port = function
   | Node dac_node -> Dac_node.rpc_port dac_node
-  | Foreign_endpoint foreign -> Foreign_endpoint.rpc_port foreign
+  | Foreign_endpoint foreign -> Endpoint.rpc_port foreign
 
 let next_name = ref 1
-
-let default_path = "./octez-dac-client"
 
 let fresh_name () =
   let index = !next_name in
@@ -62,7 +60,7 @@ let create_with_endpoint ?runner ?name ?path ?base_dir
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
-  let path = Option.value ~default:default_path path in
+  let path = Option.value ~default:(Uses.path Constant.octez_dac_client) path in
   {name; path; dac_node = endpoint; base_dir; color; runner}
 
 let create ?runner ?name ?path ?base_dir ?color dac_node =

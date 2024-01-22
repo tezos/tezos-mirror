@@ -95,6 +95,7 @@ module Scheduler (IO : IO) = struct
     mutable current_push : unit tzresult Lwt.t;
     counter : Moving_average.t;
     mutable quota : int;
+    add_closing_reason : P2p_disconnection_reason.t -> unit;
   }
 
   [@@@ocaml.warning "+30"]
@@ -167,8 +168,8 @@ module Scheduler (IO : IO) = struct
      - wait for available data
 
      - take the first connection [conn] ready in the queues (looking
-     at high priority queue first). Connections comes with the chunk
-     of bytes ready in their input.
+       at high priority queue first). Connections comes with the chunk
+       of bytes ready in their input.
 
      - push its chunk of bytes in its output pipe
 
@@ -181,7 +182,7 @@ module Scheduler (IO : IO) = struct
      - remove the bytes count from the [conn]'s quota
 
      - Call [waiter] to trigger an asynchronous "perform IO-enqueue
-     conn" on [conn]
+       conn" on [conn]
 
      During the loop, if an IO result is an error, the associated
      connection is canceled
@@ -220,6 +221,7 @@ module Scheduler (IO : IO) = struct
           let* () =
             Events.(emit unexpected_error) ("pop", conn.id, IO.name, err)
           in
+          conn.add_closing_reason (Scheduled_pop_unexpected_error err) ;
           let* () = cancel conn err in
           worker_loop st
       | Ok msg ->
@@ -238,6 +240,7 @@ module Scheduler (IO : IO) = struct
                  let* () =
                    Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
                  in
+                 conn.add_closing_reason (Scheduled_push_unexpected_error err) ;
                  let* () = cancel conn err in
                  return_error err) ;
           let len = IO.length msg in
@@ -276,7 +279,7 @@ module Scheduler (IO : IO) = struct
     st
 
   (* Scheduled connection. *)
-  let create_connection st in_param out_param canceler id =
+  let create_connection st in_param out_param canceler id add_closing_reason =
     Events.(emit__dont_wait__use_with_care create_connection (id, IO.name)) ;
     let conn =
       {
@@ -289,6 +292,7 @@ module Scheduler (IO : IO) = struct
         current_push = Lwt_result_syntax.return_unit;
         counter = Moving_average.create st.ma_state ~init:0 ~alpha;
         quota = 0;
+        add_closing_reason;
       }
     in
     waiter st conn ;
@@ -371,8 +375,12 @@ module ReadIO = struct
         | Error
             ( `Connection_lost _ | `Connection_closed_by_peer
             | `Connection_locally_closed ) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+               Losing some information here... *)
             tzfail P2p_errors.Connection_closed
-        | Error (`Unexpected_error_when_closing _ | `Unexpected_error _) ->
+        | Error (`Unexpected_error _) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+               Losing some information here... *)
             tzfail P2p_errors.Connection_error)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t
@@ -423,10 +431,15 @@ module WriteIO = struct
     | Ok () -> return_unit
     | Error
         ( `Connection_closed_by_peer | `Connection_lost _
-        | `Connection_locally_closed | `Unexpected_error_when_closing _
+        | `Connection_locally_closed
         | `Unexpected_error Lwt.Canceled ) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+           Losing some information here... *)
         tzfail P2p_errors.Connection_closed
-    | Error (`Unexpected_error ex) -> fail_with_exn ex
+    | Error (`Unexpected_error ex) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+           Losing some information here... *)
+        fail_with_exn ex
 
   (* [close] does nothing, it will still be possible to push values to
      the network. *)
@@ -545,11 +558,8 @@ let write_size bytes =
    - closing underlying socket (p2p_fd) *)
 let register st fd =
   if st.closed then (
-    Error_monad.dont_wait
-      (fun () -> P2p_fd.close fd)
-      (function
-        | `Unexpected_error ex ->
-            Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
+    Lwt.dont_wait
+      (fun () -> P2p_fd.close ~reason:IO_scheduler_closed fd)
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     raise Closed)
@@ -567,6 +577,7 @@ let register st fd =
     let read_buffer =
       Circular_buffer.create ~maxlength:(st.read_buffer_size * 2) ()
     in
+    let add_closing_reason reason = P2p_fd.add_closing_reason ~reason fd in
     let read_conn =
       ReadScheduler.create_connection
         st.read_scheduler
@@ -574,6 +585,7 @@ let register st fd =
         read_queue
         canceler
         id
+        add_closing_reason
     and write_conn =
       WriteScheduler.create_connection
         st.write_scheduler
@@ -581,24 +593,15 @@ let register st fd =
         fd
         canceler
         id
+        add_closing_reason
     in
     Lwt_canceler.on_cancel canceler (fun () ->
-        let open Lwt_syntax in
         P2p_fd.Table.remove st.connected fd ;
         Moving_average.destroy st.ma_state read_conn.counter ;
         Moving_average.destroy st.ma_state write_conn.counter ;
         Lwt_pipe.Maybe_bounded.close write_queue ;
         Lwt_pipe.Maybe_bounded.close read_queue ;
-        let* r = P2p_fd.close fd in
-        let* () =
-          match r with
-          | Ok () -> Lwt.return_unit
-          | Error (`Unexpected_error ex) ->
-              (* Do not prevent the closing if an exception is raised *)
-              let* () = Events.(emit close_error) (id, error_of_exn ex) in
-              Lwt.return_unit
-        in
-        return_unit) ;
+        P2p_fd.close fd) ;
     let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
     let conn =
       {
@@ -626,6 +629,8 @@ let write ?canceler {write_queue; _} msg =
 let write_now {write_queue; _} msg =
   Lwt_pipe.Maybe_bounded.push_now write_queue msg
 
+let set_peer_id ~peer_id conn = P2p_fd.set_peer_id ~peer_id conn.fd
+
 let convert ~ws ~rs =
   {
     P2p_stat.total_sent = ws.Moving_average.total;
@@ -644,11 +649,14 @@ let stat {read_conn; write_conn; _} =
   and ws = Moving_average.stat write_conn.counter in
   convert ~rs ~ws
 
+let add_closing_reason ~reason t = P2p_fd.add_closing_reason ~reason t.fd
+
 (* [close conn] prevents further data to be pushed to the remote peer
    and start a cascade of effects that should close the connection. *)
-let close ?timeout conn =
+let close ?timeout ?reason conn =
   let open Lwt_result_syntax in
   let id = P2p_fd.id conn.fd in
+  Option.iter (fun reason -> P2p_fd.add_closing_reason ~reason conn.fd) reason ;
   conn.remove_from_connection_table () ;
   Lwt_pipe.Maybe_bounded.close conn.write_queue ;
   (* Here, the WriteScheduler will drain the write_queue, then get a
@@ -710,7 +718,7 @@ let shutdown ?timeout st =
   let* () =
     P2p_fd.Table.iter_p
       (fun _peer_id conn ->
-        let* _ = close ?timeout conn in
+        let* _ = close ?timeout ~reason:IO_scheduler_shutdown conn in
         Lwt.return_unit)
       st.connected
   in

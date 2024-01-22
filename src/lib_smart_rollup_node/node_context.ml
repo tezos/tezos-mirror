@@ -25,9 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
+type genesis_info = Metadata.genesis_info = {
+  level : int32;
+  commitment_hash : Commitment.Hash.t;
+}
 
 type 'a store = 'a Store.t
 
@@ -39,6 +42,13 @@ type current_protocol = {
   constants : Rollup_constants.protocol_constants;
 }
 
+type last_whitelist_update = {message_index : int; outbox_level : Int32.t}
+
+type private_info = {
+  last_whitelist_update : last_whitelist_update;
+  last_outbox_level_searched : int32;
+}
+
 type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
@@ -46,24 +56,20 @@ type 'a t = {
   dac_client : Dac_observer_client.t option;
   data_dir : string;
   l1_ctxt : Layer1.t;
-  rollup_address : Address.t;
-  boot_sector_file : string option;
-  mode : Configuration.mode;
-  operators : Configuration.operators;
   genesis_info : genesis_info;
   injector_retention_period : int;
   block_finality_time : int;
   kind : Kind.t;
-  fee_parameters : Configuration.fee_parameters;
-  loser_mode : Loser_mode.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
   context : 'a Context.index;
   lcc : ('a, lcc) Reference.t;
   lpc : ('a, Commitment.t option) Reference.t;
+  private_info : ('a, private_info option) Reference.t;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
   mutable current_protocol : current_protocol;
+  global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
 }
 
 type rw = [`Read | `Write] t
@@ -71,23 +77,33 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Configuration.Operator_purpose_map.find purpose node_ctxt.operators
+  Purpose.find_operator purpose node_ctxt.config.operators
 
 let is_operator node_ctxt pkh =
-  Configuration.Operator_purpose_map.exists
-    (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
-    node_ctxt.operators
+  Purpose.mem_operator pkh node_ctxt.config.operators
 
-let is_accuser {mode; _} = mode = Accuser
+let is_accuser node_ctxt = node_ctxt.config.mode = Accuser
 
-let is_bailout {mode; _} = mode = Bailout
+let is_bailout node_ctxt = node_ctxt.config.mode = Bailout
 
-let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
+let is_loser node_ctxt = node_ctxt.config.loser_mode <> Loser_mode.no_failures
+
+let can_inject node_ctxt (op_kind : Operation_kind.t) =
+  Configuration.can_inject node_ctxt.config.mode op_kind
+
+let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
+  let operator = get_operator node_ctxt Operating in
+  match operator with
+  | Some (Single operator) ->
+      error_unless
+        (is_bailout node_ctxt
+        || List.mem ~equal:Signature.Public_key_hash.equal operator whitelist)
+        Rollup_node_errors.Operator_not_in_whitelist
+  | None -> Result_syntax.return_unit
 
 let get_fee_parameter node_ctxt operation_kind =
-  Configuration.Operation_kind_map.find operation_kind node_ctxt.fee_parameters
-  |> Option.value
-       ~default:(Configuration.default_fee_parameter ~operation_kind ())
+  Operation_kind.Map.find operation_kind node_ctxt.config.fee_parameters
+  |> Option.value ~default:(Configuration.default_fee_parameter operation_kind)
 
 let lock ~data_dir =
   let lockfile_path = Filename.concat data_dir "lock" in
@@ -121,6 +137,11 @@ let unlock {lockfile; _} =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
+let processing_lockfile_path ~data_dir =
+  Filename.concat data_dir "processing_lock"
+
+let gc_lockfile_path ~data_dir = Filename.concat data_dir "gc_lock"
+
 let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   let open Lwt_syntax in
   let path =
@@ -144,25 +165,72 @@ let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   in
   return (kernel_debug, fun () -> Lwt_io.close chan)
 
-let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
+let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
+    (store : a Store.store) (history_mode : Configuration.history_mode) =
+  let open Lwt_result_syntax in
+  let* stored_history_mode =
+    match mode with
+    | Read_only -> Store.History_mode.read store.history_mode
+    | Read_write -> Store.History_mode.read store.history_mode
+  in
+  let save_when_rw () =
+    match mode with
+    | Read_only -> return_unit
+    | Read_write -> Store.History_mode.write store.history_mode history_mode
+  in
+  match (stored_history_mode, history_mode) with
+  | None, _ -> save_when_rw ()
+  | Some Archive, Archive | Some Full, Full -> return_unit
+  | Some Archive, Full ->
+      (* Data will be cleaned at next GC, just save new mode *)
+      let*! () = Event.convert_history_mode Archive Full in
+      save_when_rw ()
+  | Some Full, Archive ->
+      failwith "Cannot transform a full rollup node into an archive one."
+
+let update_metadata ({Metadata.rollup_address; _} as metadata) ~data_dir =
+  let open Lwt_result_syntax in
+  let* disk_metadata = Metadata.Versioned.read_metadata_file ~dir:data_dir in
+  match disk_metadata with
+  | Some (V1 {rollup_address = saved_address; context_version; _}) ->
+      let*? () = Context.Version.check context_version in
+      fail_unless Address.(rollup_address = saved_address)
+      @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+  | Some (V0 {rollup_address = saved_address; context_version}) ->
+      let*? () = Context.Version.check context_version in
+      let*? () =
+        error_unless Address.(rollup_address = saved_address)
+        @@ Rollup_node_errors.Unexpected_rollup {rollup_address; saved_address}
+      in
+      Metadata.write_metadata_file ~dir:data_dir metadata
+  | None -> Metadata.write_metadata_file ~dir:data_dir metadata
+
+let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
+    ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
     l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
-        sc_rollup_node_operators = operators;
-        boot_sector_file;
-        mode = operating_mode;
-        fee_parameters;
-        loser_mode;
         l2_blocks_cache_size;
         dal_node_endpoint;
         _;
       } as configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
+  let metadata =
+    {
+      Metadata.rollup_address;
+      context_version = Context.Version.version;
+      kind;
+      genesis_info;
+    }
+  in
+  let* () = update_metadata metadata ~data_dir in
   let* () =
     Store_migration.maybe_run_migration
+      metadata
       ~storage_dir:(Configuration.default_storage_dir data_dir)
+      ~index_buffer_size:Configuration.default_index_buffer_size
   in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
@@ -170,13 +238,17 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
   let* store =
     Store.load
       mode
+      ~index_buffer_size
       ~l2_blocks_cache_size
       Configuration.(default_storage_dir data_dir)
   in
   let* context =
-    Context.load mode (Configuration.default_context_dir data_dir)
+    Context.load
+      ~cache_size:irmin_cache_size
+      mode
+      (Configuration.default_context_dir data_dir)
   in
-  let* () = Context.Rollup.check_or_set_address mode context rollup_address in
+  let* () = check_and_set_history_mode mode store configuration.history_mode in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
     if dal_cctxt = None && current_protocol.constants.dal.feature_enable then
@@ -200,6 +272,17 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
       make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
     else return (Event.kernel_debug, fun () -> return_unit)
   in
+  let global_block_watcher = Lwt_watcher.create_input () in
+  let private_info =
+    Option.map
+      (fun (message_index, outbox_level) ->
+        {
+          last_whitelist_update =
+            {outbox_level; message_index = Z.to_int message_index};
+          last_outbox_level_searched = outbox_level;
+        })
+      last_whitelist_update
+  in
   return
     {
       config = configuration;
@@ -208,24 +291,20 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
       dac_client;
       data_dir;
       l1_ctxt;
-      rollup_address;
-      boot_sector_file;
-      mode = operating_mode;
-      operators;
       genesis_info;
       lcc = Reference.new_ lcc;
       lpc = Reference.new_ lpc;
+      private_info = Reference.new_ private_info;
       kind;
       injector_retention_period = 0;
       block_finality_time = 2;
-      fee_parameters;
-      loser_mode;
       lockfile;
       store;
       context;
       kernel_debug_logger;
       finaliser = kernel_debug_finaliser;
       current_protocol;
+      global_block_watcher;
     }
 
 let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
@@ -274,6 +353,7 @@ let readonly (node_ctxt : _ t) =
     context = Context.readonly node_ctxt.context;
     lcc = Reference.readonly node_ctxt.lcc;
     lpc = Reference.readonly node_ctxt.lpc;
+    private_info = Reference.readonly node_ctxt.private_info;
   }
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
@@ -583,6 +663,52 @@ let commitment_was_published {store; _} ~source commitment_hash =
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
 
+let set_lcc node_ctxt lcc =
+  let open Lwt_result_syntax in
+  let lcc_l1 = Reference.get node_ctxt.lcc in
+  let* () = Store.Lcc.write node_ctxt.store.lcc lcc in
+  if lcc.level > lcc_l1.level then Reference.set node_ctxt.lcc lcc ;
+  let*! () =
+    Commitment_event.last_cemented_commitment_updated lcc.commitment lcc.level
+  in
+  return_unit
+
+let last_seen_lcc {store; genesis_info; _} =
+  let open Lwt_result_syntax in
+  let+ lcc = Store.Lcc.read store.lcc in
+  match lcc with
+  | Some lcc -> lcc
+  | None ->
+      {commitment = genesis_info.commitment_hash; level = genesis_info.level}
+
+let register_published_commitment node_ctxt commitment ~first_published_at_level
+    ~level ~published_by_us =
+  let open Lwt_result_syntax in
+  let commitment_hash = Commitment.hash commitment in
+  let* prev_publication =
+    Store.Commitments_published_at_level.mem
+      node_ctxt.store.commitments_published_at_level
+      commitment_hash
+  in
+  let published_at_level = if published_by_us then Some level else None in
+  let* () =
+    if (not prev_publication) || published_by_us then
+      set_commitment_published_at_level
+        node_ctxt
+        commitment_hash
+        {first_published_at_level; published_at_level}
+    else return_unit
+  in
+  when_ published_by_us @@ fun () ->
+  let* () = Store.Lpc.write node_ctxt.store.lpc commitment in
+  let update_lpc_ref =
+    match Reference.get node_ctxt.lpc with
+    | None -> true
+    | Some {inbox_level; _} -> commitment.inbox_level >= inbox_level
+  in
+  if update_lpc_ref then Reference.set node_ctxt.lpc (Some commitment) ;
+  return_unit
+
 let find_inbox {store; _} inbox_hash =
   let open Lwt_result_syntax in
   let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in
@@ -643,59 +769,19 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
-type messages_info = {
-  is_first_block : bool;
-  predecessor : Block_hash.t;
-  predecessor_timestamp : Time.Protocol.t;
-  messages : string list;
-}
+let unsafe_find_stored_messages node_ctxt =
+  Store.Messages.read node_ctxt.store.messages
 
-let find_messages node_ctxt messages_hash =
+let unsafe_get_stored_messages node_ctxt messages_hash =
   let open Lwt_result_syntax in
-  let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
-  match msg with
-  | None -> return_none
-  | Some (messages, block_hash) ->
-      let* header = header_of_hash node_ctxt block_hash in
-      let* pred_header = header_of_hash node_ctxt header.header.predecessor in
-      let* grand_parent_header =
-        header_of_hash node_ctxt pred_header.header.predecessor
-      in
-      let is_first_block =
-        pred_header.header.proto_level <> grand_parent_header.header.proto_level
-      in
-      return_some
-        {
-          is_first_block;
-          predecessor = pred_header.hash;
-          predecessor_timestamp = pred_header.header.timestamp;
-          messages;
-        }
-
-let get_messages_aux find pp node_ctxt hash =
-  let open Lwt_result_syntax in
-  let* res = find node_ctxt hash in
+  let* res = unsafe_find_stored_messages node_ctxt messages_hash in
   match res with
   | None ->
       failwith
         "Could not retrieve messages with payloads merkelized hash %a"
-        pp
-        hash
-  | Some res -> return res
-
-let get_messages node_ctxt =
-  get_messages_aux find_messages Merkelized_payload_hashes_hash.pp node_ctxt
-
-let get_messages_without_proto_messages node_ctxt =
-  get_messages_aux
-    (fun node_ctxt messages_hash ->
-      let open Lwt_result_syntax in
-      let* msg = Store.Messages.read node_ctxt.store.messages messages_hash in
-      match msg with
-      | None -> return_none
-      | Some (messages, _block_hash) -> return_some messages)
-    Merkelized_payload_hashes_hash.pp
-    node_ctxt
+        Merkelized_payload_hashes_hash.pp
+        messages_hash
+  | Some (messages, _pred) -> return messages
 
 let get_num_messages {store; _} hash =
   let open Lwt_result_syntax in
@@ -706,13 +792,13 @@ let get_num_messages {store; _} hash =
         "Could not retrieve number of messages for inbox witness %a"
         Merkelized_payload_hashes_hash.pp
         hash
-  | Some (messages, _block_hash) -> return (List.length messages)
+  | Some (messages, _pred_hash) -> return (List.length messages)
 
-let save_messages {store; _} key ~block_hash messages =
+let save_messages {store; _} key ~predecessor messages =
   Store.Messages.append
     store.messages
     ~key
-    ~header:block_hash
+    ~header:predecessor
     ~value:(messages :> string list)
 
 let get_full_l2_block node_ctxt block_hash =
@@ -720,7 +806,7 @@ let get_full_l2_block node_ctxt block_hash =
   let* block = get_l2_block node_ctxt block_hash in
   let* inbox = get_inbox node_ctxt block.header.inbox_hash
   and* messages =
-    get_messages_without_proto_messages node_ctxt block.header.inbox_witness
+    unsafe_get_stored_messages node_ctxt block.header.inbox_witness
   and* commitment =
     Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
   in
@@ -732,10 +818,9 @@ type proto_info = {
   protocol : Protocol_hash.t;
 }
 
-let protocol_of_level node_ctxt level =
+let protocol_of_level_with_store (store : _ Store.t) level =
   let open Lwt_result_syntax in
-  assert (level >= node_ctxt.genesis_info.level) ;
-  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  let* protocols = Store.Protocols.read store.protocols in
   let*? protocols =
     match protocols with
     | None | Some [] ->
@@ -764,12 +849,33 @@ let protocol_of_level node_ctxt level =
   in
   Lwt.return (find protocols)
 
+let protocol_of_level node_ctxt level =
+  assert (level >= node_ctxt.genesis_info.level) ;
+  protocol_of_level_with_store node_ctxt.store level
+
 let last_seen_protocol node_ctxt =
   let open Lwt_result_syntax in
   let+ protocols = Store.Protocols.read node_ctxt.store.protocols in
   match protocols with
   | None | Some [] -> None
   | Some (p :: _) -> Some p.protocol
+
+let protocol_activation_level node_ctxt protocol_hash =
+  let open Lwt_result_syntax in
+  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  match
+    Option.bind
+      protocols
+      (List.find_map (function Store.Protocols.{protocol; level; _} ->
+           if Protocol_hash.(protocol_hash = protocol) then Some level else None))
+  with
+  | None ->
+      failwith
+        "Could not determine the activation level of a previously unseen \
+         protocol %a"
+        Protocol_hash.pp
+        protocol_hash
+  | Some l -> return l
 
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
@@ -940,26 +1046,122 @@ let find_confirmed_slots_histories {store; _} block =
 let save_confirmed_slots_histories {store; _} block hist =
   Store.Dal_confirmed_slots_histories.add store.irmin_store block hist
 
+let get_gc_levels node_ctxt =
+  let open Lwt_result_syntax in
+  let+ gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+  match gc_levels with
+  | Some gc_levels -> gc_levels
+  | None ->
+      {
+        last_gc_level = node_ctxt.genesis_info.level;
+        first_available_level = node_ctxt.genesis_info.level;
+      }
+
+let save_gc_info node_ctxt ~at_level ~gc_level =
+  let open Lwt_syntax in
+  (* Note: Setting the `first_available_level` before GC succeeds simplifies the
+     code. However, it may be temporarily inaccurate if the GC run spans over
+     several levels or if it fails. This is not foreseen to cause any issues,
+     but if greater accuracy is needed, the `first_available_level` can be set
+     after the GC finishes via a callback. *)
+  let* res =
+    Store.Gc_levels.write
+      node_ctxt.store.gc_levels
+      {last_gc_level = at_level; first_available_level = gc_level}
+  in
+  match res with
+  | Error _ -> Event.gc_levels_storage_failure ()
+  | Ok () -> return_unit
+
+let get_gc_level node_ctxt =
+  let open Lwt_result_syntax in
+  match node_ctxt.config.history_mode with
+  | Archive ->
+      (* Never call GC in archive mode *)
+      return_none
+  | Full ->
+      (* GC up to LCC in full mode *)
+      let+ lcc = last_seen_lcc node_ctxt in
+      Some lcc.level
+
+let gc node_ctxt ~(level : int32) =
+  let open Lwt_result_syntax in
+  (* [gc_level] is the level corresponding to the hash on which GC will be
+     called. *)
+  let* gc_level = get_gc_level node_ctxt in
+  let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
+  let* {last_gc_level; first_available_level} = get_gc_levels node_ctxt in
+  match gc_level with
+  | None -> return_unit
+  | Some gc_level
+    when gc_level > first_available_level
+         && Int32.(sub level last_gc_level >= frequency)
+         && Context.is_gc_finished node_ctxt.context
+         && Store.is_gc_finished node_ctxt.store -> (
+      let* hash = hash_of_level node_ctxt gc_level in
+      let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
+      match header with
+      | None ->
+          failwith
+            "Could not retrieve L2 block header for %a"
+            Block_hash.pp
+            hash
+      | Some {context; _} ->
+          let* gc_lockfile =
+            Utils.lock (gc_lockfile_path ~data_dir:node_ctxt.data_dir)
+          in
+          let*! () = Event.calling_gc ~gc_level ~head_level:level in
+          let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+          (* Start both node and context gc asynchronously *)
+          let*! () = Context.gc node_ctxt.context context in
+          let* () = Store.gc node_ctxt.store ~level:gc_level in
+          let gc_waiter () =
+            let open Lwt_syntax in
+            let* () = Context.wait_gc_completion node_ctxt.context
+            and* () = Store.wait_gc_completion node_ctxt.store in
+            let* () = Event.gc_finished ~gc_level ~head_level:level in
+            Utils.unlock gc_lockfile
+          in
+          Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
+          return_unit)
+  | _ -> return_unit
+
+let check_level_available node_ctxt accessed_level =
+  let open Lwt_result_syntax in
+  let* {first_available_level; _} = get_gc_levels node_ctxt in
+  fail_when
+    (accessed_level < first_available_level)
+    (Rollup_node_errors.Access_below_first_available_level
+       {first_available_level; accessed_level})
+
 module Internal_for_tests = struct
-  let create_node_context cctxt current_protocol ~data_dir kind =
+  let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
+      kind =
     let open Lwt_result_syntax in
     let rollup_address = Address.zero in
-    let operators = Configuration.Operator_purpose_map.empty in
+    let mode = Configuration.Observer in
+    let*? operators =
+      Purpose.make_operator
+        ~needed_purposes:(Configuration.purposes_of_mode mode)
+        []
+    in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
+    let index_buffer_size = Configuration.default_index_buffer_size in
+    let irmin_cache_size = Configuration.default_irmin_cache_size in
     let config =
       Configuration.
         {
           sc_rollup_address = rollup_address;
           boot_sector_file = None;
-          sc_rollup_node_operators = operators;
+          operators;
           rpc_addr = Configuration.default_rpc_addr;
           rpc_port = Configuration.default_rpc_port;
           metrics_addr = None;
           reconnection_delay = 5.;
           fee_parameters = Configuration.default_fee_parameters;
-          mode = Observer;
+          mode;
           loser_mode;
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
@@ -968,24 +1170,47 @@ module Internal_for_tests = struct
           injector = Configuration.default_injector;
           l1_blocks_cache_size;
           l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
           log_kernel_debug = false;
+          no_degraded = false;
+          gc_parameters = Configuration.default_gc_parameters;
+          history_mode = Configuration.default_history_mode;
+          cors = Resto_cohttp.Cors.default;
         }
     in
     let* lockfile = lock ~data_dir in
     let* store =
       Store.load
         Read_write
+        ~index_buffer_size
         ~l2_blocks_cache_size
         Configuration.(default_storage_dir data_dir)
     in
     let* context =
-      Context.load Read_write (Configuration.default_context_dir data_dir)
+      Context.load
+        Read_write
+        (Configuration.default_context_dir data_dir)
+        ~cache_size:irmin_cache_size
     in
     let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
     let l1_ctxt = Layer1.Internal_for_tests.dummy cctxt in
     let lcc = Reference.new_ {commitment = Commitment.Hash.zero; level = 0l} in
     let lpc = Reference.new_ None in
+    let* () =
+      Store.Protocols.write
+        store.protocols
+        [
+          Store.Protocols.
+            {
+              level = Activation_level 0l;
+              proto_level = current_protocol.proto_level;
+              protocol = current_protocol.hash;
+            };
+        ]
+    in
+    let global_block_watcher = Lwt_watcher.create_input () in
     return
       {
         config;
@@ -994,23 +1219,21 @@ module Internal_for_tests = struct
         dac_client = None;
         data_dir;
         l1_ctxt;
-        rollup_address;
-        boot_sector_file = None;
-        mode = Observer;
-        operators;
         genesis_info;
         lcc;
         lpc;
+        private_info = Reference.new_ None;
         kind;
         injector_retention_period = 0;
         block_finality_time = 2;
-        fee_parameters = Configuration.default_fee_parameters;
         current_protocol;
-        loser_mode;
         lockfile;
         store;
         context;
         kernel_debug_logger = Event.kernel_debug;
         finaliser = (fun () -> Lwt.return_unit);
+        global_block_watcher;
       }
+
+  let unsafe_get_store node_ctxt = node_ctxt.store
 end

@@ -61,4 +61,6 @@ let run () =
       Printexc.print_backtrace stderr ;
       exit 2)
 
-let _ = Lwt_main.run (run ())
+let _ =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
+  Lwt_main.run (run ())

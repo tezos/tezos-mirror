@@ -416,6 +416,10 @@ opam:bls12-381:
 
 # Ignoring unreleased package internal-devtools.
 
+# Ignoring unreleased package kaitai.
+
+# Ignoring unreleased package kaitai-of-data-encoding.
+
 opam:octez-accuser-Proxford:
   extends:
     - .opam_template
@@ -469,6 +473,8 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
+# Ignoring unreleased package octez-codec-kaitai.
+
 opam:octez-crawler:
   extends:
     - .opam_template
@@ -506,13 +512,11 @@ opam:octez-distributed-lwt-internal:
   variables:
     package: octez-distributed-lwt-internal
 
-# Ignoring unreleased package octez-evm-chunker.
+# Ignoring unreleased package octez-evm-node.
 
-# Ignoring unreleased package octez-evm-proxy.
+# Ignoring unreleased package octez-evm-node-libs.
 
-# Ignoring unreleased package octez-evm-proxy-lib.
-
-# Ignoring unreleased package octez-evm-upgrade-signer.
+# Ignoring unreleased package octez-evm-node-tests.
 
 opam:octez-injector:
   extends:
@@ -520,6 +524,8 @@ opam:octez-injector:
     - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-injector
+
+# Ignoring unreleased package octez-injector-server.
 
 opam:octez-l2-libs:
   extends:
@@ -573,7 +579,7 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
 opam:octez-protocol-002-PsYLVpVv-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-protocol-002-PsYLVpVv-libs
 
@@ -664,7 +670,7 @@ opam:octez-protocol-014-PtKathma-libs:
 opam:octez-protocol-015-PtLimaPt-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-015-PtLimaPt-libs
 
@@ -710,10 +716,22 @@ opam:octez-proxy-server:
   variables:
     package: octez-proxy-server
 
+# Ignoring unreleased package octez-risc-v-pvm.
+
+# Ignoring unreleased package octez-risc-v-pvm-test.
+
+opam:octez-rpc-process:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_4
+  variables:
+    package: octez-rpc-process
+
 opam:octez-shell-libs:
   extends:
     - .opam_template
     - .rules_template__trigger_all_opam_batch_6
+    - .tags_template__no_gcp
   variables:
     package: octez-shell-libs
 
@@ -726,19 +744,9 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
-opam:octez-smart-rollup-client-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
-  variables:
-    package: octez-smart-rollup-client-Proxford
+# Ignoring unreleased package octez-smart-rollup-client-Proxford.
 
-opam:octez-smart-rollup-client-PtNairob:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
-  variables:
-    package: octez-smart-rollup-client-PtNairob
+# Ignoring unreleased package octez-smart-rollup-client-PtNairob.
 
 # Ignoring unreleased package octez-smart-rollup-client-alpha.
 
@@ -752,7 +760,7 @@ opam:octez-smart-rollup-node:
 opam:octez-smart-rollup-node-Proxford:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_1
   variables:
     package: octez-smart-rollup-node-Proxford
 
@@ -777,16 +785,26 @@ opam:octez-smart-rollup-node-lib:
   variables:
     package: octez-smart-rollup-node-lib
 
-# Ignoring unreleased package octez-smart-rollup-sequencer.
-
-# Ignoring unreleased package octez-smart-rollup-sequencer-node.
-
 opam:octez-smart-rollup-wasm-debugger:
   extends:
     - .opam_template
-    - .rules_template__trigger_exec_opam_batch_2
+    - .rules_template__trigger_exec_opam_batch_1
   variables:
     package: octez-smart-rollup-wasm-debugger
+
+opam:octez-smart-rollup-wasm-debugger-lib:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-wasm-debugger-lib
+
+opam:octez-smart-rollup-wasm-debugger-plugin:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: octez-smart-rollup-wasm-debugger-plugin
 
 # Ignoring unreleased package octez-snoop.
 
@@ -801,7 +819,7 @@ opam:octez-version:
   variables:
     package: octez-version
 
-# Ignoring unreleased package scoru-sequencer-test.
+# Ignoring unreleased package octogram.
 
 opam:tezos-benchmark:
   extends:
@@ -884,6 +902,12 @@ opam:tezos-dal-node-services:
     - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-dal-node-services
+
+# Ignoring unreleased package tezos-injector-017-PtNairob.
+
+# Ignoring unreleased package tezos-injector-018-Proxford.
+
+# Ignoring unreleased package tezos-injector-alpha.
 
 # Ignoring unreleased package tezos-lazy-containers-tests.
 
@@ -1093,9 +1117,13 @@ opam:tezos-proxy-server-config:
 
 # Ignoring unreleased package tezt-ethereum.
 
+# Ignoring unreleased package tezt-risc-v-sandbox.
+
 opam:tezt-tezos:
   extends:
     - .opam_template
     - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezt-tezos
+
+# Ignoring unreleased package tezt-tx-kernel.

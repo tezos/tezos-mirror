@@ -79,7 +79,7 @@ let assert_invalid_key run =
       match caught_exn with
       | Durable.Invalid_key _ -> Lwt.return_ok ()
       | Host_funcs.Key_too_large _ -> Lwt.return_ok ()
-      | x -> raise x)
+      | x -> Lwt.reraise x)
 
 (* Test checking that if [key] is too large, [store_has key] traps. *)
 let test_store_has_key_too_long ~version () =

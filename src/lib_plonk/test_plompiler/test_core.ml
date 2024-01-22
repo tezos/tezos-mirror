@@ -1018,15 +1018,13 @@ functor
     end)
 
     let test_constant4_bytes ~le b c () =
-      let* o' = input @@ Bytes.input_bytes ~le c in
-      let* lo' = Limbs4.of_bytes o' in
+      let* lo' = input @@ Limbs4.input_bytes ~le c in
       let* o = Bytes.constant ~le b in
-      let* lo = Limbs4.of_bytes o in
+      let* lo = Limbs4.of_bool_list o in
       assert_equal lo lo'
 
     let test_constant4_limbs ~le b c () =
-      let* o' = input @@ Bytes.input_bytes ~le c in
-      let* lo' = Limbs4.of_bytes o' in
+      let* lo' = input @@ Limbs4.input_bytes ~le c in
       let* o = Limbs4.constant ~le b in
       assert_equal o lo'
 
@@ -1057,7 +1055,7 @@ functor
       let* x = input ~kind:`Public sx in
       let* expected = input expected in
       let* xbits = bits_of_scalar ~nb_bits:total_nb_bits x in
-      let* xlimbs = Limbs_n.of_bytes xbits in
+      let* xlimbs = Limbs_n.of_bool_list xbits in
       assert_equal xlimbs expected
 
     let tests_limbs_of_scalar str f =

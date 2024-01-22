@@ -43,7 +43,15 @@ type benchmark_info = Benchmark.t
 
 (** We only register abstract models. For each of them, we store the model
     itself, as well as each of its occurences in benchmarks *)
-type model_info = {model : Model.packed_model; from : local_model_info list}
+type model_info = {
+  model : Model.packed_model;
+  from : local_model_info list;
+  codegen_destination : string option;
+      (** Specifies the code generation destination for codegen models.
+          If [None] the detination is determined from the benchmmark the model
+          belongs to.
+      *)
+}
 
 (** We only store the name of the benchmark and the local name of the model,
     as it is enough information to retrieve the associated model *)
@@ -72,10 +80,19 @@ val register_simple : ?add_timer:bool -> Benchmark.simple -> unit
 val register_simple_with_num :
   ?add_timer:bool -> Benchmark.simple_with_num -> unit
 
-(** [register_model_for_code_generation s model] registers a model [model] with
-    a local model name [s] for code generation.
-    Use [register] if a model is associated with a benchmark. *)
-val register_model_for_code_generation : string -> 'a Model.t -> unit
+(** [register_model_for_code_generation ?destination s model] registers a model
+    [model] with a local model name [s] for code generation. Use [register]
+    if a model is associated with a benchmark.
+
+    [destination] specifies the code generation destination.
+    If [destination = "michelson_v1_gas"], the code will be generated to
+    ["DIR/michelson_v1_gas_costs_generated.ml"] by
+    [octez-snoop generate code for solutions SOL --split-to DIR] command.
+    The command will not generate the code under [DIR] if [destination] is not
+    specified.
+*)
+val register_model_for_code_generation :
+  ?destination:string -> string -> 'a Model.t -> unit
 
 (** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit

@@ -72,6 +72,8 @@ let change_logging_configuration =
       [sf "file-descriptor-path://%s?level-at-least=debug" tmp0]
   in
   (* Let's make some noise: *)
+  (* Can't use [bake_for_and_wait] from now on because it relies on
+     events on stdout. *)
   let* () = Client.bake_for client in
   let tmp0_content = read_file tmp0 in
   if String.length tmp0_content < 100 then

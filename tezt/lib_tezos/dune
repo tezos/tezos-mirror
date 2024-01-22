@@ -5,7 +5,7 @@
  (name tezt_tezos)
  (public_name tezt-tezos)
  (libraries
-  tezt
+  octez-libs.tezt-wrapper
   tezt-tezos.tezt-performance-regression
   uri
   hex
@@ -15,6 +15,6 @@
   cohttp-lwt-unix)
  (flags
   (:standard)
-  -open Tezt
-  -open Tezt.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
   -open Tezt_tezos_tezt_performance_regression))

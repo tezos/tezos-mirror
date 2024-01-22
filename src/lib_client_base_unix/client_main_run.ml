@@ -595,5 +595,6 @@ let run (module M : M)
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
        Client_context.full Tezos_clic.command list tzresult Lwt.t) =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_and_forward
   @@ main (module M) ~select_commands

@@ -14,9 +14,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add:
 Proof size: 1.98 KB
-Proof hash: 773b8b2de61ca9a6de1b14f2395679e73dd3905c521bfa558c22046071cac287
-Prover_pp hash: df945f47c29ebe747726af3423edc2f54d60c49b4189e2cef283942cf14086dd
-Verifier_pp hash: 20d1ac648df8ec6b9362634f5854c87103db028c27cc50b97bd7dc6cfe217dd6
+Proof hash: bff29c0374e769227ecd53910a2f02661b49347b289ae1092fba9868053fdbba
+Prover_pp hash: 5c540b0e97c074e3ee58ff51a58472c76fbed7d095b7374f7a6e6b2cb9421f63
+Verifier_pp hash: b40a164f88916ac0cd411caae244286223faf931213411ce8f034d77460d4c9c
 
 Num.test_add:
 Constraints       : 2 [1.00]
@@ -34,9 +34,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add:
 Proof size: 1.98 KB
-Proof hash: 8148b68757d843bd633660b7ccdbb4bccfec5577ef8fa8846228043fa4cb3b40
-Prover_pp hash: df945f47c29ebe747726af3423edc2f54d60c49b4189e2cef283942cf14086dd
-Verifier_pp hash: 20d1ac648df8ec6b9362634f5854c87103db028c27cc50b97bd7dc6cfe217dd6
+Proof hash: d80883c8dd6c6bb8dc446a5b4ed6b3b18fb87ab50a0465d11ca1f7c417968f61
+Prover_pp hash: 5c540b0e97c074e3ee58ff51a58472c76fbed7d095b7374f7a6e6b2cb9421f63
+Verifier_pp hash: b40a164f88916ac0cd411caae244286223faf931213411ce8f034d77460d4c9c
 
 Num.test_add_constant:
 Constraints       : 2 [1.00]
@@ -54,9 +54,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add_constant:
 Proof size: 2.19 KB
-Proof hash: 445430f556538e0f35984a65f78b8c06e2db01a04886a9f63c72e48112da25ba
-Prover_pp hash: c4cccfa2f8f4efceb660fe40acff721a81b431c5ae2a7b4c3b6afda2030d339d
-Verifier_pp hash: af1e7291af812599221fda4495123cd77ba18ce57591f52a011080c603c4afa7
+Proof hash: 26a4ec92b1c1aeac03e6c3fbcaf1acbe355e7b5f8078d7316c661ae29eb999a6
+Prover_pp hash: cbb26d42c3af3e9a34026017c088eb96962a021fe154dbaab0d20e04245a7bc6
+Verifier_pp hash: 3d3cf86f9d9b55d109bf85dfe6180297f1c1b81257378200705272d6e73fe0b8
 
 Num.test_add_constant:
 Constraints       : 2 [1.00]
@@ -74,9 +74,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_add_constant:
 Proof size: 2.14 KB
-Proof hash: 052d804de014d0c3df2ef779024dcfde5e2b34a6c2b9b5401aab019c4b63d2f1
-Prover_pp hash: 0da21d336756f59cfb1402c070f4013d19e6cb6946933b35388a68be074a2354
-Verifier_pp hash: 83c0f12a989fa3fd5039a82511bd4c006c5141bb9e886f4436e3fa52d3ee1a61
+Proof hash: eb2ca1a4291a33cad5fdc3ca9a0530f2cb3be754f9b656e8a92be7dd6c417cc8
+Prover_pp hash: bccb351158442fa2ab93c82a98a9a675aaf65ca404c2ca6a725d3fe72cf6c083
+Verifier_pp hash: e262ca600840ccf9b5e4cf52c0111abfa6e150eb4f4dd2404c3fdffb2b286988
 
 Num.test_sub:
 Constraints       : 2 [1.00]
@@ -94,9 +94,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_sub:
 Proof size: 1.98 KB
-Proof hash: 2fa1887336103d21bd9ae2bedce376ad95cfb3cc887534dd07b0a9faa20d6ceb
-Prover_pp hash: 2eac4a709524f5c8f9e9c80f055aee32bb425ba97925924cadf67edc590ef7e2
-Verifier_pp hash: 806b6a287fcdad727468c481e74274fe8149b10e0169d416a7eeff455ee518ef
+Proof hash: 92cbca60db73ccdfbc3173681e441d423e69dd8283e575efa1b34cea5d581070
+Prover_pp hash: 1dd56eedccb6255b7d78f14413870fdc4a81a4963d97611b9897e31c626ac92b
+Verifier_pp hash: 2daf4618f0a20199558c9903fd06e3e29e44da81dcec8c1612e746a3620c2d19
 
 Num.test_sub:
 Constraints       : 2 [1.00]
@@ -114,9 +114,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_sub:
 Proof size: 1.98 KB
-Proof hash: eeced9adaff772c4ce20db75001b5341de67323b10777ca830671a4af0dba1cc
-Prover_pp hash: 2eac4a709524f5c8f9e9c80f055aee32bb425ba97925924cadf67edc590ef7e2
-Verifier_pp hash: 806b6a287fcdad727468c481e74274fe8149b10e0169d416a7eeff455ee518ef
+Proof hash: 00ffbf0dbbff858dc3e6a15affb9baa8b44ae87d74b53e9a22e047a6ab349f0f
+Prover_pp hash: 1dd56eedccb6255b7d78f14413870fdc4a81a4963d97611b9897e31c626ac92b
+Verifier_pp hash: 2daf4618f0a20199558c9903fd06e3e29e44da81dcec8c1612e746a3620c2d19
 
 Num.test_mul:
 Constraints       : 2 [1.00]
@@ -134,9 +134,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: 0ce203c7b24c89756bee1490aa805a598b76ce6640c8d6249f321a21b0ac62ef
-Prover_pp hash: bd9581ccb8ebfeb9aa7873403e98067762114d7644821c3dbd12e876612d4501
-Verifier_pp hash: de1a72c75c5bb96608d25a493573b93873bd70298902589f90e5b24bba25482e
+Proof hash: fbd14ca5a2eb710eb1697c8c36176410e45bb1ad403ec1625e0018f0097602d7
+Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
+Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
 Num.test_mul:
 Constraints       : 2 [1.00]
@@ -154,9 +154,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: 99f7c3140e3ec74f76394bfec18ad6d66b4346dad1911e0b0dd18ec3c3710232
-Prover_pp hash: bd9581ccb8ebfeb9aa7873403e98067762114d7644821c3dbd12e876612d4501
-Verifier_pp hash: de1a72c75c5bb96608d25a493573b93873bd70298902589f90e5b24bba25482e
+Proof hash: 02ff1f04ddf1b7591fe410fea836d6219544c741acf9c987bc496b7934dd46b7
+Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
+Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
 Num.test_mul:
 Constraints       : 2 [1.00]
@@ -174,9 +174,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_mul:
 Proof size: 1.92 KB
-Proof hash: 321bf51f1544f3686490293b0e4ab403fdd1af7fba9972fbff6628be6dfd0987
-Prover_pp hash: bd9581ccb8ebfeb9aa7873403e98067762114d7644821c3dbd12e876612d4501
-Verifier_pp hash: de1a72c75c5bb96608d25a493573b93873bd70298902589f90e5b24bba25482e
+Proof hash: eae3082460b2d060601f5f091f3b9259ba4e91bbd74d9f644619cbb67b126df7
+Prover_pp hash: 0d370138d147579ac4dfa99765ccbe890204d54781e39958fe4a18396c36ccf9
+Verifier_pp hash: 2dcd8999d0c153650e995db69fd77ed189104b3ccfbe3e710b2ee119a4577c2f
 
 Num.test_num:
 Constraints       : 6 [2.58]
@@ -194,9 +194,9 @@ Circuit Size      : 5 [2.32]
 
 Num.test_num:
 Proof size: 2.12 KB
-Proof hash: cad258e57baaae184d355fc6efc1b7703f8862590e0bfd8c6b3573bd89f9e353
-Prover_pp hash: 6b5420ece6c4c460113955b74c048194dd9d0fa87fef734bff89321f308c6140
-Verifier_pp hash: 162e014170de3f588db1a429ba62eb8663f0b2bcb26c8e6c5f0614c723647391
+Proof hash: 2f71604e12aff82aaa46e13afb8769bcaef68a962011aad62d2ec58db3def932
+Prover_pp hash: 7796a560e1812805af8fad486b6721079a11a1241424024184dc177ff64f919f
+Verifier_pp hash: af42f792aed37740e2cf4eecdc0ce4887612115b89fae9c9cc45ecac83ab7403
 
 Num.test_div:
 Constraints       : 3 [1.58]
@@ -214,9 +214,9 @@ Circuit Size      : 2 [1.00]
 
 Num.test_div:
 Proof size: 1.97 KB
-Proof hash: 476db86c0efda70660a956dbb3e45e72fb59115cc0020aa9f7e370984e812daf
-Prover_pp hash: a98a6551f5a1292b558f69353f08c32996ce634babc75b9e03280536e88fe314
-Verifier_pp hash: e3fb1989e6f78c5d6010315a31fef7567c3735013f3b83aac3ee2506f272ee26
+Proof hash: 6888aa42f93c3fb1f263e92d123acce6fa76fb963c4450448c70159c8fa8c304
+Prover_pp hash: 15068f010dbd0ba5dbbcef1c532c4a0a76138e93ba62b8ea6f419eb995e5ab13
+Verifier_pp hash: 6b91372f856078dd03f46755c7bfd192df7e7779c67b320f656cdab96b894bd1
 
 pow5:
 Constraints       : 2 [1.00]
@@ -234,9 +234,9 @@ Circuit Size      : 1 [0.00]
 
 pow5:
 Proof size: 1.74 KB
-Proof hash: 9c1143bb5767291b95d8ccb23e22031481649812d711214e9764a0ceee985fc4
-Prover_pp hash: 3aa6d424f17e9bd8902ba2a44520765ed945f4b82222a0ce4c999f5326c82898
-Verifier_pp hash: 43250b0c4574bd9413050499e34f905cc4905f078168be2e5cdf7fe3654112b6
+Proof hash: ab469e74220a05373a2570266a5ee79ff4c3f94747d2b9c0080c039b3261d7a8
+Prover_pp hash: df03fa5ebd0ab5e8eadd165d22f79f8c53be081029a621ecb6b98b9d3c69d8bb
+Verifier_pp hash: 440ca48cc42d8edb37554436cba8b658ef1d4e85bc2003f2bab9a8d2d9ad6dca
 
 test:
 Constraints       : 2 [1.00]
@@ -254,9 +254,9 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 9615db6d2dcab4dba8a9fdd768cc601967a87fdc4ba099328d8752614e3179f6
-Prover_pp hash: 8e7cf58912cfc2a73e84cf7f5f49d02ef0b5f3b3a7a454d7eb7a63dc00b656c5
-Verifier_pp hash: f08c178cfc8255516e281134057524c630507af65cc2a516084d41e45a9c11c0
+Proof hash: 3e1b39fd41cea717105cd8b56f835b50c030acbd0294f68e82ad47fcc353187f
+Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
+Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
 test:
 Constraints       : 2 [1.00]
@@ -274,9 +274,9 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 583c4219d57c65ce15acf36471df5138ad44b46b34b82349e98d823137c7988f
-Prover_pp hash: 8e7cf58912cfc2a73e84cf7f5f49d02ef0b5f3b3a7a454d7eb7a63dc00b656c5
-Verifier_pp hash: f08c178cfc8255516e281134057524c630507af65cc2a516084d41e45a9c11c0
+Proof hash: 2d457895c9c50d3640713d40ec25e64842de2f907912f5e42932eaae4e2b522d
+Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
+Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
 test:
 Constraints       : 2 [1.00]
@@ -294,9 +294,9 @@ Circuit Size      : 1 [0.00]
 
 test:
 Proof size: 1.74 KB
-Proof hash: 5b3cf7afe3b0d38da913c2042b5edf039c535ab1582a0918b5e8ea3d2722535b
-Prover_pp hash: 8e7cf58912cfc2a73e84cf7f5f49d02ef0b5f3b3a7a454d7eb7a63dc00b656c5
-Verifier_pp hash: f08c178cfc8255516e281134057524c630507af65cc2a516084d41e45a9c11c0
+Proof hash: 97e47b7c2361331b256d6e9add0e2c6cd9248d191bab33b22cd8e6fa835e2f20
+Prover_pp hash: bc716130d987b309464e1a7031edd4d7cc313ebf9aa01f79934dda5af4ab9cca
+Verifier_pp hash: 1cdae686f8cb5edc7f2b868071f6aa040e2dee114162261df1b0a6df55c75b8c
 
 pow:
 Constraints       : 6 [2.58]
@@ -314,9 +314,9 @@ Circuit Size      : 4 [2.00]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: b7d0dd6f95f02ab005c8a489b07992935a61c5e7d1656a8847f44c79a3e9d04d
-Prover_pp hash: 46eb977473e144f5c8ef7faacafbad8173a54db4c506bf0891d6e21d07c6e1e6
-Verifier_pp hash: b0bf195b22bcbe745e5e50c16f811446de577dd903840115e61d306f6689828a
+Proof hash: 336bea393d22ecf8de47b5becd437dfde3674f9582ac0fe2ea663245ba40d711
+Prover_pp hash: 02be315b2df994f688e9a5157dd8d338d809aeb2d0d00b90cf8b36fe715141a8
+Verifier_pp hash: 3c506db115fefebb7d0f00ef9607ac93e3ebcbdab1a7fd86e3e23d653a7f32dd
 
 pow:
 Constraints       : 6 [2.58]
@@ -334,9 +334,9 @@ Circuit Size      : 4 [2.00]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: bad25abe172a00f7d62477244cd78d57ff6f47a114e383e5a304a84c96ba9984
-Prover_pp hash: 46eb977473e144f5c8ef7faacafbad8173a54db4c506bf0891d6e21d07c6e1e6
-Verifier_pp hash: b0bf195b22bcbe745e5e50c16f811446de577dd903840115e61d306f6689828a
+Proof hash: 613898997107140fe97dee0cf878717e8bfc6642d5f0b9d77c9b9525886245c6
+Prover_pp hash: 02be315b2df994f688e9a5157dd8d338d809aeb2d0d00b90cf8b36fe715141a8
+Verifier_pp hash: 3c506db115fefebb7d0f00ef9607ac93e3ebcbdab1a7fd86e3e23d653a7f32dd
 
 pow:
 Constraints       : 10 [3.32]
@@ -354,9 +354,9 @@ Circuit Size      : 7 [2.81]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: c6641b500c1bb11581ab6e4e6e90b96c45c075bc0e607cf8762060650901c2ba
-Prover_pp hash: 9f6fa29cd7356559c0e8a9a5768f913939d0288cb35c1410b0ef1bd5ed9f0064
-Verifier_pp hash: 308d80affb6c0de6a7215fb61f9a5897cc94651c6f37531f50a6ab91c2abd88e
+Proof hash: be99a42b43dfbb7af50f873fb6a9ff1f9c90761baa0415cfb5054d6ba77fd9c9
+Prover_pp hash: cfc5a6388352669e3e564f7f5d0e20de16b157d4fd52338dfdb55dd7e705460d
+Verifier_pp hash: 09f90c3b391f8835206bf14f37a1b4632ad546cc3193b06ac34da9f8fc3f8e3c
 
 pow:
 Constraints       : 10 [3.32]
@@ -374,9 +374,9 @@ Circuit Size      : 7 [2.81]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 630a72dd6adf699e6d90d7d5dd34a5befd86fbdb8e02fc46cb23a48594ad8f90
-Prover_pp hash: 9f6fa29cd7356559c0e8a9a5768f913939d0288cb35c1410b0ef1bd5ed9f0064
-Verifier_pp hash: 308d80affb6c0de6a7215fb61f9a5897cc94651c6f37531f50a6ab91c2abd88e
+Proof hash: 2f752c6e5144d38453e2a76062fc36118e1e506de8faac3e09026fe911483f9c
+Prover_pp hash: cfc5a6388352669e3e564f7f5d0e20de16b157d4fd52338dfdb55dd7e705460d
+Verifier_pp hash: 09f90c3b391f8835206bf14f37a1b4632ad546cc3193b06ac34da9f8fc3f8e3c
 
 pow:
 Constraints       : 18 [4.17]
@@ -394,9 +394,9 @@ Circuit Size      : 13 [3.70]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 09d925c508d52edfdf09b3b01675524bda04498b8499b66f8a8bd4ef03b3cc03
-Prover_pp hash: b0abec790e52821dd43d9bdcf25f9d092150f305343a4c1f936f1d5bf3ef0a96
-Verifier_pp hash: 30c71ed7e655050c412d19c38e7ae3740bce4635c91f68e0f7635026df7be253
+Proof hash: 03d77ac2f2e5d0c79f0fe7f1eb9a3496661db4290dc1413270fe64fcc979f1ae
+Prover_pp hash: fb62d2ac6ebb7dc928d2002b70a423e9fce59d7005cbf3bd7e33e457181b8f12
+Verifier_pp hash: 023ab4847279bccdbf760768aec98fe836c079b896024316a363c3a3a94704e4
 
 pow:
 Constraints       : 26 [4.70]
@@ -414,9 +414,9 @@ Circuit Size      : 19 [4.25]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: 0777ee545c6e244fc8650c6217eeb6d30db89eab5ca8cfb17c55454a81f36fa6
-Prover_pp hash: a1d787a273c028584a5be028e2295040039f9a41e50fdc3bb247233903708e62
-Verifier_pp hash: 316872f1984308821802285d4f5800787c5fa866073f795e71b257b411e446a9
+Proof hash: 974b7cd76941defc2230bd3b5f02461751dcdd5f8872f86abaadb901bda84b30
+Prover_pp hash: ceae3d56202ec39754584a77f8dc6368a85287a553dbcad3c14867dbce55ee31
+Verifier_pp hash: 3326d9f276159d5a31dbb2432305d49b4b898800b1e4b9ee69ed47054dbdc04e
 
 pow:
 Constraints       : 14 [3.81]
@@ -434,9 +434,9 @@ Circuit Size      : 10 [3.32]
 
 pow:
 Proof size: 1.88 KB
-Proof hash: de9a82df40cb14f52ee83b36262ab9d4d4a106cc9b31d8b943493dad64a61d45
-Prover_pp hash: b6b2d68206a505a2a82119d7662e0b16cb96a386662278dc9bd8f036eb4ddccf
-Verifier_pp hash: ad8290b6ac44c8ca381a37ebc33d449507918425adc41ed26d8fb4d5e70ca45f
+Proof hash: 46e995668877cebb454302d52bfb0ee3e8ba0cb4184a9a74c0db9df30e29cf44
+Prover_pp hash: 5a1ef163ff993109e0129b4eb9eb4fbe3833288207e42ca70ce0fea6832fec92
+Verifier_pp hash: 85bb7f33d3dd6e8d1aa6f29083e00e2e001a07f9d0c692d28c4d5b0cdcd6f531
 
 Num.test_equal:
 Constraints       : 1 [0.00]
@@ -454,9 +454,9 @@ Circuit Size      : 1 [0.00]
 
 Num.test_equal:
 Proof size: 1.97 KB
-Proof hash: 4b037584c18b447674d8f3235a3558511d3acedeb01659602bab934f9386c920
-Prover_pp hash: ad9c9a78fd3f8e6491f43fe0b7644a09a6c9deb9290f84429ee41fbcedbcd73b
-Verifier_pp hash: d743117c3fd68e5e8db1091bb05f69c88a30967f4a17363cd9b4046727b387a9
+Proof hash: d8859b47e16045614ea30d7ccd729d2099f54b3cd87ae9568ff89175f359906a
+Prover_pp hash: 8fea8486642b45c7be05d2010101cbc22bdfa42a820125f2ff21d7843be91f82
+Verifier_pp hash: 092428fe884a8a1824c92d2c375402ff5bd634fd77d2aa687f6c8969147c6731
 
 Num.bits_of_scalar:
 Constraints       : 15 [3.91]
@@ -474,9 +474,9 @@ Circuit Size      : 6 [2.58]
 
 Num.bits_of_scalar:
 Proof size: 2.34 KB
-Proof hash: 659960ee8ef6bd0c385d51d3dcc987d381593b5efeabd64b7e337a41ea5931b2
-Prover_pp hash: b37cf81836078a5d526b8bbba9df3ef303811831412325c3c9bd9401577b39cc
-Verifier_pp hash: 1c1c3316ba1ef55ca55e55ea9ecfef79a15c25c11d9f4aa7e69f1301d22d3a48
+Proof hash: 6c0a255a0a30c671a255dee527637949a41031aeb2b9591c14ef6f3327a06614
+Prover_pp hash: baddad7fbf4c99bfea78c4ae7ee20a3e10d690ce9a10fca5b54f27bf12926d40
+Verifier_pp hash: fffe7fb4d591b9486795a30d4e3bf403c578a3501067b20f3c399c432e263ee5
 
 Num.bits_of_scalar:
 Constraints       : 15 [3.91]
@@ -494,9 +494,9 @@ Circuit Size      : 6 [2.58]
 
 Num.bits_of_scalar:
 Proof size: 2.34 KB
-Proof hash: a1bc0d1c3c1d798d586301ba5f8fcd470b29d44ba8ea8dd2f475e233d982256c
-Prover_pp hash: ddee9d716df544b29d1158481cee8e8a894c3ad09bf295b154e7db1b18d4b871
-Verifier_pp hash: 7535ce1f4a01226fe7b8df24a1578ddd7cbe6c50c6e3f72001ca353286785232
+Proof hash: 587cfd9d88b3d5b76657d946a65466d5227b188f453872ead69b491f63270a3c
+Prover_pp hash: e86b9bca4e0836274798b0449eb7e6d188df456fc31ef65df3a49e46787bb666
+Verifier_pp hash: 2cefb8566277501849561a5d6965a332c4717b94e7fd7230033b34d3b8c19945
 
 Num.is_upper_bounded:
 Constraints       : 8 [3.00]
@@ -514,9 +514,9 @@ Circuit Size      : 4 [2.00]
 
 Num.is_upper_bounded:
 Proof size: 2.28 KB
-Proof hash: d8e807982045099bc1e9498261d1c457802e755431cafc3c2f73dcc88dba5207
-Prover_pp hash: 1779348ffa9c9ac5d0bfe429099beffa20c83a752cd97188de610f6f09ad576f
-Verifier_pp hash: ddf46f511f81501ddbaeca74bd84235e3afdb9bbb3ec4022e6d1643694f5e8c7
+Proof hash: f4f47eafd1db952f21b737e9d2b4e019fd169e934bab3710c4ea59eb0192ae89
+Prover_pp hash: 6ed66d729931b09d66acabfc47e6c0a469aad8c57159f9f22fd7a258e002875c
+Verifier_pp hash: 53bb6b9a06a505d4edcf3f8a30fa276f0fc7d0da0bacb4192bd16d4ff2e8a8a3
 
 Num.is_upper_bounded:
 Constraints       : 14 [3.81]
@@ -534,9 +534,9 @@ Circuit Size      : 7 [2.81]
 
 Num.is_upper_bounded:
 Proof size: 2.45 KB
-Proof hash: e63a6a1c66cc3161cff3bf8dc840710c6f570d3a89dd3e40e3eae6fed7d1c29b
-Prover_pp hash: 04f2702146c2dfe310cd7b087595c78f85fc438b631a0bc0b947b9a73a2ae875
-Verifier_pp hash: 3edebcefb8b6507929f8bb00ba89a3de1ed4ba5840ac5af1fd3240c1ba1c1ed0
+Proof hash: e6fe537ad98b2145ad8903efa01177d4a46023dd7d0d593ae5594ecf8cc2803c
+Prover_pp hash: 88297d28fee4293206a61a70809a7d849b4d2978aa58de7fb375db645baabe7f
+Verifier_pp hash: 39e52877b4fe44ea9ea042f17cc8f99b385217af05d0e06d0514c233af6bf2fc
 
 Num.is_upper_bounded:
 Constraints       : 26 [4.70]
@@ -554,9 +554,9 @@ Circuit Size      : 11 [3.46]
 
 Num.is_upper_bounded:
 Proof size: 2.91 KB
-Proof hash: 9c7af69ca8759ec52839196be99907453680998d9df471dd532068d01985b067
-Prover_pp hash: fd81e2cc29fd052921e298b9b9eba9ec16cd389278ec4540b1cfbf29ee4d8644
-Verifier_pp hash: 17da74f617bf64ef9e9f8e0227608a50f12f4d40b294cff517fe41406d6934ac
+Proof hash: 0f5c6cb8472c26a595e9187103c41eb0ad964768cb322be5bc1f8a66736af708
+Prover_pp hash: a1546be5925a402c8e2bc0f3f530fe6d669b2a4ce4b74cbc06c94941f4e6ca7d
+Verifier_pp hash: 1421d200f3ce887b940946542a2571e672f39cd4bd607eb3d560b0c242e81c8b
 
 Num.is_upper_bounded:
 Constraints       : 738 [9.53]
@@ -574,9 +574,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: b456e0504480d6f1075399b37cd2118cce632f8ec22803e68473f65cdcf4fb3f
-Prover_pp hash: 5f9aa60f547667fb255a57f00c8afe593cf8c6e586c0aa4044487434cdec2e5a
-Verifier_pp hash: 1d6fe24a8a6dcd633bec2aa76916e4a390cfabab01630d63e5017cdd50588ee7
+Proof hash: 5658f60465c6c353c6d98c69e52857e25260bc8339388884a3b397b71e8464fb
+Prover_pp hash: 478bf6b595f3c3183dd4a65df5b757cb8ea241a4206f792fd5f5a7c53a2fe5e1
+Verifier_pp hash: 60b146b6a26d24fd3a8c6fb87e793763ddff31fe920033abd7466cd5f6a23ba9
 
 Num.is_upper_bounded:
 Constraints       : 8 [3.00]
@@ -594,9 +594,9 @@ Circuit Size      : 4 [2.00]
 
 Num.is_upper_bounded:
 Proof size: 2.28 KB
-Proof hash: d8e807982045099bc1e9498261d1c457802e755431cafc3c2f73dcc88dba5207
-Prover_pp hash: 1779348ffa9c9ac5d0bfe429099beffa20c83a752cd97188de610f6f09ad576f
-Verifier_pp hash: ddf46f511f81501ddbaeca74bd84235e3afdb9bbb3ec4022e6d1643694f5e8c7
+Proof hash: f4f47eafd1db952f21b737e9d2b4e019fd169e934bab3710c4ea59eb0192ae89
+Prover_pp hash: 6ed66d729931b09d66acabfc47e6c0a469aad8c57159f9f22fd7a258e002875c
+Verifier_pp hash: 53bb6b9a06a505d4edcf3f8a30fa276f0fc7d0da0bacb4192bd16d4ff2e8a8a3
 
 Num.is_upper_bounded:
 Constraints       : 735 [9.52]
@@ -614,9 +614,9 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 46a11da39c4991c78d3c4be1968fbb9f20aa80ff044da954073ed93e76695418
-Prover_pp hash: c4034551ec290adf348fd25beb997e5e1731813cec9c469eb9d5053468b0641c
-Verifier_pp hash: 99b8ea815ab98f15ca7f8649ab37138d45af961413cd3cc781f41aa9c84ee764
+Proof hash: 3d9dfe608fce91346237379d0e08fe340d6b8d9d9635087456f77804b4d1574a
+Prover_pp hash: 535f2e9ac2492fdb538e02583d80c59525721e40d96f8ef3d3681bdb4ab46673
+Verifier_pp hash: 44db1c7f32cb349c575f4b81ec4a9f819c663c6c7b5ac114ed1a7bd460fe5f88
 
 Num.is_upper_bounded:
 Constraints       : 765 [9.58]
@@ -634,9 +634,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 73314f85397a2a3c29e2aac224c42be1b13466eeda07674beb093a0725caaccb
-Prover_pp hash: 9fec7d20534dbc51bd8ac3a16be4ef3793be4182ad3792599f8d613316dd570e
-Verifier_pp hash: fe17f327c77355cddd8a4b5594664ef19ce810b44aedce69bc9e5b5eef23eb11
+Proof hash: 1d6b4265fc274866c09d98ec850e4155924431433a5f2f31876b0475ab6b50e0
+Prover_pp hash: 053b7fdd3986182e3e97358470d6c8d6a28657e9d9fd10fc93cc6eaa0cac866a
+Verifier_pp hash: dd65cf3943c179337f58340bde0f9431e7cc1fa12d393587ac4d4e0d4ae0c44d
 
 Num.is_upper_bounded:
 Constraints       : 765 [9.58]
@@ -654,9 +654,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 934ca324ae72521804b24fd0951e32fee2f0d7c21f1d1b50d02dba20616f3f34
-Prover_pp hash: 76a7f8fba8532a0ddd8e1ab796fed690c64459be4231d34a14f493081d0893a0
-Verifier_pp hash: 1959b4d02ecc078773cf5f4d867439e89c1a42dc943ae890bffad1c14acfb6d5
+Proof hash: 191eecfde37fd4cf44b93c4c5513aa2fa327c52d298fee4f47608e1407d448fc
+Prover_pp hash: 82e718c6c3287286f9f1e3638bb57b0eb14969c7bb101dcfb8529d9cf1bc92b1
+Verifier_pp hash: a5d404c705a0cef7dc26364194607476537b9a6500a98ff3b1edd418b7198bba
 
 Num.is_upper_bounded:
 Constraints       : 767 [9.58]
@@ -674,9 +674,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 6dc04058114eb63cd99ea023e743fec61b16b8d84c39ca451af02697ac6b917b
-Prover_pp hash: 0aab25ae9c065395c7341c6f96d6c4e826ead4809ca06cb3a77ee8a50cb61feb
-Verifier_pp hash: 33cca90e5f09c898a8f6282389fad9e39ac50f93e49b0595866ab0a13dc81cd1
+Proof hash: 2814b8e24208d988d4e2909abc2f6bc60440ab5464c6765aa105acbedd0b27be
+Prover_pp hash: bcf6acce517d6d567494c9a32df689adb02150102413b61e08f47dec92e61323
+Verifier_pp hash: c34ae5315b80e1501edba43c0fba71598741192e390fd54e48d8ea5af65dcc0b
 
 Num.is_upper_bounded:
 Constraints       : 735 [9.52]
@@ -694,9 +694,9 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded:
 Proof size: 3.14 KB
-Proof hash: 46a11da39c4991c78d3c4be1968fbb9f20aa80ff044da954073ed93e76695418
-Prover_pp hash: c4034551ec290adf348fd25beb997e5e1731813cec9c469eb9d5053468b0641c
-Verifier_pp hash: 99b8ea815ab98f15ca7f8649ab37138d45af961413cd3cc781f41aa9c84ee764
+Proof hash: 3d9dfe608fce91346237379d0e08fe340d6b8d9d9635087456f77804b4d1574a
+Prover_pp hash: 535f2e9ac2492fdb538e02583d80c59525721e40d96f8ef3d3681bdb4ab46673
+Verifier_pp hash: 44db1c7f32cb349c575f4b81ec4a9f819c663c6c7b5ac114ed1a7bd460fe5f88
 
 Num.is_upper_bounded_totality:
 Constraints       : 764 [9.58]
@@ -714,9 +714,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 65e32e4231d59322083208fe885d2e35aecbd7da178685e58369fbb95806d169
-Prover_pp hash: 5b3d96890ee473ae401d7159b4743e244ad52c97c0f69d888ca4bfc7e13eede8
-Verifier_pp hash: 02f38e572dd599c1a1005e5ac3db028b1718356634d3d904091e5ab177e83631
+Proof hash: a4d21e946749bfedb303681e00243706adb472103d643f89433ffcd1df497c69
+Prover_pp hash: 1a15af063c9ef462d5bec22aa9bcbf5b097007844226a96867464c9dae82fc09
+Verifier_pp hash: ef18f392837212a7284180e59703e0c342122e46895916e9f6895bb79143522a
 
 Num.is_upper_bounded_totality:
 Constraints       : 734 [9.52]
@@ -734,9 +734,9 @@ Circuit Size      : 303 [8.24]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 74727cd93a22d6db489b00aa6e2abe2a26562e0b86b1496ba21a851161472905
-Prover_pp hash: db6afbfa67bfeaf9bf9d396e04c0205584beca5533f152f254146fc2366a1847
-Verifier_pp hash: b74826d42efda1076beaa74b8f5aa667175ad086ab203cb0860d2c92caf09de9
+Proof hash: 01fa5e35d4bf9f5613fadc1eda48f1095cf6bb9ea96ef78ab99ebea114f9af8e
+Prover_pp hash: 25f55f9aea56d2136675e0ee7b8f0ec8da00d8b54d4f47c780b312e9de350c24
+Verifier_pp hash: 2ec05d66f42ceaf1bc215dc7021abb73319be987ca3233886da6e141326a9992
 
 Num.is_upper_bounded_totality:
 Constraints       : 766 [9.58]
@@ -754,9 +754,9 @@ Circuit Size      : 306 [8.26]
 
 Num.is_upper_bounded_totality:
 Proof size: 3.51 KB
-Proof hash: 2cd6c6b9f87a776cc44115e32a7cb43ef4ddee294b6eb0e5cd9791258c72415c
-Prover_pp hash: 32e6806ce54ae66b3168f591c4d826acb615bea8601a27e87915f1d7d85cdbfb
-Verifier_pp hash: 0c8071e2bea340eca4a4a54f52e25098a2d34950ec234bda75d1829f40f04385
+Proof hash: 9afa5c4d31b1fa1f236f001019147de9962da1de972d73aab9ccf5893737743c
+Prover_pp hash: 26313b2afa684df67981c362737d2a2ba456ec1f79b8a92a5fb0ee689807a0ae
+Verifier_pp hash: 8641a3dab8d42352cd956b2e1b6434eadb4087da5194c5b2a3577ee0cb2b63b3
 
 Num.geq:
 Constraints       : 25 [4.64]
@@ -774,9 +774,9 @@ Circuit Size      : 9 [3.17]
 
 Num.geq:
 Proof size: 2.52 KB
-Proof hash: 4ddba2be27feddaf5c869bd3a7943ee18f31157b5be6c5fd2da7021936ab0689
-Prover_pp hash: af2d44161d6d710a7a25d8b764f0e89434efb0e1a796e84c09c72f7cbd402f5e
-Verifier_pp hash: 56f6bf7a6fe4f4a099c1156d6edc368c4ae7974cac950e9a609573ccf853d7e8
+Proof hash: c1cde8129d15e3de6a48f946e58a147634227be2c6c03ef6da58c0f41c45a412
+Prover_pp hash: 23e32d233378fce2cb7e1b501b2247141d1fa50ac5bbf7ff1b85f5a3587bf71e
+Verifier_pp hash: 838c5280dda80e16d27288d052748e87d2ad384e1e836ae3e827d494af544eb8
 
 Num.geq:
 Constraints       : 22 [4.46]
@@ -794,9 +794,9 @@ Circuit Size      : 8 [3.00]
 
 Num.geq:
 Proof size: 2.47 KB
-Proof hash: e6c1b98057b635ce21078bd440573ac460bc755d35a0fe48ba74092d4568c2bd
-Prover_pp hash: ab5b1d8b25b27d125e8f4da08f6398cd41ad9bbaf78691fe6d520c99f1512719
-Verifier_pp hash: bc23bc639c9ecc31c2948ebec931dd4e884f73b9b1798d870e498fa068435697
+Proof hash: e818860b964e51ba50a178c37aad06fa7e83853bc0cf3a8e9d276e0deed3a72e
+Prover_pp hash: 760e00318554798046080dc4932f2d487b199adb571a88f8034fe0c42920ec71
+Verifier_pp hash: 37ccba9a7a4d325cfde6e37c7832364cfbcdea2d030168374767746917fcda4f
 
 Num.test_add:
 Constraints       : 2 [1.00]
@@ -3599,88 +3599,88 @@ Tables            : 0 [0.00]
 Circuit Size      : 16 [4.00]
 
 Limbs.test_constant4_bytes:
-Constraints       : 24 [4.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 24 [4.58]
+Circuit Size      : 10 [3.32]
 
 Limbs.test_constant4_bytes_optimized:
-Constraints       : 8 [3.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 8 [3.00]
+Circuit Size      : 4 [2.00]
 
 Limbs.test_constant4_bytes:
-Constraints       : 24 [4.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 24 [4.58]
+Circuit Size      : 10 [3.32]
 
 Limbs.test_constant4_bytes_optimized:
-Constraints       : 8 [3.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 8 [3.00]
+Circuit Size      : 4 [2.00]
 
 Limbs.test_constant4_bytes:
-Constraints       : 46 [5.52]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 46 [5.52]
-
-Limbs.test_constant4_bytes_optimized:
-Constraints       : 20 [4.32]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 20 [4.32]
-
-Limbs.test_constant4_limbs:
 Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 12 [3.58]
 Tables            : 0 [0.00]
 Circuit Size      : 18 [4.17]
 
-Limbs.test_constant4_limbs_optimized:
-Constraints       : 8 [3.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Limbs.test_constant4_bytes_optimized:
+Constraints       : 6 [2.58]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 12 [3.58]
 Tables            : 0 [0.00]
-Circuit Size      : 8 [3.00]
+Circuit Size      : 12 [3.58]
 
 Limbs.test_constant4_limbs:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 18 [4.17]
+Circuit Size      : 4 [2.00]
 
 Limbs.test_constant4_limbs_optimized:
-Constraints       : 8 [3.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 8 [3.00]
+Circuit Size      : 4 [2.00]
 
 Limbs.test_constant4_limbs:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 36 [5.17]
+Circuit Size      : 4 [2.00]
 
 Limbs.test_constant4_limbs_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 16 [4.00]
+Circuit Size      : 4 [2.00]
+
+Limbs.test_constant4_limbs:
+Constraints       : 8 [3.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 12 [3.58]
+Tables            : 0 [0.00]
+Circuit Size      : 12 [3.58]
+
+Limbs.test_constant4_limbs_optimized:
+Constraints       : 4 [2.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 12 [3.58]
+Tables            : 0 [0.00]
+Circuit Size      : 12 [3.58]
 
 Limbs.test_limbs_of_scalar_limbs:
 Constraints       : 10 [3.32]
@@ -7715,100 +7715,100 @@ Tables            : 4 [2.00]
 Circuit Size      : 24 [4.58]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4:
-Constraints       : 62 [5.95]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bool.test_xor_bytes4_optimized:
-Constraints       : 26 [4.70]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 24 [4.58]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
@@ -7897,620 +7897,620 @@ Tables            : 2 [1.00]
 Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 48 [5.58]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 18 [4.17]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 48 [5.58]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 18 [4.17]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 48 [5.58]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 18 [4.17]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 48 [5.58]
+Circuit Size      : 16 [4.00]
 
 Bool.test_bnot_bytes4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 16 [4.00]
-Circuit Size      : 18 [4.17]
+Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 3 [1.58]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 8 [3.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 0 [0.00]
+Circuit Size      : 8 [3.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 3 [1.58]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 0 [0.00]
+Circuit Size      : 8 [3.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 0 [0.00]
+Circuit Size      : 8 [3.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 3 [1.58]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 0 [0.00]
+Circuit Size      : 8 [3.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 2 [1.00]
+Range-Checks-Total: 16 [4.00]
+Range-Checks-Max  : 8 [3.00]
+Tables            : 0 [0.00]
+Circuit Size      : 8 [3.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 5 [2.32]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
+Tables            : 0 [0.00]
+Circuit Size      : 16 [4.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 0 [0.00]
 Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 5 [2.32]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 0 [0.00]
 Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 5 [2.32]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
 Tables            : 0 [0.00]
 Circuit Size      : 16 [4.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 93 [6.54]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 9 [3.17]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4_optimized:
+Constraints       : 4 [2.00]
+Range-Checks-Total: 32 [5.00]
+Range-Checks-Max  : 16 [4.00]
+Tables            : 256 [8.00]
+Circuit Size      : 256 [8.00]
+
+Bytes.test_rotate_right4:
+Constraints       : 7 [2.81]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 93 [6.54]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 32 [5.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 32 [5.00]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 93 [6.54]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 7 [2.81]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 93 [6.54]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 32 [5.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 32 [5.00]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4:
-Constraints       : 93 [6.54]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 7 [2.81]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 93 [6.54]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 32 [5.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 0 [0.00]
-Circuit Size      : 32 [5.00]
+Circuit Size      : 24 [4.58]
 
 Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 13 [3.70]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 97 [6.60]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 36 [5.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 139 [7.12]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 139 [7.12]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 48 [5.58]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 139 [7.12]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 139 [7.12]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 48 [5.58]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4:
-Constraints       : 139 [7.12]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 139 [7.12]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 48 [5.58]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 0 [0.00]
-Circuit Size      : 48 [5.58]
-
-Bytes.test_rotate_right4:
-Constraints       : 145 [7.18]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
-Tables            : 256 [8.00]
-Circuit Size      : 256 [8.00]
-
-Bytes.test_rotate_right4_optimized:
-Constraints       : 54 [5.75]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 6 [2.58]
+Range-Checks-Total: 48 [5.58]
+Range-Checks-Max  : 24 [4.58]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 17 [4.09]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 17 [4.09]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 8 [3.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 0 [0.00]
-Circuit Size      : 16 [4.00]
+Circuit Size      : 8 [3.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 17 [4.09]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 17 [4.09]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 8 [3.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 16 [4.00]
+Circuit Size      : 8 [3.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 49 [5.61]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 19 [4.25]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 18 [4.17]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 256 [8.00]
 Circuit Size      : 256 [8.00]
 
 Bytes.test_shift_right4:
-Constraints       : 47 [5.55]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 17 [4.09]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 8 [3.00]
 Tables            : 0 [0.00]
-Circuit Size      : 47 [5.55]
+Circuit Size      : 17 [4.09]
 
 Bytes.test_shift_right4_optimized:
-Constraints       : 16 [4.00]
-Range-Checks-Total: 0 [0.00]
-Range-Checks-Max  : 0 [0.00]
+Constraints       : 8 [3.00]
+Range-Checks-Total: 8 [3.00]
+Range-Checks-Max  : 4 [2.00]
 Tables            : 0 [0.00]
-Circuit Size      : 16 [4.00]
+Circuit Size      : 8 [3.00]
 
 Range-checks:
-Constraints       : 24 [4.58]
-Range-Checks-Total: 135 [7.08]
-Range-Checks-Max  : 69 [6.11]
+Constraints       : 12 [3.58]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 17 [4.09]
 Tables            : 0 [0.00]
-Circuit Size      : 69 [6.11]
+Circuit Size      : 17 [4.09]
 
 Range-checks_optimized:
-Constraints       : 22 [4.46]
-Range-Checks-Total: 135 [7.08]
-Range-Checks-Max  : 90 [6.49]
+Constraints       : 10 [3.32]
+Range-Checks-Total: 31 [4.95]
+Range-Checks-Max  : 18 [4.17]
 Tables            : 0 [0.00]
-Circuit Size      : 90 [6.49]
+Circuit Size      : 18 [4.17]
 
 Optimizer.test_long_sum:
 Constraints       : 100 [6.64]

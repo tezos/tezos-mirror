@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -256,18 +257,9 @@ let get_output_proof_simpler () =
          outbox_level
          (cctxt : #Configuration.sc_client_context) ->
       let open Lwt_result_syntax in
-      let* outbox = RPC.get_outbox cctxt `Cemented outbox_level in
-      let* output =
-        match List.nth outbox message_index with
-        | None ->
-            cctxt#error
-              "No message at index %d for outbox of level %a."
-              message_index
-              Raw_level.pp
-              outbox_level
-        | Some o -> return o
+      let* commitment_hash, proof =
+        RPC.get_outbox_proof_simple cctxt outbox_level message_index
       in
-      let* commitment_hash, proof = RPC.get_outbox_proof cctxt output in
       let*! () =
         cctxt#message
           {|@[{ "proof" : "0x%a", "commitment_hash" : "%a"@]}|}

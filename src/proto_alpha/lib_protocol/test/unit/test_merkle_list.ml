@@ -39,7 +39,7 @@ let assert_invalid_pos : 'a Environment.Error_monad.tzresult -> _ = function
       let actual_error_msg : string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace err
       in
-      Printf.printf "%s\n" actual_error_msg ;
+      Log.debug "%s\n" actual_error_msg ;
       assert (
         expected_error_msg "Merkle_list_invalid_position" = actual_error_msg)
   | _ -> assert false
@@ -252,7 +252,7 @@ let valid_tests =
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lwt.return (f ()) >|= function Ok () -> () | Error _ -> assert false)
+      match f () with Ok () -> Lwt.return_unit | Error _ -> assert false)
 
 let tests = List.map wrap valid_tests
 

@@ -31,6 +31,19 @@ val no_0x : string -> string
 val normalize : string -> string
 
 (** [u16_to_bytes n] translate an int in a binary string of two bytes
-    (little endian). 
+    (little endian).
     NB: Ints greater than 2 bytes are truncated. *)
 val u16_to_bytes : int -> string
+
+(** [mapping_position key map_position] computes the storage position for
+    a value in a mapping given its [key] and the position of the map
+    itself.
+    It computes this position as:
+    [keccack(LeftPad32(key, 0), LeftPad32(map_position, 0))]
+    as specified in
+    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
+*)
+val mapping_position : string -> int -> string
+
+(** Transform an hexadecimal string to an integer using {!Z.of_bits}. *)
+val hex_string_to_int : string -> int

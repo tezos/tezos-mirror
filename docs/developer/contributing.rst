@@ -109,7 +109,7 @@ Then use ``push -f`` in your branch to rewrite the history.
 Being proficient with interactive rebases is mandatory to avoid
 mistakes and wasting time.
 
-This Git strategy is a variant of the `git rebase workflow <https://www.atlassian.com/git/articles/git-team-workflows-merge-or-rebase>`_.
+This Git strategy is a variant of the `git rebase workflow <https://www.atlassian.com/git/tutorials/merging-vs-rebasing>`_.
 
 .. _mr_workflow:
 
@@ -185,6 +185,20 @@ any fix-up commits that were applied (remembering to edit the commit
 message appropriately). Then the developer (or anyone else when not possible) can assign the MR to the `Nomadic
 Marge-bot <https://gitlab.com/nomadic-margebot>`__, which will
 automatically rebase the branch on top of master and finally merge it.
+
+Merge Queue Order
+-----------------
+
+By default, Marge-bot will merge MRs assigned to it in the assignment order. That is, the first MR assigned is the first that is merged. There are situations when it is desirable to modify this order. To achieve this, Marge-bot respects two priority labels, whose usage is reserved to the :doc:`Octez merge team <merge_team>`:
+
+- ``marge-priority::critical``: is reserved for MRs
+  resolving critical production issues (e.g., fixing a blocked CI).
+- ``marge-priority::high``: can be applied to MRs that needs to be
+  merged urgently. For instance, it can applied to MRs for urgent
+  releases or to reduce the merge delay between MRs that compose a
+  stack.
+
+MRs with ``marge-priority::critical`` will be treated before those with ``marge-priority::high`` who in turn will be treated before all MRs lacking either of these labels.
 
 .. _preparing_MR:
 
@@ -319,6 +333,8 @@ Therefore, when creating your MR, observe the following rules:
     + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
     + ``ci--docker`` is for publishing the Docker image of the MR.
     + ``ci--arm64`` is for building on the ARM64 architecture.
+    + ``ci--no-coverage`` disables the job ``unified_coverage`` (but it does not disable coverage instrumentation).
+
 
 - *MR Options*: When opening an MR you should probably tick the following
   options:

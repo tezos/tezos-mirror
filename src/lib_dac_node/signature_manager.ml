@@ -255,7 +255,7 @@ let check_coordinator_knows_root_hash dac_plugin page_store root_hash =
       @@ Page_store.Cannot_read_page_from_page_storage (Plugin.to_hex root_hash)
   (* Return an HTTP 404 error when hash provided in signature is unknown *)
   | Ok false -> raise Not_found
-  | Ok true -> return ()
+  | Ok true -> return_unit
 
 let should_update_certificate dac_plugin get_public_key_opt ro_node_store
     committee_members signature =
@@ -281,7 +281,7 @@ let should_update_certificate dac_plugin get_public_key_opt ro_node_store
   let* dac_member_has_signed =
     check_dac_member_has_signed ro_node_store root_hash signer_pkh
   in
-  if dac_member_has_signed then return false
+  if dac_member_has_signed then return_false
   else
     let* () =
       verify_signature
@@ -290,7 +290,7 @@ let should_update_certificate dac_plugin get_public_key_opt ro_node_store
         (Signature_repr.get_signature signature)
         root_hash
     in
-    return true
+    return_true
 
 let stream_certificate_update dac_plugin committee_members certificate
     certificate_streamers =
@@ -311,8 +311,8 @@ let stream_certificate_update dac_plugin committee_members certificate
     let _ =
       Certificate_streamers.close dac_plugin certificate_streamers root_hash
     in
-    return ()
-  else return ()
+    return_unit
+  else return_unit
 
 let handle_put_dac_member_signature dac_plugin get_public_key_opt
     certificate_streamers_opt rw_node_store page_store committee_members
@@ -349,8 +349,8 @@ let handle_put_dac_member_signature dac_plugin get_public_key_opt
              V0 (V0.make raw_root_hash aggregate_signature witnesses)))
         certificate_streamers_opt
     in
-    return ()
-  else return ()
+    return_unit
+  else return_unit
 
 module Coordinator = struct
   let handle_put_dac_member_signature ctx dac_plugin rw_node_store page_store

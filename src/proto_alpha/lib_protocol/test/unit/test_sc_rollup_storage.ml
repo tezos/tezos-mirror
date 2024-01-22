@@ -113,16 +113,14 @@ let assert_balance_changed op ctxt ctxt' account amount =
   let open Lwt_result_wrap_syntax in
   let*@ _, balance = Token.Internal_for_tests.balance ctxt account in
   let*@ _, balance' = Token.Internal_for_tests.balance ctxt' account in
-  let*@ balance_op_amount = op balance amount in
+  let*?@ balance_op_amount = op balance amount in
   equal_tez balance' ~loc:__LOC__ balance_op_amount
 
 let assert_balance_increased ctxt ctxt' account amount =
-  let ( +? ) t1 t2 = Lwt.return Tez_repr.(t1 +? t2) in
-  assert_balance_changed ( +? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( +? ) ctxt ctxt' account amount
 
 let assert_balance_decreased ctxt ctxt' account amount =
-  let ( -? ) t1 t2 = Lwt.return Tez_repr.(t1 -? t2) in
-  assert_balance_changed ( -? ) ctxt ctxt' account amount
+  assert_balance_changed Tez_repr.( -? ) ctxt ctxt' account amount
 
 let perform_staking_action_and_check ctxt rollup staker do_and_check =
   let staker_contract = Contract_repr.Implicit staker in
@@ -220,25 +218,22 @@ let originate_rollup_and_deposit_with_three_stakers () =
     By convention, context is passed linearly as [ctxt].  This takes a context
     argument to allow this.
 *)
-let assert_true _ctxt = return ()
+let assert_true _ctxt = return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~loc k expected_err =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.proto_error ~loc res (( = ) expected_err)
 
 let assert_fails_with_f ~loc k pred =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.proto_error ~loc res pred
 
 let assert_fails ~loc k =
-  let open Lwt_result_syntax in
-  let*! res = k in
-  let res = Environment.wrap_tzresult res in
+  let open Lwt_result_wrap_syntax in
+  let*!@ res = k in
   Assert.error ~loc res (fun _ -> true)
 
 (** Assert operation fails because of missing rollup *)
@@ -639,7 +634,7 @@ module Stake_storage_tests = struct
              min_expected_balance = stake;
            })
     in
-    let staker_balance = Tez_repr.div_exn stake 2 in
+    let*?@ staker_balance = Tez_repr.(stake /? 2L) in
     let staker_contract = Contract_repr.Implicit staker in
     let*@ ctxt, _ =
       Token.transfer ctxt `Minted (`Contract staker_contract) staker_balance
@@ -692,7 +687,8 @@ module Stake_storage_tests = struct
         rollup2
         staker
     in
-    assert_frozen_balance ctxt staker (Tez_repr.mul_exn stake 2)
+    let*?@ stake_times_2 = Tez_repr.(stake *? 2L) in
+    assert_frozen_balance ctxt staker stake_times_2
 
   (** Test that deposit twice on the same rollup fails. *)
   let test_deposit_twice_fails () =
@@ -2293,7 +2289,7 @@ module Stake_storage_tests = struct
         (record ctxt rollup 15 42)
         Sc_rollup_errors.Sc_rollup_outbox_level_expired
     in
-    return ()
+    return_unit
 
   (** Test storage outbox size diff. Note that these tests depend on the constant.
     [sc_rollup_max_outbox_messages_per_level] which controls the maximum size
@@ -2341,7 +2337,7 @@ module Stake_storage_tests = struct
        bitset with a smaller one. Hence we get a negative size diff. *)
     let*@ size_diff, _ctxt = record ctxt rollup (level + max_active_levels) 0 in
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) (-14) in
-    return ()
+    return_unit
 
   let test_get_cemented_commitments_with_levels_of_missing_rollup () =
     assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->

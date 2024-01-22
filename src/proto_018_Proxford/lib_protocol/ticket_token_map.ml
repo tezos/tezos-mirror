@@ -58,15 +58,19 @@ let key_of_ticket_token ctxt (Ticket_token.Ex_token {ticketer; _} as token) =
     ~owner:(Destination.Contract ticketer)
     token
 
-let update ctxt key f m =
-  key_of_ticket_token ctxt key >>=? fun (key_hash, ctxt) ->
-  let f ctxt val_opt =
-    (match val_opt with
+let update_context f key ctxt val_opt =
+  let open Result_syntax in
+  let+ val_opt, ctxt =
+    match val_opt with
     | Some (_tkn, value) -> f ctxt (Some value)
-    | None -> f ctxt None)
-    >|? fun (val_opt, ctxt) -> (Option.map (fun v -> (key, v)) val_opt, ctxt)
+    | None -> f ctxt None
   in
-  Ticket_token_map.update ctxt key_hash f m |> Lwt.return
+  (Option.map (fun v -> (key, v)) val_opt, ctxt)
+
+let update ctxt key f m =
+  let open Lwt_result_syntax in
+  let* key_hash, ctxt = key_of_ticket_token ctxt key in
+  Ticket_token_map.update ctxt key_hash (update_context f key) m |> Lwt.return
 
 let fold_e ctxt f =
   Ticket_token_map.fold_e ctxt (fun ctxt acc _key_hash (tkn, value) ->
@@ -77,42 +81,54 @@ let fold_es ctxt f =
       f ctxt acc tkn value)
 
 let find ctxt ticket_token map =
-  key_of_ticket_token ctxt ticket_token >>=? fun (key_hash, ctxt) ->
-  Ticket_token_map.find ctxt key_hash map >>?= fun (val_opt, ctxt) ->
+  let open Lwt_result_syntax in
+  let* key_hash, ctxt = key_of_ticket_token ctxt ticket_token in
+  let*? val_opt, ctxt = Ticket_token_map.find ctxt key_hash map in
   return (Option.map snd val_opt, ctxt)
 
 let lift_merge_overlap merge_overlap ctxt (tkn1, v1) (_tkn2, v2) =
-  merge_overlap ctxt v1 v2 >|? fun (v, ctxt) -> ((tkn1, v), ctxt)
+  let open Result_syntax in
+  let+ v, ctxt = merge_overlap ctxt v1 v2 in
+  ((tkn1, v), ctxt)
 
 let of_list ctxt ~merge_overlap token_values =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (map, ctxt) (token, value) ->
-      key_of_ticket_token ctxt token >>=? fun (key_hash, ctxt) ->
+      let* key_hash, ctxt = key_of_ticket_token ctxt token in
       Lwt.return
         (Ticket_token_map.update
            ctxt
            key_hash
            (fun ctxt old_val ->
              match old_val with
-             | None -> ok (Some (token, value), ctxt)
+             | None -> Ok (Some (token, value), ctxt)
              | Some old ->
-                 lift_merge_overlap merge_overlap ctxt old (token, value)
-                 >|? fun (x, ctxt) -> (Some x, ctxt))
+                 let open Result_syntax in
+                 let+ x, ctxt =
+                   lift_merge_overlap merge_overlap ctxt old (token, value)
+                 in
+                 (Some x, ctxt))
            map))
     (Ticket_token_map.empty, ctxt)
     token_values
 
 let map_e ctxt f =
+  let open Result_syntax in
   Ticket_token_map.map_e ctxt (fun ctxt _key (tkn, value) ->
-      f ctxt tkn value >|? fun (new_value, ctxt) -> ((tkn, new_value), ctxt))
+      let+ new_value, ctxt = f ctxt tkn value in
+      ((tkn, new_value), ctxt))
 
 let to_list ctxt map =
-  Ticket_token_map.to_list ctxt map >>? fun (list, ctxt) ->
+  let open Result_syntax in
+  let* list, ctxt = Ticket_token_map.to_list ctxt map in
   (* Consume gas for traversing the list again and remove the key-hash. *)
-  Gas.consume
-    ctxt
-    (Carbonated_map_costs.fold_cost ~size:(Ticket_token_map.size map))
-  >|? fun ctxt -> (List.map snd list, ctxt)
+  let+ ctxt =
+    Gas.consume
+      ctxt
+      (Carbonated_map_costs.fold_cost ~size:(Ticket_token_map.size map))
+  in
+  (List.map snd list, ctxt)
 
 let merge ctxt ~merge_overlap =
   Ticket_token_map.merge ctxt ~merge_overlap:(lift_merge_overlap merge_overlap)

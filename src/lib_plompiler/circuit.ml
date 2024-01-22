@@ -1876,8 +1876,12 @@ let to_plonk_range_checks plomp_range_checks cs =
       (* We went through all wires *)
       if wire = Csir.nb_wires_arch then
         (* We assert that all pending range-checks have been processed *)
-        let () = assert (Range_checks.is_empty pending_rc) in
-        all_found_rc
+        if not (Range_checks.is_empty pending_rc) then
+          (* Probably not all inputs are constrained, i.e., they are unused *)
+          failwith
+            "to_plonk_range_checks : not all range-checks can be converted \
+             into Plonk representation !"
+        else all_found_rc
       else
         let pending_rc, found_rc =
           (* Go through all constraints of the CS *)

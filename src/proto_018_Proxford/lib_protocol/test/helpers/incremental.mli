@@ -54,6 +54,8 @@ val begin_construction :
   ?seed_nonce_hash:Nonce_hash.t ->
   ?mempool_mode:bool ->
   ?policy:Block.baker_policy ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   Block.t ->
   incremental tzresult Lwt.t
 

@@ -68,7 +68,7 @@ type error += Pending_connection
 
 type error += Connected
 
-type error += Connection_refused
+type error += Connection_failed
 
 type error += Rejected of {peer : P2p_peer.Id.t; motive : P2p_rejection.t}
 

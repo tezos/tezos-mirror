@@ -40,16 +40,16 @@ type error +=
       commitment : Dal.commitment;
       commitment_proof : Dal.commitment_proof;
     }
-  | Dal_data_availibility_attestor_not_in_committee of {
-      attestor : Signature.Public_key_hash.t;
-      level : Level_repr.t;
+  | Dal_data_availibility_attester_not_in_committee of {
+      attester : Signature.Public_key_hash.t;
+      level : Raw_level_repr.t;
     }
   | Dal_operation_for_old_level of {
-      current : Raw_level_repr.t;
+      expected : Raw_level_repr.t;
       given : Raw_level_repr.t;
     }
   | Dal_operation_for_future_level of {
-      current : Raw_level_repr.t;
+      expected : Raw_level_repr.t;
       given : Raw_level_repr.t;
     }
   | Dal_cryptobox_error of {explanation : string}
@@ -57,6 +57,7 @@ type error +=
       length : int;
       slot_header : Dal_slot_repr.Header.t;
     }
+  | Dal_unexpected_attestation_at_root_level
 
 let () =
   let open Data_encoding in
@@ -210,66 +211,67 @@ let () =
     ~id:"Dal_operation_for_old_level"
     ~title:"Dal operation for an old level"
     ~description:"The Dal operation targets an old level"
-    ~pp:(fun ppf (current_lvl, given_lvl) ->
+    ~pp:(fun ppf (expected_lvl, given_lvl) ->
       Format.fprintf
         ppf
-        "Dal operation targets an old level %a. Current level is %a."
+        "Dal operation targets an old level %a. Expected level is %a."
         Raw_level_repr.pp
         given_lvl
         Raw_level_repr.pp
-        current_lvl)
+        expected_lvl)
     Data_encoding.(
       obj2
-        (req "current_level" Raw_level_repr.encoding)
+        (req "expected_level" Raw_level_repr.encoding)
         (req "given_level" Raw_level_repr.encoding))
     (function
-      | Dal_operation_for_old_level {current; given} -> Some (current, given)
+      | Dal_operation_for_old_level {expected; given} -> Some (expected, given)
       | _ -> None)
-    (fun (current, given) -> Dal_operation_for_old_level {current; given}) ;
+    (fun (expected, given) -> Dal_operation_for_old_level {expected; given}) ;
   register_error_kind
     `Temporary
     ~id:"Dal_operation_for_future_level"
     ~title:"Dal operation for a future level"
     ~description:"The Dal operation target a future level"
-    ~pp:(fun ppf (current_lvl, given_lvl) ->
+    ~pp:(fun ppf (expected_lvl, given_lvl) ->
       Format.fprintf
         ppf
-        "Dal operation targets a future level %a. Current level is %a."
+        "Dal operation targets a future level %a. Expected level is %a."
         Raw_level_repr.pp
         given_lvl
         Raw_level_repr.pp
-        current_lvl)
+        expected_lvl)
     Data_encoding.(
       obj2
-        (req "current_level" Raw_level_repr.encoding)
+        (req "expected_level" Raw_level_repr.encoding)
         (req "given_level" Raw_level_repr.encoding))
     (function
-      | Dal_operation_for_future_level {current; given} -> Some (current, given)
+      | Dal_operation_for_future_level {expected; given} ->
+          Some (expected, given)
       | _ -> None)
-    (fun (current, given) -> Dal_operation_for_future_level {current; given}) ;
+    (fun (expected, given) -> Dal_operation_for_future_level {expected; given}) ;
   register_error_kind
     `Permanent
-    ~id:"Dal_data_availibility_attestor_not_in_committee"
-    ~title:"The attestor is not part of the DAL committee for this level"
-    ~description:"The attestor is not part of the DAL committee for this level"
-    ~pp:(fun ppf (attestor, level) ->
+    ~id:"Dal_data_availibility_attester_not_in_committee"
+    ~title:"The attester is not part of the DAL committee for this level"
+    ~description:"The attester is not part of the DAL committee for this level"
+    ~pp:(fun ppf (attester, level) ->
       Format.fprintf
         ppf
-        "The attestor %a is not part of the DAL committee for the level %a"
+        "The attester %a is not part of the DAL committee for the level %a"
         Signature.Public_key_hash.pp
-        attestor
-        Level_repr.pp
+        attester
+        Raw_level_repr.pp
         level)
     Data_encoding.(
       obj2
-        (req "attestor" Signature.Public_key_hash.encoding)
-        (req "level" Level_repr.encoding))
+        (req "attester" Signature.Public_key_hash.encoding)
+        (req "level" Raw_level_repr.encoding))
     (function
-      | Dal_data_availibility_attestor_not_in_committee {attestor; level} ->
-          Some (attestor, level)
+      | Dal_data_availibility_attester_not_in_committee {attester; level} ->
+          Some (attester, level)
       | _ -> None)
-    (fun (attestor, level) ->
-      Dal_data_availibility_attestor_not_in_committee {attestor; level}) ;
+    (fun (attester, level) ->
+      Dal_data_availibility_attester_not_in_committee {attester; level}) ;
   register_error_kind
     `Permanent
     ~id:"dal_cryptobox_error"
@@ -304,4 +306,14 @@ let () =
           Some (length, slot_header)
       | _ -> None)
     (fun (length, slot_header) ->
-      Dal_register_invalid_slot_header {length; slot_header})
+      Dal_register_invalid_slot_header {length; slot_header}) ;
+  let description = "DAL attestations are not expected at root level" in
+  register_error_kind
+    `Temporary
+    ~id:"dal_unexpected_attestation_at_root_level"
+    ~title:"DAL unexpected attestation at root level"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    empty
+    (function Dal_unexpected_attestation_at_root_level -> Some () | _ -> None)
+    (fun () -> Dal_unexpected_attestation_at_root_level)

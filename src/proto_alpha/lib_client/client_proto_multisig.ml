@@ -413,9 +413,9 @@ code
                       { SWAP ;
                         DIP
                           {
-                            SWAP ; DIIP { DUUP } ;
+                            SWAP ; DIP 2 { DUP 2 } ;
                             # Checks signatures, fails if invalid
-                            { DUUUP; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH} };
+                            { DUP 3; DIP {CHECK_SIGNATURE}; SWAP; IF {DROP} {FAILWITH} };
                             PUSH nat 1 ; ADD @valid } }
                       { SWAP ; DROP }
                   }
@@ -998,7 +998,7 @@ type multisig_prepared_action = {
   generic : bool;
 }
 
-let check_parameter_type (cctxt : #Protocol_client_context.full) ?gas ?legacy
+let check_parameter_type (cctxt : #Protocol_client_context.full) ~gas ~legacy
     ~destination ~entrypoint ~parameter_type ~parameter () =
   let open Lwt_result_syntax in
   let* _ =
@@ -1009,13 +1009,13 @@ let check_parameter_type (cctxt : #Protocol_client_context.full) ?gas ?legacy
          (cctxt#chain, cctxt#block)
          ~data:parameter
          ~ty:parameter_type
-         ?gas
-         ?legacy
+         ~gas
+         ~legacy
   in
   return_unit
 
-let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
-    ?legacy () =
+let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ~gas
+    ~legacy () =
   let open Lwt_result_syntax in
   match action with
   | Change_keys (threshold, keys) ->
@@ -1029,6 +1029,8 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
           ~entrypoint
           ~parameter_type
           ~parameter
+          ~gas:None
+          ~legacy:false
           ()
       in
       if Tez.(amount > balance) then
@@ -1049,8 +1051,8 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
              (cctxt#chain, cctxt#block)
              ~data:code
              ~ty:action_t
-             ?gas
-             ?legacy
+             ~gas
+             ~legacy
       in
       return_unit
   | _ -> return_unit
@@ -1073,7 +1075,7 @@ let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
       ~block:cctxt#block
       contract
   in
-  let* () = check_action cctxt ~action ~balance () in
+  let* () = check_action cctxt ~action ~balance ~gas:None ~legacy:false () in
   return
     {
       bytes;

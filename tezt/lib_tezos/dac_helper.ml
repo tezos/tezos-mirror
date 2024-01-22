@@ -46,13 +46,13 @@ let make_int_parameter name = function
   | None -> []
   | Some value -> [(name, `Int value)]
 
-let test ~__FILE__ ?(tags = []) ?supports title f =
+let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
   let tags = "dac" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?supports f
+  Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
-let regression_test ~__FILE__ ?(tags = []) ?supports title f =
+let regression_test ~__FILE__ ?(tags = []) ?uses ?supports title f =
   let tags = "dac" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags ?supports f
+  Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses ?supports f
 
 (* Some initialization functions to start needed nodes. *)
 
@@ -216,15 +216,19 @@ let with_fresh_rollup ?(pvm_name = "arith") ?hooks tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
-    ?(pvm_name = "arith") ?(custom_committee_members = []) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments
-    ?(allow_v1_api = false) ?(allow_regression = false) ~__FILE__
-    ~committee_size ~observers variant scenario =
+    ?(uses = fun _protocol -> []) ?(pvm_name = "arith")
+    ?(custom_committee_members = []) ?commitment_period ?challenge_window
+    ?event_sections_levels ?node_arguments ?(allow_v1_api = false)
+    ?(allow_regression = false) ~__FILE__ ~committee_size ~observers variant
+    scenario =
   let description = "Testing Full DAC infrastructure" in
   (if allow_regression then regression_test else test)
     ?supports
     ~__FILE__
     ~tags
+    ~uses:(fun protocol ->
+      Constant.octez_dac_node :: Constant.octez_smart_rollup_node
+      :: uses protocol)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
@@ -341,13 +345,14 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
-    ?challenge_window ?event_sections_levels ?node_arguments ~__FILE__ variant
-    scenario =
+let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?uses
+    ?commitment_period ?challenge_window ?event_sections_levels ?node_arguments
+    ~__FILE__ variant scenario =
   let description = "Testing DAC L1 integration" in
   test
     ~__FILE__
     ~tags
+    ?uses
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
@@ -361,11 +366,11 @@ let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
 module Call_endpoint = struct
   module V0 = struct
     let get_preimage dac_node page_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
 
     let put_dac_member_signature dac_node ~hex_root_hash ~dac_member_pkh
         ~signature =
-      RPC.call
+      Dac_node.RPC.call
         dac_node
         (Dac_rpc.V0.put_dac_member_signature
            ~hex_root_hash
@@ -373,23 +378,27 @@ module Call_endpoint = struct
            ~signature)
 
     let get_missing_page dac_node ~hex_root_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
 
     let get_certificate dac_node ~hex_root_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_certificate ~hex_root_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_certificate ~hex_root_hash)
 
     module Coordinator = struct
       let post_preimage dac_node ~payload =
-        RPC.call dac_node (Dac_rpc.V0.Coordinator.post_preimage ~payload)
+        Dac_node.RPC.call
+          dac_node
+          (Dac_rpc.V0.Coordinator.post_preimage ~payload)
     end
   end
 
   module V1 = struct
     let get_pages dac_node page_hash =
-      RPC.call dac_node (Dac_rpc.V1.get_pages page_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V1.get_pages page_hash)
   end
 
-  let get_health_live dac_node = RPC.call dac_node Dac_rpc.get_health_live
+  let get_health_live dac_node =
+    Dac_node.RPC.call dac_node Dac_rpc.get_health_live
 
-  let get_health_ready dac_node = RPC.call dac_node Dac_rpc.get_health_ready
+  let get_health_ready dac_node =
+    Dac_node.RPC.call dac_node Dac_rpc.get_health_ready
 end

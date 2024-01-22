@@ -782,7 +782,7 @@ let definition mode x_opt def =
     (function
       | Parse.Syntax _ ->
           quoted_module_with_var_opt x_opt "<invalid module>" |> Lwt.return
-      | e -> Lwt.fail e)
+      | e -> Lwt.reraise e)
 
 let access x_opt n = String.concat " " [var_opt x_opt; name n]
 
@@ -832,7 +832,7 @@ let assertion mode ass =
   match ass.it with
   | AssertMalformed (def, re) -> (
       match (mode, def.it) with
-      | `Binary, Quoted _ -> Lwt.return []
+      | `Binary, Quoted _ -> Lwt.return_nil
       | _ ->
           let+ def = definition `Original None def in
           [Node ("assert_malformed", [def; Atom (string re)])])

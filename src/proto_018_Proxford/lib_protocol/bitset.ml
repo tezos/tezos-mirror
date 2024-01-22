@@ -32,18 +32,21 @@ let encoding = Data_encoding.z
 let empty = Z.zero
 
 let mem field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.testbit field pos
+  let open Result_syntax in
+  let* () = error_when Compare.Int.(pos < 0) (Invalid_position pos) in
+  return @@ Z.testbit field pos
 
 let add field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.logor field Z.(shift_left one pos)
+  let open Result_syntax in
+  let* () = error_when Compare.Int.(pos < 0) (Invalid_position pos) in
+  return @@ Z.logor field Z.(shift_left one pos)
 
 let from_list positions = List.fold_left_e add empty positions
 
 let fill ~length =
-  error_when Compare.Int.(length < 0) (Invalid_position length) >>? fun () ->
-  ok Z.(pred (shift_left one length))
+  let open Result_syntax in
+  let* () = error_when Compare.Int.(length < 0) (Invalid_position length) in
+  return Z.(pred (shift_left one length))
 
 let inter = Z.logand
 
@@ -61,5 +64,7 @@ let () =
     (fun i -> Invalid_position i)
 
 let occupied_size_in_bits = Z.numbits
+
+let hamming_weight = Z.popcount
 
 let to_z z = z

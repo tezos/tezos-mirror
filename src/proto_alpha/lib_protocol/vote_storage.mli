@@ -105,9 +105,7 @@ val listings_encoding :
 (** Populates [!Storage.Vote.Listings] using the currently existing
    staking power and sets `Voting_power_in_listings`. Inactive
    delegates or delegates without the minimal required stake are not
-   included in the listings.
-   If adaptive issuance is enabled, voting power accounts for
-   {!Constants_parametric_repr.edge_of_staking_over_delegation}. *)
+   included in the listings. *)
 val update_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Verifies the presence of a delegate in the listing. *)

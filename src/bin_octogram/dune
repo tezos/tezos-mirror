@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name octogram_main)
+ (public_name octogram)
+ (package octogram)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt
+  tezt-tezos
+  octogram
+  yaml)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax))

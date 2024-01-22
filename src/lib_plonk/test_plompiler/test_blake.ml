@@ -35,7 +35,7 @@ module Blake (L : LIB) = struct
 
   module B = Plompiler.Blake2s (L)
 
-  let test_mixing (constants : Bytes.bl Input.t Array.t) z exp () =
+  let test_mixing (constants : Bytes.tl Input.t Array.t) z exp () =
     let* constants =
       foldM
         (fun acc c ->

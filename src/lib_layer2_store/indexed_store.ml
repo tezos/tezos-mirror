@@ -58,6 +58,10 @@ let read_int8 str offset =
 
 (* Functors to build stores on indexes *)
 
+type ('key, 'value) gc_iterator =
+  | Retain of 'key list
+  | Iterator of {first : 'key; next : 'key -> 'value -> 'key option Lwt.t}
+
 module type NAME = sig
   val name : string
 end
@@ -85,7 +89,8 @@ module type INDEXABLE_STORE = sig
 
   type value
 
-  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string -> index_buffer_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
@@ -96,6 +101,13 @@ module type INDEXABLE_STORE = sig
   val close : _ t -> unit tzresult Lwt.t
 
   val readonly : [> `Read] t -> [`Read] t
+
+  val gc :
+    ?async:bool -> rw t -> (key, value) gc_iterator -> unit tzresult Lwt.t
+
+  val wait_gc_completion : 'a t -> unit Lwt.t
+
+  val is_gc_finished : 'a t -> bool
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -127,11 +139,26 @@ module type INDEXED_FILE = sig
     value:value ->
     unit tzresult Lwt.t
 
-  val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string ->
+    index_buffer_size:int ->
+    cache_size:int ->
+    'a mode ->
+    'a t tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
 
   val readonly : [> `Read] t -> [`Read] t
+
+  val gc :
+    ?async:bool ->
+    rw t ->
+    (key, value * header) gc_iterator ->
+    unit tzresult Lwt.t
+
+  val wait_gc_completion : 'a t -> unit Lwt.t
+
+  val is_gc_finished : 'a t -> bool
 end
 
 module type SIMPLE_INDEXED_FILE = sig
@@ -139,6 +166,12 @@ module type SIMPLE_INDEXED_FILE = sig
 
   val append :
     ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
+end
+
+module type INDEX_KEY = sig
+  include Index.Key.S
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module type ENCODABLE_VALUE = sig
@@ -195,7 +228,7 @@ module Make_index_key (E : sig
   include FIXED_ENCODABLE_VALUE
 
   val equal : t -> t -> bool
-end) : Index.Key.S with type t = E.t = struct
+end) : INDEX_KEY with type t = E.t = struct
   include Make_index_value (E)
 
   let equal = E.equal
@@ -204,16 +237,63 @@ end) : Index.Key.S with type t = E.t = struct
 
   (* {!Stdlib.Hashtbl.hash} is 30 bits *)
   let hash_size = 30 (* in bits *)
+
+  let pp ppf k =
+    Format.fprintf
+      ppf
+      "%a"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct E.encoding k)
 end
 
-module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
+let gc_reachable_of_iter =
+  let open Lwt_syntax in
+  function
+  | Iterator {first; next} -> (
+      (Some first, fun k -> function Some v -> next k v | None -> return_none))
+  | Retain keys ->
+      let dispenser = Seq.to_dispenser (List.to_seq keys) in
+      let first = dispenser () in
+      (first, fun _k _v -> return (dispenser ()))
+
+module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
 
-  type _ t = {index : I.t; scheduler : Lwt_idle_waiter.t}
+  type internal_index = {index : I.t; index_path : string}
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4654
-     Make log size constant configurable. *)
-  let log_size = 10_000
+  type gc_status =
+    | No_gc
+    | Ongoing of {tmp_index : internal_index; promise : unit Lwt.t}
+
+  (** In order to periodically clean up the store with the {!gc} function, each
+      pure index store is split in multiple indexes: one fresh index and
+      multiple stale indexes (zero if no GC has ever occurred, one if the last
+      GC was successful, two if the GC is ongoing, and more in case some GC
+      failed).
+
+      Adding new information to the store is always done on the fresh index
+      whereas queries are done on both the fresh and stale indexes.
+
+      A gc operation starts by moving the fresh index to the stale list and
+      creates a new fresh index. The rest of the gc operation consists in,
+      asynchronously, merging the stale indexes while removing data. See {!gc}
+      for more details.
+  *)
+  type _ t = {
+    mutable fresh : internal_index;
+    mutable stales : internal_index list;
+    scheduler : Lwt_idle_waiter.t;
+    readonly : bool;
+    index_buffer_size : int;
+    path : string;
+    mutable gc_status : gc_status;
+  }
+
+  let internal_indexes ?(only_stale = false) store =
+    if only_stale then store.stales else store.fresh :: store.stales
+
+  let unsafe_mem store k =
+    List.exists (fun i -> I.mem i.index k) (internal_indexes store)
 
   let mem store k =
     let open Lwt_result_syntax in
@@ -221,7 +301,21 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    return (I.mem store.index k)
+    return (unsafe_mem store k)
+
+  let find_index i k = try Some (I.find i k) with Not_found -> None
+
+  let unsafe_find ?only_stale store k =
+    List.find_map
+      (fun i ->
+        try find_index i.index k
+        with e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "cannot access index %s : %s"
+            i.index_path
+            (Printexc.to_string e))
+      (internal_indexes ?only_stale store)
 
   let find store k =
     let open Lwt_result_syntax in
@@ -229,8 +323,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    let v = try Some (I.find store.index k) with Not_found -> None in
-    return v
+    return (unsafe_find store k)
 
   let add ?(flush = true) store k v =
     let open Lwt_result_syntax in
@@ -238,32 +331,229 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    I.replace store.index k v ;
-    if flush then I.flush store.index ;
+    I.replace store.fresh.index k v ;
+    if flush then I.flush store.fresh.index ;
     return_unit
 
-  let load (type a) ~path (mode : a mode) : a t tzresult Lwt.t =
+  let stale_path path n = String.concat "." [path; string_of_int n]
+
+  let tmp_path path = String.concat "." [path; "tmp"]
+
+  let load_internal_index ~index_buffer_size ~readonly index_path =
+    let index = I.v ~log_size:index_buffer_size ~readonly index_path in
+    {index; index_path}
+
+  let load (type a) ~path ~index_buffer_size (mode : a mode) :
+      a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let index = I.v ~log_size ~readonly path in
+    let fresh = load_internal_index ~index_buffer_size ~readonly path in
+    (* Loading stale indexes if they exist on disk (stale indexes are created by
+       GC operations). *)
+    let rec load_stales acc n =
+      let open Lwt_syntax in
+      let stale_path = stale_path path n in
+      let*! exists = Lwt_unix.file_exists stale_path in
+      if exists then
+        let stale =
+          load_internal_index ~index_buffer_size ~readonly:true stale_path
+        in
+        load_stales (stale :: acc) (n + 1)
+      else return acc
+    in
+    let*! stales = load_stales [] 1 in
     let scheduler = Lwt_idle_waiter.create () in
-    return {index; scheduler}
+    return
+      {
+        fresh;
+        stales;
+        scheduler;
+        readonly;
+        index_buffer_size;
+        path;
+        gc_status = No_gc;
+      }
+
+  let close_internal_index i = try I.close i.index with Index.Closed -> ()
+
+  let mv_internal_index store index dest =
+    let open Lwt_syntax in
+    close_internal_index index ;
+    let+ () = Lwt_unix.rename index.index_path dest in
+    load_internal_index
+      ~index_buffer_size:store.index_buffer_size
+      ~readonly:store.readonly
+      dest
+
+  let rm_internal_index index =
+    close_internal_index index ;
+    Lwt_utils_unix.remove_dir index.index_path
 
   let close store =
-    let open Lwt_result_syntax in
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try I.close store.index with Index.Closed -> ()) ;
+    let open Lwt_result_syntax in
+    (match store.gc_status with
+    | Ongoing {promise; _} -> Lwt.cancel promise
+    | No_gc -> ()) ;
+    close_internal_index store.fresh ;
+    List.iter close_internal_index store.stales ;
+    let*! () =
+      match store.gc_status with
+      | No_gc -> Lwt.return_unit
+      | Ongoing {tmp_index; _} -> rm_internal_index tmp_index
+    in
     return_unit
 
   let readonly x = (x :> [`Read] t)
+
+  (** A gc is initiated by moving the fresh index to the stale list and creating
+      a new fresh index, as well as creating a temporary index for the result of
+      the gc. *)
+  let initiate_gc store =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let* () = Store_events.starting_gc N.name in
+    let tmp_index_path = tmp_path store.path in
+    let new_stale_path = stale_path store.path (List.length store.stales + 1) in
+    let* new_index_stale = mv_internal_index store store.fresh new_stale_path in
+    let new_index_fresh =
+      load_internal_index
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:store.readonly
+        store.path
+    in
+    let tmp_index =
+      load_internal_index
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:false
+        tmp_index_path
+    in
+    (* Clear temporary index in case there are leftovers from a dirtily aborted
+       previous gc. *)
+    I.clear tmp_index.index ;
+    store.fresh <- new_index_fresh ;
+    store.stales <- new_index_stale :: store.stales ;
+    let promise, resolve = Lwt.task () in
+    store.gc_status <- Ongoing {tmp_index; promise} ;
+    return (tmp_index, promise, resolve)
+
+  (** If a gc operation fails, reverting simply consists in removing the
+      temporary index. We keep the two stale indexes as is, they will be merged
+      by the next successful gc.  *)
+  let revert_failed_gc store =
+    let open Lwt_syntax in
+    match store.gc_status with
+    | No_gc -> return_unit
+    | Ongoing {tmp_index; promise} ->
+        Lwt.cancel promise ;
+        store.gc_status <- No_gc ;
+        rm_internal_index tmp_index
+
+  (** Copy item associated to [k] from the [store] stale indexes to
+      [tmp_index]. *)
+  let unsafe_retain_one_item store tmp_index filter k =
+    let open Lwt_syntax in
+    let value = unsafe_find ~only_stale:true store k in
+    let* () =
+      match value with
+      | None ->
+          Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp k)
+      | Some v ->
+          if filter v then I.replace tmp_index.index k v ;
+          return_unit
+    in
+    return value
+
+  (** When the gc operation finishes, i.e. we have copied all elements to retain
+      to the temporary index, we can replace all the stale indexes by the
+      temporary one. *)
+  let finalize_gc store tmp_index =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let*! () = List.iter_s rm_internal_index store.stales in
+    let stale_path = stale_path store.path 1 in
+    let*! index_stale = mv_internal_index store tmp_index stale_path in
+    store.stales <- [index_stale] ;
+    store.gc_status <- No_gc ;
+    let*! () = Store_events.finished_gc N.name in
+    return_unit
+
+  (** The background task for a gc operation consists in copying all items
+      reachable by [gc_iter] from the stale indexes to the temporary one. While
+      this is happening, the stale indexes can still be queried and new bindings
+      can still be added to the store because only the fresh index is
+      modified. *)
+  let gc_background_task store tmp_index gc_iter filter resolve =
+    let open Lwt_syntax in
+    Lwt.dont_wait
+      (fun () ->
+        let* res =
+          trace (Gc_failed N.name) @@ protect
+          @@ fun () ->
+          let first, next = gc_reachable_of_iter gc_iter in
+          let rec copy elt =
+            let* value = unsafe_retain_one_item store tmp_index filter elt in
+            let* next = next elt value in
+            match next with None -> return_unit | Some elt -> copy elt
+          in
+          let* () = Option.iter_s copy first in
+          finalize_gc store tmp_index
+        in
+        let* () =
+          match res with
+          | Ok () -> return_unit
+          | Error error ->
+              let* () = Store_events.failed_gc N.name error in
+              revert_failed_gc store
+        in
+        Lwt.wakeup_later resolve () ;
+        return_unit)
+      (fun exn ->
+        Format.eprintf
+          "Reverting GC for store %s failed because %s@."
+          N.name
+          (Printexc.to_string exn))
+
+  (** This function is called every time a gc operation starts. *)
+  let gc_internal ~async store gc_iter filter =
+    let open Lwt_syntax in
+    match store.gc_status with
+    | Ongoing _ -> Store_events.ignore_gc N.name
+    | No_gc ->
+        let* tmp_index, promise, resolve = initiate_gc store in
+        gc_background_task store tmp_index gc_iter filter resolve ;
+        if async then return_unit
+        else
+          Lwt.catch
+            (fun () -> promise)
+            (function Lwt.Canceled -> return_unit | e -> raise e)
+
+  let gc ?(async = true) store gc_iter =
+    let open Lwt_result_syntax in
+    trace (Gc_failed N.name) @@ protect
+    @@ fun () ->
+    let*! () = gc_internal ~async store gc_iter (fun _ -> true) in
+    return_unit
+
+  let wait_gc_completion store =
+    match store.gc_status with
+    | No_gc -> Lwt.return_unit
+    | Ongoing {promise; _} ->
+        Lwt.catch
+          (fun () -> promise)
+          (function Lwt.Canceled -> Lwt.return_unit | e -> raise e)
+
+  let is_gc_finished store =
+    match store.gc_status with No_gc -> true | Ongoing _ -> false
 end
 
-module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
+module Make_indexable_removable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) =
 struct
   module V_opt = struct
     (* The values stored in the index are optional values.  When we "remove" a
@@ -318,12 +608,29 @@ struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    let exists = I.mem store.index k in
+    let exists = unsafe_mem store k in
     if not exists then return_unit
     else (
-      I.replace store.index k None ;
-      if flush then I.flush store.index ;
+      I.replace store.fresh.index k None ;
+      if flush then I.flush store.fresh.index ;
       return_unit)
+
+  let gc ?(async = true) store gc_iter =
+    let open Lwt_result_syntax in
+    trace (Gc_failed N.name) @@ protect
+    @@ fun () ->
+    let gc_iter =
+      match gc_iter with
+      | Retain keys -> Retain keys
+      | Iterator {first; next} ->
+          let next k = function
+            | None -> Lwt.return_none
+            | Some v -> next k v
+          in
+          Iterator {first; next}
+    in
+    let*! () = gc_internal ~async store gc_iter Option.is_some in
+    return_unit
 end
 
 module Make_singleton (S : sig
@@ -403,10 +710,7 @@ end) : SINGLETON_STORE with type value := S.t = struct
   let readonly x = (x :> [`Read] t)
 end
 
-module Make_indexed_file
-    (N : NAME)
-    (K : Index.Key.S)
-    (V : ENCODABLE_VALUE_HEADER) =
+module Make_indexed_file (N : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER) =
 struct
   module Cache =
     Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (K))
@@ -471,20 +775,46 @@ struct
       | Error err -> tzfail (Decoding_error err)
   end
 
-  type +'a t = {
+  type internal_store = {
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
-    scheduler : Lwt_idle_waiter.t;
-    cache : (V.t * V.Header.t, tztrace) Cache.t;
+    index_path : string;
+    data_path : string;
   }
 
-  (* The log_size corresponds to the maximum size of the memory zone
-     allocated in memory before flushing it onto the disk. It is
-     basically a cache which is use for the index. The cache size is
-     `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4654
-     Make log size constant configurable. *)
-  let blocks_log_size = 10_000
+  type gc_status =
+    | No_gc
+    | Ongoing of {tmp_store : internal_store; promise : unit Lwt.t}
+
+  (** In order to periodically clean up the store with the {!gc} function, each
+      store is split in multiple stores: one fresh store and multiple stale
+      stores (zero if no GC has ever occurred, one if the last GC was
+      successful, two if the GC is ongoing, and more in case some GC failed).
+
+      Adding new information to the store is always done on the fresh store
+      whereas queries are done on both the fresh and stale stores.
+
+      A gc operation starts by moving the fresh store to the stale list and
+      creates a new fresh store. The rest of the gc operation consists in,
+      asynchronously, merging the stale stores while removing data. See {!gc}
+      for more details.
+  *)
+  type _ t = {
+    mutable fresh : internal_store;
+    mutable stales : internal_store list;
+    scheduler : Lwt_idle_waiter.t;
+    readonly : bool;
+    index_buffer_size : int;
+    path : string;
+    cache : (V.t * V.Header.t, tztrace) Cache.t;
+    mutable gc_status : gc_status;
+  }
+
+  let internal_stores ?(only_stale = false) store =
+    if only_stale then store.stales else store.fresh :: store.stales
+
+  let unsafe_mem store k =
+    List.exists (fun s -> Header_index.mem s.index k) (internal_stores store)
 
   let mem store key =
     let open Lwt_result_syntax in
@@ -496,7 +826,23 @@ struct
       Cache.bind store.cache key (fun v -> Lwt.return (Result.is_ok v))
     in
     let*! cached = Option.value cached ~default:Lwt.return_false in
-    return (cached || Header_index.mem store.index key)
+    return (cached || unsafe_mem store key)
+
+  let find_index i k = try Some (Header_index.find i k) with Not_found -> None
+
+  let unsafe_find_header ?only_stale store k =
+    List.find_map
+      (fun s ->
+        Option.map
+          (fun h -> (h, s))
+          (try find_index s.index k
+           with e ->
+             Format.kasprintf
+               Stdlib.failwith
+               "cannot access index %s : %s"
+               s.index_path
+               (Printexc.to_string e)))
+      (internal_stores ?only_stale store)
 
   let header store key =
     let open Lwt_result_syntax in
@@ -512,22 +858,31 @@ struct
     match cached with
     | Some header -> Lwt_result.map Option.some header
     | None -> (
-        match Header_index.find store.index key with
-        | exception Not_found -> return_none
-        | {header; _} -> return_some header)
+        match unsafe_find_header store key with
+        | None -> return_none
+        | Some ({header; _}, _store) -> return_some header)
+
+  let unsafe_read_from_disk_opt ?only_stale store key =
+    let open Lwt_result_syntax in
+    match unsafe_find_header ?only_stale store key with
+    | None -> return_none
+    | Some ({IHeader.offset; header}, internal_store) ->
+        let+ value, _ofs =
+          Values_file.pread_value internal_store.fd ~file_offset:offset
+        in
+        Some (value, header)
+
+  let unsafe_read_from_disk store key =
+    let open Lwt_result_syntax in
+    let* r = unsafe_read_from_disk_opt store key in
+    match r with None -> tzfail (Exn Not_found) | Some r -> return r
 
   let read store key =
+    trace (Cannot_read_from_store IHeader.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    let read_from_disk key =
-      let open Lwt_result_syntax in
-      match Header_index.find store.index key with
-      | exception Not_found -> tzfail (Exn Not_found)
-      | {IHeader.offset; header} ->
-          let+ value, _ofs =
-            Values_file.pread_value store.fd ~file_offset:offset
-          in
-          (value, header)
-    in
+    let read_from_disk key = unsafe_read_from_disk store key in
     let open Lwt_result_syntax in
     Cache.bind_or_put store.cache key read_from_disk @@ function
     | Ok value -> return_some value
@@ -548,54 +903,275 @@ struct
     Header_index.replace store.index key {offset; header} ;
     return value_length
 
-  let append ?(flush = true) store ~key ~header ~(value : V.t) =
+  let unsafe_append_internal ?(flush = true) store ~key ~header ~value =
+    let open Lwt_result_syntax in
+    let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
+    let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
+    if flush then Header_index.flush store.index ;
+    return_unit
+
+  let append ?(flush = true) store ~key ~header ~value =
     trace (Cannot_write_to_store N.name)
     @@ protect
     @@ fun () ->
     let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     Cache.put store.cache key (return (value, header)) ;
-    let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
-    let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
-    if flush then Header_index.flush store.index ;
-    return_unit
+    unsafe_append_internal ~flush store.fresh ~key ~header ~value
 
-  let load (type a) ~path ~cache_size (mode : a mode) : a t tzresult Lwt.t =
+  let stale_path path n = Filename.concat path (string_of_int n)
+
+  let tmp_path path = Filename.concat path "tmp"
+
+  let data_path path = Filename.concat path "data"
+
+  let index_path path = Filename.concat path "index"
+
+  let load_internal_store ~index_buffer_size ~readonly path =
+    let open Lwt_syntax in
+    let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
+    let* () = Lwt_utils_unix.create_dir path in
+    let data_path = data_path path in
+    let* fd =
+      Lwt_unix.openfile data_path [Unix.O_CREAT; O_CLOEXEC; flag] 0o644
+    in
+    let index_path = index_path path in
+    let index =
+      Header_index.v ~log_size:index_buffer_size ~readonly index_path
+    in
+    return {index; fd; index_path; data_path}
+
+  let load (type a) ~path ~index_buffer_size ~cache_size (mode : a mode) :
+      a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
-    let*! () = Lwt_utils_unix.create_dir path in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
-    let*! fd =
-      Lwt_unix.openfile
-        (Filename.concat path "data")
-        [Unix.O_CREAT; O_CLOEXEC; flag]
-        0o644
+    let*! fresh = load_internal_store ~index_buffer_size ~readonly path in
+    (* Loading stale stores if they exist on disk (stale stores are created by
+       GC operations). *)
+    let rec load_stales acc n =
+      let open Lwt_syntax in
+      let stale_path = stale_path path n in
+      let*! exists = Lwt_unix.file_exists stale_path in
+      if exists then
+        let*! stale =
+          load_internal_store ~index_buffer_size ~readonly:true stale_path
+        in
+        load_stales (stale :: acc) (n + 1)
+      else return acc
     in
-    let index =
-      Header_index.v
-        ~log_size:blocks_log_size
-        ~readonly
-        (Filename.concat path "index")
-    in
+    let*! stales = load_stales [] 1 in
     let scheduler = Lwt_idle_waiter.create () in
     let cache = Cache.create cache_size in
-    return {index; fd; scheduler; cache}
+    return
+      {
+        fresh;
+        stales;
+        scheduler;
+        readonly;
+        index_buffer_size;
+        path;
+        cache;
+        gc_status = No_gc;
+      }
+
+  let close_internal_store store =
+    (try Header_index.close store.index with Index.Closed -> ()) ;
+    Lwt_utils_unix.safe_close store.fd
+
+  let mv_internal_store store internal_store dest =
+    let open Lwt_result_syntax in
+    let* () = close_internal_store internal_store in
+    let*! () = Lwt_utils_unix.create_dir dest in
+    let*! () = Lwt_unix.rename internal_store.index_path (index_path dest) in
+    let*! () = Lwt_unix.rename internal_store.data_path (data_path dest) in
+    let*! new_store =
+      load_internal_store
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:store.readonly
+        dest
+    in
+    return new_store
+
+  let rm_internal_store store =
+    let path = Filename.dirname store.index_path in
+    let open Lwt_result_syntax in
+    let* () = close_internal_store store in
+    assert (path = Filename.dirname store.data_path) ;
+    let*! () = Lwt_utils_unix.remove_dir path in
+    return_unit
 
   let close store =
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try Header_index.close store.index with Index.Closed -> ()) ;
-    Lwt_utils_unix.safe_close store.fd
+    let open Lwt_result_syntax in
+    (match store.gc_status with
+    | Ongoing {promise; _} -> Lwt.cancel promise
+    | No_gc -> ()) ;
+    let* () = close_internal_store store.fresh
+    and* () = List.iter_ep close_internal_store store.stales
+    and* () =
+      match store.gc_status with
+      | No_gc -> return_unit
+      | Ongoing {tmp_store; _} -> rm_internal_store tmp_store
+    in
+    return_unit
 
   let readonly x = (x :> [`Read] t)
+
+  (** A gc is initiated by moving the fresh store to the stale list and creating
+      a new fresh store, as well as creating a temporary store for the result of
+      the gc. *)
+  let initiate_gc store =
+    let open Lwt_result_syntax in
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let*! () = Store_events.starting_gc N.name in
+    let tmp_store_path = tmp_path store.path in
+    let new_stale_path = stale_path store.path (List.length store.stales + 1) in
+    let* new_store_stale = mv_internal_store store store.fresh new_stale_path in
+    let*! new_store_fresh =
+      load_internal_store
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:store.readonly
+        store.path
+    in
+    let*! tmp_store =
+      load_internal_store
+        ~index_buffer_size:store.index_buffer_size
+        ~readonly:false
+        tmp_store_path
+    in
+    (* Clear temporary store in case there are leftovers from a dirtily aborted
+       previous gc. *)
+    Header_index.clear tmp_store.index ;
+    let*! () = Lwt_unix.ftruncate tmp_store.fd 0 in
+    store.fresh <- new_store_fresh ;
+    store.stales <- new_store_stale :: store.stales ;
+    let promise, resolve = Lwt.task () in
+    store.gc_status <- Ongoing {tmp_store; promise} ;
+    return (tmp_store, promise, resolve)
+
+  (** If a gc operation fails, reverting simply consists in removing the
+      temporary store. We keep the two stale stores as is, they will be merged
+      by the next successful gc.  *)
+  let revert_failed_gc store =
+    let open Lwt_syntax in
+    match store.gc_status with
+    | No_gc -> return_unit
+    | Ongoing {tmp_store; promise} -> (
+        Lwt.cancel promise ;
+        let+ res = rm_internal_store tmp_store in
+        match res with
+        | Ok () -> ()
+        | Error _e -> (* ignore error when reverting *) ())
+
+  (** Copy item associated to [k] from the [store] stale stores to
+      [tmp_store]. *)
+  let unsafe_retain_one_item store tmp_store key =
+    let open Lwt_result_syntax in
+    let* v = unsafe_read_from_disk_opt ~only_stale:true store key in
+    let* () =
+      match v with
+      | None ->
+          let*! () =
+            Store_events.missing_value_gc N.name (Format.asprintf "%a" K.pp key)
+          in
+          return_unit
+      | Some (value, header) ->
+          unsafe_append_internal tmp_store ~key ~header ~value
+    in
+    return v
+
+  (** When the gc operation finishes, i.e. we have copied all elements to retain
+      to the temporary store, we can replace all the stale stores by the
+      temporary one. *)
+  let finalize_gc store tmp_store =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let* () = List.iter_es rm_internal_store store.stales in
+    let stale_path = stale_path store.path 1 in
+    let* store_stale = mv_internal_store store tmp_store stale_path in
+    store.stales <- [store_stale] ;
+    store.gc_status <- No_gc ;
+    Cache.clear store.cache ;
+    let*! () = Store_events.finished_gc N.name in
+    return_unit
+
+  (** The background task for a gc operation consists in copying all items
+      reachable by [gc_iter] from the stale stores to the temporary one. While
+      this is happening, the stale stores can still be queried and new bindings
+      can still be added to the store because only the fresh store is
+      modified. *)
+  let gc_background_task store tmp_store gc_iter resolve =
+    let open Lwt_result_syntax in
+    Lwt.dont_wait
+      (fun () ->
+        let*! res =
+          trace (Gc_failed N.name) @@ protect
+          @@ fun () ->
+          let first, next = gc_reachable_of_iter gc_iter in
+          let rec copy elt =
+            let* value = unsafe_retain_one_item store tmp_store elt in
+            let*! next = next elt value in
+            match next with None -> return_unit | Some elt -> copy elt
+          in
+          let* () = Option.iter_es copy first in
+          finalize_gc store tmp_store
+        in
+        let*! () =
+          let open Lwt_syntax in
+          match res with
+          | Ok () -> return_unit
+          | Error error ->
+              let* () = Store_events.failed_gc N.name error in
+              revert_failed_gc store
+        in
+        Lwt.wakeup_later resolve () ;
+        Lwt.return_unit)
+      (fun exn ->
+        Format.eprintf
+          "Reverting GC for store %s failed because %s@."
+          N.name
+          (Printexc.to_string exn))
+
+  let gc_internal ~async store gc_iter =
+    let open Lwt_result_syntax in
+    match store.gc_status with
+    | Ongoing _ ->
+        let*! () = Store_events.ignore_gc N.name in
+        return_unit
+    | No_gc ->
+        let* tmp_store, promise, resolve = initiate_gc store in
+        gc_background_task store tmp_store gc_iter resolve ;
+        if async then return_unit
+        else
+          Lwt.catch
+            (fun () ->
+              let*! () = promise in
+              return_unit)
+            (function Lwt.Canceled -> return_unit | e -> raise e)
+
+  let gc ?(async = true) store gc_iter =
+    trace (Gc_failed N.name) @@ gc_internal ~async store gc_iter
+
+  let wait_gc_completion store =
+    match store.gc_status with
+    | No_gc -> Lwt.return_unit
+    | Ongoing {promise; _} ->
+        Lwt.catch
+          (fun () -> promise)
+          (function Lwt.Canceled -> Lwt.return_unit | e -> raise e)
+
+  let is_gc_finished store =
+    match store.gc_status with No_gc -> true | Ongoing _ -> false
 end
 
 module Make_simple_indexed_file
     (N : NAME)
-    (K : Index.Key.S) (V : sig
+    (K : INDEX_KEY) (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t

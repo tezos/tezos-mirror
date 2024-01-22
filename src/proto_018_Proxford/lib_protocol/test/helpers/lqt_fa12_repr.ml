@@ -201,39 +201,47 @@ module Storage = struct
         raise (Invalid_storage_expr msg)
 
   let get (ctxt : Context.t) ~(contract : Contract.t) : t tzresult Lwt.t =
+    let open Lwt_result_syntax in
     match contract with
     | Implicit _ ->
         invalid_arg "Lqt_fa12_repr.Storage.get called on implicit account"
     | Originated c ->
-        Context.Contract.storage ctxt c >|=? Micheline.root >|=? of_expr_exn
+        let+ expr = Context.Contract.storage ctxt c in
+        Micheline.root expr |> of_expr_exn
 
   let get_alpha_context (ctxt : Context.t) : Alpha_context.t tzresult Lwt.t =
-    (match ctxt with
-    | B b ->
-        (* can perhaps be retrieved through Raw_context.prepare ? *)
-        Incremental.begin_construction b
-    | I i -> return i)
-    >|=? Incremental.alpha_ctxt
+    let open Lwt_result_syntax in
+    let+ result =
+      match ctxt with
+      | B b ->
+          (* can perhaps be retrieved through Raw_context.prepare ? *)
+          Incremental.begin_construction b
+      | I i -> return i
+    in
+    Incremental.alpha_ctxt result
 
   let getBalance_opt (ctxt : Context.t) ~(contract : Contract.t)
       (owner : Script_typed_ir.address) =
-    get ctxt ~contract >>=? fun storage ->
+    let open Lwt_result_wrap_syntax in
+    let* storage = get ctxt ~contract in
     let tokens = storage.tokens in
-    get_alpha_context ctxt >>=? fun ctxt ->
-    Script_ir_translator.hash_data ctxt Script_typed_ir.address_t owner
-    >|= Environment.wrap_tzresult
-    >>=? fun (address_hash, ctxt) ->
-    Big_map.get_opt ctxt tokens address_hash >|= Environment.wrap_tzresult
-    >>=? function
-    | _, Some canonical -> (
+    let* ctxt = get_alpha_context ctxt in
+    let*@ address_hash, ctxt =
+      Script_ir_translator.hash_data ctxt Script_typed_ir.address_t owner
+    in
+    let*@ _, result = Big_map.get_opt ctxt tokens address_hash in
+    match result with
+    | Some canonical -> (
         match Tezos_micheline.Micheline.root canonical with
-        | Tezos_micheline.Micheline.Int (_, amount) -> return @@ Some amount
+        | Tezos_micheline.Micheline.Int (_, amount) -> return_some amount
         | _ -> assert false)
-    | _, None -> return @@ None
+    | None -> return_none
 
   let getBalance (ctxt : Context.t) ~(contract : Contract.t)
       (owner : Script_typed_ir.address) =
-    getBalance_opt ctxt ~contract owner >|=? Option.value ~default:Z.zero
+    let open Lwt_result_syntax in
+    let+ t = getBalance_opt ctxt ~contract owner in
+    Option.value ~default:Z.zero t
 end
 
 let transaction (ctxt : Context.t) ~(contract : Contract.t) ~(src : Contract.t)

@@ -102,7 +102,7 @@ let get_dex_storage ~hooks client contract =
 
 let setup_mint_and_approve ~__LOC__ client =
   let* dex_address =
-    RPC.Client.call client ~hooks
+    Client.RPC.call client ~hooks
     @@ RPC.get_chain_block_context_liquidity_baking_cpmm_address ()
   in
   Log.info "Check DEX address" ;

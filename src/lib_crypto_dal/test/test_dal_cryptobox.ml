@@ -1,3 +1,17 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Testing
+    -------
+    Component:  Lib_crypto_dal Test_dal_cryptobox
+    Invocation: dune exec src/lib_crypto_dal/test/main.exe -- --file test_dal_cryptobox.ml
+    Subject:    Tests the cryptography used in the Data Availability Layer (DAL)
+*)
+
 module Test = struct
   (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
   let randrange ?(min = 0) max =
@@ -74,7 +88,15 @@ module Test = struct
     let* redundancy_factor_log2 = int_range 1 max_redundancy_factor_log2 in
     let* slot_size_log2 = int_range size_offset_log2 max_slot_size_log2 in
     let* page_size_log2 = int_range 0 (slot_size_log2 - size_offset_log2) in
-    let* number_of_shards_log2 = int_range 0 max_number_of_shards_log2 in
+    let polynomial_length =
+      Cryptobox.Internal_for_tests.slot_as_polynomial_length
+        ~slot_size:(1 lsl slot_size_log2)
+        ~page_size:(1 lsl page_size_log2)
+    in
+    let erasure_encoded_polynomial_length =
+      polynomial_length * (1 lsl redundancy_factor_log2)
+    in
+    let* number_of_shards = int_range 0 erasure_encoded_polynomial_length in
     let slot_size = 1 lsl slot_size_log2 in
     let* data = bytes_size (int_range 0 slot_size) in
     let padding_threshold = Bytes.length data in
@@ -99,7 +121,7 @@ module Test = struct
          (return slot_size)
          (return (1 lsl page_size_log2))
          (return (1 lsl redundancy_factor_log2))
-         (return (1 lsl number_of_shards_log2))
+         (return number_of_shards)
          (return padding_threshold)
          (return slot))
 
@@ -417,6 +439,23 @@ module Test = struct
         |> function
         | Ok () -> true
         | _ -> false)
+
+  let test_shard_proofs_invalid_parameter () =
+    (* The following parameters used to be accepted by the [ensure_validity]
+       function, while they were actually unsupported (they indeed break an
+       invariant and trigger a runtime exception). *)
+    init () ;
+    let params =
+      {
+        slot_size = 512;
+        page_size = 256;
+        redundancy_factor = 8;
+        number_of_shards = 88;
+        padding_threshold = 512;
+        slot = Bytes.create 512;
+      }
+    in
+    assert (ensure_validity params = false)
 
   let test_shard_proof_invalid =
     let open QCheck2 in
@@ -953,7 +992,9 @@ let test =
       Alcotest.test_case test_name `Quick test_func)
     [
       ("find_trusted_setup_files", Test.find_trusted_setup_files);
-      ("find_trusted_setup_files_failure", Test.find_trusted_setup_files_failure)
+      ("find_trusted_setup_files_failure", Test.find_trusted_setup_files_failure);
+      ( "shard_proofs_invalid_parameter",
+        Test.test_shard_proofs_invalid_parameter )
       (*("test_collision_page_size", Test.test_collision_page_size);*);
     ]
 
@@ -979,31 +1020,32 @@ let () =
       ("Unit tests", test);
       ( "PBT",
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
-          [
-            Test.test_erasure_code;
-            Test.test_erasure_code_with_slot_conversion;
-            Test.test_erasure_code_failure_out_of_range;
-            Test.test_erasure_code_failure_not_enough_shards;
-            Test.test_erasure_code_failure_invalid_shard_length;
-            Test.test_page_proofs;
-            Test.test_page_proofs_invalid;
-            Test.test_shard_proofs;
-            Test.test_shard_proof_invalid;
-            Test.test_commitment_proof;
-            Test.test_commitment_proof_invalid;
-            Test.test_polynomial_slot_conversions;
-            Test.test_select_fft_domain;
-            Test.test_shard_proofs_load_from_file;
-            Test.test_shard_proofs_load_from_file_invalid_hash;
-            Test.test_dal_initialisation_twice_failure;
-            Test.test_wrong_slot_size;
-            Test.test_page_length_mismatch;
-            Test.test_shard_length_mismatch;
-            Test.test_prove_page_out_of_bounds;
-            Test.test_verify_page_out_of_bounds;
-            Test.test_verify_shard_out_of_bounds;
-            Test.test_commit;
-            Test.test_commit_failure;
-            Test.test_encoded_share_size;
-          ] );
+          Test.
+            [
+              test_erasure_code;
+              test_erasure_code_with_slot_conversion;
+              test_erasure_code_failure_out_of_range;
+              test_erasure_code_failure_not_enough_shards;
+              test_erasure_code_failure_invalid_shard_length;
+              test_page_proofs;
+              test_page_proofs_invalid;
+              test_shard_proofs;
+              test_shard_proof_invalid;
+              test_commitment_proof;
+              test_commitment_proof_invalid;
+              test_polynomial_slot_conversions;
+              test_select_fft_domain;
+              test_shard_proofs_load_from_file;
+              test_shard_proofs_load_from_file_invalid_hash;
+              test_dal_initialisation_twice_failure;
+              test_wrong_slot_size;
+              test_page_length_mismatch;
+              test_shard_length_mismatch;
+              test_prove_page_out_of_bounds;
+              test_verify_page_out_of_bounds;
+              test_verify_shard_out_of_bounds;
+              test_commit;
+              test_commit_failure;
+              test_encoded_share_size;
+            ] );
     ]

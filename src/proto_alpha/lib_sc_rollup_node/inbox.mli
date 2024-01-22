@@ -51,9 +51,6 @@ val process_head :
   tzresult
   Lwt.t
 
-(** [start ()] initializes the inbox to track the messages being published. *)
-val start : unit -> unit Lwt.t
-
 (** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
     {!Sc_rollup.Inbox.add_all_messages}. *)
@@ -81,6 +78,11 @@ val payloads_history_of_messages :
   predecessor_timestamp:Timestamp.time ->
   string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
+
+(** [payloads_history_of_all_messages messages] builds the merkelized payloads
+    history for the list of serialzied messages [messages]. *)
+val payloads_history_of_all_messages :
+  string trace -> Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 
 (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
     node agrees with the L1 node that inbox for [block] is [node_inbox]. *)

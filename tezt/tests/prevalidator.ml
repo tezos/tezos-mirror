@@ -52,7 +52,8 @@ module Revamped = struct
      without taking the operations of the mempool.
 
      This function returns the level of the client after the bake. *)
-  let bake_for ?keys ?(wait_for_flush = false) ~empty ~protocol node client =
+  let bake_for ?keys ?(wait_for_flush = false) ?(empty = false) ?protocol node
+      client =
     let flush_waiter =
       if wait_for_flush then Node.wait_for_request ~request:`Flush node
       else unit
@@ -64,7 +65,7 @@ module Revamped = struct
         Client.bake_for
           ~mempool:empty_mempool_file
           ~ignore_node_mempool:true
-          ~protocol
+          ?protocol
           ?keys
           client
       else Client.bake_for ?keys client
@@ -98,7 +99,7 @@ module Revamped = struct
   let synchronize_mempool client node =
     let mempool_notify_waiter = Node.wait_for_request ~request:`Notify node in
     let* _ =
-      RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
+      Client.RPC.call client @@ RPC.post_chain_mempool_request_operations ()
     in
     mempool_notify_waiter
 
@@ -298,7 +299,7 @@ module Revamped = struct
        on node1."
       oph ;
     let* counter_json =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.get_chain_block_context_contract_counter
            ~id:Constant.bootstrap1.public_key_hash
            ()
@@ -452,7 +453,7 @@ module Revamped = struct
 
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
@@ -638,7 +639,7 @@ module Revamped = struct
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:Constant.bootstrap1.public_key_hash
            ()
@@ -869,7 +870,7 @@ module Revamped = struct
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:Constant.bootstrap1.public_key_hash
            ()
@@ -911,7 +912,7 @@ module Revamped = struct
           Some ())
     in
     let* _ =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
@@ -993,7 +994,7 @@ module Revamped = struct
 
     log_step 5 "Ban the operation %s." oph1 ;
     let* _ =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
@@ -1076,7 +1077,7 @@ module Revamped = struct
 
     log_step 3 "Forge and force inject an operation." ;
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:source1.public_key_hash
            ()
@@ -1119,7 +1120,7 @@ module Revamped = struct
 
     log_step 4 "Forge and force inject an operation." ;
     let* counter_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:source2.public_key_hash
            ()
@@ -1313,7 +1314,7 @@ module Revamped = struct
 
     log_step 3 "Ban %s on node 2." oph1 ;
     let* _ =
-      RPC.Client.call client2
+      Client.RPC.call client2
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~validated:[oph2] client2 in
@@ -1346,7 +1347,7 @@ module Revamped = struct
     let* _ = baking in
     (* empty mempool *)
     let* () = check_mempool client2 in
-    let* ops = RPC.Client.call client2 @@ RPC.get_chain_block_operations () in
+    let* ops = Client.RPC.call client2 @@ RPC.get_chain_block_operations () in
     let open JSON in
     let ops_list = ops |=> 3 |> as_list in
     let res =
@@ -1391,11 +1392,11 @@ module Revamped = struct
     log_step 3 "Ban op1 and ensure the operation is not in the mempool." ;
     (* We ban twice to check banning an operation is idempotent. *)
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~validated:[oph2] client1 in
@@ -1406,11 +1407,11 @@ module Revamped = struct
 
     log_step 5 "Ban op2 and op1 again." ;
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~validated:[oph3] client1 in
@@ -1425,7 +1426,7 @@ module Revamped = struct
 
     log_step 7 "Unban op1, successfully reinject op1." ;
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ = inject_op ~wait:true `A in
@@ -1440,7 +1441,7 @@ module Revamped = struct
 
     log_step 9 "Unban op2, successfully reinject op2." ;
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
 
@@ -1449,7 +1450,7 @@ module Revamped = struct
 
     log_step 10 "Ban op1 again, check that reinjecting it fails." ;
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
@@ -1462,11 +1463,11 @@ module Revamped = struct
 
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph3)) ()
     in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
     check_mempool ~validated:[oph3; oph2] client1
@@ -1525,15 +1526,15 @@ module Revamped = struct
     log_step 3 "Ban the first three of these operations." ;
     let* () = check_mempool ~validated:[oph4; oph3; oph2; oph1] client1 in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
-      RPC.Client.call client1
+      Client.RPC.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph3)) ()
     in
     let* () = check_mempool ~validated:[oph4] client1 in
@@ -1544,7 +1545,7 @@ module Revamped = struct
     and wait2 = Node.wait_for_request ~request:`Arrived node1
     and wait3 = Node.wait_for_request ~request:`Arrived node1 in
     let* _ =
-      RPC.Client.call client1 @@ RPC.post_chain_mempool_unban_all_operations ()
+      Client.RPC.call client1 @@ RPC.post_chain_mempool_unban_all_operations ()
     in
     let* () = synchronize_mempool client1 node1 in
     let* () = wait1 and* () = wait2 and* () = wait3 in
@@ -1554,13 +1555,15 @@ module Revamped = struct
     let* () = check_mempool ~validated:[oph4; oph3; oph2; oph1] client1 in
     check_mempool ~validated:[oph4; oph3; oph2; oph1] client2
 
-  let test_full_mempool =
+  let test_full_mempool_propagation =
     Protocol.register_test
       ~__FILE__
-      ~title:"test full mempool"
+      ~title:"test full mempool propagation"
       ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"]
     @@ fun protocol ->
-    Log.info "Test the bound on operation count in the mempool." ;
+    Log.info
+      "Test the bound on operation count in the mempool, the propagation of \
+       operations by a full mempool, and the reclassification on flush." ;
     (* We configure the filter with a limit of 4 operations, so that
        we can easily inject more with our 5 bootstrap accounts. *)
     let max_operations = 4 in
@@ -1822,6 +1825,389 @@ module Revamped = struct
     in
     unit
 
+  let test_full_mempool_attestation_vs_manager =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"test full mempool attestation vs manager"
+      ~tags:
+        ["mempool"; "gc"; "limit"; "bounding"; "full"; "attestation"; "manager"]
+    @@ fun protocol ->
+    Log.info
+      "Test the bound on operation count in the mempool with both manager and \
+       non-manager operations." ;
+    (* Baseline fee *)
+    let fee = 1000 in
+    log_step
+      0
+      "Initialize a node and activate the protocol. Bake an additional block \
+       to be able to inject valid attestations." ;
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
+    let* level = bake_for ~wait_for_flush:true node client in
+    let max_operations = 2 in
+    log_step
+      1
+      "Set the mempool config to at most %d operations. Inject two transfers \
+       and check that they are validated in the mempool."
+      max_operations ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_operations client in
+    let* (`OpHash oph1a) =
+      Operation.Manager.inject_single_transfer
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap5
+        ~fee
+        client
+    in
+    let* (`OpHash oph1b) =
+      Operation.Manager.inject_single_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap5
+        ~fee:(fee + 1)
+        client
+    in
+    let* () = check_mempool ~validated:[oph1a; oph1b] client in
+    log_step
+      2
+      "Inject an attestation and check that it has replaced the lower-fee \
+       transfer." ;
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let inject_attestation (delegate : Account.key) =
+      Operation.Consensus.inject
+        (Operation.Consensus.attestation
+           ~use_legacy_name:true
+           ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+           ~level
+           ~round:0
+           ~block_payload_hash)
+        ~signer:delegate
+        client
+    in
+    let* (`OpHash oph2) = inject_attestation Constant.bootstrap1 in
+    let* () =
+      check_mempool ~validated:[oph1b; oph2] ~branch_delayed:[oph1a] client
+    in
+    log_step
+      3
+      "Check that injecting a transfer with lower fee than the remaining \
+       transfer in the mempool fails, and the recommended fee in the error is \
+       higher than that previous transfer's by 1." ;
+    let* op3 =
+      Operation.Manager.mk_single_transfer
+        ~source:Constant.bootstrap3
+        ~dest:Constant.bootstrap5
+        ~fee:(fee / 2)
+        client
+    in
+    let* () =
+      Operation.inject_error_check_recommended_fee
+        ~loc:__LOC__
+        ~rex:Operation.rejected_by_full_mempool_with_needed_fee
+        ~expected_fee:(fee + 2)
+        op3
+        client
+    in
+    let* () =
+      check_mempool ~validated:[oph1b; oph2] ~branch_delayed:[oph1a] client
+    in
+    log_step
+      4
+      "Inject a second attestation and check that it has replaced the \
+       remaining transfer." ;
+    let* (`OpHash oph3) = inject_attestation Constant.bootstrap2 in
+    let* () =
+      check_mempool
+        ~validated:[oph2; oph3]
+        ~branch_delayed:[oph1a; oph1b]
+        client
+    in
+    log_step
+      5
+      "Check that injecting a transfer fails with no recommened fee in the \
+       error, because a manager operation can't replace a consensus one no \
+       matter the fee." ;
+    let* op5 =
+      Operation.Manager.mk_single_transfer
+        ~source:Constant.bootstrap4
+        ~dest:Constant.bootstrap5
+        ~fee
+        client
+    in
+    let* (`OpHash _) =
+      Operation.inject
+        ~error:Operation.rejected_by_full_mempool_no_possible_fee
+        op5
+        client
+    in
+    unit
+
+  let test_full_mempool_max_total_bytes =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"test full mempool max_total_bytes"
+      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"; "max_total_bytes"]
+    @@ fun protocol ->
+    Log.info "Test the bound on total operation size in the mempool." ;
+    (* The test checks that the following sizes are correct; update
+       them as needed. Note that the test currently relies on the fact
+       that transfer_size > delegation_size >= attestation_size; if
+       this is no longer the case, further adjustements will be
+       needed. *)
+    let transfer_size = 151 in
+    let delegation_size = 146 in
+    let attestation_size = 139 in
+    (* Baseline fee *)
+    let fee = 1000 in
+    (* Gas limit used for all operations, so that weight (fee/gas
+       limit ratio) only depends on fee. *)
+    let gas_limit = 1500 in
+    log_step
+      0
+      "Initialize a node and activate the protocol. Bake an additional block \
+       to be able to inject valid attestations." ;
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
+    let* level = bake_for ~wait_for_flush:true node client in
+
+    (* Helpers *)
+    let check_size ~loc ~expected op =
+      let* size = Operation.byte_size op client in
+      Check.(
+        (size = expected)
+          int
+          ~error_msg:("Operation has size %L, expected %R at " ^ loc)) ;
+      unit
+    in
+    let mk_transfer ~loc ~source ~fee =
+      let* op =
+        Operation.Manager.mk_single_transfer
+          ~source
+          ~dest:Constant.bootstrap5
+          ~fee
+          ~gas_limit
+          client
+      in
+      let* () = check_size ~loc ~expected:transfer_size op in
+      return op
+    in
+    let inject_transfer ~loc ~source ~fee =
+      let* op = mk_transfer ~loc ~source ~fee in
+      Operation.inject op client
+    in
+    let mk_delegation ~loc ~source ~fee =
+      let* op =
+        Operation.Manager.(
+          operation [make ~source ~fee ~gas_limit (delegation ())])
+          client
+      in
+      let* () = check_size ~loc ~expected:delegation_size op in
+      return op
+    in
+
+    let max_total_bytes = transfer_size / 2 in
+    log_step
+      1
+      "Update the mempool config to allow at most %d total bytes. Check that \
+       injecting a transfer (%d bytes) fails without any recommended fee to \
+       make the operation succeed."
+      max_total_bytes
+      transfer_size ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_total_bytes client in
+    let* op1 = mk_transfer ~loc:__LOC__ ~source:Constant.bootstrap1 ~fee in
+    let* (`OpHash _) =
+      Operation.inject
+        ~error:Operation.rejected_by_full_mempool_no_possible_fee
+        op1
+        client
+    in
+    let max_total_bytes = (2 * transfer_size) + delegation_size in
+    log_step
+      2
+      "Update the mempool config to allow at most %d total bytes. Inject two \
+       transfers, which have a size of %d bytes each, for a total of %d/%d. \
+       Check that both are validated in the mempool."
+      max_total_bytes
+      transfer_size
+      (2 * transfer_size)
+      max_total_bytes ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_total_bytes client in
+    let* (`OpHash oph2a) =
+      inject_transfer ~loc:__LOC__ ~source:Constant.bootstrap1 ~fee
+    in
+    let* (`OpHash oph2b) =
+      inject_transfer ~loc:__LOC__ ~source:Constant.bootstrap2 ~fee:(fee + 1)
+    in
+    let* () = check_mempool ~validated:[oph2a; oph2b] client in
+    log_step
+      3
+      "Inject a third transfer with lower fee and check that it is rejected by \
+       the mempool. Moreover, the minimal fee it would need to replace oph2a \
+       is %d"
+      (fee + 1) ;
+    let* op3 =
+      mk_transfer ~loc:__LOC__ ~source:Constant.bootstrap3 ~fee:(fee - 1)
+    in
+    let* () =
+      Operation.inject_error_check_recommended_fee
+        ~loc:__LOC__
+        ~rex:Operation.rejected_by_full_mempool_with_needed_fee
+        ~expected_fee:(fee + 1)
+        op3
+        client
+    in
+    log_step
+      4
+      "Inject another transfer with higher fee and check that it replaces \
+       oph2a. Mempool total size is still %d/%d"
+      (2 * transfer_size)
+      max_total_bytes ;
+    let* (`OpHash oph4) =
+      inject_transfer ~loc:__LOC__ ~source:Constant.bootstrap4 ~fee:(fee + 10)
+    in
+    let* () =
+      check_mempool ~validated:[oph2b; oph4] ~branch_delayed:[oph2a] client
+    in
+    log_step
+      5
+      "Inject a delegation with lower fee and check that it is validated since \
+       it is only %d bytes. Mempool total size is now %d/%d."
+      delegation_size
+      ((2 * transfer_size) + delegation_size)
+      max_total_bytes ;
+    let* op5 =
+      mk_delegation ~loc:__LOC__ ~source:Constant.bootstrap5 ~fee:(fee - 1)
+    in
+    let* (`OpHash oph5) = Operation.inject op5 client in
+    let* () =
+      check_mempool
+        ~validated:[oph2b; oph4; oph5]
+        ~branch_delayed:[oph2a]
+        client
+    in
+    log_step
+      6
+      "Injecting a transfer with fee higher than the delegation still fails. \
+       Injecting a transfer with the recommended fee succeeds and replaces \
+       both oph2b (the lowest validated transfer) and oph5 (the delegation). \
+       Mempool now contains only oph4 and oph6 for a total size of %d/%d."
+      (2 * transfer_size)
+      max_total_bytes ;
+    let* op6a = mk_transfer ~loc:__LOC__ ~source:Constant.bootstrap3 ~fee in
+    let expected_fee = fee + 2 in
+    let* () =
+      Operation.inject_error_check_recommended_fee
+        ~loc:__LOC__
+        ~rex:Operation.rejected_by_full_mempool_with_needed_fee
+        ~expected_fee
+        op6a
+        client
+    in
+    let* (`OpHash oph6) =
+      inject_transfer ~loc:__LOC__ ~source:Constant.bootstrap1 ~fee:expected_fee
+    in
+    let* () =
+      check_mempool
+        ~validated:[oph4; oph6]
+        ~branch_delayed:[oph2a; oph2b; oph5]
+        client
+    in
+    log_step
+      7
+      "Inject an attestation, which has size %d. Mempool total size is now \
+       %d/%d."
+      attestation_size
+      ((2 * transfer_size) + attestation_size)
+      max_total_bytes ;
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let inject_attestation (delegate : Account.key) =
+      let* op =
+        Operation.Consensus.operation
+          (Operation.Consensus.attestation
+             ~use_legacy_name:true
+             ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+             ~level
+             ~round:0
+             ~block_payload_hash)
+          ~signer:delegate
+          client
+      in
+      let* () = check_size ~loc:__LOC__ ~expected:attestation_size op in
+      Operation.inject op client
+    in
+    let* (`OpHash oph7) = inject_attestation Constant.bootstrap1 in
+    let* () =
+      check_mempool
+        ~validated:[oph4; oph6; oph7]
+        ~branch_delayed:[oph2a; oph2b; oph5]
+        client
+    in
+    log_step
+      8
+      "Inject two other attestations: they should replace oph6 then oph4." ;
+    let* (`OpHash oph8a) = inject_attestation Constant.bootstrap2 in
+    let* () =
+      check_mempool
+        ~validated:[oph4; oph7; oph8a]
+        ~branch_delayed:[oph2a; oph2b; oph5; oph6]
+        client
+    in
+    let* (`OpHash oph8b) = inject_attestation Constant.bootstrap3 in
+    let* () =
+      check_mempool
+        ~validated:[oph7; oph8a; oph8b]
+        ~branch_delayed:[oph2a; oph2b; oph5; oph6; oph4]
+        client
+    in
+    log_step
+      9
+      "Injecting a delegation fails even with a high fee, and there is no \
+       possible fee to recommend that would let the delegation replace an \
+       attestation." ;
+    let* op9 =
+      Operation.Manager.(
+        operation [make ~fee:1_000_000_000 ~gas_limit (delegation ())] client)
+    in
+    (* The operation is a bit larger than previous delegations because
+       of the higher fee. *)
+    let* () = check_size ~loc:__LOC__ ~expected:(delegation_size + 3) op9 in
+    let* (`OpHash _) =
+      Operation.inject
+        ~error:Operation.rejected_by_full_mempool_no_possible_fee
+        op9
+        client
+    in
+    let max_total_bytes = (3 * attestation_size) + delegation_size + 1 in
+    log_step
+      10
+      "Change the max_total_bytes to %d so that there is just enough room to \
+       add a delegation but not a transfer. Successfully inject a delegation. \
+       Injecting a transfer with higher fee fails with no recommended fee \
+       because it would also need to replace an attestation which is never \
+       allowed."
+      max_total_bytes ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_total_bytes client in
+    let* op10a = mk_delegation ~loc:__LOC__ ~fee ~source:Constant.bootstrap1 in
+    let* (`OpHash oph10a) = Operation.inject op10a client in
+    let* () =
+      check_mempool
+        ~validated:[oph7; oph8a; oph8b; oph10a]
+        ~branch_delayed:[oph2a; oph2b; oph5; oph6; oph4]
+        client
+    in
+    let* op10b =
+      mk_transfer ~loc:__LOC__ ~source:Constant.bootstrap2 ~fee:(2 * fee)
+    in
+    let* (`OpHash _) =
+      Operation.inject
+        ~error:Operation.rejected_by_full_mempool_no_possible_fee
+        op10b
+        client
+    in
+    unit
+
   let precheck_with_empty_balance =
     Protocol.register_test
       ~__FILE__
@@ -1830,7 +2216,7 @@ module Revamped = struct
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let* balance =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap1.public_key_hash
            ()
@@ -1952,7 +2338,7 @@ module Revamped = struct
 
     log_step 3 "Check that the batch is correctly [validated] in the mempool." ;
     let* mempool_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
     in
     let mempool = Mempool.of_json mempool_json in
@@ -2004,7 +2390,7 @@ module Revamped = struct
     let* () = Client.Admin.connect_address ~peer:node2 client1 in
     let* () = Client.Admin.connect_address ~peer:node3 client1 in
     let* () = Client.Admin.connect_address ~peer:node3 client2 in
-    let lvl1 = Node.get_level node1 in
+    let* lvl1 = Node.get_level node1 in
     let* (_ : int) = Node.wait_for_level node2 lvl1
     and* (_ : int) = Node.wait_for_level node3 lvl1 in
     log_step
@@ -2013,7 +2399,7 @@ module Revamped = struct
        node3." ;
     let get_prevalidators client =
       let* prevalidators =
-        RPC.Client.call client @@ RPC.get_workers_prevalidators
+        Client.RPC.call client @@ RPC.get_workers_prevalidators
       in
       return JSON.(as_list prevalidators)
     in
@@ -2100,7 +2486,7 @@ module Revamped = struct
 
     let retrieve_attestation client =
       let* mempool =
-        RPC.Client.call client
+        Client.RPC.call client
         @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
       in
       let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -2213,6 +2599,152 @@ module Revamped = struct
     let* () = synchronize_mempool client_3 node_3 in
     let* () = check_mempool ~validated:[oph_future1; oph_future2] client_3 in
     unit
+
+  let test_mempool_config_operation_filtering =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"mempool config operation filtering"
+      ~tags:
+        [
+          "node";
+          "mempool";
+          "config";
+          "filter";
+          "operation";
+          "arrival";
+          "validated";
+          "refused";
+        ]
+    @@ fun protocol ->
+    Log.info
+      "Aim: test that modifying the mempool configuration via the RPC [POST \
+       /chains/<chain>/mempool/filter] correctly impacts the classification of \
+       the operations that arrive from a peer." ;
+    log_step 1 "Start two nodes, connect them, and activate the protocol." ;
+    let nodes_args = Node.[Connections 1; Synchronisation_threshold 0] in
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~nodes_args
+          (* Need event level [debug] to receive operation arrival events in [node1]. *)
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~protocol
+        `Client
+        ()
+    in
+    let* node2, client2 = Client.init_with_node ~nodes_args `Client () in
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+    let* (_ : int) = Node.wait_for_level node2 1 in
+    let fee1 = 1000 and fee2 = 101 in
+    log_step
+      2
+      "Inject two transfers op1 and op2 with respective fees %d and %d (in \
+       mutez) in node2."
+      fee1
+      fee2 ;
+    let inject_transfer_node2 source ~fee =
+      let waiter = Node.wait_for_request ~request:`Arrived node1 in
+      let* ophash =
+        Operation.Manager.inject_single_transfer ~source ~fee client2
+      in
+      let* () = waiter in
+      return ophash
+    in
+    let* (`OpHash oph1) = inject_transfer_node2 Constant.bootstrap1 ~fee:fee1 in
+    let* (`OpHash oph2) = inject_transfer_node2 Constant.bootstrap2 ~fee:fee2 in
+    log_step
+      3
+      "Check that both operations are validated in node2's mempool. Indeed, \
+       minimal fee checks are skipped by local injection." ;
+    let* () = check_mempool ~validated:[oph1; oph2] client2 in
+    log_step
+      4
+      "Check that in the mempool of node1, op1 is validated whereas op2 is \
+       refused. Indeed, node1 has the default filter config: minimum 100 mutez \
+       PLUS 100 nanotez per gas unit PLUS 1000 nanotez per byte." ;
+    let* () = check_mempool ~validated:[oph1] ~refused:[oph2] client1 in
+    log_step
+      5
+      "Set minimal_nanotez_per_gas_unit and minimal_nanotez_per_byte to 0 in \
+       node1." ;
+    let* () =
+      Mempool.Config.set_filter
+        ~log:true
+        ~minimal_nanotez_per_gas_unit:(0, 1)
+        ~minimal_nanotez_per_byte:(0, 1)
+        client1
+    in
+    let fee3 = 100 and fee4 = 99 in
+    log_step
+      6
+      "Inject new transfers op3 and op4 with respective fees %d and %d in \
+       node2."
+      fee3
+      fee4 ;
+    let* (`OpHash oph3) = inject_transfer_node2 Constant.bootstrap3 ~fee:fee3 in
+    let* (`OpHash oph4) = inject_transfer_node2 Constant.bootstrap4 ~fee:fee4 in
+    log_step
+      7
+      "Check that op3 is validated in the mempool of node1, while op4 is \
+       refused. Note that op2 would now be valid, but it has already been \
+       refused so it will never be reclassified." ;
+    let* () =
+      check_mempool ~validated:[oph1; oph3] ~refused:[oph2; oph4] client1
+    in
+    log_step
+      8
+      "In node2, set minimal_nanotez_per_gas_unit and minimal_nanotez_per_byte \
+       to 0 but minimal_fees to 101." ;
+    let* () =
+      Mempool.Config.set_filter
+        ~log:true
+        ~minimal_fees:101
+        ~minimal_nanotez_per_gas_unit:(0, 1)
+        ~minimal_nanotez_per_byte:(0, 1)
+        client2
+    in
+    log_step
+      9
+      "Bake from node2. Since the baker filters operations to include in block \
+       independently from the mempool configuration, only op1 is included in \
+       the new block, and therefore is removed from the mempool. Moreover, \
+       operations are filtered again when the mempool gets flushed, so op3 and \
+       op4 become refused, and the only validated operation left in node2 is \
+       op2." ;
+    let* (_level : int) = bake_for ~wait_for_flush:true node2 client2 in
+    let* () = check_mempool ~validated:[oph2] ~refused:[oph3; oph4] client2 in
+    log_step
+      10
+      "Meanwhile in node1, op1 is removed from the mempool, op2 and op4 are \
+       still refused, and op3 is again classified as validated." ;
+    let* () = check_mempool ~validated:[oph3] ~refused:[oph2; oph4] client1 in
+    log_step
+      11
+      "Set minimal_fees to 10 in the mempool configuration of node1, while \
+       keeping minimal_nanotez_per_gas_unit and minimal_nanotez_per_byte at 0." ;
+    let* () =
+      Mempool.Config.set_filter
+        ~log:true
+        ~minimal_fees:10
+        ~minimal_nanotez_per_gas_unit:(0, 1)
+        ~minimal_nanotez_per_byte:(0, 1)
+        client1
+    in
+    let fee5 = 10 and fee6 = 0 in
+    log_step
+      12
+      "Inject operations op5 and op6 with respective fees %d and %d in node2, \
+       and check that both are validated in node2."
+      fee5
+      fee6 ;
+    let* (`OpHash oph5) = inject_transfer_node2 Constant.bootstrap5 ~fee:fee5 in
+    (* op1 from source bootstrap1 has been included in a block, so we
+       can safely use the same source again. *)
+    let* (`OpHash oph6) = inject_transfer_node2 Constant.bootstrap1 ~fee:fee6 in
+    let* () =
+      check_mempool ~validated:[oph2; oph5; oph6] ~refused:[oph3; oph4] client2
+    in
+    log_step 13 "Check that node1 validates op5 but refuses op6." ;
+    check_mempool ~validated:[oph3; oph5] ~refused:[oph2; oph4; oph6] client1
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -2334,7 +2866,7 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   let op_json = operation_json ~fee ~gas_limit ~source ~destination ~counter in
   let op_json_branch = operation_json_branch ~branch op_json in
   let* op_hex =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.post_chain_block_helpers_forge_operations
          ~data:(Data (Ezjsonm.from_string op_json_branch))
          ()
@@ -2343,7 +2875,7 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  RPC.Client.call client
+  Client.RPC.call client
   @@ RPC.post_injection_operation (Data (`String signed_op))
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
@@ -2409,7 +2941,7 @@ let forge_pre_filtered_operation =
   (* Step 2 *)
   (* Get the counter and the current branch *)
   let* base_counter_json =
-    RPC.Client.call client_1
+    Client.RPC.call client_1
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.public_key_hash
          ()
@@ -2437,7 +2969,7 @@ let forge_pre_filtered_operation =
   (* Step 5 *)
   (* Get client_2 ddb and check that it contains no operation *)
   let* ddb2 =
-    RPC.Client.call client_2 @@ RPC.get_worker_chain_validator_ddb ()
+    Client.RPC.call client_2 @@ RPC.get_worker_chain_validator_ddb ()
   in
   check_empty_operation__ddb ddb2 ;
   Log.info "Operation Ddb of client_2 does not contain any operation" ;
@@ -2525,7 +3057,7 @@ let refetch_failed_operation =
   (* Step 2 *)
   (* get counter and branches *)
   let* counter_json =
-    RPC.Client.call client_1
+    Client.RPC.call client_1
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.public_key_hash
          ()
@@ -2554,13 +3086,13 @@ let refetch_failed_operation =
   (* Step 4 *)
   (* Ensure that the injected operation is in node_1 mempool *)
   let* mempool_node_1 =
-    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
   in
   check_operation_is_in_applied_mempool mempool_node_1 oph ;
   (* Step 5 *)
   (* Ensure that the mempool of node_2 is empty *)
   let* mempool_count_after_failed_fetch =
-    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let count_failed_fetching = count_mempool mempool_count_after_failed_fetch in
   if count_failed_fetching.total <> 0 then
@@ -2575,14 +3107,14 @@ let refetch_failed_operation =
   (* Step 7 *)
   (* Ensure that the operation is injected in node_2 mempool *)
   let* mempool_inject_on_node_2 =
-    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
   in
   check_operation_is_in_applied_mempool mempool_inject_on_node_2 oph ;
   unit
 
 let check_op_removed client op =
   let* pending_ops =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let open JSON in
   let ops_list = pending_ops |-> "applied" |> as_list in
@@ -2765,7 +3297,7 @@ let ban_operation_and_check_applied =
   let oph_to_ban = List.nth applied_ophs 2 in
   Log.info "Operation to ban: %s" oph_to_ban ;
   let* _ =
-    RPC.Client.call client_1
+    Client.RPC.call client_1
     @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph_to_ban)) ()
   in
   Log.info "Operation %s is now banned." oph_to_ban ;
@@ -2821,7 +3353,7 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
     else fun _ _ _ -> ()
   in
   let* ops =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let open JSON in
   (* get (and log) applied and refused operations *)
@@ -2884,7 +3416,7 @@ let wait_for_notify_n_valid_ops node n_ops =
     operations). *)
 let check_n_manager_ops_in_block ?(log = false) client n_manager_ops =
   let* baked_ops =
-    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+    Client.RPC.call client @@ RPC.get_chain_block_operations ()
   in
   let baked_manager_ops = JSON.(baked_ops |=> 3 |> as_list) in
   Check.(
@@ -3088,11 +3620,11 @@ let test_pending_operation_version =
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
   let* mempool_v0 =
-    RPC.Client.call client_1
+    Client.RPC.call client_1
     @@ RPC.get_chain_mempool_pending_operations ~version:"0" ()
   in
   let* mempool_v1 =
-    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
   let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
@@ -3186,7 +3718,7 @@ let force_operation_injection =
   Log.info "Both nodes are at level %d." proto_activation_level ;
   Log.info "%s" step3_msg ;
   let* json =
-    RPC.Client.call client2
+    Client.RPC.call client2
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.public_key_hash
          ()
@@ -3211,7 +3743,7 @@ let force_operation_injection =
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
   let*? p =
-    RPC.Client.spawn client1
+    Client.RPC.spawn client1
     @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let injection_error_rex =
@@ -3223,7 +3755,7 @@ let force_operation_injection =
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
   let*? p =
-    RPC.Client.spawn client1
+    Client.RPC.spawn client1
     @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   let access_error_rex =
@@ -3232,13 +3764,13 @@ let force_operation_injection =
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
   let*? p =
-    RPC.Client.spawn client2
+    Client.RPC.spawn client2
     @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
   let* _ =
-    RPC.Client.call client2
+    Client.RPC.call client2
     @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   unit
@@ -3272,7 +3804,7 @@ let injecting_old_operation_fails =
   in
   log_step 2 step2 ;
   let* json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.public_key_hash
          ()
@@ -3304,7 +3836,7 @@ let injecting_old_operation_fails =
   in
   log_step 5 step5 ;
   let*? process =
-    RPC.Client.spawn client
+    Client.RPC.spawn client
     @@ RPC.post_injection_operation (Data (`String (op_str_hex ^ signature)))
   in
   let injection_error_rex =
@@ -3315,397 +3847,6 @@ let injecting_old_operation_fails =
        old"
   in
   Process.check_error ~msg:injection_error_rex process
-
-(* Probably to be replaced during upcoming mempool tests refactoring *)
-let init_single_node_and_activate_protocol
-    ?(arguments = Node.[Synchronisation_threshold 0; Connections 0])
-    ?event_sections_levels protocol =
-  let* node = Node.init ?event_sections_levels arguments in
-  let* client = Client.init ~endpoint:Client.(Node node) () in
-  let* () = Client.activate_protocol_and_wait ~protocol client in
-  return (node, client)
-
-(* Probably to be replaced during upcoming mempool tests refactoring *)
-let init_two_connected_nodes_and_activate_protocol ?event_sections_levels1
-    ?event_sections_levels2 protocol =
-  let arguments = Node.[Synchronisation_threshold 0; Connections 1] in
-  let* node1 = Node.init ?event_sections_levels:event_sections_levels1 arguments
-  and* node2 =
-    Node.init ?event_sections_levels:event_sections_levels2 arguments
-  in
-  let* client1 = Client.init ~endpoint:Client.(Node node1) ()
-  and* client2 = Client.init ~endpoint:Client.(Node node2) () in
-  let* () = Client.Admin.connect_address client1 ~peer:node2
-  and* () = Client.activate_protocol_and_wait ~protocol client1 in
-  let proto_activation_level = 1 in
-  let* _ = Node.wait_for_level node2 proto_activation_level in
-  return (node1, client1, node2, client2)
-
-(* TMP: to be replaced in !3418 *)
-let log_step n msg = Log.info ~color:Log.Color.BG.blue "Step %d: %s" n msg
-
-(** Aim: test RPCs [GET|POST /chains/<chain>/mempool/filter]. *)
-let test_get_post_mempool_filter =
-  let title = "get post mempool filter" in
-  let tags = ["mempool"; "node"; "filter"] in
-  let step1_msg = "Start a single node and activate the protocol." in
-  let step2_msg =
-    "Call RPC [GET /chains/main/mempool/filter], check that we obtain the \
-     default configuration (the full configuration when the query parameter \
-     [include_default] is either absent or set to [true], or an empty \
-     configuration if [include_default] is [false])."
-  in
-  let step3_msg =
-    "Call RPC [POST /chains/main/mempool/filter] for various configurations. \
-     Each time, call [GET /chains/main/mempool/filter] with optional parameter \
-     include_default omitted/[true]/[false] and check that we obtain the right \
-     configuration."
-  in
-  let step4_msg =
-    "Step 4: Post invalid config modifications, check that config is unchanged \
-     and event [invalid_mempool_filter_configuration] is witnessed."
-  in
-  let step5_msg =
-    "Step 5: Set the filter to {} and check that this restored the default \
-     config. Indeed, fields that are not provided are set to their default \
-     value."
-  in
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  let open Mempool.Config in
-  log_step 1 step1_msg ;
-  let* node1, client1 =
-    (* We need event level [debug] for event
-       [invalid_mempool_filter_configuration]. *)
-    init_single_node_and_activate_protocol
-      ~event_sections_levels:[("prevalidator", `Debug)]
-      protocol
-  in
-  log_step 2 step2_msg ;
-  let* () = check_get_filter_all_variations ~log:true default client1 in
-  log_step 3 step3_msg ;
-  let set_config_and_check msg config =
-    Log.info "%s" msg ;
-    let* output = post_filter ~log:true config client1 in
-    check_equal (fill_with_default config) (of_json output) ;
-    check_get_filter_all_variations ~log:true config client1
-  in
-  let* () =
-    set_config_and_check
-      "Config1: not all fields provided (missing fields should be set to \
-       default)."
-      {
-        minimal_fees = Some 25;
-        minimal_nanotez_per_gas_unit = None;
-        minimal_nanotez_per_byte = Some (1050, 1);
-        replace_by_fee_factor = None;
-        max_operations = Some 0;
-        max_total_bytes = Some 11;
-      }
-  in
-  let* () =
-    set_config_and_check
-      "Config2: all fields provided and distinct from default."
-      {
-        minimal_fees = Some 1;
-        minimal_nanotez_per_gas_unit = Some (2, 3);
-        minimal_nanotez_per_byte = Some (4, 5);
-        replace_by_fee_factor = Some (6, 7);
-        max_operations = Some 8;
-        max_total_bytes = Some 9;
-      }
-  in
-  let config3 =
-    {
-      minimal_fees = None;
-      minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
-      minimal_nanotez_per_byte = Some (4, 2);
-      replace_by_fee_factor = None;
-      max_operations = Some default_max_operations;
-      max_total_bytes = Some 10_000_000;
-    }
-  in
-  let* () =
-    set_config_and_check
-      "Config3: some of the provided fields equal to default."
-      config3
-  in
-  log_step 4 step4_msg ;
-  let config3_full = fill_with_default config3 in
-  let test_invalid_config invalid_config_str =
-    let waiter =
-      Node.wait_for
-        node1
-        (* This event has level [debug]. *)
-        "invalid_mempool_filter_configuration.v0"
-        (Fun.const (Some ()))
-    in
-    let* output = post_filter_str invalid_config_str client1 in
-    check_equal config3_full (of_json output) ;
-    let* () = waiter in
-    let* output = RPC.Client.call client1 @@ RPC.get_chain_mempool_filter () in
-    check_equal config3_full (of_json output) ;
-    Log.info "Tested invalid config: %s." invalid_config_str ;
-    unit
-  in
-  let* () =
-    Tezos_base__TzPervasives.List.iter_s
-      test_invalid_config
-      [
-        (* invalid field name *)
-        {|{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "1050", "1" ], "minimal_nanotez_per_byte": [ "7", "5" ], "replace_by_fee_factor": ["21", "20"], "max_operations": 0, "max_total_bytes": 10_000_000, "invalid_field_name": 0 }|};
-        (* wrong type *)
-        {|{ "minimal_fees": true}|};
-        (* not enough elements in a pair *)
-        {|{ "minimal_nanotez_per_gas_unit": [ "100" ]}|};
-        (* too many elements in a pair *)
-        {|{ "minimal_nanotez_per_gas_unit": [ "100", "1", "10" ]}|};
-      ]
-  in
-  log_step 5 step5_msg ;
-  let* output = post_filter_str ~log:true "{}" client1 in
-  check_equal default (of_json output) ;
-  check_get_filter_all_variations ~log:true default client1
-
-(** Similar to [Node_event_level.transfer_and_wait_for_injection] but more general.
-    Should be merged with it during upcoming mempool tests refactoring. *)
-let inject_transfer ?(amount = 1) ?(giver_key = Constant.bootstrap1)
-    ?(receiver_key = Constant.bootstrap5) ?fee ?(wait_for = wait_for_injection)
-    ?node client =
-  let waiter = match node with None -> unit | Some node -> wait_for node in
-  let _ =
-    Client.transfer
-      ~wait:"0"
-      ~amount:(Tez.of_int amount)
-      ~giver:giver_key.Account.alias
-      ~receiver:receiver_key.Account.alias
-      ?fee:(Option.map Tez.of_mutez_int fee)
-      client
-  in
-  waiter
-
-(** Gets the fee of an operation from the json representing the operation. *)
-let get_fee op = JSON.(op |-> "contents" |=> 0 |-> "fee" |> as_int)
-
-let check_unordered_int_list_equal expected actual ~error_msg =
-  let unordered_int_list_equal l1 l2 =
-    let sort = List.sort Int.compare in
-    List.equal Int.equal (sort l1) (sort l2)
-  in
-  Check.(
-    (expected = actual)
-      (equalable
-         Format.(
-           pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ") pp_print_int)
-         unordered_int_list_equal)
-      ~error_msg)
-
-(** Checks that in the mempool of [client], [applied] is the list of
-    respective fees of the applied operations (the order of the list
-    is not required to be right), and [refused] is the list of respective
-    fees of the refused operations. Also logs the hash and fee of all
-    these operations. Moreover, check that there is no branch_delayed,
-    branch_refused, or unprocessed operation. *)
-let check_mempool_ops_fees ~(applied : int list) ~(refused : int list) client =
-  let client_name = Client.name client in
-  let* ops =
-    RPC.Client.call client
-    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
-  in
-  let check_fees classification expected =
-    let classification_ops = JSON.(ops |-> classification |> as_list) in
-    let actual =
-      List.map
-        (fun op ->
-          let fee = get_fee op in
-          Log.info
-            ~color:Log.Color.FG.yellow
-            ~prefix:(client_name ^ ", " ^ classification)
-            "%s (fee: %d)"
-            (get_hash op)
-            fee ;
-          fee)
-        classification_ops
-    in
-    check_unordered_int_list_equal
-      expected
-      actual
-      ~error_msg:
-        (sf
-           "In the mempool of %s, %s operations should have respective fees: \
-            [%s] but found: [%s]."
-           client_name
-           classification
-           "%L"
-           "%R")
-  in
-  check_fees "applied" applied ;
-  check_fees "refused" refused ;
-  (* Check that other classifications are empty *)
-  List.iter
-    (fun classification ->
-      match JSON.(ops |-> classification |> as_list) with
-      | [] -> ()
-      | _ ->
-          Test.fail
-            "Unexpectedly found %s operation(s) in the mempool of %s:\n%s"
-            classification
-            client_name
-            (JSON.encode ops))
-    ["branch_refused"; "branch_delayed"; "unprocessed"] ;
-  unit
-
-(** Aim: test that when we modify the filter configuration of the mempool
-    using the RPC [POST /chains/<chain>/mempool/filter], this correctly
-    impacts the classification of the operations that arrive from a peer. *)
-let test_mempool_filter_operation_arrival =
-  let title = "mempool filter arrival" in
-  let tags = ["mempool"; "node"; "filter"; "refused"; "applied"] in
-  let show_fees fees = String.concat "; " (List.map Int.to_string fees) in
-  let step1 = "Start two nodes, connect them, and activate the protocol." in
-  let step2 =
-    "In [node2]'s mempool filter configuration, set all fields [minimal_*] to \
-     0, so that [node2] accepts operations with any fee."
-  in
-  let fee1 = 1000 and fee2 = 101 in
-  let feesA = [fee1; fee2] in
-  let appliedA2 = feesA in
-  let step3 =
-    sf
-      "Inject two operations (transfers) in [node2] with respective fees (in \
-       mutez): %s. Check that both operations are [applied] in [node2]'s \
-       mempool."
-      (show_fees feesA)
-  in
-  let appliedA1 = [fee1] and refusedA1 = [fee2] in
-  let step4 =
-    sf
-      "Bake with an empty mempool for [node1] to force synchronization with \
-       [node2]. Check that in the mempool of [node1], the operation with fee \
-       %d is applied and the one with fee %d is refused. Indeed, [node1] has \
-       the default filter config: (minimal fees (mutez): 100, minimal nanotez \
-       per gas unit: 100, minimal nanotez per byte: 1000). Moreover, the fee \
-       must overcome the SUM of minimal fees, minimal nanotez per gas unit \
-       multiplied by the operation's gas, and minimal nanotez per byte \
-       multiplied by the operation's size; therefore the operation with fee %d \
-       does not qualify."
-      fee1
-      fee2
-      fee2
-  in
-  let fee3 = 100 and fee4 = 99 in
-  let feesB = [fee3; fee4] in
-  let appliedB1 = fee3 :: appliedA1 and refusedB1 = fee4 :: refusedA1 in
-  let step5 =
-    sf
-      "Set [minimal_nanotez_per_gas_unit] and [minimal_nanotez_per_byte] to 0 \
-       in [node1]. Inject new operations in [node2] with respective fees: %s. \
-       Bake again with an empty mempool. Check the operations in the mempool \
-       of [node1]: the operation with fee %d should be [applied], while the \
-       one with fee %d should be [refused]. Note that the operation with fee \
-       %d would now be valid, but it has already been [refused] and cannot be \
-       revalidated."
-      (show_fees feesB)
-      fee3
-      fee4
-      fee2
-  in
-  let applied_after_bake_2 = [fee2; fee3; fee4] in
-  let step6 =
-    sf
-      "Bake for [node2] normally (without enforcing a given mempool). Note \
-       that the filter used to determine which operations are included in the \
-       block does not share its configuration with the mempool's filter, so \
-       only the operation with fee %d is included. This will allow us to reuse \
-       [bootstrap1] (the author of this operation) to issue a new transfer. \
-       Check that [node2] has three [applied] operations left with fees: %s."
-      fee1
-      (show_fees applied_after_bake_2)
-  in
-  let fee5 = 10 and fee6 = 0 in
-  let feesC = [fee5; fee6] in
-  let appliedC2 = applied_after_bake_2 @ feesC in
-  let appliedC1 = [fee5; fee3] and refusedC1 = fee6 :: refusedB1 in
-  let step7 =
-    sf
-      "Set [minimal_fees] to 10 in the mempool filter configuration of \
-       [node1], while keeping [minimal_nanotez_per_gas_unit] and \
-       [minimal_nanotez_per_byte] at 0. Inject operations with fees: %s in \
-       [node2], and check that all operations are [applied] in [node2]. Bake \
-       again with on empty mempool, and check the operations in [node1]."
-      (show_fees feesC)
-  in
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  log_step 1 step1 ;
-  let* node1, client1, node2, client2 =
-    init_two_connected_nodes_and_activate_protocol
-    (* Need event level [debug] to receive operation arrival events in [node1]. *)
-      ~event_sections_levels1:[("prevalidator", `Debug)]
-      protocol
-  in
-  log_step 2 step2 ;
-  let* _ = set_filter_no_fee_requirement client2 in
-  log_step 3 step3 ;
-  let inject_transfers ?receiver_key giver_keys fees =
-    iter2_p
-      (fun giver_key fee ->
-        inject_transfer ?receiver_key ~giver_key ~fee ~node:node2 client2)
-      giver_keys
-      fees
-  in
-  let waiter_arrival_node1 = wait_for_arrival node1 in
-  let* () = inject_transfers Constant.[bootstrap1; bootstrap2] feesA in
-  let* () = check_mempool_ops_fees ~applied:appliedA2 ~refused:[] client2 in
-  log_step 4 step4 ;
-  let* () =
-    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
-  in
-  let* () = waiter_arrival_node1 in
-  let* () =
-    check_mempool_ops_fees ~applied:appliedA1 ~refused:refusedA1 client1
-  in
-  log_step 5 step5 ;
-  let* _ =
-    Mempool.Config.set_filter
-      ~log:true
-      ~minimal_nanotez_per_gas_unit:(0, 1)
-      ~minimal_nanotez_per_byte:(0, 1)
-      client1
-  in
-  let waiterB = wait_for_arrival node1 in
-  let* () = inject_transfers Constant.[bootstrap3; bootstrap4] feesB in
-  let* () =
-    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
-  in
-  let* () = waiterB in
-  let* () =
-    check_mempool_ops_fees ~applied:appliedB1 ~refused:refusedB1 client1
-  in
-  log_step 6 step6 ;
-  let* () = bake_wait_log node2 client2 in
-  let* () =
-    check_mempool_ops_fees ~applied:applied_after_bake_2 ~refused:[] client2
-  in
-  log_step 7 step7 ;
-  let* _ =
-    Mempool.Config.set_filter
-      ~minimal_fees:10
-      ~minimal_nanotez_per_gas_unit:(0, 1)
-      ~minimal_nanotez_per_byte:(0, 1)
-      client1
-  in
-  let waiterC = wait_for_arrival node1 in
-  let* () =
-    inject_transfers
-      ~receiver_key:Constant.bootstrap2
-      Constant.[bootstrap5; bootstrap1]
-      feesC
-  in
-  let* () = check_mempool_ops_fees ~applied:appliedC2 ~refused:[] client2 in
-  let* () =
-    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
-  in
-  let* () = waiterC in
-  check_mempool_ops_fees ~applied:appliedC1 ~refused:refusedC1 client1
 
 let test_request_operations_peer =
   let step1_msg = "Step 1: Connect and initialise two nodes " in
@@ -3761,7 +3902,7 @@ let test_request_operations_peer =
   let* () = Client.Admin.connect_address ~peer:node_1 client_2 in
   let* node1_identity = Node.wait_for_identity node_1 in
   let* _ =
-    RPC.Client.call client_2
+    Client.RPC.call client_2
     @@ RPC.post_chain_mempool_request_operations ~peer:node1_identity ()
   in
   let* () = wait_mempool in
@@ -3784,13 +3925,16 @@ let register ~protocols =
   Revamped.ban_operation protocols ;
   Revamped.unban_operation_and_reinject protocols ;
   Revamped.unban_all_operations protocols ;
-  Revamped.test_full_mempool protocols ;
+  Revamped.test_full_mempool_propagation protocols ;
   Revamped.test_full_mempool_and_replace_same_manager protocols ;
+  Revamped.test_full_mempool_attestation_vs_manager protocols ;
+  Revamped.test_full_mempool_max_total_bytes protocols ;
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   Revamped.mempool_disabled protocols ;
   Revamped.propagation_future_attestation protocols ;
+  Revamped.test_mempool_config_operation_filtering protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_applied protocols ;
@@ -3798,6 +3942,4 @@ let register ~protocols =
   test_pending_operation_version protocols ;
   force_operation_injection protocols ;
   injecting_old_operation_fails protocols ;
-  test_get_post_mempool_filter protocols ;
-  test_mempool_filter_operation_arrival protocols ;
   test_request_operations_peer protocols

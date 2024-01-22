@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint mint
 Node is bootstrapped.
-Estimated gas: 2222.514 units (will add 100 for safety)
+Estimated gas: 2222.033 units (will add 100 for safety)
 Estimated storage: 221 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -30,7 +30,7 @@ This sequence of operations was run:
           Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
       Storage size: 309 bytes
       Paid storage size diff: 221 bytes
-      Consumed gas: 2222.481
+      Consumed gas: 2222
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.05525
         storage fees ........................... +ꜩ0.05525
@@ -49,7 +49,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3142.041 units (will add 100 for safety)
+Estimated gas: 3141.953 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -62,7 +62,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000624
     Expected counter: 4
-    Gas limit: 3243
+    Gas limit: 3242
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000624
@@ -76,7 +76,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 220 bytes
-      Consumed gas: 3032.033
+      Consumed gas: 3031.954
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -96,7 +96,7 @@ This sequence of operations was run:
           Parameter: { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
                        Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
           This transaction was successfully applied
-          Consumed gas: 109.941
+          Consumed gas: 109.932
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string

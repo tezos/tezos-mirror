@@ -157,10 +157,11 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
   let*! state_hash = PVM.state_hash state in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let* constants =
+    Protocol_plugins.get_constants_of_level node_ctxt inbox_level
+  in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
+    constants.sc_rollup.reveal_activation_level
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
@@ -217,10 +218,11 @@ let () =
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let* constants =
+    Protocol_plugins.get_constants_of_block_hash node_ctxt block
+  in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
+    constants.sc_rollup.reveal_activation_level
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
@@ -232,12 +234,15 @@ let () =
   Block_directory.register0 Sc_rollup_services.Block.dal_slots
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
+  let* constants =
+    Protocol_plugins.get_constants_of_block_hash node_ctxt block
+  in
   let+ slots =
     Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
   in
   List.rev_map
     (Sc_rollup_proto_types.Dal.Slot_header.of_octez
-       ~number_of_slots:node_ctxt.current_protocol.constants.dal.number_of_slots)
+       ~number_of_slots:constants.dal.number_of_slots)
     slots
   |> List.rev
 
@@ -269,6 +274,16 @@ let () =
   @@ fun (node_ctxt, _block_hash) output () ->
   let open Lwt_result_syntax in
   let+ commitment, proof = Outbox.proof_of_output node_ctxt output in
+  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
+
+let () =
+  Block_helpers_directory.register1
+    Sc_rollup_services.Block.Helpers.outbox_proof_simple
+  @@ fun (node_ctxt, _block_hash) outbox_level message_index () ->
+  let open Lwt_result_syntax in
+  let+ commitment, proof =
+    Outbox.proof_of_output_simple node_ctxt ~outbox_level ~message_index
+  in
   (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
 
 let () =

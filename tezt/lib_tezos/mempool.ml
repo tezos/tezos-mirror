@@ -105,7 +105,7 @@ let get_mempool ?endpoint ?hooks ?chain ?(validated = true)
     ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
     ?(outdated = true) ?(validation_passes = []) client =
   let* mempool_json =
-    RPC.Client.call client ?hooks ?endpoint
+    Client.RPC.call client ?hooks ?endpoint
     @@ RPC.get_chain_mempool_pending_operations
          ?chain
          ~version:"2"
@@ -297,19 +297,20 @@ module Config = struct
       max_total_bytes = aux_int default_max_total_bytes config.max_total_bytes;
     }
 
-  let check_get_filter_all_variations ?(log = false) expected_config client =
+  let call_get_filter ?endpoint ?hooks ?include_default client =
+    Client.RPC.call ?endpoint ?hooks client
+    @@ RPC.get_chain_mempool_filter ?include_default ()
+
+  let check_get_filter_all_variations ?(log = false) ?endpoint ?hooks
+      expected_config client =
     let expected_full = fill_with_default expected_config in
-    let* json = RPC.Client.call client @@ RPC.get_chain_mempool_filter () in
+    let* json = call_get_filter ?endpoint ?hooks client in
     check_equal expected_full (of_json json) ;
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:true ()
-    in
+    let* json = call_get_filter ?endpoint ?hooks ~include_default:true client in
     check_equal expected_full (of_json json) ;
     let expected_partial = clear_default expected_config in
     let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:false ()
+      call_get_filter ?endpoint ?hooks ~include_default:false client
     in
     check_equal expected_partial (of_json json) ;
     if log then
@@ -320,25 +321,25 @@ module Config = struct
         (to_string expected_partial) ;
     unit
 
-  let call_post_filter json_u client =
-    RPC.Client.call client
+  let call_post_filter ?endpoint ?hooks json_u client =
+    Client.RPC.call ?endpoint ?hooks client
     @@ RPC.post_chain_mempool_filter ~data:(Data json_u) ()
 
-  let post_filter ?(log = false) config client =
+  let post_filter ?(log = false) ?endpoint ?hooks config client =
     let json_u = to_json_u config in
     if log then
       Log.info
         "Set mempool filter config to: %s."
         (Ezjsonm.value_to_string json_u) ;
-    call_post_filter json_u client
+    call_post_filter ?endpoint ?hooks json_u client
 
-  let post_filter_str ?(log = false) config_str client =
+  let post_filter_str ?(log = false) ?endpoint ?hooks config_str client =
     if log then Log.info "Set mempool filter config to: %s." config_str ;
-    call_post_filter (Ezjsonm.from_string config_str) client
+    call_post_filter ?endpoint ?hooks (Ezjsonm.from_string config_str) client
 
-  let set_filter ?log ?minimal_fees ?minimal_nanotez_per_gas_unit
-      ?minimal_nanotez_per_byte ?replace_by_fee_factor ?max_operations
-      ?max_total_bytes client =
+  let set_filter ?log ?endpoint ?hooks ?minimal_fees
+      ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+      ?replace_by_fee_factor ?max_operations ?max_total_bytes client =
     let config =
       make
         ?minimal_fees
@@ -349,7 +350,7 @@ module Config = struct
         ?max_total_bytes
         ()
     in
-    let* output = post_filter ?log config client in
+    let* output = post_filter ?endpoint ?hooks ?log config client in
     check_equal (fill_with_default config) (of_json output) ;
     unit
 end

@@ -1,6 +1,8 @@
 include: .gitlab/ci/jobs/publish/common.yml
 
 gitlab:release:
+  extends:
+    - .tags_template__no_gcp
   # https://gitlab.com/tezos/docker-images/ci-release
   image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
   stage: publish_release_gitlab
@@ -9,6 +11,8 @@ gitlab:release:
   dependencies:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries
+    - build:dpkg:amd64
+    - build:rpm:amd64
     - docker:merge_manifests
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci gitlab-release
+    - ./scripts/ci/gitlab-release.sh

@@ -40,17 +40,6 @@ val rollup_exists : addr:Address.t -> kind:Kind.t -> unit Lwt.t
     node is stopping with exit status [exit_status]. *)
 val shutdown_node : int -> unit Lwt.t
 
-(** Emits the event that the connection to the Tezos node has been lost. *)
-val connection_lost : unit -> unit Lwt.t
-
-(** [cannot_connect ~count error] emits the event that the rollup node cannot
-    connect to the Tezos node because of [error] for the [count]'s time. *)
-val cannot_connect : count:int -> tztrace -> unit Lwt.t
-
-(** [wait_reconnect delay] emits the event that the rollup will wait [delay]
-    seconds before attempting to reconnect to the Tezos node . *)
-val wait_reconnect : float -> unit Lwt.t
-
 (** [starting_metrics_server ~metrics_addr ~metrics_port] emits the event
     that the metrics server for the rollup node is starting. *)
 val starting_metrics_server : host:string -> port:int -> unit Lwt.t
@@ -91,3 +80,42 @@ val detected_protocol_migration : unit -> unit Lwt.t
 (** [acquiring_lock ()] emits an event to indicate that the node is attempting
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t
+
+(** [calling_gc ~gc_level ~head_level] emits the event that the GC is started
+    for level [gc_level].  *)
+val calling_gc : gc_level:int32 -> head_level:int32 -> unit Lwt.t
+
+(** [starting_context_gc hash] emits an event which indicates that a GC run
+    was launched for [hash]. *)
+val starting_context_gc : Smart_rollup_context_hash.t -> unit Lwt.t
+
+(** [context_gc_already_launched ()] emits an event which indicates that a GC
+    launch was attempted but resulted in no action because a GC run is already
+    in progress. *)
+val context_gc_already_launched : unit -> unit Lwt.t
+
+(** [ending_context_gc total_duration finalise_duration] emits an event which
+    indicates that a GC run has ended, providing its total duration and its
+    finalisation duration. *)
+val ending_context_gc : Ptime.span * Ptime.span -> unit Lwt.t
+
+(** [context_gc_failure err] emits an event which indicates a GC failure. *)
+val context_gc_failure : string -> unit Lwt.t
+
+(** [context_gc_launch_failure err] emits an event which indicates a GC launch
+    error. *)
+val context_gc_launch_failure : string -> unit Lwt.t
+
+(** [gc_levels_storage_failure ()] emits an event which indicates that GC level
+    values ([last_gc_level], [first_available_level]) could not be written to
+    storage. *)
+val gc_levels_storage_failure : unit -> unit Lwt.t
+
+(** [convert_history_mode old_history_mode new_history_mode] emits an event for
+    when the history mode of the rollup node is changed. *)
+val convert_history_mode :
+  Configuration.history_mode -> Configuration.history_mode -> unit Lwt.t
+
+(** [gc_finished ~gc_level ~head_level] emits the event that the GC is finished
+    for level [gc_level].  *)
+val gc_finished : gc_level:int32 -> head_level:int32 -> unit Lwt.t

@@ -88,3 +88,16 @@ val transfer_ticket :
   Ticket_token.ex_token ->
   Ticket_amount.t ->
   (context * Z.t, error trace) result Lwt.t
+
+(** [transfer_tickets_in_parameters ctxt param param_ty ~source ~dst]
+    Scans the [param] for tickets and transfers ownership of those tickets
+    from [source] to [dst] by updating the ticket table. The function returns
+    the updated context, the ticket receipt, and the number of newly allocated
+    bytes for the ticket table. *)
+val transfer_tickets_in_parameters :
+  context ->
+  'a ->
+  ('a, 'b) Script_typed_ir.ty ->
+  source:Destination.t ->
+  dst:Destination.t ->
+  (context * Ticket_receipt.t * Z.t, error trace) result Lwt.t

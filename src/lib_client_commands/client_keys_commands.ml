@@ -338,7 +338,7 @@ let generate_test_keys =
       let alias_prefix =
         match alias_prefix with
         | None -> fun i -> Format.sprintf "bootstrap%d" (i + 6)
-        | Some alias_prefix -> Format.sprintf "%s%06d" alias_prefix
+        | Some alias_prefix -> Format.sprintf "%s%d" alias_prefix
       in
       let* source_list =
         List.init_es ~when_negative_length:[] n (fun i ->

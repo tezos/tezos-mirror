@@ -1,0 +1,133 @@
+#!/bin/bash
+# Start/stop the Octez Bakers and Accusers
+#
+### BEGIN INIT INFO
+# Provides:          octez-baker
+# Required-Start:    octez-node
+# Required-Stop:
+# Should-Start:      $network $named
+# Should-Stop:       $network $named
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: The Octez Baking daemons
+# Description:       The Octez Bakers bake new blocks on the Tezos blockchain
+#		     and the Accusers look for bad behaviour
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export DESC="octez baker"
+NAME=octez-baker
+PIDDIR=/var/run/tezos
+PIDFILEA=$PIDDIR/octez-accuser.pid
+PIDFILEB=$PIDDIR/octez-baker.pid
+export SCRIPTNAME=/etc/init.d/"$NAME"
+
+if [ -f "/lib/lsb/init-functions" ]; then
+	. /lib/lsb/init-functions
+else
+	. /etc/rc.d/init.d/functions
+fi
+
+# Defaults
+user=tezos
+group=tezos
+nodedir=/var/tezos/node
+logdir=/var/log/tezos
+rotateonstart=yes
+protocols="@PROTOCOLS@"
+waitfornode=yes
+othercliopts_baker_@PROTOCOL@=""
+keepalive=yes
+keepalive_opt="-K"
+
+#shellcheck disable=SC1091
+[ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
+#shellcheck disable=SC1091
+[ -r /etc/octez/baker.conf ] && . /etc/octez/baker.conf
+
+logfile_basea="${logdir}/accuser_"
+logfile_baseb="${logdir}/baker_"
+baker="/usr/bin/octez-baker"
+accuser="/usr/bin/octez-accuser"
+
+[ "${keepalive}" != "yes" ] && keepalive_opt=""
+
+initial_checks()
+{
+	mkdir -p ${PIDDIR}
+	chown $user:$group ${PIDDIR}
+
+	mkdir -p ${logdir}
+	if [ -z "$lq_vote" ]; then
+		echo "lq_vote must be set in /etc/octez/baker.conf" >&2
+		exit 3
+	fi
+	if [ -z "$baking_key" ]; then
+		echo "baking_key must be set in /etc/octez/baker.conf" >&2
+		exit 3
+	fi
+
+}
+
+wait_for_bootstrap()
+{
+	echo "Waiting for node to be bootstrapped" >&2
+
+	while :; do
+		/usr/bin/octez-client bootstrapped >/dev/null 2>&1 && break
+		echo "Node not ready - sleeping for 30 seconds" >&2
+		sleep 30
+
+	done
+
+}
+
+rotate_logs ()
+{
+	if [ ${rotateonstart} = "yes" ]; then
+		for p in ${protocols}; do
+			mv -f "${logfile_baseb}${p}.log" "${logfile_baseb}${p}.log.1"
+			mv -f "${logfile_basea}${p}.log" "${logfile_basea}${p}.log.1"
+		done
+	fi
+}
+
+case "$1" in
+start)	initial_checks
+	rotate_logs
+	[ "$waitfornode" = "yes" ] &&  wait_for_bootstrap
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+
+		othercliopts="othercliopts_baker_$p"
+		su $user -c "${baker}-$p run with local node $nodedir $baking_key --liquidity-baking-toggle-vote $lq_vote --pidfile ${PIDFILEB}-$p ${keepalive_opt} ${!othercliopts} >> ${logfile_baseb}${p}.log 2>&1 &"
+		su $user -c "${accuser}-$p run ${keepalive_opt} --pidfile ${PIDFILEA}-$p >> ${logfile_basea}${p}.log 2>&1 &"
+	done
+	;;
+stop)
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+    kill  "$(cat ${PIDFILEB}-$p)"
+    kill  "$(cat ${PIDFILEA}-$p)"
+		rm -f ${PIDFILEB}-$p ${PIDFILEA}-$p
+	done
+        ;;
+restart)
+        $0 stop
+        $0 start
+        ;;
+reload|force-reload)
+        ;;
+status)
+	for p in ${protocols}; do
+		[ ! -x "${baker}-$p" ] && continue
+        	status_of_proc -p ${PIDFILEB}-$p ${baker}-$p $NAME || exit $?
+        	status_of_proc -p ${PIDFILEA}-$p ${accuser}-$p $NAME || exit $?
+	done
+	exit 0
+        ;;
+*)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
+        exit 2
+        ;;
+esac
+exit 0

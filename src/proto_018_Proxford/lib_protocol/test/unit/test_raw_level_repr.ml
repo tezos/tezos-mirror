@@ -44,20 +44,23 @@ module Test_raw_level_repr = struct
 
   (** Testing [encoding], int32 underneath, by applying it with Data_encoding *)
   let test_encoding () =
+    let open Lwt_result_syntax in
     let encoding = Raw_level_repr.encoding in
     let bytes = Bytes.make 4 '0' in
     Bytes.set_int32_ne bytes 0 0l ;
-    (Data_encoding.Binary.of_bytes encoding bytes |> function
-     | Ok x -> Lwt.return (Ok x)
-     | Error e ->
-         failwith
-           "Data_encoding.Binary.read shouldn't have failed with \
-            Raw_level_repr.encoding: %a"
-           Data_encoding.Binary.pp_read_error
-           e)
-    >>=? fun v ->
-    Assert.equal_int ~loc:__LOC__ (Int32.to_int (Raw_level_repr.to_int32 v)) 0
-    >>=? fun () ->
+    let* v =
+      match Data_encoding.Binary.of_bytes encoding bytes with
+      | Ok x -> return x
+      | Error e ->
+          failwith
+            "Data_encoding.Binary.read shouldn't have failed with \
+             Raw_level_repr.encoding: %a"
+            Data_encoding.Binary.pp_read_error
+            e
+    in
+    let* () =
+      Assert.equal_int ~loc:__LOC__ (Int32.to_int (Raw_level_repr.to_int32 v)) 0
+    in
     Bytes.set_int32_ne bytes 0 (-1l) ;
     Data_encoding.Binary.of_bytes encoding bytes |> function
     | Error _ -> return_unit
@@ -72,17 +75,18 @@ module Test_raw_level_repr = struct
 
   (** int32 interop tests *)
   let test_int32_interop () =
+    let open Lwt_result_wrap_syntax in
     let int32v = 100l in
-    Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
-    >>=? fun raw_level ->
-    Assert.equal_int32 ~loc:__LOC__ (Raw_level_repr.to_int32 raw_level) int32v
-    >>=? fun () ->
+    let*?@ raw_level = Raw_level_repr.of_int32 int32v in
+    let* () =
+      Assert.equal_int32 ~loc:__LOC__ (Raw_level_repr.to_int32 raw_level) int32v
+    in
     let int32v = -1l in
-    (Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
-     >>= function
-     | Ok _ -> failwith "Negative int32s should not be coerced into raw_level"
-     | Error _ -> return_unit)
-    >>=? fun () ->
+    let* () =
+      match Raw_level_repr.of_int32 int32v with
+      | Ok _ -> failwith "Negative int32s should not be coerced into raw_level"
+      | Error _ -> return_unit
+    in
     try
       let (_ : Raw_level_repr.t) = Raw_level_repr.of_int32_exn int32v in
       failwith "Negative int32s should not be coerced into raw_level"
@@ -95,12 +99,14 @@ module Test_raw_level_repr = struct
 
   (** Asserting [succ] which is expected to return successor levels *)
   let test_succ () =
+    let open Lwt_result_syntax in
     let next_raw_level = Raw_level_repr.succ Raw_level_repr.root in
-    Assert.equal_int32
-      ~loc:__LOC__
-      (next_raw_level |> Raw_level_repr.to_int32)
-      1l
-    >>=? fun () ->
+    let* () =
+      Assert.equal_int32
+        ~loc:__LOC__
+        (next_raw_level |> Raw_level_repr.to_int32)
+        1l
+    in
     let arbitrary_next_raw_level =
       Raw_level_repr.succ (Raw_level_repr.of_int32_exn 99l)
     in
@@ -111,17 +117,19 @@ module Test_raw_level_repr = struct
 
   (** Asserting [pred] which is expected to return predecessor levels *)
   let test_pred () =
-    (match Raw_level_repr.pred (Raw_level_repr.of_int32_exn 1l) with
-    | Some previous_raw_level ->
-        Assert.equal_int32
-          ~loc:__LOC__
-          (previous_raw_level |> Raw_level_repr.to_int32)
-          0l
-    | None ->
-        failwith
-          "Raw_level_repr.pred should have successfully returned 0l as the \
-           predecessor of 1l")
-    >>=? fun () ->
+    let open Lwt_result_syntax in
+    let* () =
+      match Raw_level_repr.pred (Raw_level_repr.of_int32_exn 1l) with
+      | Some previous_raw_level ->
+          Assert.equal_int32
+            ~loc:__LOC__
+            (previous_raw_level |> Raw_level_repr.to_int32)
+            0l
+      | None ->
+          failwith
+            "Raw_level_repr.pred should have successfully returned 0l as the \
+             predecessor of 1l"
+    in
     Raw_level_repr.pred Raw_level_repr.root |> function
     | Some _ ->
         failwith

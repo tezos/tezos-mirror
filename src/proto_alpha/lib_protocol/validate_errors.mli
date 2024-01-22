@@ -41,7 +41,7 @@ module Consensus : sig
 
   (** Errors for preattestations and attestations. *)
   type error +=
-    | Zero_frozen_deposits of Signature.Public_key_hash.t
+    | Forbidden_delegate of Signature.Public_key_hash.t
     | Consensus_operation_not_allowed
     | Consensus_operation_for_old_level of {
         kind : consensus_operation_kind;
@@ -190,8 +190,8 @@ module Manager : sig
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
-    | Sc_rollup_feature_disabled
     | Sc_rollup_arith_pvm_disabled
+    | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
 end
 

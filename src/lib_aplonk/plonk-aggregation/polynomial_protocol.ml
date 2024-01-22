@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
+open Kzg.Bls
+open Kzg.Utils
 open Plonk.Identities
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module PC : Polynomial_commitment.S
@@ -52,14 +52,14 @@ module type S = sig
   type verifier_aux = {alpha : Scalar.t; x : Scalar.t; r : Scalar.t}
 
   val update_transcript_with_formatted_answers :
-    transcript ->
+    Transcript.t ->
     (Scalar.t SMap.t SMap.t list -> Answers_commitment.t) SMap.t ->
     Scalar.t SMap.t SMap.t list ->
-    Scalar.t list * Answers_commitment.t SMap.t * transcript
+    Scalar.t list * Answers_commitment.t SMap.t * Transcript.t
 
   val prove_super_aggregation :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     commit_to_answers_map:
       (Scalar.t SMap.t SMap.t list -> Answers_commitment.t) SMap.t ->
     n:int ->
@@ -69,11 +69,11 @@ module type S = sig
     evaluations:Evaluations.t SMap.t ->
     identities:prover_identities ->
     nb_of_t_chunks:int ->
-    (proof * prover_aux) * transcript
+    (proof * prover_aux) * Transcript.t
 
   val verify_super_aggregation :
     verifier_public_parameters ->
-    transcript ->
+    Transcript.t ->
     n:int ->
     generator:Scalar.t ->
     commitments:PC.Commitment.t list ->
@@ -83,7 +83,7 @@ module type S = sig
     t_answers:Scalar.t list ->
     ids_batch:(Scalar.t * int) SMap.t ->
     proof ->
-    (bool * verifier_aux) * PC.transcript
+    (bool * verifier_aux) * Transcript.t
 end
 
 module Make_impl
@@ -231,6 +231,5 @@ module Make_aggregation : functor
   S with module Answers_commitment = Answers_commitment with module PC = PC =
   Make_impl
 
-module KZG_Answers_commitment =
-  Plonk.Input_commitment.Make (Plonk.Polynomial_commitment.Commitment)
+module KZG_Answers_commitment = Plonk.Input_commitment.Make (Kzg.Commitment)
 include Make_aggregation (Polynomial_commitment) (KZG_Answers_commitment)

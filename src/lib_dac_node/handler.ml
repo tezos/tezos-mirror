@@ -257,7 +257,7 @@ module Committee_member = struct
           let*! () =
             Event.emit_processing_root_hash_failed dac_plugin root_hash errs
           in
-          return ()
+          return_unit
     in
     let remote_store =
       Page_store.(Remote.init {cctxt = coordinator_cctxt; page_store})
@@ -297,14 +297,14 @@ module Observer = struct
           let*! () =
             Event.emit_received_root_hash_processed dac_plugin root_hash
           in
-          return ()
+          return_unit
       | Error errs ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4930.
              Improve handling of errors. *)
           let*! () =
             Event.emit_processing_root_hash_failed dac_plugin root_hash errs
           in
-          return ()
+          return_unit
     in
     let remote_store =
       Page_store.(Remote.init {cctxt = coordinator_cctxt; page_store})

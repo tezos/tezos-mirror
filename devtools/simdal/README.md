@@ -28,7 +28,7 @@ The entrypoint of the simulator is `bin/sim.ml`
 # TODOs
 
 - [ ] sim: cleaner way to parameterize the simulation (e.g. json-based)
-- [ ] sim: strategy for --min-relay is perhaps too aggressive for small attestors
+- [ ] sim: strategy for --min-relay is perhaps too aggressive for small attesters
 - [ ] sim: lazy/mixed message propagation
 - [ ] sim: propagation time analysis
 - [ ] stake: more realistic committee computation

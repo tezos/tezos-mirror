@@ -2,8 +2,8 @@ include: .gitlab/ci/jobs/build/common.yml
 
 .build_arm64:
   extends:
-    - .tags_template__build_arm64
     - .build
+    - .tags_template__build_arm64
   variables:
     ARCH: "arm64"
     # Disable coverage for arm64
@@ -34,4 +34,4 @@ build_arm64-exp-dev-extra:
     - .build_arm64
   variables:
     EXECUTABLE_FILES: "script-inputs/experimental-executables script-inputs/dev-executables"
-    BUILD_EXTRA: "src/bin_tps_evaluation/main_tps_evaluation.exe tezt/tests/main.exe"
+    BUILD_EXTRA: "src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe tezt/tests/main.exe"

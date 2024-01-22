@@ -23,11 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include RPC_core
-include RPC_legacy
-
-type 'a t = (Node.t, 'a) RPC_core.t
-
 module Query_arg = struct
   let opt name f = function None -> [] | Some x -> [(name, f x)]
 
@@ -38,17 +33,15 @@ module Query_arg = struct
   let switch name b = if b then [(name, "")] else []
 end
 
-let make ?data ?query_string =
-  make
-    ?data
-    ?query_string
-    ~get_host:Node.rpc_host
-    ~get_port:Node.rpc_port
-    ~get_scheme:Node.rpc_scheme
-
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
 end
+
+type 'result t = 'result RPC_core.t
+
+type data = RPC_core.data
+
+let make = RPC_core.make
 
 let get_config = make GET ["config"] Fun.id
 
@@ -186,6 +179,16 @@ let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
       "nonces";
       string_of_int block_level;
     ]
+    Fun.id
+
+let get_chain_block_context_seed ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "seed"] Fun.id
+
+let get_chain_block_context_seed_computation ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "seed_computation"]
     Fun.id
 
 let get_chain_block_context_liquidity_baking_cpmm_address ?(chain = "main")
@@ -649,6 +652,16 @@ let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
     @ value_path)
     Fun.id
 
+let get_chain_block_context_raw_bytes ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] Fun.id
+
+let get_chain_block_context_cache_contracts_all ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
+    Fun.id
+
 let get_chain_block_context_constants ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "constants"] Fun.id
 
@@ -697,6 +710,22 @@ let get_chain_block_context_contract_storage_paid_space ?(chain = "main")
       contract;
       "storage";
       "paid_space";
+    ]
+    JSON.as_int
+
+let get_chain_block_context_contract_staking_numerator ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "staking_numerator";
     ]
     JSON.as_int
 
@@ -1018,7 +1047,7 @@ let get_chain_block_context_smart_rollups_smart_rollup_commitment
       "commitment";
       hash;
     ]
-    Fun.id
+    (fun json -> Sc_rollup_rpc.commitment_from_json json)
 
 let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
@@ -1150,6 +1179,45 @@ let get_chain_block_context_delegate_delegated_contracts ?(chain = "main")
       "delegates";
       pkh;
       "delegated_contracts";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_stakers ?(chain = "main") ?(block = "head")
+    pkh =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "stakers"]
+    Fun.id
+
+let get_chain_block_context_delegate_total_delegated_stake ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "total_delegated_stake";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_staking_denominator ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "staking_denominator";
     ]
     Fun.id
 
@@ -1361,6 +1429,21 @@ let get_chain_block_context_issuance_current_yearly_rate_exact ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_issuance_current_yearly_rate_details
+    ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "current_yearly_rate_details";
+    ]
+    Fun.id
+
 let get_chain_block_context_issuance_issuance_per_minute ?(chain = "main")
     ?(block = "head") () =
   make
@@ -1473,7 +1556,7 @@ let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
   let query_string =
     match level with
     | None -> []
-    | Some offset -> [("level", string_of_int offset)]
+    | Some level -> [("level", string_of_int level)]
   in
   make
     GET
@@ -1481,4 +1564,16 @@ let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
     ~query_string
     Fun.id
 
-let make = RPC_core.make
+let get_monitor_applied_blocks = make GET ["monitor"; "applied_blocks"] Fun.id
+
+let get_monitor_heads_chain ?(chain = "main") () =
+  make GET ["monitor"; "heads"; chain] Fun.id
+
+let get_monitor_validated_blocks =
+  make GET ["monitor"; "validated_blocks"] Fun.id
+
+let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
+
+let get_chain_block_context_denunciations ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "context"; "denunciations"] Fun.id

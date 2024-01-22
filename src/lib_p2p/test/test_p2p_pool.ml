@@ -50,7 +50,7 @@ module Simple = struct
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
     | Error
-        ((( Tezos_p2p_services.P2p_errors.Connection_refused
+        ((( Tezos_p2p_services.P2p_errors.Connection_failed
           | Tezos_p2p_services.P2p_errors.Pending_connection
           | Tezos_p2p_services.P2p_errors.Rejected_socket_connection
           | Tezos_p2p_services.P2p_errors.Rejected_by_nack _ | Canceled
@@ -63,7 +63,7 @@ module Simple = struct
             point
             (fun ppf err ->
               match err with
-              | Tezos_p2p_services.P2p_errors.Connection_refused ->
+              | Tezos_p2p_services.P2p_errors.Connection_failed ->
                   Format.fprintf ppf "connection refused"
               | Tezos_p2p_services.P2p_errors.Pending_connection ->
                   Format.fprintf ppf "pending connection"
@@ -111,7 +111,8 @@ module Simple = struct
         (* in this test only Ping messages are used. *))
       conns
 
-  let close_all conns = List.iter_p P2p_conn.disconnect conns
+  let close_all conns =
+    List.iter_p (P2p_conn.disconnect ~reason:(User "test shutdown")) conns
 
   let node (node : Node.t) =
     let open Lwt_result_syntax in
@@ -157,7 +158,9 @@ module Random_connections = struct
     let*! _ = trace Write @@ P2p_conn.write conn Node.Ping in
     let* _ = trace Read @@ P2p_conn.read conn in
     let*! () = Lwt_unix.sleep (0.2 +. Random.float 1.0) in
-    let*! () = P2p_conn.disconnect conn in
+    let*! () =
+      P2p_conn.disconnect ~reason:(User "test explicit disconnection") conn
+    in
     decr rem ;
     if !rem mod total = 0 then Tezt.Log.debug "Remaining: %d.@." (!rem / total) ;
     if n > 1 then connect_random connect_handler pool total rem point (pred n)
@@ -264,7 +267,7 @@ module Overcrowded = struct
         | None -> failwith "Woops...")
     | Error
         [
-          (( Tezos_p2p_services.P2p_errors.Connection_refused
+          (( Tezos_p2p_services.P2p_errors.Connection_failed
            | Tezos_p2p_services.P2p_errors.Pending_connection
            | Tezos_p2p_services.P2p_errors.Rejected_socket_connection | Canceled
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
@@ -278,7 +281,7 @@ module Overcrowded = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"
@@ -334,7 +337,11 @@ module Overcrowded = struct
            %d, remote: %d).@."
           port
           (snd target) ;
-        let*! () = P2p_conn.disconnect conn in
+        let*! () =
+          P2p_conn.disconnect
+            ~reason:(User "connection should have been rejected")
+            conn
+        in
         Error_monad.failwith
           "Overcrowded error: connection should be rejected (local: %d, \
            remote: %d).@."
@@ -564,7 +571,7 @@ module No_common_network = struct
         | None -> failwith "Woops...")
     | Error
         [
-          (( Tezos_p2p_services.P2p_errors.Connection_refused
+          (( Tezos_p2p_services.P2p_errors.Connection_failed
            | Tezos_p2p_services.P2p_errors.Pending_connection
            | Tezos_p2p_services.P2p_errors.Rejected_socket_connection | Canceled
            | Timeout | Tezos_p2p_services.P2p_errors.Rejected _ ) as err);
@@ -578,7 +585,7 @@ module No_common_network = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"
@@ -623,7 +630,11 @@ module No_common_network = struct
     | Ok conn ->
         Tezt.Log.debug
           "Not good: connection accepted while it should be rejected.@." ;
-        let*! () = P2p_conn.disconnect conn in
+        let*! () =
+          P2p_conn.disconnect
+            ~reason:(User "connection should have been rejected")
+            conn
+        in
         return_unit
     | Error
         [Tezos_p2p_services.P2p_errors.Rejected_no_common_protocol {announced}]

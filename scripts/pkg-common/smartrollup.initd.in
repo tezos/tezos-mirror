@@ -1,0 +1,116 @@
+#!/bin/bash
+# Start/stop the Octez Bakers and Accusers
+#
+### BEGIN INIT INFO
+# Provides:          octez-smartrollup
+# Required-Start:    
+# Required-Stop:     
+# Should-Start:      $network $named 
+# Should-Stop:       $network $named 
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: The Octez Smart Rollup daemons
+# Description:       The Octez Smart Rollup daemons manage a rollup on the
+#		     Tezos network.
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DESC="octez smartrollup"
+NAME=octez-smartrollup
+PIDDIR=/var/run/tezos
+SCRIPTNAME=/etc/init.d/"$NAME"
+
+if [ -f "/lib/lsb/init-functions" ]; then
+        . /lib/lsb/init-functions
+else
+        . /etc/rc.d/init.d/functions
+fi
+
+# Defaults
+user=tezos
+group=tezos
+nodedir=/var/tezos/node
+clientdir=~tezos/.tezos-client
+logdir=/var/log/tezos
+rotateonstart=yes
+waitfornode=yes
+nodeaddr=127.0.0.1
+rpcport=8732
+othercliopts_smartrollup=""
+
+[ -r /etc/octez/node.conf ] && . /etc/octez/node.conf
+[ -r /etc/octez/smartrollup.conf ] && . /etc/octez/smartrollup.conf
+
+[ -z "$nodeurl" ] && nodeurl="http://$nodeaddr:$rpcport"
+
+logfile="${logdir}/smartrollup.log"
+sr="/usr/bin/octez-smart-rollup-node"
+
+initial_checks()
+{
+	mkdir -p ${PIDDIR}
+	chown $user:$group ${PIDDIR}
+
+	mkdir -p ${logdir}
+	if [ -z "$rollupdatadir" ]; then
+		echo "rollupdatadir must be set in /etc/octez/smartrollup.conf" >&2
+		exit 3
+	fi
+	if [ -z "$clientdir" ]; then
+		echo "clientdir must be set" >&2
+		exit 3
+	fi
+
+	if [ ! -f "$rollupdatadir/config.json" ]; then
+		echo "Rollup not configured" >&2
+		exit 3
+	fi
+	
+}
+
+wait_for_bootstrap()
+{
+	echo "Waiting for node to be bootstrapped" >&2
+		
+	while [ 1 = 1 ]; do
+		/usr/bin/octez-client -E $nodeurl bootstrapped >/dev/null 2>&1
+		[ "$?" = "0" ] && break
+		echo "Node not ready - sleeping for 30 seconds" >&2
+		sleep 30
+	done
+
+
+
+}
+
+rotate_logs ()
+{
+	if [ ${rotateonstart} = "yes" ]; then
+		mv -f "${logfile}" "${logfile}.1"
+	fi
+}
+
+case "$1" in
+start)	initial_checks
+	rotate_logs
+	[ "$waitfornode" = "yes" ] && wait_for_bootstrap
+	su $user -c "${sr} -d "$clientdir" -E $nodeurl run --data-dir "$rollupdatadir" ${othercliopts_smartrollup} >> ${logfile} 2>&1 &"
+	;;
+stop)	
+       	pkill octez-smart-rollup-node
+        ;;
+restart) 
+        $0 stop
+        $0 start
+        ;;
+reload|force-reload) 
+        ;;
+status)
+	status_of_proc ${sr} $NAME || exit $?
+	exit 0
+        ;;
+*)	echo "Usage: $0 {start|stop|status|restart|reload|force-reload}" >&2
+        exit 2
+        ;;
+esac
+exit 0

@@ -10,7 +10,7 @@ include: .gitlab/ci/jobs/shared/templates.yml
 publish:documentation:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
   stage: doc
   # Make the publish_documentation run in the beginning of the master
   # pipeline to ensure it has time to run before the next merge.
@@ -22,7 +22,8 @@ publish:documentation:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-publish
+    - ./scripts/ci/doc_publish.sh
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

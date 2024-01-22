@@ -243,17 +243,13 @@ let binary_encoded_parameter ~name encoding =
   in
   file_or_text_parameter ~from_text ()
 
+let parse_micheline_parameter source =
+  Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+  @@ Michelson_v1_parser.expand_expression source
+
 let micheline_parameter =
-  Tezos_clic.parameter (fun _ source ->
-      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
-      @@
-      let tokens, lexing_errors =
-        Tezos_micheline.Micheline_parser.tokenize source
-      in
-      let ast, parsing_errors =
-        Tezos_micheline.Micheline_parser.parse_expression tokens
-      in
-      ((ast, source), lexing_errors @ parsing_errors))
+  Tezos_clic.parameter (fun (_ : full) source ->
+      parse_micheline_parameter source)
 
 let entrypoint_parameter =
   Tezos_clic.parameter (fun _ str ->
@@ -266,6 +262,36 @@ let init_arg =
     ~doc:"initial value of the contract's storage"
     ~default:"Unit"
     string_parameter
+
+let other_contracts_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      let open Lwt_result_syntax in
+      let* parsed = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_other_contracts parsed in
+      return l)
+
+let other_contracts_arg =
+  Tezos_clic.arg
+    ~doc:
+      {|types and addresses of extra contracts, formatted as {Contract "KT1..." <ty1>; Contract "KT1..." <ty2>; ...}|}
+    ~long:"other-contracts"
+    ~placeholder:"contracts"
+    other_contracts_parameter
+
+let extra_big_maps_parameter =
+  Tezos_clic.parameter (fun _ source ->
+      let open Lwt_result_syntax in
+      let* parsed = parse_micheline_parameter source in
+      let*? l = Michelson_v1_stack.parse_extra_big_maps parsed in
+      return l)
+
+let extra_big_maps_arg =
+  Tezos_clic.arg
+    ~doc:
+      {|identifier and content of extra big maps, formatted as {Big_map <index> <key_type> <value_type> {Elt <key1> <value1>; Elt <key2> <value2>; ...}}|}
+    ~long:"extra-big-maps"
+    ~placeholder:"big maps"
+    extra_big_maps_parameter
 
 let global_constant_param ~name ~desc next =
   Tezos_clic.param ~name ~desc string_parameter next
@@ -410,6 +436,16 @@ let non_negative_parameter () = Tezos_clic.parameter non_negative_parser
 
 let non_negative_param ~name ~desc next =
   Tezos_clic.param ~name ~desc (non_negative_parameter ()) next
+
+let positive_int_parser (cctxt : #Client_context.io) s =
+  match int_of_string_opt s with
+  | Some i when i > 0 -> return i
+  | _ -> cctxt#error "Parameter should be a positive integer literal"
+
+let positive_int_parameter () = Tezos_clic.parameter positive_int_parser
+
+let positive_int_param ~name ~desc next =
+  Tezos_clic.param ~name ~desc (positive_int_parameter ()) next
 
 let fee_arg =
   Tezos_clic.arg

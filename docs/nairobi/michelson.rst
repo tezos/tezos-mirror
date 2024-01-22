@@ -1889,6 +1889,9 @@ parameters require sequences in the concrete syntax.
     IF { instr1_true ; instr2_true ; ... }
        { instr1_false ; instr2_false ; ... }
 
+.. _syntax_of_scripts:
+.. _syntax_of_scripts_nairobi:
+
 Main program structure
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2583,8 +2586,15 @@ Micheline expressions are encoded in JSON like this:
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
+Environment for writing Michelson contracts
+-------------------------------------------
+
+`Emacs <https://www.gnu.org/software/emacs/>`_ can be used as a practical environment for writing,
+editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
+configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
+
 Examples
----------
+--------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
@@ -3018,3 +3028,502 @@ The language is implemented in OCaml as follows:
    function is very simple, what we have to check is that we transform a
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
+
+.. michelson_tzt:
+.. michelson_tzt_nairobi:
+
+TZT, a Syntax extension for writing unit tests
+----------------------------------------------
+
+This section describes the TZT format, an extension of the Michelson
+language allowing to run Michelson unit tests at a finer level than a
+full smart contract script. This extension adds syntax to specify an
+instruction (or sequence of instructions) to test, a concrete input
+stack and the expected output stack.
+
+These unit tests can be useful for both smart contract developers who
+need to independently test various parts of the smart contracts they
+develop and to the developers of new implementations of the Michelson
+interpreter who need to check that their new implementations behave as
+the reference implementation by passing `a conformance test suite
+<https://gitlab.com/tezos/tzt-reference-test-suite>`__.
+
+Similarly to Michelson scripts, the concrete syntax of TZT unit tests
+is :doc:`../shell/micheline`.
+
+TZT unit test files usually have the extension ``.tzt``. A unit test
+file describes a single unit test. It consists of a Micheline sequence
+of primitive applications (see :doc:`../shell/micheline`), in no particular order. This is
+:ref:`similar to Michelson scripts <syntax_of_scripts_nairobi>` but
+the set of primitives allowed at the toplevel differ; in Michelson
+scripts, the allowed toplevel primitives are ``parameter``
+(mandatory), ``storage`` (mandatory), ``code`` (mandatory), and
+``view`` (optional and repeated). For TZT unit tests, the toplevel
+primitives which can be used are:
+
+ - ``input``,
+ - ``code``,
+ - ``output``,
+ - ``now``,
+ - ``sender``,
+ - ``source``,
+ - ``chain_id``,
+ - ``self``,
+ - ``parameter``,
+ - ``amount``,
+ - ``balance``,
+ - ``other_contracts``, and
+ - ``big_maps``.
+
+Mandatory primitives
+~~~~~~~~~~~~~~~~~~~~
+
+Each of the mandatory primitives ``input``, ``code``, and ``output``
+must occur exactly once in a unit test file in no particular order.
+
+The ``input`` primitive is used to declare the input stack (see the
+:ref:`syntax of concrete stacks <syntax_of_concrete_stacks_nairobi>`).
+
+The ``code`` primitive is used to declare the instruction or sequence
+of instructions to execute.
+
+The ``output`` primitive is used to declare if the execution is
+expected to succeed or fail and what result is expected from the
+execution. For executions expected to succeed, the argument of the
+``output`` primitive is simply the expected output stack (see the
+:ref:`syntax of errors <syntax_of_errors_nairobi>`). For executions
+expected to fail, the argument is the expected error. In both cases,
+the :ref:`wildcard pattern <omitting_parts_of_the_output_nairobi>` can
+be used to omit part of the expected output.
+
+The simplest test which can be written asserts that executing no
+instruction on the empty stack successfully returns the empty stack:
+
+::
+
+   input {};
+   code {};
+   output {}
+
+Here is a slightly more involved test which demonstrates the effect of the `SWAP
+<https://tezos.gitlab.io/michelson-reference/#instr-SWAP>`__ instruction:
+
+::
+
+   input
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     };
+   code SWAP;
+   output
+     {
+       Stack_elt bool False ;
+       Stack_elt nat 8
+     }
+
+It is possible to test the effect of several instructions by wrapping them in a sequence:
+
+::
+
+   input
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     };
+   code { SWAP ; SWAP };
+   output
+     {
+       Stack_elt nat 8 ;
+       Stack_elt bool False
+     }
+
+Here is an example showing how to test the ``FAILWITH`` instruction:
+
+::
+
+   input {Stack_elt nat 2};
+   code FAILWITH;
+   output (Failed 2)
+
+Optional primitives
+~~~~~~~~~~~~~~~~~~~
+
+Optional primitives are used to set the execution context for the
+test. Each of the optional primitives can be used at most once, in no
+particular order.
+
+ - ``amount`` (optional, defaults to 0): the amount, expressed in
+   mutez, that should be pushed by the `AMOUNT
+   <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
+   instruction
+
+ - ``balance`` (optional, defaults to 0): the balance, expressed in
+   mutez, that should be pushed by the `BALANCE
+   <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
+   instruction
+
+ - ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
+   timestamp that should be pushed by the `NOW
+   <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+   instruction
+
+ - ``sender`` (optional, defaults to
+   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
+   that should be pushed by the `SENDER
+   <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
+   instruction
+
+ - ``source`` (optional, defaults to
+   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
+   that should be pushed by the `SOURCE
+   <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
+   instruction
+
+ - ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
+   chain identifier that should be pushed by the `CHAIN_ID
+   <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
+   instruction
+
+ - ``self`` (optional, defaults to
+   ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
+   should be pushed by the `SELF
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
+   `SELF_ADDRESS
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
+   instructions
+
+ - ``parameter`` (optional, defaults to ``unit``): the type of the
+   parameter of the contract pushed by the `SELF
+   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
+   instruction
+
+ - ``other_contracts`` (optional, defaults to ``{}``): mapping between
+   the contract addresses that are assumed to exist and their
+   parameter types (see the :ref:`syntax of other contracts
+   specifications <syntax_of_other_contracts_nairobi>`)
+
+ - ``big_maps`` (optional, defaults to ``{}``): mapping between
+   integers representing ``big_map`` indices and descriptions of big
+   maps (see the :ref:`syntax of extra big maps specifications
+   <syntax_of_extra_big_maps_nairobi>`)
+
+The following test example asserts that the default value for the `NOW
+<https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+instruction is the unix epoch:
+
+::
+
+   input {};
+   code NOW;
+   output { Stack_elt timestamp "1970-01-01T00:00:00Z" }
+
+The following example shows how to use the ``now`` toplevel primitive
+to make the `NOW
+<https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+instruction return a chosen timestamp:
+
+::
+
+   input {};
+   now "2020-01-08T07:13:51Z";
+   code NOW;
+   output { Stack_elt timestamp "2020-01-08T07:13:51Z" }
+
+.. _syntax_of_concrete_stacks:
+.. _syntax_of_concrete_stacks_nairobi:
+
+Syntax of concrete stacks
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A concrete stack is written as a Micheline sequence whose elements are
+of the form ``Stack_elt <ty> <x>`` where ``<x>`` is a Michelson value
+and ``<ty>`` is its type. For example, ``{ Stack_elt bool True ;
+Stack_elt nat 42 }`` is a concrete stack of length 2 whose top element
+is the boolean ``True`` and the bottom element is the natural number
+``42``.
+
+.. _omitting_parts_of_the_output:
+.. _omitting_parts_of_the_output_nairobi:
+
+Omitting parts of the output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Any part of the ``output`` specification can be replaced with the
+wildcard pattern ``_``.
+
+For example, let's consider the following test of the ``PAIR`` instruction:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (Pair True "foo")}
+
+Omitting the ``True`` argument to the ``Pair`` primitive can be done as follows:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (Pair _ "foo")}
+
+Omitting the ``Pair`` primitive:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt (pair bool string) (_ True "foo")}
+
+Omitting the ``pair bool string`` type:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {Stack_elt _ (Pair True "foo")}
+
+Omitting the resulting stack element:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output {_}
+
+Omitting all of the output:
+
+::
+
+   input {Stack_elt bool True; Stack_elt string "foo"};
+   code PAIR;
+   output _
+
+The difference between the last two examples is that ``output {_}``
+means that the instruction is expected to successfully return a stack
+of length 1 while ``output _`` means that nothing in particular is
+expected from the execution of the instruction, not even being
+successful.
+
+The wildcard pattern is typically used to omit unspecified aspects of
+the Michelson language when writing portable tests; in particular the
+cryptographic nonces in values of type ``operation`` (see the
+:ref:`syntax of concrete operations
+<syntax_of_concrete_operations_nairobi>`) or implementation-specific
+parts of error outputs (see the :ref:`syntax of errors
+<syntax_of_errors_nairobi>`).
+
+.. _output_normalization:
+.. _output_normalization_nairobi:
+
+Output normalization
+~~~~~~~~~~~~~~~~~~~~
+
+The input and output stacks can use the readable and optimized formats
+for Michelson values and even mix the formats; for a test to pass, the
+expected output does not need to syntactically match the result of the
+execution but only to match up to conversion between optimized and
+readable formats; the TZT test runner is responsible for normalizing
+the actual output and the expected one to common format. This means in
+particular that conversion between readable and optimized formats can
+be tested by using ``{}`` as the ``code`` instruction sequence to
+test; for example these two tests pass:
+
+::
+
+   input {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c};
+   code {};
+   output {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
+
+::
+
+   input {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"};
+   code {};
+   output {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c}
+
+This normalization feature is however incompatible with using the
+:ref:`wildcard pattern <omitting_parts_of_the_output_nairobi>` in the
+output; when using wildcards the output must be formatted using the
+readable format so the following test does not pass:
+
+::
+
+   input {Stack_elt address "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"};
+   code {};
+   output {Stack_elt _ 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c}
+
+but the following test does pass:
+
+::
+
+   input {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c};
+   code {};
+   output {Stack_elt _ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
+
+.. _syntax_of_errors:
+.. _syntax_of_errors_nairobi:
+
+Syntax of errors
+~~~~~~~~~~~~~~~~
+
+To test that the execution of an instruction fails, the following
+syntaxes can be used instead of the output stack as the argument of the 
+``output`` toplevel primitive to specify which error the instruction is expected to
+raise:
+
+ - ``(StaticError <error description>)``: an error occurred before the
+   instruction was executed; the error description format is
+   unspecified so consider using a :ref:`wildcard
+   <omitting_parts_of_the_output_nairobi>` such as ``(StaticError _)``
+   to write portable tests;
+
+ - ``(Failed <value>)``: the execution reached a ``FAILWITH``
+   instruction and the topmost element of the stack at this point was
+   ``<value>``;
+
+ - ``MutezOverflow``: an addition or multiplication on type ``mutez``
+   produced a result which was too large to be represented as a value
+   of type ``mutez``;
+
+ - ``MutezUnderflow``: a mutez subtraction resulted in a negative
+   value. This should only happen in the case of the deprecated
+   ``mutez`` case of the ``SUB`` instruction;
+
+ - ``GeneralOverflow``: the number of bits to shift using the ``LSL``
+   or ``LSR`` instruction was too large;
+
+
+The following example shows how to test a runtime failure; it asserts
+that the `FAILWITH
+<https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__
+instruction produces a runtime error containing the top of the stack.
+
+::
+
+   input { Stack_elt nat 4 ; Stack_elt bytes 0x };
+   code FAILWITH;
+   output (Failed 4)
+
+The following example shows how to test type checking failure; it
+asserts that the `DUP
+<https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__
+instruction cannot be used on an empty stack.
+
+::
+
+   input {};
+   code DUP;
+   output (StaticError _)
+
+The following example shows another kind of static failure: a string
+cannot be passed as argument to the `DUP
+<https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__
+instruction.
+
+::
+
+   input { Stack_elt nat 8 };
+   code { DUP "foo" };
+   output (StaticError _)
+
+.. _syntax_of_concrete_operations:
+.. _syntax_of_concrete_operations_nairobi:
+
+Syntax of concrete operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `operation type
+<https://tezos.gitlab.io/michelson-reference/#type-operation>`__ has
+no concrete syntax in Michelson. In order to specify the result of the
+operation forging instructions `TRANSFER_TOKENS
+<https://tezos.gitlab.io/michelson-reference/#instr-TRANSFER_TOKENS>`__,
+`CREATE_CONTRACT
+<https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__,
+and `SET_DELEGATE
+<https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ ,
+the following data constructors are added:
+
+ - ``Transfer_tokens``,
+ - ``Create_contract``, and
+ - ``Set_delegate``.
+
+They take as arguments the inputs of the corresponding operation
+forging instructions plus a cryptographic nonce represented as a byte
+sequence. The result of ``TRANSFER_TOKENS``, ``CREATE_CONTRACT``,
+and ``SET_DELEGATE`` have respectively the following shapes:
+
+ - ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
+ - ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
+ - ``Set_delegate <optional delegate> <nonce>``.
+
+The computation of the cryptographic nonce is not specified. To write
+portable tests, the nonces appearing in output stack expectations
+should be replaced by :ref:`a wildcard pattern
+<omitting_parts_of_the_output_nairobi>`.
+
+Here is an example unit test for the ``SET_DELEGATE`` instruction used
+to set the delegate of the current contract to the account at address
+``tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z``:
+
+::
+
+  input { Stack_elt (option key_hash) (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") } ;
+  code SET_DELEGATE ;
+  output { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }
+
+.. _syntax_of_other_contracts:
+.. _syntax_of_other_contracts_nairobi:
+
+Syntax of other contracts specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of the `CONTRACT
+<https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__
+instruction depends on whether or not its input is the address of an
+originated contract accepting the expected type as parameter. To test
+it, the ``other_contract`` toplevel primitive can be used to specify
+which contracts are assumed to be originated and which type they
+accept as parameter.
+
+The mapping given to the ``other_contract`` toplevel primitive is a
+Micheline sequence whose elements have the form ``Contract "KT1..."
+<ty>`` where ``"KT1..."`` is a valid smart contract address and
+``<ty>`` is the type of its parameter. Each address should appear at
+most once and the order is irrelevant.
+
+.. _syntax_of_extra_big_maps:
+.. _syntax_of_extra_big_maps_nairobi:
+
+Syntax of extra big maps specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of the instructions operating on type `big_map
+<https://tezos.gitlab.io/michelson-reference/#type-big_map>`__ depend
+on the contents of big maps stored in the context. To test them, the
+``big_maps`` toplevel primitive can be used to specify the types and
+contents of the big maps which are assumed to be present.
+
+The mapping given to the ``big_maps`` toplevel primitive is a
+Micheline sequence whose elements have the form ``Big_map <i> <kty>
+<vty> { Elt <k1> <v1>; Elt <k2> <v2>; ...}`` where ``<i>`` is an
+integer (the identifier of the big map), ``<kty>`` is the comparable
+type of keys, ``<vty>`` is the type of values, each ``<ki>`` is of
+type ``<kty>`` and each ``<vi>`` is of type ``<vty>``. Each identifier
+should appear at most once and the order in which big maps are
+specified is irrelevant but each ``{ Elt <k1> <v1>; Elt <k2> <v2>;
+...}`` description of big map contents should be given in increasing
+order of keys.
+
+The following example tests the `GET
+<https://tezos.gitlab.io/michelson-reference/#instr-GET>`__
+instruction in the `big_map
+<https://tezos.gitlab.io/michelson-reference/#type-big_map>`__ case:
+
+::
+
+   big_maps { Big_map 4 string nat { Elt "bar" 42 } };
+   input { Stack_elt (big_map string nat) 4 };
+   code { PUSH string "foo"; GET };
+   output { Stack_elt (option nat) None }
+

@@ -39,8 +39,8 @@ struct
     in
     let inputs = [H.make_secret pp_prover circuit.input_com_sizes witness] in
     let verifier_inputs =
-      Main.to_verifier_inputs pp_prover (Plonk.SMap.singleton "" inputs)
-      |> Plonk.SMap.choose |> snd
+      Main.to_verifier_inputs pp_prover (Kzg.SMap.singleton "" inputs)
+      |> Kzg.SMap.choose |> snd
     in
     let b_pp_verifier =
       Data_encoding.Binary.to_bytes_exn
@@ -119,10 +119,9 @@ struct
     let qc = Unit_tests_for_each_selector.qc in
     let ql = Unit_tests_for_each_selector.linear_selector_test 0 in
     let circuits =
-      Plonk.SMap.of_list
-        [(qc.name, (qc.circuit, 1)); (ql.name, (ql.circuit, 1))]
+      Kzg.SMap.of_list [(qc.name, (qc.circuit, 1)); (ql.name, (ql.circuit, 1))]
     in
-    let inputs = Plonk.SMap.singleton qc.name [qc.witness] in
+    let inputs = Kzg.SMap.singleton qc.name [qc.witness] in
     H.test_circuits
       ~name:"several_circuits_one_input"
       ~zero_knowledge

@@ -195,17 +195,26 @@ let close
   and+ () = Irmin_store.close irmin_store in
   ()
 
-let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
-    a store tzresult Lwt.t =
+let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
+    data_dir : a store tzresult Lwt.t =
   let open Lwt_result_syntax in
   let path name = Filename.concat data_dir name in
   let cache_size = l2_blocks_cache_size in
-  let* l2_blocks = L2_blocks.load mode ~path:(path "l2_blocks") ~cache_size in
-  let* messages = Messages.load mode ~path:(path "messages") ~cache_size in
-  let* inboxes = Inboxes.load mode ~path:(path "inboxes") ~cache_size in
-  let* commitments = Commitments.load mode ~path:(path "commitments") in
+  let* l2_blocks =
+    L2_blocks.load mode ~index_buffer_size ~path:(path "l2_blocks") ~cache_size
+  in
+  let* messages =
+    Messages.load mode ~index_buffer_size ~path:(path "messages") ~cache_size
+  in
+  let* inboxes =
+    Inboxes.load mode ~index_buffer_size ~path:(path "inboxes") ~cache_size
+  in
+  let* commitments =
+    Commitments.load mode ~index_buffer_size ~path:(path "commitments")
+  in
   let* commitments_published_at_level =
     Commitments_published_at_level.load
+      ~index_buffer_size
       mode
       ~path:(path "commitments_published_at_level")
   in
@@ -214,7 +223,10 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     Last_finalized_level.load mode ~path:(path "last_finalized_level")
   in
   let* levels_to_hashes =
-    Levels_to_hashes.load mode ~path:(path "levels_to_hashes")
+    Levels_to_hashes.load
+      mode
+      ~index_buffer_size
+      ~path:(path "levels_to_hashes")
   in
   let+ irmin_store = Irmin_store.load mode (path "irmin_store") in
   {
@@ -229,7 +241,7 @@ let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
     irmin_store;
   }
 
-let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
+let iter_l2_blocks ?progress _ {l2_blocks; l2_head; _} f =
   let open Lwt_result_syntax in
   let* head = L2_head.read l2_head in
   match head with
@@ -237,6 +249,14 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
       (* No reachable head, nothing to do *)
       return_unit
   | Some head ->
+      let track_progress =
+        match progress with
+        | None -> fun f -> f (fun _ -> Lwt.return_unit)
+        | Some message ->
+            let progress_bar = Progress_bar.spinner ~message in
+            fun f -> Progress_bar.Lwt.with_reporter progress_bar f
+      in
+      track_progress @@ fun count_progress ->
       let rec loop hash =
         let* block = L2_blocks.read l2_blocks hash in
         match block with
@@ -245,6 +265,12 @@ let iter_l2_blocks ({l2_blocks; l2_head; _} : _ t) f =
             return_unit
         | Some (block, header) ->
             let* () = f {block with header} in
+            let*! () = count_progress 1 in
             loop header.predecessor
       in
       loop head.header.block_hash
+
+let gc (_ : _ t) ~level:_ = failwith "GC is not implemented for store V1"
+
+let wait_gc_completion (_ : _ t) =
+  Lwt.fail_with "GC is not implemented for store V1"

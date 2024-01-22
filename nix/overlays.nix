@@ -2,6 +2,7 @@
   lib,
   stdenv,
   libiconv,
+  pkg-config,
 }: {
   pick-latest-packages = final: prev:
     builtins.mapAttrs
@@ -14,6 +15,9 @@
         # Compile faster!
         jobs = "$NIX_BUILD_CORES";
       };
+    }
+    // {
+      conf-pkg-config = final.lib.overrideNativeDepends prev.conf-pkg-config [pkg-config];
     };
 
   darwin-overlay = final: prev: {
@@ -25,7 +29,7 @@
     class_group_vdf = prev.class_group_vdf.overrideAttrs (old: {
       hardeningDisable =
         (old.hardeningDisable or [])
-        ++ lib.optionals stdenv.isAarch64 ["stackprotector"];
+        ++ ["stackprotector"];
     });
 
     # This package makes no sense to build on MacOS. Some OPAM package
@@ -34,7 +38,7 @@
   };
 
   fix-rust-packages = final: prev: {
-    conf-rust-2021 = prev.conf-rust.overrideAttrs (old: {
+    conf-rust-2021 = prev.conf-rust-2021.overrideAttrs (old: {
       propagatedNativeBuildInputs =
         (old.propagatedNativeBuildInputs or [])
         ++

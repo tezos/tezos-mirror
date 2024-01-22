@@ -1026,6 +1026,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         return PS.(Needs_reveal Reveal_metadata)
     | Waiting_for_reveal (Request_dal_page page) ->
         return PS.(Needs_reveal (Request_dal_page page))
+    | Waiting_for_reveal Reveal_dal_parameters ->
+        return PS.(Needs_reveal Reveal_dal_parameters)
     | Halted | Parsing | Evaluating -> return PS.No_input_required
 
   let is_input_state ~is_reveal_enabled =
@@ -1159,7 +1161,7 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         | None, Some (Request_dal_page page_id) ->
             (* We are in the same level, fetch the next page. *)
             next_dal_page dal_params ~target:(`Page_after page_id)
-        | _, Some Reveal_metadata ->
+        | _, Some Reveal_metadata | _, Some Reveal_dal_parameters ->
             (* Should not happen. *)
             assert false
         | _, Some (Reveal_raw_data _) ->
@@ -1277,6 +1279,13 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         let* () = Next_message.set (Some (Bytes.to_string data)) in
         let* () = start_parsing in
         return ()
+    | PS.Dal_parameters _ ->
+        (* Should not happen as requesting DAL parameters is disabled
+           in the arith PVM. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6563
+           Support reveal DAL parameters in arith PVM in order to test
+           the refutation game for revealing DAL parameters. *)
+        assert false
 
   let ticked m =
     let open Monad.Syntax in
@@ -1609,6 +1618,10 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
           (* For all the cases above, the input request matches the given input, so
              we proceed by setting the input. *)
           set_input input state
+      | PS.Needs_reveal Reveal_dal_parameters, _ ->
+          error
+            "Invalid set_input: revealing DAL parameters is not supported in \
+             the arith PVM."
       | (PS.Initial | PS.First_after _), _ ->
           error "Invalid set_input: expecting inbox message, got a reveal."
       | PS.Needs_reveal (Reveal_raw_data _hash), _ ->
@@ -1743,8 +1756,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
   module Internal_for_tests = struct
     let insert_failure state =
-      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
       let open Lwt_syntax in
+      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
       let* n = Tree.length state ["failures"] in
       add n
   end
@@ -1774,7 +1787,7 @@ module Protocol_implementation = Make (struct
 
   let produce_proof _context _state _f =
     (* Can't produce proof without full context*)
-    Lwt.return None
+    Lwt.return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash

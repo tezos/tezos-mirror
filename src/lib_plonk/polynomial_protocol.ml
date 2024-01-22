@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
 open Identities
 
 (** A polynomial protocol allows a prover to convince a verifier of the fact
@@ -57,15 +57,13 @@ open Identities
 
 (** Functor building an implementation of a polynomial protocol given a
     polynomial commitment scheme [PC]. *)
-module Make_impl (PC : Polynomial_commitment.S) = struct
+module Make_impl (PC : Kzg.Interfaces.Polynomial_commitment) = struct
   module PC = PC
 
   type prover_public_parameters = PC.Public_parameters.prover [@@deriving repr]
 
   type verifier_public_parameters = PC.Public_parameters.verifier
   [@@deriving repr]
-
-  type transcript = Bytes.t [@@deriving repr]
 
   type proof = {
     cm_t : PC.Commitment.t;
@@ -122,7 +120,7 @@ module Make_impl (PC : Polynomial_commitment.S) = struct
     let alpha, transcript = Fr_generation.random_fr transcript in
     let evaluated_ids = identities evaluations in
     let t = compute_t ~n ~alpha ~nb_of_t_chunks evaluated_ids in
-    let cm_t, t_prover_aux = PC.Commitment.commit pc_public_parameters t in
+    let cm_t, t_prover_aux = PC.commit pc_public_parameters t in
     let transcript = Transcript.expand PC.Commitment.t cm_t transcript in
     let x, transcript = Fr_generation.random_fr transcript in
     let prover_aux_list = t_prover_aux :: List.map snd secrets in
@@ -207,7 +205,7 @@ end
 module type S = sig
   (** Underlying polynomial commitment scheme on which the polynomial protocol
       is based. Input of the functor [Polynomial_protocol.Make]. *)
-  module PC : Polynomial_commitment.S
+  module PC : Kzg.Interfaces.Polynomial_commitment
 
   (** The type of prover public parameters. *)
   type prover_public_parameters = PC.Public_parameters.prover [@@deriving repr]
@@ -215,9 +213,6 @@ module type S = sig
   (** The type of verifier public parameters. *)
   type verifier_public_parameters = PC.Public_parameters.verifier
   [@@deriving repr]
-
-  (** The type for transcripts, used for applying the Fiat-Shamir heuristic *)
-  type transcript = PC.transcript [@@deriving repr]
 
   (** The type for proofs, containing a commitment to the polynomial T that
     asserts the satisfiability of the identities over the subset of interest,
@@ -235,7 +230,7 @@ module type S = sig
   val setup :
     setup_params:PC.Public_parameters.setup_params ->
     srs:Srs.t * Srs.t ->
-    prover_public_parameters * verifier_public_parameters
+    prover_public_parameters * verifier_public_parameters * Transcript.t
 
   (** The prover function. Takes as input the [prover_public_parameters],
     an initial [transcript] (possibly including a context if this [prove] is
@@ -251,7 +246,7 @@ module type S = sig
     Outputs a proof and an updated transcript. *)
   val prove :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     n:int ->
     generator:Scalar.t ->
     secrets:(Poly.t SMap.t * PC.Commitment.prover_aux) list ->
@@ -259,7 +254,7 @@ module type S = sig
     evaluations:Evaluations.t SMap.t ->
     identities:prover_identities ->
     nb_of_t_chunks:int ->
-    proof * transcript
+    proof * Transcript.t
 
   (** The verifier function. Takes as input the [verifier_public_parameters],
     an initial [transcript] (that should coincide with the initial transcript
@@ -270,17 +265,18 @@ module type S = sig
     Outputs a [bool] value representing acceptance or rejection. *)
   val verify :
     verifier_public_parameters ->
-    transcript ->
+    Transcript.t ->
     n:int ->
     generator:Scalar.t ->
     commitments:PC.Commitment.t list ->
     eval_points:eval_point list list ->
     identities:verifier_identities ->
     proof ->
-    bool * transcript
+    bool * Transcript.t
 end
 
-module Make : functor (PC : Polynomial_commitment.S) -> S with module PC = PC =
+module Make : functor (PC : Kzg.Interfaces.Polynomial_commitment) ->
+  S with module PC = PC =
   Make_impl
 
-include Make (Polynomial_commitment)
+include Make (Kzg.Polynomial_commitment)

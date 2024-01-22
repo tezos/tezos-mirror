@@ -1,0 +1,20 @@
+[package]
+name = "mir"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+lalrpop = "0.20.0"
+
+[dependencies]
+lalrpop-util = "0.20.0"
+checked = "0.5"
+thiserror = "1.0"
+logos = "0.13"
+hex = "0.4"
+tezos_crypto_rs = "0.5"
+typed-arena = "2"
+
+[[bin]]
+name = "tzt_runner"
+path = "tzt_runner/main.rs"

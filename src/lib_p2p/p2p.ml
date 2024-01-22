@@ -174,9 +174,19 @@ module Real = struct
     welcome : P2p_welcome.t option;
     watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
     triggers : P2p_trigger.t;
+    received_msg_hook :
+      ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit;
+    sent_msg_hook : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit;
+    broadcasted_msg_hook :
+      ('msg, 'peer_meta, 'conn_meta) connection P2p_peer.Table.t ->
+      ?except:(('msg, 'peer_meta, 'conn_meta) connection -> bool) ->
+      ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
+      'msg ->
+      unit;
   }
 
-  let create ~config ~limits meta_cfg msg_cfg conn_meta_cfg =
+  let create ~config ~limits ?received_msg_hook ?sent_msg_hook
+      ?broadcasted_msg_hook meta_cfg msg_cfg conn_meta_cfg =
     let open Lwt_result_syntax in
     let io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
@@ -223,7 +233,7 @@ module Real = struct
       create_maintenance_worker limits pool connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
-    P2p_metrics_collectors.collect pool ;
+    P2p_metrics_collectors.collect pool io_sched ;
     return
       {
         config;
@@ -235,6 +245,13 @@ module Real = struct
         welcome;
         watcher;
         triggers;
+        received_msg_hook =
+          Option.value ~default:(fun _ _ -> ()) received_msg_hook;
+        sent_msg_hook = Option.value ~default:(fun _ _ -> ()) sent_msg_hook;
+        broadcasted_msg_hook =
+          Option.value
+            ~default:(fun _ ?except:_ ?alt:_ _ -> ())
+            broadcasted_msg_hook;
       }
 
   let peer_id {config; _} = config.identity.peer_id
@@ -287,7 +304,7 @@ module Real = struct
   let find_connection_by_point {pool; _} point =
     P2p_pool.Connection.find_by_point pool point
 
-  let disconnect ?wait conn = P2p_conn.disconnect ?wait conn
+  let disconnect ?wait ~reason = P2p_conn.disconnect ?wait ~reason:(User reason)
 
   let connection_info _net conn = P2p_conn.info conn
 
@@ -314,13 +331,16 @@ module Real = struct
       net.connect_handler
       point
 
-  let recv _net conn =
+  let recv net conn =
     let open Lwt_syntax in
     let* msg = P2p_conn.read conn in
     let peer_id = (P2p_conn.info conn).peer_id in
     let* () =
       match msg with
-      | Ok _ -> Events.(emit message_read) peer_id
+      | Ok msg ->
+          let* () = Events.(emit message_read) peer_id in
+          net.received_msg_hook conn msg ;
+          return_unit
       | Error _ -> Events.(emit message_read_error) peer_id
     in
     return msg
@@ -345,30 +365,40 @@ module Real = struct
     | Some conn -> (
         let* r = recv net conn in
         match r with
-        | Ok msg -> Lwt.return (conn, msg)
+        | Ok msg ->
+            net.received_msg_hook conn msg ;
+            Lwt.return (conn, msg)
         | Error _ ->
             let* () = Lwt.pause () in
             recv_any net ())
 
-  let send _net conn m =
+  let send net conn m =
     let open Lwt_result_syntax in
     let*! r = P2p_conn.write conn m in
     let*! () =
       match r with
       | Ok () ->
           let peer_id = (P2p_conn.info conn).peer_id in
-          Events.(emit message_sent) peer_id
+          let*! () = Events.(emit message_sent) peer_id in
+          net.sent_msg_hook conn m ;
+          Lwt.return_unit
       | Error trace ->
           Events.(emit sending_message_error)
             ((P2p_conn.info conn).peer_id, trace)
     in
     Lwt.return r
 
-  let try_send _net conn v =
-    match P2p_conn.write_now conn v with
+  let try_send net conn m =
+    match P2p_conn.write_now conn m with
     | Ok v ->
         Events.(emit__dont_wait__use_with_care message_trysent)
-          (P2p_conn.info conn).peer_id ;
+          ((P2p_conn.info conn).peer_id, v) ;
+        if v then (
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4874
+
+             the counter should be moved to P2p_conn instead *)
+          Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
+          net.sent_msg_hook conn m) ;
         v
     | Error err ->
         Events.(emit__dont_wait__use_with_care trysending_message_error)
@@ -415,7 +445,7 @@ module Real = struct
          conn
          (P2p_socket.copy_encoded_message encoded_msg)
 
-  let broadcast connections ?except ?alt msg =
+  let raw_broadcast connections ?except ?alt msg =
     let buf = ref None in
     let alt_buf = ref None in
     let send conn = send_conn ?alt conn buf alt_buf msg in
@@ -427,6 +457,10 @@ module Real = struct
         | _ -> ())
       connections ;
     Events.(emit__dont_wait__use_with_care broadcast) ()
+
+  let broadcast net connections ?except ?alt msg =
+    raw_broadcast connections ?except ?alt msg ;
+    net.broadcasted_msg_hook connections ?except ?alt msg
 
   let fold_connections {pool; _} ~init ~f =
     P2p_pool.Connection.fold pool ~init ~f
@@ -479,7 +513,10 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   find_connection_by_point :
     P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
   disconnect :
-    ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t;
+    ?wait:bool ->
+    reason:string ->
+    ('msg, 'peer_meta, 'conn_meta) connection ->
+    unit Lwt.t;
   connection_info :
     ('msg, 'peer_meta, 'conn_meta) connection ->
     'conn_meta P2p_connection.Info.t;
@@ -502,6 +539,12 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   send :
     ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t;
   try_send : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> bool;
+  broadcast :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_peer.Table.t ->
+    ?except:(('msg, 'peer_meta, 'conn_meta) connection -> bool) ->
+    ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
+    'msg ->
+    unit;
   pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option;
   connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t option;
   fold_connections :
@@ -561,10 +604,21 @@ let check_limits =
     in
     return_unit
 
-let create ~config ~limits peer_cfg conn_cfg msg_cfg =
+let create ~config ~limits ?received_msg_hook ?sent_msg_hook
+    ?broadcasted_msg_hook peer_cfg conn_cfg msg_cfg =
   let open Lwt_result_syntax in
   let*? () = check_limits limits in
-  let* net = Real.create ~config ~limits peer_cfg msg_cfg conn_cfg in
+  let* net =
+    Real.create
+      ~config
+      ~limits
+      ?received_msg_hook
+      ?sent_msg_hook
+      ?broadcasted_msg_hook
+      peer_cfg
+      msg_cfg
+      conn_cfg
+  in
   return
     {
       announced_version =
@@ -594,6 +648,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       recv_any = Real.recv_any net;
       send = Real.send net;
       try_send = Real.try_send net;
+      broadcast = Real.broadcast net;
       pool = Some net.pool;
       connect_handler = Some net.connect_handler;
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
@@ -626,7 +681,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     connections = (fun () -> []);
     find_connection_by_peer_id = (fun _ -> None);
     find_connection_by_point = (fun _ -> None);
-    disconnect = (fun ?wait:_ _ -> Lwt.return_unit);
+    disconnect = (fun ?wait:_ ~reason:_ _ -> Lwt.return_unit);
     connection_info =
       (fun _ -> Fake.connection_info announced_version faked_metadata);
     connection_local_metadata = (fun _ -> faked_metadata);
@@ -637,11 +692,12 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     set_peer_metadata = (fun _ _ -> ());
     connect =
       (fun ?trusted:_ ?expected_peer_id:_ ?timeout:_ _ ->
-        Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
+        Lwt_result_syntax.tzfail P2p_errors.Connection_failed);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
     send = (fun _ _ -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed);
     try_send = (fun _ _ -> false);
+    broadcast = (fun _ ?except:_ ?alt:_ _ -> ());
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
@@ -693,8 +749,8 @@ let send net = net.send
 
 let try_send net = net.try_send
 
-let broadcast connections ?except ?alt msg =
-  Real.broadcast connections ?except ?alt msg
+let broadcast net connections ?except ?alt =
+  net.broadcast connections ?except ?alt
 
 let fold_connections net = net.fold_connections
 
@@ -715,7 +771,7 @@ let watcher net = Lwt_watcher.create_stream net.watcher
 let negotiated_version net = net.negotiated_version
 
 module Internal_for_tests = struct
-  let broadcast_conns (connections : ('a, 'b, 'c) P2p_conn.t P2p_peer.Table.t)
-      ?except ?alt msg =
-    broadcast connections ?except ?alt msg
+  let raw_broadcast (connections : ('a, 'b, 'c) P2p_conn.t P2p_peer.Table.t)
+      ?except ?alt =
+    Real.raw_broadcast connections ?except ?alt
 end

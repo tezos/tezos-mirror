@@ -1,41 +1,6 @@
 Overview of the economic protocol
 =================================
 
-Tezos overview
-~~~~~~~~~~~~~~
-
-Tezos is a distributed system in which nodes agree upon a chain of blocks of
-operations. Tezos is also an account-based crypto-ledger, where an account is
-associated to a public-private key pair, and has a balance, that is, a number of
-tokens. Tezos is a :doc:`proof-of-stake<proof_of_stake>` system in which any
-account that has a minimal stake amount has the right to produce blocks, in
-proportion to their balance.
-
-A Tezos node has mainly three roles: it validates blocks and operations, it
-broadcasts them to (and retrieves them from) other nodes, and it maintains a
-main chain and its associated state (i.e. the ledger), which includes accounts
-and their balances, among other things. Note that, as blocks only specify a
-predecessor block, exchanged blocks do not necessarily form a chain, but rather
-a tree. Nodes communicate over :doc:`a gossip network<../shell/p2p>`.
-
-A Tezos node acts as a server, which responds to queries and requests from
-clients. Such queries and requests are implemented via :doc:`RPC
-calls<../developer/rpc>`. A client can query the chain’s state and can inject
-blocks and operations into a node. One particular client is the :ref:`baker daemon <baker_run>`,
-which is associated to an account. In particular the baker has access to the
-account’s private key and thus can sign blocks and operations.
-
-The main reason for using such a client-server architecture is safety: to insulate
-the component that has access to the client keys, i.e. the baker, from the
-component which is exposed to the internet, i.e. the node. Indeed, the node and
-the baker can sit on different computers and the baker does not need to be
-exposed to the internet. So nodes manage communication and shield bakers from
-network attacks, and bakers hold secrets and bake blocks into the blockchain.
-
-Another advantage of this architecture is that bakers can more easily have
-different implementations, and this is important, for instance because different bakers may want
-to implement different transaction selection strategies.
-
 Tezos is a self-amending blockchain, in that a large part of Tezos can be
 changed through a so-called amendment procedure. To this end, as mentioned in
 :ref:`the big picture<the_big_picture>`, a Tezos node consists of two
@@ -171,9 +136,9 @@ The *values* of protocol constants in any given protocol can be found using spec
 Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:
 
-- :ref:`proof-of-stake parameters <ps_constants_alpha>`.
+- :ref:`proof-of-stake parameters <ps_constants_alpha>`
 - :ref:`consensus-related parameters <cs_constants_alpha>`
-- :ref:`randomness generation parameters <rg_constants_alpha>`.
+- :ref:`randomness generation parameters <rg_constants_alpha>`
 
 See also
 ~~~~~~~~

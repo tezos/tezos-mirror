@@ -32,10 +32,14 @@ let wait_for_sync node =
   Node.wait_for node "synchronisation_status.v0" filter
 
 module Network = struct
-  type network = Dailynet | Mondaynet
+  type network = Dailynet | Weeklynet
 
-  let short_name = function Dailynet -> "dailynet" | Mondaynet -> "mondaynet"
+  let short_name = function Dailynet -> "dailynet" | Weeklynet -> "weeklynet"
 
+  (* The network name is <kind>-yyyy-mm-dd, where <kind> is
+     "dailynet"/"weeklynet". This function thus extracts the date of the last
+     start of Dailynet/Weeklynet. Currently, Weeklynet is started on
+     Wednesdays. *)
   let name = function
     | Dailynet -> (
         match
@@ -43,22 +47,21 @@ module Network = struct
         with
         | None ->
             let year, month, day = Ptime_clock.now () |> Ptime.to_date in
-            (* Format of the day should be: yyyy-mm-dd *)
             Format.sprintf "dailynet-%d-%02d-%02d" year month day
         | Some network -> network)
-    | Mondaynet -> (
+    | Weeklynet -> (
         match
           Cli.get ~default:None (fun name -> Some (Some name)) "network"
         with
         | None ->
             let now = Ptime_clock.now () in
-            let weekday = (6 + Ptime.weekday_num now) mod 7 in
-            (* Monday is day 0 (not 1)! *)
-            let offset = Ptime.Span.of_d_ps (weekday, 0L) |> Option.get in
-            let monday = Ptime.sub_span now offset |> Option.get in
-            let year, month, day = monday |> Ptime.to_date in
-            (* Format of the day should be: yyyy-mm-dd *)
-            Format.sprintf "mondaynet-%d-%02d-%02d" year month day
+            (* offset of the current day wrt to Wednesday *)
+            let day_offset = (4 + Ptime.weekday_num now) mod 7 in
+            let year, month, day =
+              Ptime.Span.of_d_ps (day_offset, 0L)
+              |> Option.get |> Ptime.sub_span now |> Option.get |> Ptime.to_date
+            in
+            Format.sprintf "weeklynet-%d-%02d-%02d" year month day
         | Some network -> network)
 end
 
@@ -78,7 +81,7 @@ let rec wait_for_balance client pkh target_balance =
   let node = get_node client in
   (* Could be racy but in practice should be ok, at worst we
      should wait one more block or do a useless check. *)
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* _ = Node.wait_for_level node (level + 1) in
   let* balance = Client.get_balance_for ~account:pkh client in
   if balance < target_balance then (
@@ -95,10 +98,11 @@ let reveal_accounts client accounts =
     Lwt_list.filter_s
       (fun account ->
         let* res =
-          RPC.call node
-          @@ RPC.get_chain_block_context_contract_manager_key
-               ~id:account.Account.public_key_hash
-               ()
+          Node.RPC.(
+            call node
+            @@ get_chain_block_context_contract_manager_key
+                 ~id:account.Account.public_key_hash
+                 ())
         in
         let revealed = not (JSON.is_null res) in
         if revealed then
@@ -119,7 +123,7 @@ let reveal_accounts client accounts =
       unrevealed
   in
   if List.length unrevealed > 0 then (
-    let level = Node.get_level node in
+    let* level = Node.get_level node in
     Log.info
       "Waiting for a level (namely %d) to be \"sure\" the operations are \
        included..."
@@ -173,8 +177,8 @@ module Wallet = struct
 
     let giver_account =
       {
-        (* That's dal_rich_account at
-           https://github.com/oxheadalpha/teztnets/blob/c6d40e06a2565610813cbc1c059ee70793e2809e/dailynet/values.yaml#L206 *)
+        (* That's dal_rich_account cf.
+           https://github.com/tacoinfra/teztnets/blob/main/networks/dailynet/values.yaml *)
         Account.alias = giver_alias;
         public_key_hash = "tz1PEhbjTyVvjQ2Zz8g4bYU2XPTbhvG8JMFh";
         public_key = "edpkuwL7MVYArfQN9jyR8pZTqmFGYFWTYhhF4F8KWjr2vB18ozTqbd";
@@ -183,7 +187,9 @@ module Wallet = struct
             "edsk3AWajGUgzzGi3UrQiNWeRZR1YMRYVxfe642AFSKBTFXaoJp5hu";
       }
 
-    let register_giver client = Client.import_secret_key client giver_account
+    let register_giver client =
+      let Account.{alias; secret_key; _} = giver_account in
+      Client.import_secret_key client ~alias secret_key
 
     let perform_transfers ~amount ~keys client =
       let* counter =
@@ -225,7 +231,7 @@ module Wallet = struct
                keys))
         else return ()
       in
-      Log.info "\nReveal wallet addresses if needed..." ;
+      Log.info "Reveal wallet addresses if needed..." ;
       reveal_accounts client keys
   end
 

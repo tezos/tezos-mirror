@@ -49,11 +49,13 @@ type level_participation = Participated | Didn't_participate
    recorded in the next cycle. *)
 let record_attesting_participation ctxt ~delegate ~participation
     ~attesting_power =
+  let open Lwt_result_syntax in
   match participation with
   | Participated -> Stake_storage.set_active ctxt delegate
   | Didn't_participate -> (
       let contract = Contract_repr.Implicit delegate in
-      Storage.Contract.Missed_attestations.find ctxt contract >>=? function
+      let* result = Storage.Contract.Missed_attestations.find ctxt contract in
+      match result with
       | Some {remaining_slots; missed_levels} ->
           let remaining_slots = remaining_slots - attesting_power in
           Storage.Contract.Missed_attestations.update
@@ -62,8 +64,9 @@ let record_attesting_participation ctxt ~delegate ~participation
             {remaining_slots; missed_levels = missed_levels + 1}
       | None -> (
           let level = Level_storage.current ctxt in
-          Raw_context.stake_distribution_for_current_cycle ctxt
-          >>?= fun stake_distribution ->
+          let*? stake_distribution =
+            Raw_context.stake_distribution_for_current_cycle ctxt
+          in
           match
             Signature.Public_key_hash.Map.find delegate stake_distribution
           with
@@ -76,14 +79,15 @@ let record_attesting_participation ctxt ~delegate ~participation
               assert (Compare.Int32.(level.cycle_position = 0l)) ;
               return ctxt
           | Some active_stake ->
-              Stake_storage.get_total_active_stake ctxt level.cycle
-              >>=? fun total_active_stake ->
+              let* total_active_stake =
+                Stake_storage.get_total_active_stake ctxt level.cycle
+              in
               let expected_slots =
                 let active_stake_weight =
-                  Stake_context.staking_weight ctxt active_stake
+                  Stake_repr.staking_weight active_stake
                 in
                 let total_active_stake_weight =
-                  Stake_context.staking_weight ctxt total_active_stake
+                  Stake_repr.staking_weight total_active_stake
                 in
                 expected_slots_for_given_active_stake
                   ctxt
@@ -103,47 +107,50 @@ let record_attesting_participation ctxt ~delegate ~participation
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
-  Stake_storage.set_active ctxt payload_producer >>=? fun ctxt ->
-  (if not (Signature.Public_key_hash.equal payload_producer block_producer) then
-   Stake_storage.set_active ctxt block_producer
-  else return ctxt)
-  >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt = Stake_storage.set_active ctxt payload_producer in
+  let* ctxt =
+    if not (Signature.Public_key_hash.equal payload_producer block_producer)
+    then Stake_storage.set_active ctxt block_producer
+    else return ctxt
+  in
   let pay_payload_producer ctxt delegate =
     let contract = Contract_repr.Implicit delegate in
-    Token.balance ctxt `Block_fees >>=? fun (ctxt, block_fees) ->
-    Token.transfer ctxt `Block_fees (`Contract contract) block_fees
-    >>=? fun (ctxt, balance_updates_block_fees) ->
-    Delegate_staking_parameters.pay_rewards
-      ctxt
-      ~source:`Baking_rewards
-      ~delegate
-      baking_reward
-    >|=? fun (ctxt, balance_updates_baking_rewards) ->
+    let* ctxt, block_fees = Token.balance ctxt `Block_fees in
+    let* ctxt, balance_updates_block_fees =
+      Token.transfer ctxt `Block_fees (`Contract contract) block_fees
+    in
+    let+ ctxt, balance_updates_baking_rewards =
+      Shared_stake.pay_rewards
+        ctxt
+        ~source:`Baking_rewards
+        ~delegate
+        baking_reward
+    in
     (ctxt, balance_updates_block_fees @ balance_updates_baking_rewards)
   in
   let pay_block_producer ctxt delegate bonus =
-    Delegate_staking_parameters.pay_rewards
-      ctxt
-      ~source:`Baking_bonuses
-      ~delegate
-      bonus
+    Shared_stake.pay_rewards ctxt ~source:`Baking_bonuses ~delegate bonus
   in
-  pay_payload_producer ctxt payload_producer
-  >>=? fun (ctxt, balance_updates_payload_producer) ->
-  (match reward_bonus with
-  | Some bonus -> pay_block_producer ctxt block_producer bonus
-  | None -> return (ctxt, []))
-  >>=? fun (ctxt, balance_updates_block_producer) ->
+  let* ctxt, balance_updates_payload_producer =
+    pay_payload_producer ctxt payload_producer
+  in
+  let* ctxt, balance_updates_block_producer =
+    match reward_bonus with
+    | Some bonus -> pay_block_producer ctxt block_producer bonus
+    | None -> return (ctxt, [])
+  in
   return
     (ctxt, balance_updates_payload_producer @ balance_updates_block_producer)
 
 let check_and_reset_delegate_participation ctxt delegate =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
-  Storage.Contract.Missed_attestations.find ctxt contract >>=? fun missed ->
+  let* missed = Storage.Contract.Missed_attestations.find ctxt contract in
   match missed with
   | None -> return (ctxt, true)
   | Some missed_attestations ->
-      Storage.Contract.Missed_attestations.remove ctxt contract >>= fun ctxt ->
+      let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
 
 type participation_info = {
@@ -157,9 +164,11 @@ type participation_info = {
 
 (* Inefficient, only for RPC *)
 let participation_info ctxt delegate =
+  let open Lwt_result_syntax in
   let level = Level_storage.current ctxt in
-  Stake_storage.get_selected_distribution ctxt level.cycle
-  >>=? fun stake_distribution ->
+  let* stake_distribution =
+    Stake_storage.get_selected_distribution ctxt level.cycle
+  in
   match
     List.assoc_opt
       ~equal:Signature.Public_key_hash.equal
@@ -178,14 +187,13 @@ let participation_info ctxt delegate =
           expected_attesting_rewards = Tez_repr.zero;
         }
   | Some active_stake ->
-      Stake_storage.get_total_active_stake ctxt level.cycle
-      >>=? fun total_active_stake ->
+      let* total_active_stake =
+        Stake_storage.get_total_active_stake ctxt level.cycle
+      in
       let expected_cycle_activity =
-        let active_stake_weight =
-          Stake_context.staking_weight ctxt active_stake
-        in
+        let active_stake_weight = Stake_repr.staking_weight active_stake in
         let total_active_stake_weight =
-          Stake_context.staking_weight ctxt total_active_stake
+          Stake_repr.staking_weight total_active_stake
         in
         expected_slots_for_given_active_stake
           ctxt
@@ -208,8 +216,9 @@ let participation_info ctxt delegate =
         Tez_repr.mul_exn attesting_reward_per_slot expected_cycle_activity
       in
       let contract = Contract_repr.Implicit delegate in
-      Storage.Contract.Missed_attestations.find ctxt contract
-      >>=? fun missed_attestations ->
+      let* missed_attestations =
+        Storage.Contract.Missed_attestations.find ctxt contract
+      in
       let missed_slots, missed_levels, remaining_allowed_missed_slots =
         match missed_attestations with
         | None -> (0, 0, maximal_cycle_inactivity)

@@ -10,7 +10,7 @@
     GIT_DATETIME: "1970-01-01 00:00:00 +0000%"
     GIT_VERSION: "dev"
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
+    - ./scripts/ci/build_full_unreleased.sh
   artifacts:
     name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
@@ -19,6 +19,7 @@
       - src/proto_*/parameters/*.json
       - _build/default/src/lib_protocol_compiler/bin/main_native.exe
       - _build/default/tezt/tests/main.exe
+      - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     expire_in: 1 day
     when: on_success
 
@@ -27,13 +28,14 @@
 .build_static_binaries_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_dependencies_template
+    - .image_template__runtime_build_dependencies
   stage: build
   variables:
     ARCH: ""
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci build-static-binaries
-
+    - eval $(opam env)
+    - ./scripts/ci/take_ownership.sh
+    - ./scripts/ci/build_static_binaries.sh
   artifacts:
     paths:
       - "octez-binaries/$ARCH/*"
@@ -44,7 +46,6 @@
     - .image_template__docker
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
-    RUST_TOOLCHAIN_IMAGE: "${PROD_AWS_ECR}/rust-toolchain"
     IMAGE_ARCH_PREFIX: ""
   before_script:
     - ./scripts/ci/docker_registry_auth.sh

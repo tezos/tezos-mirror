@@ -24,8 +24,6 @@
 (*****************************************************************************)
 
 module Cache_costs = struct
-  module S = Saturation_repr
-
   (* Computed by typing the contract
      "{parameter unit; storage unit; code FAILWITH}"
      and evaluating
@@ -34,20 +32,12 @@ module Cache_costs = struct
   let minimal_size_of_typed_contract_in_bytes = 688
 
   let approximate_cardinal bytes =
-    S.safe_int (bytes / minimal_size_of_typed_contract_in_bytes)
-
-  let log2 x = S.safe_int (1 + S.numbits x)
-
-  let cache_update_constant = S.safe_int 600
-
-  let cache_update_coeff = S.safe_int 43
+    bytes / minimal_size_of_typed_contract_in_bytes
 
   (* Cost of calling [Environment_cache.update]. *)
-  (* model cache/CACHE_UPDATE *)
   let cache_update ~cache_size_in_bytes =
     let approx_card = approximate_cardinal cache_size_in_bytes in
-    Gas_limit_repr.atomic_step_cost
-      S.(add cache_update_constant (mul cache_update_coeff (log2 approx_card)))
+    Cache_repr_costs.cache_update_cost approx_card
 
   (* Cost of calling [Environment_cache.find].
      This overapproximates [cache_find] slightly. *)
@@ -134,6 +124,7 @@ module Admin = struct
   include Raw_context.Cache
 
   let future_cache_expectation ?blocks_before_activation ctxt ~time_in_blocks =
+    let open Lwt_result_syntax in
     let time_in_blocks' = Int32.of_int time_in_blocks in
     let blocks_per_voting_period =
       Int32.(
@@ -141,10 +132,12 @@ module Admin = struct
           (Constants_storage.cycles_per_voting_period ctxt)
           (Constants_storage.blocks_per_cycle ctxt))
     in
-    (match blocks_before_activation with
-    | None -> Voting_period_storage.blocks_before_activation ctxt
-    | Some block -> return_some block)
-    >>=? function
+    let* block_opt =
+      match blocks_before_activation with
+      | None -> Voting_period_storage.blocks_before_activation ctxt
+      | Some block -> return_some block
+    in
+    match block_opt with
     | Some block
       when Compare.Int32.(
              (Compare.Int32.(block >= 0l) && block <= time_in_blocks')
@@ -227,6 +220,7 @@ end
 let register_exn (type cvalue)
     (module C : CLIENT with type cached_value = cvalue) :
     (module INTERFACE with type cached_value = cvalue) =
+  let open Lwt_result_syntax in
   if
     Compare.Int.(C.cache_index < 0)
     || Compare.Int.(Constants_repr.cache_layout_size <= C.cache_index)
@@ -239,7 +233,8 @@ let register_exn (type cvalue)
 
     let () =
       let voi ctxt i =
-        C.value_of_identifier ctxt i >>=? fun v -> return (K v)
+        let* v = C.value_of_identifier ctxt i in
+        return (K v)
       in
       value_of_key_handlers :=
         NamespaceMap.add C.namespace voi !value_of_key_handlers
@@ -253,21 +248,27 @@ let register_exn (type cvalue)
       @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
 
     let update ctxt id v =
+      let open Result_syntax in
       let cache_size_in_bytes = size ctxt in
-      Raw_context.consume_gas
-        ctxt
-        (Cache_costs.cache_update ~cache_size_in_bytes)
-      >|? fun ctxt ->
+      let+ ctxt =
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_update ~cache_size_in_bytes)
+      in
       let v = Option.map (fun (v, size) -> (K v, size)) v in
       Admin.update ctxt (mk ~id) v
 
     let find ctxt id =
       let cache_size_in_bytes = size ctxt in
-      Raw_context.consume_gas ctxt (Cache_costs.cache_find ~cache_size_in_bytes)
-      >>?= fun ctxt ->
-      Admin.find ctxt (mk ~id) >>= function
-      | None -> return None
-      | Some (K v) -> return (Some v)
+      let*? ctxt =
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_find ~cache_size_in_bytes)
+      in
+      let*! value_opt = Admin.find ctxt (mk ~id) in
+      match value_opt with
+      | None -> return_none
+      | Some (K v) -> return_some v
       | _ ->
           (* This execution path is impossible because all the keys of
              C's namespace (which is unique to C) are constructed with

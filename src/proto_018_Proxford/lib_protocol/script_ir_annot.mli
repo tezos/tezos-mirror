@@ -43,10 +43,6 @@ val check_type_annot : Script.location -> string list -> unit tzresult
 (** Check a field annotation only. *)
 val is_field_annot : Script.location -> string -> bool tzresult
 
-(** Check an annotation for composed types, of the form
-    [:ty_name %field1 %field2] in any order. *)
-val check_composed_type_annot : Script.location -> string list -> unit tzresult
-
 (** Checks whether a node has a field annotation. *)
 val has_field_annot : Script.node -> bool tzresult
 

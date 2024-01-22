@@ -1,20 +1,12 @@
 documentation:linkcheck:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
   stage: doc
   needs: []
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--no-docs(?:$|[,])/'
-      when: manual
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_MERGE_REQUEST_ID'
-      changes:
-        - docs/introduction/*.sh
-        - docs/developer/*.sh
-        - docs/scripts/test_doc_scripts.sh
-      when: on_success
     # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
       when: on_success
@@ -22,6 +14,9 @@ documentation:linkcheck:
   before_script:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-linkcheck
+    - make all
+    - make -C docs redirectcheck
+    - make -C docs linkcheck
   allow_failure: true

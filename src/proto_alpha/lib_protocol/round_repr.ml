@@ -76,7 +76,8 @@ let () =
     (fun i -> Round_overflow (Int64.to_int i))
 
 let of_int32 i =
-  if i >= 0l then Ok i else error (Negative_round (Int32.to_int i))
+  let open Result_syntax in
+  if i >= 0l then return i else tzfail (Negative_round (Int32.to_int i))
   [@@inline]
 
 let pred r =
@@ -84,21 +85,24 @@ let pred r =
   of_int32 p
 
 let of_int i =
-  if Compare.Int.(i < 0) then error (Negative_round i)
+  let open Result_syntax in
+  if Compare.Int.(i < 0) then tzfail (Negative_round i)
   else
     (* i is positive *)
     let i32 = Int32.of_int i in
     if Compare.Int.(Int32.to_int i32 = i) then Ok i32
-    else error (Round_overflow i)
+    else tzfail (Round_overflow i)
 
 let to_int i32 =
+  let open Result_syntax in
   let i = Int32.to_int i32 in
-  if Int32.(equal (of_int i) i32) then ok i else error (Round_overflow i)
+  if Int32.(equal (of_int i) i32) then return i else tzfail (Round_overflow i)
 
 let to_int32 t = t [@@inline]
 
 let to_slot round ~committee_size =
-  to_int round >>? fun r ->
+  let open Result_syntax in
+  let* r = to_int round in
   let slot = r mod committee_size in
   Slot_repr.of_int slot
 
@@ -148,15 +152,19 @@ module Durations = struct
       t.delay_increment_per_round
 
   let create ~first_round_duration ~delay_increment_per_round =
-    error_when
-      Compare.Int64.(Period_repr.to_seconds first_round_duration < 1L)
-      (Round_durations_must_be_at_least_one_second
-         {round = first_round_duration})
-    >>? fun () ->
-    error_when
-      Compare.Int64.(Period_repr.to_seconds delay_increment_per_round < 1L)
-      (Non_increasing_rounds {increment = delay_increment_per_round})
-    >>? fun () -> ok {first_round_duration; delay_increment_per_round}
+    let open Result_syntax in
+    let* () =
+      error_when
+        Compare.Int64.(Period_repr.to_seconds first_round_duration < 1L)
+        (Round_durations_must_be_at_least_one_second
+           {round = first_round_duration})
+    in
+    let* () =
+      error_when
+        Compare.Int64.(Period_repr.to_seconds delay_increment_per_round < 1L)
+        (Non_increasing_rounds {increment = delay_increment_per_round})
+    in
+    return {first_round_duration; delay_increment_per_round}
 
   let create_opt ~first_round_duration ~delay_increment_per_round =
     match create ~first_round_duration ~delay_increment_per_round with
@@ -236,14 +244,15 @@ let () =
                                    + 1/2 * r * (r - 1) * delay_increment_per_round
 *)
 let raw_level_offset_of_round round_durations ~round =
-  if Compare.Int32.(round = zero) then ok Int64.zero
+  let open Result_syntax in
+  if Compare.Int32.(round = zero) then return Int64.zero
   else
     let sum_durations =
       let Durations.{first_round_duration; delay_increment_per_round} =
         round_durations
       in
       let roundz = Int64.of_int32 round in
-      let m = Z.of_int64 Int64.(div (mul roundz (pred roundz)) (of_int 2)) in
+      let m = Z.of_int64 Int64.(div (mul roundz (pred roundz)) 2L) in
       Z.(
         add
           (mul
@@ -253,9 +262,8 @@ let raw_level_offset_of_round round_durations ~round =
              (Z.of_int32 round)
              (Z.of_int64 @@ Period_repr.to_seconds first_round_duration)))
     in
-    if Compare.Z.(sum_durations > Z.of_int64 Int64.max_int) then
-      error (Round_too_high round)
-    else ok (Z.to_int64 sum_durations)
+    if Z.fits_int64 sum_durations then return (Z.to_int64 sum_durations)
+    else tzfail (Round_too_high round)
 
 type error += Level_offset_too_high of Period_repr.t
 
@@ -280,6 +288,7 @@ type round_and_offset = {round : int32; offset : Period_repr.t}
 
 (** Complexity: O(log level_offset). *)
 let round_and_offset round_durations ~level_offset =
+  let open Result_syntax in
   let level_offset_in_seconds = Period_repr.to_seconds level_offset in
   (* We set the bound as 2^53 to prevent overflows when computing the
      variable [discr] for reasonable values of [first_round_duration] and
@@ -287,7 +296,7 @@ let round_and_offset round_durations ~level_offset =
      from the inequation [discr] < Int64.max_int. *)
   let overflow_bound = Int64.shift_right Int64.max_int 10 in
   if Compare.Int64.(overflow_bound < level_offset_in_seconds) then
-    error (Level_offset_too_high level_offset)
+    tzfail (Level_offset_too_high level_offset)
   else
     let Durations.{first_round_duration; delay_increment_per_round} =
       round_durations
@@ -299,7 +308,7 @@ let round_and_offset round_durations ~level_offset =
     (* If [level_offset] is lower than the first round duration, then
        the solution straightforward. *)
     if Compare.Int64.(level_offset_in_seconds < first_round_duration) then
-      ok {round = 0l; offset = level_offset}
+      return {round = 0l; offset = level_offset}
     else
       let round =
         if Compare.Int64.(delay_increment_per_round = Int64.zero) then
@@ -363,9 +372,10 @@ let round_and_offset round_durations ~level_offset =
                (sqrt discr))
             (double delay_increment_per_round)
       in
-      raw_level_offset_of_round round_durations ~round:(Int64.to_int32 round)
-      >>? fun current_level_offset ->
-      ok
+      let* current_level_offset =
+        raw_level_offset_of_round round_durations ~round:(Int64.to_int32 round)
+      in
+      return
         {
           round = Int64.to_int32 round;
           offset =
@@ -378,6 +388,7 @@ let round_and_offset round_durations ~level_offset =
 (** Complexity: O(|round_durations|). *)
 let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     ~round =
+  let open Result_syntax in
   let pred_round_duration =
     Durations.round_duration round_durations predecessor_round
   in
@@ -385,11 +396,12 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
      to start. This is given by adding to the timestamp of the round
      of predecessor level l-1 [predecessor_timestamp], the duration of
      its last round [predecessor_round]. *)
-  Time_repr.(predecessor_timestamp +? pred_round_duration)
-  >>? fun start_of_current_level ->
+  let* start_of_current_level =
+    Time_repr.(predecessor_timestamp +? pred_round_duration)
+  in
   (* Finally, we sum the durations of the rounds at the current level l until
      reaching current [round]. *)
-  raw_level_offset_of_round round_durations ~round >>? fun level_offset ->
+  let* level_offset = raw_level_offset_of_round round_durations ~round in
   let level_offset = Period_repr.of_seconds_exn level_offset in
   Time_repr.(start_of_current_level +? level_offset)
 
@@ -404,11 +416,14 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     Complexity: O(|round_durations|). *)
 let timestamp_of_another_round_same_level round_durations ~current_timestamp
     ~current_round ~considered_round =
-  raw_level_offset_of_round round_durations ~round:considered_round
-  >>? fun target_offset ->
-  raw_level_offset_of_round round_durations ~round:current_round
-  >>? fun current_offset ->
-  ok
+  let open Result_syntax in
+  let* target_offset =
+    raw_level_offset_of_round round_durations ~round:considered_round
+  in
+  let* current_offset =
+    raw_level_offset_of_round round_durations ~round:current_round
+  in
+  return
   @@ Time_repr.of_seconds
        Int64.(
          add
@@ -455,31 +470,36 @@ let () =
 
 let round_of_timestamp round_durations ~predecessor_timestamp ~predecessor_round
     ~timestamp =
+  let open Result_syntax in
   let round_duration =
     Durations.round_duration round_durations predecessor_round
   in
-  Time_repr.(predecessor_timestamp +? round_duration)
-  >>? fun start_of_current_level ->
-  Period_repr.of_seconds (Time_repr.diff timestamp start_of_current_level)
-  |> Error_monad.record_trace
-       (Round_of_past_timestamp
-          {
-            predecessor_timestamp;
-            provided_timestamp = timestamp;
-            predecessor_round;
-          })
-  >>? fun diff ->
-  round_and_offset round_durations ~level_offset:diff
-  >>? fun round_and_offset -> ok round_and_offset.round
+  let* start_of_current_level =
+    Time_repr.(predecessor_timestamp +? round_duration)
+  in
+  let* diff =
+    Period_repr.of_seconds (Time_repr.diff timestamp start_of_current_level)
+    |> Error_monad.record_trace
+         (Round_of_past_timestamp
+            {
+              predecessor_timestamp;
+              provided_timestamp = timestamp;
+              predecessor_round;
+            })
+  in
+  let* round_and_offset = round_and_offset round_durations ~level_offset:diff in
+  return round_and_offset.round
 
 let level_offset_of_round round_durations ~round =
-  raw_level_offset_of_round round_durations ~round >>? fun offset ->
-  ok (Period_repr.of_seconds_exn offset)
+  let open Result_syntax in
+  let* offset = raw_level_offset_of_round round_durations ~round in
+  return (Period_repr.of_seconds_exn offset)
 
 module Internals_for_test = struct
   type round_and_offset_raw = {round : round; offset : Period_repr.t}
 
   let round_and_offset round_durations ~level_offset =
-    round_and_offset round_durations ~level_offset >|? fun v ->
+    let open Result_syntax in
+    let+ v = round_and_offset round_durations ~level_offset in
     {round = v.round; offset = v.offset}
 end

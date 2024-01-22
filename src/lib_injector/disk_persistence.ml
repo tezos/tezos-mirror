@@ -190,7 +190,12 @@ let delete_file file =
   @@ protect
   @@ fun () ->
   let open Lwt_result_syntax in
-  let*! () = Lwt_unix.unlink file in
+  let*! () =
+    Lwt.catch
+      (fun () -> Lwt_unix.unlink file)
+      (function
+        | Unix.(Unix_error (ENOENT, _, _)) -> Lwt.return_unit | e -> raise e)
+  in
   return_unit
 
 module Make_table (H : H) = struct
@@ -246,7 +251,7 @@ module Make_table (H : H) = struct
           (fun () ->
             let+ f = Lwt_unix.readdir d in
             Some f)
-          (function End_of_file -> return_none | e -> raise e)
+          (function End_of_file -> return_none | e -> Lwt.reraise e)
       in
       match filename with
       | None -> return_unit
@@ -351,7 +356,7 @@ struct
           (fun () ->
             let+ f = Lwt_unix.readdir d in
             Some f)
-          (function End_of_file -> return_none | e -> raise e)
+          (function End_of_file -> return_none | e -> Lwt.reraise e)
       in
       match filename with
       | None -> return acc

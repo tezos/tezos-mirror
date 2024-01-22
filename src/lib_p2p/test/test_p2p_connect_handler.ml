@@ -133,7 +133,9 @@ let test_on_new_connection =
     ~msg:"After connect, on_disconnection is not called"
     ~expected:0
     ~actual:!num_disconnect ;
-  let*! () = P2p_conn.disconnect ~wait:true conn in
+  let*! () =
+    P2p_conn.disconnect ~wait:true ~reason:(User "explicit disconnect") conn
+  in
   check
     ~msg:"After disconnect, on_new_connection is not called"
     ~expected:1

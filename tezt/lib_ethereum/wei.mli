@@ -54,6 +54,12 @@ val of_wei_z : t -> Z.t
     This doesn't perform any bounds checks. *)
 val of_eth_int : int -> t
 
+(** Convert a [string] amount of eth to a wei one.
+    This doesn't perform any bounds checks.
+    It assumes the string represents either an integer
+    or a float - both denoting an amount of eth. *)
+val of_eth_string : string -> t
+
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t
 
@@ -71,3 +77,6 @@ val typ : t Check.typ
 
 (** Convert {!t} to U256 little endian bytes. *)
 val to_le_bytes : t -> Bytes.t
+
+(** Truncate the Wei (10^18) to Mutez (10^9). *)
+val truncate_to_mutez : t -> int

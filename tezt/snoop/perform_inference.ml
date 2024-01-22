@@ -23,51 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let local_model_names =
-  [
-    "interpreter";
-    "gas_translator_model";
-    "size_translator_model";
-    "micheline";
-    "micheline_bytes";
-    "encoding";
-    "global_constants_storage/Set_add/model";
-    "global_constants_storage/Set_elements/model";
-    "global_constants_storage/Script_expr_hash_of_b58check_opt/model";
-    "global_constants_storage/expr_to_address_in_context/model";
-    "global_constants_storage/expand_constant_branch/model";
-    "global_constants_storage/expand_no_constant_branch/model";
-    "cache/CACHE_UPDATE/model";
-    "ir_size_model";
-    "carbonated_map";
-    "tickets/COLLECT_TICKETS_STEP/model";
-    "tickets/TYPE_HAS_TICKETS/model";
-    "compare_tickets";
-    "list_key_values";
-    "skip_list/next/model";
-    "skip_list/hash_cell/model";
-    "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
-    "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
-    "bloomer";
-    "strip_annotations_model";
-    "micheline/strip_locations_micheline/model";
-    "apply_diff";
-    "publish_slot_header";
-  ]
-
-let cleanup local_model_name =
-  let open Files in
-  let inference_root = Files.(working_dir // inference_results_dir) in
-  let files =
-    [
-      inference_root // solution_csv local_model_name;
-      inference_root // solution_bin local_model_name;
-      inference_root // report_tex local_model_name;
-      inference_root // dep_graph local_model_name;
-    ]
-  in
-  List.iter Files.unlink_if_present files
-
 let rec retry ?max_tries closure =
   Lwt.catch closure (fun e ->
       match max_tries with
@@ -78,26 +33,18 @@ let main () =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
   let inference_root = Files.(working_dir // inference_results_dir) in
-  Lwt_list.iter_s
-    (fun local_model_name ->
-      let saved_local_model_name =
-        String.split_on_char '/' local_model_name |> String.concat "__"
-      in
-      cleanup saved_local_model_name ;
-      (* Python bindings tend to crash, hence the need to retry and resume inference midway,
-         multiple times. When python bindings are removed, this needs to be removed as well
-         See https://gitlab.com/tezos/tezos/-/issues/1523
-      *)
-      retry ~max_tries:5 (fun () ->
-          Snoop.infer_parameters
-            ~local_model_name
-            ~workload_data:Files.(working_dir // benchmark_results_dir)
-            ~regression_method:Snoop.(Lasso {positive = true})
-            ~dump_csv:
-              Files.(inference_root // solution_csv saved_local_model_name)
-            ~solution:
-              Files.(inference_root // solution_bin saved_local_model_name)
-            ~report:Files.(inference_root // report_tex saved_local_model_name)
-            ~graph:Files.(inference_root // dep_graph saved_local_model_name)
-            snoop))
-    local_model_names
+  let* () = Files.cleanup inference_root in
+
+  (* Python bindings tend to crash, hence the need to retry and resume inference midway,
+     multiple times. When python bindings are removed, this needs to be removed as well
+     See https://gitlab.com/tezos/tezos/-/issues/1523
+  *)
+  retry ~max_tries:5 (fun () ->
+      Snoop.infer_parameters
+        ~workload_data:Files.(working_dir // benchmark_results_dir)
+        ~regression_method:Snoop.(Lasso {positive = true})
+        ~dump_csv:Files.(inference_root // solution_csv)
+        ~solution:Files.(inference_root // solution_bin)
+        ~report:Files.(inference_root // report_tex)
+        ~graph:Files.(inference_root // dep_graph)
+        snoop)

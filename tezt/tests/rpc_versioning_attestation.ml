@@ -31,18 +31,19 @@
    Subject:      rpc versioning
 *)
 
-let register_test ~title ?(additionnal_tags = []) f =
+let register_test ~title ?(additionnal_tags = []) ?uses f =
   Protocol.register_test
     ~__FILE__
     ~title
     ~supports:(Protocol.From_protocol 18)
     ~tags:(["rpc"; "versioning"] @ additionnal_tags)
+    ?uses
     f
 
 let get_consensus_info delegate client =
   let* level = Client.level client in
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators ~delegate ~level ()
   in
   let slots =
@@ -50,7 +51,7 @@ let get_consensus_info delegate client =
       JSON.as_int
       JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
   in
-  let* block_header = RPC.Client.call client @@ RPC.get_chain_block_header () in
+  let* block_header = Client.RPC.call client @@ RPC.get_chain_block_header () in
   let block_payload_hash =
     JSON.(block_header |-> "payload_hash" |> as_string)
   in
@@ -76,11 +77,11 @@ let check_kind json kind =
     Test.fail ~__LOC__ "Operation should have %s kind, got: %s" kind json_kind
 
 let check_version ~version ~use_legacy_name ~check ~rpc ~get_name ~data client =
-  let* t = RPC.Client.call client @@ rpc ~version data in
+  let* t = Client.RPC.call client @@ rpc ~version data in
   return (check ~use_legacy_name t (get_name use_legacy_name))
 
 let check_unknown_version ~version ~rpc ~data client =
-  let*? p = RPC.Client.spawn client @@ rpc ~version data in
+  let*? p = Client.RPC.spawn client @@ rpc ~version data in
   let msg = rex "Failed to parse argument 'version'" in
   Process.check_error ~msg p
 
@@ -324,7 +325,7 @@ module Forge = struct
       Log.info
         "Ensures that the generated JSON cannot be parsed by the forge RPC" ;
       let*? t =
-        RPC.Client.spawn client
+        Client.RPC.spawn client
         @@ RPC.post_chain_block_helpers_forge_operations
              ~data:(Data consensus_json)
              ()
@@ -413,12 +414,14 @@ module Parse = struct
     register_test
       ~title:"Parse raw consensus operations"
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol -> test_parse Operation.Attestation protocol
 
   let test_parse_preconsensus =
     register_test
       ~title:"Parse raw pre-consensus operations"
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"; "pre"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol -> test_parse Operation.Preattestation protocol
 
   let test_parse_double_evidence double_evidence_kind protocol =
@@ -448,6 +451,7 @@ module Parse = struct
       ~title:"Parse raw double consensus evidence operations"
       ~additionnal_tags:
         ["parse"; "raw"; "operations"; "double"; "consensus"; "evidence"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     test_parse_double_evidence
       Operation.Anonymous.Double_attestation_evidence
@@ -458,6 +462,7 @@ module Parse = struct
       ~title:"Parse raw double pre-consensus evidence operations"
       ~additionnal_tags:
         ["parse"; "raw"; "operations"; "double"; "consensus"; "pre"; "evidence"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     test_parse_double_evidence
       Operation.Anonymous.Double_preattestation_evidence
@@ -575,16 +580,15 @@ module Mempool = struct
 
   let monitor_mempool node ~use_legacy_name =
     let monitor_operations_url =
-      RPC.(
-        make_uri
-          node
-          (get_chain_mempool_monitor_operations
-             ~refused:true
-             ~version:(if use_legacy_name then "0" else "1")
-             ())
-        |> Uri.to_string)
+      RPC_core.make_uri
+        (Node.as_rpc_endpoint node)
+        (RPC.get_chain_mempool_monitor_operations
+           ~refused:true
+           ~version:(if use_legacy_name then "0" else "1")
+           ())
+      |> Uri.to_string
     in
-    RPC.Curl.get monitor_operations_url
+    Curl.get monitor_operations_url
 
   let check_monitor_mempool p name =
     let* s = Process.check_and_read_stdout p in
@@ -595,13 +599,12 @@ module Mempool = struct
 
   let check_invalid_monitor_mempool_version node =
     let monitor_operations_url =
-      RPC.(
-        make_uri
-          node
-          (get_chain_mempool_monitor_operations ~refused:true ~version:"2" ())
-        |> Uri.to_string)
+      RPC_core.make_uri
+        (Node.as_rpc_endpoint node)
+        (RPC.get_chain_mempool_monitor_operations ~refused:true ~version:"2" ())
+      |> Uri.to_string
     in
-    let*? p = RPC.Curl.get monitor_operations_url in
+    let*? p = Curl.get monitor_operations_url in
     let* s = Process.check_and_read_stdout p in
     try
       let _ =
@@ -753,7 +756,7 @@ module Run_Simulate = struct
            operations."
         (* both run_operation and simulate_operation returns the same error *)
       in
-      let*? p = RPC.Client.spawn client @@ get_rpc rpc op_json in
+      let*? p = Client.RPC.spawn client @@ get_rpc rpc op_json in
       Process.check_error ~msg p
     in
 

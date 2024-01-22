@@ -140,7 +140,7 @@ module Events = struct
      at the same level as main node (the baker only bakes on main node
      in these tests). *)
   let wait_sync nodes =
-    let level = Node.get_level nodes.main.node in
+    let* level = Node.get_level nodes.main.node in
     Node.wait_for_level nodes.observer.node level
 end
 
@@ -207,12 +207,8 @@ module Helpers = struct
       client
 
   (** Initialize a network with two nodes *)
-  let init ?(disable_operation_precheck = false)
-      ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
-    let args =
-      [Node.Synchronisation_threshold 0; Connections 1]
-      @ if disable_operation_precheck then [Disable_operations_precheck] else []
-    in
+  let init ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
+    let args = [Node.Synchronisation_threshold 0; Connections 1] in
     let node1 = Node.create args in
     let node2 = Node.create args in
     let* client1 = Client.init ~endpoint:(Node node1) ()
@@ -289,7 +285,7 @@ module Helpers = struct
 
   let gas_limits client =
     let* constants =
-      RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
     in
     let hard_gas_limit_per_operation =
       JSON.(constants |-> "hard_gas_limit_per_operation" |> as_int)
@@ -407,7 +403,7 @@ module Memchecks = struct
     List.map (fun err -> JSON.(err |-> "id" |> as_string)) errs
 
   let is_in_block ?block client oph =
-    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+    let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     Lwt.return
     @@ List.exists (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
@@ -513,7 +509,7 @@ module Memchecks = struct
   let check_status_in_block ~__LOC__ ~who ~oph ~expected_statuses
       ?expected_errors ?block client =
     Log.info "- Checking inclusion and status of operation in %s's block." who ;
-    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+    let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     let head_hash = JSON.(head |-> "hash" |> as_string) in
     let op_contents =
@@ -677,7 +673,7 @@ module Memchecks = struct
 
   let check_balance ~__LOC__ {client; _} key amount =
     let* bal =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:key.Account.public_key_hash
            ()
@@ -693,7 +689,7 @@ module Memchecks = struct
 
   let check_revealed ~__LOC__ {client; _} key ~revealed =
     let* res =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_manager_key
            ~id:key.Account.public_key_hash
            ()
@@ -761,6 +757,7 @@ module Illtyped_originations = struct
       ~__FILE__
       ~title:"Contract's body illtyped 1"
       ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
@@ -784,6 +781,7 @@ module Illtyped_originations = struct
       ~__FILE__
       ~title:"Contract's body illtyped 2"
       ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
@@ -807,6 +805,7 @@ module Illtyped_originations = struct
       ~__FILE__
       ~title:"Contract's initial storage illtyped"
       ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
@@ -865,8 +864,7 @@ module Deserialisation = struct
     return contract
 
   (* Gas to execute call to noop contract without deserialization *)
-  let gas_to_execute_rest_noop = function
-    | Protocol.Nairobi | Oxford | Alpha -> 1941
+  let gas_to_execute_rest_noop (_ : Protocol.t) = 1941
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -891,6 +889,7 @@ module Deserialisation = struct
       ~title:
         "Smart contract call that should succeeds with the provided gas limit"
       ~tags:["precheck"; "gas"; "deserialization"; "canary"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract protocol nodes.main in
@@ -920,6 +919,7 @@ module Deserialisation = struct
       ~title:"Contract call with not enough gas to deserialize argument"
       ~supports:(Protocol.From_protocol 14)
       ~tags:["precheck"; "gas"; "deserialization"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract protocol nodes.main in
@@ -946,10 +946,11 @@ module Deserialisation = struct
         "Smart contract call that would succeed if we did not account \
          deserialization gas correctly"
       ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract protocol nodes.main in
-    let size_kB = 20 in
+    let size_kB = 21 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
     (* This is specific to this contract, obtained empirically *)
@@ -963,7 +964,7 @@ module Deserialisation = struct
       inject_call_with_bytes
         ~protocol
         ~contract
-        ~size_kB:20
+        ~size_kB
         ~gas_limit:(min_deserialization_gas + gas_for_the_rest - 1)
         (* Enough gas to deserialize or to do the rest, but not to do both *)
         nodes.main.client
@@ -1083,6 +1084,7 @@ module Reveal = struct
       ~__FILE__
       ~title:"Simple revelation with a wrong public key"
       ~tags:["reveal"; "revelation"; "batch"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
@@ -1106,6 +1108,7 @@ module Reveal = struct
       ~__FILE__
       ~title:"Simple revelation with something that is not a public key"
       ~tags:["reveal"; "revelation"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
@@ -1131,6 +1134,7 @@ module Reveal = struct
       ~__FILE__
       ~title:"Correct public key revealed twice in a batch"
       ~tags:["reveal"; "revelation"; "batch"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1152,6 +1156,7 @@ module Reveal = struct
       ~__FILE__
       ~title:"Two reveals in a batch. First key is wrong"
       ~tags:["reveal"; "revelation"; "batch"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
@@ -1172,6 +1177,7 @@ module Reveal = struct
       ~__FILE__
       ~title:"Two reveals in a batch. Second key is wrong"
       ~tags:["reveal"; "revelation"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1202,6 +1208,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer applied"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
@@ -1213,10 +1220,11 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer not enough balance to pay fees"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1246,10 +1254,11 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer not enough balance to make transfer"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1284,13 +1293,14 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer counter in the past"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1321,13 +1331,14 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer counter in the future"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1359,10 +1370,11 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer with wrong signature"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1393,6 +1405,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer with not enough gas"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1424,6 +1437,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Simple transfer with not enough fees to cover gas"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _ =
@@ -1448,6 +1462,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Test simple transfer with low balance to pay allocation (1)"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key1 =
@@ -1488,6 +1503,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Test simple transfer with low balance to pay allocation (2)"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key1 =
@@ -1528,6 +1544,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Test simple transfer of the whole balance"
       ~tags:["transaction"; "transfer"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key1 =
@@ -1563,6 +1580,7 @@ module Simple_transfers = struct
       ~title:"Test succesive injections with same manager"
       ~supports:(Protocol.From_protocol 14)
       ~tags:["transaction"; "transfer"; "counters"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* counter =
@@ -1700,6 +1718,7 @@ module Simple_contract_calls = struct
       ~__FILE__
       ~title:"Successful smart contract call"
       ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
@@ -1729,6 +1748,7 @@ module Simple_contract_calls = struct
       ~__FILE__
       ~title:"Smart contract call with illtyped argument"
       ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
@@ -1759,6 +1779,7 @@ module Simple_contract_calls = struct
       ~__FILE__
       ~title:"Smart contract call that throws a failwith"
       ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
@@ -1790,6 +1811,7 @@ module Simple_contract_calls = struct
       ~title:
         "Smart contract call that loops/fails with 'not enough gas' at exec"
       ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =

@@ -29,8 +29,8 @@
    part of verification checks on scalar values to the prover, who will produce
    a PlonK proof that the checks pass correctly. *)
 
-open Plonk.Bls
-module SMap = Plonk.SMap
+open Kzg.Bls
+module SMap = Kzg.SMap
 
 module Make_impl
     (Main_KZG : Plonk.Main_protocol.S
@@ -165,35 +165,40 @@ struct
 
   type public_inputs = scalar list [@@deriving repr]
 
-  type verifier_inputs =
-    (public_inputs * Input_commitment.public list list) SMap.t
+  type circuit_verifier_input = {
+    nb_proofs : int;
+    public : public_inputs;
+    commitments : Input_commitment.public list list;
+  }
   [@@deriving repr]
+
+  type verifier_inputs = circuit_verifier_input SMap.t [@@deriving repr]
 
   let to_verifier_inputs (pp : prover_public_parameters) inputs =
     let vi = Main_Pack.to_verifier_inputs pp.main_pp inputs in
     SMap.mapi
-      (fun circuit_name (pi, ic) ->
+      (fun circuit_name Main_Pack.{nb_proofs; public; commitments} ->
         let module PI = (val PIs.get_pi_module circuit_name) in
-        let pi = PI.outer_of_inner (List.map Array.to_list pi) in
-        assert (List.for_all (fun i -> i = []) ic) ;
-        (pi, ic))
+        let public = PI.outer_of_inner (List.map Array.to_list public) in
+        assert (List.for_all (fun i -> i = []) commitments) ;
+        {nb_proofs; public; commitments})
       vi
 
   (* We only need to modify the main circuit PP, since it rules them all
      (meta-circuits get their state updated after the main circuit proof) *)
-  let update_prover_public_parameters bytes (pp : prover_public_parameters) =
+  let update_prover_public_parameters repr x (pp : prover_public_parameters) =
     {
       pp with
-      main_pp = Main_Pack.update_prover_public_parameters bytes pp.main_pp;
+      main_pp = Main_Pack.update_prover_public_parameters repr x pp.main_pp;
     }
 
   (* We only need to modify the main circuit PP, since it rules them all
      (meta-circuits get their state updated after the main circuit proof) *)
-  let update_verifier_public_parameters bytes (pp : verifier_public_parameters)
+  let update_verifier_public_parameters repr x (pp : verifier_public_parameters)
       =
     {
       pp with
-      main_pp = Main_Pack.update_verifier_public_parameters bytes pp.main_pp;
+      main_pp = Main_Pack.update_verifier_public_parameters repr x pp.main_pp;
     }
 
   let filter_prv_pp_circuits (pp : prover_public_parameters) inputs =
@@ -220,7 +225,7 @@ struct
             answers =
               (fun answers ->
                 let answers =
-                  Plonk.Utils.pad_answers
+                  Aggreg_circuit.pad_answers
                     pp.nb_proofs
                     pp.nb_rc_wires
                     nb_proofs
@@ -315,7 +320,8 @@ struct
       Aggreg_circuit.compute_switches prover_meta_pp.nb_proofs nb_proofs
     in
     let inner_pi =
-      SMap.find circuit_name inner_pi_map |> fst |> List.map Array.to_list
+      let Main_Pack.{public; _} = SMap.find circuit_name inner_pi_map in
+      List.map Array.to_list public
     in
     let trace =
       let outer_pi = PI.outer_of_inner inner_pi in
@@ -338,7 +344,10 @@ struct
     assert (Plonk.Circuit.sat cs trace) ;
     let inputs = SMap.singleton ("meta_" ^ circuit_name) [secret] in
     let pp_aggreg_circuit =
-      Main_KZG.update_prover_public_parameters transcript prover_meta_pp.meta_pp
+      Main_KZG.update_prover_public_parameters
+        Kzg.Utils.Transcript.t
+        transcript
+        prover_meta_pp.meta_pp
     in
     try Main_KZG.prove pp_aggreg_circuit ~inputs
     with Main_KZG.Rest_not_null _ ->
@@ -350,9 +359,7 @@ struct
   let meta_proof (pp : prover_public_parameters) inputs
       (main_proof, (prover_aux : Main_Pack.prover_aux)) =
     let open Main_Pack in
-    let transcript =
-      Data_encoding.Binary.to_bytes_exn proof_encoding main_proof
-    in
+    let transcript = Kzg.Utils.Transcript.(expand proof_t main_proof empty) in
     let inner_pi_map = to_verifier_inputs pp.main_pp inputs in
     let batches =
       Aggreg_circuit.get_batches inputs prover_aux.answers prover_aux.r
@@ -406,9 +413,8 @@ struct
     let meta_proof = SMap.find circuit_name proof.meta_proofs in
     let batch = SMap.find circuit_name proof.batches in
     let ids_batch = SMap.find circuit_name proof.ids_batch |> fst in
-    let pi, input_commitments_list = SMap.find circuit_name inputs in
-    let nb_proofs = List.length input_commitments_list in
-    if List.exists (fun l -> l <> []) input_commitments_list then
+    let input = SMap.find circuit_name inputs in
+    if List.exists (fun l -> l <> []) input.commitments then
       raise
       @@ Invalid_argument
            "input commitments in the base circuit of\n\
@@ -419,16 +425,24 @@ struct
         alpha_et_al
         batch
         ids_batch
-        (Scalar.of_int nb_proofs)
-        pi
+        (Scalar.of_int input.nb_proofs)
+        input.public
     in
     let pp_aggreg_circuit =
-      Main_KZG.update_verifier_public_parameters transcript pp.meta_pp
+      Main_KZG.update_verifier_public_parameters
+        Kzg.Utils.Transcript.t
+        transcript
+        pp.meta_pp
     in
     let inputs =
       SMap.singleton
         ("meta_" ^ circuit_name)
-        ([public_inputs], [[cm_pi; cm_answers]])
+        Main_KZG.
+          {
+            nb_proofs = 1;
+            public = [public_inputs];
+            commitments = [[cm_pi; cm_answers]];
+          }
     in
     Main_KZG.verify pp_aggreg_circuit ~inputs meta_proof
 
@@ -445,9 +459,7 @@ struct
           proof.ids_batch )
     in
     let transcript =
-      Data_encoding.Binary.to_bytes_exn
-        Main_Pack.proof_encoding
-        proof.main_proof
+      Kzg.Utils.Transcript.(expand Main_Pack.proof_t proof.main_proof empty)
     in
     let batch_ok =
       Aggreg_circuit.verify_batch
@@ -485,10 +497,8 @@ struct
 
   module Internal_for_tests = struct
     let mutate_vi verifier_inputs =
-      let key, (public_inputs, input_commitments_list) =
-        SMap.choose verifier_inputs
-      in
-      match public_inputs with
+      let key, {nb_proofs; public; commitments} = SMap.choose verifier_inputs in
+      match public with
       | [] -> None
       | input ->
           let input = Array.of_list input in
@@ -497,7 +507,7 @@ struct
           Some
             (SMap.add
                key
-               (Array.to_list input, input_commitments_list)
+               {nb_proofs; public = Array.to_list input; commitments}
                verifier_inputs)
   end
 end

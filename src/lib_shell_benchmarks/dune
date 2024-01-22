@@ -13,6 +13,7 @@
   octez-libs.crypto
   octez-libs.tezos-context
   octez-shell-libs.shell-context
+  octez-shell-libs.store
   octez-libs.micheline)
  (library_flags (:standard -linkall))
  (flags
@@ -21,4 +22,5 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_error_monad
-  -open Tezos_benchmark))
+  -open Tezos_benchmark)
+ (foreign_stubs (language c) (names alloc_mmap)))

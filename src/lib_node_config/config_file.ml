@@ -128,7 +128,7 @@ let blockchain_network_mainnet =
           "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1" );
       ]
     ~default_bootstrap_peers:
-      ["boot.tzboot.net"; "boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
+      ["boot.tzinit.org"; "boot.tzboot.net"; "boot.tzbeta.net"]
 
 let blockchain_network_ghostnet =
   make_blockchain_network
@@ -164,12 +164,12 @@ let blockchain_network_ghostnet =
       ]
     ~default_bootstrap_peers:
       [
-        "ghostnet.teztnets.xyz";
-        "ghostnet.smartpy.io";
+        "ghostnet.teztnets.com";
+        "ghostnet.tzinit.org";
+        "ghostnet.tzboot.net";
         "ghostnet.boot.ecadinfra.com";
         "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
-        "ghostnet.visualtez.com";
       ]
 
 let blockchain_network_sandbox =
@@ -624,6 +624,8 @@ let rpc : rpc Data_encoding.t =
           ~description:"The media types supported by the server."
           Media_type.Command_line.encoding
           default_rpc.media_type))
+
+let rpc_encoding = rpc
 
 let encoding =
   let open Data_encoding in

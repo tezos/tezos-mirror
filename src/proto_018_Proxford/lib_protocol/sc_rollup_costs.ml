@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Sc_rollup_costs_generated
 
 module Constants = struct
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.contract_optimized *)
@@ -65,9 +66,10 @@ end
 
 (* Reusing model from {!Ticket_costs.has_tickets_of_ty_cost}. *)
 let is_valid_parameters_ty_cost ~ty_size =
+  let open S.Syntax in
   let fixed_cost = S.safe_int 10 in
   let coeff = S.safe_int 6 in
-  S.add fixed_cost (S.mul coeff ty_size)
+  fixed_cost + (coeff * ty_size)
 
 let cost_serialize_internal_inbox_message
     (internal_inbox_message :
@@ -84,14 +86,8 @@ let cost_serialize_internal_inbox_message
   | Protocol_migration _ -> Saturation_repr.zero
   | Info_per_level _ -> Saturation_repr.zero
 
-(* Derived from benchmark in
-   [Sc_rollup_benchmarks.Sc_rollup_deserialize_output_proof_benchmark] and model
-   [model_Sc_rollup_deserialize_output_proof_benchmark]. *)
-(* fun size -> (7086.16259141 + (6.04996016914 * size)) *)
 let cost_deserialize_output_proof ~bytes_len =
-  let open S.Syntax in
-  let v0 = S.safe_int bytes_len in
-  S.safe_int 7100 + ((v0 lsl 2) + (v0 lsl 1))
+  cost_Sc_rollup_deserialize_output_proof_benchmark bytes_len
 
 let cost_serialize_external_inbox_message ~bytes_len =
   let len = S.safe_int bytes_len in
@@ -103,11 +99,7 @@ let cost_hash_bytes ~bytes_len =
   let v0 = S.safe_int bytes_len in
   S.safe_int 430 + v0 + (v0 lsr 3)
 
-let cost_compare a_size_in_bytes b_size_in_bytes =
-  let open S.Syntax in
-  let size_in_bytes = Compare.Int.min a_size_in_bytes b_size_in_bytes in
-  let v0 = S.safe_int size_in_bytes in
-  S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
+let cost_compare = Michelson_v1_gas_costs.cost_N_ICompare
 
 let cost_search_in_tick_list len tick_size =
   let open S.Syntax in
@@ -130,25 +122,8 @@ let cost_add_message ~current_index ~msg_len =
   in
   hash_cell_cost + hash_content_cost + next_cell_cost
 
-(* Derived from benchmark in
-   [Sc_rollup_benchmarks.Sc_rollup_verify_output_proof_benchmark] and model
-   [model_Sc_rollup_verify_output_proof_benchmark] with estimated parameters:
-   [fun size -> (103413.141163 + (6.85566158429 * size))] *)
 let cost_verify_output_proof ~bytes_len =
-  let open S.Syntax in
-  let size = S.safe_int bytes_len in
-  let v0 = size in
-  S.safe_int 103450 + (v0 lsl 2) + (v0 lsl 1) + v0
+  cost_Sc_rollup_verify_output_proof_benchmark bytes_len
 
-(* Derived from benchmark in
-   [Sc_rollup_benchmarks.Sc_rollup_install_boot_sector_benchmark] and model
-   [sc_rollup/Sc_rollup_install_boot_sector_benchmark/model]
-   assuming
-   model builtin/timer_model
-   19. *)
-(* fun size -> (13535.257218 + (3.68260983358 * size)) *)
 let cost_install_boot_sector_in_wasm_pvm ~boot_sector_size_in_bytes =
-  let open S.Syntax in
-  let size = S.safe_int boot_sector_size_in_bytes in
-  let v0 = size in
-  S.safe_int 13550 + ((v0 lsl 1) + v0 + (v0 lsr 1))
+  cost_Sc_rollup_install_boot_sector_benchmark boot_sector_size_in_bytes

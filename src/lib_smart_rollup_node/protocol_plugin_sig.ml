@@ -177,6 +177,7 @@ module type LAYER1_HELPERS = sig
     #Client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
 
   val get_last_published_commitment :
+    ?allow_unstake:bool ->
     #Client_context.full ->
     Address.t ->
     Signature.public_key_hash ->
@@ -207,6 +208,10 @@ module type LAYER1_HELPERS = sig
     #Client_context.full ->
     Address.t ->
     Signature.public_key_hash list option tzresult Lwt.t
+
+  (** Retrieve information about the last whitelist update on L1. *)
+  val find_last_whitelist_update :
+    #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)
@@ -215,9 +220,13 @@ module type L1_PROCESSING = sig
       node matches the one of the PVM on the L1 node.  *)
   val check_pvm_initial_state_hash : _ Node_context.t -> unit tzresult Lwt.t
 
-  (** React to L1 operations included in a block of the chain. *)
+  (** React to L1 operations included in a block of the chain. When
+      [catching_up] is true, the process block is in the past and the
+      failure condition of the process differs (e.g. if it detects a
+      whitelist update execution, it does not fail when the operator
+      is not in the whitelist).  *)
   val process_l1_block_operations :
-    Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
+    catching_up:bool -> Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
 end
 
 (** Partial protocol plugin with just the PVM and the function to access the
@@ -246,7 +255,7 @@ module type REFUTATION_GAME_HELPERS = sig
     has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
-    _ Node_context.t ->
+    Node_context.rw ->
     start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->

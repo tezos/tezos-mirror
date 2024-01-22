@@ -204,7 +204,7 @@ let drop_works =
              && check_dropped_equal_popped)
            (function
              | Bounds -> Lwt.return (IntVector.num_elements map = 0)
-             | _ -> Lwt.return false))
+             | _ -> Lwt.return_false))
 
 let check_overflow () =
   let open Lwt.Syntax in
@@ -213,7 +213,7 @@ let check_overflow () =
       (fun () ->
         let+ () = f () in
         failwith "This test should have overflown, but didn't.")
-      (function SizeOverflow -> Lwt.return_unit | exn -> raise exn)
+      (function SizeOverflow -> Lwt.return_unit | exn -> Lwt.reraise exn)
   in
   (* Creates a vector of the maximum size possible (2^63) *)
   let v = IntVector.create (-1) in

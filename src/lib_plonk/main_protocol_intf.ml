@@ -22,7 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Bls
+open Kzg.Bls
+module SMap = Kzg.SMap
 
 module type S = sig
   (** Raised by the prover when the provided inputs are not a satisfying
@@ -85,11 +86,19 @@ module type S = sig
   (** The public inputs for one circuit & several statements *)
   type public_inputs [@@deriving repr]
 
+  (** The verifier input for a circuit, represented as the actual number of
+      proofs that have been proved by the prover, the public inputs & the input
+      commitments *)
+  type circuit_verifier_input = {
+    nb_proofs : int;
+    public : public_inputs;
+    commitments : Input_commitment.public list list;
+  }
+  [@@deriving repr]
+
   (** The verifier inputs, represented as a map where each circuit is binded to
       the verifier inputs for this circuit. *)
-  type verifier_inputs =
-    (public_inputs * Input_commitment.public list list) SMap.t
-  [@@deriving repr]
+  type verifier_inputs = circuit_verifier_input SMap.t [@@deriving repr]
 
   (** Conversion from [prover_inputs] to [verifier_inputs]. *)
   val to_verifier_inputs :
@@ -136,7 +145,7 @@ module type S = sig
       public parameters.
   *)
   val update_prover_public_parameters :
-    Bytes.t -> prover_public_parameters -> prover_public_parameters
+    'a Repr.ty -> 'a -> prover_public_parameters -> prover_public_parameters
 
   (** Enrich the [verifier_public_parameters] with extra application data to
       prevent replay attacks.
@@ -144,7 +153,7 @@ module type S = sig
       public parameters.
   *)
   val update_verifier_public_parameters :
-    Bytes.t -> verifier_public_parameters -> verifier_public_parameters
+    'a Repr.ty -> 'a -> verifier_public_parameters -> verifier_public_parameters
 
   (** [prove public_parameters ~inputs] produces a proof for the collection
       of statements implied by [inputs] and the circuits used for generating

@@ -1,6 +1,6 @@
 # Light Mode
 
-The light mode is an alternative mode of `tezos-client`. It builds
+The light mode is an alternative mode of `octez-client`. It builds
 upon the proxy mode. The point of the light mode is
 to provide additional security to the proxy mode, by obtaining
 data from multiple (hopefully unrelated) endpoints and making sure
@@ -29,12 +29,12 @@ the light mode does the following:
   endpoints; and check that the hashes in these trees match the
   hashes obtained by hashing data obtained in the previous step.
 
-## `tezos-client` CLI
+## `octez-client` CLI
 
 The light mode is requested by passing `--mode light` to the client. For
 this, `src/lib_client/client_config.ml` contains a `Mode_light` value.
 
-This flag is inspected in `src/lib_client/client_main_run.ml` to 
+This flag is inspected in `src/lib_client/client_main_run.ml` to
 pass a value of type `Tezos_proxy.Proxy_services.mode` to
 `Client_context.unix_proxy`. Ultimately, this value is
 used in `lib_proxy/proxy_services.ml` to create different
@@ -79,16 +79,16 @@ it delegates to other files:
   that enough endpoints provide merkle trees that agree
   with the local data tree.
 
-## `tezos-node` new RPC: `merkle_tree`
+## `octez-node` new RPC: `merkle_tree`
 
 For the light mode,
-`tezos-node` is augmented with a new RPC whose syntax is
+`octez-node` is augmented with a new RPC whose syntax is
 `/chains/<chain_id>/blocks/<block_id>/context/merkle_tree/<path_in_context>?holey=[yes|no]`.
 For example, to retrieve the merkle tree of `contracts/global_counter`,
 one should do:
 
 ```
-tezos-client rpc get /chains/main/blocks/head/context/merkle_tree/contracts/global_counter
+octez-client rpc get /chains/main/blocks/head/context/merkle_tree/contracts/global_counter
 ```
 
 Here's the RPC's output:

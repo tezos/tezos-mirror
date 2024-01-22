@@ -43,8 +43,15 @@ type argument =
           cannot be safely used as a key in any form of cache. *)
 
 (** Get the RPC port of a proxy server. It's the port to
-    do request to. *)
+    do requests to. *)
 val rpc_port : t -> int
+
+(** Get the RPC host of a proxy server. It's the host to
+    do requests to. Its value is ["127.0.0.1"]. *)
+val rpc_host : string
+
+(** Get the RPC scheme of a proxy server. Its value is ["http"]. *)
+val rpc_scheme : string
 
 (** Get the runner associated to a proxy server.
 
@@ -85,3 +92,9 @@ type event = {name : string; value : JSON.t; timestamp : float}
     You can have multiple [on_event] handlers, although
     the order in which they trigger is unspecified. *)
 val on_event : t -> (event -> unit) -> unit
+
+(** See [Daemon.Make.wait_for]. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Expose the RPC server address of this proxy server as a foreign endpoint. *)
+val as_rpc_endpoint : t -> Endpoint.t

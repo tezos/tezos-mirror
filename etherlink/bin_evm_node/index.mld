@@ -1,0 +1,11 @@
+{0 Octez-evm-node-libs: octez EVM Node libraries}
+
+This is a package containing some libraries used by the EVM Node of Octez.
+
+It contains the following libraries:
+
+- {{!module-Evm_node_config}Evm_node_config}: Configuration for the EVM node
+- {{!module-Evm_node_lib_dev}Evm_node_lib_dev}: An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [dev version]
+- {{!module-Evm_node_lib_dev_encoding}Evm_node_lib_dev_encoding}: EVM encodings for the EVM node and plugin for the WASM Debugger [dev version]
+- {{!module-Evm_node_lib_prod}Evm_node_lib_prod}: An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [prod version]
+- {{!module-Evm_node_lib_prod_encoding}Evm_node_lib_prod_encoding}: EVM encodings for the EVM node and plugin for the WASM Debugger [prod version]

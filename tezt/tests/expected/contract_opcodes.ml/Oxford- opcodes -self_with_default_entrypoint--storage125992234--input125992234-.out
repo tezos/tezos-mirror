@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/self_with_default_entrypoint.tz on storage Unit and input Unit --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/self_with_default_entrypoint.tz on storage Unit and input Unit --level 1 --trace-stack
 storage
   Unit
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 13 (just consumed gas: 15.335)
+  - location: 13 (just consumed gas: 15.247)
     [ (Pair (Right (Left Unit)) Unit) ]
   - location: 13 (just consumed gas: 0.010)
     [  ]
@@ -33,9 +33,9 @@ trace
     [ 0 ]
   - location: 25 (just consumed gas: 0.010)
     [ True ]
-  - location: 26 (just consumed gas: 0)
+  - location: 26 (just consumed gas: 0.010)
     [  ]
-  - location: 26 (just consumed gas: 0.015)
+  - location: 26 (just consumed gas: 0.025)
     [  ]
   - location: 32 (just consumed gas: 0.010)
     [ Unit ]

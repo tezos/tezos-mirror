@@ -27,7 +27,8 @@
 
 (** This module maintains the storage related to slashing of delegates for
    double signing. In particular, it is responsible for maintaining the
-   {!Storage.Slashed_deposits} and {!Storage.Contract.Slashed_deposits} tables.
+   {!Storage.Slashed_deposits}, {!Storage.Contract.Slashed_deposits}, and
+   {!Storage.Current_cycle_denunciations} tables.
 *)
 
 (** Returns true if the given delegate has already been slashed
@@ -58,32 +59,29 @@ type punishing_amounts = {
 }
 
 (** Record in the context that the given delegate has now been slashed
-    for double attesting for the given level and return the amounts to
+    for double signing for the given misbehaviour for the given level and return the amounts to
     burn and to reward. If the delegate has no remaining frozen
     deposits, this will also forbid it to bake or attest until a new
     deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for double attesting for the given level.  *)
-val punish_double_attesting :
+    already been slashed for the same misbehaviour for the given level.  *)
+val punish_double_signing :
   Raw_context.t ->
+  operation_hash:Operation_hash.t ->
+  Misbehaviour.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
-  (Raw_context.t * punishing_amounts) tzresult Lwt.t
-
-(** Record in the context that the given delegate has now been slashed
-    for double baking for the given level and returns the amounts to
-    burn and to reward. If the delegate has no remaining frozen
-    deposits, this will also forbid it to bake or attest until a new
-    deposit is frozen.
-
-    Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for double baking for the given level.  *)
-val punish_double_baking :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  (Raw_context.t * punishing_amounts) tzresult Lwt.t
+  rewarded:Signature.public_key_hash ->
+  (Raw_context.t * bool) tzresult Lwt.t
 
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
+
+val apply_and_clear_current_cycle_denunciations :
+  Raw_context.t ->
+  (Raw_context.t
+  * Int_percentage.t Signature.Public_key_hash.Map.t
+  * Receipt_repr.balance_updates)
+  tzresult
+  Lwt.t

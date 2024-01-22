@@ -420,7 +420,7 @@ let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
   let* () =
     bake_with_mempool ~protocol state.sandbox_node state.sandbox_client mempool
   in
-  let* block = RPC.(Client.call state.sandbox_client (get_chain_block ())) in
+  let* block = Client.RPC.call state.sandbox_client @@ RPC.get_chain_block () in
   let expected_number_manager_op =
     match expected_baked_operations with
     | None ->
@@ -477,7 +477,7 @@ let test_ordering =
   bake_and_check state ~protocol ~mempool ~sources
 
 let check_op_not_in_baked_block client op =
-  let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
+  let* ops = Client.RPC.call client @@ RPC.get_chain_block_operations () in
   let open JSON in
   let ops_list = ops |=> 3 |> as_list in
   let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
@@ -510,7 +510,7 @@ let wrong_branch_operation_dismissal =
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   (* We inject an operation where the branch is the head (instead of
      head~2). Such operation should not be included. *)
-  let* branch = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+  let* branch = Client.RPC.call client @@ RPC.get_chain_block_hash () in
   Log.info "Injecting a transfer branched on the current head." ;
   let* (`OpHash oph) =
     Operation.Manager.(inject ~branch [make @@ transfer ()] client)
@@ -621,7 +621,7 @@ let test_operation_pool_ordering
 
   let* () = Client.bake_for_and_wait ~endpoint client in
   let* gas_limit =
-    let* block = RPC.Client.call_json client (RPC.get_chain_block ()) in
+    let* block = Client.RPC.call_json client (RPC.get_chain_block ()) in
     JSON.get "operations" block
     |> JSON.geti 3 |> JSON.geti 0 |> JSON.get "contents" |> JSON.geti 0
     |> JSON.get "gas_limit" |> JSON.as_int |> Lwt.return
@@ -657,7 +657,7 @@ let test_operation_pool_ordering
 
   (* Create a valid operation pool from current mempool *)
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let mgmt_ops = JSON.get "applied" mempool in
 
@@ -683,7 +683,7 @@ let test_operation_pool_ordering
   in
   let* op_hashes =
     let* json =
-      RPC.Client.call_json client (RPC.get_chain_block_operation_hashes ())
+      Client.RPC.call_json client (RPC.get_chain_block_operation_hashes ())
     in
     JSON.as_list (JSON.geti 3 json) |> Lwt.return
   in

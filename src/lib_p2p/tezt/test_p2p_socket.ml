@@ -210,8 +210,8 @@ module Self_identification = struct
       let*! id_client = id2 in
       let pp_connect_error ppf e =
         match e with
-        | `Connection_refused ->
-            Format.pp_print_string ppf "Connection Connection_refused"
+        | `Connection_failed ->
+            Format.pp_print_string ppf "Connection Connection_failed"
         | `Unexpected_error e ->
             Format.pp_print_string ppf (Printexc.to_string e)
       in
@@ -227,7 +227,11 @@ module Self_identification = struct
               ~canceler
               (P2p_io_scheduler.to_readable conn)
           in
-          let* () = P2p_io_scheduler.close conn in
+          let* () =
+            P2p_io_scheduler.close
+              ~reason:(User "client first explicit close")
+              conn
+          in
           (* During the second connection, the client will send the server's
              connection message instead of its own. *)
           let*! conn = P2p_test_utils.raw_connect sched addr port in

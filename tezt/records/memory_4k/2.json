@@ -1,0 +1,18 @@
+[
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Alpha: storage snapshot export and import",
+    "tags": [
+      "alpha",
+      "storage",
+      "snapshot",
+      "export",
+      "import",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "83475193",
+      "count": "1"
+    }
+  }
+]

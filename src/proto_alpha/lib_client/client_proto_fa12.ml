@@ -992,7 +992,7 @@ let is_viewable_action action =
   | _ -> tzfail (Not_a_viewable_entrypoint (action_to_entrypoint action))
 
 let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?sender ~contract ~action ?payer ?gas ~unparsing_mode () =
+    ~sender ~contract ~action ~payer ~gas ~unparsing_mode () =
   let open Lwt_result_syntax in
   let* () = is_viewable_action action in
   let* () = contract_has_fa12_interface cctxt ~chain ~block ~contract () in
@@ -1005,13 +1005,15 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ~contract
     ~input
     ~chain_id
-    ?sender
-    ?payer
-    ?gas
+    ~sender
+    ~payer
+    ~gas
     ~entrypoint
     ~unparsing_mode
     ~now:None
     ~level:None
+    ~other_contracts:None
+    ~extra_big_maps:None
 
 let () =
   Data_encoding.(

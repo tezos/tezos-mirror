@@ -33,7 +33,7 @@
 (* Copy-pasted from tenderbake.ml. *)
 let baker_at_round_n ?level round client =
   let* json =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_baking_rights ?level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_baking_rights ?level ()
   in
   match JSON.(json |=> round |-> "delegate" |> as_string_opt) with
   | Some delegate_id -> return delegate_id
@@ -99,7 +99,8 @@ let test_fork =
   (* Bake two blocks at round 0 so that the fitness is maximal. *)
   Log.info "Bake a branch with a high fitness on node 1" ;
   let level = 1 in
-  Check.(level = Node.get_level node1)
+  let* current_level = Node.get_level node1 in
+  Check.(level = current_level)
     Check.int
     ~__LOC__
     ~error_msg:"Level is expected to be %L but is %R" ;
@@ -107,7 +108,7 @@ let test_fork =
   let* () = Client.bake_for_and_wait ~keys:[baker] client1 in
   let* baker = baker_at_round_n ~level:(level + 2) 0 client1 in
   let* () = Client.bake_for_and_wait ~keys:[baker] client1 in
-  let* head_1 = RPC.call node1 @@ RPC.get_chain_block_header () in
+  let* head_1 = Node.RPC.call node1 @@ RPC.get_chain_block_header () in
 
   Log.info "Terminate node 1 and restart node 2" ;
   let* () = Node.terminate node1 in
@@ -139,7 +140,7 @@ let test_fork =
   let* () = Client.bake_for_and_wait ~keys:[baker] client2 in
   let* baker = baker_at_round_n ~level:(level + 2) 0 client2 in
   let* () = Client.bake_for_and_wait ~keys:[baker] client2 in
-  let* head_2 = RPC.call node2 @@ RPC.get_chain_block_header () in
+  let* head_2 = Node.RPC.call node2 @@ RPC.get_chain_block_header () in
 
   (* Check that the fitness of the first branch (node1) is higher than
      that of the second branch (node2) *)
@@ -174,7 +175,7 @@ let test_fork =
   let* () = wait_branch_switch in
   (* Make sure heads are synchronized. *)
   let* () =
-    let* new_head_2 = RPC.call node2 @@ RPC.get_chain_block_header () in
+    let* new_head_2 = Node.RPC.call node2 @@ RPC.get_chain_block_header () in
     let head_hash_1 = JSON.(head_1 |-> "hash" |> as_string) in
     let head_hash_2 = JSON.(new_head_2 |-> "hash" |> as_string) in
     Check.(head_hash_1 = head_hash_2)

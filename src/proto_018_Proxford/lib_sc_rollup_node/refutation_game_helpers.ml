@@ -66,24 +66,32 @@ let page_membership_proof params page_index slot_data =
       be unconfirmed on L1, this function returns [None]. If the data of the
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
-let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
-    (dal_params : Dal.parameters) start_state =
+let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
+    ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-    |> Sc_rollup.is_reveal_enabled_predicate
+    match constants.sc_rollup.reveal_activation_level with
+    | Some reveal_activation_level ->
+        Sc_rollup.is_reveal_enabled_predicate
+          (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+             reveal_activation_level)
+    | None ->
+        (* For older protocol, constants don't have the notion of reveal
+           activation level. *)
+        fun ~current_block_level:_ _ -> true
   in
   let*! input_request = PVM.is_input_state ~is_reveal_enabled start_state in
   match input_request with
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
       let Dal.Page.{slot_id; page_index} = page_id in
       let* pages =
-        Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
+        Dal_pages_request.slot_pages
+          ~dal_attestation_lag
+          ~inbox_level
+          node_ctxt
+          slot_id
       in
       match pages with
       | None -> return_none (* The slot is not confirmed. *)
@@ -110,7 +118,7 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
   | _ -> return_none
 
 let metadata (node_ctxt : _ Node_context.t) =
-  let address = node_ctxt.rollup_address in
+  let address = node_ctxt.config.sc_rollup_address in
   let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
   Sc_rollup.Metadata.{address; origination_level}
 
@@ -149,19 +157,18 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
-  let* parametric_constants =
-    let cctxt = node_ctxt.cctxt in
-    Protocol.Constants_services.parametric
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, `Level snapshot_level_int32)
+  let* constants =
+    Protocol_plugins.get_constants_of_level node_ctxt snapshot_level_int32
   in
-  let dal_l1_parameters = parametric_constants.dal in
+  let dal_l1_parameters = constants.dal in
   let dal_parameters = dal_l1_parameters.cryptobox_parameters in
   let dal_attestation_lag = dal_l1_parameters.attestation_lag in
+  let dal_number_of_slots = dal_l1_parameters.number_of_slots in
 
   let* page_info =
     page_info_from_pvm_state
-      ~dal_attestation_lag
+      constants
+      ~inbox_level:game.inbox_level
       node_ctxt
       dal_parameters
       start_state
@@ -182,7 +189,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash
       in
-      match res with Ok data -> return @@ Some data | Error _ -> return None
+      match res with Ok data -> return_some data | Error _ -> return_none
 
     module Inbox_with_history = struct
       let inbox = snapshot
@@ -212,16 +219,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
              ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
         @@
         let open Lwt_result_syntax in
-        let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-          Node_context.get_messages node_ctxt witness
-        in
-        let*? hist =
-          Inbox.payloads_history_of_messages
-            ~is_first_block
-            ~predecessor
-            ~predecessor_timestamp
-            messages
-        in
+        let* messages = Messages.get node_ctxt witness in
+        let*? hist = Inbox.payloads_history_of_all_messages messages in
         return hist
     end
 
@@ -236,14 +235,26 @@ let generate_proof (node_ctxt : _ Node_context.t)
 
       let dal_parameters = dal_parameters
 
+      let dal_number_of_slots = dal_number_of_slots
+
       let page_info = page_info
     end
   end in
   let metadata = metadata node_ctxt in
   let*! start_tick = PVM.get_tick start_state in
   let is_reveal_enabled =
-    Sc_rollup.is_reveal_enabled_predicate
-      parametric_constants.sc_rollup.reveal_activation_level
+    match constants.sc_rollup.reveal_activation_level with
+    | Some reveal_activation_level ->
+        Sc_rollup.is_reveal_enabled_predicate
+          (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+             reveal_activation_level)
+    | None ->
+        (* Constants for an older protocol, there is no notion of reveal
+           activation level for those. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6247
+           default value for is_reveal_enabled that returns true for all reveal
+           supported in protocols <= 18. *)
+        fun ~current_block_level:_ _ -> true
   in
   let* proof =
     trace
@@ -252,19 +263,21 @@ let generate_proof (node_ctxt : _ Node_context.t)
            inbox_level = game.inbox_level;
            start_tick = Sc_rollup.Tick.to_z start_tick;
          })
-    @@ (Sc_rollup.Proof.produce
-          ~metadata
-          (module P)
-          (Raw_level.of_int32_exn game.inbox_level)
-          ~is_reveal_enabled
-       >|= Environment.wrap_tzresult)
+    @@ let*! result =
+         Sc_rollup.Proof.produce
+           ~metadata
+           (module P)
+           (Raw_level.of_int32_exn game.inbox_level)
+           ~is_reveal_enabled
+       in
+       Lwt.return @@ Environment.wrap_tzresult result
   in
   let*? pvm_step =
     Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module PVM) proof.pvm_step
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
-  let*! res =
+  let*! result =
     Sc_rollup.Proof.valid
       ~metadata
       snapshot
@@ -272,11 +285,12 @@ let generate_proof (node_ctxt : _ Node_context.t)
       dal_slots_history
       dal_parameters
       ~dal_attestation_lag
+      ~dal_number_of_slots
       ~pvm:(module PVM)
       unserialized_proof
       ~is_reveal_enabled
-    >|= Environment.wrap_tzresult
   in
+  let res = Environment.wrap_tzresult result in
   assert (Result.is_ok res) ;
   let proof =
     Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof
@@ -318,12 +332,12 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
 
 let timeout_reached node_ctxt ~self ~opponent =
   let open Lwt_result_syntax in
-  let Node_context.{rollup_address; cctxt; _} = node_ctxt in
+  let Node_context.{config; cctxt; _} = node_ctxt in
   let+ game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Head 0)
-      rollup_address
+      config.sc_rollup_address
       self
       opponent
   in

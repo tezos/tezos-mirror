@@ -74,6 +74,19 @@ type t = {
   shutdown : unit -> unit Lwt.t;
 }
 
+let get_version node =
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let version = Tezos_version_value.Current_git_info.version in
+  let network_version = P2p.announced_version node.p2p in
+  Tezos_version.Node_version.
+    {version; commit_info = Some commit_info; network_version}
+
 let peer_metadata_cfg : _ P2p_params.peer_meta_config =
   {
     peer_meta_encoding = Peer_metadata.encoding;
@@ -110,6 +123,11 @@ let init_p2p chain_name p2p_params disable_mempool =
         P2p.create
           ~config
           ~limits
+          ~received_msg_hook:
+            Shell_metrics.Distributed_db.Messages.on_received_msg
+          ~sent_msg_hook:Shell_metrics.Distributed_db.Messages.on_sent_msg
+          ~broadcasted_msg_hook:
+            Shell_metrics.Distributed_db.Messages.on_broadcasted_msg
           peer_metadata_cfg
           conn_metadata_cfg
           message_cfg
@@ -346,7 +364,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
 
 let shutdown node = node.shutdown ()
 
-let build_rpc_directory ~version ~commit_info node =
+let build_rpc_directory ~node_version ~commit_info node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
@@ -373,7 +391,7 @@ let build_rpc_directory ~version ~commit_info node =
        ~dal_config:node.dal_config
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
-  merge (Version_directory.rpc_directory ~version ~commit_info node.p2p) ;
+  merge (Version_directory.rpc_directory node_version) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

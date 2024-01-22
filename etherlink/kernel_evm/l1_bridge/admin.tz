@@ -1,0 +1,21 @@
+{ parameter (pair (address %evm_rollup) (bytes %payload)) ;
+  storage address ;
+  code { UNPAIR ;
+         UNPAIR ;
+         DUP 3 ;
+         SENDER ;
+         COMPARE ;
+         NEQ ;
+         IF { DROP 3 ; PUSH string "Unauthorized set entrypoint" ; FAILWITH }
+            { CONTRACT (or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes) ;
+              IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+              DIG 2 ;
+              NIL operation ;
+              DIG 2 ;
+              PUSH mutez 0 ;
+              DIG 4 ;
+              RIGHT (or (pair bytes (ticket (pair nat (option bytes)))) bytes) ;
+              TRANSFER_TOKENS ;
+              CONS ;
+              PAIR } } }
+

@@ -2,7 +2,8 @@ include: .gitlab/ci/jobs/publish/common.yml
 
 opam:release:
   extends:
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
+    - .tags_template__no_gcp
   stage: publish_release
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false
@@ -10,4 +11,4 @@ opam:release:
     - gitlab:release
   script:
   # create opam release and push to github (also pushes latest master branch)
-  - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-release
+  - ./scripts/ci/opam-release.sh

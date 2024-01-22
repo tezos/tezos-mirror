@@ -60,7 +60,7 @@ let setup_l2_node ?runner ?name ?loser_mode ~operator client node rollup =
 
 let game_in_progress ~staker rollup_address client =
   let* game =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
          ~staker
          rollup_address
@@ -71,16 +71,18 @@ let game_in_progress ~staker rollup_address client =
 let rec wait_for_game ~staker rollup_address client node =
   let* in_progress = game_in_progress ~staker rollup_address client in
   if not in_progress then (
-    Log.info "Still no game at level %d" (Node.get_level node) ;
-    let* _ = Node.wait_for_level node (Node.get_level node + 1) in
+    let* current_level = Node.get_level node in
+    Log.info "Still no game at level %d" current_level ;
+    let* _ = Node.wait_for_level node (current_level + 1) in
     wait_for_game ~staker rollup_address client node)
   else unit
 
 let rec wait_for_end_of_game ~staker rollup_address client node =
   let* in_progress = game_in_progress ~staker rollup_address client in
   if in_progress then (
-    Log.info "Game still in progress at level %d" (Node.get_level node) ;
-    let* _ = Node.wait_for_level node (Node.get_level node + 1) in
+    let* current_level = Node.get_level node in
+    Log.info "Game still in progress at level %d" current_level ;
+    let* _ = Node.wait_for_level node (current_level + 1) in
     wait_for_end_of_game ~staker rollup_address client node)
   else unit
 
@@ -104,7 +106,7 @@ let rejection_with_proof ~(testnet : unit -> Testnet.t) () =
   let* rollup_address =
     originate_new_rollup ~src:honest_operator.alias client
   in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let fault_level = level + 5 in
   Log.info
     "Dishonest operator expected to inject an error at level %d"

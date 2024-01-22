@@ -28,9 +28,10 @@
    -------
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  * make -f kernels.mk build
-                 * provide a `kernel_upgrade_scenario.json` such as:
+                 * provide a `evm_upgrade_configuration.json` such as:
                  ```
                  {
+                   "evm-configuration": "<evm-configuration-path>",
                    "smart-rollup": {
                        "address": "<smart-rollup-address>",
                        "current-preimages-dir": "<preimages-dir-used-for-address-above>"
@@ -41,11 +42,13 @@
                  ```
    Invocation:   dune exec src/bin_testnet_scenarios/main.exe -- --file evm_rollup_upgrade.ml --verbose
                  NB: if your configuration files are not provided at the root of the project add
-                 additional `-a configuration=<PATH> -a upgrade_configuration=<PATH>` arguments.
+                 additional `-a configuration=<PATH> -a evm_upgrade_configuration=<PATH>` arguments.
 *)
 
 type upgrade_config = {
-  (* Rollup where the previous kernel is deployed *)
+  (* EVM general configuration. *)
+  evm_config : Evm_rollup.config;
+  (* Rollup where the previous kernel is deployed. *)
   smart_rollup : Evm_rollup.existing_rollup option;
   (* Directory where to find the new kernel. *)
   kernel_dir : string;
@@ -54,20 +57,21 @@ type upgrade_config = {
   new_kernel : string;
 }
 
-let get_upgrade_config path =
-  let config = JSON.parse_file path in
-  let smart_rollup_opt = JSON.(config |-> "smart-rollup" |> as_object_opt) in
+let get_upgrade_config config =
+  let open JSON in
+  let evm_config = Evm_rollup.get_config (config |-> "evm-configuration") in
+  let smart_rollup_opt = config |-> "smart-rollup" |> as_object_opt in
   let smart_rollup =
     match smart_rollup_opt with
     | Some [(_, address); (_, current_preimages_dir)] ->
-        let address = JSON.(address |> as_string) in
-        let current_preimages_dir = JSON.(current_preimages_dir |> as_string) in
+        let address = address |> as_string in
+        let current_preimages_dir = current_preimages_dir |> as_string in
         Some Evm_rollup.{address; current_preimages_dir}
     | _ -> None
   in
-  let kernel_dir = JSON.(config |-> "kernel-dir" |> as_string) in
-  let new_kernel = JSON.(config |-> "new-kernel" |> as_string) in
-  {smart_rollup; kernel_dir; new_kernel}
+  let kernel_dir = config |-> "kernel-dir" |> as_string in
+  let new_kernel = config |-> "new-kernel" |> as_string in
+  {evm_config; smart_rollup; kernel_dir; new_kernel}
 
 let durable_storage_rpc ~smart_rollup_node ~key =
   Sc_rollup_helpers.call_rpc
@@ -82,7 +86,10 @@ let send_external_message_and_wait ~client ~node ~sender ~hex_msg =
       ~msg:("hex:[ \"" ^ hex_msg ^ "\" ]")
       client
   in
-  let* _ = Node.wait_for_level node (Node.get_level node + 2) in
+  let* _ =
+    let* current_level = Node.get_level node in
+    Node.wait_for_level node (current_level + 2)
+  in
   unit
 
 let strip_0x s =
@@ -146,43 +153,41 @@ let replace_preimages ~smart_rollup_node ~kernel_dir ~new_kernel =
   let preimages_dir =
     Sc_rollup_node.data_dir smart_rollup_node // "wasm_2_0_0"
   in
-  let* _, root_hash =
-    Sc_rollup_helpers.prepare_installer_kernel_gen
+  let* {root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
       ~preimages_dir
       ~base_installee:kernel_dir
-      ~display_root_hash:true
       new_kernel
   in
-  match root_hash with
-  | Some root_hash -> return root_hash
-  | None ->
-      failwith
-        "Couldn't obtain the root hash of the preimages of the chunked kernel."
+  return root_hash
 
-let upgrade_kernel ~testnet () =
-  let testnet = testnet () in
-  let path =
-    Cli.get_string
-      ~default:"kernel_upgrade_scenario.json"
-      "upgrade_configuration"
+let upgrade_kernel ~configuration_path ~testnet () =
+  let upgrade_config =
+    get_upgrade_config (JSON.parse_file configuration_path)
   in
-  let upgrade_config = get_upgrade_config path in
+  let testnet = testnet () in
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
-  let mode =
-    Cli.get_string ~default:"Operator" "mode" |> Sc_rollup_node.mode_of_string
+  let* () =
+    Evm_rollup.check_operator_balance
+      ~node
+      ~client
+      ~mode:upgrade_config.evm_config.mode
+      ~operator
   in
-  let* () = Evm_rollup.check_operator_balance ~node ~client ~mode ~operator in
-  let* smart_rollup_address, smart_rollup_node, _evm_proxy_server =
+  let* smart_rollup_address, smart_rollup_node, _evm_node =
     Evm_rollup.setup_evm_infra
-      ~mode
+      ~config:upgrade_config.evm_config
       ~operator
       ?preexisting_rollup:upgrade_config.smart_rollup
       node
       client
   in
   (* Wait for the kernel to initialize. *)
-  let* _ = Node.wait_for_level node (Node.get_level node + 2) in
+  let* _ =
+    let* current_level = Node.get_level node in
+    Node.wait_for_level node (current_level + 2)
+  in
   let new_kernel =
     project_root // upgrade_config.kernel_dir
     // (upgrade_config.new_kernel ^ ".wasm")
@@ -215,11 +220,16 @@ let upgrade_kernel ~testnet () =
   Check.(boot_wasm_expected = boot_wasm)
     Check.string
     ~error_msg:"Unexpected kernel [boot.wasm]" ;
-  Evm_rollup.stop_or_keep_going ~node
+  Evm_rollup.stop_or_keep_going ~config:upgrade_config.evm_config ~node
 
 let register ~testnet =
+  let configuration_path =
+    Cli.get_string
+      ~default:"evm_upgrade_configuration.json"
+      "evm_upgrade_configuration"
+  in
   Test.register
     ~__FILE__
     ~title:"Upgrade an EVM rollup"
     ~tags:["upgrade"]
-    (upgrade_kernel ~testnet)
+    (upgrade_kernel ~configuration_path ~testnet)

@@ -205,7 +205,7 @@ let extract_view_output_type entrypoint ty =
   | Micheline.Prim
       (_, Script.T_pair, [_; Micheline.Prim (_, Script.T_contract, [ty], _)], _)
     ->
-      ok (Micheline.strip_locations ty)
+      Ok (Micheline.strip_locations ty)
   | _ -> Environment.Error_monad.error (Illformed_view_type (entrypoint, ty))
 
 (* 'view' entrypoints returns their value by calling a callback contract, thus
@@ -235,7 +235,7 @@ let extract_parameter_from_operations entrypoint operations callback =
      };
   ]
     when Contract_hash.equal destination callback ->
-      ok unparsed_parameters
+      Ok unparsed_parameters
   | [] ->
       Environment.Error_monad.error (View_never_returns (entrypoint, callback))
   | _ -> unexpected_return
@@ -289,5 +289,5 @@ let make_michelson_viewer_script address view input input_ty output_ty :
    [make_michelson_viewer_script]. *)
 let extract_value_from_storage (storage : Script.expr) =
   match Micheline.root storage with
-  | Micheline.Prim (_, Script.D_Some, [value], []) -> ok value
+  | Micheline.Prim (_, Script.D_Some, [value], []) -> Ok value
   | _ -> Environment.Error_monad.error @@ Viewer_unexpected_storage

@@ -33,11 +33,11 @@ type t = private {
           to be the same as in [octez-client] *)
   rpc_addr : Uri.t option;
       (** The address that the proxy server serves. Name
-          was chosen to be the same as in [tezos-node run] *)
+          was chosen to be the same as in [octez-node run] *)
   rpc_tls : string option;
       (** A string of the form ["crt,key"] where [crt] is the path
           to the TLS certificate to use and [key] is the path to the key
-          to use. Name was chosen to be the same as in [tezos-node run] *)
+          to use. Name was chosen to be the same as in [octez-node run] *)
   sym_block_caching_time : Ptime.span option;
       (** The time during which data for a symbolic block identifier
           (like [head], [head~1]) is kept. Smaller values increase [endpoint]'s
@@ -50,7 +50,7 @@ type t = private {
           is too high, pass a bigger value than [time_between_blocks] (if
           your clients are fine seeing slightly deprecated values) *)
   data_dir : string option;
-      (** Path to the data-dir of a running tezos-node. If specified, we use
+      (** Path to the data-dir of a running octez-node. If specified, we use
           the [context] subdirectory to obtain data instead of using the
           [../raw/bytes] RPC call (hereby reducing the node's IO). *)
 }
@@ -70,7 +70,7 @@ type runtime = private {
   sym_block_caching_time : Ptime.span option;
       (** The duration during which data of symbolic blocks is kept *)
   data_dir : string option;
-      (** Path to the data-dir of a running tezos-node. If specified, we use
+      (** Path to the data-dir of a running octez-node. If specified, we use
           the [context] subdirectory to obtain data instead of using the
           [../raw/bytes] RPC call (hereby reducing the node's IO). *)
 }

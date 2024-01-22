@@ -124,6 +124,17 @@ let rec infer_cmd local_model_name workload_data solver infer_opts =
         workload_data ;
       exit 1
 
+and infer_all_cmd workload_data solver infer_opts =
+  Pyinit.pyinit () ;
+  let file_stats = Unix.stat workload_data in
+  match file_stats.st_kind with
+  | S_DIR ->
+      (* User specified a directory. Automatically process all workload data in that directory. *)
+      infer_all_cmd_full_auto workload_data solver infer_opts
+  | _ ->
+      Format.eprintf "Error: %s is not a directory.@." workload_data ;
+      exit 1
+
 and infer_cmd_one_shot local_model_name workload_data solver
     (infer_opts : Cmdline.infer_parameters_options) =
   let measure = Measure.load ~filename:workload_data in
@@ -220,6 +231,69 @@ and infer_cmd_full_auto local_model_name workload_data solver
        solution
        ~solver
        infer_opts
+
+and infer_all_cmd_full_auto workload_data solver
+    (infer_opts : Cmdline.infer_parameters_options) =
+  let map_file ~local_model_name =
+    let local_model_name =
+      String.split_on_char '/' local_model_name |> String.concat "__"
+    in
+    fun original_name ->
+      let extension = Filename.extension original_name in
+      Format.sprintf
+        "%s_%s%s"
+        (Filename.remove_extension original_name)
+        local_model_name
+        extension
+  in
+  let workload_files = get_all_workload_data_files workload_data in
+  let local_model_names =
+    List.concat_map
+      (fun filename ->
+        match Measure.load ~filename with
+        | Measure.Measurement (b, _) ->
+            let module B : Benchmark.S = (val b) in
+            List.map fst B.models)
+      workload_files
+    |> List.filter (fun x -> x <> "*")
+    |> List.sort_uniq String.compare
+  in
+  List.iter
+    (fun local_model_name ->
+      let remap_file = Option.map (map_file ~local_model_name) in
+      let infer_opts =
+        {
+          infer_opts with
+          csv_export = remap_file infer_opts.csv_export;
+          dot_file = remap_file infer_opts.dot_file;
+          save_solution = remap_file infer_opts.save_solution;
+          report =
+            (match infer_opts.report with
+            | Cmdline.ReportToFile x ->
+                ReportToFile (map_file ~local_model_name x)
+            | _ as x -> x);
+        }
+      in
+      let graph, measurements =
+        Dep_graph.load_workload_files ~local_model_name workload_files
+      in
+      if Dep_graph.Graph.is_empty graph then (
+        Format.eprintf "Empty dependency graph.@." ;
+        exit 1) ;
+      Option.iter
+        (fun filename -> Dep_graph.Graph.save_graphviz graph filename)
+        infer_opts.dot_file ;
+      Format.eprintf "Performing topological run@." ;
+      let solution = Dep_graph.Graph.to_sorted_list graph in
+
+      ignore
+      @@ infer_for_measurements
+           ~local_model_name
+           measurements
+           solution
+           ~solver
+           infer_opts)
+    (List.sort_uniq String.compare local_model_names)
 
 (* If [local_model_name] is specified, the inference is restricted only to
    the models with [local_model_name]. *)
@@ -545,77 +619,128 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
-let generate_code_for_models sol models codegen_options ~exclusions =
+(** It returns [(destination, code list) map] *)
+let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
   let transform = code_transform codegen_options in
-  Codegen.codegen_models models sol transform ~exclusions
+  let generated = Codegen.codegen_models models sol transform in
+  if codegen_options.split then
+    List.fold_left
+      (fun m -> function
+        | Some dest, code ->
+            String.Map.update
+              dest
+              (function None -> Some [code] | Some x -> Some (x @ [code]))
+              m
+        | None, _ -> m)
+      String.Map.empty
+      generated
+  else String.Map.singleton "auto_build" (List.map snd generated)
+
+(* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
+let convert_costs_file_name path =
+  let open Option_syntax in
+  let dir = Filename.dirname path in
+  let base = Filename.remove_extension @@ Filename.basename path in
+  let suffix = "_costs_generated" in
+  let+ prefix = String.remove_suffix ~suffix base in
+  let fn = Format.asprintf "%s_costs.ml" prefix in
+  Filename.concat dir fn
+
+let get_defined_cost_function_list save_to =
+  let open Option_syntax in
+  let* costs_file = convert_costs_file_name save_to in
+  let+ costs_file =
+    if Sys.file_exists costs_file then Some costs_file else None
+  in
+  let () = Format.eprintf "Detected %s@." costs_file in
+  let res = Codegen.Parser.get_cost_functions costs_file in
+  match res with Ok cost_fun_list -> cost_fun_list | Error err -> raise err
 
 let save_code_list_as_a_module save_to code_list =
   let result = Codegen.make_toplevel_module code_list in
   stdout_or_file save_to (fun ppf -> Codegen.pp_module ppf result)
 
-let generate_code codegen_options generated_code =
-  let generated =
-    List.fold_left
-      (fun acc (destination, code) ->
-        String.Map.update
-          destination
-          (function None -> Some [code] | Some x -> Some (x @ [code]))
-          acc)
-      String.Map.empty
-      generated_code
+let generate_code codegen_options generated =
+  let make_destination destination_module save_to =
+    let is_split = codegen_options.Cmdline.split in
+    let dirname, destination =
+      if not is_split then
+        ( Filename.dirname save_to,
+          Filename.remove_extension @@ Filename.basename save_to )
+      else (
+        (match Sys.is_directory save_to with
+        | true -> ()
+        | false ->
+            Sys.remove save_to ;
+            Sys.mkdir save_to 0o777
+        | exception Sys_error _ -> Sys.mkdir save_to 0o777) ;
+        ( save_to,
+          Filename.remove_extension @@ Filename.basename destination_module ))
+    in
+    let suffix =
+      if Option.is_some codegen_options.Cmdline.transform then String.empty
+      else "__non_fp"
+    in
+    let result = Format.sprintf "%s%s.ml" destination suffix in
+    Filename.concat dirname result
   in
-  let save_to destination =
-    Option.filter_map
-      (fun save_to ->
-        let destination =
-          Filename.remove_extension @@ Filename.basename destination
-        in
-        let dirname = Filename.dirname save_to in
-        let basename = Filename.remove_extension @@ Filename.basename save_to in
-        let basename = String.remove_prefix ~prefix:"auto_build" basename in
-        let basename_empty =
-          Option.fold ~none:true ~some:(fun x -> String.equal x "") basename
-        in
-        let result =
-          if basename_empty then Some (destination ^ ".ml")
-          else
-            Option.map
-              (fun base -> Format.sprintf "%s_%s.ml" destination base)
-              basename
-        in
-        Option.map (Filename.concat dirname) result)
+  let save_to destination_module =
+    Option.map
+      (make_destination destination_module)
       codegen_options.Cmdline.save_to
   in
+  let filter_defined_cost_function dest codes =
+    (* Filter [cost_*] functions which is already defined in "*_costs.ml" file *)
+    let fun_list =
+      let open Option_syntax in
+      let* split_to_dir =
+        if codegen_options.split then codegen_options.save_to else None
+      in
+      let generated_file = Filename.(concat split_to_dir (basename dest)) in
+      get_defined_cost_function_list generated_file
+    in
+    match fun_list with
+    | None -> codes
+    | Some fun_list ->
+        let codes, filtered =
+          List.partition_map
+            (fun code ->
+              match Codegen.get_name_of_code code with
+              | None -> Left code
+              | Some name ->
+                  if List.mem ~equal:String.equal name fun_list then Right name
+                  else Left code)
+            codes
+        in
+        let () =
+          let open Format in
+          eprintf
+            "@[<v2>Skipped functions to be output:@;%a@]@."
+            (pp_print_list pp_print_string)
+            filtered
+        in
+        codes
+  in
   String.Map.iter
-    (fun k v -> save_code_list_as_a_module (save_to k) v)
+    (fun k v ->
+      let v = filter_defined_cost_function k v in
+      save_code_list_as_a_module (save_to k) v)
     generated
-
-let get_exclusions () =
-  Registration.all_models ()
-  |> List.filter_map (fun (name, info) ->
-         let is_excluded =
-           List.is_empty @@ Codegen.get_codegen_destinations info
-         in
-         if is_excluded then Some (Namespace.to_string name) else None)
-  |> String.Set.of_list
 
 let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
-  let exclusions = get_exclusions () in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
-  let generated =
-    generate_code_for_models sol models codegen_options ~exclusions
-  in
+  let generated = generate_code_for_models sol models codegen_options in
   generate_code codegen_options generated
 
-let codegen_for_a_solution solution codegen_options ~exclusions =
+let codegen_for_a_solution solution codegen_options =
   let fvs_of_codegen_model model =
     let (Model.Model model) = model in
     let module Model = (val model) in
@@ -628,29 +753,27 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
       (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
-  let is_generate_all info =
-    if String.Set.is_empty exclusions then true
-    else not @@ List.is_empty @@ Codegen.get_codegen_destinations info
-  in
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter (fun (_model_name, ({Registration.model; from = _} as info)) ->
-        model_fvs_included_in_sol model && is_generate_all info)
+    List.filter (fun (_model_name, {Registration.model; _}) ->
+        model_fvs_included_in_sol model)
     @@ Registration.all_models ()
   in
-  generate_code_for_models solution codegen_models codegen_options ~exclusions
+  generate_code_for_models solution codegen_models codegen_options
 
-let save_codegen_for_solutions solutions codegen_options ~exclusions =
+let save_codegen_for_solutions solutions codegen_options =
   let generated =
-    List.concat_map
-      (fun solution ->
-        codegen_for_a_solution solution codegen_options ~exclusions)
+    List.fold_left
+      (fun m solution ->
+        let m' = codegen_for_a_solution solution codegen_options in
+        String.Map.merge (fun _dest -> Option.merge (fun a b -> a @ b)) m m')
+      String.Map.empty
       solutions
   in
   generate_code codegen_options generated
 
-let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
-  let exclusions' = get_exclusions () in
+let codegen_for_solutions_cmd ?(build_all = false) solution_fns codegen_options
+    =
   let is_dir, solution_dir =
     match solution_fns with
     | x :: [] -> (Sys.is_directory x, x)
@@ -664,10 +787,15 @@ let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
     else solution_fns
   in
   let solutions = List.map Codegen.load_solution solutions in
-  save_codegen_for_solutions
-    solutions
-    codegen_options
-    ~exclusions:(String.Set.union exclusions' exclusions)
+  save_codegen_for_solutions solutions codegen_options ;
+  if build_all then
+    let transform =
+      Option.fold
+        ~none:(Some Fixed_point_transform.default_options)
+        ~some:(fun _ -> None)
+        codegen_options.transform
+    in
+    save_codegen_for_solutions solutions {codegen_options with transform}
 
 let save_solutions_in_text out_fn nsolutions =
   stdout_or_file out_fn @@ fun ppf ->
@@ -798,10 +926,73 @@ module Auto_build = struct
         mich_fn ;
       None)
 
+  let get_head_context_hash data_dir =
+    match
+      Lwt_main.run @@ Tezos_shell_benchmarks.Io_helpers.load_head_block data_dir
+    with
+    | Error e ->
+        Format.eprintf
+          "Error: %a@."
+          Tezos_error_monad.Error_monad.pp_print_trace
+          e ;
+        Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
+        exit 1
+    | Ok res -> res
+
+  (* Assumes the data files are found in [_snoop/tezos_node] *)
+  let make_io_read_random_key_benchmark_config dest ns =
+    let open Tezos_shell_benchmarks.Io_benchmarks.Read_random_key_bench in
+    let data_dir = "_snoop/tezos-node" in
+    let context_dir = Filename.concat data_dir "context" in
+    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    Format.eprintf
+      "Using %s, Context_hash: %a; Block: %ld %a@."
+      context_dir
+      Context_hash.pp
+      context_hash
+      level
+      Block_hash.pp
+      block_hash ;
+    let config =
+      {
+        existing_context = (context_dir, context_hash);
+        subdirectory = "/contracts/index";
+      }
+    in
+    let json = Data_encoding.Json.construct config_encoding config in
+    Config.(save_config dest (build [(ns, json)])) ;
+    Some dest
+
+  (* Assumes the data files are found in [_snoop/tezos_node] *)
+  let make_io_write_random_keys_benchmark_config dest ns =
+    let open Tezos_shell_benchmarks.Io_benchmarks.Write_random_keys_bench in
+    let data_dir = "_snoop/tezos-node" in
+    let context_dir = Filename.concat data_dir "context" in
+    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    Format.eprintf
+      "Using %s, Context_hash: %a; Block: %ld %a@."
+      context_dir
+      Context_hash.pp
+      context_hash
+      level
+      Block_hash.pp
+      block_hash ;
+    let config =
+      {
+        default_config with
+        existing_context = (context_dir, context_hash);
+        subdirectory = "/contracts/index";
+      }
+    in
+    let json = Data_encoding.Json.construct config_encoding config in
+    Config.(save_config dest (build [(ns, json)])) ;
+    Some dest
+
   (* Benchmark specific config overrides *)
   let override_measure_options ~outdir ~bench_name measure_options =
     let open Measure in
     let {bench_number; nsamples; config_file; _} = measure_options in
+    let bench_name_tokens = Namespace.to_list bench_name in
     (* override [config_file] for sapling and michelson encoding benchmarks *)
     let config_file =
       Option.either_f config_file @@ fun () ->
@@ -810,7 +1001,7 @@ module Auto_build = struct
         @@ Namespace.to_filename bench_name
         ^ "_benchmark.config"
       in
-      match Namespace.to_list bench_name with
+      match bench_name_tokens with
       | "." :: "sapling" :: _ -> make_sapling_benchmark_config dest bench_name
       | "." :: "interpreter" :: n :: _
         when String.starts_with ~prefix:"ISapling" n ->
@@ -828,11 +1019,26 @@ module Auto_build = struct
             dest
             bench_name
             "_snoop/michelson_data/data.mich"
+      | ["."; "io"; "READ_RANDOM_KEY"] ->
+          make_io_read_random_key_benchmark_config dest bench_name
+      | ["."; "io"; "WRITE_RANDOM_KEYS"] ->
+          make_io_write_random_keys_benchmark_config dest bench_name
       | _ -> None
+    in
+    (* override [nsamples] for "alloc"s *)
+    let nsamples =
+      if List.mem ~equal:String.equal "alloc" bench_name_tokens then 1
+      else nsamples
     in
     (* override [bench_number] and [nsamples] for intercept and TIMER_LATENCY *)
     let bench_number, nsamples =
-      match Namespace.to_list bench_name with
+      match bench_name_tokens with
+      | "." :: "io" :: _ ->
+          (* Currently, IO benchmarks reloads the context and purges the disk cache only
+             once for each benchmark.  [nsamples] must be 1 otherwise the second and later
+             samples are executed with the caches available.
+          *)
+          (bench_number, 1)
       | ["."; "interpreter"; "N_IOpen_chest"; "intercept"] ->
           (* Timings of [IOpen_chest] are highly affected by hidden randomness
              of [puzzle].  We need multiple [bench_number] to avoid this effect.
@@ -1014,26 +1220,22 @@ module Auto_build = struct
       [(solution_fn, solution)] ;
     solution
 
-  let codegen mkfilename solution ~exclusions =
+  let codegen ~split mkfilename solution =
     let codegen_options =
-      Cmdline.{transform = None; save_to = Some (mkfilename "_non_fp.ml")}
+      Cmdline.{transform = None; save_to = Some (mkfilename ".ml"); split}
     in
-    save_codegen_for_solutions [solution] codegen_options ~exclusions ;
+    save_codegen_for_solutions [solution] codegen_options ;
     let codegen_options =
       Cmdline.
         {
-          transform =
-            Some
-              {
-                Fixed_point_transform.default_options with
-                max_relative_error = 0.5;
-              };
+          transform = Some Fixed_point_transform.default_options;
           save_to = Some (mkfilename ".ml");
+          split;
         }
     in
-    save_codegen_for_solutions [solution] codegen_options ~exclusions
+    save_codegen_for_solutions [solution] codegen_options
 
-  let cmd targets
+  let cmd ?(split = false) targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
     let exitf status fmt =
       Format.kasprintf
@@ -1047,10 +1249,7 @@ module Auto_build = struct
           exitf 1 "Need to specify --out-dir")
     in
     (* No non-lwt version available... *)
-    Lwt_main.run
-      (let open Lwt_syntax in
-      let* () = Lwt_utils_unix.create_dir outdir in
-      Lwt_utils_unix.create_dir (Filename.concat outdir "generated_code")) ;
+    Lwt_main.run (Lwt_utils_unix.create_dir outdir) ;
 
     let state_tbl = init_state_tbl () in
 
@@ -1102,15 +1301,16 @@ module Auto_build = struct
 
     (* Inference and codegen *)
     Pyinit.pyinit () ;
-
     let mkfilename ext = Filename.concat outdir "auto_build" ^ ext in
     (* Infernece *)
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
-    let exclusions = get_exclusions () in
+    let mkfilename ext =
+      if split then outdir else Filename.concat outdir "auto_build" ^ ext
+    in
     (* Codegen *)
-    codegen mkfilename solution ~exclusions
+    codegen ~split mkfilename solution
 end
 
 (* -------------------------------------------------------------------------- *)
@@ -1133,15 +1333,17 @@ let () =
           benchmark_cmd bench_name bench_opts
       | Infer {local_model_name; workload_data; solver; infer_opts} ->
           infer_cmd local_model_name workload_data solver infer_opts
+      | Infer_all {workload_data; solver; infer_opts} ->
+          infer_all_cmd workload_data solver infer_opts
       | Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
       | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
-      | Codegen_inferred {solution; codegen_options; exclusions} ->
-          codegen_for_solutions_cmd [solution] codegen_options ~exclusions
-      | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
-          codegen_for_solutions_cmd solutions codegen_options ~exclusions
+      | Codegen_inferred {solution; codegen_options} ->
+          codegen_for_solutions_cmd [solution] codegen_options
+      | Codegen_for_solutions {solutions; codegen_options} ->
+          codegen_for_solutions_cmd ~build_all:true solutions codegen_options
       | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd None solutions
-      | Auto_build {targets; auto_build_options} ->
-          Auto_build.cmd targets auto_build_options)
+      | Auto_build {targets; auto_build_options; split} ->
+          Auto_build.cmd ~split targets auto_build_options)

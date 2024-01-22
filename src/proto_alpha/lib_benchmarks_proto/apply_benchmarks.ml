@@ -96,9 +96,7 @@ module Take_fees_benchmark = struct
     Sparse_vec.String.of_list [("batch_length", float_of_int batch_length)]
 
   let model =
-    Model.make
-      ~conv:(fun {batch_length} -> (batch_length, ()))
-      ~model:Model.affine
+    Model.make ~conv:(fun {batch_length} -> (batch_length, ())) Model.affine
 
   let create_benchmark ~rng_state _conf =
     let open Annotated_manager_operation in

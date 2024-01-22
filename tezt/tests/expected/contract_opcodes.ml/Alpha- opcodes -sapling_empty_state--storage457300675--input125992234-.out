@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (just consumed gas: 4.358)
+  - location: 8 (just consumed gas: 4.250)
     [ (Pair Unit {}) ]
   - location: 8 (just consumed gas: 0.010)
     [  ]

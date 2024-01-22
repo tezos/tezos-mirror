@@ -61,7 +61,7 @@ type t
 
 type operation := t
 
-type consensus_kind = Attestation | Preattestation
+type consensus_kind = Attestation | Preattestation | Dal_attestation
 
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
@@ -110,6 +110,21 @@ val sign :
 
 (** [hash t client] returns the hash of the operation  *)
 val hash : t -> Client.t -> [`OpHash of string] Lwt.t
+
+(** Returns the size (in bytes) of the operation.
+
+    @param protocol Allows using the operation encoding rather than
+    using the [forge_operations] RPC to compute the hexadecimal
+    representation of the operation.
+
+    @param signature Allows to manually set the signature of the
+    operation. When omitted, the operation is correctly signed using {!sign}. *)
+val byte_size :
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  int Lwt.t
 
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
@@ -215,11 +230,11 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [dal_attestation ~attestation ~level] crafts a slot attestation
+  (** [dal_attestation ~attestation ~level ~slot] crafts a slot attestation
      operation to attest at [level] slot headers published at level
      [level - attestation_lag].  For each slot, the value of the
      booleans indicates whether the data is deemed available. *)
-  val dal_attestation : attestation:bool array -> level:int -> t
+  val dal_attestation : attestation:bool array -> level:int -> slot:int -> t
 
   (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
       crafts a consensus operation with the [kind] at [level] on the [round]
@@ -290,6 +305,21 @@ module Consensus : sig
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** Retrieves the attestation slots at [level] by calling the [GET
+      /chains/<chain>/blocks/<block>/helpers/validators] RPC. *)
+  val get_slots : level:int -> Client.t -> JSON.t Lwt.t
+
+  (** Returns the first slot of the provided delegate in the
+      [slots_json] that describes all attestation rights at some
+      level.
+
+      Causes the test to fail if the delegate is not found. *)
+  val first_slot : slots_json:JSON.t -> Account.key -> int
+
+  (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
+      extracts the head block's payload hash from the result. *)
+  val get_block_payload_hash : Client.t -> string Lwt.t
 end
 
 module Anonymous : sig
@@ -570,6 +600,41 @@ module Manager : sig
       Tenderbake.
   *)
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
+
+  (** A wrapper for {!val-operation} on a list consisting in a single
+      {!val-transfer}. See both functions for details and default
+      values of arguments. *)
+  val mk_single_transfer :
+    ?source:Account.key ->
+    ?counter:int ->
+    ?fee:int ->
+    ?gas_limit:int ->
+    ?storage_limit:int ->
+    ?dest:Account.key ->
+    ?amount:int ->
+    ?branch:string ->
+    ?signer:Account.key ->
+    Client.t ->
+    operation Lwt.t
+
+  (** A wrapper for {!inject}ing a batch consisting in a single
+      transfer. See {!transfer}, {!make_batch}, and {!inject} for the
+      descriptions and default values of the arguments. *)
+  val inject_single_transfer :
+    ?source:Account.key ->
+    ?counter:int ->
+    ?fee:int ->
+    ?gas_limit:int ->
+    ?storage_limit:int ->
+    ?dest:Account.key ->
+    ?amount:int ->
+    ?request:[< `Arrived | `Flush | `Inject | `Notify > `Inject] ->
+    ?force:bool ->
+    ?branch:string ->
+    ?signer:Account.key ->
+    ?error:rex ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
 end
 
 (** Regular expressions for specific error messages.
@@ -591,8 +656,30 @@ val gas_limit_exceeded : rex
 val conflict_error_with_needed_fee : rex
 
 (** Matches the message produced by
+    [Operation_conflict {new_hash; needed_fee_in_mutez = None}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [new_hash]. *)
+val conflict_error_no_possible_fee : rex
+
+(** Matches the message produced by
     [Rejected_by_full_mempool {hash; needed_fee_in_mutez = Some fee}]
     from [src/lib_shell_services/validation_errors].
 
     Captures [hash] and [fee]. *)
 val rejected_by_full_mempool_with_needed_fee : rex
+
+(** Matches the message produced by
+    [Rejected_by_full_mempool {hash; needed_fee_in_mutez = None}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [hash]. *)
+val rejected_by_full_mempool_no_possible_fee : rex
+
+(** Calls {!inject_and_capture2_stderr} and checks that the second
+    captured group is [expected_fee].
+
+    Intended to be used with {!conflict_error_with_needed_fee} or
+    {!rejected_by_full_mempool_with_needed_fee} as [rex]. *)
+val inject_error_check_recommended_fee :
+  loc:string -> rex:rex -> expected_fee:int -> t -> Client.t -> unit Lwt.t

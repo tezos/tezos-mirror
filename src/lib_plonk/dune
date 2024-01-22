@@ -6,14 +6,10 @@
  (public_name octez-libs.plonk)
  (instrumentation (backend bisect_ppx))
  (libraries
-  repr
-  hacl-star
-  data-encoding
-  octez-libs.bls12-381-polynomial
+  octez-libs.kzg
   octez-libs.plompiler
   str)
  (preprocess (pps ppx_repr))
  (flags
   (:standard)
-  -open Octez_bls12_381_polynomial
   -open Plompiler))

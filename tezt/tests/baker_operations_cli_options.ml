@@ -33,7 +33,8 @@
 (* Simple tests to check support for the following operations-related options
    for baking
    - --ignore-node-mempool
-   - --operations-pool [file|uri] *)
+   - --operations-pool [file|uri]
+   - --record-state *)
 
 type http_path_mapping = Present | Absent
 
@@ -140,15 +141,13 @@ let test_ignore_node_mempool =
   let* mempool = Mempool.get_mempool client in
   Mempool.check_mempool ~validated:[] mempool ;
   let* balance2 = Client.get_balance_for ~account:sender.alias client in
+  let* level = Node.get_level node in
   Check.(
     (balance2 = Tez.(balance0 - amount - fee))
       Tez.typ
       ~__LOC__
       ~error_msg:"Expected the balance of sender to be %R, but got %L" ;
-    (Node.get_level node = 3)
-      int
-      ~__LOC__
-      ~error_msg:"Expected level %R, got %L") ;
+    (level = 3) int ~__LOC__ ~error_msg:"Expected level %R, got %L") ;
   unit
 
 let with_http_server file presence f =
@@ -207,7 +206,7 @@ let only_has_consensus block =
        else l |> as_list |> function [] -> true | _ -> false)
 
 let check_block_all_empty ~__LOC__ client =
-  let* head = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* head = Client.RPC.call client @@ RPC.get_chain_block () in
   Check.is_true
     (all_empty head)
     ~__LOC__
@@ -215,7 +214,7 @@ let check_block_all_empty ~__LOC__ client =
   unit
 
 let check_block_only_has_consensus ?block ~__LOC__ client =
-  let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+  let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
   Check.is_true
     (only_has_consensus head)
     ~__LOC__
@@ -238,10 +237,11 @@ let test_bake_empty_operations protocols =
        ~mempool
        ~tags:["empty"]
        (fun node client mempool ->
-         let level = Node.get_level node in
+         let* level = Node.get_level node in
          let* () = Client.bake_for_and_wait ~mempool client in
+         let* new_level = Node.get_level node in
          Check.(
-           (Node.get_level node = level + 1)
+           (new_level = level + 1)
              int
              ~__LOC__
              ~error_msg:"Expected level %R, got %L") ;
@@ -261,7 +261,7 @@ let get_operations client =
       }
   in
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   return JSON.(mempool |-> "validated" |> as_list |> List.map to_op)
@@ -382,7 +382,7 @@ let test_baker_external_operations =
   in
   let* () = Client.bake_for_and_wait ~keys client in
   let* () = Client.bake_for_and_wait ~keys client in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   Check.((level = 4) int ~__LOC__ ~error_msg:"Expected level %R, got %L") ;
   let* pending_ops = get_operations client in
   Check.(
@@ -425,7 +425,7 @@ let test_baker_external_operations =
      our operations file *)
   Log.info "Check block baked" ;
   let* block =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block ~block:(string_of_int level) ()
   in
   let manager_ops = JSON.(block |-> "operations" |=> 3) in
@@ -454,8 +454,65 @@ let test_baker_external_operations =
   in
   unit
 
+(* Test that baking a block results in the generation of the
+   "record_state" file in the client directory or not, depending
+   on the [state_recorder] input argument. *)
+let test_baker_state_recorder protocol state_recorder =
+  let* node, client =
+    Client.init_with_protocol ~timestamp:Now ~protocol `Client ()
+  in
+  let keys =
+    Array.map
+      (fun Account.{public_key_hash; _} -> public_key_hash)
+      Account.Bootstrap.keys
+    |> Array.to_list
+  in
+  (* Bake an empty block *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* level = Node.get_level node in
+  (* Initialise a baker *)
+  let* _baker =
+    if state_recorder then Baker.init ~protocol ~state_recorder node client
+    else Baker.init ~protocol node client
+  in
+  (* Wait for chain to process the empty block *)
+  let* (_ : int) = Node.wait_for_level node (level + 1) in
+  (* Obtain the "record_state" file name *)
+  let* chain_id = Client.RPC.call client (RPC.get_chain_chain_id ()) in
+  let chain_id =
+    Tezos_crypto.Hashed.Chain_id.to_short_b58check
+      (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+  in
+  let state_recorder_file = chain_id ^ "_baker_state" in
+  let base_dir = Client.base_dir client in
+  let dir_contents = Array.to_list @@ Sys.readdir base_dir in
+  Check.(
+    (List.mem state_recorder_file dir_contents = state_recorder)
+      bool
+      ~__LOC__
+      ~error_msg:
+        "The state_recorder file presence: %L, but its presence should have \
+         been: %R") ;
+  unit
+
+let test_baker_state_recorder_memory =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker state recorder - memory case"
+    ~tags:["baker"; "state"; "recorder"; "memory"]
+  @@ fun protocol -> test_baker_state_recorder protocol false
+
+let test_baker_state_recorder_filesystem =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker state recorder - filesystem case"
+    ~tags:["baker"; "state"; "recorder"; "filesystem"]
+  @@ fun protocol -> test_baker_state_recorder protocol true
+
 let register ~protocols =
   test_ignore_node_mempool protocols ;
   test_bake_empty_operations protocols ;
   test_bake_singleton_operations protocols ;
-  test_baker_external_operations protocols
+  test_baker_external_operations protocols ;
+  test_baker_state_recorder_memory protocols ;
+  test_baker_state_recorder_filesystem protocols

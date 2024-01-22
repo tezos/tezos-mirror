@@ -33,9 +33,9 @@ type solution = {
 }
 
 (** [get_codegen_destinations model_info] will return 
-    all the generated code destinations in which given model is used 
+    the generated code destination in which given model is used
   *)
-val get_codegen_destinations : Registration.model_info -> string trace
+val get_codegen_destination : Registration.model_info -> string option
 
 val solution_encoding : solution Data_encoding.t
 
@@ -49,9 +49,6 @@ val save_solution : solution -> string -> unit
 
 val solution_to_csv : solution -> Csv.csv
 
-(** Load a text file of lines of function names *)
-val load_exclusions : string -> String.Set.t
-
 (** Generated code for a model *)
 type code
 
@@ -61,16 +58,14 @@ type module_
 val codegen :
   Model.packed_model -> solution -> Costlang.transform -> Namespace.t -> code
 
-(** [codegen_models models solution transform ~exclusions] generates
-    the cost function codes of multiple [models].  The functions in
-    the set [exclusions] are excluded from the generation.
+(** [codegen_models models solution transform] generates
+    the cost function codes of multiple [models].
 *)
 val codegen_models :
   (Namespace.t * Registration.model_info) list ->
   solution ->
   Costlang.transform ->
-  exclusions:String.Set.t ->
-  (string * code) list
+  (string option * code) list
 
 (** Make a comment *)
 val comment : string list -> code
@@ -81,6 +76,9 @@ val make_toplevel_module : code list -> module_
 val pp_code : Format.formatter -> code -> unit
 
 val pp_module : Format.formatter -> module_ -> unit
+
+(** Get the function name of [code] if it has *)
+val get_name_of_code : code -> string option
 
 module Parser : sig
   (** [get_cost_functions fn] extracts the cost function names of

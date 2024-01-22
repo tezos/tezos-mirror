@@ -42,15 +42,17 @@ module type S = sig
   (** [close store] closes the store. *)
   val close : _ t -> unit tzresult Lwt.t
 
-  (** [load mode ~l2_blocks_cache_size directory] loads a store from the data
-      persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
-      indexes and irmin store will be opened in readonly mode and only read
+  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory] loads a
+      store from the data persisted in [directory]. If [mode] is {!Store_sigs.Read_only},
+      then the indexes and irmin store will be opened in readonly mode and only read
       operations will be permitted. This allows to open a store for read access
       that is already opened in {!Store_sigs.Read_write} mode in another
-      process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
+      process. [index_buffer_size] is the maximum cache size in memory before it is flushed
+      to disk. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
       will keep in memory. *)
   val load :
     'a Store_sigs.mode ->
+    index_buffer_size:int ->
     l2_blocks_cache_size:int ->
     string ->
     'a store tzresult Lwt.t
@@ -58,8 +60,22 @@ module type S = sig
   (** [readonly store] returns a read-only version of [store]. *)
   val readonly : _ t -> ro
 
-  (** [iter_l2_blocks store f] iterates [f] on all L2 blocks reachable from the
-      head, from newest to oldest.  *)
+  (** [iter_l2_blocks ?progress metadata store f] iterates [f] on all L2 blocks
+      reachable from the head, from newest to oldest. If [progress] is provided,
+      a progress bar is displayed with the progress messages during the
+      iteration. *)
   val iter_l2_blocks :
-    _ t -> (Sc_rollup_block.t -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+    ?progress:string ->
+    Metadata.t ->
+    _ t ->
+    (Sc_rollup_block.t -> unit tzresult Lwt.t) ->
+    unit tzresult Lwt.t
+
+  (** [gc store ~level] asynchronously garbage collects everything from the
+      store that concerns blocks for levels below [level]. *)
+  val gc : rw -> level:int32 -> unit tzresult Lwt.t
+
+  (** [wait_gc_completion store] returns a blocking thread if a GC run is
+      currently ongoing. *)
+  val wait_gc_completion : 'a t -> unit Lwt.t
 end

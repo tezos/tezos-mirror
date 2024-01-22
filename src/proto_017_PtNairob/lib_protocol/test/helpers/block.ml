@@ -452,7 +452,7 @@ let validate_bootstrap_accounts
       failwith
         "Insufficient tokens in initial accounts: the amount should be at \
          least minimal_stake")
-    (function Exit -> return_unit | exc -> raise exc)
+    (function Exit -> return_unit | exc -> Lwt.reraise exc)
 
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot

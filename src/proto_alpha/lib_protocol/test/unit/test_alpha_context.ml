@@ -61,16 +61,17 @@ let assert_equal_key_values ~loc kvs1 kvs2 =
 module Test_Script = struct
   (** Force serialise of lazy [Big_map.t] in a given [alpha_context] *)
   let test_force_bytes_in_context () =
-    create () >>=? fun alpha_context ->
+    let open Lwt_result_wrap_syntax in
+    let* alpha_context = create () in
     let mbytes_pp ppf t =
       Format.pp_print_string ppf (Environment.Bytes.to_string t)
     in
     let open Alpha_context.Script in
-    Environment.wrap_tzresult
-    @@ force_bytes_in_context alpha_context
-    @@ lazy_expr @@ Micheline.strip_locations
-    @@ Prim (0, D_Unit, [], [])
-    >>?= fun (bytes, _) ->
+    let*?@ bytes, _ =
+      force_bytes_in_context alpha_context
+      @@ lazy_expr @@ Micheline.strip_locations
+      @@ Prim (0, D_Unit, [], [])
+    in
     Assert.equal
       ~loc:__LOC__
       Environment.Bytes.equal
@@ -83,28 +84,32 @@ end
 module Test_Big_map = struct
   (** Test failure path: look for a non-existent key in a [Big_map] *)
   let test_mem () =
-    ( create () >>=? fun alpha_context ->
-      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
-      >>=? fun (alpha_context, big_map_id) ->
+    let open Lwt_result_wrap_syntax in
+    let* alpha_context = create () in
+    let*@ alpha_context, big_map_id =
+      Big_map.fresh ~temporary:true alpha_context
+    in
+    let*@ _alpha_context, is_member =
       Big_map.mem
         alpha_context
         big_map_id
         (Script_expr_hash.hash_string ["0"; "0"])
-      >|= Environment.wrap_tzresult )
-    >>=? fun (_alpha_context, is_member) ->
+    in
     Assert.equal_bool ~loc:__LOC__ is_member false
 
   (** Test failure code path of [get_opt] by looking for missing key in a [Big_map.t] *)
   let test_get_opt () =
-    ( create () >>=? fun alpha_context ->
-      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
-      >>=? fun (alpha_context, big_map_id) ->
+    let open Lwt_result_wrap_syntax in
+    let* alpha_context = create () in
+    let*@ alpha_context, big_map_id =
+      Big_map.fresh ~temporary:true alpha_context
+    in
+    let*@ _alpha_context, value =
       Big_map.get_opt
         alpha_context
         big_map_id
         (Script_expr_hash.hash_string ["0"; "0"])
-      >|= Environment.wrap_tzresult )
-    >>=? fun (_alpha_context, value) ->
+    in
     match value with
     | Some _ ->
         failwith "get_opt should have failed looking for a non-existent key"
@@ -112,11 +117,12 @@ module Test_Big_map = struct
 
   (** Test existence of a non-existent [Big_map] in an [Alpha_context.t] *)
   let test_exists () =
-    ( create () >>=? fun alpha_context ->
-      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
-      >>=? fun (alpha_context, big_map_id) ->
-      Big_map.exists alpha_context big_map_id >|= Environment.wrap_tzresult )
-    >>=? fun (_alpha_context, value) ->
+    let open Lwt_result_wrap_syntax in
+    let* alpha_context = create () in
+    let*@ alpha_context, big_map_id =
+      Big_map.fresh ~temporary:true alpha_context
+    in
+    let*@ _alpha_context, value = Big_map.exists alpha_context big_map_id in
     match value with
     | Some _ ->
         failwith "exists should have failed looking for a non-existent big_map"
@@ -124,7 +130,7 @@ module Test_Big_map = struct
 
   (** Test that [Big_map.list_key_values] retrieves hashed keys and values. *)
   let test_list_key_values () =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     let* block, source = Context.init1 () in
     let key_values =
       [
@@ -144,8 +150,8 @@ module Test_Big_map = struct
         ~value_type:"string"
         key_values
     in
-    let* _ctxt, retrieved_key_values =
-      Big_map.list_key_values ctxt big_map_id >|= Environment.wrap_tzresult
+    let*@ _ctxt, retrieved_key_values =
+      Big_map.list_key_values ctxt big_map_id
     in
     let expected_key_hash_values =
       List.map
@@ -164,7 +170,7 @@ module Test_Big_map = struct
 
   (** Test [Big_map.list_key_values] with [length] and [offset] arguments. *)
   let test_list_key_values_parameters () =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     let* block, source = Context.init1 () in
     let hash_key key =
       let bytes =
@@ -192,9 +198,8 @@ module Test_Big_map = struct
           ~value_type:"string"
           key_values
       in
-      let* _ctxt, retrieved_key_values =
+      let*@ _ctxt, retrieved_key_values =
         Big_map.list_key_values ?offset ?length ctxt big_map_id
-        >|= Environment.wrap_tzresult
       in
       let expected_key_hash_values =
         (* A negative length is interpreted as 0 *)

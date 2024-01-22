@@ -55,6 +55,16 @@ module Commitments :
      and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
+(** Storage containing the last cemented commitment. *)
+module Lcc : sig
+  type lcc = {commitment : Commitment.Hash.t; level : int32}
+
+  include SINGLETON_STORE with type value := lcc
+end
+
+(** Storage containing a single commitment for the last published commitment. *)
+module Lpc : SINGLETON_STORE with type value := Octez_smart_rollup.Commitment.t
+
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
     to [Dal.Slot.t]. The encoding function converts this
@@ -101,6 +111,23 @@ module Protocols : sig
   include SINGLETON_STORE with type value = proto_info list
 end
 
+(** Data related to the effects of garbage collection. *)
+module Gc_levels : sig
+  type levels = {
+    last_gc_level : int32;
+        (** Records the last level at which GC was called. *)
+    first_available_level : int32;
+        (** Records the first level for which data is guaranteed to be stored.
+        Data for all previous levels might have been removed. *)
+  }
+
+  include SINGLETON_STORE with type value = levels
+end
+
+(** History mode of the rollup node. *)
+module History_mode :
+  SINGLETON_STORE with type value := Configuration.history_mode
+
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
@@ -109,9 +136,16 @@ type +'a store = {
   commitments_published_at_level : 'a Commitments_published_at_level.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
+  lcc : 'a Lcc.t;
+  lpc : 'a Lpc.t;
   levels_to_hashes : 'a Levels_to_hashes.t;
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
+  gc_levels : 'a Gc_levels.t;
+  history_mode : 'a History_mode.t;
 }
 
 include Store_sig.S with type 'a store := 'a store
+
+(** [is_gc_finished t] returns [true] if there is no GC running. *)
+val is_gc_finished : 'a t -> bool

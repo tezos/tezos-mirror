@@ -73,7 +73,7 @@ module ACL = struct
         target
         ~data:"\000\010Hello, world. This is garbage, greylist me !"
     in
-    let* json = RPC.Client.call client RPC.get_network_greylist_ips in
+    let* json = Client.RPC.call client RPC.get_network_greylist_ips in
     let greylisted_ips = JSON.(as_list (json |-> "ips")) in
     let nb_greylisted_ips = List.length greylisted_ips in
     if nb_greylisted_ips <> 1 then
@@ -171,7 +171,7 @@ let rec wait_pred ~pred ~arg =
 (* [get_nb_connections ~client] returns the number of active connections of the
    node  to [client]. *)
 let get_nb_connections node =
-  let* ports = RPC.call node RPC.get_network_connections in
+  let* ports = Node.RPC.call node RPC.get_network_connections in
   return @@ List.length ports
 
 (* [wait_connections ~client n] waits until the node related to [client] has at
@@ -321,7 +321,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:["p2p"; "node"; "maintenance"]
+      ~tags:["p2p"; "node"; "maintenance"; Tag.memory_4k]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -453,7 +453,7 @@ module Swap = struct
     let connect node1 node2 =
       let addr, port = Node.point node2 in
       let point = addr ^ ":" ^ Int.to_string port in
-      RPC.(call node1 (put_network_points point))
+      Node.RPC.(call node1 (put_network_points point))
     in
     let get_node_from_id nodes id =
       Lwt_list.find_s
@@ -470,7 +470,7 @@ module Swap = struct
           ppf
           (StringSet.to_seq s)
       in
-      let* conns = RPC.(call node get_network_connections) in
+      let* conns = Node.RPC.(call node get_network_connections) in
       let conn_ids =
         List.map (fun (_, _, id) -> id) conns |> StringSet.of_list
       in
@@ -568,7 +568,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:["p2p"; "node"; "swap"]
+      ~tags:["p2p"; "node"; "swap"; Tag.memory_4k]
     @@ fun () ->
     (* Since we try to verify that something does not happen, we need
        to find when we consider having waited enough time to consider
@@ -663,7 +663,7 @@ let test_advertised_port () =
   unit
 
 let known_points node =
-  let* points = RPC.(call node get_network_points) in
+  let* points = Node.RPC.(call node get_network_points) in
   return
   @@ List.map
        (fun (str, _) ->
@@ -904,7 +904,7 @@ let trusted_ring () =
       point_id_of_node (List.nth nodes ((index + 1) mod num_nodes))
     in
     let data = JSON.annotate ~origin:"acl" @@ `O [("acl", `String "trust")] in
-    RPC.(call node @@ patch_network_point neighbour_point_id data)
+    Node.RPC.(call node @@ patch_network_point neighbour_point_id data)
   in
   Log.info "Wait for connections" ;
   let* () = connection_p in
@@ -918,9 +918,9 @@ let trusted_ring () =
   let* () =
     iter_p nodes @@ fun node ->
     let point_id = point_id_of_node node in
-    let* peer_id = RPC.(call node @@ get_network_self) in
-    let* points = RPC.(call node @@ get_network_points) in
-    let* peers = RPC.(call node @@ get_network_peers) in
+    let* peer_id = Node.RPC.(call node @@ get_network_self) in
+    let* points = Node.RPC.(call node @@ get_network_points) in
+    let* peers = Node.RPC.(call node @@ get_network_peers) in
     let trusted_points = List.filter point_is_trusted points in
     let running_points = List.filter point_is_running points in
     (* the set of known points that are not the node itself *)
@@ -990,7 +990,7 @@ let expected_peer_id () =
   let* peer_ids =
     Lwt_list.map_s
       (fun node ->
-        let* peer_id = RPC.(call node @@ get_network_self) in
+        let* peer_id = Node.RPC.(call node @@ get_network_self) in
         Log.info "Peer id of node %s: %s" (Node.name node) peer_id ;
         return peer_id)
       nodes
@@ -1010,7 +1010,7 @@ let expected_peer_id () =
       JSON.annotate ~origin:"expected_peer_id"
       @@ `O [("peer_id", `String neighbor_peer_id)]
     in
-    RPC.(call node @@ patch_network_point neighbor_point_id data)
+    Node.RPC.(call node @@ patch_network_point neighbor_point_id data)
   in
   Log.info
     "Check expected_peer_id and that we still have %d connected points per node"
@@ -1024,7 +1024,7 @@ let expected_peer_id () =
     let neighbor_index = next index in
     let neighbor_point_id = point_id_of_node (List.nth nodes neighbor_index) in
     let* neighbor_peer =
-      RPC.(call node @@ get_network_point neighbor_point_id)
+      Node.RPC.(call node @@ get_network_point neighbor_point_id)
     in
     Check.(
       (JSON.(neighbor_peer |-> "expected_peer_id" |> as_string)
@@ -1034,7 +1034,7 @@ let expected_peer_id () =
         ~error_msg:
           ("Expected the expected_peer_id of neighbor of " ^ Node.name node
          ^ " to be %R, got %L")) ;
-    let* points = RPC.(call node @@ get_network_points) in
+    let* points = Node.RPC.(call node @@ get_network_points) in
     let connected_points = List.filter point_is_running points in
     Check.(
       (List.length connected_points = num_nodes - 1)
@@ -1081,7 +1081,7 @@ let expected_peer_id () =
       JSON.annotate ~origin:"expected_peer_id"
       @@ `O [("peer_id", `String peer_id)]
     in
-    RPC.(call node @@ patch_network_point neighbor_point_id data)
+    Node.RPC.(call node @@ patch_network_point neighbor_point_id data)
   in
   Log.info "Waiting for disconnections" ;
   let* () = all_disconnections in
@@ -1089,7 +1089,7 @@ let expected_peer_id () =
   (* Each node should now have two connected peers less *)
   let* () =
     iter_p nodes @@ fun node ->
-    let* points = RPC.(call node @@ get_network_points) in
+    let* points = Node.RPC.(call node @@ get_network_points) in
     let connected_points = List.filter point_is_running points in
     (* We lost two connections *)
     Check.(
@@ -1219,7 +1219,7 @@ module P2p_stat = struct
     Test.register
       ~__FILE__
       ~title:"Test [octez-admin-client p2p stat]"
-      ~tags:["p2p"; "connections"; "p2p_stat"]
+      ~tags:["p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
     @@ fun () ->
     let num_nodes = 5 in
     Log.info "Start a clique of %d nodes" num_nodes ;
@@ -1233,7 +1233,7 @@ module P2p_stat = struct
       let* output = Client.Admin.p2p_stat client in
       let p2p_stat = parse_p2p_stat output in
       let* rpc_points =
-        let* points = RPC.(call node @@ get_network_points) in
+        let* points = Node.RPC.(call node @@ get_network_points) in
         return
           (List.map
              (fun (point_id_s, meta) ->
@@ -1250,7 +1250,7 @@ module P2p_stat = struct
              points)
       in
       let* rpc_peers =
-        let* peers = RPC.(call node @@ get_network_peers) in
+        let* peers = Node.RPC.(call node @@ get_network_peers) in
         return
           (List.map
              (fun (peer_id_s, meta) ->
@@ -1279,7 +1279,7 @@ end
 module Peer_discovery = struct
   let connect node1 node2 =
     let point = Node.point_str node2 in
-    RPC.(call node1 (put_network_points point))
+    Node.RPC.(call node1 (put_network_points point))
 
   let create_node ?name ~maintenance_idle_time () =
     let patch_maintenance_idle_time =

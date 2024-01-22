@@ -1,0 +1,226 @@
+octogram_binary:
+  push: octogram
+
+agents:
+  - name: node
+    address: 127.0.0.1
+    user: root
+    port: 30000
+    identity: ~/.ssh/tf
+
+  - name: localhost
+    address: 127.0.0.1
+    user: root
+    port: 30000
+    identity: ~/.ssh/tf
+
+vars:
+  network: sandbox
+  keys_base_dir: fresh_wallet
+  number_of_shards: 1024
+  page_size: 128
+  slot_size: 32768
+  redundancy_factor: 2
+  number_of_slots: 8
+  attestation_lag: 4
+  attestation_threshold: 5
+  blocks_per_epoch: 1
+  minimal_block_delay: 2
+  pk_revealed_accounts_prefix: delegate_
+  pk_unrevealed_accounts_prefix: account_
+
+stages:
+  - name: Initialize protocol parameters file
+    with_agents: 'localhost'
+    run_agents: concurrent
+    jobs:
+      - name: Upload octez-client
+        copy:
+          local_path: octez-client
+          remote_path: '.'
+
+      - name: Generate keys for accounts with revealed public keys
+        tezos.generate_keys:
+          base_dir: 'self://{{ vars.keys_base_dir }}'
+          kind:
+             # default: # We currently re-use default Tezt keys
+             # for when we want fresh keys
+             fresh:
+               count: 5
+               path_client: 'self://./octez-client'
+               alias_prefix: '{{ vars.pk_revealed_accounts_prefix }}'
+
+      - name: Generate keys for accounts with unrevealed public keys
+        tezos.generate_keys:
+          base_dir: 'self://{{ vars.keys_base_dir }}'
+          kind:
+             # default: # to re-use default Tezt keys
+             fresh:
+               count: 5
+               path_client: 'self://./octez-client'
+               alias_prefix: '{{ vars.pk_unrevealed_accounts_prefix }}'
+
+      - name: Compress generated keys
+        builtins.tar:
+          contents: '{{ vars.keys_base_dir }}'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: create
+
+      - name: Upload protocol parameters file
+        copy:
+          local_path: 'src/proto_alpha/parameters/{{ vars.network }}-parameters.json'
+          remote_path: '.'
+
+      - name: Generate protocol parameters file
+        tezos.generate_protocol_parameters_file:
+          # generates the file 'parameters.json' in the agent's home dir
+          # use output_file_name: <other_file_name> to change that
+          base_file: 'self://{{ vars.network }}-parameters.json'
+          wallet: 'self://{{ vars.keys_base_dir }}'
+          pk_revealed_accounts_prefix: '{{ vars.pk_revealed_accounts_prefix }}'
+          pk_unrevealed_accounts_prefix: '{{ vars.pk_unrevealed_accounts_prefix }}'
+          default_balance: '1_000_000_000_000'
+          balance_updates: [['delegate_0', '2_000_000_000_000']]
+          minimal_block_delay: '{{ vars.minimal_block_delay }}'
+          dal:
+            feature_enable: 'true'
+            number_of_shards: '{{ vars.number_of_shards }}'
+            page_size: '{{ vars.page_size }}'
+            slot_size: '{{ vars.slot_size }}'
+            redundancy_factor: '{{ vars.redundancy_factor }}'
+            attestation_lag: '{{ vars.attestation_lag }}'
+            attestation_threshold: '{{ vars.attestation_threshold }}'
+            number_of_slots: '{{ vars.number_of_slots }}'
+            blocks_per_epoch: '{{ vars.blocks_per_epoch }}'
+
+      - name: Start HTTP server
+        builtins.start_http_server:
+          http_port: '30999'
+
+  - name: Running nodes
+    with_agents: 'node'
+    run_agents: concurrent
+    jobs:
+      - name: Pull protocol parameters file
+        builtins.prefetch: 'localhost://parameters.json'
+
+      - name: Pull generated keys
+        builtins.prefetch: 'localhost://{{ vars.keys_base_dir }}.tar.gz'
+
+      - name: Uncompress generated keys
+        builtins.tar:
+          contents: 'my-unique-baker'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: extract
+
+      - name: Uncompress generated keys
+        builtins.tar:
+          contents: 'slot-producers'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: extract
+
+      - name: Upload octez binaries
+        run_items: concurrent
+        copy:
+          local_path: '{{ item }}'
+          remote_path: '.'
+        with_items:
+          - octez-node
+          - octez-client
+          - octez-baker-alpha
+          - octez-dal-node
+
+      - name: Start octez-node
+        tezos.start_node:
+          name: node
+          path_node: self://./octez-node
+          network: '{{ vars.network }}'
+          synchronization_threshold: 0
+          rpc_port: '30001'
+          metrics_port: '30002'
+          net_port: '30003'
+          dal_cryptobox_parameters:
+            number_of_shards: '{{ vars.number_of_shards }}'
+            page_size: '{{ vars.page_size }}'
+            slot_size: '{{ vars.slot_size }}'
+            redundancy_factor: '{{ vars.redundancy_factor }}'
+
+      - name: Activate protocol
+        tezos.activate_protocol:
+          endpoint: self://node
+          path_client: self://./octez-client
+          protocol: alpha
+          parameter_file: 'self://parameters.json'
+
+      - name: Wait for bootstrapped node
+        tezos.wait_for_bootstrapped:
+          path_client: self://./octez-client
+          endpoint: self://node
+
+      - name: Start octez-dal-node
+        tezos.start_dal_node:
+          name: dal_node
+          path_node: self://./octez-dal-node
+          rpc_port: '30011'
+          metrics_port: '30012'
+          net_port: '30013'
+          l1_node_uri: self://node
+          bootstrap_profile: false
+          path_client: self://./octez-client
+          base_dir: 'self://slot-producers/{{ vars.keys_base_dir }}'
+          attester_profiles:
+           - '{{ vars.pk_revealed_accounts_prefix }}0'
+           - '{{ vars.pk_revealed_accounts_prefix }}1'
+           - '{{ vars.pk_revealed_accounts_prefix }}2'
+           - '{{ vars.pk_revealed_accounts_prefix }}3'
+           - '{{ vars.pk_revealed_accounts_prefix }}4'
+          producer_profiles:
+           - '1'
+           - '2'
+
+      - name: Start octez-baker-alpha
+        tezos.start_baker:
+          name: my-unique-baker
+          protocol: alpha
+          base_dir: 'self://my-unique-baker/{{ vars.keys_base_dir }}'
+          node_uri: self://node
+          dal_node_uri: self://dal_node
+          delegates:
+           - '{{ vars.pk_revealed_accounts_prefix }}0'
+           - '{{ vars.pk_revealed_accounts_prefix }}1'
+           - '{{ vars.pk_revealed_accounts_prefix }}2'
+           - '{{ vars.pk_revealed_accounts_prefix }}3'
+           - '{{ vars.pk_revealed_accounts_prefix }}4'
+
+      - name: Publish a DAL slot where target_published_level is set
+        run_items: sequential
+        tezos.publish_dal_slot:
+          slot_info:
+            slot_index: '1'
+            slot_size: '{{ vars.slot_size }}'
+            payload: 'slot content for level {{ item }} and slot index 1'
+          target_published_level: '{{ item }}'
+          # We can either provide "Self/Owned" nodes or foreign RPC address
+          l1_node_uri: self://node
+          dal_node_uri: self://dal_node
+          path_client: self://./octez-client
+          base_dir: 'self://slot-producers/{{ vars.keys_base_dir }}'
+          source: delegate_1
+        with_items:
+         - '5..9'
+
+      - name: Publish a DAL slot where target_published_level is not set
+        run_items: sequential
+        tezos.publish_dal_slot:
+          slot_info:
+            slot_index: '2'
+            slot_size: '{{ vars.slot_size }}'
+            payload: 'slot content for level {{ item }} and slot index 2'
+          # We can either provide "Self/Owned" nodes or foreign RPC address
+          l1_node_uri: self://node
+          dal_node_uri: self://dal_node
+          path_client: self://./octez-client
+          base_dir: 'self://slot-producers/{{ vars.keys_base_dir }}'
+          source: delegate_2
+        with_items:
+         - '10..14'

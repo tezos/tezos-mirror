@@ -36,7 +36,7 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
 ./octez-client --wait none send smart rollup message '[" dal:256:2:256:5 "]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 170.835 units (will add 100 for safety)
+Estimated gas: 170.826 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -56,12 +56,12 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000277
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 170.769
+      Consumed gas: 170.760
 
 
 ./octez-client --wait none send smart rollup message '[" value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 170.414 units (will add 100 for safety)
+Estimated gas: 170.405 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -81,11 +81,11 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000266
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 170.348
+      Consumed gas: 170.339
 
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000005"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\005"
+GET http://127.0.0.1:[PORT]/global/block/head/state?key=vars/value
+"00000005"
 
-./octez-smart-rollup-client-alpha get state value for vars/value --block head
-"\000\000\000\005"

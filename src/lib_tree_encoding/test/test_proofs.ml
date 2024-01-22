@@ -142,7 +142,7 @@ let test_move_subtrees () =
     assert_proof_size small_proof (350 + (n * 500)) ;
     (* We check that  *)
     assert (proof_size small_proof < proof_size big_proof) ;
-    Lwt.return ()
+    Lwt.return_unit
   in
   let* () = check_proof_size 2 in
   let* () = check_proof_size 10 in

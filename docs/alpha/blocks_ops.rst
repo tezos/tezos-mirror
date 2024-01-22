@@ -32,17 +32,7 @@ operations<manager_operations_alpha>`. This order also specifies the
 of each of these classes. Consensus operations are considered the
 highest priority ones, and manager operations the lowest.
 
-The current protocol implementation enforces the following invariant:
-
-- each kind of operation belongs to *at most one* validation pass;
-- operations whose kind does not belong to any validation pass cannot
-  be :ref:`applied<operation_validity_alpha>`.
-
-.. FIXME tezos/tezos#3915:
-
-   Failing noops don't fit within any of the validation passes
-   below. We need to change the structure a bit to be able to list
-   them here.
+Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop_alpha` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_alpha>`.
 
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
@@ -86,8 +76,7 @@ voting operations:
   (``Pass``), when examining a protocol amendment proposal.
 
 Further details on each operation's implementation and semantics are
-provided in the dedicated entry for :ref:`on-chain
-governance<voting_operations_alpha>`.
+provided in the dedicated entry for :doc:`on-chain governance<voting>`.
 
 .. _anonymous_operations_alpha:
 
@@ -259,3 +248,26 @@ Batches satisfy the following properties:
   atomically: all its operations are executed sequentially, without
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
+
+.. _failing_noop_alpha:
+
+Failing_noop operation
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``Failing_noop`` operation is not executable in the protocol:
+
+- it can only be validated in :ref:`mempool mode <partial_construction_alpha>`, by the :doc:`prevalidator component <../shell/prevalidation>`;
+- consequently, this operation cannot be :ref:`applied <operation_validity_alpha>`, and in fact will never be included into a block.
+
+Rather, the ``Failing_noop`` operation allows
+to sign an arbitrary string, without introducing an operation that could be misinterpreted in the protocol.
+
+The Octez client provides commands to sign and verify the signature of input messages by a given key. These commands create a ``failing_noop``
+operation from the message that is being signed or checked.
+
+::
+
+   octez-client sign message "hello world" for <account>
+
+   octez-client check that message "hello world" was signed by <account> to
+   produce <signature>

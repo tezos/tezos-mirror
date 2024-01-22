@@ -717,7 +717,7 @@ let () =
         (Format.asprintf
            "@[<v>cannot find Zcash params in any of:@,\
             %a@ You may download them using \
-            https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
+            https://raw.githubusercontent.com/zcash/zcash/713fc761dd9cf4c9087c37b078bdeab98697bad2/zcutil/fetch-params.sh@]@."
            (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
            locations)
   | _ -> None

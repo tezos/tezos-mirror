@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/cons.tz on storage '{ -5 ; 10 }' and input 99 --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/cons.tz on storage '{ -5 ; 10 }' and input 99 --level 1 --trace-stack
 storage
   { 99 ; -5 ; 10 }
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (just consumed gas: 4.760)
+  - location: 8 (just consumed gas: 4.610)
     [ (Pair 99 { -5 ; 10 }) ]
   - location: 8 (just consumed gas: 0.010)
     [ 99

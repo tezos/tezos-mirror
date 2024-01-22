@@ -8,7 +8,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "3.0" & < "3.11" }
+  "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs"
   "lwt-watcher" { = "0.2" }
@@ -16,7 +16,7 @@ depends: [
   "ringo" { >= "1.0.0" }
   "aches" { >= "1.0.0" }
   "prometheus" { >= "1.2" }
-  "tezt" { >= "3.1.1" & < "4.0.0" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
   "tezt-tezos" {with-test}
   "octez-alcotezt" {with-test}
   "astring" {with-test}
@@ -39,7 +39,7 @@ depends: [
   "tezos-benchmark"
   "qcheck-alcotest" { with-test & >= "0.20" }
   "qcheck-core" {with-test}
-  "lwt" { with-test & >= "5.6.0" }
+  "lwt" { with-test & >= "5.7.0" }
 ]
 depopts: [
   "ledgerwallet-tezos"

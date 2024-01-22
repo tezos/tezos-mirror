@@ -303,7 +303,7 @@ module Set_add : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.add."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -321,7 +321,7 @@ module Set_add : Benchmark.S = struct
    fun size -> Sparse_vec.String.of_list [("size", float_of_int size)]
 
   (*  As an OCaml set is a balanced binary tree, complexity is O(log n). *)
-  let model = Model.(make ~conv:(fun size -> (size, ())) ~model:logn)
+  let model = Model.(make ~conv:(fun size -> (size, ())) logn)
 
   module Int_set = Set.Make (Int)
 
@@ -352,7 +352,7 @@ module Set_elements : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.elements."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -371,7 +371,7 @@ module Set_elements : Benchmark.S = struct
 
   (* Cost of retrieving all elements from the set is linear with the size
       of the set.*)
-  let model = Model.(make ~conv:(fun size -> (size, ())) ~model:linear)
+  let model = Model.(make ~conv:(fun size -> (size, ())) linear)
 
   module Int_set = Set.Make (Int)
 
@@ -404,7 +404,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
       "Validate assumptions about functions using \
        Script_expr_hash.of_b58check_opt."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "script_expr_hash"
 
   let tags = ["global_constants"]
 
@@ -431,8 +431,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
      time operation. However, to test this, we use an affine model. If
      our assumption holds, the coefficient should be near zero. *)
   let model =
-    Model.(
-      make ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ())) ~model:affine)
+    Model.(make ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ())) affine)
 
   (* To create realistic benchmarks, we generate a random Micheline expression,
      hash it, then benchmark the cost of validating the hash. *)
@@ -466,7 +465,7 @@ struct
 
   let purpose = Benchmark.Generate_code "global_constants"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -484,7 +483,7 @@ struct
    fun size -> Sparse_vec.String.of_list [("size", float_of_int size)]
 
   (** The cost of a Blake2b hashing function is linear with the size of the input *)
-  let model = Model.(make ~conv:(fun size -> (size, ())) ~model:linear)
+  let model = Model.(make ~conv:(fun size -> (size, ())) linear)
 
   let create_benchmark ~rng_state _config =
     let open Micheline in
@@ -542,7 +541,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 
@@ -564,12 +563,13 @@ module Global_constants_storage_expand_models = struct
     (** The cost of Branch 2 is linear to the number of constants in the expression. As
         discussed above, the constant time operation [Script_expr_hash.of_b58check_opt]
         dominates the cost of each iteration. *)
-    let model = Model.(make ~conv:(fun size -> (size, ())) ~model:linear)
+    let model = Model.(make ~conv:(fun size -> (size, ())) linear)
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
        consisting of the same constant repeated n times. As n increases,
        the benchmark more closely approximates the true cost of Branch 2. *)
     let create_benchmark ~rng_state _config =
+      let open Lwt_syntax in
       let open Micheline in
       let node = Micheline_sampler.sample rng_state in
       let size = (Micheline_sampler.micheline_size node).nodes in
@@ -577,10 +577,13 @@ module Global_constants_storage_expand_models = struct
       let hash = registered_constant |> node_to_hash in
       let context, _ = Execution_context.make ~rng_state () |> assert_ok_lwt in
       let context, _, _ =
-        Alpha_context.Global_constants_storage.register
-          context
-          (strip_locations registered_constant)
-        >|= Environment.wrap_tzresult |> assert_ok_lwt
+        (let+ result =
+           Alpha_context.Global_constants_storage.register
+             context
+             (strip_locations registered_constant)
+         in
+         Environment.wrap_tzresult result)
+        |> assert_ok_lwt
       in
       let node = seq_of_n_constants size hash in
       let closure () =
@@ -609,7 +612,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 
@@ -639,7 +642,7 @@ module Global_constants_storage_expand_models = struct
        [Script_expr_hash.of_b58check_opt] will dominate. A n*log(n) model seems
        accurate enough for the range of values tested.
     *)
-    let model = Model.(make ~conv:(fun size -> (size, ())) ~model:nlogn)
+    let model = Model.(make ~conv:(fun size -> (size, ())) nlogn)
 
     (** We benchmark this by generating a random Micheline expression without constants
         and calling [expand] on it. This causes the function to spend all its time in

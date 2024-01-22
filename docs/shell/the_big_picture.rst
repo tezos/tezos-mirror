@@ -1,7 +1,10 @@
-Tezos Software Architecture
+Octez Software Architecture
 ===========================
 
-This document contains two sections. The first section, which should be
+This page presents the software architecture of the most important tool in a Tezos network: the Tezos node, implemented in our case as the Octez node executable (``octez-node``).
+The Octez software architecture faithfully implements the :doc:`Tezos software architecture <../global/architecture>` principles.
+
+This page contains two sections. The first section, which should be
 readable by anyone, describes the main elements of Tezos from a
 distance. It abstracts from all plumbing and both internal and system
 dependencies to give a simple view of the main components, their
@@ -18,7 +21,7 @@ The diagram below shows a very coarse-grained architecture of Tezos.
 
 The characteristic that makes Tezos unique is its self-amending
 property. The part that amends itself is called :doc:`the economic protocol<../alpha/protocol>`
-(the green eye of the octopus), sometimes abbreviated by protocol or
+(the green brain of the octopus), sometimes abbreviated by protocol or
 even proto in the source code. The rest of a Tezos node is what we call
 the *shell* (the blue octopus).
 

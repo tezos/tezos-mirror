@@ -173,7 +173,8 @@ let remove_zero_ticket_entries orig_ctxt =
       Logging.(
         log
           Warning
-          "Error while removing zero tickets: %a"
+          "Trying to remove zero tickets from Mainnet context failed with \
+           error (ignore this message on testnets): %a"
           Error_monad.pp_trace
           e) ;
       return orig_ctxt

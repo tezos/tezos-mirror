@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 open Plonk.Identities
 
 module External (PP : Plonk.Polynomial_protocol.S) = struct
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
 
   let pow5_mod_zh ~n p =
     let domain = Domain.build_power_of_two (Z.log2 @@ Z.of_int (8 * n)) in
@@ -144,24 +144,24 @@ module External (PP : Plonk.Polynomial_protocol.S) = struct
       sample_polys_and_identities n
     in
     (* setup *)
-    let prover_pp, verifier_pp =
+    let prover_pp, verifier_pp, transcript =
       let next_pow2 k = Z.(pow (of_int 2) @@ log2up (of_int k) |> to_int) in
       PP.setup
         ~setup_params:(next_pow2 @@ max nb_of_t_chunks (SMap.cardinal poly_map))
         ~srs:Plonk_test.Helpers.srs
     in
     (* prover *)
-    let cm, prover_aux = PP.PC.Commitment.commit prover_pp poly_map in
+    let cm, prover_aux = PP.PC.commit prover_pp poly_map in
     let secrets = [(poly_map, prover_aux)] in
     let eval_points = [[X]] in
     (* The generator is not needed since we evaluate only at X *)
     let generator = Scalar.zero in
     let domain = Domain.build_power_of_two (Z.log2 @@ Z.of_int (8 * n)) in
     let evaluations = SMap.map (Evaluations.evaluation_fft domain) poly_map in
-    let proof, transcript =
+    let proof, transcript' =
       PP.prove
         prover_pp
-        Bytes.empty
+        transcript
         ~n
         ~generator
         ~secrets
@@ -171,10 +171,10 @@ module External (PP : Plonk.Polynomial_protocol.S) = struct
         ~nb_of_t_chunks
     in
     (* verifier *)
-    let ok, transcript' =
+    let ok, transcript'' =
       PP.verify
         verifier_pp
-        Bytes.empty
+        transcript
         ~n
         ~generator
         ~commitments:[cm]
@@ -182,7 +182,7 @@ module External (PP : Plonk.Polynomial_protocol.S) = struct
         ~identities:verifier_identities
         proof
     in
-    assert (Bytes.equal transcript transcript') ;
+    assert (Kzg.Utils.Transcript.equal transcript' transcript'') ;
     assert ok
 end
 

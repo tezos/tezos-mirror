@@ -52,9 +52,6 @@ A correct setup should write an entry in the logs similar to:
 Gathering data
 --------------
 
-This section focuses on access to the metrics and their uses.
-More details on the metrics specifications are available :doc:`here <../developer/openmetrics>`
-
 Scraping Octez Metrics
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,6 +112,14 @@ a `counter <https://github.com/OpenObservability/OpenMetrics/blob/main/specifica
 or a `histogram <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
 
 The label value is sometimes used to store information that can't be described by the metric value (which can only be a float). This is used for example by the ``octez_version`` metric that provides the version within the labels.
+
+For the list of metrics provided by the node, and a typical monitoring setup, see the following page:
+
+.. toctree::
+   :maxdepth: 2
+
+   ../developer/openmetrics
+
 
 .. note::
 
@@ -223,9 +228,9 @@ Note, if you use filecheck for storage monitoring, you need to configure your da
 Logs
 ~~~~
 
-Eventually, you may want to gather the logs from the different Octez executables. To do so, we suggest to use `Loki <https://grafana.com/docs/loki/latest/>`_ and `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_. Promtail is used to gather the logs from each executable of Octez and pushes them to a Loki instance, for indexing metadata about the logs.
+Eventually, you may want to gather the logs from the different Octez executables. To do so, we suggest to use `Loki <https://grafana.com/docs/loki/latest/>`_ and `Promtail <https://grafana.com/docs/loki/latest/send-data/promtail/>`_. Promtail is used to gather the logs from each executable of Octez and pushes them to a Loki instance, for indexing metadata about the logs.
 
-You first need to install both tools, following `their installation instructions <https://grafana.com/docs/loki/latest/installation/local/>`_.
+You first need to install both tools, following `their installation instructions <https://grafana.com/docs/loki/latest/setup/install/local/>`_.
 
 A configuration file will be required, which can be downloaded with:
 

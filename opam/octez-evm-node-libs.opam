@@ -1,0 +1,25 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "octez-libs"
+  "octez-smart-rollup-wasm-debugger-plugin"
+  "octez-version"
+  "lwt-exit"
+  "octez-l2-libs"
+  "octez-smart-rollup-wasm-debugger-lib"
+]
+build: [
+  ["rm" "-r" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Octez EVM node libraries"

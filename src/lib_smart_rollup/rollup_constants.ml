@@ -29,18 +29,21 @@ type dal_constants = {
   feature_enable : bool;
   attestation_lag : int;
   number_of_slots : int;
+  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.parameters;
 }
 
 type reveal_activation_level = {
   blake2B : int32;
   metadata : int32;
   dal_page : int32;
+  dal_parameters : int32;
 }
 
 type sc_rollup_constants = {
   challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;
   reveal_activation_level : reveal_activation_level option;
+  max_number_of_stored_cemented_commitments : int;
 }
 
 type protocol_constants = {

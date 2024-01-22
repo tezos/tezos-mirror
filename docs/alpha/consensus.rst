@@ -54,7 +54,7 @@ only provide a user/developer perspective.
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
-stake, in the same way as endorsers are selected in Emmy*. We let
+stake, in the same way as endorsers were selected in Emmy*. We let
 ``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_alpha>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
@@ -153,15 +153,15 @@ balance*. Let us first (re)define these and related concepts.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
-- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE``
-  of the maximum active stake during the last ``PRESERVED_CYCLES + MAX_SLASHING_PERIOD``. This amount
-  represents the delegate's skin in the game: in the case that the
+- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE`` of
+  the active stake at the end of the cycle that precedes the consensus rights
+  snapshoting.
+  This amount represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
-  :ref:`slashing_alpha`).  Taking the maximum over an
-  interval of cycles (instead of just considering the active stake at
-  the cycle where the bad action can occur) allows to avoid situations
-  where a malicious delegate empties its accounts between the time when
-  rights are attributed and the time when the deposit is frozen. The frozen deposits are updated at the end of each cycle.
+  :ref:`slashing_alpha`).
+  The frozen deposits are updated at the end of each cycle.  It must be at least
+  ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot be selected as a
+  validator.
 - The *spendable balance* of a delegate is its full balance
   minus the frozen deposits.
 
@@ -184,14 +184,12 @@ Delegates can set an upper limit to their frozen deposits with the
 command ``octez-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
-using a new manager operation ``Set_deposits_limit``. When emitting such a
-command in cycle ``c``, it affects the active stake for cycles starting
-with ``c + PRESERVED_CYCLES + 1``; the new active stake is
-taken into account when computing the frozen deposit for cycle ``c+1``
-already, however the user may see an update to its frozen deposit at
-cycle ``c + PRESERVED_CYCLES + MAX_SLASHING_PERIOD`` at the
-latest (because up to that cycle the frozen deposit also depends on the
-active stake at cycles before cycle ``c+1``).
+using a new manager operation ``Set_deposits_limit``.
+When emitting such a command in cycle ``c``, it affects the automatic deposit at
+the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
+PRESERVED_CYCLES + 1``.
+Since the deposit will be adjusted at the end of cycle ``c``, unstaked tokens
+will be available at cycle  ``c + 1 + PRESERVED_CYCLES + MAX_SLASHING_PERIOD``.
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
 the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),

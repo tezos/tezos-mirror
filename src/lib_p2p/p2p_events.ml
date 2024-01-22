@@ -414,14 +414,71 @@ module P2p_fd = struct
       ("connection_id", Data_encoding.int31)
 
   let close_fd =
-    declare_3
+    declare_4
       ~section
       ~name:"close_fd"
-      ~msg:"cnx:{connection_id}:close fd (stats : {nread}/{nwrit})"
+      ~msg:
+        "cnx:{connection_id}:close fd (reasons: {reasons}, stats : \
+         {nread}/{nwrit})"
       ~level:Debug
       ("connection_id", Data_encoding.int31)
+      ("reasons", Data_encoding.list P2p_disconnection_reason.encoding)
       ("nread", Data_encoding.int31)
       ("nwrit", Data_encoding.int31)
+
+  let close_fd_reason =
+    declare_3
+      ~section
+      ~name:"close_fd_reason"
+      ~msg:"disconnected from {point}#{peer}: {reason}"
+      ~level:Info
+      ~pp1:
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "<Undefined_point>")
+            P2p_point.Id.pp)
+      ~pp2:
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "<Undefined_peer_id>")
+            P2p_peer.Id.pp_short)
+      ~pp3:
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+            P2p_disconnection_reason.pp)
+      ("point", Data_encoding.option P2p_point.Id.encoding)
+      ("peer", Data_encoding.option P2p_peer.Id.encoding)
+      ("reason", Data_encoding.(list P2p_disconnection_reason.encoding))
+
+  let close_fd_unknown_reason =
+    declare_2
+      ~section
+      ~name:"close_fd_unknown_reason"
+      ~msg:"disconnected from {point}#{peer}: unknown reason"
+      ~level:Info
+      ~pp1:
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "<Undefined_point>")
+            P2p_point.Id.pp)
+      ~pp2:
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "<Undefined_peer_id>")
+            P2p_peer.Id.pp_short)
+      ("point", Data_encoding.option P2p_point.Id.encoding)
+      ("peer", Data_encoding.option P2p_peer.Id.encoding)
+
+  let close_fd_error =
+    declare_2
+      ~section
+      ~name:"close_fd_error"
+      ~msg:
+        "socket related to connection {connection_id} failed to close:{error}"
+      ~level:Warning
+      ("connection_id", Data_encoding.int31)
+      ("error", Data_encoding.string)
 
   let try_read =
     declare_2
@@ -1056,12 +1113,13 @@ module P2p = struct
       ("error", Error_monad.trace_encoding)
 
   let message_trysent =
-    declare_1
+    declare_2
       ~section
       ~name:"message_trysent"
       ~level:Debug
-      ~msg:"message trysent to {peer}"
+      ~msg:"message trysent to {peer} resulting to {result}"
       ("peer", P2p_peer.Id.encoding)
+      ("result", Data_encoding.bool)
 
   let trysending_message_error =
     declare_2

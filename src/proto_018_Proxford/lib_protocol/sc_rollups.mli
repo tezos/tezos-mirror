@@ -55,7 +55,7 @@ module Kind : sig
 
      This list must only be appended for backward compatibility.
   *)
-  type t = Example_arith | Wasm_2_0_0
+  type t = Example_arith | Wasm_2_0_0 | Riscv
 
   val encoding : t Data_encoding.t
 
@@ -64,7 +64,7 @@ module Kind : sig
   (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
   val pvm_of : t -> PVM.t
 
-  (** [all] returns all implemented PVM. *)
+  (** [all] returns all implemented PVMs. *)
   val all : t list
 
   val of_string : string -> t option

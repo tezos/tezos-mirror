@@ -78,7 +78,8 @@ val shutdown : t -> unit Lwt.t
 
 val valid_block_watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val new_head_watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
+val new_head_watcher :
+  t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
 
 val running_workers : unit -> (Chain_id.t * t) list
 

@@ -112,4 +112,4 @@ let export inst name =
       Some export)
     (function
       | Not_found | Lazy_map.UnexpectedAccess -> Lwt.return_none
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)

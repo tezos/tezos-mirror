@@ -44,6 +44,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   views
+
+.. toctree::
+   :maxdepth: 2
+
    timelock
 
 .. toctree::
@@ -100,3 +105,8 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    tickets
+
+.. toctree::
+   :maxdepth: 2
+
+   adaptive_issuance

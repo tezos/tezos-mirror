@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (just consumed gas: 42.718)
+  - location: 11 (just consumed gas: 42.680)
     [ (Pair (Pair 1 4 2 Unit) Unit) ]
   - location: 11 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
@@ -27,9 +27,9 @@ trace
   - location: 20 (just consumed gas: 0.010)
     [ True
       (Pair 1 4 2 Unit) ]
-  - location: 21 (just consumed gas: 0)
+  - location: 21 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
-  - location: 21 (just consumed gas: 0.015)
+  - location: 21 (just consumed gas: 0.025)
     [ (Pair 1 4 2 Unit) ]
   - location: 27 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit)
@@ -47,9 +47,9 @@ trace
   - location: 36 (just consumed gas: 0.010)
     [ True
       (Pair 1 4 2 Unit) ]
-  - location: 37 (just consumed gas: 0)
+  - location: 37 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
-  - location: 37 (just consumed gas: 0.015)
+  - location: 37 (just consumed gas: 0.025)
     [ (Pair 1 4 2 Unit) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit)
@@ -67,9 +67,9 @@ trace
   - location: 52 (just consumed gas: 0.010)
     [ True
       (Pair 1 4 2 Unit) ]
-  - location: 53 (just consumed gas: 0)
+  - location: 53 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
-  - location: 53 (just consumed gas: 0.015)
+  - location: 53 (just consumed gas: 0.025)
     [ (Pair 1 4 2 Unit) ]
   - location: 59 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit)
@@ -87,9 +87,9 @@ trace
   - location: 68 (just consumed gas: 0.010)
     [ True
       (Pair 1 4 2 Unit) ]
-  - location: 69 (just consumed gas: 0)
+  - location: 69 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
-  - location: 69 (just consumed gas: 0.015)
+  - location: 69 (just consumed gas: 0.025)
     [ (Pair 1 4 2 Unit) ]
   - location: 75 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit)
@@ -107,9 +107,9 @@ trace
   - location: 82 (just consumed gas: 0.010)
     [ True
       (Pair 1 4 2 Unit) ]
-  - location: 83 (just consumed gas: 0)
+  - location: 83 (just consumed gas: 0.010)
     [ (Pair 1 4 2 Unit) ]
-  - location: 83 (just consumed gas: 0.015)
+  - location: 83 (just consumed gas: 0.025)
     [ (Pair 1 4 2 Unit) ]
   - location: 89 (just consumed gas: 0.010)
     [  ]

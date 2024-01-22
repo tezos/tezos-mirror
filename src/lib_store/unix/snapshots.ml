@@ -1124,7 +1124,7 @@ end = struct
       let buffer_size = 32768 in
       let buffer = Cstruct.create buffer_size in
       let rec loop (n : int) =
-        if n <= 0 then Lwt.return ()
+        if n <= 0 then Lwt.return_unit
         else
           let amount = min n buffer_size in
           let block = Cstruct.sub buffer 0 amount in
@@ -1292,7 +1292,7 @@ end = struct
     let block_size = 32768 in
     let buffer = Cstruct.create block_size in
     let rec loop remaining =
-      if remaining = 0L then Lwt.return ()
+      if remaining = 0L then Lwt.return_unit
       else
         let this = Int64.(to_int (min (of_int block_size) remaining)) in
         let block = Cstruct.sub buffer 0 this in
@@ -1708,7 +1708,7 @@ module Raw_exporter : EXPORTER = struct
                       (cemented_blocks_dir t.snapshot_tmp_dir)))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     Lwt.catch
       (fun () ->
@@ -1720,7 +1720,7 @@ module Raw_exporter : EXPORTER = struct
                     (cemented_blocks_dir t.snapshot_tmp_dir)))))
       (function
         | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-        | exn -> Lwt.fail exn)
+        | exn -> Lwt.reraise exn)
 
   let filter_cemented_block_indexes t ~limit =
     let open Cemented_block_store in
@@ -1960,7 +1960,7 @@ module Tar_exporter : EXPORTER = struct
                    (cemented_blocks_hash_index_dir t.snapshot_tmp_cemented_dir))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     let* () =
       Lwt.catch
@@ -1972,7 +1972,7 @@ module Tar_exporter : EXPORTER = struct
                    (cemented_blocks_level_index_dir t.snapshot_tmp_cemented_dir))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     let* () =
       Onthefly.add_directory_and_finalize

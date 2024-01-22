@@ -81,23 +81,19 @@ val consensus_threshold : Raw_context.t -> int
 
 val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
-val max_slashing_period : Raw_context.t -> int
-
 val limit_of_delegation_over_baking : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :
-  Raw_context.t -> int
+  Raw_context.t -> Int_percentage.t
 
 val percentage_of_frozen_deposits_slashed_per_double_attestation :
-  Raw_context.t -> int
+  Raw_context.t -> Int_percentage.t
 
 val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option
 
 val minimal_block_delay : Raw_context.t -> Period_repr.t
 
 val delay_increment_per_round : Raw_context.t -> Period_repr.t
-
-val sc_rollup_enable : Raw_context.t -> bool
 
 val sc_rollup_arith_pvm_enable : Raw_context.t -> bool
 
@@ -148,5 +144,11 @@ val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
 
 val adaptive_issuance_launch_ema_threshold : Raw_context.t -> int32
 
+val adaptive_issuance_activation_vote_enable : Raw_context.t -> bool
+
 val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
+
+val adaptive_issuance_autostaking_enable : Raw_context.t -> bool
+
+val direct_ticket_spending_enable : Raw_context.t -> bool

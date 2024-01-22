@@ -13,7 +13,7 @@ parameter (or (key_hash %Initialize)
 storage (map :stored_balance key_hash mutez);
 code { DUP; CAR;
        # Deposit into account
-       IF_LEFT { DUP; DIIP{ CDR %stored_balance; DUP };
+       IF_LEFT { DUP; DIP 2 { CDR %stored_balance; DUP };
                  DIP{ SWAP }; GET @opt_prev_balance;
                  # Create the account
                  IF_SOME # Add to an existing account
@@ -24,18 +24,18 @@ code { DUP; CAR;
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
                  CAR %from;
-                 DIIP{ CDAR %withdraw_amount; PACK ; BLAKE2B @signed_amount };
+                 DIP 2 { CDAR %withdraw_amount; PACK ; BLAKE2B @signed_amount };
                  DIP{ CDDR %sig }; CHECK_SIGNATURE;
                  IF {} { PUSH string "Bad signature"; FAILWITH };
                  # Get user account information
-                 DIIP{ CDR %stored_balance; DUP };
+                 DIP 2 { CDR %stored_balance; DUP };
                  CAR %from; HASH_KEY @from_hash; DUP; DIP{ DIP { SWAP }; SWAP}; GET;
                  # Account does not exist
                  IF_NONE { PUSH string "Account does not exist"; PAIR; FAILWITH }
                          # Account exists
                          { RENAME @previous_balance;
                            DIP { DROP };
-                           DUP; DIIP{ DUP; CDAR %withdraw_amount; DUP };
+                           DUP; DIP 2 { DUP; CDAR %withdraw_amount; DUP };
                            # Ensure funds are available
                            DIP{ CMPLT @not_enough }; SWAP;
                            IF { PUSH string "Not enough funds"; FAILWITH }

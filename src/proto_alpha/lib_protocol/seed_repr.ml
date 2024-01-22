@@ -199,9 +199,10 @@ let () =
     (fun () -> Unexpected_nonce_length)
 
 let make_nonce nonce =
+  let open Result_syntax in
   if Compare.Int.(Bytes.length nonce <> Constants_repr.nonce_length) then
-    error Unexpected_nonce_length
-  else ok nonce
+    tzfail Unexpected_nonce_length
+  else return nonce
 
 let hash nonce = Nonce_hash.hash_bytes [nonce]
 

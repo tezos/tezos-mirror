@@ -34,7 +34,17 @@
 open Lwt.Syntax
 module Buff = Circular_buffer
 
-let buffer_size = ref (1 lsl 14)
+let section =
+  Clap.section
+    "CIRCULAR BUFFER TESTS"
+    ~description:("Options that apply to tests from: " ^ __FILE__)
+
+let buffer_size =
+  Clap.default_int
+    ~section
+    ~long:"buffer-size"
+    ~description:"Size of the read buffers"
+    (1 lsl 14)
 
 let random_bytes size =
   let buff = Bytes.create size in
@@ -289,7 +299,8 @@ module Fail_Test = struct
             circular_buffer
         in
         assert false)
-      (function Invalid_argument _ -> Lwt.return_unit | exn -> raise exn)
+      (function
+        | Invalid_argument _ -> Lwt.return_unit | exn -> Lwt.reraise exn)
 
   (** Fail read too long.  *)
   let read_invalid ~max_buffer_len ~max_data_size ~actual_data_size =
@@ -337,14 +348,6 @@ module Fail_Test = struct
     read_invalid ~max_buffer_len:4 ~max_data_size:0 ~actual_data_size:0
 end
 
-let spec =
-  Arg.[("--buffer-size", Set_int buffer_size, " Size of the read buffers")]
-
-let () =
-  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
-  let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
-  Arg.parse spec anon_fun usage_msg
-
 let wrap n f =
   Alcotest.test_case n `Quick (fun () ->
       match
@@ -367,12 +370,10 @@ let () =
          ( "circular_buffer.constant-chunks." ^ descr,
            [
              wrap "bad-fit" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = (buffer_size / 13) + 1 in
                  let chunks_count = buffer_size / chunks_size in
                  run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
              wrap "bad-fit-underflow" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = (buffer_size / 13) + 1 in
                  let chunks_count = (buffer_size / chunks_size) - 1 in
                  run
@@ -382,17 +383,14 @@ let () =
                    ~iter:(chunks_count + 2)
                    ());
              wrap "bad-fit-overflow" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = (buffer_size / 13) + 1 in
                  let chunks_count = (buffer_size / chunks_size) + 3 in
                  run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
              wrap "perfect-fit" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = buffer_size / (buffer_size lsr 3) in
                  let chunks_count = buffer_size / chunks_size in
                  run ~buffer_size ~chunks_size ~chunks_count ~iter:2 ());
              wrap "perfect-fit-underflow" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = buffer_size / (buffer_size lsr 3) in
                  let chunks_count = (buffer_size / chunks_size) - 1 in
                  run
@@ -402,7 +400,6 @@ let () =
                    ~iter:(chunks_count + 2)
                    ());
              wrap "perfect-fit-overflow" (fun () ->
-                 let buffer_size = !buffer_size in
                  let chunks_size = buffer_size / (buffer_size lsr 3) in
                  let chunks_count = (buffer_size / chunks_size) + 2 in
                  run

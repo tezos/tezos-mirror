@@ -1674,7 +1674,7 @@
   },
   {
     "file": "dal.ml",
-    "title": "Alpha: Testing DAL node (dal attestor with bake for)",
+    "title": "Alpha: Testing DAL node (dal attester with bake for)",
     "tags": [
       "alpha",
       "dal",

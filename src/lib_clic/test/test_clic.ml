@@ -604,7 +604,7 @@ let test_parameters_autocompletion =
                    Tezos_clic.(
                      non_terminal_seq
                        ~suffix:[]
-                       (int_param ~autocomplete:(fun _ctxt -> return []))
+                       (int_param ~autocomplete:(fun _ctxt -> return_nil))
                      @@ stop)
                  in
                  ()) );

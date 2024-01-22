@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name kaitai_of_data_encoding)
+ (public_name kaitai-of-data-encoding)
+ (libraries
+  yaml
+  data-encoding
+  kaitai))

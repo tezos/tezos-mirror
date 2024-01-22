@@ -164,13 +164,13 @@ module Automaton_config :
     module Message = struct
       include String_iterable
 
-      let valid msg msg_id = Validity_hook.apply msg msg_id
+      let valid ?message ~message_id () = Validity_hook.apply message message_id
     end
   end
 end
 
 module C = Automaton_config
-module GS = Tezos_gossipsub.Make (C)
+module GS = Tezos_gossipsub.Automaton (C)
 
 let pp_per_topic_score_limits =
   Fmt.Dump.record
@@ -343,28 +343,37 @@ module Worker_config = struct
   end
 
   module Stream = struct
-    type 'a t = {stream : 'a Lwt_stream.t; pusher : 'a option -> unit}
+    type 'a t = {
+      stream : 'a Lwt_stream.t;
+      pusher : 'a option -> unit;
+      mutable length : int;
+    }
 
     let empty () =
       let stream, pusher = Lwt_stream.create () in
-      {stream; pusher}
+      {stream; pusher; length = 0}
 
-    let push e t = t.pusher (Some e)
+    let push e t =
+      t.pusher (Some e) ;
+      t.length <- t.length + 1
 
     let pop t =
       let open Lwt_syntax in
       let* r = Lwt_stream.get t.stream in
       match r with
-      | Some r -> Lwt.return r
+      | Some r ->
+          t.length <- t.length - 1 ;
+          Lwt.return r
       | None ->
           Stdlib.failwith "Invariant: we don't push None values in the stream"
 
-    let get_available t = Lwt_stream.get_available t.stream
+    let get_available t =
+      t.length <- 0 ;
+      Lwt_stream.get_available t.stream
+
+    let length t = t.length
   end
 end
 
 module Worker = Tezos_gossipsub.Worker (Worker_config)
-module Message_cache =
-  Tezos_gossipsub.Internal_for_tests.Message_cache
-    (Automaton_config.Subconfig)
-    (Automaton_config.Time)
+module Message_cache = GS.Introspection.Message_cache

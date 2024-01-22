@@ -97,7 +97,7 @@ module MakeHelpers () = struct
     in
     write_file init_state_file ~contents
 
-  let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq s
+  let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Kzg.SMap.to_seq s
 
   let circuits_info_file = with_epoxy_dir "circuits_info"
 
@@ -138,7 +138,7 @@ module MakeHelpers () = struct
         ()
     in
     Log.info "Activated protocol." ;
-    let* () = Client.bake_for client in
+    let* () = Client.bake_for_and_wait client in
     return (client, node)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4290

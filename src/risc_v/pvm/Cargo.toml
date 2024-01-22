@@ -1,0 +1,13 @@
+[package]
+name = "octez-risc-v-pvm"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies.risc-v-interpreter]
+path = "../interpreter"
+
+[build-dependencies]
+cbindgen = "*"

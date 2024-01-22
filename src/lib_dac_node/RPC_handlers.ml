@@ -64,11 +64,11 @@ let () =
 
 let handle_get_health_live node_ctxt =
   match Node_context.get_status node_ctxt with
-  | Ready _ | Starting -> Lwt_result_syntax.return true
+  | Ready _ | Starting -> Lwt_result_syntax.return_true
 
 let handle_get_health_ready node_ctxt =
   match Node_context.get_status node_ctxt with
-  | Ready _ -> Lwt_result_syntax.return true
+  | Ready _ -> Lwt_result_syntax.return_true
   | Starting -> Lwt_result_syntax.tzfail @@ DAC_node_not_ready "starting"
 
 module Shared_by_V0_and_V1 = struct

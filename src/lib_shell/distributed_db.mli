@@ -96,7 +96,7 @@ val get_chain : t -> Chain_id.t -> chain_db option
 val deactivate : chain_db -> unit Lwt.t
 
 (** Kick a given peer. *)
-val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t
+val disconnect : reason:string -> chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Greylist a given peer. *)
 val greylist : chain_db -> P2p_peer.Id.t -> unit Lwt.t

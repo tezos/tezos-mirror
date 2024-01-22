@@ -23,21 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = V0 | V1 | V2 | V3
+type t = V0 | V1 | V2 | V3 | V4
 
 let pp ppf v =
   Format.pp_print_string ppf
-  @@ match v with V0 -> "v0" | V1 -> "v1" | V2 -> "v2" | V3 -> "v3"
+  @@
+  match v with V0 -> "v0" | V1 -> "v1" | V2 -> "v2" | V3 -> "v3" | V4 -> "v4"
 
 let encoding =
   let open Data_encoding in
   conv
-    (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3)
+    (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3 | V4 -> 4)
     (function
       | 0 -> V0
       | 1 -> V1
       | 2 -> V2
       | 3 -> V3
+      | 4 -> V4
       | v -> Format.ksprintf Stdlib.failwith "Unsupported store version %d" v)
     (obj1 (req "store_version" int31))
 

@@ -213,6 +213,19 @@ module Query = struct
            | Error e -> invalid_message e)
     |> seal
 
+  let message_index_query =
+    let open Tezos_rpc.Query in
+    query (fun message_index ->
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        req "index" (fun o -> o) message_index)
+    |+ opt_field "index" Tezos_rpc.Arg.uint (fun o -> Some o)
+    |> seal
+
   type key_query = {key : string}
 
   let key_query : key_query Tezos_rpc.Query.t =
@@ -432,5 +445,18 @@ module Block = struct
               (req "commitment" Sc_rollup.Commitment.Hash.encoding)
               (req "proof" Encodings.hex_string))
         (path / "proofs" / "outbox")
+
+    let outbox_proof_simple =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Generate serialized output proof for some outbox message at level \
+           and index"
+        ~query:Query.message_index_query
+        ~output:
+          Data_encoding.(
+            obj2
+              (req "commitment" Sc_rollup.Commitment.Hash.encoding)
+              (req "proof" Encodings.hex_string))
+        (path / "proofs" / "outbox" /: level_param / "messages")
   end
 end

@@ -61,7 +61,7 @@ let any_in_range_inclusive min max = Random.int (max + 1 - min) + min
 
 let rpc_big_map_get_all ?offset ?length client =
   let* json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_big_maps ~id:"4" ?offset ?length ()
   in
   Lwt.return
@@ -168,7 +168,7 @@ let test_2_pivots actual_all_values client =
 let test_invalid_input_fail client =
   let must_fail ?offset ?length () =
     let*? process =
-      RPC.Client.spawn client
+      Client.RPC.spawn client
       @@ RPC.get_chain_block_context_big_maps ~id:"0" ?offset ?length ()
     in
     Process.check ~expect_failure:true process

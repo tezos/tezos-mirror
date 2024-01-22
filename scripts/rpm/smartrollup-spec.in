@@ -1,0 +1,28 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez Smart Rollup daemons
+
+Packager:   @MAINT@
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Requires:	@DPKG@-client
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez Smart Rollup daemons
+
+%files
+%{_bindir}/octez-*
+%{_sysconfdir}/init.d/octez-*
+%config /etc/octez/smartrollup.conf
+
+%post 
+/usr/bin/systemctl daemon-reload

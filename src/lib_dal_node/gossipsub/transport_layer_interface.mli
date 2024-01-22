@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Types = Tezos_dal_node_services.Types
+
 (** This module defines the data structures used to instantiate the Octez P2P
     library. More exactly, it exposes:
 
@@ -46,35 +48,20 @@ type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
     {!P2p_peer.Id.t} elements in [px] are augmented by their {!P2p_point.Id.t}
     counterpart. *)
 type p2p_message =
-  | Graft of {topic : Gs_interface.topic}
-  | Prune of {
-      topic : Gs_interface.topic;
-      px : px_peer Seq.t;
-      backoff : Gs_interface.Span.t;
-    }
-  | IHave of {
-      topic : Gs_interface.topic;
-      message_ids : Gs_interface.message_id list;
-    }
-  | IWant of {message_ids : Gs_interface.message_id list}
-  | Subscribe of {topic : Gs_interface.topic}
-  | Unsubscribe of {topic : Gs_interface.topic}
+  | Graft of {topic : Types.Topic.t}
+  | Prune of {topic : Types.Topic.t; px : px_peer Seq.t; backoff : Types.Span.t}
+  | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
+  | IWant of {message_ids : Types.Message_id.t list}
+  | Subscribe of {topic : Types.Topic.t}
+  | Unsubscribe of {topic : Types.Topic.t}
   | Message_with_header of {
-      message : Gs_interface.message;
-      topic : Gs_interface.topic;
-      message_id : Gs_interface.message_id;
+      message : Types.Message.t;
+      topic : Types.Topic.t;
+      message_id : Types.Message_id.t;
     }
-
-(** {!peer_metadata} is not used. So, its value is [unit]. *)
-type peer_metadata = unit
-
-(** {!connection_metadata} is not used currently. So, its value is [unit]. *)
-type connection_metadata = unit
 
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
   network_name:string -> p2p_message P2p_params.message_config
 
-val peer_meta_config : peer_metadata P2p_params.peer_meta_config
-
-val conn_meta_config : connection_metadata P2p_params.conn_meta_config
+val version : network_name:string -> Network_version.t

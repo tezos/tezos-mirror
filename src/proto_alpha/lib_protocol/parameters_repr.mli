@@ -51,6 +51,7 @@ type bootstrap_smart_rollup = {
   pvm_kind : Sc_rollups.Kind.t;
   boot_sector : string;
   parameters_ty : Script_repr.lazy_expr;
+  whitelist : Sc_rollup_whitelist_repr.t option;
 }
 
 (** Protocol parameters define some constants regulating behaviour of the

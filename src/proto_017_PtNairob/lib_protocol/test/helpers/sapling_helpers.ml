@@ -49,7 +49,7 @@ module Common = struct
     res >>= function Ok _ -> assert false | Error _ -> return_unit
 
   let print ?(prefix = "") e v =
-    Printf.printf
+    Format.printf
       "%s: %s\n"
       prefix
       Data_encoding.(Json.to_string (Json.construct e v))

@@ -24,25 +24,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./octez-client"
+let octez_client = "./octez-client"
 
-let tezos_admin_client = "./octez-admin-client"
+let octez_admin_client = "./octez-admin-client"
 
-let tezos_node = "./octez-node"
+let octez_node = "./octez-node"
 
-let tezos_proxy_server = "./octez-proxy-server"
+let octez_proxy_server =
+  Uses.make ~tag:"proxy_server" ~path:"./octez-proxy-server"
 
-let tezos_codec = "./octez-codec"
+let octez_codec = Uses.make ~tag:"codec" ~path:"./octez-codec"
 
-let tezos_snoop = "./octez-snoop"
+let octez_snoop = Uses.make ~tag:"snoop" ~path:"./octez-snoop"
 
-let tezos_protocol_compiler = "./octez-protocol-compiler"
+let octez_protocol_compiler =
+  Uses.make ~tag:"protocol_compiler" ~path:"./octez-protocol-compiler"
 
-let dal_node = "./octez-dal-node"
+let octez_dal_node = Uses.make ~tag:"dal_node" ~path:"./octez-dal-node"
 
-let dac_node = "./octez-dac-node"
+let octez_dac_node = Uses.make ~tag:"dac_node" ~path:"./octez-dac-node"
 
-let smart_rollup_node = "./octez-smart-rollup-node"
+let octez_dac_client = Uses.make ~tag:"dac_client" ~path:"./octez-dac-client"
+
+let octez_smart_rollup_node =
+  Uses.make ~tag:"smart_rollup_node" ~path:"./octez-smart-rollup-node"
+
+let octez_evm_node = Uses.make ~tag:"evm_node" ~path:"./octez-evm-node"
+
+let octez_signer = Uses.make ~tag:"signer" ~path:"./octez-signer"
+
+let octez_injector_server =
+  Uses.make
+    ~tag:"injector_server"
+    ~path:
+      "./_build/default/contrib/octez_injector_server/octez_injector_server.exe"
 
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
@@ -91,8 +106,7 @@ let max_op_ttl = 120
 
 (** Constant gas cost required for every manager operation. Should
     match [Michelson_v1_gas.Cost_of.manager_operation]. *)
-let manager_operation_gas_cost ~protocol =
-  match protocol with Protocol.Nairobi | Oxford | Alpha -> 100
+let manager_operation_gas_cost ~protocol:_ = 100
 
 (** A valid base58 encoded compressed state hash. *)
 let sc_rollup_compressed_state =

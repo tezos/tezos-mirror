@@ -81,7 +81,7 @@ let test_distribution ?(circuit_builder = Circuit_Builder.base) dp () =
   output_bytes oc b ;
   close_out oc ;
   let inputs =
-    Plonk.SMap.map
+    Kzg.SMap.map
       (List.map (fun witness -> DP.MP.{witness; input_commitments = []}))
       x_map
   in

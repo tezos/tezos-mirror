@@ -24,15 +24,15 @@
 (*****************************************************************************)
 
 open Protocol
-open Alpha_context
 open Tezos_micheline
 
 (** The result of parsing and expanding a Michelson V1 script or data. *)
-type parsed = {
+type 'prim parser_result = {
   source : string;  (** The original source code. *)
   unexpanded : string Micheline.canonical;
       (** Original expression with macros. *)
-  expanded : Script.expr;  (** Expression with macros fully expanded. *)
+  expanded : 'prim Micheline.canonical;
+      (** Expression with macros fully expanded. *)
   expansion_table : (int * (Micheline_parser.location * int list)) list;
       (** Associates unexpanded nodes to their parsing locations and
         the nodes expanded from it in the expanded expression. *)
@@ -41,15 +41,29 @@ type parsed = {
         expression. *)
 }
 
+type parsed = Michelson_v1_primitives.prim parser_result
+
 val compare_parsed : parsed -> parsed -> int
 
 val parse_toplevel :
   ?check:bool -> string -> parsed Micheline_parser.parsing_result
 
+(** Same as [parse_toplevel] but skips the final step (recognizing the
+    primitives). *)
+val expand_toplevel :
+  ?check:bool -> string -> string parser_result Micheline_parser.parsing_result
+
 val parse_expression :
   ?check:bool -> string -> parsed Micheline_parser.parsing_result
 
-val expand_all :
+(** Same as [parse_expression] but skips the final step (recognizing the
+    primitives). *)
+val expand_expression :
+  ?check:bool -> string -> string parser_result Micheline_parser.parsing_result
+
+val expand_all_and_recognize_prims :
   source:string ->
   original:Micheline_parser.node ->
   parsed Micheline_parser.parsing_result
+
+val unrecognize_prims : parsed -> string parser_result

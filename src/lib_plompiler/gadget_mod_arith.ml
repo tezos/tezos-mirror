@@ -145,7 +145,7 @@ module type MOD_ARITH = functor (L : LIB) -> sig
      endian bit decomposition of the given integer [n]. The default length of
      the list is [nb_limbs] * [base]. If padded is true, padding with zeros is
      done to get the length multiple of 8. *)
-  val bytes_of_mod_int : ?padded:bool -> mod_int repr -> Bytes.bl repr t
+  val bytes_of_mod_int : ?padded:bool -> mod_int repr -> Bytes.tl repr t
 
   val constant : Z.t -> mod_int repr t
 

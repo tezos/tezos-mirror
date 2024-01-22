@@ -23,39 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
-module SMap = Plonk.SMap
+open Kzg.Bls
+open Kzg.Utils
+module SMap = Kzg.SMap
 
 module type Super_PC_sig = sig
-  include Kzg.PC_for_distribution_sig
+  include Polynomial_commitment.PC_for_distribution_sig
 
   type prover_aux = {r : Scalar.t; s_list : Scalar.t SMap.t list}
 
   val prove_super_aggregation :
     Public_parameters.prover ->
-    transcript ->
+    Transcript.t ->
     Poly.t SMap.t list ->
     Commitment.prover_aux list ->
     query list ->
     Scalar.t SMap.t SMap.t list ->
-    (proof * prover_aux) * transcript
+    (proof * prover_aux) * Transcript.t
 
   val verify_super_aggregation :
     Public_parameters.verifier ->
-    transcript ->
+    Transcript.t ->
     Commitment.t list ->
     query list ->
     Scalar.t SMap.t list ->
     proof ->
-    bool * Scalar.t * transcript
+    bool * Scalar.t * Transcript.t
 end
 
 (** Extension of the KZG_pack implementation with additional
     types and functions used in by Distributed_prover  *)
 module Kzg_pack_impl = struct
   module Pack = Aggregation.Pack
-  module PC = Kzg.Kzg_impl
+  module PC = Polynomial_commitment.Kzg_impl
   module BasePC = Aggregation.Polynomial_commitment.Make_impl (PC)
 
   include (BasePC : module type of BasePC)
@@ -67,7 +67,7 @@ module Kzg_pack_impl = struct
 
   type main_prover_state =
     Public_parameters.prover
-    * transcript
+    * Transcript.t
     * Scalar.t
     * query list
     * Scalar.t SMap.t list

@@ -38,13 +38,12 @@
           - integrate to aPlonK
 *)
 
-open Bls
+open Kzg.Bls
 open Identities
+open Kzg.Utils
 
 module type Cq_sig = sig
   exception Entry_not_in_table
-
-  type transcript = bytes
 
   type prover_public_parameters
 
@@ -60,16 +59,17 @@ module type Cq_sig = sig
 
   val prove :
     prover_public_parameters ->
-    transcript ->
+    Transcript.t ->
     S.t array SMap.t list ->
-    proof * transcript
+    proof * Transcript.t
 
   val verify :
-    verifier_public_parameters -> transcript -> proof -> bool * transcript
+    verifier_public_parameters -> Transcript.t -> proof -> bool * Transcript.t
 end
 
-module Make (PC : Polynomial_commitment.S) = struct
+module Internal = struct
   open Utils
+  module PC = Kzg.Polynomial_commitment
   module ISet = Set.Make (Int)
   module IMap = Map.Make (Int)
 
@@ -124,7 +124,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     cm_b0 : PC.Commitment.t;
     cm_qa : PC.Commitment.t;
     cm_m : PC.Commitment.t;
-    cm_p : PC.Commitment.t;
+    cm_p : Kzg.Degree_check.Proof.t;
     cm_b0_qb_f : PC.Commitment.t;
     (* evaluations *)
     a0 : Scalar.t list;
@@ -163,7 +163,7 @@ module Make (PC : Polynomial_commitment.S) = struct
 
   (* This function is used to aggregate commitments for different proofs *)
   let aggregate_cm cm etas =
-    pippenger1_with_affine_array
+    Kzg.Commitment.Commit.with_affine_array_1
       (PC.Commitment.to_map cm |> SMap.values |> Array.of_list)
       etas
 
@@ -172,20 +172,21 @@ module Make (PC : Polynomial_commitment.S) = struct
     List.map (convert_eval_points ~generator:Scalar.zero ~x:gamma) [[X]]
 
   (* We use PC’s function to commit our polynomials *)
-  let commit1 = PC.Commitment.commit_single
+  let commit1 srs =
+    PC.(Commitment.commit_single (Public_parameters.get_commit_parameters srs))
 
-  (* [kzg_0 p] returns (p - p(0))/X *)
-  let kzg_0 p =
+  (* [open_at_0 p] returns (p - p(0))/X *)
+  let open_at_0 p =
     let q, r =
       Poly.(division_xn (p - constant (evaluate p Scalar.zero)) 1 Scalar.zero)
     in
-    if not (Poly.is_zero r) then failwith "Cq.kzg_0 : division error." ;
+    assert (Poly.is_zero r) ;
     q
 
   (* This function avoid some lines of code duplication *)
   let compute_and_commit f list =
     let m, l = List.map f list |> Array.of_list |> Array.split in
-    (m, pippenger1_with_affine_array l m)
+    (m, Kzg.Commitment.Commit.with_affine_array_1 l m)
 
   let setup_prover (n, domain) k (table_arrays, table_polys) pc =
     let domain_k = Domain.build k in
@@ -218,7 +219,9 @@ module Make (PC : Polynomial_commitment.S) = struct
           |> Evaluations.interpolation_fft domain)
     in
     let cms_lagrange = Array.map (commit1 pc) lagrange in
-    let cms_lagrange_0 = Array.map (fun p -> commit1 pc @@ kzg_0 p) lagrange in
+    let cms_lagrange_0 =
+      Array.map (fun p -> commit1 pc @@ open_at_0 p) lagrange
+    in
 
     let q =
       List.map2
@@ -246,7 +249,7 @@ module Make (PC : Polynomial_commitment.S) = struct
       try G2.(add (Srs_g2.get srs2 n) (negate one))
       with Invalid_argument _ ->
         raise
-          (Utils.SRS_too_short
+          (Kzg.Commitment.SRS_too_short
              (Printf.sprintf
                 "Cq.setup_verifier : SRS_2 of size at least (%d + 1) expected \
                  (size %d received)."
@@ -254,7 +257,7 @@ module Make (PC : Polynomial_commitment.S) = struct
                 (Srs_g2.size srs2)))
     in
 
-    let cm_table = List.map (commit2 srs2) table_poly in
+    let cm_table = List.map (Kzg.Commitment.Commit.with_srs2 srs2) table_poly in
 
     let srs2_0 = Srs_g2.get srs2 0 in
     let srs2_1 = Srs_g2.get srs2 1 in
@@ -285,11 +288,9 @@ module Make (PC : Polynomial_commitment.S) = struct
               n)) ;
     let domain = Domain.build n in
     let table_polys = List.map (Evaluations.interpolation_fft2 domain) table in
-    let pc = PC.Public_parameters.setup 0 (srs, srs) in
-    let prv =
-      setup_prover (n, domain) wire_size (table, table_polys) (fst pc)
-    in
-    let vrf = setup_verifier srs n wire_size table_polys (snd pc) in
+    let pc_prv, pc_vrf, _ = PC.Public_parameters.setup 0 (srs, srs) in
+    let prv = setup_prover (n, domain) wire_size (table, table_polys) pc_prv in
+    let vrf = setup_verifier srs n wire_size table_polys pc_vrf in
     (prv, vrf)
 
   let compute_m_and_t_sparse pp f_arrays f_agg =
@@ -379,8 +380,13 @@ module Make (PC : Polynomial_commitment.S) = struct
     let q, r = Poly.division_xn bf_1 k Scalar.(negate one) in
     if Poly.is_zero r then q else raise Entry_not_in_table
 
-  let compute_p (pp : prover_public_parameters) k b0 =
-    Poly.mul_xn b0 (pp.n - 1 - (k - 2)) Scalar.zero |> commit1 pp.pc
+  let compute_p (pp : prover_public_parameters) transcript k b0 =
+    Kzg.Degree_check.prove_multi
+      ~max_commit:(pp.n - 1)
+      ~max_degree:(k - 2)
+      (PC.Public_parameters.get_commit_parameters pp.pc)
+      transcript
+      b0
 
   (* as written p. 13, N × a₀ = ΣA_i for i < N ; since A is sparse, it’s fine *)
   let compute_a0 n a =
@@ -413,8 +419,8 @@ module Make (PC : Polynomial_commitment.S) = struct
       ((cm_f, f_aux), (cm_f_agg, f_agg_aux)) (b0_map, f, f_agg, qb) =
     let qb_map = SMap.Aggregation.of_list ~n "" qb_name qb in
     let f_map = SMap.union_disjoint_list [f; f_agg; b0_map; qb_map] in
-    let cm_b0, b0_aux = PC.Commitment.commit pp.pc b0_map in
-    let cm_qb, qb_aux = PC.Commitment.commit pp.pc qb_map in
+    let cm_b0, b0_aux = PC.commit pp.pc b0_map in
+    let cm_qb, qb_aux = PC.commit pp.pc qb_map in
     (* Does this must be in lexicographic order ? *)
     let cm_map = PC.Commitment.(recombine [cm_b0; cm_f; cm_f_agg; cm_qb]) in
     let aux =
@@ -533,7 +539,7 @@ module Make (PC : Polynomial_commitment.S) = struct
              |> SMap.Aggregation.prefix_map ~n ~i "")
            f_map_list
     in
-    let cm_f, f_aux = PC.Commitment.commit pp.pc f_map in
+    let cm_f, f_aux = PC.commit pp.pc f_map in
     let transcript = Transcript.expand PC.Commitment.t cm_f transcript in
     (* α will be used to aggregate wires & table’s columns *)
     let alpha, transcript = Fr_generation.random_fr transcript in
@@ -557,7 +563,7 @@ module Make (PC : Polynomial_commitment.S) = struct
         f_agg_arrays_list
     in
     let f_agg_map = SMap.Aggregation.of_list ~n "" f_agg_name f_agg_list in
-    let cm_f_agg, f_agg_aux = PC.Commitment.commit pp.pc f_agg_map in
+    let cm_f_agg, f_agg_aux = PC.commit pp.pc f_agg_map in
 
     (* 1.1, 1.2 *)
     let m_and_t, cm_m =
@@ -587,21 +593,15 @@ module Make (PC : Polynomial_commitment.S) = struct
     let b0 =
       SMap.of_list
       @@ List.mapi
-           (fun i b -> (SMap.Aggregation.add_prefix ~n ~i "" b0_name, kzg_0 b))
+           (fun i b ->
+             (SMap.Aggregation.add_prefix ~n ~i "" b0_name, open_at_0 b))
            b
     in
     (* 2.8, 2.9 *)
     let qb = List.map2 (compute_qb pp beta k) b (SMap.values f_agg_map) in
 
-    (* 2.10 *)
-    let cm_p, _ =
-      SMap.map (compute_p pp k) b0
-      |> SMap.values
-      |> PC.Commitment.of_list pp.pc ~name:p_name
-    in
-
     let transcript =
-      Transcript.list_expand PC.Commitment.t [cm_a; cm_qa; cm_p] transcript
+      Transcript.list_expand PC.Commitment.t [cm_a; cm_qa] transcript
     in
     (* 3.6.b *)
     let b0y, fy, fy_agg, cm_b0_qb_f, cm_b0, pc, transcript =
@@ -611,6 +611,21 @@ module Make (PC : Polynomial_commitment.S) = struct
         n
         ((cm_f, f_aux), (cm_f_agg, f_agg_aux))
         (b0, f_map, f_agg_map, qb)
+    in
+
+    (* 2.10 *)
+    let cm_p, transcript =
+      Kzg.Degree_check.prove_multi
+        ~max_commit:(pp.n - 1)
+        ~max_degree:(k - 2)
+        (PC.Public_parameters.get_commit_parameters pp.pc)
+        transcript
+        cm_b0
+        b0
+    in
+
+    let transcript =
+      Transcript.expand Kzg.Degree_check.Proof.t cm_p transcript
     in
 
     (* 3.3 *)
@@ -657,7 +672,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     let transcript =
       Transcript.list_expand
         PC.Commitment.t
-        [proof.cm_a; proof.cm_qa; proof.cm_p]
+        [proof.cm_a; proof.cm_qa]
         transcript
     in
 
@@ -665,6 +680,21 @@ module Make (PC : Polynomial_commitment.S) = struct
 
     (* 3.5, 3.6.a *)
     let kzg_verif, transcript = kzg_verify pp transcript proof pp.k beta in
+
+    (* 2.12 *)
+    (* At this point, b0 already has been added to the transcript, & it is
+       added again in Degree_check *)
+    let check_b0, transcript =
+      Kzg.Degree_check.verify_multi
+        {srs_0 = pp.srs2_0; srs_n_d = pp.srs2_N_1_k_2}
+        transcript
+        proof.cm_b0
+        proof.cm_p
+    in
+
+    let transcript =
+      Transcript.expand Kzg.Degree_check.Proof.t proof.cm_p transcript
+    in
 
     (* 3.6.a *)
     let transcript = Transcript.list_expand Scalar.t proof.a0 transcript in
@@ -678,9 +708,6 @@ module Make (PC : Polynomial_commitment.S) = struct
     let cm_a = aggregate_cm proof.cm_a etas in
     let cm_qa = aggregate_cm proof.cm_qa etas in
     let cm_m = aggregate_cm proof.cm_m etas in
-
-    let cm_b0 = aggregate_cm proof.cm_b0 etas in
-    let cm_p = aggregate_cm proof.cm_p etas in
 
     let a0 =
       List.fold_left
@@ -706,12 +733,6 @@ module Make (PC : Polynomial_commitment.S) = struct
           ]
     in
 
-    (* 2.12 *)
-    let check_b0 =
-      Pairing.pairing_check
-        G1.[(negate cm_b0, pp.srs2_N_1_k_2); (cm_p, pp.srs2_0)]
-    in
-
     (* 3.6.b *)
     let check_a0 =
       Pairing.pairing_check
@@ -725,4 +746,4 @@ module Make (PC : Polynomial_commitment.S) = struct
     (f_agg_verif && kzg_verif && check_a && check_b0 && check_a0, transcript)
 end
 
-include (Make (Polynomial_commitment) : Cq_sig)
+include (Internal : Cq_sig)

@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (just consumed gas: 11.189)
+  - location: 12 (just consumed gas: 10.847)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })
@@ -15,7 +15,7 @@ trace
   - location: 13 (just consumed gas: 0.010)
     [ "1"
       (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
   - location: 17 (just consumed gas: 0.010)
     [ (Pair None { Elt "1" "one" ; Elt "2" "two" }) ]
@@ -24,11 +24,11 @@ trace
   - location: 19 (just consumed gas: 0.010)
     [ { Elt "1" "one" ; Elt "2" "two" }
       { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ "1"
       { Elt "1" "one" ; Elt "2" "two" }
       { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 20 (just consumed gas: 0.083)
+  - location: 20 (just consumed gas: 0.045)
     [ (Some "one")
       { Elt "1" "one" ; Elt "2" "two" } ]
   - location: 21 (just consumed gas: 0.010)

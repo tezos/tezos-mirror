@@ -25,7 +25,7 @@
 
 type version
 
-val v2 : version
+val v3 : version
 
 type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 

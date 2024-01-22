@@ -30,7 +30,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
   | Nairobi -> V1
   | Oxford -> V2
-  | Proto_alpha -> V2
+  | Proto_alpha -> V3
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
@@ -55,7 +55,7 @@ let has_reboot_flag durable =
   let+ allows_reboot =
     Lwt.catch
       (fun () -> Durable.(find_value durable Constants.reboot_flag_key))
-      (function exn -> raise exn)
+      (function exn -> Lwt.reraise exn)
   in
   allows_reboot <> None
 
@@ -267,7 +267,7 @@ let unsafe_next_tick_state ~version ~stack_size_limit host_funcs
             Some extern)
           (function
             | Tezos_lazy_containers.Lazy_map.UnexpectedAccess -> return_none
-            | exn -> raise exn)
+            | exn -> Lwt.reraise exn)
       in
       match extern with
       | Some (Wasm.Instance.ExternFunc main_func) ->

@@ -178,7 +178,7 @@ module Cache_update_benchmark : Benchmark.S = struct
     in
     Model.make
       ~conv:(function {cache_cardinal} -> (cache_cardinal, ()))
-      ~model:(affine_logn ~intercept:intercept_variable ~coeff:coeff_variable)
+      (affine_logn ~intercept:intercept_variable ~coeff:coeff_variable)
 
   let models = [("cache_model", model)]
 

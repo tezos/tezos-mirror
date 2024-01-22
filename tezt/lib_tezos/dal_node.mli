@@ -39,8 +39,24 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?public_addr:string ->
   ?metrics_addr:string ->
   node:Node.t ->
+  unit ->
+  t
+
+val create_from_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?listen_addr:string ->
+  ?public_addr:string ->
+  ?metrics_addr:string ->
+  l1_node_endpoint:Client.endpoint ->
   unit ->
   t
 
@@ -66,13 +82,21 @@ val metrics_addr : t -> string
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
-(** [run ?wait_ready ?env node] launches the given dal
+(** [run ?wait_ready ?env ?event_level node] launches the given dal
     node where env is a map of environment variable.
 
     If [wait_ready] is [true], the promise waits for the dal node to be ready.
     [true] by default.
+
+    [event_level] allows to determine the printed levels. By default,
+    it is set to [`Debug] by default.
 *)
-val run : ?wait_ready:bool -> ?env:string String_map.t -> t -> unit Lwt.t
+val run :
+  ?wait_ready:bool ->
+  ?env:string String_map.t ->
+  ?event_level:Daemon.Level.default_level ->
+  t ->
+  unit Lwt.t
 
 (** Send SIGTERM and wait for the process to terminate.
 
@@ -103,7 +127,7 @@ val wait : t -> Unix.process_status Lwt.t
 val init_config :
   ?expected_pow:float ->
   ?peers:string list ->
-  ?attestor_profiles:string list ->
+  ?attester_profiles:string list ->
   ?producer_profiles:int list ->
   ?bootstrap_profile:bool ->
   t ->
@@ -128,3 +152,6 @@ end
 
 (** Read the content of the node's identity file. *)
 val read_identity : t -> JSON.t
+
+(** Expose the RPC server address of this node as a foreign endpoint. *)
+val as_rpc_endpoint : t -> Endpoint.t

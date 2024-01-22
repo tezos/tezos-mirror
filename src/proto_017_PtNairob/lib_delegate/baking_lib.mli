@@ -39,6 +39,9 @@ val bake :
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:Uri.t ->
+  (* Number of baked blocks. Defaults to 1. *)
+  ?count:int ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
@@ -64,5 +67,17 @@ val propose :
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
+  ?state_recorder:Baking_configuration.state_recorder_config ->
+  Baking_state.consensus_key list ->
+  unit tzresult Lwt.t
+
+(** [repropose] tries to bake a new block proposal on the same level
+    as the current head. If provided, the proposal will use the
+    [force_round] argument as its reproposal round, otherwise the
+    current tenderbake round will be used. *)
+val repropose :
+  Protocol_client_context.full ->
+  ?force:bool ->
+  ?force_round:Round.t ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t

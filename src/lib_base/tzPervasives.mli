@@ -90,6 +90,7 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
+module P2p_params = P2p_params
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 module Block_hash = Tezos_crypto.Hashed.Block_hash
@@ -184,4 +185,20 @@ module Empty : sig
         let i = Empty.get_ok (Ok 41) in i + 1
       ]} *)
   val absurd : t -> 'a
+end
+
+module Profiler = Profiler
+
+module type PRINTABLE = sig
+  type t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+module type COMPARABLE = Compare.S
+
+module type ENCODABLE = sig
+  type t
+
+  val encoding : t Data_encoding.t
 end

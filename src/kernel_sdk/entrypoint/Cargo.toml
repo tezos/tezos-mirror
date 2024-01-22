@@ -5,7 +5,7 @@
 
 [package]
 name = "tezos-smart-rollup-entrypoint"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -22,30 +22,31 @@ dlmalloc = { version = "0.2.3", features = ["global"], optional = true}
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [dependencies.tezos-smart-rollup-panic-hook]
 path = "../panic-hook"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 optional = true
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [dependencies.tezos-smart-rollup-debug]
 path = "../debug"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
 
 [features]
 default = ["std", "alloc", "dlmalloc", "panic-hook-debug", "panic-hook-abort", "panic-hook"]
-std = []
+std = ["tezos-smart-rollup-panic-hook/std", "tezos-smart-rollup-host/std"]
 alloc = []
 panic-hook = ["tezos-smart-rollup-panic-hook"]
 panic-hook-debug = ["panic-hook", "tezos-smart-rollup-panic-hook/debug", "tezos-smart-rollup-debug/default"]
 panic-hook-abort = ["panic-hook", "tezos-smart-rollup-panic-hook/abort"]
 testing = []
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha", "tezos-smart-rollup-debug/proto-alpha"]

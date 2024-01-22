@@ -10,6 +10,11 @@ The following pages describe the former Octez releases in reverse chronological 
 .. toctree::
    :maxdepth: 2
 
+   version-17
+
+.. toctree::
+   :maxdepth: 2
+
    version-16
 
 .. toctree::

@@ -1,48 +1,32 @@
-Coding guidelines
-=================
+===================================
+Documentation and coding guidelines
+===================================
 
-This document provides guidelines that should be observed by all the contributors to the Octez codebase. It first presents documentation guidelines, and then rules more specific to coding (e.g., logging levels, code formatting, naming conventions, etc.).
+This document provides guidelines that should be observed by all the contributors to the Octez codebase. It first presents documentation guidelines, and then rules specific to coding.
 
-License
--------
+Documentation guidelines
+========================
 
-The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
-
-.. literalinclude:: LICENSE.ml
-   :language: ocaml
-
-
-Note that:
-
-- The holder, on the copyright line, is the name of the company which hires the employee or the sub-contractor.
-- For sub-contractors, check your specific contract terms. They sometimes allow to include, as an additional copyright holder, the name of a particular developer, but consider that this may end up with bloated license headers.
-- When adding a significant new contribution to a file (i.e. more like whole new features, rather than simple fixes), check whether there already is a copyright for your copyright holder (see above).
-
-  + If there is one, mentioning any year, it is not required to add the current year (but this is allowed). In no case should you *replace* the existing year with the current one.
-  + If there is no line for your copyright holder, you should add one, with the current year.
-
-- Old source files may contain on the first line ``Open Source License`` instead of ``MIT License``. When touching such a file, please replace the former with the latter, correct form.
-
-For example, for a source file with multiple contributors spanning several years, the copyright lines may look as follows:
-
-.. code-block:: ocaml
-
-  (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-  (* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
-  (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-
+Documentation guidelines are presented for different scales: functions, modules, files, and libraries. General remarks applying to all scales are presented :ref:`afterwards <general_doc_rules>`.
 
 .. _in_code_comments:
 
-Comments in the code
---------------------
+Comments within the code
+------------------------
 
-The OCaml code should include comments facilitating the comprehension and the maintenance. In particular, the main syntactic constructs in the code should be commented as follows.
+The OCaml code should include comments facilitating comprehension and maintenance.
+
+Towards this goal, comments are useful in the code wherever they bring important information that is not easily deducible from the code itself, such as: explaining the high-level goal of a code fragment, justifying an unusual pattern of code, exhibiting an  invariant, etc. See also rule :ref:`rule_dont_repeat_the_code`.
+
+Additionally, the main syntactic constructs in the code should be commented as follows.
 
 Modules:
 
 - One-line comment explaining the purpose of the module
 - If needed: More detailed description
+
+The comments on a module may describe the overall abstraction provided by the module and its capabilities, without implementation details or even specifics of the different functions.
+It may also describe limitations of the module that are important to developers using it (e.g. concurrency or performance limitations).
 
 Types:
 
@@ -50,22 +34,23 @@ Types:
 
 Functions and methods:
 
-- Purpose of the function, brief description of the returned value
+- Purpose of the function, brief description of the arguments and returned value
 - If needed: How and why to use this function
-- If needed: Pre-conditions for calling the function
-- If needed: Conditions under which the function will return an error
+- If needed: Pre-conditions for calling the function, including constraints on arguments values or dependencies between arguments, if any
+- If needed: Conditions under which the function will return an error or raise an exception
 - If needed: Any special behavior that is not obvious
 
-Constants and struct fields:
+Constants, variables, variants, and struct fields:
 
-- Purpose and definition of this data. If the unit is a measurement of time, include it, e.g., TIMEOUT_MS for timeout in milliseconds.
+- Purpose and definition of this data. Useful comments do not just expand a name using the same words, but rather describe the data including details that could not be included in its name.
+- If there is an associated measurement unit, define it in the comment, unless it is contained in the name, e.g.,  ``TIMEOUT_MS`` for a timeout in milliseconds.
 
 .. _todo_fixme:
 
 TODO/FIXME comments
 ~~~~~~~~~~~~~~~~~~~
 
-During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implement its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
+During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implements its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
 When the place of the future evolution is known in advance (e.g. a given function), you should mark it with a ``TODO`` comment of the form:
 
 .. code-block:: ocaml
@@ -86,6 +71,43 @@ The reference to an issue may be one of:
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
 - a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``),
   or ``oxheadalpha/merbocop#123`` (fully qualified).
+
+License
+-------
+
+The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template:
+
+.. code-block:: ocaml
+
+    (*****************************************************************************)
+    (*                                                                           *)
+    (* SPDX-License-Identifier: MIT                                              *)
+    (* SPDX-FileCopyrightText: [year(s)] [Holder <email>]                        *)
+    (*                                                                           *)
+    (*****************************************************************************)
+
+For other languages than OCaml, use the appropriate comment syntax. For example, here is the Rust template::
+
+    //
+    // SPDX-License-Identifier: MIT
+    // SPDX-FileCopyrightText: [year(s)] [Holder <email>]
+    //
+
+
+The following, full-text equivalent, template for OCaml is also valid but deprecated:
+
+.. literalinclude:: LICENSE.ml
+   :language: ocaml
+
+
+Note that:
+
+- The holder, on the copyright line, is the name of the company which hires the employee or the sub-contractor.
+- For sub-contractors, check your specific contract terms. They sometimes allow to include, as an additional copyright holder, the name of a particular developer, but consider that this may end up with bloated license headers.
+- When adding a significant new contribution to a file (i.e. more like whole new features, rather than simple fixes), check whether there already is a copyright for your copyright holder (see above).
+
+  + If there is one, mentioning any year, it is not required to add the current year (but this is allowed). In no case should you *replace* the existing year with the current one.
+  + If there is no line for your copyright holder, you should add one, with the current year.
 
 Documenting interfaces and implementations
 ------------------------------------------
@@ -112,6 +134,8 @@ Interface (``.mli``) file comments:
 - Brief description of the library, introducing the needed concepts
 - Brief description of each module, type, function, data, as described for :ref:`comments in the code<in_code_comments>` but :ref:`using special comments <using_docstrings>`
 - If applicable, external invariants (i.e., visible to the user).
+
+Interface comments should omit implementation details, to the extent where these are invisible to users of the interface.
 
 .. _using_docstrings:
 
@@ -229,7 +253,134 @@ HTML comments (which are visible to the document maintainers but invisible to
 end-users), so that any maintainer can check how well the README instantiates
 the template, and address any gap if needed.
 
+.. _general_doc_rules:
 
+General documentation rules
+---------------------------
+
+.. _rule_dont_repeat_the_code:
+
+Don't repeat the code
+~~~~~~~~~~~~~~~~~~~~~
+
+When writing comments, a common mistake is to repeat the code, paraphrasing it with the same words, or at the same abstraction level.
+Good comments bring information that is not obvious from the code itself.
+They complement the code with details at a *different level of abstraction*, thus typically using different words to provide details on the meaning of the code.
+
+- Lower-level comments add precision
+
+  Such comments add precision by providing details not easily inferred from the code. For example, comments on a function may define its behaviour in particular cases, or provide defaults for the arguments; comments on a variable may add details, such as the measurement units, boundary conditions, invariants, or define the meaning of the different values (e.g. for a boolean variable).
+
+- Higher-level comments enhance intuition
+
+  Such comments are written at a higher level of discourse than the code, and provide a basis to understand the provided asbtractions and underlying concepts, and to reason about them.
+  For example:
+
+    * An implementation comment inside a module or function body may explain the overall goal and provide a conceptual framework in which the details of the code may be easily understood.
+      Typically, the comment will explain *what* the code is doing, and possibly *why* (e.g., in which context the code is called), rather than *how* it is done --  this can be usually seen in the code itself.
+
+    * A comment on the interface provided by a library may describe the solution provided for the given problem domain, how the different functions may be combined together, some limitations of the library (e.g. in terms of concurrency), etc.
+
+Comments maintainability
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Maintaining comments up-to-date with the code is a crucial component of their usefulness.
+Moreover, if many comments in a piece of software become out of date, developers may start ignoring them altogether.
+Fortunately, a few techniques may greatly increase the maintainability of comments.
+
+* Place comments near the concerned code.
+
+  Comments are more likely to be updated if they are placed at the "natural" place where developers would look for them.
+  For interface comments, the position of docstrings is already defined by Odoc: on the definition of the module, function, or variable.
+  Implementation comments should be placed near the code they describe; avoid placing all the comments at the beginning of the file, unless their scope is the whole file.
+
+* Stay at a high level.
+
+  Usually, the farther comments are from the code, the more high-level they must be.
+  Comments associated to a large scope of code may typically present a global view of the code in general terms, which makes them less likely to be invalidated by local changes; when changes concern a large part of that scope, they can be impacted but there are chances that developers will see them.
+
+* Avoid duplicating comments.
+
+  Some comments are needed in several places.
+
+  * For instance, an externally-visble module exporting part of the functionality of some internal module(s) should describe each exported element, because users may not look to the internal module(s); but the internal modules should also describe their interface for their own users and maintainers.
+
+    In such cases, duplication may be avoided by choosing a single place for the comments, and using cross-references to it wherever needed.
+    Fortunately, Odoc provides `such cross-references <https://ocaml.github.io/odoc/odoc_for_authors.html#links-and-references>`__ and checks for each reference that the target element exists, ensuring they do not get stale when code is moved or suppressed.
+
+  * In other cases, the documentation needed near some piece of code is already available outside the code. For instance, a user-visible client command or node RPC should not duplicate explanations in the user reference.
+
+    Most such cases are handled in Octez by automatically generating the reference manual from the code.
+    When this is not the case, comments in the code should refer to the outside sources instead of duplicating them, by using: web links to the technical documentation, to GitLab repositories, or to third-party websites when appropriate (e.g. Wikipedia for known concepts).
+
+  * Another important case is comments describing a cross-module design decision or property.
+
+    Duplication can be avoided here by using cross-references, as described above.
+    However, if all the modules belong to the same library, you could rather place the comments in a ``index.mld`` file describing the library, and refer to that file in all the needed places, using Odoc-checked cross-references.
+
+* Envision cohesive documentation.
+
+  * When writing online technical documentation, refer whenever needed to code artefacts: module APIs, GitLab entities in the Octez repository, or source files, using our Sphinx-checked :ref:`custom roles <custom_sphinx_roles>`.
+
+  * More generally, including various kinds of checked cross-references in the documentation makes it more cohesive, more robust and easier to maintain.
+    Indeed, the more checked links you include in the documentation (from comments to related code elements, from comments to ``.mld`` files and back, from external documentation to code and back, to external websites, etc.), the more are chances that the documentation will be updated along with the code, when some links break.
+
+    Our documentation tools (Odoc and Sphinx, currently) provide support for such cohesive documentation which is probably more advanced than the average, so take advantage from it!
+
+Logging vs comments
+~~~~~~~~~~~~~~~~~~~
+
+Sometimes, it may be preferable to use logging instead of commenting a section of code.
+That is, consider using:
+
+.. code-block:: ocaml
+
+   Log.info "Does this and that..." ;
+
+instead of:
+
+.. code-block:: ocaml
+
+   (* Does this and that... *)
+
+and certainly instead of:
+
+.. code-block:: ocaml
+
+   (* Does this and that... *)
+   Log.info "Does this and that..." ;
+
+This form of "executable comments" is appropriate for instance when writing tests, and more generally, whenever a dynamic execution trace is useful, provided that the log message contains all the information that you would put in a comment.
+Of course, if the log message is too short to fully describe the code section, consider completing it (rather than duplicating it) with comments.
+
+For details on logging, see :ref:`logging_levels`.
+
+Comment first
+~~~~~~~~~~~~~
+
+This section is by no means a rule to comply with, but just some arguments, advocated by John Ousterhout [1]_, for a documentation practice consisting in writing most comments *before* writing the code, or *while* writing the code.
+These arguments are left to the appreciation of each developer.
+
+Most comments, including all the docstrings that describe interfaces, are more related to the software design phase than to the other phases of software development such as coding, testing, releasing.
+Indeed, these comments are currently the only way to fully describe the abstractions provided by software and their underlying concepts.
+Writing comments during the design phase (e.g. woven with the definition of interfaces), may be an effective way to improve the quality of both the design and the comments, because:
+
+* During this phase, the developers' mindset is at the right level of abstraction to describe software components clearly and simply, not distracted by implementation details.
+  This usually results in better comments.
+
+* Moreover, by expressing the interface design concisely in words, comments are an effective design tool: they allow evaluating the simplicity of interfaces from the start, and thus producing better designs.
+  For example, a module or function difficult to describe in a simple way may be a sign that the design does not effectively hide complexity or does not provide the right abstractions.
+
+* Finally, writing comments before the code may be more fun and rewarding.
+  Indeed, integrating comments in a useful way in the design process can make documentation more appealing, and a well-presented result may by more satisfying.
+  As opposed to that, many developers are writing comments as some sort of menial work to do after code is complete, when the design has to be partly reconstituted from the code; this typically leads to more work, and to lower-quality, and hence less satisfactory comments.
+
+Coding guidelines
+=================
+
+This section presents coding guidelines, related to aspects such as logging levels, code formatting, and naming.
+
+.. _logging_levels:
 
 Logging Levels
 --------------
@@ -660,10 +811,27 @@ compositions.
 
 Check the :package-api:`online documentation <octez-libs/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`.
 
-Coding conventions
-------------------
+Naming
+------
 
-Other than the guidelines above, there are currently no coding
-conventions enforced in the codebase. However, Octez developers should be aware
+Good names help maintainers quickly understand the code by concisely suggesting what a variable represents or what a function computes.
+
+This implies that good names precisely evoke the denoted value(s), without being longer than necessary:
+
+* *precision*: avoid using too generic names such as "buffer", "counter", or "result"; give instead some hint about what is stored, counted, or computed.
+* *concision*: as you cannot put everything into a name, select the most important notion(s), and avoid redundant words (abbreviating or not is up to you; it's just about avoiding names longer than necessary).
+  For instance, suffixing the name with its type such as "..._list" is not needed since the IDE can tell its type; just using plural is usually enough.
+  On the contrary, it is useful to add details to the type, such as "..._dir" or "..._title" for a value of type string.
+
+Beyond choosing good individual names, it is also important to ensure *consistency* of naming.
+For example, if within a same module, "operation" is used sometimes for Michelson operations and other times for arithmetic operations, this introduces ambiguity, that can be solved by refining the naming scheme.
+
+Other coding conventions
+------------------------
+
+Other than the guidelines above, Octez developers should be aware
 of general `OCaml programming guidelines <https://caml.inria.fr/resources/doc/guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
 and more.
+
+.. [1]
+   J. Ousterhout, `A Philosophy of Software Design <https://web.stanford.edu/~ouster/cgi-bin/aposd.php>`__, Yaknyam Press, 2021.

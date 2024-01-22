@@ -32,17 +32,35 @@
 (** Smart contract rollup node states. *)
 type t
 
+type purpose = Operating | Batching | Cementing | Recovering
+
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
+  | Execute_outbox_message
+
 type mode =
   | Batcher
-  | Custom
+  | Custom of operation_kind list
   | Maintenance
   | Observer
   | Operator
   | Accuser
   | Bailout
 
+type history_mode = Archive | Full
+
+type event = {name : string; value : JSON.t; timestamp : float}
+
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
 val mode_of_string : string -> mode
+
+(** Returns the string representation of an history mode. *)
+val string_of_history_mode : history_mode -> string
 
 (** Create a smart contract rollup node.
 
@@ -80,7 +98,7 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?operators:(string * string) list ->
+  ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
   mode ->
@@ -98,12 +116,16 @@ val create_with_endpoint :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?operators:(string * string) list ->
+  ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
   mode ->
   Client.endpoint ->
   t
+
+(** [write_in_stdin rollup_node str] write str into the stdin of the
+    rollup node process. *)
+val write_in_stdin : t -> string -> unit Lwt.t
 
 (** Get the name of an sc node. *)
 val name : t -> string
@@ -126,6 +148,8 @@ val data_dir : t -> string
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
 
+val string_of_purpose : purpose -> string
+
 (** Wait until an sc node terminates and check its status.
 
     If the sc node is not running,
@@ -136,15 +160,17 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels ?loser_mode ?wait_ready node
-    rollup_address arguments ] launches the given smart contract rollup node for
-    the rollup at [rollup_address] with the given extra arguments. [event_level]
-    and [event_sections_levels] allow to select which events we want the node to
+(** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
+    ?gc_frequency ?history_mode ?wait_ready node rollup_address arguments ]
+    launches the given smart contract rollup node for the rollup at
+    [rollup_address] with the given extra arguments. [event_level] and
+    [event_sections_levels] allow to select which events we want the node to
     emit (see {!Daemon}). [legacy] (by default [false]) must be set if we want
     to use the legacy [run] command of the node (which requires a config file to
     exist). If [wait_ready] is [false], tezt does not wait for the node to be
-    ready. If [restart] is [true], it will stop and restart the node if it is already
-    running. *)
+    ready. If [restart] is [true], it will stop and restart the node if it is
+    already running. [gc_frequency] is [1] by default to make the rollup GC on
+    every occasion during tests. *)
 val run :
   ?legacy:bool ->
   ?restart:bool ->
@@ -152,31 +178,28 @@ val run :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   ?wait_ready:bool ->
+  ?password_file:string ->
   t ->
   string ->
   string list ->
   unit Lwt.t
 
-(** [run_sequencer ?event_level ?event_sections_levels ?wait_ready node
-    rollup_address arguments] launches the sequencer node for
-    the rollup at [rollup_address] with the given extra arguments.
-    [event_level] and [event_sections_levels] allow to select which events we
-    want the node to emit (see {!Daemon}).
-    If [wait_ready] is [false], tezt does not wait for the node to be
-    ready. *)
-val run_sequencer :
-  ?event_level:Daemon.Level.default_level ->
-  ?event_sections_levels:(string * Daemon.Level.level) list ->
-  ?wait_ready:bool ->
+(** [spawn_run ?loser_mode ?allow_degraded node ?gc_frequency ?history_mode
+    rollup_address arguments] is a lightweight version of {!run} that spawns a
+    process. *)
+val spawn_run :
+  ?loser_mode:string ->
+  ?allow_degraded:bool ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
   t ->
   string ->
   string list ->
-  unit Lwt.t
-
-(** [spawn_run node rollup_address arguments] is a lightweight version of {!run}
-    that spawns a process. *)
-val spawn_run : t -> string -> string list -> Process.t
+  Process.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
@@ -198,13 +221,25 @@ val kill : t -> unit Lwt.t
     [octez-sc-rollup-node-alpha config init].  Returns the name of the resulting
     configuration file. *)
 val config_init :
-  t -> ?force:bool -> ?loser_mode:string -> string -> string Lwt.t
+  t ->
+  ?force:bool ->
+  ?loser_mode:string ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  string ->
+  string Lwt.t
 
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init] and return the corresponding
     process. *)
 val spawn_config_init :
-  t -> ?force:bool -> ?loser_mode:string -> string -> Process.t
+  t ->
+  ?force:bool ->
+  ?loser_mode:string ->
+  ?gc_frequency:int ->
+  ?history_mode:history_mode ->
+  string ->
+  Process.t
 
 module Config_file : sig
   (** Sc node configuration files. *)
@@ -249,13 +284,13 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     This variant of {!wait_for_sync} should not be used in sandboxes, as it has
     been witnessed time and time again that these tests are more subject to
     race conditions when setting up rollup infrastructure. On open testnets
-    like mondaynet and dailynet, this does not happen because of the large
+    like weeklynet and dailynet, this does not happen because of the large
     block time. *)
-val unsafe_wait_sync : ?timeout:float -> t -> int Lwt.t
+val unsafe_wait_sync : ?path_client:string -> ?timeout:float -> t -> int Lwt.t
 
 (** Wait until the layer 1 of the sc node is synchronized with its
     underlying l1 node. *)
-val wait_sync : t -> timeout:float -> int Lwt.t
+val wait_sync : ?path_client:string -> t -> timeout:float -> int Lwt.t
 
 (** [wait_for ?where sc_node event_name filter] waits for the SCORU node
     [sc_node] to emit an event named [name] (usually this is the name the event
@@ -266,7 +301,28 @@ val wait_sync : t -> timeout:float -> int Lwt.t
     applies. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
+(** Add a callback to be called whenever the daemon emits an event. *)
+val on_event : t -> (event -> unit) -> unit
+
 (** Stops the rollup node and restart it, connected to another Tezos Layer 1
     node. *)
 val change_node_and_restart :
   ?event_level:Daemon.Level.default_level -> t -> string -> Node.t -> unit Lwt.t
+
+(** Change the rollup mode. This does not terminate nor restart the
+    node. Change will take effect when the node is run/restart. *)
+val change_node_mode : t -> mode -> t
+
+(** [dump_durable_storage ~sc_rollup_node ~dump ?string ()] writes to [dump] the current
+    state of the WASM PVM from [sc_rollup_node]. *)
+val dump_durable_storage :
+  sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
+
+(** [export_snapshot rollup_node dir] creates a snapshot of the rollup node in
+    directory [dir]. *)
+val export_snapshot : t -> string -> string Runnable.process
+
+(** Expose the RPC server address of this node as a foreign endpoint. *)
+val as_rpc_endpoint : t -> Endpoint.t
+
+module RPC : RPC_core.CALLERS with type uri_provider := t

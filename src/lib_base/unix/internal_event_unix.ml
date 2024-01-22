@@ -117,6 +117,14 @@ let close () =
 
 open Filename.Infix
 
+let default_daily_logs_at ~daily_logs_path =
+  Internal_event_config.make_config_uri
+    ~create_dirs:true
+    ~daily_logs:7
+    ~level:Info
+    ~format:"pp-rfc5424"
+    (`Path (daily_logs_path // "daily.log"))
+
 let make_default_internal_events ~rules ~verbosity ~colors
     ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path =
   (* By default the node has two logs output:
@@ -156,14 +164,7 @@ let make_default_internal_events ~rules ~verbosity ~colors
   let sinks =
     match daily_logs_path with
     | Some daily_logs_path ->
-        let internal_logs_events =
-          Internal_event_config.make_config_uri
-            ~create_dirs:true
-            ~daily_logs:7
-            ~level:Info
-            ~format:"pp-rfc5424"
-            (`Path (daily_logs_path // "daily.log"))
-        in
+        let internal_logs_events = default_daily_logs_at ~daily_logs_path in
         internal_logs_events :: sinks
     | None -> sinks
   in
@@ -182,3 +183,7 @@ let init ?config:(internal_events = make_with_defaults ()) () =
   let open Lwt_syntax in
   let* () = init_raw ~internal_events () in
   return_unit
+
+let enable_default_daily_logs_at ~daily_logs_path =
+  let uri = default_daily_logs_at ~daily_logs_path in
+  Internal_event.All_sinks.activate uri

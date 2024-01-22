@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name kaitai)
+ (public_name kaitai)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  yaml
+  sexplib)
+ (preprocess (pps ppx_sexp_conv)))
+
+(ocamllex lexer)
+
+(menhir (modules parser))

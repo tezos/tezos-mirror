@@ -114,7 +114,11 @@ type 'workload t =
 
 val pp : Format.formatter -> _ t -> unit
 
-val make : conv:('a -> 'b) -> model:'b model -> 'a t
+(** Build [_ t] from [_ model], with a type conversion fucntion [conv].
+    If [~takes_saturation_reprs: true] is given, its generated code
+    will take [_ Saturation_reprs.t] instead of [int].
+*)
+val make : ?takes_saturation_reprs:bool -> conv:('a -> 'b) -> 'b model -> 'a t
 
 val make_aggregated :
   model:('a -> applied) -> sub_models:packed_model list -> 'a t
@@ -140,11 +144,6 @@ val get_free_variable_set_of_t : _ t -> Free_variable.Set.t
 val get_free_variable_set_applied :
   'workload t -> 'workload -> Free_variable.Set.t
 
-(** Set [takes_saturation_reprs] field of the model.
-    Raises [Invalid_arg _] when the model is [Aggregate _].
-*)
-val set_takes_saturation_reprs : bool -> 'a t -> 'a t
-
 (* -------------------------------------------------------------------------- *)
 (** Commonly used abstract models
     Except for [zero], they all require a unique name in {!Namespace.t}, and some
@@ -162,6 +161,18 @@ val zero : unit model
     [fun () -> const]
 *)
 val unknown_const1 : name:Namespace.t -> const:Free_variable.t -> unit model
+
+(** Model ignores the arguments.
+    [fun n -> const]
+*)
+val unknown_const1_skip1 :
+  name:Namespace.t -> const:Free_variable.t -> (int * unit) model
+
+(** Model ignores the arguments.
+    [fun n m -> const]
+*)
+val unknown_const1_skip2 :
+  name:Namespace.t -> const:Free_variable.t -> (int * (int * unit)) model
 
 (** [fun n -> coeff × n] *)
 val linear : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
@@ -203,6 +214,13 @@ val logn : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
 
 (** [fun a b -> intercept + coeff × (a+b)] *)
 val linear_sum :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  (int * (int * unit)) model
+
+(** [fun a b -> intercept + coeff × (a-b)] *)
+val linear_sat_sub :
   name:Namespace.t ->
   intercept:Free_variable.t ->
   coeff:Free_variable.t ->
@@ -250,6 +268,13 @@ val bilinear_affine :
   intercept:Free_variable.t ->
   coeff1:Free_variable.t ->
   coeff2:Free_variable.t ->
+  (int * (int * unit)) model
+
+(** [fun a b -> intercept + coeff × b] *)
+val affine_skip1 :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
   (int * (int * unit)) model
 
 (** [fun n m -> intercept + coeff × n×log(m)] *)

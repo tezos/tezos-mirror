@@ -380,7 +380,7 @@ module Data = struct
     let z = Protocol.Script_timestamp.to_zint ts in
     prim A_Timestamp [int z] []
 
-  let mutez (tz : Protocol.Alpha_context.Tez.tez) =
+  let mutez (tz : Protocol.Alpha_context.Tez.t) =
     let i = Protocol.Alpha_context.Tez.to_mutez tz in
     prim A_Mutez [int (Z.of_int64 i)] []
 

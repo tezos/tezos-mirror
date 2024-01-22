@@ -9,19 +9,19 @@ big_map diff
   Set map(4)["bar"] to 4
   Set map(4)["foo"] to 11
 trace
-  - location: 12 (just consumed gas: 11.994)
+  - location: 12 (just consumed gas: 11.711)
     [ (Pair "baz" { Elt "bar" 4 ; Elt "foo" 11 } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ "baz"
       (Pair { Elt "bar" 4 ; Elt "foo" 11 } None) ]
-  - location: 13 (just consumed gas: 0)
+  - location: 13 (just consumed gas: 0.010)
     [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } None) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "bar" 4 ; Elt "foo" 11 } ]
   - location: 16 (just consumed gas: 0.010)
     [ { Elt "bar" 4 ; Elt "foo" 11 }
       { Elt "bar" 4 ; Elt "foo" 11 } ]
-  - location: 13 (just consumed gas: 0.025)
+  - location: 13 (just consumed gas: 0.035)
     [ "baz"
       { Elt "bar" 4 ; Elt "foo" 11 }
       { Elt "bar" 4 ; Elt "foo" 11 } ]

@@ -75,6 +75,8 @@ let sub_level level decrement =
   if r < 0l then None else Some r
 
 let sc_rollup_commitment_period node_ctxt =
+  (* Publishing commitments is done w.r.t. the period in the protocol in which
+     the commitment is published, and not the one for the inbox level. *)
   node_ctxt.Node_context.current_protocol.constants.sc_rollup
     .commitment_period_in_blocks
 
@@ -181,7 +183,7 @@ let create_commitment_if_necessary plugin (node_ctxt : _ Node_context.t)
     in
     if current_level = next_commitment_level then
       let*! () = Commitment_event.compute_commitment current_level in
-      let+ commitment =
+      let* commitment =
         build_commitment
           plugin
           node_ctxt
@@ -190,7 +192,12 @@ let create_commitment_if_necessary plugin (node_ctxt : _ Node_context.t)
           ~inbox_level:current_level
           ctxt
       in
-      Some commitment
+      let*! () =
+        Commitment_event.new_commitment
+          (Octez_smart_rollup.Commitment.hash commitment)
+          commitment.inbox_level
+      in
+      return_some commitment
     else return_none
 
 let process_head plugin (node_ctxt : _ Node_context.t) ~predecessor
@@ -271,47 +278,59 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
       in
       gather [] commitment
 
-let publish_commitment (node_ctxt : _ Node_context.t) ~source
+let publish_commitment (node_ctxt : _ Node_context.t)
     (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
   let publish_operation =
-    L1_operation.Publish {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Publish
+      {rollup = node_ctxt.config.sc_rollup_address; commitment}
   in
   let*! () =
     Commitment_event.publish_commitment
       (Octez_smart_rollup.Commitment.hash commitment)
       commitment.inbox_level
   in
-  let* _hash = Injector.add_pending_operation ~source publish_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      publish_operation
+  in
+  return_unit
+
+let inject_recover_bond (node_ctxt : _ Node_context.t)
+    (staker : Signature.Public_key_hash.t) =
+  let open Lwt_result_syntax in
+  let recover_operation =
+    L1_operation.Recover_bond
+      {rollup = node_ctxt.config.sc_rollup_address; staker}
+  in
+  let*! () = Commitment_event.recover_bond staker in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      recover_operation
+  in
   return_unit
 
 let on_publish_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Operating in
-  if Node_context.is_accuser node_ctxt || Node_context.is_bailout node_ctxt then
-    (* Accuser and Bailout do not publish all commitments *)
-    return_unit
-  else
-    match operator with
-    | None ->
-        (* Configured to not publish commitments *)
-        return_unit
-    | Some source ->
-        let* commitments = missing_commitments node_ctxt in
-        List.iter_es (publish_commitment node_ctxt ~source) commitments
+  let* commitments = missing_commitments node_ctxt in
+  List.iter_es (publish_commitment node_ctxt) commitments
 
-let publish_single_commitment node_ctxt
+let publish_single_commitment (node_ctxt : _ Node_context.t)
     (commitment : Octez_smart_rollup.Commitment.t) =
-  let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Operating in
   let lcc = Reference.get node_ctxt.lcc in
+  when_ (commitment.inbox_level > lcc.level) @@ fun () ->
+  publish_commitment node_ctxt commitment
+
+let recover_bond node_ctxt =
+  let open Lwt_result_syntax in
+  let operator = Node_context.get_operator node_ctxt Recovering in
   match operator with
   | None ->
-      (* Configured to not publish commitments *)
+      (* No known operator to recover bond for. *)
       return_unit
-  | Some source ->
-      when_ (commitment.inbox_level > lcc.level) @@ fun () ->
-      publish_commitment node_ctxt ~source commitment
+  | Some (Single committer) -> inject_recover_bond node_ctxt committer
 
 (* Commitments can only be cemented after [sc_rollup_challenge_window] has
    passed since they were first published. *)
@@ -392,24 +411,23 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
   in
   gather [] latest_cementable_commitment
 
-let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
+let cement_commitment (node_ctxt : _ Node_context.t) commitment =
   let open Lwt_result_syntax in
   let cement_operation =
-    L1_operation.Cement {rollup = node_ctxt.rollup_address; commitment}
+    L1_operation.Cement
+      {rollup = node_ctxt.config.sc_rollup_address; commitment}
   in
-  let* _hash = Injector.add_pending_operation ~source cement_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.config.mode
+      cement_operation
+  in
   return_unit
 
 let on_cement_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Cementing in
-  match operator with
-  | None ->
-      (* Configured to not cement commitments *)
-      return_unit
-  | Some source ->
-      let* cementable_commitments = cementable_commitments node_ctxt in
-      List.iter_es (cement_commitment node_ctxt ~source) cementable_commitments
+  let* cementable_commitments = cementable_commitments node_ctxt in
+  List.iter_es (cement_commitment node_ctxt) cementable_commitments
 
 module Types = struct
   type nonrec state = state
@@ -484,7 +502,14 @@ let start node_ctxt =
   let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
 
-let init node_ctxt =
+let start_in_mode mode =
+  let open Configuration in
+  match mode with
+  | Maintenance | Operator | Bailout -> true
+  | Observer | Accuser | Batcher -> false
+  | Custom ops -> purpose_matches_mode (Custom ops) Operating
+
+let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match Lwt.state worker_promise with
   | Lwt.Return _ ->
@@ -495,7 +520,8 @@ let init node_ctxt =
       fail [Rollup_node_errors.No_publisher; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
-      start node_ctxt
+      if start_in_mode node_ctxt.config.mode then start node_ctxt
+      else return_unit
 
 (* This is a publisher worker for a single scoru *)
 let worker =
@@ -503,23 +529,28 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> return worker
-    | Lwt.Fail _ | Lwt.Sleep -> tzfail Rollup_node_errors.No_publisher)
+    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
+    | Lwt.Sleep -> Error Rollup_node_errors.No_publisher)
 
-let publish_commitments () =
+let worker_add_request ~request =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let*! (_pushed : bool) = Worker.Queue.push_request w Request.Publish in
-  return_unit
+  match Lazy.force worker with
+  | Ok w ->
+      let node_ctxt = Worker.state w in
+      (* Bailout does not publish any commitment it only cement them. *)
+      unless (Node_context.is_bailout node_ctxt && request = Request.Publish)
+      @@ fun () ->
+      let*! (_pushed : bool) = Worker.Queue.push_request w request in
+      return_unit
+  | Error Rollup_node_errors.No_publisher -> return_unit
+  | Error e -> tzfail e
 
-let cement_commitments () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let*! (_pushed : bool) = Worker.Queue.push_request w Request.Cement in
-  return_unit
+let publish_commitments () = worker_add_request ~request:Request.Publish
+
+let cement_commitments () = worker_add_request ~request:Request.Cement
 
 let shutdown () =
-  let w = Lazy.force worker in
-  match w with
+  match Lazy.force worker with
   | Error _ ->
       (* There is no publisher, nothing to do *)
       Lwt.return_unit

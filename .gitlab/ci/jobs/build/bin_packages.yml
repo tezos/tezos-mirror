@@ -1,0 +1,33 @@
+include: .gitlab/ci/jobs/build/bin_packages_common.yml
+
+build:dpkg:amd64:
+  extends:
+    - .tags_template__build
+    - .bin_packages_common
+  image: debian:bookworm
+  stage: build
+  needs: []
+  variables:
+    TARGET: "dpkg"
+  before_script:
+    - apt update
+    - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev
+  artifacts:
+    paths:
+      - octez-*.deb
+
+build:rpm:amd64:
+  extends:
+    - .tags_template__build
+    - .bin_packages_common
+  image: fedora:39
+  stage: build
+  needs: []
+  variables:
+    TARGET: "rpm"
+  before_script:
+    - dnf update -y
+    - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env
+  artifacts:
+    paths:
+      - octez-*.rpm

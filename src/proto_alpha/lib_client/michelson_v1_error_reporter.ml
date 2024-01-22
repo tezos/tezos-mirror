@@ -139,7 +139,8 @@ let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
       Lwt.return @@ Environment.wrap_tzresult @@ Script_repr.force_decode code
 
 type error +=
-  | Rich_runtime_contract_error of Contract_hash.t * Michelson_v1_parser.parsed
+  | Rich_runtime_contract_error of
+      Contract_hash.t * string Michelson_v1_parser.parser_result
 
 let enrich_runtime_errors cctxt ~chain ~block ~parsed =
   let open Lwt_result_syntax in
@@ -155,12 +156,16 @@ let enrich_runtime_errors cctxt ~chain ~block ~parsed =
               @@
               match script_opt with
               | Ok script ->
-                  let parsed = Michelson_v1_printer.unparse_toplevel script in
+                  let parsed =
+                    Michelson_v1_parser.unrecognize_prims
+                    @@ Michelson_v1_printer.unparse_toplevel script
+                  in
                   Rich_runtime_contract_error (contract, parsed)
               | Error err -> Fetch_script_meta_error err))
       | e -> Lwt.return e)
 
-let report_errors ~details ~show_source ?parsed ppf errs =
+let report_errors ~details ~show_source
+    ?(parsed : string Michelson_v1_parser.parser_result option) ppf errs =
   let rec print_trace locations errs =
     let print_loc ppf loc =
       match locations loc with
@@ -194,26 +199,26 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     in
     match errs with
     | [] -> ()
-    | Michelson_v1_stack.Wrong_stack_item (loc, expr) :: rest ->
+    | Michelson_v1_stack.Wrong_stack_item loc_node :: rest ->
         Format.fprintf
           ppf
-          "@[<v 0>%s,@ wrong syntax for a stack element, expecting something \
+          "@[<v 0>%a,@ wrong syntax for a stack element, expecting something \
            of the following shape: Stack_elt <ty> <val>; got %a.@]"
-          (String.capitalize_ascii
-             (Format.asprintf "%a" Micheline_parser.print_location loc))
-          Micheline_printer.print_expr_unwrapped
-          expr ;
+          Michelson_v1_stack.print_localized_node_location
+          loc_node
+          Michelson_v1_stack.print_localized_node
+          loc_node ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Michelson_v1_stack.Wrong_stack (loc, expr) :: rest ->
+    | Michelson_v1_stack.Wrong_stack loc_node :: rest ->
         Format.fprintf
           ppf
-          "@[<v 0>%s,@ wrong syntax for stack, expecting a sequence of \
+          "@[<v 0>%a,@ wrong syntax for stack, expecting a sequence of \
            elements of the following shape: Stack_elt <ty> <val>; got %a.@]"
-          (String.capitalize_ascii
-             (Format.asprintf "%a" Micheline_parser.print_location loc))
-          Micheline_printer.print_expr_unwrapped
-          expr ;
+          Michelson_v1_stack.print_localized_node_location
+          loc_node
+          Michelson_v1_stack.print_localized_node
+          loc_node ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error
@@ -243,9 +248,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     | Environment.Ecoproto_error (Ill_typed_data (name, expr, ty)) :: rest ->
         let parsed =
           match parsed with
-          | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
+          | Some parsed
+            when Michelson_v1_primitives.strings_of_prims expr
+                 = parsed.Michelson_v1_parser.expanded ->
               parsed
-          | Some _ | None -> Michelson_v1_printer.unparse_expression expr
+          | Some _ | None ->
+              Michelson_v1_parser.unrecognize_prims
+              @@ Michelson_v1_printer.unparse_expression expr
         in
         let hilights = collect_error_locations rest in
         Format.fprintf
@@ -312,9 +321,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     | Environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
         let parsed =
           match parsed with
-          | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
+          | Some parsed
+            when Michelson_v1_primitives.strings_of_prims expr
+                 = parsed.Michelson_v1_parser.expanded ->
               parsed
-          | Some _ | None -> Michelson_v1_printer.unparse_expression expr
+          | Some _ | None ->
+              Michelson_v1_parser.unrecognize_prims
+              @@ Michelson_v1_printer.unparse_expression expr
         in
         let hilights = loc :: collect_error_locations errs in
         if show_source then
@@ -333,10 +346,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         let parsed =
           match parsed with
           | Some parsed
-            when (not details) && expr = parsed.Michelson_v1_parser.expanded ->
+            when (not details)
+                 && Michelson_v1_primitives.strings_of_prims expr
+                    = parsed.Michelson_v1_parser.expanded ->
               parsed
           | Some _ | None ->
-              Michelson_v1_printer.unparse_toplevel ~type_map expr
+              Michelson_v1_parser.unrecognize_prims
+              @@ Michelson_v1_printer.unparse_toplevel ~type_map expr
         in
         let hilights = collect_error_locations rest in
         if show_source then

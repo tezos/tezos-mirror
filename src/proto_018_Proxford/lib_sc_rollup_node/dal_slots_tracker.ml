@@ -52,12 +52,12 @@ type confirmations_info = {
   confirmed_slots_indexes : Bitset.t;
 }
 
-(** [slots_info node_ctxt head] gathers information about the slot confirmations
+(** [slots_info constants node_ctxt head] gathers information about the slot confirmations
     of slot indexes. It reads the slot indexes that have been declared available
     from [head]'s block receipt. It then returns the hash of
     the block where the slot headers have been published and the list of
     slot indexes that have been confirmed for that block.  *)
-let slots_info node_ctxt (Layer1.{hash; _} as head) =
+let slots_info constants node_ctxt (Layer1.{hash; _} as head) =
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3722
      The case for protocol migrations when the lag constant has
      been changed is tricky, especially if the lag is reduced.
@@ -67,9 +67,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
      we reduce the lag to 1, then the slots header will never be confirmed.
   *)
   let open Lwt_result_syntax in
-  let lag =
-    node_ctxt.Node_context.current_protocol.constants.dal.attestation_lag
-  in
+  let lag = constants.Rollup_constants.dal.attestation_lag in
   (* we are downloading attestation for slots at level [level], so
      we need to download the data at level [level - lag].
   *)
@@ -80,7 +78,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
   | None ->
       (* Less then lag levels have passed from the rollup origination, and
          confirmed slots should not be applied *)
-      return None
+      return_none
   | Some published_block_hash ->
       let* {metadata; _} =
         Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash
@@ -103,9 +101,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           node_ctxt
           ~published_in_block_hash:published_block_hash
       in
-      let number_of_slots =
-        node_ctxt.Node_context.current_protocol.constants.dal.number_of_slots
-      in
+      let number_of_slots = constants.dal.number_of_slots in
       let confirmed_slots_indexes_list =
         List.filter
           (Dal.Attestation.is_attested confirmed_slots)
@@ -132,24 +128,21 @@ let to_slot_index_list (constants : Rollup_constants.protocol_constants) bitset
    Use a shared storage between dal and rollup node to store slots data.
 *)
 
-let download_and_save_slots (node_context : _ Node_context.t)
+let download_and_save_slots constants (node_context : _ Node_context.t)
     ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
-    Bitset.fill
-      ~length:node_context.current_protocol.constants.dal.number_of_slots
+    Bitset.fill ~length:constants.Rollup_constants.dal.number_of_slots
     |> Environment.wrap_tzresult
   in
   let*? not_confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list node_context.current_protocol.constants
+    @@ to_slot_index_list constants
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
   let*? confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list
-         node_context.current_protocol.constants
-         confirmed_slots_indexes
+    @@ to_slot_index_list constants confirmed_slots_indexes
   in
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
@@ -176,8 +169,7 @@ let download_and_save_slots (node_context : _ Node_context.t)
       let*! () =
         Dal_slots_tracker_event.slot_has_been_confirmed
           (Sc_rollup_proto_types.Dal.Slot_index.of_octez
-             ~number_of_slots:
-               node_context.current_protocol.constants.dal.number_of_slots
+             ~number_of_slots:constants.dal.number_of_slots
              s_slot)
           published_block_hash
           current_block_hash
@@ -186,17 +178,15 @@ let download_and_save_slots (node_context : _ Node_context.t)
     confirmed
 
 module Confirmed_slots_history = struct
-  (** [confirmed_slots_with_headers node_ctxt confirmations_info] returns the
+  (** [confirmed_slots_with_headers constants node_ctxt confirmations_info] returns the
       headers of confirmed slot indexes for the block with hash
       [confirmations_info.published_block_hash]. *)
-  let confirmed_slots_with_headers node_ctxt
+  let confirmed_slots_with_headers constants node_ctxt
       {published_block_hash; confirmed_slots_indexes; _} =
     let open Lwt_result_syntax in
     let*? relevant_slots_indexes =
       Environment.wrap_tzresult
-      @@ to_slot_index_list
-           node_ctxt.Node_context.current_protocol.constants
-           confirmed_slots_indexes
+      @@ to_slot_index_list constants confirmed_slots_indexes
     in
     List.map_ep
       (fun slot_index ->
@@ -207,12 +197,11 @@ module Confirmed_slots_history = struct
             slot_index
         in
         Sc_rollup_proto_types.Dal.Slot_header.of_octez
-          ~number_of_slots:
-            node_ctxt.current_protocol.constants.dal.number_of_slots
+          ~number_of_slots:constants.dal.number_of_slots
           h)
       relevant_slots_indexes
 
-  let read_slots_history_from_l1 {Node_context.cctxt; _} block =
+  let read_slots_history_from_l1 _constants {Node_context.cctxt; _} block =
     let open Lwt_result_syntax in
     (* We return the empty Slots_history if DAL is not enabled. *)
     let* slots_list_opt =
@@ -227,12 +216,9 @@ module Confirmed_slots_history = struct
       slots_history and slots_history's cache entries in the store after
       [origination_level + attestation_lag] blocks. This function checks if
       that level is reached or not.  *)
-  let should_process_dal_slots node_ctxt block_level =
+  let should_process_dal_slots constants node_ctxt block_level =
     let open Node_context in
-    let lag =
-      Int32.of_int
-        node_ctxt.Node_context.current_protocol.constants.dal.attestation_lag
-    in
+    let lag = Int32.of_int constants.Rollup_constants.dal.attestation_lag in
     let block_level = Raw_level.to_int32 block_level in
     let genesis_level = node_ctxt.genesis_info.level in
     Int32.(block_level >= add lag genesis_level)
@@ -242,13 +228,16 @@ module Confirmed_slots_history = struct
       =
     let open Lwt_result_syntax in
     let* confirmed_slots_history_opt = find node_ctxt block_hash in
+    let* constants =
+      Protocol_plugins.get_constants_of_level node_ctxt block_level
+    in
     let block_level = Raw_level.of_int32_exn block_level in
     let should_process_dal_slots =
-      should_process_dal_slots node_ctxt block_level
+      should_process_dal_slots constants node_ctxt block_level
     in
     match (confirmed_slots_history_opt, should_process_dal_slots) with
     | Some confirmed_dal_slots, true -> return confirmed_dal_slots
-    | None, false -> default node_ctxt block_hash
+    | None, false -> default constants node_ctxt block_hash
     | Some _confirmed_dal_slots, false ->
         failwith
           "The confirmed DAL %S for block hash %a (level = %a) is not expected \
@@ -292,10 +281,8 @@ module Confirmed_slots_history = struct
       block
       ~entry_kind:"slots history cache"
       ~find
-      ~default:(fun node_ctxt _block ->
-        let num_slots =
-          node_ctxt.Node_context.current_protocol.constants.dal.number_of_slots
-        in
+      ~default:(fun constants _node_ctxt _block ->
+        let num_slots = constants.Rollup_constants.dal.number_of_slots in
         (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
            Put an accurate value for capacity. The value
                   `num_slots * 60000` below is chosen based on:
@@ -309,11 +296,11 @@ module Confirmed_slots_history = struct
         @@ Dal.Slots_history.History_cache.empty
              ~capacity:(Int64.of_int @@ (num_slots * 60000)))
 
-  let update node_ctxt Layer1.({hash = head_hash; _} as head) confirmation_info
-      =
+  let update constants node_ctxt Layer1.({hash = head_hash; _} as head)
+      confirmation_info =
     let open Lwt_result_syntax in
     let* slots_to_save =
-      confirmed_slots_with_headers node_ctxt confirmation_info
+      confirmed_slots_with_headers constants node_ctxt confirmation_info
     in
     let slots_to_save =
       let open Dal in
@@ -353,19 +340,21 @@ module Confirmed_slots_history = struct
     return ()
 end
 
-let process_head node_ctxt (Layer1.{hash = head_hash; _} as head) =
+let process_head node_ctxt (Layer1.{hash = head_hash; level} as head) =
   let open Lwt_result_syntax in
-  let* confirmation_info = slots_info node_ctxt head in
+  let* constants = Protocol_plugins.get_constants_of_level node_ctxt level in
+  let* confirmation_info = slots_info constants node_ctxt head in
   match confirmation_info with
   | None -> return_unit
   | Some confirmation_info ->
       let* () =
         download_and_save_slots
           ~current_block_hash:head_hash
+          constants
           node_ctxt
           confirmation_info
       in
-      Confirmed_slots_history.update node_ctxt head confirmation_info
+      Confirmed_slots_history.update constants node_ctxt head confirmation_info
 
 let slots_history_of_hash = Confirmed_slots_history.slots_history_of_hash
 

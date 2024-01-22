@@ -194,22 +194,26 @@ module Make (Hooks : Mocked_services_hooks) = struct
            return (q#version, ops))
 
   let hash =
+    let open Lwt_result_syntax in
     Directory.prefix
       (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
     @@ Directory.register
          Directory.empty
          Block_services.Empty.S.hash
          (fun (((), _chain), block) () () ->
-           Hooks.header block >>=? fun x -> return x.hash)
+           let* x = Hooks.header block in
+           return x.hash)
 
   let shell_header =
+    let open Lwt_result_syntax in
     Directory.prefix
       (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
     @@ Directory.register
          Directory.empty
          Mockup.M.Block_services.S.Header.shell_header
          (fun (((), _chain), block) _ _ ->
-           Hooks.header block >>=? fun x -> return x.shell)
+           let* x = Hooks.header block in
+           return x.shell)
 
   let chain chain_id =
     Directory.prefix
@@ -220,6 +224,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
          (fun _chain () () -> return chain_id))
 
   let inject_block =
+    let open Lwt_result_syntax in
     Directory.register
       Directory.empty
       Injection_services.S.block
@@ -228,7 +233,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
         | None -> failwith "faked_services.inject_block: can't deserialize"
         | Some block_header ->
             let block_hash = Block_hash.hash_bytes [bytes] in
-            Hooks.inject_block block_hash block_header operations >>=? fun () ->
+            let* () = Hooks.inject_block block_hash block_header operations in
             return block_hash)
 
   let inject_operation =
@@ -259,12 +264,13 @@ module Make (Hooks : Mocked_services_hooks) = struct
         Hooks.broadcast_operation ?dests operation)
 
   let pending_operations =
+    let open Lwt_syntax in
     Directory.gen_register
       Directory.empty
       (Mockup.M.Block_services.S.Mempool.pending_operations
       @@ Block_services.mempool_path Block_services.chain_path)
       (fun ((), _chain) params () ->
-        Hooks.pending_operations () >>= fun mempool ->
+        let* mempool = Hooks.pending_operations () in
         Tezos_rpc.Answer.return (params#version, mempool))
 
   let monitor_operations =
@@ -338,6 +344,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
       ]
 
   let directory chain_id =
+    let open Lwt_syntax in
     let proto_directory =
       Directory.prefix
         Chain_services.path
@@ -345,7 +352,8 @@ module Make (Hooks : Mocked_services_hooks) = struct
            Block_services.path
            (Directory.map
               (fun (((), _chain), block) ->
-                Hooks.rpc_context_callback block >>= function
+                let* result = Hooks.rpc_context_callback block in
+                match result with
                 | Error _ -> assert false
                 | Ok rpc_context -> Lwt.return rpc_context)
               Mockup.M.directory))

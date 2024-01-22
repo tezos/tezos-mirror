@@ -46,18 +46,23 @@ let () =
     (function Unregistered_delegate k -> Some k | _ -> None)
     (fun k -> Unregistered_delegate k)
 
+type error += No_previous_cycle
+
 let registered = Storage.Delegates.mem
 
 module Contract = struct
   let init ctxt contract delegate =
-    Contract_manager_storage.is_manager_key_revealed ctxt delegate
-    >>=? fun known_delegate ->
-    error_unless known_delegate (Unregistered_delegate delegate) >>?= fun () ->
-    registered ctxt delegate >>= fun is_registered ->
-    error_unless is_registered (Unregistered_delegate delegate) >>?= fun () ->
-    Contract_delegate_storage.init ctxt contract delegate >>=? fun ctxt ->
-    Contract_storage.get_balance_and_frozen_bonds ctxt contract
-    >>=? fun balance_and_frozen_bonds ->
+    let open Lwt_result_syntax in
+    let* known_delegate =
+      Contract_manager_storage.is_manager_key_revealed ctxt delegate
+    in
+    let*? () = error_unless known_delegate (Unregistered_delegate delegate) in
+    let*! is_registered = registered ctxt delegate in
+    let*? () = error_unless is_registered (Unregistered_delegate delegate) in
+    let* ctxt = Contract_delegate_storage.init ctxt contract delegate in
+    let* balance_and_frozen_bonds =
+      Contract_storage.get_balance_and_frozen_bonds ctxt contract
+    in
     Stake_storage.add_delegated_stake ctxt delegate balance_and_frozen_bonds
 
   type error +=
@@ -222,56 +227,62 @@ let fold = Storage.Delegates.fold
 
 let list = Storage.Delegates.elements
 
-let frozen_deposits ctxt delegate =
-  Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
+let initial_frozen_deposits ctxt delegate =
+  let open Lwt_result_syntax in
+  let* stake_opt =
+    match Raw_context.find_stake_distribution_for_current_cycle ctxt with
+    | Some distribution ->
+        return (Signature.Public_key_hash.Map.find delegate distribution)
+    | None ->
+        (* This branch happens when the stake distribution is not initialized in
+           [ctxt], e.g. when RPCs are called or operations are simulated. *)
+        let current_cycle = (Raw_context.current_level ctxt).cycle in
+        let+ stakes =
+          Stake_storage.get_selected_distribution ctxt current_cycle
+        in
+        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+  in
+  match stake_opt with
+  | None -> return Tez_repr.zero
+  | Some {frozen; weighted_delegated = _} -> return frozen
+
+let initial_frozen_deposits_of_previous_cycle ctxt delegate =
+  let open Lwt_result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  match Cycle_repr.pred current_cycle with
+  | None -> tzfail No_previous_cycle
+  | Some previous_cycle -> (
+      let+ stakes =
+        Stake_storage.get_selected_distribution ctxt previous_cycle
+      in
+      match
+        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+      with
+      | None -> Tez_repr.zero
+      | Some {frozen; weighted_delegated = _} -> frozen)
+
+let current_frozen_deposits ctxt delegate =
+  let open Lwt_result_syntax in
+  let* {own_frozen; staked_frozen; delegated = _} =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  let*? total = Tez_repr.(own_frozen +? staked_frozen) in
+  return total
+
+let frozen_deposits_limit ctxt delegate =
+  Storage.Contract.Frozen_deposits_limit.find
+    ctxt
+    (Contract_repr.Implicit delegate)
+
+let set_frozen_deposits_limit ctxt delegate limit =
+  Storage.Contract.Frozen_deposits_limit.add_or_remove
+    ctxt
+    (Contract_repr.Implicit delegate)
+    limit
 
 let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
-
-let is_forbidden_delegate ctxt delegate =
-  let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
-  Signature.Public_key_hash.Set.mem delegate forbidden_delegates
-
-let forbid_delegate ctxt delegate =
-  let ctxt = Raw_context.Consensus.forbid_delegate ctxt delegate in
-  let new_forbidden_delegates =
-    Raw_context.Consensus.forbidden_delegates ctxt
-  in
-  Storage.Tenderbake.Forbidden_delegates.add ctxt new_forbidden_delegates
-
-let load_forbidden_delegates ctxt =
-  let open Lwt_result_syntax in
-  let* forbidden_delegates_opt =
-    Storage.Tenderbake.Forbidden_delegates.find ctxt
-  in
-  let ctxt =
-    match forbidden_delegates_opt with
-    | Some forbidden_delegates ->
-        Raw_context.Consensus.set_forbidden_delegates ctxt forbidden_delegates
-    | None ->
-        Raw_context.Consensus.set_forbidden_delegates
-          ctxt
-          Signature.Public_key_hash.Set.empty
-  in
-  return ctxt
-
-let set_forbidden_delegates ctxt forbidden_delegates =
-  let open Lwt_syntax in
-  let* ctxt =
-    Storage.Tenderbake.Forbidden_delegates.add ctxt forbidden_delegates
-  in
-  let ctxt =
-    Raw_context.Consensus.set_forbidden_delegates ctxt forbidden_delegates
-  in
-  return ctxt
-
-let reset_forbidden_delegates ctxt =
-  if
-    Signature.Public_key_hash.Set.is_empty
-      (Raw_context.Consensus.forbidden_delegates ctxt)
-  then Lwt.return ctxt
-  else set_forbidden_delegates ctxt Signature.Public_key_hash.Set.empty
 
 let drain ctxt ~delegate ~destination =
   let open Lwt_result_syntax in
@@ -307,47 +318,62 @@ let drain ctxt ~delegate ~destination =
 
 module For_RPC = struct
   let full_balance ctxt delegate =
-    Staking_pseudotokens_storage.For_RPC.staked_balance
-      ctxt
-      ~delegate
-      ~contract:(Contract_repr.Implicit delegate)
-    >>=? fun own_frozen_deposits ->
-    (Unstake_requests_storage.prepare_finalize_unstake
-       ctxt
-       (Contract_repr.Implicit delegate)
-     >>=? function
-     | None -> return Tez_repr.zero
-     | Some {finalizable; unfinalizable} ->
-         Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
-           ctxt
-           unfinalizable
-         >>=? fun unfinalizable_requests ->
-         Lwt.return
-           ( List.fold_left_e
-               (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
-               Tez_repr.zero
-               unfinalizable_requests
-           >>? fun sum_unfinalizable ->
-             List.fold_left_e
-               (fun acc (_, _cycle, tz) -> Tez_repr.(acc +? tz))
-               sum_unfinalizable
-               finalizable ))
-    >>=? fun unstaked_frozen ->
-    Lwt.return Tez_repr.(own_frozen_deposits +? unstaked_frozen)
-    >>=? fun all_frozen ->
+    let open Lwt_result_syntax in
+    let* own_frozen_deposits =
+      Staking_pseudotokens_storage.For_RPC.staked_balance
+        ctxt
+        ~delegate
+        ~contract:(Contract_repr.Implicit delegate)
+    in
+    let* unstaked_frozen =
+      let* result =
+        Unstake_requests_storage.prepare_finalize_unstake
+          ctxt
+          ~for_next_cycle_use_only_after_slashing:false
+          (Contract_repr.Implicit delegate)
+      in
+      match result with
+      | None -> return Tez_repr.zero
+      | Some {finalizable; unfinalizable} ->
+          let* unfinalizable_requests =
+            Unstake_requests_storage.For_RPC
+            .apply_slash_to_unstaked_unfinalizable
+              ctxt
+              unfinalizable
+          in
+          let*? sum_unfinalizable =
+            List.fold_left_e
+              (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+              Tez_repr.zero
+              unfinalizable_requests
+          in
+          let*? sum =
+            List.fold_left_e
+              (fun acc (_, _cycle, tz) -> Tez_repr.(acc +? tz))
+              sum_unfinalizable
+              finalizable
+          in
+          return sum
+    in
+    let*? all_frozen = Tez_repr.(own_frozen_deposits +? unstaked_frozen) in
     let delegate_contract = Contract_repr.Implicit delegate in
-    Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
-    >>=? fun balance_and_frozen_bonds ->
-    Lwt.return Tez_repr.(all_frozen +? balance_and_frozen_bonds)
+    let* balance_and_frozen_bonds =
+      Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
+    in
+    let*? sum = Tez_repr.(all_frozen +? balance_and_frozen_bonds) in
+    return sum
 
   let staking_balance ctxt delegate =
-    registered ctxt delegate >>= fun is_registered ->
+    let open Lwt_result_syntax in
+    let*! is_registered = registered ctxt delegate in
     if is_registered then
       Stake_storage.For_RPC.get_staking_balance ctxt delegate
     else return Tez_repr.zero
 
   let delegated_balance ctxt delegate =
-    staking_balance ctxt delegate >>=? fun staking_balance ->
-    full_balance ctxt delegate >>=? fun self_staking_balance ->
-    Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
+    let open Lwt_result_syntax in
+    let* staking_balance = staking_balance ctxt delegate in
+    let* self_staking_balance = full_balance ctxt delegate in
+    let*? sum = Tez_repr.(staking_balance -? self_staking_balance) in
+    return sum
 end

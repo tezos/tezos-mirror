@@ -47,7 +47,7 @@ val update_stored_rewards_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [init ctxt] adds into the context an adaptive issuance vote EMA
-    at 0, and and adaptive issuance launch cycle at None. *)
+    at 0, and adaptive issuance launch cycle at None. *)
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_ema ctxt ~vote] returns the new context with the new EMA *)
@@ -79,4 +79,36 @@ module For_RPC : sig
       Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
   val get_reward_coeff :
     Raw_context.t -> cycle:Cycle_repr.t -> Q.t tzresult Lwt.t
+
+  (** [get_reward_bonus ctxt cycle] reads the reward bonus for the given cycle
+      from the storage. If [cycle] is [None], returns 0.
+
+      Returns 0 if the given cycle is not between [current_cycle] and
+      [current_cycle + preserved_cycles].
+
+      If adaptive issuance has not been activated,
+      then this function returns 0.
+      Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
+  val get_reward_bonus :
+    Raw_context.t ->
+    cycle:Cycle_repr.t option ->
+    Issuance_bonus_repr.t tzresult Lwt.t
+end
+
+module Internal_for_tests : sig
+  (** Reward computation functions *)
+  val compute_reward_coeff_ratio :
+    stake_ratio:Q.t ->
+    bonus:Issuance_bonus_repr.t ->
+    issuance_ratio_max:Q.t ->
+    issuance_ratio_min:Q.t ->
+    Q.t
+
+  val compute_bonus :
+    seconds_per_cycle:int64 ->
+    total_supply:Tez_repr.t ->
+    total_frozen_stake:Tez_repr.t ->
+    previous_bonus:Issuance_bonus_repr.t ->
+    reward_params:Constants_parametric_repr.adaptive_rewards_params ->
+    Issuance_bonus_repr.t tzresult
 end

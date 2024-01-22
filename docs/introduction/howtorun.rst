@@ -88,6 +88,10 @@ that is, their own balance plus their delegated balance.
 A :ref:`minimal active stake<def_minimal_stake>` of 6kꜩ
 is required for participating in consensus and in governance.
 
+.. warning::
+
+  Starting with the Adaptive-Issuance/Staking proposal, the staking mechanism changes, see :doc:`../alpha/adaptive_issuance`. The rest of this page assumes the current staking mechanism in the active protocol.
+
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active
 stake during the last 7 cycles). A delegate is
@@ -192,6 +196,8 @@ However, it is safe (and actually necessary) to temporarily run two bakers just 
 
    It is possible to bake and attest using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
+The baker uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
 Accuser
 ~~~~~~~
 
@@ -210,6 +216,7 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
    octez-accuser-alpha run
 
+The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
 Docker
 ~~~~~~

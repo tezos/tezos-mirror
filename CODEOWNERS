@@ -83,6 +83,7 @@
 # @hhugo1 = Hugo Heuzard
 # @igarnier = Ilias Garnier
 # @iguerNL = Mohamed Iguernlala
+# @ilya.peresadin = Ilya Peresadin
 # @jobjo = Joel Bjornson
 # @julien.t = Julien Tesson
 # @Killian-Delarue = Killian Delarue
@@ -104,6 +105,7 @@
 # @pirbo = Pierre Boutillier
 # @rafoo_ = Raphaël Cauderlier
 # @raphael-proust = Raphaël Proust
+# @rodibozman = Rodi-Can Bozman
 # @romain.nl = Romain
 # @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
@@ -117,7 +119,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @pe.cornilleau @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @ryan.tan3 @Saroupille @satos---jp @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @camlspotter @dianegalloiswong @emturner @eugenz @hhugo1 @igarnier @iguerNL @ilya.peresadin @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @pe.cornilleau @picdc @pirbo @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @satos---jp @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #

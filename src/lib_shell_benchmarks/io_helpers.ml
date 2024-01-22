@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,10 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** Helpers for loading contexts, saving contexts, writing to contexts, etc.
-    Also contains the [Key_map] module, heavily used for preparing benchmarks
-    and computing statistics. *)
 
 let assert_ok ~msg = function
   | Ok x -> x
@@ -64,12 +61,25 @@ let commit context =
          (Int64.of_int (int_of_float @@ Unix.gettimeofday ())))
     context
 
+let flush context =
+  let open Lwt.Syntax in
+  let context = Tezos_shell_context.Shell_context.unwrap_disk_context context in
+  let+ context = Tezos_context.Context.flush context in
+  Tezos_shell_context.Shell_context.wrap_disk_context context
+
 let prepare_empty_context base_dir =
   let open Lwt_result_syntax in
   let* index, context, _context_hash = prepare_genesis base_dir in
   let*! context_hash = commit context in
   let*! () = Tezos_context.Context.close index in
   return context_hash
+
+let purge_disk_cache () =
+  Format.eprintf "Purging disk cache@." ;
+  let command = "./purge_disk_cache.exe" in
+  match Sys.command command with
+  | 0 -> ()
+  | n -> Format.eprintf "Warning: failed to execute %s: code: %d" command n
 
 let load_context_from_disk_lwt base_dir context_hash =
   let open Lwt_syntax in
@@ -92,11 +102,8 @@ let with_context ~base_dir ~context_hash f =
     let* () = Tezos_context.Context.close index in
     Lwt.return res)
 
-let prepare_base_dir base_dir =
-  Unix.unlink base_dir ;
-  Unix.mkdir base_dir 0o700
+let prepare_base_dir base_dir = Unix.unlink base_dir
 
-(* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
   let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
   Tezos_protocol_environment.Context.add context path bytes
@@ -107,8 +114,6 @@ let commit_and_reload base_dir index context =
   let* () = Tezos_context.Context.close index in
   load_context_from_disk_lwt base_dir context_hash
 
-(** Maps from string lists to bytes. No balancing. A key cannot be a prefix
-    or a suffix to another key. *)
 module Key_map = struct
   module String_map = String.Map
 
@@ -179,14 +184,17 @@ module Key_map = struct
         | None -> None
         | Some subtree -> find_opt tl subtree)
 
-  let rec to_seq path acc tree =
+  let rec to_seq :
+      String_map.key list ->
+      (String_map.key list * 'a) Seq.t ->
+      'a t ->
+      (String_map.key list * 'a) Seq.t =
+   fun path acc tree ->
     match tree with
     | Leaf v -> fun () -> Seq.Cons ((List.rev path, v), acc)
     | Node map ->
-        String_map.fold
-          (fun seg subtree acc -> to_seq (seg :: path) acc subtree)
-          map
-          acc
+        Seq.concat_map (fun (seg, subtree) -> to_seq (seg :: path) acc subtree)
+        @@ String_map.to_seq map
 
   let to_seq tree = to_seq [] Seq.empty tree
 
@@ -298,3 +306,210 @@ let rec copy_rec source dest =
         source ;
       set_infos dest infos
   | _ -> prerr_endline ("Can't cope with special file " ^ source)
+
+let split_absolute_path s =
+  (* Must start with / *)
+  if s = "" || s.[0] <> '/' then None
+  else
+    let ss = String.split_no_empty '/' s in
+    (* Must not contain ., .. *)
+    if List.exists (function "." | ".." -> true | _ -> false) ss then None
+    else Some ss
+
+let load_head_block data_dir =
+  let chain_id = "NetXdQprcVkpa" in
+  let genesis =
+    let config =
+      let fn_config =
+        Printf.sprintf "%s/store/chain_%s/config.json" data_dir chain_id
+      in
+      let config =
+        Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file fn_config
+      in
+      match Data_encoding.Json.from_string config with
+      | Error s -> Stdlib.failwith s
+      | Ok config ->
+          Data_encoding.Json.destruct
+            Tezos_store_shared.Store_types.chain_config_encoding
+            config
+    in
+    config.genesis
+  in
+  let open Lwt_result_syntax in
+  let open Tezos_store.Store in
+  let* store =
+    init
+      ~store_dir:(Filename.concat data_dir "store")
+      ~context_dir:(Filename.concat data_dir "context")
+      ~allow_testchains:false
+      genesis
+  in
+  let chain_store = main_chain_store store in
+  let*! head = Chain.current_head chain_store in
+  let*! () = close_store store in
+  return (Block.level head, Block.hash head, Block.context_hash head)
+
+module Meminfo = struct
+  type t = {
+    memTotal : int;
+    memFree : int;
+    memAvailable : int;
+    buffers : int;
+    cached : int;
+    swapTotal : int;
+  }
+
+  let pp ppf {memTotal; memFree; memAvailable; buffers; cached; swapTotal} =
+    let open Format in
+    fprintf
+      ppf
+      "{ memTotal: %d; memFree: %d; memAvailable: %d; buffers: %d; cached: %d; \
+       swapTotal: %d }"
+      memTotal
+      memFree
+      memAvailable
+      buffers
+      cached
+      swapTotal
+
+  let get () =
+    let ic = open_in "/proc/meminfo" in
+    let rec loop acc =
+      match input_line ic with
+      | exception End_of_file ->
+          close_in ic ;
+          acc
+      | s ->
+          let acc =
+            try
+              let n = String.index s ':' in
+              let key = String.sub s 0 n in
+              let rest =
+                let rest = String.(sub s (n + 1) (length s - n - 1)) in
+                match String.remove_suffix ~suffix:" kB" rest with
+                | Some s -> s
+                | _ | (exception _) -> rest
+              in
+              let kbs = Scanf.sscanf rest " %d" Fun.id in
+              match key with
+              | "MemTotal" -> {acc with memTotal = kbs}
+              | "MemFree" -> {acc with memFree = kbs}
+              | "MemAvailable" -> {acc with memAvailable = kbs}
+              | "Buffers" -> {acc with buffers = kbs}
+              | "Cached" -> {acc with cached = kbs}
+              | "SwapTotal" -> {acc with swapTotal = kbs}
+              | _ -> acc
+            with _ -> acc
+          in
+          loop acc
+    in
+    (* We can use [option] type but no worth for it *)
+    loop
+      {
+        memTotal = -1;
+        memFree = -1;
+        memAvailable = -1;
+        buffers = -1;
+        cached = -1;
+        swapTotal = -1;
+      }
+
+  let get_available () =
+    let meminfo = get () in
+    meminfo.memAvailable
+end
+
+module Dummy_memory = struct
+  (* Dummy memory is allocated by mmap(2).
+
+     [MemAvailable] decreases immediately when a process allocates
+     a new memory block. However, it does not increase immediately
+     even when the process frees it.
+
+     [MemAvailable] is immediately updated when the memory is allocated
+     by mmap(2) then released by munmap(2).
+  *)
+
+  type t
+
+  external alloc : int -> t = "caml_alloc_by_mmap"
+
+  external free : t -> unit = "caml_free_by_mmap"
+
+  let allocate = alloc
+
+  let deallocate = free
+end
+
+let with_memory_restriction gib f =
+  let blocks = ref ([] : Dummy_memory.t list) in
+  let block_size = 1024 * 1024 * 100 (* 100MiB *) in
+  let target = int_of_float (gib *. 1024. *. 1024. *. 1024.) in
+  let restrict () =
+    let rec loop acc =
+      let available = Meminfo.get_available () * 1024 in
+      let diff = available - target in
+      if diff <= -block_size then (
+        match acc with
+        | [] -> acc
+        | block :: acc ->
+            Dummy_memory.deallocate block ;
+            loop acc)
+      else if block_size < diff then
+        loop (Dummy_memory.allocate block_size :: acc)
+      else acc
+    in
+    blocks := loop !blocks
+  in
+  let res = f restrict in
+  List.iter Dummy_memory.deallocate !blocks ;
+  res
+
+let fill_disk_cache ~rng ~restrict_memory context keys_list =
+  let open Lwt.Syntax in
+  let nkeys =
+    List.fold_left (fun acc keys -> acc + Array.length keys) 0 keys_list
+  in
+  Format.eprintf "Filling the disk cache...@." ;
+  (* Allocate memory to restrict the size of disk cache *)
+  let rec fill_cache context = function
+    | 0 -> Lwt.return context
+    | n ->
+        let i = Random.State.int rng nkeys in
+        let rec get_ith i = function
+          | [] -> invalid_arg "get_ith"
+          | keys :: keys_list ->
+              let len = Array.length keys in
+              if len <= i then get_ith (i - len) keys_list else keys.(i)
+        in
+        let* _ =
+          Tezos_protocol_environment.Context.find
+            context
+            (fst @@ get_ith i keys_list)
+        in
+        fill_cache context (n - 1)
+  in
+  let rec loop context cond n =
+    let* context = flush context in
+    let* context = fill_cache context 10000 in
+    restrict_memory () ;
+    let meminfo = Meminfo.get () in
+    match cond with
+    | `End_in 0 -> Lwt.return_unit
+    | `End_in m -> loop context (`End_in (m - 1)) (n + 1)
+    | `Caching _ when n >= 20 ->
+        Format.eprintf "Filling the disk cache: enough tried@." ;
+        Lwt.return_unit
+    | `Caching _
+      when meminfo.memAvailable - meminfo.buffers - meminfo.cached
+           < 1024_00 (* 100MiB *) ->
+        (* Most of the [MemAvailable] is now used for the buffer and cache. *)
+        Format.eprintf "Filling the disk cache: reaching a fixed point@." ;
+        (* We loop 5 more times *)
+        loop context (`End_in 5) (n + 1)
+    | `Caching _ -> loop context (`Caching meminfo.cached) (n + 1)
+  in
+  let* () = loop context (`Caching 0) 0 in
+  let meminfo = Meminfo.get () in
+  Format.eprintf "%a@." Meminfo.pp meminfo ;
+  Lwt.return_unit

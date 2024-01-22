@@ -81,9 +81,10 @@ val create :
 (** [save_peers pool] save all peer currently known by the node on disk *)
 val save_peers : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
-(** [tear_down_connections pool] close all connections, and returns when member
-    connections are either disconnected or canceled. *)
-val tear_down_connections : ('msg, 'peer, 'conn) t -> unit Lwt.t
+(** [tear_down_connections ~reason pool] close all connections, and returns
+    when member connections are either disconnected or canceled. *)
+val tear_down_connections :
+  reason:P2p_disconnection_reason.t -> ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (** [destroy pool] calls tear_down_connections and save the known peers list on the disk *)
 val destroy : ('msg, 'peer, 'conn) t -> unit Lwt.t
@@ -275,6 +276,13 @@ module Peers : sig
 
   (** [get_greylisted_list t] returns the list of all the greylisted peers *)
   val get_greylisted_list : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t list
+
+  (** [info_of_peer_info t peer] returns the peer info from the peer
+      state info. *)
+  val info_of_peer_info :
+    ('msg, 'peer, 'conn) t ->
+    (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t ->
+    ('peer, 'conn) P2p_peer.Info.t
 end
 
 (** {1 Functions on [Points]} *)

@@ -30,20 +30,20 @@ type t = {
   rpc_addr : P2p_point.Id.t;
   neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
+  public_addr : P2p_point.Id.t;
   peers : string list;
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t;
-  profiles : Services.Types.profiles;
+  profiles : Types.profiles;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
 let store_path {data_dir; _} = Filename.concat data_dir "store"
 
-let default_rpc_addr =
-  P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
+let default_rpc_addr = P2p_point.Id.of_string_exn ~default_port:10732 "0.0.0.0"
 
 let default_listen_addr =
   let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
@@ -66,7 +66,7 @@ let default_metrics_port =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.listening_port + 1
 
 let default_metrics_addr =
-  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "127.0.0.1"
+  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "0.0.0.0"
 
 let default =
   {
@@ -74,6 +74,7 @@ let default =
     rpc_addr = default_rpc_addr;
     neighbors = default_neighbors;
     listen_addr = default_listen_addr;
+    public_addr = default_listen_addr;
     peers = default_peers;
     expected_pow = default_expected_pow;
     network_name = default_network_name;
@@ -110,6 +111,7 @@ let encoding : t Data_encoding.t =
            data_dir;
            rpc_addr;
            listen_addr;
+           public_addr;
            neighbors;
            peers;
            expected_pow;
@@ -118,30 +120,33 @@ let encoding : t Data_encoding.t =
            metrics_addr;
            profiles;
          } ->
-      ( data_dir,
-        rpc_addr,
-        listen_addr,
-        neighbors,
-        peers,
-        expected_pow,
-        network_name,
-        endpoint,
-        metrics_addr,
+      ( ( data_dir,
+          rpc_addr,
+          listen_addr,
+          public_addr,
+          neighbors,
+          peers,
+          expected_pow,
+          network_name,
+          endpoint,
+          metrics_addr ),
         profiles ))
-    (fun ( data_dir,
-           rpc_addr,
-           listen_addr,
-           neighbors,
-           peers,
-           expected_pow,
-           network_name,
-           endpoint,
-           metrics_addr,
+    (fun ( ( data_dir,
+             rpc_addr,
+             listen_addr,
+             public_addr,
+             neighbors,
+             peers,
+             expected_pow,
+             network_name,
+             endpoint,
+             metrics_addr ),
            profiles ) ->
       {
         data_dir;
         rpc_addr;
         listen_addr;
+        public_addr;
         neighbors;
         peers;
         expected_pow;
@@ -150,57 +155,64 @@ let encoding : t Data_encoding.t =
         metrics_addr;
         profiles;
       })
-    (obj10
-       (dft
-          "data-dir"
-          ~description:"Location of the data dir"
-          string
-          default_data_dir)
-       (dft
-          "rpc-addr"
-          ~description:"RPC address"
-          P2p_point.Id.encoding
-          default_rpc_addr)
-       (dft
-          "net-addr"
-          ~description:"P2P address of this node"
-          P2p_point.Id.encoding
-          default_listen_addr)
-       (dft
-          "neighbors"
-          ~description:"DAL Neighbors"
-          (list neighbor_encoding)
-          default_neighbors)
-       (dft
-          "peers"
-          ~description:"P2P addresses of remote peers"
-          (list string)
-          default_peers)
-       (dft
-          "expected-pow"
-          ~description:"Expected P2P identity's PoW"
-          float
-          default_expected_pow)
-       (dft
-          "network-name"
-          ~description:"The name that identifies the network"
-          string
-          default_network_name)
-       (dft
-          "endpoint"
-          ~description:"The Tezos node endpoint"
-          endpoint_encoding
-          default_endpoint)
-       (dft
-          "metrics-addr"
-          ~description:"The point for the DAL node metrics server"
-          P2p_point.Id.encoding
-          default_metrics_addr)
-       (dft
-          "profiles"
-          ~description:"The Octez DAL node profiles"
-          Services.Types.profiles_encoding
-          (Operator [])))
+    (merge_objs
+       (obj10
+          (dft
+             "data-dir"
+             ~description:"Location of the data dir"
+             string
+             default_data_dir)
+          (dft
+             "rpc-addr"
+             ~description:"RPC address"
+             P2p_point.Id.encoding
+             default_rpc_addr)
+          (dft
+             "net-addr"
+             ~description:"P2P address of this node"
+             P2p_point.Id.encoding
+             default_listen_addr)
+          (dft
+             "public-addr"
+             ~description:"P2P address of this node"
+             P2p_point.Id.encoding
+             default_listen_addr)
+          (dft
+             "neighbors"
+             ~description:"DAL Neighbors"
+             (list neighbor_encoding)
+             default_neighbors)
+          (dft
+             "peers"
+             ~description:"P2P addresses of remote peers"
+             (list string)
+             default_peers)
+          (dft
+             "expected-pow"
+             ~description:"Expected P2P identity's PoW"
+             float
+             default_expected_pow)
+          (dft
+             "network-name"
+             ~description:"The name that identifies the network"
+             string
+             default_network_name)
+          (dft
+             "endpoint"
+             ~description:"The Tezos node endpoint"
+             endpoint_encoding
+             default_endpoint)
+          (dft
+             "metrics-addr"
+             ~description:"The point for the DAL node metrics server"
+             P2p_point.Id.encoding
+             default_metrics_addr))
+       (obj1
+          (dft
+             "profiles"
+             ~description:"The Octez DAL node profiles"
+             Types.profiles_encoding
+             (Operator []))))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

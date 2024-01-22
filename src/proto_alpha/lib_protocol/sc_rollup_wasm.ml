@@ -103,7 +103,7 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
-  let current_version = Wasm_2_0_0.v2
+  let current_version = Wasm_2_0_0.v3
 
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
@@ -154,7 +154,7 @@ module V2_0_0 = struct
   *)
   let reference_initial_state_hash =
     Sc_rollup_repr.State_hash.of_b58check_exn
-      "srs11qkRe5cbDBixB2fuumn4tfkvQcxUSuFXa94Lv5c6kdzzfpM9UF"
+      "srs127FAyj2NkJYtN8RE8yPieBGpakvAH8MgwzRPUM4UnsCKB24rrA"
 
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
@@ -369,10 +369,10 @@ module V2_0_0 = struct
       result_of (get_status ~is_reveal_enabled)
 
     let get_outbox outbox_level state =
+      let open Lwt_syntax in
       let outbox_level_int32 =
         Raw_level_repr.to_int32_non_negative outbox_level
       in
-      let open Lwt_syntax in
       let rec aux outbox message_index =
         let output =
           Wasm_2_0_0.{outbox_level = outbox_level_int32; message_index}
@@ -431,10 +431,30 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
           set s
-      | PS.Reveal (PS.Dal_page _content_opt) ->
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3927.
-             Handle DAL pages in wasm PVM. *)
-          assert false
+      | PS.Reveal (PS.Dal_page content_bytes) ->
+          let content_bytes =
+            Option.value ~default:Bytes.empty content_bytes
+            (* [content_opt] is [None] when the slot was not confirmed in the L1.
+               In this case, we return empty bytes.
+
+               Note that the kernel can identify this unconfirmed slot scenario because
+               all confirmed pages have a size of 4KiB. Thus, a page can only be considered
+               empty (0KiB) if it is unconfirmed. *)
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step content_bytes s) in
+          set s
+      | PS.Reveal (PS.Dal_parameters dal_parameters) ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
+             reveal_dal_parameters result for slow execution PVM. *)
+          let dal_parameters_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Sc_rollup_dal_parameters_repr.encoding
+              dal_parameters
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step dal_parameters_bytes s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 
@@ -687,8 +707,8 @@ module V2_0_0 = struct
 
     module Internal_for_tests = struct
       let insert_failure state =
-        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let open Lwt_syntax in
+        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let* n = Tree.length state ["failures"] in
         add n
     end
@@ -723,7 +743,7 @@ module V2_0_0 = struct
 
         let produce_proof _context _state _f =
           (* Can't produce proof without full context*)
-          Lwt.return None
+          Lwt.return_none
 
         let kinded_hash_to_state_hash = function
           | `Value hash | `Node hash ->

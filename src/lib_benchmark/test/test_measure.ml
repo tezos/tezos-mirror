@@ -29,7 +29,7 @@ open Tezos_benchmark_examples
 let bench_opts =
   let open Measure in
   {
-    seed = Some 1337;
+    seed = 1337;
     nsamples = 3000;
     (* Percentile 50 = Median *)
     bench_number = 100;

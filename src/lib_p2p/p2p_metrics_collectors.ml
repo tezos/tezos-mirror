@@ -255,8 +255,50 @@ module Points = struct
       pool
 end
 
-let collect pool =
+module Net_stats = struct
+  let component = "io_scheduler"
+
+  let p2p_stats = ref P2p_stat.empty
+
+  let total_sent =
+    metric
+      ~help:"Total amount of sent data (in bytes)"
+      ~component
+      ~name:"total_sent"
+      (fun () -> Int64.to_float !p2p_stats.total_sent)
+
+  let total_recv =
+    metric
+      ~help:"Total amount of received data"
+      ~component
+      ~name:"total_recv"
+      (fun () -> Int64.to_float !p2p_stats.total_recv)
+
+  let current_inflow =
+    metric
+      ~help:"Current ingoing data rate"
+      ~component
+      ~name:"current_inflow"
+      (fun () -> float !p2p_stats.current_inflow)
+
+  let current_outflow =
+    metric
+      ~help:"Current outgoing data rate"
+      ~component
+      ~name:"current_outflow"
+      (fun () -> float !p2p_stats.current_outflow)
+
+  let metrics = [total_sent; total_recv; current_inflow; current_outflow]
+
+  let () = List.iter add_metric metrics
+
+  let collect io_scheduler =
+    p2p_stats := P2p_io_scheduler.global_stat io_scheduler
+end
+
+let collect pool io_scheduler =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
       Connections.collect pool ;
       Peers.collect pool ;
-      Points.collect pool)
+      Points.collect pool ;
+      Net_stats.collect io_scheduler)

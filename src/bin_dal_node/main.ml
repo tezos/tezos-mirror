@@ -26,7 +26,7 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
    Improve profile configuration UX for when we have conflicting CLI and config file. *)
 let merge_profiles ~from_config_file ~from_cli =
-  let open Services.Types in
+  let open Types in
   match from_cli with
   | None -> from_config_file
   | Some from_cli -> (
@@ -45,6 +45,7 @@ let merge
         rpc_addr;
         expected_pow;
         listen_addr;
+        public_addr;
         endpoint;
         metrics_addr;
         profiles;
@@ -56,6 +57,7 @@ let merge
       data_dir = Option.value ~default:configuration.data_dir data_dir;
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
+      public_addr = Option.value ~default:configuration.public_addr public_addr;
       expected_pow =
         Option.value ~default:configuration.expected_pow expected_pow;
       endpoint = Option.value ~default:configuration.endpoint endpoint;
@@ -87,9 +89,11 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.Cli.data_dir
       in
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Daemon.run ~data_dir (merge cli_options)
   | Config_init ->
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
 

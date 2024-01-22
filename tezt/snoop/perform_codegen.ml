@@ -23,68 +23,40 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-let local_model_names = Perform_inference.local_model_names
-
-let cost_function_ml fp = if fp then "auto_build_no_fp.ml" else "auto_build.ml"
-
-let rec cleanup () =
-  let codegen_root = Files.(working_dir // codegen_results_dir) in
-  match Files.classify_dirname codegen_root with
-  | Files.Does_not_exist -> Files.create_dir codegen_root
-  | Exists_and_is_not_a_dir ->
-      Files.unlink_if_present codegen_root ;
-      cleanup ()
-  | Exists ->
-      let _ =
-        Sys.readdir codegen_root
-        |> Array.iter (fun x -> Sys.remove (Filename.concat codegen_root x))
-      in
-      Sys.rmdir codegen_root ;
-      cleanup ()
-
-let solution_fn inference_root local_model_name =
-  Files.(inference_root // solution_bin local_model_name)
 
 let prepare_fp_json inference_root =
   let fn = inference_root // "fp.json" in
   Base.write_file
     fn
     ~contents:
-      {|{ "precision": 4,
-      "max_relative_error": 0.5,
+      {|{ "precision": 6,
+      "max_relative_error": 0.1,
       "cast_mode": "Round",
-      "inverse_scaling": 3,
+      "inverse_scaling": 10,
       "resolution": 5 }|} ;
   fn
 
-let destination fp =
-  Files.(working_dir // codegen_results_dir // cost_function_ml fp)
+let destination = Files.(working_dir // codegen_results_dir)
 
 let main () =
   Log.info "Entering Perform_codegen.main" ;
   let snoop = Snoop.create () in
+  let* () = Files.cleanup destination in
   let inference_root = Files.(working_dir // inference_results_dir) in
   let fp_json_fn = prepare_fp_json inference_root in
-  let* () = cleanup () in
-  Lwt_list.iter_s
-    (fun local_model_name ->
-      let open Lwt.Syntax in
-      let saved_model_name =
-        String.split_on_char '/' local_model_name |> String.concat "__"
-      in
-      let solution_fn = solution_fn inference_root saved_model_name in
-      let* _ =
-        Snoop.generate_code_using_solution
-          ~solution:solution_fn
-          ~save_to:(destination true)
-          snoop
-      in
-      let* _ =
-        Snoop.generate_code_using_solution
-          ~solution:solution_fn
-          ~save_to:(destination false)
-          ~fixed_point:fp_json_fn
-          snoop
-      in
-      Lwt.return_unit)
-    local_model_names
+  let open Lwt.Syntax in
+  let solution_fn = inference_root in
+  let* _ =
+    Snoop.generate_code_for_solutions
+      ~solution:solution_fn
+      ~split_to:destination
+      snoop
+  in
+  let* _ =
+    Snoop.generate_code_for_solutions
+      ~solution:solution_fn
+      ~split_to:destination
+      ~fixed_point:fp_json_fn
+      snoop
+  in
+  Lwt.return_unit

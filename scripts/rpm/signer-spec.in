@@ -1,0 +1,29 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez Signer
+
+Packager:   @MAINT@
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez Signer
+
+%files
+%{_bindir}/octez-*
+%{_sysconfdir}/init.d/octez-signer
+%config /etc/octez/signer.conf
+
+%post
+getent group tzsigner >/dev/null 2>&1 || groupadd tzsigner
+getent passwd tzsigner >/dev/null 2>&1 || useradd -g tzsigner tzsigner
+/usr/bin/systemctl daemon-reload

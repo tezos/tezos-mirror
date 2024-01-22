@@ -852,7 +852,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let*! slow_tick_state = Wasm.Internal_for_tests.get_tick_state slow_tree in
   assert (slow_tick_state = Snapshot) ;
 
-  return ()
+  return_unit
 
 let test_check_nb_ticks ~version () =
   let open Lwt_result_syntax in
@@ -883,7 +883,7 @@ let test_check_nb_ticks ~version () =
   in
   assert (Int64.equal fast_ticks slow_ticks) ;
 
-  return ()
+  return_unit
 
 let test_read_input_write_output_failing ~version () =
   let kernel =

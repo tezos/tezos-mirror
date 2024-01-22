@@ -31,12 +31,13 @@ let messages_store_location ~storage_dir =
   let open Filename.Infix in
   storage_dir // "messages"
 
-let version_of_unversioned_store ~storage_dir =
+let version_of_unversioned_store ~storage_dir ~index_buffer_size =
   let open Lwt_syntax in
   let path = messages_store_location ~storage_dir in
-  let* messages_store_v0 = Store_v0.Messages.load ~path ~cache_size:1 Read_only
+  let* messages_store_v0 =
+    Store_v0.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
   and* messages_store_v1 =
-    Store_v1.Messages.load ~path ~cache_size:1 Read_only
+    Store_v1.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
   in
   let cleanup () =
     let open Lwt_syntax in
@@ -65,13 +66,13 @@ let version_of_unversioned_store ~storage_dir =
   in
   Lwt.finalize guess_version cleanup
 
-let version_of_store ~storage_dir =
+let version_of_store ~storage_dir ~index_buffer_size =
   let open Lwt_result_syntax in
   let* version = Store_version.read_version_file ~dir:storage_dir in
   match version with
   | Some v -> return_some (v, Version_known)
   | None ->
-      let+ v = version_of_unversioned_store ~storage_dir in
+      let+ v = version_of_unversioned_store ~storage_dir ~index_buffer_size in
       Option.map (fun v -> (v, Unintialized_version)) v
 
 module type MIGRATION_ACTIONS = sig
@@ -91,7 +92,11 @@ module type MIGRATION_ACTIONS = sig
 end
 
 module type S = sig
-  val migrate : storage_dir:string -> unit tzresult Lwt.t
+  val migrate :
+    Metadata.t ->
+    storage_dir:string ->
+    index_buffer_size:int ->
+    unit tzresult Lwt.t
 end
 
 let migrations = Stdlib.Hashtbl.create 7
@@ -111,11 +116,16 @@ module Make
          Store_version.pp
          S_dest.version
 
-  let migrate ~storage_dir =
+  let migrate metadata ~storage_dir ~index_buffer_size =
     let open Lwt_result_syntax in
     let* source_store =
-      S_from.load Read_only ~l2_blocks_cache_size:1 storage_dir
+      S_from.load
+        Read_only
+        ~l2_blocks_cache_size:1
+        storage_dir
+        ~index_buffer_size
     in
+
     let tmp_dir = tmp_dir ~storage_dir in
     let*! tmp_dir_exists = Lwt_utils_unix.dir_exists tmp_dir in
     let*? () =
@@ -131,7 +141,9 @@ module Make
       else Ok ()
     in
     let*! () = Lwt_utils_unix.create_dir tmp_dir in
-    let* dest_store = S_dest.load Read_write ~l2_blocks_cache_size:1 tmp_dir in
+    let* dest_store =
+      S_dest.load Read_write ~l2_blocks_cache_size:1 tmp_dir ~index_buffer_size
+    in
     let cleanup () =
       let open Lwt_syntax in
       let* (_ : unit tzresult) = S_from.close source_store
@@ -142,6 +154,14 @@ module Make
     let run_migration () =
       let* () =
         S_from.iter_l2_blocks
+          ~progress:
+            (Format.asprintf
+               "Migrating store from %a to %a"
+               Store_version.pp
+               S_from.version
+               Store_version.pp
+               S_dest.version)
+          metadata
           source_store
           (Actions.migrate_block_action source_store dest_store)
       in
@@ -173,8 +193,7 @@ let migration_path ~from ~dest =
       (* Recursively look for migration sub-paths *)
       let paths =
         List.filter_map
-          (fun (step, migration) ->
-            path ((from, step, migration) :: acc) step dest)
+          (fun (step, migration) -> path (migration :: acc) step dest)
           first_steps
       in
       (* Choose shortest migration path *)
@@ -182,9 +201,9 @@ let migration_path ~from ~dest =
   in
   path [] from dest
 
-let maybe_run_migration ~storage_dir =
+let maybe_run_migration metadata ~storage_dir ~index_buffer_size =
   let open Lwt_result_syntax in
-  let* current_version = version_of_store ~storage_dir in
+  let* current_version = version_of_store ~storage_dir ~index_buffer_size in
   let last_version = Store.version in
   match (current_version, last_version) with
   | None, _ ->
@@ -212,14 +231,7 @@ let maybe_run_migration ~storage_dir =
           Format.printf "Starting store migration@." ;
           let+ () =
             List.iter_es
-              (fun (vx, vy, migrate) ->
-                Format.printf
-                  "- Migrating store from %a to %a@."
-                  Store_version.pp
-                  vx
-                  Store_version.pp
-                  vy ;
-                migrate ~storage_dir)
+              (fun migrate -> migrate metadata ~storage_dir ~index_buffer_size)
               migrations
           in
           Format.printf "Store migration completed@.")
@@ -391,17 +403,17 @@ module V2_migrations = struct
           let open Lwt_result_syntax in
           let* () =
             migrate_messages
-              Store_v1.(Messages.read v1_store.messages)
+              (Store_v1.Messages.read v1_store.Store_v1.messages)
               v2_store
               l2_block
           and* () =
             migrate_commitment
-              Store_v1.(Commitments.find v1_store.commitments)
+              (Store_v1.Commitments.find v1_store.commitments)
               v2_store
               l2_block
           and* () =
             migrate_inbox
-              Store_v1.(Inboxes.read v1_store.inboxes)
+              (Store_v1.Inboxes.read v1_store.inboxes)
               v2_store
               l2_block
           in
@@ -417,17 +429,17 @@ module V2_migrations = struct
           let open Lwt_result_syntax in
           let* () =
             migrate_messages
-              Store_v0.(Messages.read v0_store.messages)
+              (Store_v0.Messages.read v0_store.Store_v0.messages)
               v2_store
               l2_block
           and* () =
             migrate_commitment
-              Store_v0.(Commitments.find v0_store.commitments)
+              (Store_v0.Commitments.find v0_store.commitments)
               v2_store
               l2_block
           and* () =
             migrate_inbox
-              Store_v0.(Inboxes.read v0_store.inboxes)
+              (Store_v0.Inboxes.read v0_store.inboxes)
               v2_store
               l2_block
           in
@@ -464,6 +476,49 @@ module V3_migrations = struct
       (struct
         let migrate_block_action _v2_store v3_store l2_block =
           recompute_level v3_store l2_block
+
+        let final_actions = final_actions
+      end)
+end
+
+module V4_migrations = struct
+  let messages_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "messages"
+
+  let migrate_messages (v3_store : _ Store_v3.t) (v4_store : _ Store_v4.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* v3_messages =
+      Store_v3.Messages.read v3_store.messages l2_block.header.inbox_witness
+    in
+    match v3_messages with
+    | None -> return_unit
+    | Some (messages, _v3_header) ->
+        let header = l2_block.header.predecessor in
+        Store_v4.Messages.append
+          v4_store.messages
+          ~key:l2_block.header.inbox_witness
+          ~header
+          ~value:messages
+
+  let final_actions ~storage_dir ~tmp_dir _ _ =
+    let open Lwt_result_syntax in
+    let*! () =
+      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
+    in
+    let*! () =
+      Lwt_unix.rename
+        (messages_store_location ~storage_dir:tmp_dir)
+        (messages_store_location ~storage_dir)
+    in
+    return_unit
+
+  module From_v3 =
+    Make (Store_v3) (Store_v4)
+      (struct
+        let migrate_block_action v3_store v4_store l2_block =
+          migrate_messages v3_store v4_store l2_block
 
         let final_actions = final_actions
       end)

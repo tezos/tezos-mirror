@@ -1,0 +1,26 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "octez-shell-libs"
+  "octez-libs"
+  "tezt" { >= "4.0.0" & < "5.0.0" }
+  "tezt-tezos"
+  "jingoo"
+  "dmap"
+  "yaml" { >= "3.1.0" }
+]
+build: [
+  ["rm" "-r" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "An Ansible-inspired environment to run scenarios and experiments"

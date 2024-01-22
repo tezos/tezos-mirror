@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 15 (just consumed gas: 19.499)
+  - location: 15 (just consumed gas: 19.185)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)
             Unit) ]
@@ -17,12 +17,12 @@ trace
   - location: 16 (just consumed gas: 0.010)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
-  - location: 17 (just consumed gas: 0)
+  - location: 17 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
   - location: 19 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
-  - location: 17 (just consumed gas: 0.025)
+  - location: 17 (just consumed gas: 0.035)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
@@ -36,15 +36,15 @@ trace
   - location: 24 (just consumed gas: 0.010)
     [ True
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
-  - location: 25 (just consumed gas: 0)
+  - location: 25 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
-  - location: 25 (just consumed gas: 0.015)
+  - location: 25 (just consumed gas: 0.025)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003 ]
-  - location: 31 (just consumed gas: 2.753)
+  - location: 31 (just consumed gas: 2.514)
     [ (Some (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })) ]
-  - location: 40 (just consumed gas: 0)
+  - location: 40 (just consumed gas: 0.010)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 }) ]
-  - location: 40 (just consumed gas: 0.015)
+  - location: 40 (just consumed gas: 0.025)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 }) ]
   - location: 46 (just consumed gas: 0.010)
     [  ]
@@ -70,7 +70,7 @@ At line 4 characters 14 to 26,
 script reached FAILWITH instruction
 with Unit
 trace
-  - location: 15 (just consumed gas: 19.499)
+  - location: 15 (just consumed gas: 19.185)
     [ (Pair (Pair (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
                   0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)
             Unit) ]
@@ -80,12 +80,12 @@ trace
   - location: 16 (just consumed gas: 0.010)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
-  - location: 17 (just consumed gas: 0)
+  - location: 17 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
   - location: 19 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
-  - location: 17 (just consumed gas: 0.025)
+  - location: 17 (just consumed gas: 0.035)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
@@ -99,7 +99,7 @@ trace
   - location: 24 (just consumed gas: 0.010)
     [ False
       0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
-  - location: 25 (just consumed gas: 0)
+  - location: 25 (just consumed gas: 0.010)
     [ 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004 ]
   - location: 29 (just consumed gas: 0.010)
     [ Unit

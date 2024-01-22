@@ -86,8 +86,8 @@ let benchmark ~nb_batches ~batch_size () =
   Format.printf "nb_batches %i batch_size %i\n%!" nb_batches batch_size ;
   let circ_map, private_inputs =
     let circ, private_inputs = circuit_inputs ~nb_batches ~batch_size in
-    let circ_map = Plonk.SMap.(add "batch" (circ, nb_batches) empty) in
-    let private_inputs = Plonk.SMap.(add "batch" private_inputs empty) in
+    let circ_map = Kzg.SMap.(add "batch" (circ, nb_batches) empty) in
+    let private_inputs = Kzg.SMap.(add "batch" private_inputs empty) in
     (circ_map, private_inputs)
   in
   Gc.full_major () ;
@@ -102,8 +102,8 @@ let benchmark_meta ~nb_batches ~batch_size () =
   end in
   let module H = Plonk_test.Helpers.Make (Aplonk.Main_protocol.Make (PIs)) in
   let circuit, witness = circuit_inputs ~nb_batches ~batch_size in
-  let circuit_map = Plonk.SMap.singleton "" (circuit, nb_batches) in
-  let inputs = Plonk.SMap.singleton "" witness in
+  let circuit_map = Kzg.SMap.singleton "" (circuit, nb_batches) in
+  let inputs = Kzg.SMap.singleton "" witness in
   Gc.full_major () ;
   H.test_circuits ~name:"benchmark_meta" ~verbose:true circuit_map inputs
 

@@ -48,26 +48,32 @@ let succeed x = match x with Ok _ -> true | _ -> false
 let failed x = not (succeed x)
 
 let dummy_context () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (block, _contract) ->
-  Raw_context.prepare
-    ~level:Int32.zero
-    ~predecessor_timestamp:Time.Protocol.epoch
-    ~timestamp:Time.Protocol.epoch
-    (* ~fitness:[] *)
-    (block.context : Tezos_protocol_environment.Context.t)
-    ~adaptive_issuance_enable:false
-  >|= Environment.wrap_tzresult
+  let open Lwt_result_wrap_syntax in
+  let* block, _contract = Context.init1 ~consensus_threshold:0 () in
+  let*@ ctxt =
+    Raw_context.prepare
+      ~level:Int32.zero
+      ~predecessor_timestamp:Time.Protocol.epoch
+      ~timestamp:Time.Protocol.epoch
+      (* ~fitness:[] *)
+      (block.context : Tezos_protocol_environment.Context.t)
+      ~adaptive_issuance_enable:false
+  in
+  return ctxt
 
 let consume_gas_lwt context gas =
-  Lwt.return (consume_gas context (S.safe_int gas))
-  >|= Environment.wrap_tzresult
+  let open Lwt_result_wrap_syntax in
+  let*?@ ctxt = consume_gas context (S.safe_int gas) in
+  return ctxt
 
 let consume_gas_limit_in_block_lwt context gas =
-  Lwt.return (consume_gas_limit_in_block context gas)
-  >|= Environment.wrap_tzresult
+  let open Lwt_result_wrap_syntax in
+  let*?@ ctxt = consume_gas_limit_in_block context gas in
+  return ctxt
 
 let test_detect_gas_exhaustion_in_fresh_context () =
-  dummy_context () >>=? fun context ->
+  let open Lwt_result_syntax in
+  let* context = dummy_context () in
   fail_unless
     (consume_gas context (S.safe_int opg) |> succeed)
     (err "In a fresh context, gas consumption is unlimited.")
@@ -75,8 +81,9 @@ let test_detect_gas_exhaustion_in_fresh_context () =
 (** Create a context with a given block gas level, capped at the
     hard gas limit per block *)
 let make_context remaining_block_gas =
+  let open Lwt_result_syntax in
   let open Gas_limit_repr in
-  dummy_context () >>=? fun context ->
+  let* context = dummy_context () in
   let hard_limit = Arith.fp (constants context).hard_gas_limit_per_operation in
   let hard_limit_block =
     Arith.fp (constants context).hard_gas_limit_per_block
@@ -89,7 +96,7 @@ let make_context remaining_block_gas =
     else if Arith.(to_consume <= hard_limit) then
       consume_gas_limit_in_block_lwt context to_consume
     else
-      consume_gas_limit_in_block_lwt context hard_limit >>=? fun context ->
+      let* context = consume_gas_limit_in_block_lwt context hard_limit in
       aux context (Arith.sub to_consume hard_limit)
   in
   aux context Arith.(sub hard_limit_block block_gas)
@@ -97,27 +104,31 @@ let make_context remaining_block_gas =
 (** Test operation gas exhaustion. Should pass when remaining gas is 0,
     and fail when it goes over *)
 let test_detect_gas_exhaustion_when_operation_gas_hits_zero () =
+  let open Lwt_result_syntax in
   let gas_op = 100000 in
-  dummy_context () >>=? fun context ->
+  let* context = dummy_context () in
   set_gas_limit context (Gas_limit_repr.Arith.unsafe_fp (Z.of_int gas_op))
   |> fun context ->
-  fail_unless
-    (consume_gas context (S.safe_int gas_op) |> succeed)
-    (err "Succeed when consuming exactly the remaining operation gas.")
-  >>=? fun () ->
+  let* () =
+    fail_unless
+      (consume_gas context (S.safe_int gas_op) |> succeed)
+      (err "Succeed when consuming exactly the remaining operation gas.")
+  in
   fail_unless
     (consume_gas context (S.safe_int (gas_op + 1)) |> failed)
     (err "Fail when consuming more than the remaining operation gas.")
 
 (** Test block gas exhaustion *)
 let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
+  let open Lwt_result_syntax in
   let gas k = Gas_limit_repr.Arith.unsafe_fp (Z.of_int k) in
   let remaining_gas = gas 100000 and too_much = gas (100000 + 1) in
-  make_context 100000 >>=? fun context ->
-  fail_unless
-    (consume_gas_limit_in_block context remaining_gas |> succeed)
-    (err "Succeed when consuming exactly the remaining block gas.")
-  >>=? fun () ->
+  let* context = make_context 100000 in
+  let* () =
+    fail_unless
+      (consume_gas_limit_in_block context remaining_gas |> succeed)
+      (err "Succeed when consuming exactly the remaining block gas.")
+  in
   fail_unless
     (consume_gas_limit_in_block context too_much |> failed)
     (err "Fail when consuming more than the remaining block gas.")
@@ -125,7 +136,8 @@ let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
 (** Test invalid gas limit. Should fail when limit is above the hard gas limit per
     operation *)
 let test_detect_gas_limit_consumption_above_hard_gas_operation_limit () =
-  dummy_context () >>=? fun context ->
+  let open Lwt_result_syntax in
+  let* context = dummy_context () in
   fail_unless
     (consume_gas_limit_in_block
        context
@@ -138,6 +150,7 @@ let test_detect_gas_limit_consumption_above_hard_gas_operation_limit () =
 (** For a given [context], check if its levels match those given in [block_level] and
     [operation_level] *)
 let check_context_levels context block_level operation_level =
+  let open Lwt_result_syntax in
   let op_check =
     match gas_level context with
     | Unaccounted -> true
@@ -148,21 +161,23 @@ let check_context_levels context block_level operation_level =
     Gas_limit_repr.Arith.(
       unsafe_fp (Z.of_int block_level) = block_gas_level context)
   in
-  fail_unless
-    (op_check || block_check)
-    (err "Unexpected block and operation gas levels")
-  >>=? fun () ->
-  fail_unless op_check (err "Unexpected operation gas level") >>=? fun () ->
+  let* () =
+    fail_unless
+      (op_check || block_check)
+      (err "Unexpected block and operation gas levels")
+  in
+  let* () = fail_unless op_check (err "Unexpected operation gas level") in
   fail_unless block_check (err "Unexpected block gas level")
 
 let monitor remaining_block_gas initial_operation_level consumed_gas () =
+  let open Lwt_result_syntax in
   let op_limit =
     Gas_limit_repr.Arith.unsafe_fp (Z.of_int initial_operation_level)
   in
-  make_context remaining_block_gas >>=? fun context ->
-  consume_gas_limit_in_block_lwt context op_limit >>=? fun context ->
+  let* context = make_context remaining_block_gas in
+  let* context = consume_gas_limit_in_block_lwt context op_limit in
   set_gas_limit context op_limit |> fun context ->
-  consume_gas_lwt context consumed_gas >>=? fun context ->
+  let* context = consume_gas_lwt context consumed_gas in
   check_context_levels
     context
     (remaining_block_gas - initial_operation_level)
@@ -172,24 +187,26 @@ let test_monitor_gas_level = monitor 1000 100 10
 
 (** Test cas consumption mode switching (limited -> unlimited) *)
 let test_set_gas_unlimited () =
+  let open Lwt_result_syntax in
   let init_block_gas = 100000 in
   let op_limit_int = 10000 in
   let op_limit = Gas_limit_repr.Arith.unsafe_fp (Z.of_int op_limit_int) in
-  make_context init_block_gas >>=? fun context ->
+  let* context = make_context init_block_gas in
   set_gas_limit context op_limit |> set_gas_unlimited |> fun context ->
-  consume_gas_lwt context opg >>=? fun context ->
+  let* context = consume_gas_lwt context opg in
   check_context_levels context init_block_gas (-1)
 
 (** Test cas consumption mode switching (unlimited -> limited) *)
 let test_set_gas_limited () =
+  let open Lwt_result_syntax in
   let init_block_gas = 100000 in
   let op_limit_int = 10000 in
   let op_limit = Gas_limit_repr.Arith.unsafe_fp (Z.of_int op_limit_int) in
   let op_gas = 100 in
-  make_context init_block_gas >>=? fun context ->
+  let* context = make_context init_block_gas in
   set_gas_unlimited context |> fun context ->
   set_gas_limit context op_limit |> fun context ->
-  consume_gas_lwt context op_gas >>=? fun context ->
+  let* context = consume_gas_lwt context op_gas in
   check_context_levels context init_block_gas (op_limit_int - op_gas)
 
 (*** Tests with blocks ***)
@@ -214,29 +231,35 @@ let finalize_validation_and_application (validation_state, application_state)
   finalize_application application_state shell_header
 
 let apply_with_gas header ?(operations = []) (pred : Block.t) =
+  let open Lwt_result_wrap_syntax in
   let open Alpha_context in
-  (let open Environment.Error_monad in
-  begin_validation_and_application
-    pred.context
-    Chain_id.zero
-    (Application header)
-    ~predecessor:pred.header.shell
-  >>=? fun vstate ->
-  List.fold_left_es
-    (fun vstate op ->
-      validate_and_apply_operation vstate op >|=? fun (state, _result) -> state)
-    vstate
-    operations
-  >>=? fun vstate ->
-  finalize_validation_and_application vstate (Some header.shell)
-  >|=? fun (validation, result) -> (validation.context, result.consumed_gas))
-  >|= Environment.wrap_tzresult
-  >|=? fun (context, consumed_gas) ->
+  let+@ context, consumed_gas =
+    let* vstate =
+      begin_validation_and_application
+        pred.context
+        Chain_id.zero
+        (Application header)
+        ~predecessor:pred.header.shell
+    in
+    let* vstate =
+      List.fold_left_es
+        (fun vstate op ->
+          let+ state, _result = validate_and_apply_operation vstate op in
+          state)
+        vstate
+        operations
+    in
+    let+ validation, result =
+      finalize_validation_and_application vstate (Some header.shell)
+    in
+    (validation.context, result.consumed_gas)
+  in
   let hash = Block_header.hash header in
   ( {Block.hash; header; operations; context; constants = pred.constants},
     consumed_gas )
 
 let bake_with_gas ?policy ?timestamp ?operation ?operations pred =
+  let open Lwt_result_syntax in
   let operations =
     match (operation, operations) with
     | Some op, Some ops -> Some (op :: ops)
@@ -244,9 +267,8 @@ let bake_with_gas ?policy ?timestamp ?operation ?operations pred =
     | None, Some ops -> Some ops
     | None, None -> None
   in
-  Block.Forge.forge_header ?timestamp ?policy ?operations pred
-  >>=? fun header ->
-  Block.Forge.sign_header header >>=? fun header ->
+  let* header = Block.Forge.forge_header ?timestamp ?policy ?operations pred in
+  let* header = Block.Forge.sign_header header in
   apply_with_gas header ?operations pred
 
 let check_consumed_gas consumed expected =
@@ -270,11 +292,14 @@ let prepare_origination block source script =
   Op.contract_origination (B block) source ~script
 
 let originate_contract block source script =
-  prepare_origination block source script >>=? fun (operation, dst) ->
-  Block.bake ~operation block >>=? fun block -> return (block, dst)
+  let open Lwt_result_syntax in
+  let* operation, dst = prepare_origination block source script in
+  let* block = Block.bake ~operation block in
+  return (block, dst)
 
 let init_block n to_originate =
-  Context.init_n n ~consensus_threshold:0 () >>=? fun (block, src_list) ->
+  let open Lwt_result_syntax in
+  let* block, src_list = Context.init_n n ~consensus_threshold:0 () in
   match src_list with
   | [] -> assert false
   | src :: _ ->
@@ -282,10 +307,10 @@ let init_block n to_originate =
       let rec full_originate block originated = function
         | [] -> return (block, List.rev originated)
         | h :: t ->
-            originate_contract block src h >>=? fun (block, ct) ->
+            let* block, ct = originate_contract block src h in
             full_originate block (ct :: originated) t
       in
-      full_originate block [] to_originate >>=? fun (block, originated) ->
+      let* block, originated = full_originate block [] to_originate in
       return (block, src_list, originated)
 
 let nil_contract =
@@ -315,12 +340,15 @@ let loop_contract =
   \     }\n"
 
 let block_with_one_origination n contract =
-  init_block n [contract] >>=? fun (block, srcs, originated) ->
+  let open Lwt_result_syntax in
+  let* block, srcs, originated = init_block n [contract] in
   match originated with [dst] -> return (block, srcs, dst) | _ -> assert false
 
 let full_block n () =
-  init_block n [nil_contract; fail_contract; loop_contract]
-  >>=? fun (block, src_list, originated) ->
+  let open Lwt_result_syntax in
+  let* block, src_list, originated =
+    init_block n [nil_contract; fail_contract; loop_contract]
+  in
   let dst_nil, dst_fail, dst_loop =
     match originated with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
   in
@@ -329,42 +357,49 @@ let full_block n () =
 (** Combine a list of operations into an operation list. Also returns
     the sum of their gas limits.*)
 let combine_operations_with_gas block list_dst =
+  let open Lwt_result_syntax in
   let rec make_op_list src full_gas op_list = function
     | [] -> return (src, full_gas, List.rev op_list)
     | (src, dst, gas_limit) :: t ->
-        Op.transaction
-          ~gas_limit:(Custom_gas gas_limit)
-          (B block)
-          src
-          dst
-          Alpha_context.Tez.zero
-        >>=? fun op ->
+        let* op =
+          Op.transaction
+            ~gas_limit:(Custom_gas gas_limit)
+            (B block)
+            src
+            dst
+            Alpha_context.Tez.zero
+        in
         make_op_list
           (Some src)
           (Alpha_context.Gas.Arith.add full_gas gas_limit)
           (op :: op_list)
           t
   in
-  make_op_list None Alpha_context.Gas.Arith.zero [] list_dst
-  >>=? fun (src, full_gas, op_list) ->
+  let* src, full_gas, op_list =
+    make_op_list None Alpha_context.Gas.Arith.zero [] list_dst
+  in
   match src with
   | None -> assert false
   | Some source ->
-      Op.batch_operations ~recompute_counters:true ~source (B block) op_list
-      >>=? fun operation -> return (operation, full_gas)
+      let* operation =
+        Op.batch_operations ~recompute_counters:true ~source (B block) op_list
+      in
+      return (operation, full_gas)
 
 (** Applies [combine_operations_with_gas] to lists in a list, then bake a block
     with this list of operations. Also returns the sum of all gas limits *)
 let bake_operations_with_gas block list_list_dst =
+  let open Lwt_result_syntax in
   let rec make_list full_gas op_list = function
     | [] -> return (full_gas, List.rev op_list)
     | list_dst :: t ->
-        combine_operations_with_gas block list_dst >>=? fun (op, gas) ->
+        let* op, gas = combine_operations_with_gas block list_dst in
         make_list (Alpha_context.Gas.Arith.add full_gas gas) (op :: op_list) t
   in
-  make_list Alpha_context.Gas.Arith.zero [] list_list_dst
-  >>=? fun (gas_limit_total, operations) ->
-  bake_with_gas ~operations block >>=? fun (block, consumed_gas) ->
+  let* gas_limit_total, operations =
+    make_list Alpha_context.Gas.Arith.zero [] list_list_dst
+  in
+  let* block, consumed_gas = bake_with_gas ~operations block in
   return (block, consumed_gas, gas_limit_total)
 
 (* A sampler for gas limits, the returned value should always be high
@@ -376,9 +411,11 @@ let basic_gas_sampler () =
    + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
+  let open Lwt_result_syntax in
   let sources_number = List.length structure in
-  block_with_one_origination sources_number contract
-  >>=? fun (block, src_list, dst) ->
+  let* block, src_list, dst =
+    block_with_one_origination sources_number contract
+  in
   let lld =
     List.mapi
       (fun i t ->
@@ -387,8 +424,9 @@ let generic_test_block_one_origination contract gas_sampler structure =
         | Some src -> (List.map (fun _ -> (src, dst, gas_sampler ()))) t)
       structure
   in
-  bake_operations_with_gas block lld
-  >>=? fun (_block, consumed_gas, gas_limit_total) ->
+  let* _block, consumed_gas, gas_limit_total =
+    bake_operations_with_gas block lld
+  in
   check_consumed_gas consumed_gas gas_limit_total
 
 let make_batch_test_block_one_origination name contract gas_sampler =
@@ -408,9 +446,11 @@ let make_batch_test_block_one_origination name contract gas_sampler =
 
 (** Tests the consumption of all gas in a block, should pass *)
 let test_consume_exactly_all_block_gas () =
+  let open Lwt_result_syntax in
   let number_of_ops = 2 in
-  block_with_one_origination number_of_ops nil_contract
-  >>=? fun (block, src_list, dst) ->
+  let* block, src_list, dst =
+    block_with_one_origination number_of_ops nil_contract
+  in
   (* assumptions:
      hard gas limit per operation = 1_040_000
      hard gas limit per block = 2_600_000
@@ -421,14 +461,17 @@ let test_consume_exactly_all_block_gas () =
         [(src, dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
       src_list
   in
-  bake_operations_with_gas block lld >>=? fun (_, _, _) -> return_unit
+  let* _, _, _ = bake_operations_with_gas block lld in
+  return_unit
 
 (** Tests the consumption of more than the block gas level with many single
     operations, should fail *)
 let test_malformed_block_max_limit_reached () =
+  let open Lwt_result_syntax in
   let number_of_ops = 6 in
-  block_with_one_origination number_of_ops nil_contract
-  >>=? fun (block, src_list, dst) ->
+  let* block, src_list, dst =
+    block_with_one_origination number_of_ops nil_contract
+  in
   (* assumptions:
      hard gas limit per operation = 1040000
      hard gas limit per block = 5200000
@@ -444,10 +487,11 @@ let test_malformed_block_max_limit_reached () =
         ])
       src_list
   in
-  bake_operations_with_gas block lld >>= function
+  let*! result = bake_operations_with_gas block lld in
+  match result with
   | Error _ -> return_unit
   | Ok _ ->
-      fail
+      tzfail
         (err
            "Invalid block: sum of operation gas limits exceeds hard gas limit \
             per block")
@@ -455,9 +499,11 @@ let test_malformed_block_max_limit_reached () =
 (** Tests the consumption of more than the block gas level with one big
     operation list, should fail *)
 let test_malformed_block_max_limit_reached' () =
+  let open Lwt_result_syntax in
   let number_of_ops = 6 in
-  block_with_one_origination number_of_ops nil_contract
-  >>=? fun (block, src_list, dst) ->
+  let* block, src_list, dst =
+    block_with_one_origination number_of_ops nil_contract
+  in
   (* assumptions:
      hard gas limit per operation = 1040000
      hard gas limit per block = 5200000
@@ -473,45 +519,52 @@ let test_malformed_block_max_limit_reached' () =
         ])
       src_list
   in
-  bake_operations_with_gas block lld >>= function
+  let*! result = bake_operations_with_gas block lld in
+  match result with
   | Error _ -> return_unit
   | Ok _ ->
-      fail
+      tzfail
         (err
            "Invalid block: sum of gas limits in operation list exceeds hard \
             gas limit per block")
 
 let test_block_mixed_operations () =
+  let open Lwt_result_syntax in
   let number_of_ops = 4 in
-  full_block number_of_ops ()
-  >>=? fun (block, src_list, dst_nil, dst_fail, dst_loop) ->
+  let* block, src_list, dst_nil, dst_fail, dst_loop =
+    full_block number_of_ops ()
+  in
   let l = [[dst_nil]; [dst_nil; dst_fail; dst_nil]; [dst_loop]; [dst_nil]] in
-  List.map2
-    ~when_different_lengths:[]
-    (fun src l -> (List.map (fun x -> (src, x, basic_gas_sampler ()))) l)
-    src_list
-    l
-  >>?= fun lld ->
-  bake_operations_with_gas block lld
-  >>=? fun (_block, consumed_gas, gas_limit_total) ->
+  let*? lld =
+    List.map2
+      ~when_different_lengths:[]
+      (fun src l -> (List.map (fun x -> (src, x, basic_gas_sampler ()))) l)
+      src_list
+      l
+  in
+  let* _block, consumed_gas, gas_limit_total =
+    bake_operations_with_gas block lld
+  in
   check_consumed_gas consumed_gas gas_limit_total
 
 (** Test that emptying an account does not cost extra-gas *)
 let test_emptying_account_gas () =
+  let open Lwt_result_syntax in
   let open Alpha_context in
-  Context.init1 ~consensus_threshold:0 () >>=? fun (b, bootstrap) ->
+  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let {Account.pkh; pk; _} = Account.new_account () in
   let contract = Contract.Implicit pkh in
   let amount = Test_tez.of_int 10 in
-  Op.transaction (B b) bootstrap contract amount >>=? fun op1 ->
-  Block.bake ~operation:op1 b >>=? fun b ->
-  Op.revelation ~fee:Tez.zero (B b) pk >>=? fun op2 ->
-  Block.bake ~operation:op2 b >>=? fun b ->
+  let* op1 = Op.transaction (B b) bootstrap contract amount in
+  let* b = Block.bake ~operation:op1 b in
+  let* op2 = Op.revelation ~fee:Tez.zero (B b) pk in
+  let* b = Block.bake ~operation:op2 b in
   let gas_limit = Op.Low in
-  Op.delegation ~fee:amount ~gas_limit (B b) contract (Some bootstrap_pkh)
-  >>=? fun op ->
-  Incremental.begin_construction b >>=? fun i ->
+  let* op =
+    Op.delegation ~fee:amount ~gas_limit (B b) contract (Some bootstrap_pkh)
+  in
+  let* i = Incremental.begin_construction b in
   (* The delegation operation should be valid as the operation effect
      would be to remove [contract] and should not generate any extra
      gas cost. *)
@@ -523,8 +576,10 @@ let test_emptying_account_gas () =
         return_unit
     | err -> failwith "got unexpected error: %a" pp_print_trace err
   in
-  Incremental.add_operation ~expect_apply_failure i op
-  >>=? fun (_i : Incremental.t) -> return_unit
+  let* (_i : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure i op
+  in
+  return_unit
 
 let quick (what, how) = Tztest.tztest what `Quick how
 

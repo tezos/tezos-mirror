@@ -3,13 +3,21 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.2"
+    "version": "18.1"
   },
   "paths": {
     "/": {
       "get": {
         "description": "All the information about a block. The associated metadata may not be present depending on the history mode and block's distance from the head.",
         "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "force_metadata",
             "in": "query",
@@ -35,42 +43,87 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "protocol": {
-                      "type": "string",
-                      "enum": [
-                        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                  "oneOf": [
+                    {
+                      "title": "block_info_encoding",
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "enum": [
+                            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                          ]
+                        },
+                        "chain_id": {
+                          "$ref": "#/components/schemas/Chain_id"
+                        },
+                        "hash": {
+                          "$ref": "#/components/schemas/block_hash"
+                        },
+                        "header": {
+                          "$ref": "#/components/schemas/raw_block_header"
+                        },
+                        "metadata": {
+                          "$ref": "#/components/schemas/block_header_metadata"
+                        },
+                        "operations": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/operation"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "protocol",
+                        "chain_id",
+                        "hash",
+                        "header",
+                        "operations"
                       ]
                     },
-                    "chain_id": {
-                      "$ref": "#/components/schemas/Chain_id"
-                    },
-                    "hash": {
-                      "$ref": "#/components/schemas/block_hash"
-                    },
-                    "header": {
-                      "$ref": "#/components/schemas/raw_block_header"
-                    },
-                    "metadata": {
-                      "$ref": "#/components/schemas/block_header_metadata"
-                    },
-                    "operations": {
-                      "type": "array",
-                      "items": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/operation"
+                    {
+                      "title": "block_info_encoding_with_legacy_attestation_name",
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "enum": [
+                            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                          ]
+                        },
+                        "chain_id": {
+                          "$ref": "#/components/schemas/Chain_id"
+                        },
+                        "hash": {
+                          "$ref": "#/components/schemas/block_hash"
+                        },
+                        "header": {
+                          "$ref": "#/components/schemas/raw_block_header"
+                        },
+                        "metadata": {
+                          "$ref": "#/components/schemas/block_header_metadata"
+                        },
+                        "operations": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
+                            }
+                          }
                         }
-                      }
+                      },
+                      "required": [
+                        "protocol",
+                        "chain_id",
+                        "hash",
+                        "header",
+                        "operations"
+                      ]
                     }
-                  },
-                  "required": [
-                    "protocol",
-                    "chain_id",
-                    "hash",
-                    "header",
-                    "operations"
                   ]
                 }
               }
@@ -7780,7 +7833,24 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/next_operation"
+                        "oneOf": [
+                          {
+                            "title": "operation_data_encoding",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/next_operation"
+                              }
+                            ]
+                          },
+                          {
+                            "title": "operation_data_encoding_with_legacy_attestation_name",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/next_operation_with_legacy_attestation_name"
+                              }
+                            ]
+                          }
+                        ]
                       }
                     }
                   }
@@ -7980,13 +8050,40 @@
     "/helpers/preapply/operations": {
       "post": {
         "description": "Simulate the application of the operations with the context of the given block and return the result of each operation application.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/next_operation"
+                  "oneOf": [
+                    {
+                      "title": "operation_data_encoding",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/next_operation"
+                        }
+                      ]
+                    },
+                    {
+                      "title": "operation_data_encoding_with_legacy_attestation_name",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/next_operation_with_legacy_attestation_name"
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -7998,10 +8095,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/017-PtNairob.operation.alpha.operation_with_metadata"
-                  }
+                  "oneOf": [
+                    {
+                      "title": "preapplied_operations_encoding",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/017-PtNairob.operation.alpha.operation_with_metadata"
+                      }
+                    },
+                    {
+                      "title": "preapplied_operations_encoding_with_legacy_attestation_name",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/017-PtNairob.operation.alpha.operation_with_metadata"
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -10025,6 +10134,14 @@
         "description": "All the operations included in the block.",
         "parameters": [
           {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "force_metadata",
             "in": "query",
             "description": "DEPRECATED: Forces to recompute the operations metadata if it was considered as too large.",
@@ -10049,13 +10166,28 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/operation"
+                  "oneOf": [
+                    {
+                      "title": "operations_encoding",
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/operation"
+                        }
+                      }
+                    },
+                    {
+                      "title": "operations_encoding_with_legacy_attestation_name",
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
               }
             }
@@ -10087,6 +10219,14 @@
             }
           },
           {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "force_metadata",
             "in": "query",
             "description": "DEPRECATED: Forces to recompute the operations metadata if it was considered as too large.",
@@ -10111,10 +10251,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/operation"
-                  }
+                  "oneOf": [
+                    {
+                      "title": "operations_in_pass_encoding",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/operation"
+                      }
+                    },
+                    {
+                      "title": "operations_in_pass_encoding_with_legacy_attestation_name",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -10155,6 +10307,14 @@
             }
           },
           {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "force_metadata",
             "in": "query",
             "description": "DEPRECATED: Forces to recompute the operations metadata if it was considered as too large.",
@@ -10181,95 +10341,20 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "description": "An operation's shell header.",
-                      "type": "object",
-                      "properties": {
-                        "protocol": {
-                          "type": "string",
-                          "enum": [
-                            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-                          ]
-                        },
-                        "chain_id": {
-                          "$ref": "#/components/schemas/Chain_id"
-                        },
-                        "hash": {
-                          "$ref": "#/components/schemas/Operation_hash"
-                        },
-                        "branch": {
-                          "$ref": "#/components/schemas/block_hash"
-                        },
-                        "metadata": {
-                          "type": "string",
-                          "enum": [
-                            "too large"
-                          ]
+                      "title": "operation_encoding",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/operation"
                         }
-                      },
-                      "required": [
-                        "protocol",
-                        "chain_id",
-                        "hash",
-                        "branch",
-                        "metadata"
-                      ],
-                      "additionalProperties": {}
+                      ]
                     },
                     {
-                      "description": "An operation's shell header.",
-                      "type": "object",
-                      "properties": {
-                        "protocol": {
-                          "type": "string",
-                          "enum": [
-                            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-                          ]
-                        },
-                        "chain_id": {
-                          "$ref": "#/components/schemas/Chain_id"
-                        },
-                        "hash": {
-                          "$ref": "#/components/schemas/Operation_hash"
-                        },
-                        "branch": {
-                          "$ref": "#/components/schemas/block_hash"
+                      "title": "operation_encoding_with_legacy_attestation_name",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/operation_with_legacy_attestation_name"
                         }
-                      },
-                      "required": [
-                        "protocol",
-                        "chain_id",
-                        "hash",
-                        "branch"
-                      ],
-                      "additionalProperties": {}
-                    },
-                    {
-                      "description": "An operation's shell header.",
-                      "type": "object",
-                      "properties": {
-                        "protocol": {
-                          "type": "string",
-                          "enum": [
-                            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-                          ]
-                        },
-                        "chain_id": {
-                          "$ref": "#/components/schemas/Chain_id"
-                        },
-                        "hash": {
-                          "$ref": "#/components/schemas/Operation_hash"
-                        },
-                        "branch": {
-                          "$ref": "#/components/schemas/block_hash"
-                        }
-                      },
-                      "required": [
-                        "protocol",
-                        "chain_id",
-                        "hash",
-                        "branch"
-                      ],
-                      "additionalProperties": {}
+                      ]
                     }
                   ]
                 }
@@ -21979,7 +22064,131 @@
           "contents"
         ]
       },
+      "next_operation_with_legacy_attestation_name": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+            ]
+          },
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+            }
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature.V1"
+          }
+        },
+        "required": [
+          "protocol",
+          "branch",
+          "contents"
+        ]
+      },
       "operation": {
+        "oneOf": [
+          {
+            "description": "An operation's shell header.",
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                ]
+              },
+              "chain_id": {
+                "$ref": "#/components/schemas/Chain_id"
+              },
+              "hash": {
+                "$ref": "#/components/schemas/Operation_hash"
+              },
+              "branch": {
+                "$ref": "#/components/schemas/block_hash"
+              },
+              "metadata": {
+                "type": "string",
+                "enum": [
+                  "too large"
+                ]
+              }
+            },
+            "required": [
+              "protocol",
+              "chain_id",
+              "hash",
+              "branch",
+              "metadata"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "description": "An operation's shell header.",
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                ]
+              },
+              "chain_id": {
+                "$ref": "#/components/schemas/Chain_id"
+              },
+              "hash": {
+                "$ref": "#/components/schemas/Operation_hash"
+              },
+              "branch": {
+                "$ref": "#/components/schemas/block_hash"
+              }
+            },
+            "required": [
+              "protocol",
+              "chain_id",
+              "hash",
+              "branch"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "description": "An operation's shell header.",
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                ]
+              },
+              "chain_id": {
+                "$ref": "#/components/schemas/Chain_id"
+              },
+              "hash": {
+                "$ref": "#/components/schemas/Operation_hash"
+              },
+              "branch": {
+                "$ref": "#/components/schemas/block_hash"
+              }
+            },
+            "required": [
+              "protocol",
+              "chain_id",
+              "hash",
+              "branch"
+            ],
+            "additionalProperties": {}
+          }
+        ]
+      },
+      "operation_with_legacy_attestation_name": {
         "oneOf": [
           {
             "description": "An operation's shell header.",

@@ -40,12 +40,10 @@ let () =
     (function Failed_to_hash_node -> Some () | _ -> None)
     (fun () -> Failed_to_hash_node)
 
-let hash_bytes_cost bytes =
-  let module S = Saturation_repr in
-  let ( + ) = S.add in
-  let v0 = S.safe_int @@ Bytes.length bytes in
-  let ( lsr ) = S.shift_right in
-  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
+(* No model is given. The original definition was a copy of
+   Global_constants_costs.expr_to_address_in_context_cost.
+*)
+let hash_bytes_cost = Global_constants_costs.expr_to_address_in_context_cost
 
 let hash_of_node ctxt node =
   let open Result_syntax in

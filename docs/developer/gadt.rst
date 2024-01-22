@@ -144,6 +144,6 @@ in :src:`src/proto_alpha/lib_protocol/script_ir_translator.ml` in function
 the same type or ``None`` if that's not the case.
 
 
-.. _Algebraic Data Types: https://ocaml.org/docs/data-types
+.. _Algebraic Data Types: https://ocaml.org/docs/basic-data-types
 .. _Generalized Algebraic Data Types: https://ocaml.org/manual/gadts.html
 .. _A simple expression evaluator: https://blog.mads-hartmann.com/ocaml/2015/01/05/gadt-ocaml.html

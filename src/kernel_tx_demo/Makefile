@@ -11,10 +11,18 @@ endif
 .PHONY: all
 all: build test check
 
-.PHONY: build
-build:
+.PHONY: tx_kernel
+tx_kernel:
+	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel --features dal
+	@mv target/wasm32-unknown-unknown/release/tx_kernel.wasm target/wasm32-unknown-unknown/release/tx_kernel_dal.wasm
 	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel
+
+.PHONY: tx-demo-collector
+tx-demo-collector:
 	@cargo build $(NATIVE_OPT) --release -p tx-demo-collector
+
+.PHONY: build
+build: tx_kernel tx-demo-collector
 
 .PHONY: build-deps
 build-deps:
@@ -30,7 +38,6 @@ test:
 
 .PHONY: check
 check:
-	@cargo fmt --check
 	@cargo clippy --features testing --all-targets -- --deny warnings
 
 .PHONY: clean

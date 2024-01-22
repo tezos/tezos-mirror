@@ -44,8 +44,10 @@ let storage addr ?key () =
     (eth_account addr)
     (match key with None -> "" | Some key -> "/" ^ key)
 
-let dictator = evm "/dictator_key"
+let admin = evm "/admin"
 
 let ticketer = evm "/ticketer"
+
+let sequencer = evm "/sequencer"
 
 let kernel_boot_wasm = kernel "/boot.wasm"

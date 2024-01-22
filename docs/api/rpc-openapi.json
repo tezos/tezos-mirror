@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.2"
+    "version": "18.1"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1050,16 +1050,12 @@
                             "notice"
                           ]
                         },
+                        "colors": {
+                          "description": "Enables light coloring in logs.",
+                          "type": "boolean"
+                        },
                         "rules": {
                           "description": "Fine-grained logging instructions. Same format as described in `octez-node run --help`, DEBUG section. In the example below, sections 'p2p' and all sections starting by 'client' will have their messages logged up to the debug level, whereas the rest of log sections will be logged up to the notice level.",
-                          "oneOf": [
-                            {
-                              "$ref": "#/components/schemas/unistring"
-                            }
-                          ]
-                        },
-                        "template": {
-                          "description": "Format for the log file, see https://github.com/ocsigen/lwt_log/blob/1.1.1/src/core/lwt_log_core.mli#L229.",
                           "oneOf": [
                             {
                               "$ref": "#/components/schemas/unistring"
@@ -1283,6 +1279,63 @@
                               "items": {
                                 "$ref": "#/components/schemas/unistring"
                               }
+                            },
+                            "dal_config": {
+                              "description": "USE FOR TESTING PURPOSE ONLY. Configuration for the data-availibility layer",
+                              "type": "object",
+                              "properties": {
+                                "activated": {
+                                  "type": "boolean"
+                                },
+                                "use_mock_srs_for_testing": {
+                                  "nullable": true,
+                                  "oneOf": [
+                                    {
+                                      "title": "Some",
+                                      "type": "object",
+                                      "properties": {
+                                        "redundancy_factor": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        },
+                                        "page_size": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 65535
+                                        },
+                                        "slot_size": {
+                                          "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823
+                                        },
+                                        "number_of_shards": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 65535
+                                        }
+                                      },
+                                      "required": [
+                                        "redundancy_factor",
+                                        "page_size",
+                                        "slot_size",
+                                        "number_of_shards"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "bootstrap_peers": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/unistring"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "activated",
+                                "use_mock_srs_for_testing",
+                                "bootstrap_peers"
+                              ]
                             }
                           },
                           "required": [
@@ -1299,56 +1352,6 @@
                       "items": {
                         "$ref": "#/components/schemas/unistring"
                       }
-                    },
-                    "dal": {
-                      "description": "USE FOR TESTING PURPOSE ONLY. Configuration for the data-availibility layer",
-                      "type": "object",
-                      "properties": {
-                        "activated": {
-                          "type": "boolean"
-                        },
-                        "use_mock_srs_for_testing": {
-                          "nullable": true,
-                          "oneOf": [
-                            {
-                              "title": "Some",
-                              "type": "object",
-                              "properties": {
-                                "slot_size": {
-                                  "type": "integer",
-                                  "minimum": -1073741824,
-                                  "maximum": 1073741823
-                                },
-                                "page_size": {
-                                  "type": "integer",
-                                  "minimum": -1073741824,
-                                  "maximum": 1073741823
-                                },
-                                "redundancy_factor": {
-                                  "type": "integer",
-                                  "minimum": -1073741824,
-                                  "maximum": 1073741823
-                                },
-                                "number_of_shards": {
-                                  "type": "integer",
-                                  "minimum": -1073741824,
-                                  "maximum": 1073741823
-                                }
-                              },
-                              "required": [
-                                "slot_size",
-                                "page_size",
-                                "redundancy_factor",
-                                "number_of_shards"
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "activated",
-                        "use_mock_srs_for_testing"
-                      ]
                     }
                   }
                 }
@@ -1452,6 +1455,86 @@
                 "schema": {
                   "type": "object",
                   "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/network/dal": {
+      "get": {
+        "description": "Configuration for the DAL",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activated": {
+                      "type": "boolean"
+                    },
+                    "use_mock_srs_for_testing": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "title": "Some",
+                          "type": "object",
+                          "properties": {
+                            "redundancy_factor": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "page_size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "slot_size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "number_of_shards": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            }
+                          },
+                          "required": [
+                            "redundancy_factor",
+                            "page_size",
+                            "slot_size",
+                            "number_of_shards"
+                          ]
+                        }
+                      ]
+                    },
+                    "bootstrap_peers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    }
+                  },
+                  "required": [
+                    "activated",
+                    "use_mock_srs_for_testing",
+                    "bootstrap_peers"
+                  ]
                 }
               }
             }

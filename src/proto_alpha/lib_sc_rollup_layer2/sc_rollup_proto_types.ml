@@ -439,10 +439,12 @@ module Kind = struct
   let of_octez : Octez_smart_rollup.Kind.t -> t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> Riscv
 
   let to_octez : t -> Octez_smart_rollup.Kind.t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> Riscv
 end
 
 module Constants = struct
@@ -450,20 +452,24 @@ module Constants = struct
     Constants.Parametric.sc_rollup_reveal_activation_level
 
   let reveal_activation_level_of_octez
-      Octez_smart_rollup.Rollup_constants.{blake2B; metadata; dal_page} :
-      reveal_activation_level =
+      Octez_smart_rollup.Rollup_constants.
+        {blake2B; metadata; dal_page; dal_parameters} : reveal_activation_level
+      =
     {
       raw_data = {blake2B = Raw_level.of_int32_exn blake2B};
       metadata = Raw_level.of_int32_exn metadata;
       dal_page = Raw_level.of_int32_exn dal_page;
+      dal_parameters = Raw_level.of_int32_exn dal_parameters;
     }
 
   let reveal_activation_level_to_octez
-      Constants.Parametric.{raw_data = {blake2B}; metadata; dal_page} :
+      Constants.Parametric.
+        {raw_data = {blake2B}; metadata; dal_page; dal_parameters} :
       Octez_smart_rollup.Rollup_constants.reveal_activation_level =
     {
       blake2B = Raw_level.to_int32 blake2B;
       metadata = Raw_level.to_int32 metadata;
       dal_page = Raw_level.to_int32 dal_page;
+      dal_parameters = Raw_level.to_int32 dal_parameters;
     }
 end

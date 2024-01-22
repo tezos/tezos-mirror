@@ -53,7 +53,7 @@
 *)
 let get_operations client =
   let* operations =
-    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+    Client.RPC.call client @@ RPC.get_chain_block_operations ()
   in
   return JSON.(operations |> geti 3 |> geti 0 |> get "contents")
 
@@ -82,7 +82,7 @@ let current_head = ["chains"; "main"; "blocks"; "head"]
 
 let get_counter client =
   let* counter_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:Constant.bootstrap1.public_key_hash
          ()
@@ -98,7 +98,7 @@ let get_size client =
 
 let get_storage ~contract_id client =
   let* storage_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
   in
   return
@@ -251,7 +251,9 @@ let liquidity_baking_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 (** [get_cached_contracts client] retrieves the cached scripts, except
     the liquidity baking CPMM script. *)
 let get_cached_contracts client =
-  let* contracts = RPC.Script_cache.get_cached_contracts client in
+  let* contracts =
+    Client.RPC.call client @@ RPC.get_chain_block_context_cache_contracts_all ()
+  in
   let all =
     JSON.(
       as_list contracts
@@ -551,7 +553,7 @@ let check_reloading_efficiency ~protocol body =
   let start = Unix.gettimeofday () in
   let* () = Node.run nodeA [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready nodeA in
-  let* _ = RPC.Client.call clientA @@ RPC.get_chain_is_bootstrapped () in
+  let* _ = Client.RPC.call clientA @@ RPC.get_chain_is_bootstrapped () in
   let* _ = Client.bake_for_and_wait clientA in
   let stop = Unix.gettimeofday () in
   let* cached_contracts' = get_cached_contracts clientA in
@@ -629,10 +631,10 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
          | Some b -> Printf.sprintf {|, "blocks_before_activation" : %d |} b)
   in
 
-  let* block = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+  let* block = Client.RPC.call client @@ RPC.get_chain_block_hash () in
   let data : RPC_core.data = Data (data block counter) in
   let* result =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.post_chain_block_helpers_scripts_simulate_operation ~data ()
   in
   return (read_consumed_gas JSON.(get "contents" result |> geti 0))
@@ -644,7 +646,7 @@ let check_simulation_takes_cache_into_account ~protocol =
     ~protocol
   @@ fun () ->
   let* _, client = init1 ~protocol in
-  let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+  let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
   let* contract_id = originate_very_small_contract client in
   let* () = Client.bake_for_and_wait client in
 
@@ -703,7 +705,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
   in
   setup_migration_time ~migration_level:8 @@ fun node client ->
   let* contract_id = originate_very_small_contract client in
-  let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+  let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
   let simulate ~blocks_before_activation counter =
     let arg = {|{ "prim" : "Unit" }|} in
     gas_from_simulation
@@ -824,7 +826,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
   let* final_period =
     let get_period () =
       let* json =
-        RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+        Client.RPC.call client @@ RPC.get_chain_block_votes_current_period ()
       in
       return @@ JSON.(json |-> "voting_period" |-> "kind" |> as_string)
     in
@@ -856,7 +858,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       ~error_msg:"We never reached the adoption period") ;
 
   let* json =
-    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+    Client.RPC.call client @@ RPC.get_chain_block_votes_current_period ()
   in
   let level = JSON.(json |-> "remaining" |> as_int) in
   Log.info "Remaining %d blocks before the end of %s" level final_period ;
@@ -880,7 +882,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
 
   let simulate counter =
     let arg = {|{ "prim" : "Unit" }|} in
-    let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+    let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
     gas_from_simulation client chain_id contract_id counter arg
   in
   let* predicted_gas_in_simulation = simulate 4 in
@@ -896,7 +898,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       ~error_msg:"Expecting %R, got %L") ;
 
   let* _json =
-    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+    Client.RPC.call client @@ RPC.get_chain_block_votes_current_period ()
   in
   let* () = Client.bake_for_and_wait client in
   let* predicted_gas_in_simulation = simulate 4 in

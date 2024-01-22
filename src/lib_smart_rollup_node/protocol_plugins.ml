@@ -70,6 +70,14 @@ let proto_plugin_for_level node_ctxt level =
   let*? plugin = proto_plugin_for_protocol protocol in
   return plugin
 
+let proto_plugin_for_level_with_store node_store level =
+  let open Lwt_result_syntax in
+  let* {protocol; _} =
+    Node_context.protocol_of_level_with_store node_store level
+  in
+  let*? plugin = proto_plugin_for_protocol protocol in
+  return plugin
+
 let proto_plugin_for_block node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* level = Node_context.level_of_hash node_ctxt block_hash in
@@ -83,3 +91,40 @@ let last_proto_plugin node_ctxt =
   | Some protocol ->
       let*? plugin = proto_plugin_for_protocol protocol in
       return plugin
+
+module Constants_cache =
+  Aches_lwt.Lache.Make_result
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Protocol_hash))
+
+let constants_cache =
+  let cache_size = 3 in
+  Constants_cache.create cache_size
+
+let get_constants_of_protocol (node_ctxt : _ Node_context.t) protocol_hash =
+  let open Lwt_result_syntax in
+  if Protocol_hash.(protocol_hash = node_ctxt.current_protocol.hash) then
+    return node_ctxt.current_protocol.constants
+  else
+    let retrieve protocol_hash =
+      let*? plugin = proto_plugin_for_protocol protocol_hash in
+      let module Plugin = (val plugin) in
+      let* (First_known l | Activation_level l) =
+        Node_context.protocol_activation_level node_ctxt protocol_hash
+      in
+      Plugin.Layer1_helpers.retrieve_constants ~block:(`Level l) node_ctxt.cctxt
+    in
+    Constants_cache.bind_or_put
+      constants_cache
+      protocol_hash
+      retrieve
+      Lwt.return
+
+let get_constants_of_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let* {protocol; _} = Node_context.protocol_of_level node_ctxt level in
+  get_constants_of_protocol node_ctxt protocol
+
+let get_constants_of_block_hash node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let* level = Node_context.level_of_hash node_ctxt block_hash in
+  get_constants_of_level node_ctxt level

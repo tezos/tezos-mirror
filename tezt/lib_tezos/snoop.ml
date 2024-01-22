@@ -57,7 +57,8 @@ type michelson_term_kind = Data | Code
 
 type list_mode = All | Any | Exactly
 
-let create ?(path = Constant.tezos_snoop) ?(color = Log.Color.FG.blue) () =
+let create ?(path = Uses.path Constant.octez_snoop) ?(color = Log.Color.FG.blue)
+    () =
   {path; name = "snoop"; color}
 
 let spawn_command snoop command =
@@ -123,8 +124,8 @@ let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
 
 (* Infer command *)
 
-let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
-    ~solution ?report ?graph () =
+let infer_command ~workload_data ~regression_method ~dump_csv ~solution ?report
+    ?graph () =
   let regression_method =
     match regression_method with
     | Lasso {positive} ->
@@ -143,27 +144,16 @@ let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
     | None -> []
     | Some graph_file -> ["--dot-file"; graph_file]
   in
-  [
-    "infer";
-    "parameters";
-    "for";
-    "model";
-    local_model_name;
-    "on";
-    "data";
-    workload_data;
-    "using";
-  ]
+  ["infer"; "parameters"; "on"; "data"; workload_data; "using"]
   @ regression_method
   @ ["--dump-csv"; dump_csv; "--save-solution"; solution]
   @ report @ graph
 
-let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
-    ~dump_csv ~solution ?report ?graph snoop =
+let spawn_infer_parameters ~workload_data ~regression_method ~dump_csv ~solution
+    ?report ?graph snoop =
   spawn_command
     snoop
     (infer_command
-       ~local_model_name
        ~workload_data
        ~regression_method
        ~dump_csv
@@ -172,10 +162,9 @@ let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
        ?graph
        ())
 
-let infer_parameters ~local_model_name ~workload_data ~regression_method
-    ~dump_csv ~solution ?report ?graph snoop =
+let infer_parameters ~workload_data ~regression_method ~dump_csv ~solution
+    ?report ?graph snoop =
   spawn_infer_parameters
-    ~local_model_name
     ~workload_data
     ~regression_method
     ~dump_csv
@@ -404,20 +393,13 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
   in
   spawn_command snoop command |> Process.check
 
-let generate_code_using_solution ~solution ?save_to ?fixed_point snoop =
+let generate_code_for_solutions ~solution ?save_to ?split_to ?fixed_point snoop
+    =
   let command =
-    [
-      "generate";
-      "code";
-      "using";
-      "solution";
-      solution;
-      "for";
-      "inferred";
-      "models";
-    ]
+    ["generate"; "code"; "for"; "solutions"; solution]
     @ (match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn])
-    @ match save_to with None -> [] | Some file -> ["--save-to"; file]
+    @ (match save_to with None -> [] | Some file -> ["--save-to"; file])
+    @ match split_to with None -> [] | Some dir -> ["--split-to"; dir]
   in
 
   let process = spawn_command snoop command in

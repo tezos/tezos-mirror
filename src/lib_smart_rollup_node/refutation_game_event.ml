@@ -26,41 +26,19 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2880
    Add corresponding .mli file. *)
 
-let section = ["sc_rollup_node"; "refutation_game"]
+let section = ["smart_rollup_node"; "refutation_game"]
 
 module Simple = struct
   include Internal_event.Simple
 
-  let timeout =
-    declare_1
-      ~section
-      ~name:"sc_rollup_node_timeout"
-      ~msg:
-        "The rollup node has been slashed because of a timeout issued by \
-         {address}"
-      ~level:Notice
-      ("address", Signature.Public_key_hash.encoding)
-
-  let invalid_move =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_invalid_move"
-      ~msg:
-        "The rollup node is about to make an invalid move in the refutation \
-         game! It is stopped to avoid being slashed. The problem should be \
-         reported immediately or the rollup node should be upgraded to have a \
-         chance to be back before the timeout is reached."
-      ~level:Notice
-      ()
-
   let conflict_detected =
     declare_5
       ~section
-      ~name:"sc_rollup_node_conflict_detected"
+      ~name:"smart_rollup_node_conflict_detected"
       ~msg:
         "A conflict has been found with our commitment {our_commitment_hash} \
          at level {level} with staker {other} that hash issued commitment \
-         {their_commitment_hash} both based on {parent_commitment_hash}."
+         {their_commitment_hash} both based on {parent_commitment_hash}"
       ~level:Notice
       ("our_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
@@ -71,11 +49,11 @@ module Simple = struct
   let potential_conflict_detected =
     declare_4
       ~section
-      ~name:"sc_rollup_node_potential_conflict_detected"
+      ~name:"smart_rollup_node_potential_conflict_detected"
       ~msg:
         "A potential conflict has been found with our commitment \
          {our_commitment_hash} at level {level} with staker {other} that hash \
-         issued commitment {their_commitment_hash}."
+         issued commitment {their_commitment_hash}"
       ~level:Notice
       ("our_commitment_hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
@@ -85,19 +63,18 @@ module Simple = struct
   let timeout_detected =
     declare_1
       ~section
-      ~name:"sc_rollup_node_timeout_detected"
-      ~msg:
-        "The rollup node has detected that opponent {other} can be timed out."
+      ~name:"smart_rollup_node_timeout_detected"
+      ~msg:"The rollup node has detected that opponent {other} can be timed out"
       ~level:Notice
       ("other", Signature.Public_key_hash.encoding)
 
   let computed_dissection =
     declare_4
       ~section
-      ~name:"sc_rollup_node_computed_dissection"
+      ~name:"smart_rollup_node_computed_dissection"
       ~msg:
         "Computed dissection against {opponent} between ticks {start_tick} and \
-         {end_tick}: {dissection}."
+         {end_tick}: {dissection}"
       ~level:Debug
       ("opponent", Signature.Public_key_hash.encoding)
       ("start_tick", Data_encoding.z)
@@ -116,7 +93,7 @@ module Simple = struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"Request {view} failed ({worker_status}): {errors}"
         ~level:Notice
         ("view", Request.encoding)
         ~pp1:Request.pp
@@ -150,7 +127,7 @@ module Simple = struct
         ~section
         ~name:"player_started"
         ~msg:
-          "refutation player started to play against {opponent}, defenfing \
+          "Refutation player started to play against {opponent}, defenfing \
            commitment {commitment}"
         ~level:Notice
         ("opponent", Signature.Public_key_hash.encoding)
@@ -162,7 +139,7 @@ module Simple = struct
       declare_1
         ~section
         ~name:"player_stopped"
-        ~msg:"refutation player for opponent {opponent} has been stopped"
+        ~msg:"Refutation player for opponent {opponent} has been stopped"
         ~level:Notice
         ("opponent", Signature.Public_key_hash.encoding)
         ~pp1:Signature.Public_key_hash.pp
@@ -185,10 +162,6 @@ module Simple = struct
         ()
   end
 end
-
-let timeout address = Simple.(emit timeout address)
-
-let invalid_move () = Simple.(emit invalid_move ())
 
 let conflict_detected (conflict : Octez_smart_rollup.Game.conflict) =
   let our_commitment_hash =

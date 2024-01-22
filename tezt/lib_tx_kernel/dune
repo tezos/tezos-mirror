@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_tx_kernel)
+ (package tezt-tx-kernel)
+ (libraries
+  tezt
+  tezt-tezos
+  tezos-protocol-alpha.protocol
+  octez-libs.crypto)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax))

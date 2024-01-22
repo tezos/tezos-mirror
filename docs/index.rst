@@ -96,14 +96,14 @@ If you want to know more about the Tezos *technology*, there are several section
 
 Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
 
-If you are looking for an accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://tezos.com/developer-portal/>`__ and `Open Tezos <https://opentezos.com>`__.
+If you are looking for an accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://tezos.com/developers/>`__ and `Open Tezos <https://opentezos.com>`__.
 
 For Tezos developers, this website mostly provides reference and API documentation, but also some guidelines, including:
 
 - A complete reference of :doc:`active/michelson`
 - Important API concepts such as the :doc:`developer/rpc`
 - API references such as :doc:`shell/rpc`, :doc:`api/openapi`, or :doc:`api/errors`
-- Guidelines for writing smart contracts in Michelson, such as :doc:`developer/michelson_anti_patterns`.
+- Guidelines for writing smart contracts in Michelson, such as :doc:`active/michelson_anti_patterns`.
 
 .. raw:: html
 
@@ -148,6 +148,7 @@ Platform developers are also provided reference materials for internal APIs of O
    introduction/test_networks
    introduction/get_troubleshooting
    introduction/support
+   BREAKING CHANGES <introduction/breaking_changes>
 
 .. toctree::
    :maxdepth: 2
@@ -170,6 +171,8 @@ Platform developers are also provided reference materials for internal APIs of O
    shell/the_big_picture
    shell/shell
    shell/data_availability_committees
+   shell/dal
+   shell/smart_rollup_node
    shell/p2p_api
    shell/cli-commands
    shell/rpc
@@ -210,8 +213,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    developer/rpc
-   developer/michelson_anti_patterns
-   developer/openmetrics
    api/errors
    api/openapi
 
@@ -247,5 +248,12 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    releases/releases
-   releases/version-17
+   releases/version-18
    releases/history
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Global doc
+   :hidden:
+
+   global/architecture

@@ -82,8 +82,9 @@ code
                                  DIP { AMOUNT } ; ADD ; # transaction
                                  # The amount must not exceed Q * K
                                  DUP ;
-                                 DIIP { DUP ; CDDAAR ; # Q
-                                        DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
+                                 DIP 2
+                                     { DUP ; CDDAAR ; # Q
+                                       DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
                                  DIP { COMPARE ; GT ; # new amount > Q * K
                                        IF { FAIL } { } } ; # abort or continue
                                  #  then we rebuild the globals
@@ -103,7 +104,7 @@ code
                         IF { # not reached, pay the seller
                              BALANCE ;
                              DIP { DUP ; CDDDDADR } ; # S
-                             DIIP { CDR } ;
+                             DIP 2 { CDR } ;
                              DIP { CONTRACT unit ; ASSERT_SOME } ;
                              UNIT ; TRANSFER_TOKENS ;
                              NIL operation ; SWAP ; CONS ; PAIR }
@@ -135,7 +136,7 @@ code
                                          { # Transfer all the money to the seller
                                            BALANCE ;
                                            DIP { DUP ; CDDDDADR } ; # S
-                                           DIIP { CDR } ;
+                                           DIP 2 { CDR } ;
                                            DIP { CONTRACT unit ; ASSERT_SOME } ;
                                            UNIT ; TRANSFER_TOKENS ;
                                            NIL operation ; SWAP ; CONS } } ;
@@ -143,7 +144,7 @@ code
                                 { # after T + 48, transfer everything to the buyer
                                   BALANCE ;
                                   DIP { DUP ; CDDDDAAR } ; # B
-                                  DIIP { CDR } ;
+                                  DIP 2 { CDR } ;
                                   DIP { CONTRACT unit ; ASSERT_SOME } ;
                                   UNIT ; TRANSFER_TOKENS ;
                                   NIL operation ; SWAP ; CONS ;

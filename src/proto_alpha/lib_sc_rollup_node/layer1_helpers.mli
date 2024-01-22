@@ -43,6 +43,7 @@ val get_last_cemented_commitment :
   #Client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
 
 val get_last_published_commitment :
+  ?allow_unstake:bool ->
   #Client_context.full ->
   Address.t ->
   Signature.public_key_hash ->
@@ -74,7 +75,12 @@ val retrieve_genesis_info :
     [block_hash] has to be the block where the rollup was originated. *)
 val get_boot_sector : Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t
 
+(** Find and retrieve the whitelist the rollup. *)
 val find_whitelist :
   #Client_context.full ->
   Address.t ->
   Protocol.Alpha_context.Sc_rollup.Whitelist.t option tzresult Lwt.t
+
+(** Find and retrieve information about the last whitelist update. *)
+val find_last_whitelist_update :
+  #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t

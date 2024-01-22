@@ -128,7 +128,11 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   let* conns = accept_n main_socket n in
   let conns = List.map (P2p_io_scheduler.register sched) conns in
   let* () = List.iter_p receive (List.map P2p_io_scheduler.to_readable conns) in
-  let* r = List.iter_ep P2p_io_scheduler.close conns in
+  let* r =
+    List.iter_ep
+      (P2p_io_scheduler.close ~reason:(User "shutdown from server"))
+      conns
+  in
   match r with
   | Ok () ->
       Tezt.Log.debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
@@ -175,7 +179,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
          return_unit);
       ]
   in
-  let* r = P2p_io_scheduler.close conn in
+  let* r = P2p_io_scheduler.close ~reason:(User "shutdown from client") conn in
   match r with
   | Error err -> Lwt.fail (Error err)
   | Ok () ->
@@ -216,7 +220,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
             (function
               (* the connection was already closed *)
               | Unix.Unix_error (EBADF, _, _) -> return_unit
-              | err -> Lwt.fail err)
+              | err -> Lwt.reraise err)
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in

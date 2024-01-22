@@ -92,17 +92,17 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
                     (reply, rem) )))
       in
       let evaluations =
-        Prover.build_evaluations pp (SMap.union_disjoint all_f_wires f_map)
+        Prover.build_evaluations pp (Kzg.SMap.union_disjoint all_f_wires f_map)
       in
       let identities =
         Prover.build_gates_plook_rc1_identities
           ~shifts_map
           pp
-          {beta; gamma; delta = Bls.Scalar.zero}
+          {beta; gamma; delta = Kzg.Bls.Scalar.zero}
           inputs_map
       in
       let evaluated_ids = identities evaluations in
-      let ids_keys = SMap.bindings evaluated_ids |> List.map fst in
+      let ids_keys = Kzg.SMap.bindings evaluated_ids |> List.map fst in
       let* _transcript =
         handle_request
           main_pid
@@ -146,7 +146,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
            [distributed_prover_worker] with dummy values in the positions that
            the worker does not have information about, namely, those of:
            t_map, g_map, plook_map, which are ATM handled by the main thread *)
-        let pad_secrets l = (List.init 3 @@ Fun.const SMap.empty) @ l in
+        let pad_secrets l = (List.init 3 @@ Fun.const Kzg.SMap.empty) @ l in
         let pad_prover_aux l =
           (List.init 3 @@ Fun.const PP.PC.Commitment.empty_prover_aux) @ l
         in

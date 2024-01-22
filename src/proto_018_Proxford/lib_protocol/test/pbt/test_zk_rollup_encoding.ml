@@ -66,7 +66,7 @@ let gen_zkr_account =
   let open Zk_rollup_account_repr in
   let* state = gen_l2_state in
   let _prover_pp, public_parameters = Lazy.force Operator.lazy_pp in
-  let circuits_info = SMap.of_seq (Plonk.SMap.to_seq Operator.circuits) in
+  let circuits_info = SMap.of_seq (Kzg.SMap.to_seq Operator.circuits) in
   let* nb_ops = nat in
   let static =
     {

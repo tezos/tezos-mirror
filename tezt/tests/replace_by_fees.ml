@@ -143,7 +143,7 @@ let replacement_op = {default_op with fee = replacement_fee}
 (* Auxiliary function to get the current counter *)
 let get_counter ?(contract = default_source) client =
   let* counter_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:contract.Account.public_key_hash
          ()

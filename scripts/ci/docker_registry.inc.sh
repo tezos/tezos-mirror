@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 registry_uri="https://registry.gitlab.com/v2"
 auth_uri="https://gitlab.com/jwt/auth"
@@ -22,7 +22,8 @@ getTagDigest() {
     local token=$1
     local reponame=$2
     local tag=$3
-    local digest="$(curl -fs -H "Authorization: Bearer ${token}" \
+    local digest
+    digest="$(curl -fs -H "Authorization: Bearer ${token}" \
                             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
                     --head  \
                     "${registry_uri}/${reponame}/manifests/${tag}" | \
@@ -42,7 +43,8 @@ deleteTag() {
     local token=$1
     local reponame=$2
     local tag=$3
-    local digest="$(getTagDigest "${token}" "${reponame}" "${tag}")"
+    local digest
+    digest="$(getTagDigest "${token}" "${reponame}" "${tag}")"
     if [ -z "$digest" ]; then
         echo "Failed to locate the ${reponame}:${tag}"
         exit 1

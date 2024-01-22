@@ -77,6 +77,18 @@ val max_allowed_global_constant_depth : int
  *)
 val michelson_maximum_type_size : int
 
+(** The max slashing period is the maximum number of cycles after which a
+    misbehaviour can be denounced, i.e. if a misbehaviour happened at cycle [c],
+    it will be rejected if it is denounced at cycle [c + max_slashing_period].
+    Having [max_slashing_period] strictly smaller than 2 doesn't make sense.
+    Indeed, if a misbehaviour happens at the very last block of a cycle, it
+    couldn't be denounced.
+    [max_slashing_period = 2] leaves one cycle to denounce a misbehaviour in
+    the worst case, which is deemed enough.
+    Several parts of the codebase may use the fact that
+    [max_slashing_period = 2], so let's ensure it cannot be different. *)
+val max_slashing_period : int
+
 (** A size limit for {!Sc_rollups.wrapped_proof} binary encoding. *)
 val sc_max_wrapped_proof_binary_size : int
 

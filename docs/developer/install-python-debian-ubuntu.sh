@@ -67,20 +67,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.10.12 through pyenv
+## Install python 3.11.6 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.10.12
-pyenv global 3.10.12
+pyenv install 3.11.6
+pyenv global 3.11.6
 
 # [print python version]
-python --version # should output 3.10.12
+python --version # should output 3.11.6
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.10.12" ]
+[ "$(python --version)" = "Python 3.11.6" ]
 
 ##
 ## Install poetry

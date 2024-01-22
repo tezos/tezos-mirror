@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,15 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Storage_costs_generated
+
 (* The model for read accesses is the following:
 
    cost(path_length, read_bytes) = 200_000 + 5000 * path_length + 2 * read_bytes
 *)
 let read_access ~path_length ~read_bytes =
   let open Saturation_repr in
-  let base_cost = safe_int (200_000 + (5000 * path_length)) in
+  let open S.Syntax in
   Gas_limit_repr.atomic_step_cost
-    (add base_cost (mul (safe_int 2) (safe_int read_bytes)))
+  @@ safe_int 200_000
+     + (safe_int 5000 * safe_int path_length)
+     + (safe_int 2 * safe_int read_bytes)
 
 (* The model for write accesses is the following:
 
@@ -39,15 +44,8 @@ let read_access ~path_length ~read_bytes =
 *)
 let write_access ~written_bytes =
   let open Saturation_repr in
+  let open S.Syntax in
   Gas_limit_repr.atomic_step_cost
-    (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
+  @@ (safe_int 200_000 + (safe_int 4 * safe_int written_bytes))
 
-let list_key_values_step_cost = Saturation_repr.safe_int 117
-
-let list_key_values_intercept = Saturation_repr.safe_int 470
-
-let list_key_values_traverse ~size =
-  Saturation_repr.(
-    add
-      list_key_values_intercept
-      (mul (safe_int size) list_key_values_step_cost))
+let list_key_values_traverse ~size = cost_List_key_values size

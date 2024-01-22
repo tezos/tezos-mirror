@@ -75,6 +75,8 @@ is the tool used to compile this format into plain web pages in HTML format.
 
 For the RST syntax, see the `Sphinx RST primer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html>`_ and also the `Sphinx extensions`_ below.
 
+.. _custom_sphinx_roles:
+
 Sphinx extensions
 -----------------
 

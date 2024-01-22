@@ -192,16 +192,31 @@ module Inbox = struct
         l
   end
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5897
-     Use a Prometheus histogram instead of a Gauge to report the processing
-     time of each inbox level. *)
   let head_process_time =
     v_gauge
       ~help:"The time the rollup node spent processing the head"
       "head_inbox_process_time"
 
+  module Head_process_time_histogram = Histogram (struct
+    (* These values define the 20 buckets of the histogram. The buckets deal
+       with the time intervals [0.01 * i, 0.01 * (i + 1)) for i = 0,..., 20-1,
+       so that we cover the range 0-200 ms for the inbox head processing time.
+       The last bucket (i = 20) covers the range 200 ms-Infinity. *)
+    let spec = Histogram_spec.of_linear 0. 0.01 20
+  end)
+
+  let head_process_time_histogram =
+    Head_process_time_histogram.v
+      ~registry:sc_rollup_node_registry
+      ~namespace
+      ~subsystem
+      ~help:"The time the rollup node spent processing the head"
+      "head_inbox_process_time_histogram"
+
   let set_process_time pt =
-    Prometheus.Gauge.set head_process_time (Ptime.Span.to_float_s pt)
+    let pt = Ptime.Span.to_float_s pt in
+    Prometheus.Gauge.set head_process_time pt ;
+    Head_process_time_histogram.observe head_process_time_histogram pt
 
   let metrics =
     let head_inbox_level =

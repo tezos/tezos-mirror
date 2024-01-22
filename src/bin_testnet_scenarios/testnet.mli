@@ -39,6 +39,9 @@ type t = {
   data_dir : string option;
       (** Optionally can start a node using an existing data-dir, instead
           of creating and bootstrapping one. *)
+  client_dir : string option;
+      (** Optionally can start a client using an existing client-dir,
+          to retreive keys and addresses. *)
 }
 
 (** [get_testnet_config path] returns the configuration of the network

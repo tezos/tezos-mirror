@@ -92,7 +92,7 @@ module Simple = struct
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
     | Error
-        ((( Tezos_p2p_services.P2p_errors.Connection_refused
+        ((( Tezos_p2p_services.P2p_errors.Connection_failed
           | Tezos_p2p_services.P2p_errors.Pending_connection
           | Tezos_p2p_services.P2p_errors.Rejected_socket_connection
           | Tezos_p2p_services.P2p_errors.Rejected_by_nack _ | Canceled
@@ -104,7 +104,7 @@ module Simple = struct
           point
           (fun ppf err ->
             match err with
-            | Tezos_p2p_services.P2p_errors.Connection_refused ->
+            | Tezos_p2p_services.P2p_errors.Connection_failed ->
                 Format.fprintf ppf "connection refused"
             | Tezos_p2p_services.P2p_errors.Pending_connection ->
                 Format.fprintf ppf "pending connection"
@@ -142,7 +142,7 @@ module Simple = struct
   let connect_all ~timeout connect_handler pool points =
     List.map_ep (connect ~timeout connect_handler pool) points
 
-  let write_all msg = P2p.Internal_for_tests.broadcast_conns peer_table msg
+  let write_all msg = P2p.Internal_for_tests.raw_broadcast peer_table msg
 
   let read conn ref_msg =
     let open Lwt_result_syntax in
@@ -164,7 +164,7 @@ module Simple = struct
     let open Lwt_syntax in
     P2p_pool.Connection.fold
       ~f:(fun _ conn acc ->
-        let* () = P2p_conn.disconnect conn in
+        let* () = P2p_conn.disconnect ~reason:(User "test shutdown") conn in
         acc)
       ~init:Lwt.return_unit
       pool

@@ -50,7 +50,7 @@ let reraise = function
   | Chunked_byte_vector.Bounds | Lazy_vector.Bounds -> raise Bounds
   | Chunked_byte_vector.SizeOverflow | Lazy_vector.SizeOverflow ->
       raise SizeOverflow
-  | exn -> raise exn
+  | exn -> Lwt.reraise exn
 
 type memory = {mutable ty : memory_type; content : Chunked.t}
 

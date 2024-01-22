@@ -45,7 +45,11 @@ let start configuration dir =
      More restrictive access control. *)
   let acl = RPC_server.Acl.allow_all in
   let server =
-    RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
+    RPC_server.init_server
+      dir
+      ~cors:configuration.cors
+      ~acl
+      ~media_types:Media_type.all_media_types
   in
   protect @@ fun () ->
   let*! () =

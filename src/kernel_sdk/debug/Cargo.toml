@@ -5,7 +5,7 @@
 [package]
 name = "tezos-smart-rollup-debug"
 edition = "2021"
-version = "0.2.1"
+version = "0.2.2"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
 repository = "https://gitlab.com/tezos/tezos.git"
@@ -15,18 +15,15 @@ categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.2.1"
+version = "0.2.2"
 default-features = false
-
-[dev-dependencies.tezos-smart-rollup-core]
-path = "../core"
-version = "0.2.1"
-features = ["testing"]
 
 [features]
 default = ["alloc"]
 alloc = []
+testing = ["tezos-smart-rollup-core/testing"]
+proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]

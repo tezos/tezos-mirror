@@ -29,14 +29,14 @@ open Protocol
 open Alpha_context
 open Apply_results
 
-let check_pvm_initial_state_hash {Node_context.cctxt; rollup_address; kind; _} =
+let check_pvm_initial_state_hash {Node_context.cctxt; config; kind; _} =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind kind) in
   let* l1_reference_initial_state_hash =
     RPC.Sc_rollup.initial_pvm_state_hash
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, cctxt#block)
-      (Sc_rollup_proto_types.Address.of_octez rollup_address)
+      (Sc_rollup_proto_types.Address.of_octez config.sc_rollup_address)
   in
   let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! l2_initial_state_hash = PVM.state_hash s in
@@ -99,8 +99,31 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
           ~level:their_commitment.inbox_level
           ~other
       in
-      assert (Octez_smart_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
+      assert (
+        Octez_smart_rollup.Address.(node_ctxt.config.sc_rollup_address = rollup)) ;
       Publisher.publish_single_commitment node_ctxt our_commitment
+
+(** If in bailout mode and when the operator is not staked on any
+    commitment, the bond is recovered. *)
+let maybe_recover_bond node_ctxt =
+  let open Lwt_result_syntax in
+  if Node_context.is_bailout node_ctxt then
+    let operating_pkh = Node_context.get_operator node_ctxt Operating in
+    match operating_pkh with
+    | None -> return_unit
+    | Some (Single operating_pkh) -> (
+        let* staked_on_commitment =
+          RPC.Sc_rollup.staked_on_commitment
+            (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+            (node_ctxt.cctxt#chain, `Head 0)
+            (Sc_rollup_proto_types.Address.of_octez
+               node_ctxt.config.sc_rollup_address)
+            operating_pkh
+        in
+        match staked_on_commitment with
+        | None -> Publisher.recover_bond node_ctxt
+        | Some _ (* operator still staked on something *) -> return_unit)
+  else return_unit
 
 (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
@@ -114,23 +137,15 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       Sc_rollup_publish_result {published_at_level; _} )
     when Node_context.is_operator node_ctxt source ->
       (* Published commitment --------------------------------------------- *)
-      let save_lpc =
-        match Reference.get node_ctxt.lpc with
-        | None -> true
-        | Some lpc ->
-            Raw_level.to_int32 commitment.inbox_level >= lpc.inbox_level
-      in
       let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
-      if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
       let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
       let* () =
-        Node_context.set_commitment_published_at_level
+        Node_context.register_published_commitment
           node_ctxt
-          commitment_hash
-          {
-            first_published_at_level = Raw_level.to_int32 published_at_level;
-            published_at_level = Some head.Layer1.level;
-          }
+          commitment
+          ~first_published_at_level:(Raw_level.to_int32 published_at_level)
+          ~level:head.Layer1.level
+          ~published_by_us:true
       in
       let*! () =
         Commitment_event.last_published_commitment_updated
@@ -152,25 +167,12 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let* () =
         if not known_commitment then return_unit
         else
-          let* republication =
-            Node_context.commitment_was_published
-              node_ctxt
-              ~source:Anyone
-              their_commitment_hash
-          in
-          if republication then return_unit
-          else
-            let* () =
-              Node_context.set_commitment_published_at_level
-                node_ctxt
-                their_commitment_hash
-                {
-                  first_published_at_level =
-                    Raw_level.to_int32 published_at_level;
-                  published_at_level = None;
-                }
-            in
-            return_unit
+          Node_context.register_published_commitment
+            node_ctxt
+            (Sc_rollup_proto_types.Commitment.to_octez their_commitment)
+            ~first_published_at_level:(Raw_level.to_int32 published_at_level)
+            ~level:head.Layer1.level
+            ~published_by_us:false
       in
       (* An accuser node will publish its commitment if the other one is
          refutable. *)
@@ -205,17 +207,12 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           (Sc_rollup_node_errors.Disagree_with_cemented
              {inbox_level; ours = our_commitment_hash; on_l1 = commitment_hash})
       in
-      let lcc = Reference.get node_ctxt.lcc in
-      let*! () =
-        if inbox_level > lcc.level then (
-          Reference.set
-            node_ctxt.lcc
-            {commitment = commitment_hash; level = inbox_level} ;
-          Commitment_event.last_cemented_commitment_updated
-            commitment_hash
-            inbox_level)
-        else Lwt.return_unit
+      let* () =
+        Node_context.set_lcc
+          node_ctxt
+          {commitment = commitment_hash; level = inbox_level}
       in
+      let* () = maybe_recover_bond node_ctxt in
       return_unit
   | ( Sc_rollup_refute _,
       Sc_rollup_refute_result {game_status = Ended end_status; _} )
@@ -251,6 +248,18 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           (Sc_rollup_proto_types.Dal.Slot_header.to_octez slot_header)
       in
       return_unit
+  (* If the node is in bailout mode and the bond of the operator has
+     been recovered then initiate an exit from bailout mode and
+     gracefully shut down the process. Otherwise, no action is
+     taken. *)
+  | Sc_rollup_recover_bond {staker; _}, Sc_rollup_recover_bond_result _
+    when Node_context.is_bailout node_ctxt -> (
+      match Node_context.get_operator node_ctxt Operating with
+      | Some (Single operating_pkh) ->
+          fail_when
+            Signature.Public_key_hash.(operating_pkh = staker)
+            Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
+      | _ -> return_unit)
   | _, _ ->
       (* Other manager operations *)
       return_unit
@@ -269,7 +278,7 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     | Sc_rollup_recover_bond {sc_rollup = rollup; staker = _} ->
         Octez_smart_rollup.Address.(
           Sc_rollup_proto_types.Address.to_octez rollup
-          = node_ctxt.Node_context.rollup_address)
+          = node_ctxt.Node_context.config.sc_rollup_address)
     | Dal_publish_slot_header _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
@@ -277,22 +286,25 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         false
   in
+  (* Only look at operations that are for the node's rollup *)
   if not (is_for_my_rollup operation) then return_unit
   else
-    (* Only look at operations that are for the node's rollup *)
     let*! () =
-      match Sc_rollup_injector.injector_operation_of_manager operation with
-      | None -> Lwt.return_unit
-      | Some op ->
-          let status, errors =
-            match result with
-            | Applied _ -> (`Applied, None)
-            | Backtracked (_, e) ->
-                (`Backtracked, Option.map Environment.wrap_tztrace e)
-            | Failed (_, e) -> (`Failed, Some (Environment.wrap_tztrace e))
-            | Skipped _ -> (`Skipped, None)
-          in
-          Daemon_event.included_operation ?errors status op
+      (* Only event for rollup node's own operations *)
+      if not (Node_context.is_operator node_ctxt source) then Lwt.return_unit
+      else
+        match Sc_rollup_injector.injector_operation_of_manager operation with
+        | None -> Lwt.return_unit
+        | Some op ->
+            let status, errors =
+              match result with
+              | Applied _ -> (`Applied, None)
+              | Backtracked (_, e) ->
+                  (`Backtracked, Option.map Environment.wrap_tztrace e)
+              | Failed (_, e) -> (`Failed, Some (Environment.wrap_tztrace e))
+              | Skipped _ -> (`Skipped, None)
+            in
+            Daemon_event.included_operation ?errors status op
     in
     match result with
     | Applied success_result ->
@@ -306,7 +318,8 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
         (* No action for non successful operations  *)
         return_unit
 
-let process_l1_block_operations node_ctxt (head : Layer1.header) =
+let process_l1_block_operations ~catching_up:_ node_ctxt (head : Layer1.header)
+    =
   let open Lwt_result_syntax in
   let* block =
     Layer1_helpers.fetch_tezos_block node_ctxt.Node_context.l1_ctxt head.hash

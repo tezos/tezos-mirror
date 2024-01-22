@@ -1,27 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name main)
- (libraries tezt
-            tezt-tezos
-            tezt-tezos.tezt-performance-regression
-            octez-libs.lwt-result-stdlib
-            octez-protocol-alpha-libs.test-helpers
-            octez-libs.micheline
-            tezos-openapi
-            tezos-protocol-alpha.protocol
-            qcheck-core
-            tezos-time-measurement
-            data-encoding
-            octez-libs.event-logging
-	    octez-libs.test-helpers
-            )
- (flags (:standard
-          -open Tezt
-          -open Tezt_tezos
-          -open Tezt_tezos.Runnable.Syntax
-          -open Tezt.Base
-          -open Tezt_tezos_tezt_performance_regression
-          -open Tezos_lwt_result_stdlib
-          -open Tezos_event_logging
-          -open Tezos_test_helpers
-          (:include %{workspace_root}/macos-link-flags.sexp)
-         )))
+ (libraries
+  tezt
+  tezt-tezos
+  tezt-tezos.tezt-performance-regression
+  octez-libs.lwt-result-stdlib
+  octez-protocol-alpha-libs.test-helpers
+  octez-libs.micheline
+  tezos-openapi
+  tezos-protocol-alpha.protocol
+  qcheck-core
+  tezos-time-measurement
+  data-encoding
+  octez-libs.event-logging
+  octez-libs.test-helpers)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_tezos_tezt_performance_regression
+  -open Tezos_lwt_result_stdlib
+  -open Tezos_event_logging
+  -open Tezos_test_helpers))

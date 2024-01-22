@@ -2857,7 +2857,7 @@ val log2up: t -> int
 external size: t -> int = "ml_z_size" [@@noalloc]
 (** Returns the number of machine words used to represent the number. *)
 
-external extract: t -> int -> int -> t = "ml_z_extract"
+val extract: t -> int -> int -> t
 (** [extract a off len] returns a nonnegative number corresponding to bits
     [off] to [off]+[len]-1 of [b].
     Negative [a] are considered in infinite-length 2's complement
@@ -5986,31 +5986,6 @@ val error : 'err -> ('a, 'err trace) result
 val trace_of_error : 'err -> 'err trace
 
 val tzfail : 'err -> ('a, 'err trace) result Lwt.t
-
-val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-
-val ( >>? ) :
-  ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
-
-val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
-
-val ( >>=? ) :
-  ('a, 'trace) result Lwt.t ->
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  ('b, 'trace) result Lwt.t
-
-val ( >|=? ) :
-  ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
-
-val ( >>?= ) :
-  ('a, 'trace) result ->
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  ('b, 'trace) result Lwt.t
-
-val ( >|?= ) :
-  ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
 
 val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
 
@@ -12098,7 +12073,7 @@ end
 
 type version
 
-val v2 : version
+val v3 : version
 
 type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 

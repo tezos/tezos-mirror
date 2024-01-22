@@ -3,7 +3,7 @@
 .opam_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies_template
+    - .image_template__runtime_prebuild_dependencies
   stage: packaging
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
@@ -12,7 +12,9 @@
   # underlying tests have been fixed.
   retry: 2
   script:
-    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci opam-configure
+    - opam remote add dev-repo ./_opam-repo-for-release
+    - opam install --yes ${package}.dev
+    - opam reinstall --yes --with-test ${package}.dev
   needs: [opam:prepare]
   dependencies: [opam:prepare]
   after_script:
@@ -24,6 +26,7 @@
     expire_in: 1 week
     when: always
   variables:
+    # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
     RUNTEZTALIAS: "true"
     # We store caches in _build for two reasons: (1) the _build
     # folder is excluded from opam's rsync. (2) gitlab ci cache
@@ -38,12 +41,16 @@
 opam:prepare:
   extends:
     - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies_template
+    - .image_template__runtime_prebuild_dependencies
     - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
   needs: [trigger]
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-prepare
+    - eval $(opam env)
+    - git init _opam-repo-for-release
+    - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+    - git -C _opam-repo-for-release add packages
+    - git -C _opam-repo-for-release commit -m "tezos packages"
   artifacts:
     paths:
       - _opam-repo-for-release/

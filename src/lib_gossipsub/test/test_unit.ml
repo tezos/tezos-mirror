@@ -120,8 +120,7 @@ let assert_topic_mesh ~__LOC__ ~topic ~expected_peers state =
 let assert_peer_score ~__LOC__ ~expected_score peer state =
   let view = GS.Introspection.view state in
   let actual_score =
-    GS.Introspection.get_peer_score peer view
-    |> GS.Score.Internal_for_tests.to_float
+    GS.Introspection.get_peer_score peer view |> GS.Score.Introspection.to_float
   in
   Check.(
     (actual_score = expected_score)
@@ -1560,7 +1559,8 @@ let test_handle_ihave_subscribed_and_msg_not_seen rng limits parameters =
           ~__LOC__) ;
       unit
   | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
-  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked
+  | Invalid_message_id ->
       Test.fail ~__LOC__ "Expected to request message."
 
 (* Tests that handling an IHave message for a subscribed topic that has been seen
@@ -1599,7 +1599,8 @@ let test_handle_ihave_subscribed_and_msg_seen rng limits parameters =
   (* IHave should not request any messages. *)
   match output with
   | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
-  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+  | Too_many_sent_iwant_messages _ | Message_topic_not_tracked
+  | Invalid_message_id ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_requested_message_ids message_ids ->
       Check.(
@@ -1638,7 +1639,8 @@ let test_handle_ihave_not_subscribed rng limits parameters =
   (* IHave should result in [Message_topic_not_tracked]. *)
   match output with
   | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
-  | Too_many_sent_iwant_messages _ | Message_requested_message_ids _ ->
+  | Too_many_sent_iwant_messages _ | Message_requested_message_ids _
+  | Invalid_message_id ->
       Test.fail ~__LOC__ "Expected Message_requested_message_ids."
   | Message_topic_not_tracked -> unit
 
@@ -1692,7 +1694,7 @@ let test_ignore_too_many_ihaves rng limits parameters =
            let ihave_count = i + 1 in
            match output with
            | Ihave_from_peer_with_low_score _ | Too_many_sent_iwant_messages _
-           | Message_topic_not_tracked ->
+           | Message_topic_not_tracked | Invalid_message_id ->
                Test.fail
                  ~__LOC__
                  "Expected [Too_many_recv_ihave_messages] or \
@@ -1736,7 +1738,8 @@ let test_ignore_too_many_ihaves rng limits parameters =
            in
            match output with
            | Ihave_from_peer_with_low_score _ | Too_many_sent_iwant_messages _
-           | Message_topic_not_tracked | Too_many_recv_ihave_messages _ ->
+           | Message_topic_not_tracked | Too_many_recv_ihave_messages _
+           | Invalid_message_id ->
                Test.fail ~__LOC__ "Expected [Message_requested_message_ids]."
            | Message_requested_message_ids _ ->
                (* Expected case *)
@@ -1761,7 +1764,8 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
         check message_ids ;
         ()
     | Ihave_from_peer_with_low_score _ | Too_many_recv_ihave_messages _
-    | Too_many_sent_iwant_messages _ | Message_topic_not_tracked ->
+    | Too_many_sent_iwant_messages _ | Message_topic_not_tracked
+    | Invalid_message_id ->
         Test.fail ~__LOC__ "Expected to request messages."
   in
   let check_message_ids_length ~__LOC__ ids ~expected =
@@ -1841,7 +1845,8 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
         (* Expected case. *)
         ()
     | Message_requested_message_ids _ | Ihave_from_peer_with_low_score _
-    | Too_many_recv_ihave_messages _ | Message_topic_not_tracked ->
+    | Too_many_recv_ihave_messages _ | Message_topic_not_tracked
+    | Invalid_message_id ->
         Test.fail ~__LOC__ "Expected [Too_many_sent_iwant_messages]."
   in
   (* After heartbeat the count should have been reset. *)

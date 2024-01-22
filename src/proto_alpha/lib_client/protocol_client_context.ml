@@ -166,7 +166,12 @@ let () =
   @@ def "script" ["loc"] Protocol.Alpha_context.Script.location_encoding ;
   register ~pp:Protocol.Alpha_context.Contract.pp
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
-  register @@ def "staker" [] Protocol.Stake_repr.staker_encoding ;
+  register
+  @@ def
+       "unstaked_frozen_staker"
+       []
+       Protocol.Unstaked_frozen_staker_repr.encoding ;
+  register @@ def "frozen_staker" [] Protocol.Frozen_staker_repr.encoding ;
   register
   @@ def
        "receipt"
@@ -269,6 +274,60 @@ let () =
        "voting_period"
        ["kind"]
        Protocol.Alpha_context.Voting_period.kind_encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Address.pp
+  @@ def
+       "smart_rollup"
+       ["address"]
+       Protocol.Alpha_context.Sc_rollup.Address.encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Kind.pp
+  @@ def "smart_rollup" ["kind"] Protocol.Alpha_context.Sc_rollup.Kind.encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Whitelist.pp
+  @@ def
+       "smart_rollup"
+       ["whitelist"]
+       Protocol.Alpha_context.Sc_rollup.Whitelist.encoding ;
+  register ~pp:Protocol.Alpha_context.Sc_rollup.Metadata.pp
+  @@ def
+       "smart_rollup"
+       ["metadata"]
+       Protocol.Alpha_context.Sc_rollup.Metadata.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["inbox"]
+       Protocol.Alpha_context.Sc_rollup.Inbox.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["inbox"; "message"]
+       Protocol.Alpha_context.Sc_rollup.Inbox_message.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["reveal"]
+       Protocol.Alpha_context.Sc_rollup.reveal_encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["outbox"; "message"]
+       Protocol.Alpha_context.Sc_rollup.Outbox.Message.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["output"]
+       Protocol.Alpha_context.Sc_rollup.output_encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["commmitment"]
+       Protocol.Alpha_context.Sc_rollup.Commitment.encoding ;
+  register
+  @@ def
+       "smart_rollup"
+       ["proof"]
+       Protocol.Alpha_context.Sc_rollup.Proof.encoding ;
+  register
+  @@ def "smart_rollup" ["game"] Protocol.Alpha_context.Sc_rollup.Game.encoding ;
   register
   @@ def
        "errors"

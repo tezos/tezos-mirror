@@ -69,7 +69,7 @@ let write_input () =
           })
       (fun _ -> assert false)
       (function
-        | Input_buffer.Cannot_store_an_earlier_message -> Lwt.return ()
+        | Input_buffer.Cannot_store_an_earlier_message -> Lwt.return_unit
         | _ -> assert false)
   in
   Lwt.return Result.return_unit

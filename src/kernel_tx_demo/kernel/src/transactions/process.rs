@@ -9,6 +9,7 @@ use std::slice::from_mut;
 
 use crate::inbox::external::dac_iterator::IteratorState;
 use crate::inbox::ParsedExternalInboxMessage;
+use crate::storage::dal;
 use crate::storage::AccountStorage;
 use crate::transactions::external_inbox;
 use crate::transactions::external_inbox::process_batch_message;
@@ -204,6 +205,13 @@ fn process_at_start<Host: Runtime>(
                 }
             }
         }
+        ParsedExternalInboxMessage::ChangeDalSlot(slot_index) => {
+            match dal::set_slot_index(host, slot_index) {
+                Ok(_) => Ok(Decision::NextMessage),
+                Err(dal::StorageError::PathError(e)) => Err(CachedTransactionError::Path(e)),
+                Err(dal::StorageError::RuntimeError(e)) => Err(CachedTransactionError::Store(e)),
+            }
+        }
     }
 }
 
@@ -233,6 +241,9 @@ fn process_verified<Host: Runtime>(
                     Ok(Decision::NextMessage)
                 }
             }
+        }
+        ParsedExternalInboxMessage::ChangeDalSlot(_) => {
+            unreachable!("ChangeDalSlot processed by previous step");
         }
     }
 }

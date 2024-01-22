@@ -33,6 +33,8 @@ Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 
+let group = Benchmark.Group "script_ir_translator"
+
 module Size = Gas_input_size
 
 let ns = Translator_model.ns
@@ -76,10 +78,8 @@ module Default_boilerplate = struct
 
   let make_models t_kind code_or_data =
     [
-      ( "gas_translator_model",
-        Translator_model.gas_based_model t_kind code_or_data );
-      ( "size_translator_model",
-        Translator_model.size_based_model t_kind code_or_data );
+      ("gas_model", Translator_model.gas_based_model t_kind code_or_data);
+      ("size_model", Translator_model.size_based_model t_kind code_or_data);
     ]
 end
 
@@ -270,6 +270,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Typechecking_data)
 
 module Unparsing_data : Benchmark.S = struct
@@ -360,6 +361,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Unparsing_data)
 
 module Typechecking_code : Benchmark.S = struct
@@ -442,6 +444,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Typechecking_code)
 
 module Unparsing_code : Benchmark.S = struct
@@ -534,6 +537,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Unparsing_code)
 
 let rec check_printable_ascii v i =
@@ -604,12 +608,11 @@ module Ty_eq : Benchmark.S = struct
 
   let group = Benchmark.Group "size_translator_model"
 
-  let model ~name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~name
-         ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-         ~model:Model.affine
+  let model =
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
+      Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     let open Lwt_result_syntax in
@@ -652,7 +655,7 @@ module Ty_eq : Benchmark.S = struct
         sample_in_interval ~range:{min = 1; max = cfg.max_size} rng_state)
     in
     let ty =
-      Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
+      Michelson_generation.Samplers.Random_type.m_type ~size:nodes () rng_state
     in
     ty_eq_benchmark rng_state nodes ty
 end
@@ -775,7 +778,7 @@ module Parse_type_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 end
 
 let () = Registration.register (module Parse_type_benchmark)
@@ -820,8 +823,9 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let model =
     Model.make
+      ~takes_saturation_reprs:true
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 end
 
 let () = Registration.register (module Unparse_type_benchmark)

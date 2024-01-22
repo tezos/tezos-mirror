@@ -96,6 +96,8 @@ of the storage:
 - *savepoint*: the last known block which contains metadata,
 - *caboose*: the last known block.
 
+For more details about what data are stored in each mode, refer to :doc:`../shell/storage`.
+
 .. _Set_up_a_full_node:
 
 Setting up a node in full mode

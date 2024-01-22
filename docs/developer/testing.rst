@@ -132,7 +132,7 @@ Typical use cases:
    randomized inputs.
 
 Example test:
- - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the `Tezos_base.Time <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/Time/index.html>`_ module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
+ - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the :package-api:`Tezos_base.Time <octez-libs/Tezos_base/Time/index.html>` module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
 
 References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
@@ -168,7 +168,7 @@ Example tests:
 
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
- - `General API documentation <https://nomadic-labs.gitlab.io/tezt/dev/tezt/Tezt/index.html>`__
+ - `General API documentation <https://nomadic-labs.gitlab.io/tezt/>`__
  - :package-api:`Octez-specific API documentation <tezt-tezos/Tezt_tezos/index.html>`
 
 .. _long_tezt_section:

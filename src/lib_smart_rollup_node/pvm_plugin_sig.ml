@@ -89,7 +89,17 @@ module type S = sig
   val install_boot_sector :
     Kind.t -> Context.tree -> string -> Context.tree Lwt.t
 
-  val get_status : _ Node_context.t -> Context.tree -> string Lwt.t
+  val get_status : _ Node_context.t -> Context.tree -> string tzresult Lwt.t
+
+  val find_whitelist_update_output_index :
+    _ Node_context.t -> Context.tree -> outbox_level:int32 -> int option Lwt.t
+
+  val produce_serialized_output_proof :
+    Node_context.rw ->
+    Context.tree ->
+    outbox_level:int32 ->
+    message_index:int ->
+    string tzresult Lwt.t
 
   val get_current_level : Kind.t -> Context.tree -> int32 option Lwt.t
 
@@ -101,6 +111,40 @@ module type S = sig
 
   val info_per_level_serialized :
     predecessor:Block_hash.t -> predecessor_timestamp:Time.Protocol.t -> string
+
+  module Wasm_2_0_0 : sig
+    (** [decode_durable_state enc tree] decodes a value using the encoder
+        [enc] from the provided [tree] *)
+    val decode_durable_state :
+      'a Tezos_tree_encoding.t -> Context.tree -> 'a Lwt.t
+
+    (** [proof_mem_tree t k] is false iff [find_tree k = None].*)
+    val proof_mem_tree : Context.tree -> string list -> bool Lwt.t
+
+    (** [fold ?depth t root ~order ~init ~f] recursively folds over the trees and
+        values of t. The f callbacks are called with a key relative to root. f is
+        never called with an empty key for values; i.e., folding over a value is a no-op.
+
+        The depth is 0-indexed. If depth is set (by default it is not), then f is only
+        called when the conditions described by the parameter is true:
+
+        - [Eq d] folds over nodes and values of depth exactly d.
+        - [Lt d] folds over nodes and values of depth strictly less than d.
+        - [Le d] folds over nodes and values of depth less than or equal to d.
+        - [Gt d] folds over nodes and values of depth strictly more than d.
+        - [Ge d] folds over nodes and values of depth more than or equal to d.
+
+        If order is [`Sorted] (the default), the elements are traversed in lexicographic
+        order of their keys. *)
+    val proof_fold_tree :
+      ?depth:Tezos_context_sigs.Context.depth ->
+      Context.tree ->
+      string list ->
+      order:[`Sorted | `Undefined] ->
+      init:'a ->
+      f:(string list -> Context.tree -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+  end
 
   module Fueled : sig
     module Free : FUELED_PVM with type fuel := Fuel.Free.t

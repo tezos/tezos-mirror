@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "dal_echo_kernel"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-entrypoint.workspace = true
+tezos-smart-rollup-storage.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup-mock.workspace = true
+
+[features]
+default = []
+testing = []

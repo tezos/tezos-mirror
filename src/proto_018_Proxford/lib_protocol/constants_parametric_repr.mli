@@ -43,10 +43,10 @@ type sc_rollup_reveal_activation_level = {
   raw_data : sc_rollup_reveal_hashing_schemes;
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
+  dal_parameters : Raw_level_repr.t;
 }
 
 type sc_rollup = {
-  enable : bool;
   arith_pvm_enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
@@ -86,6 +86,11 @@ type sc_rollup = {
   max_number_of_parallel_games : int;
   (* Activation's block level of reveal kinds. *)
   reveal_activation_level : sc_rollup_reveal_activation_level;
+  (* Activates an updatable whitelist of stakers. Only keys in the whitelist are
+     allowed to stake and publish a commitment. *)
+  private_enable : bool;
+  (* Activates the RISC-V pvm. *)
+  riscv_pvm_enable : bool;
 }
 
 type zk_rollup = {
@@ -104,8 +109,8 @@ type zk_rollup = {
 type adaptive_rewards_params = {
   issuance_ratio_min : (* Maximum yearly issuance rate *) Q.t;
   issuance_ratio_max : (* Minimum yearly issuance rate *) Q.t;
-  max_bonus : (* Maximum issuance bonus value *) int64;
-  growth_rate : (* Bonus value's groth rate *) int64;
+  max_bonus : (* Maximum issuance bonus value *) Issuance_bonus_repr.max_bonus;
+  growth_rate : (* Bonus value's growth rate *) Q.t;
   center_dz : (* Center for bonus *) Q.t;
   radius_dz :
     (* Minimum distance from center required for non-zero growth *) Q.t;
@@ -120,6 +125,15 @@ type adaptive_issuance = {
   launch_ema_threshold : (* Threshold of the activation vote *) int32;
   adaptive_rewards_params :
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
+  activation_vote_enable :
+    (* If set to true, reaching the launch_ema_threshold in the adaptive
+       issuance activation vote triggers the activation of the adaptive
+       inflation feature; otherwise the activation vote has no effect. *)
+    bool;
+  autostaking_enable :
+    (* If set to true, a stake/unstake/finalize operation will be triggered for
+       all delegate at end of cycle. *)
+    bool;
 }
 
 type issuance_weights = {
@@ -168,12 +182,11 @@ type t = {
   (* in slots *)
   consensus_threshold : int;
   (* in slots *)
-  max_slashing_period : int;
-  (* in cycles *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
-  percentage_of_frozen_deposits_slashed_per_double_baking : int;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : int;
+  percentage_of_frozen_deposits_slashed_per_double_baking : Int_percentage.t;
+  percentage_of_frozen_deposits_slashed_per_double_attestation :
+    Int_percentage.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;

@@ -82,3 +82,73 @@ much as possible, a test in this testsuite should avoid the use of timeouts
 and instead, should rely on `events` if possible.
 
 The implementation of the `tezt` library is detailed in its own documentation in the `lib/README.md` file.
+
+## Declaring test ownership with `TESTOWNERS.json`
+
+`TESTOWNERS.json` is a JSON file mapping 'products' to tests. It's
+used to declare test ownership by attaching tests to products.
+Through this file, developers and automated tooling can know what
+product team is responsible for the maintenance of which test.
+
+In pseudo-TypeScript, the schema of `TESTOWNERS.json` is:
+
+```typescript
+type TESTOWNERS = [PRODUCT_NAME: string]: PRODUCT_SPEC;
+type PRODUCT_SPEC = {
+  tags?: string[];
+  path_patterns?: string[];
+};
+```
+
+where the top-level element of `TESTOWNERS.json` has the type `TESTOWNERS`.
+                                   
+Semantically, each `PRODUCT_NAME` - `PRODUCT_SPEC` association in
+`TESTOWNERS` corresponds to a product and a set of Tezt test tags and
+path patterns to associated with the product. Path patterns are
+interpreted as Perl-style regular expressions such that a pattern `P`
+matches all tests with a `~__FILE__` that matches `P`. Tags match
+all the tests with the given tag. The full set of tests associated to
+a product is the union of all tests matched by any of the tags or the
+path patterns associated to the test. Each of the fields `tags` and
+`path_patterns` are optional, and their absence is interpreted as the
+empty list.
+
+Note that `path_patterns` should be acceptable by the `--match` option
+or the `=~` TSL operator in Tezt. For instance, a valid
+`TESTOWNERS.json` is:
+
+```json
+{
+    "layer1": {
+        "tags": ["michelson"],
+        "path_patterns": [
+            "^src/proto_.*/lib_protocol/"
+        ]
+    }
+}
+```
+
+This example defines a product called `layer1` and declares that all tezts
+tagged `michelson` or which are registered with `~__FILE__` in
+`src/proto_.*/lib_protocol/` (that is,
+`/src/proto_alpha/lib_protocol` but also similar tests for any other
+supported Tezos protocol) belong to the Layer 1 product.
+
+In other words, this TEZTOWNERS entry declares the Layer 1 product to
+be the owner of the union of the results returned by:
+
+```
+tezt 'michelson || file =~ "^src/proto_.*\/lib_protocol/"'
+```
+
+To see all the tests associated with a product, run:
+
+```shell
+scripts/tests_of_product.sh PRODUCT
+```
+
+To see the products associated with a set of tests, run:
+
+```shell
+scripts/tests_of_product.sh --reverse TSL_EXPRESSION
+```

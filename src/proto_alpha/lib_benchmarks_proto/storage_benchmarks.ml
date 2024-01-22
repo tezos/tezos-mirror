@@ -172,15 +172,14 @@ module List_key_values_benchmark_boilerplate = struct
   let workload_to_vector {size} =
     Sparse_vec.String.of_list [("size", float_of_int size)]
 
-  let group = Benchmark.Group "list_key_values"
+  let group = Benchmark.Group "storage_costs"
 
   let model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
-      ~model:
-        (Model.affine
-           ~intercept:(fv "list_key_values_intercept")
-           ~coeff:(fv "list_key_values_step"))
+      (Model.affine
+         ~intercept:(fv "list_key_values_intercept")
+         ~coeff:(fv "list_key_values_step"))
 end
 
 module List_key_values_benchmark = struct

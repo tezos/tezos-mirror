@@ -45,19 +45,11 @@ module type COMMITMENT = sig
 
   val pp : Format.formatter -> t -> unit
 
+  val pp_short : Format.formatter -> t -> unit
+
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
-
-  val zero : t
-end
-
-module type COMMITMENT_PROOF = sig
-  (** A commitment proof. *)
-  type t
-
-  (** An encoding for a commitment proof. This encoding is bounded. *)
-  val encoding : t Data_encoding.t
 
   val zero : t
 end
@@ -96,7 +88,8 @@ module type VERIFIER = sig
      bounded by a constant. *)
   type commitment_proof
 
-  module Commitment_proof : COMMITMENT_PROOF with type t := commitment_proof
+  module Commitment_proof :
+    Kzg.Interfaces.DegreeCheck_proof with type t := commitment_proof
 
   (** [verify_commitment t commitment proof] returns [true] if and only if the
       size of the data committed via [commitment] does not exceed the

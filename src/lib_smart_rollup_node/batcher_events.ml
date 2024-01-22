@@ -29,22 +29,22 @@ end) =
 struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; WORKER.worker_name]
+  let section = ["smart_rollup_node"; WORKER.worker_name]
 
   let queue =
     declare_1
       ~section
       ~name:"queue"
-      ~msg:"adding {nb_messages} to queue"
-      ~level:Notice
+      ~msg:"Adding {nb_messages} to queue"
+      ~level:Info
       ("nb_messages", Data_encoding.int31)
 
   let batched =
     declare_2
       ~section
       ~name:"batched"
-      ~msg:"batched {nb_messages} messages into {nb_batches} batches"
-      ~level:Notice
+      ~msg:"Batched {nb_messages} messages into {nb_batches} batches"
+      ~level:Debug
       ("nb_batches", Data_encoding.int31)
       ("nb_messages", Data_encoding.int31)
 
@@ -57,7 +57,7 @@ struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"[Warning]: Request {view} failed ({worker_status}): {errors}"
         ~level:Warning
         ("view", Request.encoding)
         ~pp1:Request.pp
@@ -65,17 +65,6 @@ struct
         ~pp2:Worker_types.pp_status
         ("errors", Error_monad.trace_encoding)
         ~pp3:Error_monad.pp_print_trace
-
-    let request_completed_notice =
-      declare_2
-        ~section
-        ~name:"request_completed_notice"
-        ~msg:"{view} {worker_status}"
-        ~level:Notice
-        ("view", Request.encoding)
-        ("worker_status", Worker_types.request_status_encoding)
-        ~pp1:Request.pp
-        ~pp2:Worker_types.pp_status
 
     let request_completed_debug =
       declare_2

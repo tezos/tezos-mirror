@@ -241,7 +241,9 @@ let test_evaluation_fft_random_values_with_smaller_polynomial ~power () =
     Poly.generate_biased_random_polynomial (Random.int (power - 1))
   in
   let expected_results =
-    Array.map (Poly.evaluate polynomial) (Domain.to_array domain)
+    let w = Domain.get domain 1 in
+    Array.init (Domain.length domain) (fun i ->
+        Poly.evaluate polynomial (Scalar.pow w (Z.of_int i)))
   in
   let results = Evaluations.(evaluation_fft domain polynomial |> to_array) in
   assert (Array.for_all2 Scalar.eq results expected_results)

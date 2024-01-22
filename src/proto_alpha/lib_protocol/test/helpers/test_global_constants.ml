@@ -34,8 +34,10 @@ let create_context () =
   Block.alpha_context (Account.make_bootstrap_accounts accounts)
 
 let expr_to_hash expr =
+  let open Result_syntax in
   let lexpr = Script_repr.lazy_expr expr in
-  Script_repr.force_bytes lexpr >|? fun b -> Script_expr_hash.hash_bytes [b]
+  let+ b = Script_repr.force_bytes lexpr in
+  Script_expr_hash.hash_bytes [b]
 
 let assert_expr_equal loc =
   Assert.equal

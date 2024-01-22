@@ -85,7 +85,7 @@ module Query : sig
         emission dates (cf. {!Time_constraint}).
 
       See also an example of use in {!Client_event_logging_commands}
-      (command ["tezos-client-admin query events from
+      (command ["octez-client-admin query events from
       unix-files:///..."]).
   *)
   val fold :

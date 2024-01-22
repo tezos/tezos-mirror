@@ -107,6 +107,7 @@ module Big_map = struct
        contract code are used, these ones are only used to make sure they are
        compatible during transmissions between contracts, and only need to be
        compatible, annotations notwithstanding. *)
+    let open Lwt_result_syntax in
     let key_type =
       Micheline.strip_locations
         (Script_repr.strip_annotations (Micheline.root key_type))
@@ -115,7 +116,7 @@ module Big_map = struct
       Micheline.strip_locations
         (Script_repr.strip_annotations (Micheline.root value_type))
     in
-    Storage.Big_map.Key_type.init ctxt id key_type >>=? fun ctxt ->
+    let* ctxt = Storage.Big_map.Key_type.init ctxt id key_type in
     Storage.Big_map.Value_type.init ctxt id value_type
 
   let apply_update ctxt ~id
@@ -124,26 +125,30 @@ module Big_map = struct
         key_hash;
         value;
       } =
+    let open Lwt_result_syntax in
     match value with
     | None ->
-        Storage.Big_map.Contents.remove (ctxt, id) key_hash
-        >|=? fun (ctxt, freed, existed) ->
+        let+ ctxt, freed, existed =
+          Storage.Big_map.Contents.remove (ctxt, id) key_hash
+        in
         let freed =
           if existed then freed + bytes_size_for_big_map_key else freed
         in
         (ctxt, Z.of_int ~-freed)
     | Some v ->
-        Storage.Big_map.Contents.add (ctxt, id) key_hash v
-        >|=? fun (ctxt, size_diff, existed) ->
+        let+ ctxt, size_diff, existed =
+          Storage.Big_map.Contents.add (ctxt, id) key_hash v
+        in
         let size_diff =
           if existed then size_diff else size_diff + bytes_size_for_big_map_key
         in
         (ctxt, Z.of_int size_diff)
 
   let apply_updates ctxt ~id updates =
+    let open Lwt_result_syntax in
     List.fold_left_es
       (fun (ctxt, size) update ->
-        apply_update ctxt ~id update >|=? fun (ctxt, added_size) ->
+        let+ ctxt, added_size = apply_update ctxt ~id update in
         (ctxt, Z.add size added_size))
       (ctxt, Z.zero)
       updates
@@ -275,13 +280,14 @@ let apply_updates :
     id:i ->
     u ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
- fun ctxt (module OPS) ~id updates ->
-  OPS.apply_updates ctxt ~id updates >>=? fun (ctxt, updates_size) ->
-  if Z.(equal updates_size zero) then return (ctxt, updates_size)
-  else
-    OPS.Total_bytes.get ctxt id >>=? fun size ->
-    OPS.Total_bytes.update ctxt id (Z.add size updates_size) >|=? fun ctxt ->
-    (ctxt, updates_size)
+  let open Lwt_result_syntax in
+  fun ctxt (module OPS) ~id updates ->
+    let* ctxt, updates_size = OPS.apply_updates ctxt ~id updates in
+    if Z.(equal updates_size zero) then return (ctxt, updates_size)
+    else
+      let* size = OPS.Total_bytes.get ctxt id in
+      let+ ctxt = OPS.Total_bytes.update ctxt id (Z.add size updates_size) in
+      (ctxt, updates_size)
 
 (**
   [apply_init ctxt ops ~id init] applies the initialization [init] on lazy
@@ -297,19 +303,20 @@ let apply_init :
     id:i ->
     (i, a) init ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
- fun ctxt (module OPS) ~id init ->
-  match init with
-  | Existing -> return (ctxt, Z.zero)
-  | Copy {src} ->
-      OPS.copy ctxt ~from:src ~to_:id >>=? fun ctxt ->
-      if OPS.Id.is_temp id then return (ctxt, Z.zero)
-      else
-        OPS.Total_bytes.get ctxt src >>=? fun copy_size ->
-        return (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
-  | Alloc alloc ->
-      OPS.Total_bytes.init ctxt id Z.zero >>=? fun ctxt ->
-      OPS.alloc ctxt ~id alloc >>=? fun ctxt ->
-      return (ctxt, OPS.bytes_size_for_empty)
+  let open Lwt_result_syntax in
+  fun ctxt (module OPS) ~id init ->
+    match init with
+    | Existing -> return (ctxt, Z.zero)
+    | Copy {src} ->
+        let* ctxt = OPS.copy ctxt ~from:src ~to_:id in
+        if OPS.Id.is_temp id then return (ctxt, Z.zero)
+        else
+          let+ copy_size = OPS.Total_bytes.get ctxt src in
+          (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
+    | Alloc alloc ->
+        let* ctxt = OPS.Total_bytes.init ctxt id Z.zero in
+        let+ ctxt = OPS.alloc ctxt ~id alloc in
+        (ctxt, OPS.bytes_size_for_empty)
 
 (**
   [apply_diff ctxt ops ~id diff] applies the diff [diff] on lazy storage [id]
@@ -325,19 +332,21 @@ let apply_diff :
     id:i ->
     (i, a, u) diff ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
- fun ctxt ((module OPS) as ops) ~id diff ->
-  match diff with
-  | Remove ->
-      if OPS.Id.is_temp id then
-        OPS.remove ctxt id >|= fun ctxt -> ok (ctxt, Z.zero)
-      else
-        OPS.Total_bytes.get ctxt id >>=? fun size ->
-        OPS.remove ctxt id >>= fun ctxt ->
-        return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
-  | Update {init; updates} ->
-      apply_init ctxt ops ~id init >>=? fun (ctxt, init_size) ->
-      apply_updates ctxt ops ~id updates >>=? fun (ctxt, updates_size) ->
-      return (ctxt, Z.add init_size updates_size)
+  let open Lwt_result_syntax in
+  fun ctxt ((module OPS) as ops) ~id diff ->
+    match diff with
+    | Remove ->
+        if OPS.Id.is_temp id then
+          let*! ctxt = OPS.remove ctxt id in
+          return (ctxt, Z.zero)
+        else
+          let* size = OPS.Total_bytes.get ctxt id in
+          let*! ctxt = OPS.remove ctxt id in
+          return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
+    | Update {init; updates} ->
+        let* ctxt, init_size = apply_init ctxt ops ~id init in
+        let* ctxt, updates_size = apply_updates ctxt ops ~id updates in
+        return (ctxt, Z.add init_size updates_size)
 
 type diffs_item =
   | Item :
@@ -389,10 +398,11 @@ let encoding =
   def "lazy_storage_diff" @@ list item_encoding
 
 let apply ctxt diffs =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (ctxt, total_size) (Item (k, id, diff)) ->
       let ops = get_ops k in
-      apply_diff ctxt ops ~id diff >|=? fun (ctxt, added_size) ->
+      let+ ctxt, added_size = apply_diff ctxt ops ~id diff in
       let (module OPS) = ops in
       ( ctxt,
         if OPS.Id.is_temp id then total_size else Z.add total_size added_size ))
@@ -423,11 +433,14 @@ let init ctxt =
     Lazy_storage_kind.all
 
 let cleanup_temporaries ctxt =
+  let open Lwt_syntax in
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
-      List.fold_left_s
-        (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
-          let (module OPS) = get_ops k in
-          Lazy_storage_kind.Temp_ids.fold_s k OPS.remove temp_ids ctxt)
-        ctxt
-        Lazy_storage_kind.all
-      >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
+      let+ ctxt =
+        List.fold_left_s
+          (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
+            let (module OPS) = get_ops k in
+            Lazy_storage_kind.Temp_ids.fold_s k OPS.remove temp_ids ctxt)
+          ctxt
+          Lazy_storage_kind.all
+      in
+      (ctxt, Lazy_storage_kind.Temp_ids.init))

@@ -59,7 +59,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
 
   let metadata (node_ctxt : _ Node_context.t) =
     let address =
-      Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+      Sc_rollup_proto_types.Address.of_octez node_ctxt.config.sc_rollup_address
     in
     let origination_level =
       Raw_level.of_int32_exn node_ctxt.genesis_info.level
@@ -77,11 +77,12 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
+    let* constants =
+      Protocol_plugins.get_constants_of_level node_ctxt (Int32.of_int level)
+    in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.current_protocol.constants.dal.attestation_lag
-    in
+    let dal_attestation_lag = constants.dal.attestation_lag in
     let decode_reveal (Tezos_scoru_wasm.Wasm_pvm_state.Reveal_raw payload) =
       match
         Data_encoding.Binary.of_string_opt
@@ -134,7 +135,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             in
             return (state, executed_ticks, failing_ticks))
           (function
-            | Error_wrapper error -> Lwt.return (Error error) | exn -> raise exn)
+            | Error_wrapper error -> Lwt.return (Error error)
+            | exn -> Lwt.reraise exn)
       in
       let failure_insertion_eval state tick failing_ticks' =
         let*! () =
@@ -330,7 +332,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in
@@ -419,7 +421,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           let message_index = message_counter_offset - 1 in
           let failing_ticks =
             Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
+              node_ctxt.Node_context.config.loser_mode
               ~level
               ~message_index
           in

@@ -23,23 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
+open Kzg.Bls
+open Kzg.Utils
 
 module Internal = struct
-  open Plonk.Polynomial_commitment.Kzg_impl
+  open Kzg.Polynomial_commitment
 
   let test_verifier_srs () =
     let n = 2 in
-    let pp_prv, pp_vrf =
+    let pp_prv, pp_vrf, _ =
       Public_parameters.setup (n, 0) Plonk_test.Helpers.srs
     in
     assert (G2.eq pp_prv.encoding_1 pp_vrf.encoding_1) ;
     assert (G2.eq pp_prv.encoding_x pp_vrf.encoding_x)
 end
 
-module External (PC : Plonk.Polynomial_commitment.S) = struct
-  module SMap = Plonk.SMap
+module External (PC : Kzg.Interfaces.Polynomial_commitment) = struct
+  module SMap = Kzg.SMap
 
   let generate_random_poly degree =
     Poly.of_coefficients (List.init degree (fun i -> (Scalar.random (), i)))
@@ -56,14 +56,14 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
     f_map_list : Poly.t SMap.t list;
     cmt_list : PC.Commitment.t list;
     prover_aux_list : PC.Commitment.prover_aux list;
-    transcript : Bytes.t;
+    transcript : Transcript.t;
     query_list : Scalar.t SMap.t list;
     answer_list : PC.answer list;
   }
 
   let generate_instance ~nb_batches ~nb_polys_per_batch =
     let max_degree = 20 in
-    let pp_prover, pp_verifier =
+    let pp_prover, pp_verifier, transcript =
       PC.Public_parameters.setup (2 * nb_polys_per_batch) Plonk_test.Helpers.srs
     in
     let f_map_list =
@@ -71,10 +71,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
           generate_f_map ~prefix:(string_of_int i) max_degree nb_polys_per_batch)
     in
     let cmt_list, prover_aux_list =
-      List.map (PC.Commitment.commit pp_prover) f_map_list |> List.split
-    in
-    let transcript =
-      Transcript.list_expand PC.Commitment.t cmt_list Bytes.empty
+      List.map (PC.commit pp_prover) f_map_list |> List.split
     in
     let x1 = Scalar.random () in
     let x2 = Scalar.random () in
@@ -109,7 +106,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
     let b, verifier_final_transcript =
       PC.verify
         instance.pp_verifier
-        (if wrong_transcript then Bytes.empty else instance.transcript)
+        (if wrong_transcript then Transcript.empty else instance.transcript)
         instance.cmt_list
         instance.query_list
         instance.answer_list
@@ -120,7 +117,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
        the same answer list and start from the same transcript (where
        we should typically have included the cmt list *)
     if not wrong_transcript then
-      assert (Bytes.equal prover_final_transcript verifier_final_transcript) ;
+      assert (Transcript.equal prover_final_transcript verifier_final_transcript) ;
     b
 
   let test_correctness () =
@@ -147,7 +144,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
     assert (not @@ prove_and_verify_instance ~wrong_transcript:true instance)
 end
 
-module KZG_Tests = External (Plonk.Polynomial_commitment)
+module KZG_Tests = External (Kzg.Polynomial_commitment)
 module KZG_Pack_Tests = External (Aggregation.Polynomial_commitment)
 
 let tests =

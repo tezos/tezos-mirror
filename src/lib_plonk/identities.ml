@@ -1,4 +1,8 @@
-open Bls
+open Kzg.Bls
+module SMap = Kzg.SMap
+
+(* Module to operate with polynomials in FFT evaluations form. *)
+module Evaluations = Evaluations_map.Make (Evals)
 
 module Identities : sig
   (** The type for prover identities: functions from a (string) map of

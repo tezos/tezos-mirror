@@ -1,0 +1,23 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez Client
+
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Packager:       @MAINT@
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez Client and Wallet
+
+%files
+%{_bindir}/octez-*
+

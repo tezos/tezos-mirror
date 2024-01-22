@@ -9,3 +9,6 @@ build:static-x86_64-linux-binaries:
   variables:
     ARCH: "x86_64"
     EXECUTABLE_FILES: "script-inputs/released-executables"
+  # Extend the lifespan to prevent failure for external tools using artifacts.
+  artifacts:
+    expire_in: 90 days

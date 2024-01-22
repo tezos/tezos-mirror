@@ -69,7 +69,7 @@ end)
 
 let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
-  @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.rollup_address
+  @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.config.sc_rollup_address
 
 let () =
   Global_directory.register0 Rollup_node_services.Global.current_tezos_head
@@ -95,6 +95,33 @@ let () =
       in
       Option.map (fun c -> (c, commitment_hash)) commitment
 
+(* Sets up a block watching service. It creates a stream to
+   observe block events and asynchronously fetches the next
+   block when available *)
+let create_block_watcher_service (node_ctxt : _ Node_context.t) =
+  let open Lwt_syntax in
+  (* input source block creating a stream to observe the events *)
+  let block_stream, stopper =
+    Lwt_watcher.create_stream node_ctxt.global_block_watcher
+  in
+  let* head = Node_context.last_processed_head_opt node_ctxt in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  (* generate the next asynchronous event *)
+  let next =
+    let first_call = ref true in
+    fun () ->
+      if !first_call then (
+        first_call := false ;
+        return (Result.to_option head |> Option.join))
+      else Lwt_stream.get block_stream
+  in
+  Tezos_rpc.Answer.return_stream {next; shutdown}
+
+let () =
+  Global_directory.gen_register0
+    Rollup_node_services.Global.global_block_watcher
+  @@ fun node_ctxt () () -> create_block_watcher_service node_ctxt
+
 let () =
   Local_directory.register0 Rollup_node_services.Local.last_published_commitment
   @@ fun node_ctxt () () ->
@@ -118,6 +145,38 @@ let () =
       return_some (commitment, hash, first_published, published)
 
 let () =
+  Local_directory.register1 Rollup_node_services.Local.commitment
+  @@ fun node_ctxt commitment_hash () () ->
+  let open Lwt_result_syntax in
+  let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
+  match commitment with
+  | None -> return_none
+  | Some commitment ->
+      let hash = Octez_smart_rollup.Commitment.hash commitment in
+      (* The corresponding level in Store.Commitments.published_at_level is
+         available only when the commitment has been published and included
+         in a block. *)
+      let* published_at_level_info =
+        Node_context.commitment_published_at_level node_ctxt hash
+      in
+      let first_published, published =
+        match published_at_level_info with
+        | None -> (None, None)
+        | Some {first_published_at_level; published_at_level} ->
+            (Some first_published_at_level, published_at_level)
+      in
+      return_some (commitment, hash, first_published, published)
+
+let () =
+  Local_directory.register0 Rollup_node_services.Local.gc_info
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let+ {last_gc_level; first_available_level} =
+    Node_context.get_gc_levels node_ctxt
+  in
+  Rollup_node_services.{last_gc_level; first_available_level}
+
+let () =
   Local_directory.register0 Rollup_node_services.Local.injection
   @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
@@ -139,18 +198,25 @@ let () =
          ((last_commitment - inbox_level) / commitment_period
           * commitment_period)
       v}
-  *)
+*)
 let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Option_syntax in
-  let+ last_published_commitment = Reference.get node_ctxt.lpc in
-  let commitment_period =
-    Int32.of_int
-      node_ctxt.current_protocol.constants.sc_rollup.commitment_period_in_blocks
+  let open Lwt_result_syntax in
+  let last_published_commitment = Reference.get node_ctxt.lpc in
+  let+ constants =
+    Protocol_plugins.get_constants_of_level node_ctxt inbox_level
   in
-  let last_published = last_published_commitment.inbox_level in
-  let open Int32 in
-  div (sub last_published inbox_level) commitment_period
-  |> mul commitment_period |> sub last_published
+  let commitment_period =
+    Int32.of_int constants.sc_rollup.commitment_period_in_blocks
+  in
+  Option.map
+    (fun last_published_commitment ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6246
+         fix and test last_published_inbox_level in RPC dir. *)
+      let last_published = last_published_commitment.Commitment.inbox_level in
+      let open Int32 in
+      div (sub last_published inbox_level) commitment_period
+      |> mul commitment_period |> sub last_published)
+    last_published_commitment
 
 let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let open Lwt_result_syntax in
@@ -185,7 +251,7 @@ let () =
                 let* finalized, cemented =
                   inbox_info_of_level node_ctxt l1_level
                 in
-                let commitment_level =
+                let* commitment_level =
                   commitment_level_of_inbox_level node_ctxt l1_level
                 in
                 match commitment_level with
@@ -299,6 +365,7 @@ let directory node_ctxt =
         let* level =
           Block_directory_helpers.block_level_of_id node_ctxt block_id
         in
+        let* () = Node_context.check_level_available node_ctxt level in
         let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
         Plugin.RPC_directory.block_directory node_ctxt
       in

@@ -72,6 +72,7 @@ end = struct
     Logs.Src.set_level Logger.log_src logs_level ;
     Logs.set_reporter @@ Logger.lwt_reporter () ;
     let ret = ref None in
+    Lwt.Exception_filter.(set handle_all_except_runtime) ;
     Lwt_main.run
       (D.run_node
          ~process:(master_proc m ~ret)

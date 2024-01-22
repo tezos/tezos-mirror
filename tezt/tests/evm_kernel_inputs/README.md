@@ -25,13 +25,22 @@ External message:
 
 # Inputs for the Proxy
 
+## 100-inputs-for-proxy
 The file `100-inputs-for-proxy` is a list of signed transactions generated with `signer.js`. It can be regenerated with the following command:
 ```
 npm install @ethereumjs/common @ethereumjs/tx
 ./signer.js > 100-inputs-for-proxy
 ```
 
-#Smart contracts inputs
+# 100-loops and 100-loops-transfers
+The file `100-loops` has been produced by a scenario in `kernel_evm/benchmarks`
+```
+node etherlink/kernel_evm/benchmarks/scripts/benchmarks/bench_loop_expensive.js for-test
+```
+This produces both transfers and calls. The transfers goes in a file `100-loops-transfers`.
+The calls go in `100-loops`.
+
+# Smart contracts inputs
 
 To deploy a solidity contract on the rollup two files are necessary:
 - the ABI (interface), in a JSON format,
@@ -41,4 +50,4 @@ Those files can be generated from the solidity source code using Ethereum
 standard tooling. For example [Remix](https://remix.ethereum.org/) (online IDE)
 or other tools.
 
-The contracts source code can be found in `src/kernel_evm/solidity_examples`.
+The contracts source code can be found in `etherlink/kernel_evm/solidity_examples`.

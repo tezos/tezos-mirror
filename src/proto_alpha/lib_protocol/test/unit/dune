@@ -73,7 +73,8 @@
   test_local_contexts
   test_dal_slot_proof
   test_adaptive_issuance
-  test_adaptive_issuance_ema))
+  test_adaptive_issuance_ema
+  test_percentage))
 
 (executable
  (name main)

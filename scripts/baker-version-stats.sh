@@ -14,7 +14,7 @@ fi
 
 if [ -z "$TO_LEVEL" ]
 then
-    SCRIPT_NAME=$(basename $0)
+    SCRIPT_NAME=$(basename "$0")
     echo "Usage: $SCRIPT_NAME <FROM_LEVEL> <TO_LEVEL> [HOST:PORT]"
     echo
     echo "This script gets the commit hash from the proof of work nonce"
@@ -31,29 +31,29 @@ fi
 ########################################################
 # Gather Proof of Work Nonces
 
-RAW_FILENAME=$(tempfile --prefix baker-version-stats-raw --suffix .txt)
+RAW_FILENAME=$(mktemp --suffix=.txt baker-version-stats-raw.XXXXXXXX)
 
-for i in $(seq $FROM_LEVEL $TO_LEVEL)
+for i in $(seq "$FROM_LEVEL" "$TO_LEVEL")
 do
 #    echo "Fetching $i/$TO_LEVEL..."
-    curl -s http://$HOST/chains/main/blocks/$i/header | jq .proof_of_work_nonce >> $RAW_FILENAME
+    curl -s "http://$HOST/chains/main/blocks/$i/header" | jq -r .proof_of_work_nonce >> "$RAW_FILENAME"
 done
 
 ########################################################
 # Count Statistics
 
-STATS_FILENAME=$(tempfile --prefix baker-version-stats --suffix .txt)
-sort $RAW_FILENAME | cut -c 2-9 | uniq -c | sort -n > $STATS_FILENAME
-rm -f $RAW_FILENAME
+STATS_FILENAME=$(mktemp --suffix=.txt baker-version-stats.XXXXXXXX)
+sort "$RAW_FILENAME" | cut -c 1-8 | uniq -c | sort -n > "$STATS_FILENAME"
+rm -f "$RAW_FILENAME"
 
 ########################################################
 # Display Statistics
 
-while read LINE
+while read -r LINE
 do
-    COUNT=$(echo $LINE | cut -d ' ' -f 1)
-    COMMIT=$(echo $LINE | cut -d ' ' -f 2)
-    COMMIT_INFO=$(PAGER=cat git log $COMMIT -1 --format=format:'%h %ci%d%n%s' 2> /dev/null)
+    COUNT=$(echo "$LINE" | cut -d ' ' -f 1)
+    COMMIT=$(echo "$LINE" | cut -d ' ' -f 2)
+    COMMIT_INFO=$(PAGER="cat" git log "$COMMIT" -1 --format=format:'%h %ci%d%n%s' 2> /dev/null)
     echo
     if [ -z "$COMMIT_INFO" ]
     then
@@ -62,6 +62,6 @@ do
         echo "$COMMIT_INFO"
     fi
     echo "=> $COUNT blocks"
-done < $STATS_FILENAME
+done < "$STATS_FILENAME"
 
-rm -f $STATS_FILENAME
+rm -f "$STATS_FILENAME"

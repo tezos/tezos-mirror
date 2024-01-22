@@ -103,7 +103,7 @@ let streamed_certificates_client coordinator_node root_hash =
       Dac_rpc.V0.api_prefix
       root_hash
   in
-  RPC.Curl.get_raw endpoint
+  Curl.get_raw endpoint
   |> Runnable.map (fun output ->
          let as_list = String.split_on_char '\n' output in
          (* Each JSON item in the response of the curl request is
@@ -304,9 +304,10 @@ let sample_payload example_filename =
 
 let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
-let assert_state_changed ?block sc_rollup_client prev_state_hash =
-  let*! state_hash =
-    Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
+let assert_state_changed ?block sc_rollup_node prev_state_hash =
+  let* state_hash =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_state_hash ?block ()
   in
   Check.(state_hash <> prev_state_hash)
     Check.string
@@ -560,7 +561,7 @@ module Full_infrastructure = struct
 
   (** [run_and_subscribe_nodes coordinator_node dac_nodes] runs all [dac_nodes].
       Additionally, it blocks until all nodes are successfully subscribed to
-      [coordinator_node]. *)
+      [coordinator_node] and synchronized with L1. *)
   let run_and_subscribe_nodes coordinator_node dac_nodes =
     let wait_for_node_subscribed_to_data_streamer () =
       wait_for_handle_new_subscription_to_hash_streamer coordinator_node
@@ -571,12 +572,16 @@ module Full_infrastructure = struct
        we cannot wait for multiple subscription to the hash streamer, as
        events of this kind are indistinguishable one from the other.
        Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
+       node to be notified before running the next node.
+       In addition to that, we also wait for the dac_nodes to be
+       synchronized with the L1's current head. *)
     Lwt_list.iter_s
       (fun node ->
         let node_is_subscribed = wait_for_node_subscribed_to_data_streamer () in
+        let wait_for_level = wait_for_layer1_new_head node in
         let* () = Dac_node.run ~wait_ready:true node in
         let* () = check_liveness_and_readiness node in
+        let* () = wait_for_level in
         node_is_subscribed)
       dac_nodes
 
@@ -945,7 +950,7 @@ module Full_infrastructure = struct
     (* 4. The signature of the root hash is requested again via the
           client `get certificate` command. *)
     let* get_certificate =
-      RPC.call
+      Dac_node.RPC.call
         coordinator_node
         (Dac_rpc.V0.get_serialized_certificate
            ~hex_root_hash:(`Hex expected_rh))
@@ -1618,18 +1623,22 @@ module Tx_kernel_e2e = struct
       @@ [multiaccount_tx_of accounts_ops]
   end
 
-  let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
-    let*! ticks = Sc_rollup_client.total_ticks ?block ~hooks sc_rollup_client in
+  let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
+    let* ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ?block ()
+    in
     Check.(ticks > prev_ticks)
       Check.int
       ~error_msg:"Tick counter did not advance (%L > %R)" ;
     Lwt.return_unit
 
   (* Send a deposit into the rollup. *)
-  let test_deposit ~client ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address
+  let test_deposit ~client ~sc_rollup_node ~sc_rollup_address
       ~mint_and_deposit_contract level tz4_address =
-    let*! prev_state_hash =
-      Sc_rollup_client.state_hash ~hooks sc_rollup_client
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
     let* () =
       (* Internal message through forwarder *)
@@ -1652,7 +1661,7 @@ module Tx_kernel_e2e = struct
     let* _ =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + 1)
     in
-    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed sc_rollup_node prev_state_hash in
     Lwt.return @@ (level + 1)
 
   let rec bake_until cond client sc_rollup_node =
@@ -1816,56 +1825,36 @@ module Tx_kernel_e2e = struct
         level;
       }
 
-  let send_message_and_wait_for_level ~level ~sc_rollup_client ~sc_rollup_node
-      ~client ~hooks hex_encoded_message =
-    let*! prev_state_hash =
-      Sc_rollup_client.state_hash ~hooks sc_rollup_client
+  let send_message_and_wait_for_level ~level ~sc_rollup_node ~client
+      hex_encoded_message =
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
     in
-    let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+    let* prev_ticks =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+    in
     let* () = send_message client (sf "hex:[%S]" hex_encoded_message) in
     let level = level + 1 in
     let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-    let* () = assert_state_changed sc_rollup_client prev_state_hash in
+    let* () = assert_state_changed sc_rollup_node prev_state_hash in
     return {prev_state_hash; prev_ticks; level}
 
-  let verify_outbox_answer ~withdrawal_level ~sc_rollup_client
-      ~sc_rollup_address ~client ~receive_tickets_contract
-      ~mint_and_deposit_contract =
-    let*! outbox =
-      Sc_rollup_client.outbox ~outbox_level:withdrawal_level sc_rollup_client
+  let verify_outbox_answer ~withdrawal_level ~sc_rollup_node ~sc_rollup_client
+      ~sc_rollup_address ~client =
+    let* outbox =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:withdrawal_level ()
     in
     Log.info "Outbox is %s" @@ JSON.encode outbox ;
     let* answer =
       let message_index = 0 in
       let outbox_level = withdrawal_level in
-      let destination = receive_tickets_contract in
-      let open Tezos_protocol_alpha.Protocol.Alpha_context in
-      let ticketer =
-        mint_and_deposit_contract |> Contract.of_b58check |> Result.get_ok
-        |> Data_encoding.(Binary.to_string_exn Contract.encoding)
-        |> hex_encode
-      in
-      let parameters d =
-        Printf.sprintf
-          {|Pair 0x%s (Pair "%s" %s)|}
-          ticketer
-          "Hello, Ticket!"
-          (Int.to_string d)
-      in
-      let outbox_transaction param =
-        Sc_rollup_client.
-          {
-            destination;
-            entrypoint = Some "receive_tickets";
-            parameters = parameters param;
-            parameters_ty = None;
-          }
-      in
-      Sc_rollup_client.outbox_proof_batch
+      Sc_rollup_client.outbox_proof
         sc_rollup_client
         ~message_index
         ~outbox_level
-        (List.map outbox_transaction [220; 100; 40])
     in
     match answer with
     | Some {commitment_hash; proof} ->
@@ -1968,7 +1957,7 @@ module Tx_kernel_e2e = struct
     let* _ = Dac_node.init_config observer_node in
     let* () = Dac_node.run observer_node in
     let* () = check_liveness_and_readiness observer_node in
-    let* boot_sector =
+    let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat
@@ -1989,7 +1978,7 @@ module Tx_kernel_e2e = struct
     let* () = Client.bake_for_and_wait client in
     (* Run the rollup node, ensure origination succeeds. *)
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup_address
     in
@@ -2006,8 +1995,7 @@ module Tx_kernel_e2e = struct
            pkh1;
            transfer_message;
            withdraw_message;
-           mint_and_deposit_contract;
-           receive_tickets_contract;
+           mint_and_deposit_contract : _;
            level;
            _;
          } =
@@ -2023,7 +2011,6 @@ module Tx_kernel_e2e = struct
       test_deposit
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
@@ -2057,10 +2044,8 @@ module Tx_kernel_e2e = struct
     let* {level; _} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         l1_external_message
     in
 
@@ -2069,10 +2054,8 @@ module Tx_kernel_e2e = struct
     let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         withdraw_message
     in
     let* _, last_lcc_level =
@@ -2098,17 +2081,16 @@ module Tx_kernel_e2e = struct
     in
 
     let block = string_of_int next_lcc_level in
-    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
-    let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
+    let* () = assert_state_changed ~block sc_rollup_node prev_state_hash in
+    let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
     (* EXECUTE withdrawal *)
     let* () =
       verify_outbox_answer
         ~client
+        ~sc_rollup_node
         ~sc_rollup_client
         ~sc_rollup_address
-        ~receive_tickets_contract
-        ~mint_and_deposit_contract
         ~withdrawal_level
     in
     unit
@@ -2137,7 +2119,7 @@ module Tx_kernel_e2e = struct
       scenario
     in
     let sc_rollup_node = List.nth rollup_nodes 0 in
-    let* boot_sector =
+    let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat
@@ -2159,7 +2141,7 @@ module Tx_kernel_e2e = struct
 
     (* Run the rollup node, ensure origination succeeds. *)
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup_address
     in
@@ -2184,7 +2166,6 @@ module Tx_kernel_e2e = struct
            transfer_message;
            withdraw_message;
            mint_and_deposit_contract;
-           receive_tickets_contract;
            level;
            _;
          } =
@@ -2200,7 +2181,6 @@ module Tx_kernel_e2e = struct
       test_deposit
         ~client
         ~sc_rollup_node
-        ~sc_rollup_client
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
@@ -2258,10 +2238,8 @@ module Tx_kernel_e2e = struct
     let* {level; _} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         l1_external_message
     in
 
@@ -2270,10 +2248,8 @@ module Tx_kernel_e2e = struct
     let* {prev_state_hash; prev_ticks; level = withdrawal_level} =
       send_message_and_wait_for_level
         ~level
-        ~sc_rollup_client
         ~sc_rollup_node
         ~client
-        ~hooks
         withdraw_message
     in
     let* _, last_lcc_level =
@@ -2298,17 +2274,16 @@ module Tx_kernel_e2e = struct
         sc_rollup_node
     in
     let block = string_of_int next_lcc_level in
-    let* () = assert_state_changed ~block sc_rollup_client prev_state_hash in
-    let* () = assert_ticks_advanced ~block sc_rollup_client prev_ticks in
+    let* () = assert_state_changed ~block sc_rollup_node prev_state_hash in
+    let* () = assert_ticks_advanced ~block sc_rollup_node prev_ticks in
 
     (* EXECUTE withdrawal *)
     let* () =
       verify_outbox_answer
         ~client
+        ~sc_rollup_node
         ~sc_rollup_client
         ~sc_rollup_address
-        ~receive_tickets_contract
-        ~mint_and_deposit_contract
         ~withdrawal_level
     in
     unit
@@ -2320,6 +2295,7 @@ module Tx_kernel_e2e = struct
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
+      ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
       ~observers:1
@@ -2335,8 +2311,9 @@ module Tx_kernel_e2e = struct
     let custom_committee_members = [Constant.aggregate_tz4_account] in
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
-      ~supports:Protocol.(From_protocol (number Oxford))
+      ~supports:Protocol.(From_protocol (number Nairobi + 1))
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
+      ~uses:(fun _protocol -> [Constant.octez_smart_rollup_node])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
       ~observers:1
@@ -2394,14 +2371,14 @@ module V1_API = struct
       (* TODO https://gitlab.com/tezos/tezos/-/issues/5671
          Once we have "PUT v1/preimage" we should use a call to [V1] api here
          instead. *)
-      RPC.call
+      Dac_node.RPC.call
         coordinator_node
         (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
     in
     let* response =
-      RPC.call_raw coordinator_node @@ Dac_rpc.V1.get_pages root_hash
+      Dac_node.RPC.call_raw coordinator_node @@ Dac_rpc.V1.get_pages root_hash
     in
-    return @@ RPC.check_string_response ~code:404 response
+    return @@ RPC_core.check_string_response ~code:404 response
 end
 
 (** [Api_regression] is a module that encapsulates schema regression tests of
@@ -2486,7 +2463,7 @@ module Api_regression = struct
       Cohttp.Header.of_list [("Content-Type", "application/json")]
     in
     let* () = capture_rpc_request headers verb uri in
-    return @@ (RPC.Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
+    return @@ (Curl.get_raw (Uri.to_string uri) |> Runnable.map capture)
 
   (** [V0] module is used for regression testing [V0] API. *)
   module V0 = struct
@@ -2566,7 +2543,7 @@ module Api_regression = struct
       in
       (* We put the sample signature to Coordinator node. *)
       let* () =
-        RPC.call
+        Dac_node.RPC.call
           coordinator_node
           (Dac_rpc.V0.put_dac_member_signature
              ~hex_root_hash:root_hash
@@ -2672,7 +2649,7 @@ let register ~protocols =
     ~__FILE__
     ~committee_size:0
     ~observers:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_streaming_of_root_hashes"
     Full_infrastructure.test_streaming_of_root_hashes_as_observer
     protocols ;
@@ -2680,7 +2657,7 @@ let register ~protocols =
     ~__FILE__
     ~committee_size:1
     ~observers:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_push_signature_as_member"
     Full_infrastructure.test_streaming_of_root_hashes_as_member
     protocols ;
@@ -2688,7 +2665,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "committee member downloads pages from coordinator"
     Full_infrastructure.test_observer_downloads_pages
     protocols ;
@@ -2696,7 +2673,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_get_certificate"
     Full_infrastructure.Signature_manager.test_get_certificate
     protocols ;
@@ -2704,7 +2681,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:3
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_store_member_signature"
     Full_infrastructure.Signature_manager.test_handle_store_signature
     protocols ;
@@ -2712,7 +2689,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_coordinator_post_preimage_endpoint"
     Full_infrastructure.test_coordinator_post_preimage_endpoint
     protocols ;
@@ -2720,13 +2697,14 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "dac_observer_get_missing_page"
     Full_infrastructure.test_observer_get_missing_page
     protocols ;
   scenario_with_layer1_node
     ~__FILE__
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_node])
     "dac_observer_times_out_when_page_cannot_be_fetched"
     test_observer_times_out_when_page_cannot_be_fetched
     protocols ;
@@ -2734,7 +2712,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "committee members and observers download pages from coordinator"
     Full_infrastructure.test_download_and_retrieval_of_pages
     protocols ;
@@ -2742,7 +2720,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "certificates are updated in streaming endpoint"
     Full_infrastructure.test_streaming_certificates
     protocols ;
@@ -2750,7 +2728,8 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test client commands (hex payload from CLI)"
     (Full_infrastructure.test_client ~send_payload_from_file:false)
     protocols ;
@@ -2758,7 +2737,8 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test client commands (binary payload from file)"
     (Full_infrastructure.test_client ~send_payload_from_file:true)
     protocols ;
@@ -2766,7 +2746,8 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
+    ~uses:(fun _protocol -> [Constant.octez_dac_client])
     "test serialized certificate"
     Full_infrastructure.test_serialized_certificate
     protocols ;
@@ -2774,7 +2755,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test committee member disconnects from Coordinator"
     Full_infrastructure.test_committe_member_disconnects_scenario
     protocols ;
@@ -2782,7 +2763,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:1
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test DAC disconnects from L1"
     Full_infrastructure.test_tezos_node_disconnects_scenario
     protocols ;
@@ -2793,7 +2774,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test v1/get_pages"
     V1_API.test_get_pages
     protocols ;
@@ -2802,7 +2783,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"]
+    ~tags:["dac"]
     "test --allow_v1_api feature flag"
     V1_API.test_allow_v1_feature_flag
     protocols ;
@@ -2810,7 +2791,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test Coordinator's post preimage"
     Api_regression.V0.test_coordinator_post_preimage
@@ -2819,7 +2800,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/preimage"
     Api_regression.V0.test_get_preimage
@@ -2828,7 +2809,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test PUT v0/dac_member_signature"
     Api_regression.V0.test_put_dac_member_signature
@@ -2837,7 +2818,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:2
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/certificate"
     Api_regression.V0.test_get_certificate
@@ -2846,7 +2827,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:1
     ~committee_size:3
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/missing_page"
     Api_regression.V0.test_observer_get_missing_page
@@ -2855,7 +2836,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:0
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/monitor/root_hashes"
     Api_regression.V0.test_monitor_root_hashes
@@ -2864,7 +2845,7 @@ let register ~protocols =
     ~__FILE__
     ~observers:0
     ~committee_size:1
-    ~tags:["dac"; "dac_node"; "api_regression"]
+    ~tags:["dac"; "api_regression"]
     ~allow_regression:true
     "test GET v0/monitor/certificate"
     Api_regression.V0.test_monitor_certificates

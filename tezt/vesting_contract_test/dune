@@ -1,11 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name main)
- (libraries octez-libs.stdlib
-            octez-protocol-alpha-libs.test-helpers
-            octez-libs.micheline
-            tezos-protocol-alpha.protocol
-            tezt-tezos
-            ptime)
- (flags (:standard
-          (:include %{workspace_root}/macos-link-flags.sexp)
-          -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezos_stdlib)))
+ (libraries
+  tezt
+  tezt-tezos
+  octez-libs.stdlib
+  octez-libs.test-helpers
+  octez-libs.micheline
+  tezos-protocol-alpha.protocol
+  ptime)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos))

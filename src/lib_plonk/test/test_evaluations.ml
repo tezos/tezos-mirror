@@ -22,10 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Plonk.Bls
-module SMap = Plonk.SMap
+open Kzg.Bls
+open Plonk.Identities
+module SMap = Kzg.SMap
 
-let powers = Plonk.Utils.Fr_generation.powers
+let powers = Kzg.Utils.Fr_generation.powers
 
 open Evaluations
 

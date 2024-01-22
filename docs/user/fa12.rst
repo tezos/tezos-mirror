@@ -1,16 +1,22 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-FA1.2 asset smart contracts
-===========================
+FA1.2 support
+=============
 
 Financial application 1.2, or **FA1.2** for short, is a standard that
 describes the interface of smart contracts that implement ledger with
 balances that is described by `tzip-007
 <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_.
-On the following page, we will refer to FA1.2 assets as their commonly
-used terminology: tokens.
+We refer hereafter to FA1.2 assets by their common name: tokens.
 
-As such, an FA1.2 contract implements multiple entrypoints that describe how
+This page does not present FA1.2 tokens in general, but their Michelson interface and their support in the Octez client.
+
+For a more general presentation of token standards such as FA1.2 from a Tezos developer perspective, using higher-level smart contract languages, see `Token standards in Tezos <https://docs.tezos.com/architecture/tokens#token-standards>`__.
+
+Michelson interface
+-------------------
+
+An FA1.2 contract implements multiple entrypoints that describe how
 users can transfer tokens, approve others to withdraw tokens from their account,
 and retrieve some information such as balances, withdrawal allowance and total
 supply. The Michelson interface is then described by the following entrypoints:
@@ -42,6 +48,10 @@ returns a value on a given contract.
 <https://tezos.gitlab.io/alpha/cli-commands.html#client-manual>`_ to
 interact with FA1.2-compatible contracts, with details about the syntax of each
 one.
+
+
+Client commands
+---------------
 
 Checking whether a contract is FA1.2 compatible
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -110,7 +120,7 @@ View information
 An FA1.2 contract implements three entrypoints that allow a user to check any
 account's balance, or allowance between an account and an operator, and get the
 total supply of tokens of the contract. These entrypoints are implemented as
-`views
+`offline views
 <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_:
 they give back the requested information as a transaction on a given contract,
 assuming its parameter is compatible.

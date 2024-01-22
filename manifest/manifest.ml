@@ -96,6 +96,8 @@ module Dune = struct
     | Native -> "native"
     | JS -> "js"
 
+  type ppx_kind = Ppx_rewriter | Ppx_deriver
+
   type s_expr =
     | E
     | S of string
@@ -221,10 +223,12 @@ module Dune = struct
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
-      ?library_flags ?link_flags ?(inline_tests = false) ?(optional = false)
-      ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
-      ?modules ?modules_without_implementation ?modes
+      ?library_flags ?link_flags ?(inline_tests = false)
+      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
+      ?(ppx_runtime_libraries = []) ?(preprocess = Stdlib.List.[])
+      ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
+      ?default_implementation ?implements ?modules
+      ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
       ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
       (names : string list) =
@@ -277,8 +281,18 @@ module Dune = struct
              [S "flags"; S "-verbose"];
              S "modes"
              :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
+             (match inline_tests_deps with
+             | [] -> E
+             | deps -> S "deps" :: of_list deps);
            ]
           else E);
+          (match ppx_kind with
+          | None -> E
+          | Some Ppx_rewriter -> [S "kind"; S "ppx_rewriter"]
+          | Some Ppx_deriver -> [S "kind"; S "ppx_deriver"]);
+          (match ppx_runtime_libraries with
+          | [] -> E
+          | _ -> [V (S "ppx_runtime_libraries" :: ppx_runtime_libraries)]);
           (match preprocess with
           | [] -> E
           | _ :: _ -> S "preprocess" :: of_list preprocess);
@@ -402,9 +416,13 @@ module Dune = struct
 
   let ocamllex name = [S "ocamllex"; S name]
 
+  let menhir name = [S "menhir"; [S "modules"; S name]]
+
   let ocamlyacc name = [S "ocamlyacc"; S name]
 
-  let pps names = S "pps" :: of_atom_list names
+  let pps ?(args = Stdlib.List.[]) names =
+    let atoms = match args with [] -> names | _ :: _ -> names @ args in
+    S "pps" :: of_atom_list atoms
 
   let staged_pps names =
     let s_exprs = Stdlib.List.map (fun n -> S n) names in
@@ -976,48 +994,52 @@ module Ctypes = struct
     generated_entry_point : string;
     c_flags : string list;
     c_library_flags : string list;
+    deps : string list;
   }
 
   let to_dune desc =
-    Dune.
+    let open Dune in
+    let deps =
+      match desc.deps with [] -> E | deps -> S "deps" :: of_atom_list deps
+    in
+    [
+      S "ctypes";
+      [S "external_library_name"; S desc.external_library_name];
       [
-        S "ctypes";
-        [S "external_library_name"; S desc.external_library_name];
+        S "build_flags_resolver";
         [
-          S "build_flags_resolver";
-          [
-            S "vendored";
-            of_atom_list
-              ([
-                 "c_flags";
-                 ":standard";
-                 "-Wno-discarded-qualifiers";
-                 "-I" ^ desc.extra_search_dir;
-               ]
-              @ desc.c_flags);
-            of_atom_list
-              (["c_library_flags"; ":standard"]
-              @ desc.c_library_flags
-              @ [
-                  "-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir;
-                ]);
-          ];
+          S "vendored";
+          of_atom_list
+            ([
+               "c_flags";
+               ":standard";
+               "-Wno-discarded-qualifiers";
+               "-I" ^ desc.extra_search_dir;
+             ]
+            @ desc.c_flags);
+          of_atom_list
+            (["c_library_flags"; ":standard"]
+            @ desc.c_library_flags
+            @ ["-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir]
+            );
         ];
-        [S "headers"; [S "include"; S desc.include_header]];
-        [
-          S "type_description";
-          [S "instance"; S desc.type_description.instance];
-          [S "functor"; S desc.type_description.functor_];
-        ];
-        [
-          S "function_description";
-          [S "concurrency"; S "unlocked"];
-          [S "instance"; S desc.function_description.instance];
-          [S "functor"; S desc.function_description.functor_];
-        ];
-        [S "generated_types"; S desc.generated_types];
-        [S "generated_entry_point"; S desc.generated_entry_point];
-      ]
+      ];
+      [S "headers"; [S "include"; S desc.include_header]];
+      [
+        S "type_description";
+        [S "instance"; S desc.type_description.instance];
+        [S "functor"; S desc.type_description.functor_];
+      ];
+      [
+        S "function_description";
+        [S "concurrency"; S "unlocked"];
+        [S "instance"; S desc.function_description.instance];
+        [S "functor"; S desc.function_description.functor_];
+      ];
+      [S "generated_types"; S desc.generated_types];
+      [S "generated_entry_point"; S desc.generated_entry_point];
+      deps;
+    ]
 end
 
 module Env : sig
@@ -1186,6 +1208,7 @@ module Target = struct
     foreign_stubs : Dune.foreign_stubs option;
     implements : t option;
     inline_tests : bool;
+    inline_tests_deps : Dune.s_expr list option;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
     documentation : Dune.s_expr option;
@@ -1203,6 +1226,8 @@ module Target = struct
     optional : bool;
     opens : string list;
     path : string;
+    ppx_kind : Dune.ppx_kind option;
+    ppx_runtime_libraries : t list;
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
@@ -1223,7 +1248,9 @@ module Target = struct
     with_macos_security_framework : bool;
   }
 
-  and preprocessor = PPS of t list | Staged_PPS of t list
+  and preprocessor =
+    | PPS of {targets : t list; args : string list}
+    | Staged_PPS of t list
 
   and inline_tests = Inline_tests_backend of t
 
@@ -1240,21 +1267,21 @@ module Target = struct
     | External of external_
     | Opam_only of opam_only
     | Optional of t
+    | Re_export of t  (** Stanza [(re_export <t>)] *)
     | Select of select
     | Open of t * string
 
   let rec get_internal = function
     | Internal i -> Some i
-    | Optional t -> get_internal t
-    | Open (t, _) -> get_internal t
-    | Select {package; _} -> get_internal package
+    | Optional t | Re_export t | Open (t, _) | Select {package = t; _} ->
+        get_internal t
     | Vendored _ -> None
     | External _ -> None
     | Opam_only _ -> None
 
-  let pps = function
+  let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
-    | Some target -> PPS [target]
+    | Some target -> PPS {targets = [target]; args}
 
   let ppses targets =
     let targets =
@@ -1265,7 +1292,7 @@ module Target = struct
           | Some target -> target)
         targets
     in
-    PPS targets
+    PPS {targets; args = []}
 
   let staged_pps targets =
     Staged_PPS (Stdlib.List.concat_map Option.to_list targets)
@@ -1322,13 +1349,19 @@ module Target = struct
   (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         name_for_errors target
     | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         names_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1340,7 +1373,10 @@ module Target = struct
 
   let rec library_name_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> Ok name
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         library_name_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -1370,6 +1406,7 @@ module Target = struct
     ?ctypes:Ctypes.t ->
     ?implements:t option ->
     ?inline_tests:inline_tests ->
+    ?inline_tests_deps:Dune.s_expr list ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
     ?documentation:Dune.s_expr ->
@@ -1385,6 +1422,8 @@ module Target = struct
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
     ?optional:bool ->
+    ?ppx_kind:Dune.ppx_kind ->
+    ?ppx_runtime_libraries:t option list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1441,10 +1480,12 @@ module Target = struct
               | Vendored {npm_deps; _} ->
                   let seen = String_set.add name seen in
                   (seen, List.map Npm.node_preload npm_deps @ acc)
-              | Select {package; _} -> loop (seen, acc) package
               | Opam_only _ -> (seen, acc)
-              | Optional t -> loop (seen, acc) t
-              | Open (t, _) -> loop (seen, acc) t)
+              | Optional target
+              | Re_export target
+              | Select {package = target; _}
+              | Open (target, _) ->
+                  loop (seen, acc) target)
       and loops (seen, acc) deps =
         List.fold_left
           (fun (seen, acc) x -> loop (seen, acc) x)
@@ -1459,10 +1500,11 @@ module Target = struct
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
-      ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
-      ?opam_homepage ?(opam_with_test = Always) ?(optional = false)
+      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?documentation
+      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
+      ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
+      ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
+      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
       ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
@@ -1472,6 +1514,7 @@ module Target = struct
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
       match implements with
       | None -> None
@@ -1482,7 +1525,8 @@ module Target = struct
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
-        | Optional target | Select {package = target; _} -> get_opens acc target
+        | Optional target | Re_export target | Select {package = target; _} ->
+            get_opens acc target
         | Open (target, module_name) -> get_opens (module_name :: acc) target
       in
       List.flatten (List.map (get_opens []) deps)
@@ -1500,12 +1544,16 @@ module Target = struct
     in
     let kind = make_kind names in
     let preprocess, inline_tests =
-      match inline_tests with
-      | None -> (preprocess, false)
-      | Some (Inline_tests_backend target) -> (
+      match (inline_tests, inline_tests_deps) with
+      | None, None -> (preprocess, false)
+      | None, Some _ ->
+          invalid_arg
+            "Target.internal: cannot specify `inline_tests_deps` without \
+             inline_tests"
+      | Some (Inline_tests_backend target), (Some _ | None) -> (
           match kind with
           | Public_library _ | Private_library _ ->
-              (PPS [target] :: preprocess, true)
+              (PPS {targets = [target]; args = []} :: preprocess, true)
           | Public_executable _ | Private_executable _ | Test_executable _ ->
               invalid_arg
                 "Target.internal: cannot specify `inline_tests` for \
@@ -1667,6 +1715,26 @@ module Target = struct
                 (String.concat ", " privates))
       | _ -> ()
     in
+    let () =
+      (* Sanity checks around [ppx_rewriter] and [ppx_deriver] libraries. *)
+      match ppx_kind with
+      | Some (Dune.Ppx_rewriter | Ppx_deriver) -> (
+          match kind with
+          | Public_library _ | Private_library _ -> ()
+          | Public_executable _ | Private_executable _ | Test_executable _ ->
+              error
+                "Argument ~ppx_kind is only allowed for libraries; target %s \
+                 is not a library"
+                (kind_name_for_errors kind))
+      | None -> (
+          match ppx_runtime_libraries with
+          | [] -> ()
+          | _ :: _ ->
+              error
+                "Argument ~ppx_runtime_libraries is only allowed when \
+                 ~ppx_kind is also specified; target %s does not qualify"
+                (kind_name_for_errors kind))
+    in
     let static =
       match (static, kind) with
       | Some static, _ -> static
@@ -1762,6 +1830,24 @@ module Target = struct
     let dune =
       List.fold_right (fun x dune -> Dune.(x :: dune)) runtest_rules dune
     in
+    if
+      match release_status with
+      | Unreleased -> false
+      | Experimental | Released | Auto_opam -> true
+    then
+      if
+        not
+          (String.starts_with ~prefix:"src/" path
+          || String.starts_with ~prefix:"tezt/" path
+          || String.starts_with ~prefix:"etherlink/" path)
+      then
+        invalid_argf
+          "A target has the release status %s but is located at %s which is \
+           outside of `src/` or `tezt/`. This is not supported. Move the code \
+           to `src/` or set the release status to %s."
+          (show_release_status release_status)
+          path
+          (show_release_status Unreleased) ;
     register_internal
       {
         bisect_ppx;
@@ -1775,6 +1861,7 @@ module Target = struct
         foreign_stubs;
         implements;
         inline_tests;
+        inline_tests_deps;
         js_compatible;
         js_of_ocaml;
         documentation;
@@ -1792,6 +1879,8 @@ module Target = struct
         optional;
         opens;
         path;
+        ppx_kind;
+        ppx_runtime_libraries;
         preprocess;
         preprocessor_deps;
         private_modules;
@@ -1939,6 +2028,10 @@ module Target = struct
         invalid_arg
           "Target.external_sublib: Optional should be used in dependency \
            lists, not when registering"
+    | Re_export _ ->
+        invalid_arg
+          "Target.external_sublib: Re_export should be used in dependency \
+           lists, not when registering"
     | Select _ ->
         invalid_arg
           "Target.external_sublib: Select should be used in dependency lists, \
@@ -1968,7 +2061,10 @@ module Target = struct
                 "Manifest.open_: cannot be used on executable and test targets \
                  (such as %s)"
                 (name_for_errors target))
-      | Optional target | Select {package = target; _} | Open (target, _) ->
+      | Optional target
+      | Re_export target
+      | Select {package = target; _}
+      | Open (target, _) ->
           main_module_name target
       | Vendored {main_module = Some main_module; _}
       | External {main_module = Some main_module; _} ->
@@ -2001,6 +2097,10 @@ module Target = struct
   let open_if ?m condition target =
     if condition then open_ ?m target else target
 
+  let re_export = function
+    | None -> None
+    | Some target -> Some (Re_export target)
+
   let select ~package ~source_if_present ~source_if_absent ~target =
     match package with
     | None -> None
@@ -2009,10 +2109,10 @@ module Target = struct
 
   let all_internal_deps internal =
     let extract_targets = function
-      | PPS targets | Staged_PPS targets -> targets
+      | PPS {targets; args = _} | Staged_PPS targets -> targets
     in
     List.concat_map extract_targets internal.preprocess
-    @ internal.deps @ internal.opam_only_deps
+    @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
 end
 
 type target = Target.t option
@@ -2285,6 +2385,7 @@ module Sub_lib = struct
        ?ctypes
        ?implements
        ?inline_tests
+       ?inline_tests_deps
        ?js_compatible
        ?js_of_ocaml
        ?documentation
@@ -2300,6 +2401,8 @@ module Sub_lib = struct
        ?opam_homepage
        ?opam_with_test
        ?optional
+       ?ppx_kind
+       ?ppx_runtime_libraries
        ?preprocess
        ?preprocessor_deps
        ?private_modules
@@ -2365,6 +2468,7 @@ module Sub_lib = struct
       ?ctypes
       ?implements
       ?inline_tests
+      ?inline_tests_deps
       ?js_compatible
       ?js_of_ocaml
       ?documentation
@@ -2379,6 +2483,8 @@ module Sub_lib = struct
       ?opam_homepage
       ?opam_with_test
       ?optional
+      ?ppx_kind
+      ?ppx_runtime_libraries
       ?preprocess
       ?preprocessor_deps
       ?private_modules
@@ -2438,7 +2544,7 @@ let write filename f =
   write_raw filename f
 
 let generate_dune (internal : Target.internal) =
-  let libraries, empty_files_to_create =
+  let libraries, ppx_runtime_libraries, empty_files_to_create =
     let empty_files_to_create = ref [] in
     let rec get_library (dep : Target.t) =
       let name =
@@ -2471,6 +2577,7 @@ let generate_dune (internal : Target.internal) =
               [H [S name; S "->"; S empty_name]];
               [H [S "->"; S empty_name]];
             ]
+      | Re_export _ -> Dune.[G [S "re_export"; S name]]
       | Select {package = _; source_if_present; source_if_absent; target} ->
           Dune.
             [
@@ -2481,7 +2588,10 @@ let generate_dune (internal : Target.internal) =
       | Open (target, _) -> get_library target
     in
     let libraries = List.map get_library internal.deps |> Dune.of_list in
-    (libraries, List.rev !empty_files_to_create)
+    let ppx_runtime_libraries =
+      List.map get_library internal.ppx_runtime_libraries |> Dune.of_list
+    in
+    (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
   let is_lib =
     match internal.kind with
@@ -2538,8 +2648,8 @@ let generate_dune (internal : Target.internal) =
             ^ String.concat ", " (hd :: tl))
     in
     let make_preprocessors = function
-      | (PPS targets : Target.preprocessor) ->
-          Dune.pps @@ List.map get_target_name targets
+      | (PPS {targets; args} : Target.preprocessor) ->
+          Dune.pps ~args @@ List.map get_target_name targets
       | Staged_PPS targets ->
           Dune.staged_pps @@ List.map get_target_name targets
     in
@@ -2659,7 +2769,10 @@ let generate_dune (internal : Target.internal) =
       ?link_flags
       ?flags
       ~inline_tests:internal.inline_tests
+      ?inline_tests_deps:internal.inline_tests_deps
       ~optional:internal.optional
+      ?ppx_kind:internal.ppx_kind
+      ~ppx_runtime_libraries
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules
@@ -2949,7 +3062,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
            ~with_test
            ~optional
            target)
-  | Open (target, _) ->
+  | Re_export target | Open (target, _) ->
       as_opam_dependency
         ~for_release
         ~for_conflicts
@@ -2963,10 +3076,10 @@ let as_opam_monorepo_opam_provided = function
   | _ -> None
 
 let dune_depend =
-  (* version 3.11 removes support for ctypes extension versions 0.1 and 0.2 *)
+  (* versions 3.11.1 contains a fix for running inline_tests in parallel *)
   {
     Opam.package = "dune";
-    version = Version.(at_least "3.0" && less_than "3.11");
+    version = Version.(at_least "3.11.1");
     with_test = Never;
     optional = false;
   }
@@ -3309,14 +3422,15 @@ let generate_opam_files_for_release packages_dir opam_release_graph
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
-let dune_lang_version = "3.0"
+let dune_lang_version = "3.7"
 
 let generate_dune_project_files () =
   write "dune-project" @@ fun fmt ->
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
-  Format.fprintf fmt "(using ctypes 0.1)@." ;
+  Format.fprintf fmt "(using ctypes 0.3)@." ;
+  Format.fprintf fmt "(using menhir 2.1)@." ;
   ( Target.iter_internal_by_opam @@ fun package internals ->
     let has_public_target =
       List.exists
@@ -3340,8 +3454,11 @@ let generate_package_json_file () =
     | External {npm_deps; _} | Vendored {npm_deps; _} | Internal {npm_deps; _}
       ->
         List.iter add npm_deps
-    | Optional internal -> collect internal
-    | Select {package; _} | Open (package, _) -> collect package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        collect package
     | Opam_only _ -> ()
   in
   Target.iter_internal_by_path (fun _path internals ->
@@ -3531,8 +3648,11 @@ let check_js_of_ocaml () =
     | Internal ({js_compatible; _} as internal) ->
         if not js_compatible then
           missing_jsoo_for_target ~used_by (internal_name internal)
-    | Optional internal -> check_target ~used_by internal
-    | Select {package; _} | Open (package, _) -> check_target ~used_by package
+    | Optional package
+    | Re_export package
+    | Select {package; _}
+    | Open (package, _) ->
+        check_target ~used_by package
     | Opam_only _ -> (* irrelevent to this check *) ()
   in
   let check_internal (internal : Target.internal) =
@@ -3815,13 +3935,19 @@ let generate_opam_ci opam_release_graph =
         {|@.opam:%s:
   extends:
     - .opam_template
-    - .rules_template__trigger_%s_opam_batch_%d
+    - .rules_template__trigger_%s_opam_batch_%d%s
   variables:
     package: %s
 |}
         package_name
         (if is_executable then "exec" else "all")
         batch_index
+        (* Tag below is added because the job in question does not work as is on
+           Gitlab Runner CI GCP. To remove once https://gitlab.com/tezos/tezos/-/issues/6584
+           is fixed. *)
+        (if package_name = "octez-shell-libs" then
+         "\n    - .tags_template__no_gcp"
+        else "")
         package_name
     else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
   in
@@ -3868,7 +3994,10 @@ let generate_profiles ~default_profile =
         (* This corresponds to libs from the stdlib, like dynlink, compiler-libs etc.
            There is no opam package to add to the lock file. *)
         ()
-    | Optional target | Select {package = target; _} | Open (target, _) ->
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
         add_target_to deps profile target
   in
   String_map.iter

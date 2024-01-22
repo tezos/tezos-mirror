@@ -25,9 +25,9 @@
 
 open Base
 
-type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
+type verb = GET | PUT | POST | PATCH | DELETE
 
-type data = Client.data
+type data = Data of JSON.u | File of string
 
 let show_verb = function
   | GET -> "GET"
@@ -43,20 +43,16 @@ let cohttp_of_verb : verb -> Cohttp.Code.meth = function
   | PATCH -> `PATCH
   | DELETE -> `DELETE
 
-type ('endpoint, 'result) t = {
+type 'result t = {
   verb : verb;
   path : string list;
   query_string : (string * string) list;
-  data : Client.data option;
+  data : data option;
   decode : JSON.t -> 'result;
-  get_host : 'endpoint -> string;
-  get_port : 'endpoint -> int;
-  get_scheme : 'endpoint -> string;
 }
 
-let make ?data ?(query_string = []) ~get_host ~get_port ~get_scheme verb path
-    decode =
-  {verb; path; query_string; data; decode; get_host; get_port; get_scheme}
+let make ?data ?(query_string = []) verb path decode =
+  {verb; path; query_string; data; decode}
 
 let decode_raw ?(origin = "RPC response") rpc raw =
   rpc.decode (JSON.parse ~origin raw)
@@ -75,16 +71,55 @@ let check_string_response ?(body_rex = "") ~code (response : string response) =
 
 let make_uri endpoint rpc =
   Uri.make
-    ~scheme:(rpc.get_scheme endpoint)
-    ~host:(rpc.get_host endpoint)
-    ~port:(rpc.get_port endpoint)
+    ~scheme:(Endpoint.rpc_scheme endpoint)
+    ~host:(Endpoint.rpc_host endpoint)
+    ~port:(Endpoint.rpc_port endpoint)
     ~path:(String.concat "/" rpc.path)
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
 
-let call_raw ?(log_request = true) ?(log_response_status = true)
-    ?(log_response_body = true) node rpc =
-  let uri = make_uri node rpc in
+type rpc_hooks = {on_request : string -> unit; on_response : string -> unit}
+
+module type CALLERS = sig
+  type uri_provider
+
+  val call :
+    ?rpc_hooks:rpc_hooks ->
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    'result Lwt.t
+
+  val call_raw :
+    ?rpc_hooks:rpc_hooks ->
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    string response Lwt.t
+
+  val call_json :
+    ?rpc_hooks:rpc_hooks ->
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    JSON.t response Lwt.t
+end
+
+let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
+    ?(log_response_body = true) endpoint rpc =
+  let uri = make_uri endpoint rpc in
+  let () =
+    Option.iter
+      (fun {on_request; _} ->
+        on_request @@ sf "%s %s" (show_verb rpc.verb) (Uri.to_string uri))
+      rpc_hooks
+  in
   if log_request then
     Log.debug
       ~color:Log.Color.bold
@@ -103,8 +138,7 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
       ?body:
         (Option.map
            (function
-             | Client.Data body ->
-                 Cohttp_lwt.Body.of_string (JSON.encode_u body)
+             | Data body -> Cohttp_lwt.Body.of_string (JSON.encode_u body)
              | File filename -> Cohttp_lwt.Body.of_string (read_file filename))
            rpc.data)
       (cohttp_of_verb rpc.verb)
@@ -116,13 +150,20 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
       "RPC response: %s"
       (Cohttp.Code.string_of_status response.status) ;
   let* body = Cohttp_lwt.Body.to_string response_body in
+  let () = Option.iter (fun {on_response; _} -> on_response body) rpc_hooks in
   if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
   return {body; code = Cohttp.Code.code_of_status response.status}
 
-let call_json ?log_request ?log_response_status ?(log_response_body = true) node
-    rpc =
+let call_json ?rpc_hooks ?log_request ?log_response_status
+    ?(log_response_body = true) endpoint rpc =
   let* response =
-    call_raw node ?log_request ?log_response_status ~log_response_body:false rpc
+    call_raw
+      endpoint
+      ?rpc_hooks
+      ?log_request
+      ?log_response_status
+      ~log_response_body:false
+      rpc
   in
   match JSON.parse ~origin:"RPC response" response.body with
   | exception (JSON.Error _ as exn) ->
@@ -140,100 +181,16 @@ let check_status_code node rpc code =
       (Uri.to_string (make_uri node rpc))
       (Cohttp.Code.string_of_status (Cohttp.Code.status_of_code code))
 
-let call ?log_request ?log_response_status ?log_response_body node rpc =
+let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body node
+    rpc =
   let* response =
-    call_json ?log_request ?log_response_status ?log_response_body node rpc
+    call_json
+      ?rpc_hooks
+      ?log_request
+      ?log_response_status
+      ?log_response_body
+      node
+      rpc
   in
   check_status_code node rpc response.code ;
   return (rpc.decode response.body)
-
-module Client = struct
-  type nonrec 'a t = (Node.t, 'a) t
-
-  let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env ?protocol_hash client
-      {verb; path; query_string; data; decode = _; _} =
-    (* No need to log here, the [Process] module already logs. *)
-    Client.spawn_rpc
-      ?log_command
-      ?log_status_on_exit
-      ?log_output
-      ?better_errors
-      ?endpoint
-      ?hooks
-      ?env
-      ?data
-      ?protocol_hash
-      ~query_string
-      verb
-      path
-      client
-    |> Process.check_and_read_stdout
-
-  let call_json ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env ?protocol_hash client rpc =
-    let* raw =
-      call_raw
-        ?log_command
-        ?log_status_on_exit
-        ?log_output
-        ?better_errors
-        ?endpoint
-        ?hooks
-        ?env
-        ?protocol_hash
-        client
-        rpc
-    in
-    return (JSON.parse ~origin:"RPC response" raw)
-
-  let call ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-      ?hooks ?env ?protocol_hash client rpc =
-    let* json =
-      call_json
-        ?log_command
-        ?log_status_on_exit
-        ?log_output
-        ?better_errors
-        ?endpoint
-        ?hooks
-        ?env
-        ?protocol_hash
-        client
-        rpc
-    in
-    return (rpc.decode json)
-
-  let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env ?protocol_hash client {verb; path; _} =
-    Client.rpc_schema
-      ?log_command
-      ?log_status_on_exit
-      ?log_output
-      ?better_errors
-      ?endpoint
-      ?hooks
-      ?env
-      ?protocol_hash
-      verb
-      path
-      client
-
-  let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env ?protocol_hash client
-      {verb; path; query_string; data; decode = _; _} =
-    Client.Spawn.rpc
-      ?log_command
-      ?log_status_on_exit
-      ?log_output
-      ?better_errors
-      ?endpoint
-      ?hooks
-      ?env
-      ?data
-      ?protocol_hash
-      ~query_string
-      verb
-      path
-      client
-end

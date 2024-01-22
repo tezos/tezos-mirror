@@ -23,20 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make_transform_callback forwarding_endpoint callback conn req body =
+type forwarder_events = {
+  on_forwarding : Cohttp.Request.t -> unit Lwt.t;
+  on_locally_handled : Cohttp.Request.t -> unit Lwt.t;
+}
+
+let make_transform_callback ?ctx ?forwarder_events forwarding_endpoint callback
+    conn req body =
   let open Lwt_syntax in
   let open Cohttp in
   (* Using a [Cohttp_lwt.Body.t] destructs it. As we may need it
      twice, we explicitly clone the underlying [Lwt_stream.t]. *)
   let body_stream = Cohttp_lwt.Body.to_stream body in
   let* answer =
-    callback conn req (Cohttp_lwt.Body.of_stream (Lwt_stream.clone body_stream))
+    (* We need to catch non-lwt errors to handle them through the same
+       Lwt workflow. *)
+    Lwt.catch
+      (fun () ->
+        callback
+          conn
+          req
+          (Cohttp_lwt.Body.of_stream (Lwt_stream.clone body_stream)))
+      (function
+        | Not_found ->
+            (* Not_found exception are handled and forwarded as a "not
+               found response" to allow a potential redirection to the
+               node. *)
+            let* nf = Cohttp_lwt_unix.Server.respond_not_found () in
+            Lwt.return (`Response nf)
+        | exn -> Lwt.fail exn)
   in
   let answer_has_not_found_status = function
     | `Expert (response, _) | `Response (response, _) ->
         Response.status response = `Not_found
   in
   if answer_has_not_found_status answer then
+    let* () =
+      match forwarder_events with
+      | Some {on_forwarding; _} -> on_forwarding req
+      | None -> Lwt.return_unit
+    in
     let uri = Request.uri req in
     let uri =
       Uri.make
@@ -62,6 +88,7 @@ let make_transform_callback forwarding_endpoint callback conn req body =
     in
     let* resp, body =
       Cohttp_lwt_unix.Client.call
+        ?ctx
         ~headers
         ~body:(Cohttp_lwt.Body.of_stream body_stream)
         (Request.meth req)
@@ -75,7 +102,40 @@ let make_transform_callback forwarding_endpoint callback conn req body =
     in
     let* answer = Cohttp_lwt_unix.Server.respond ~headers ~status ~body () in
     Lwt.return (`Response answer)
-  else Lwt.return answer
+  else
+    let* () =
+      match forwarder_events with
+      | Some {on_locally_handled; _} -> on_locally_handled req
+      | None -> Lwt.return_unit
+    in
+    Lwt.return answer
+
+let make_transform_callback_with_acl ~acl ?ctx ?forwarder_events
+    forwarding_endpoint callback conn req body =
+  let allowed =
+    let path =
+      Resto.Utils.decode_split_path (Uri.path @@ Cohttp.Request.uri req)
+    in
+    match Cohttp.Request.meth req with
+    | #Resto.meth as meth -> RPC_server.Acl.allowed acl ~meth ~path
+    | `HEAD | `OPTIONS | `Other _ | `CONNECT | `TRACE -> true
+  in
+  if allowed then
+    make_transform_callback
+      ?ctx
+      ?forwarder_events
+      forwarding_endpoint
+      callback
+      conn
+      req
+      body
+  else
+    let response =
+      let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
+      let status = `Unauthorized in
+      (Cohttp.Response.make ~status ~encoding (), body)
+    in
+    Lwt.return (`Response response)
 
 let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
   let open Lwt_result_syntax in
@@ -104,5 +164,13 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
-let proxy_server_query_forwarder forwarding_endpoint =
-  make_transform_callback forwarding_endpoint
+let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarding_endpoint
+    =
+  match acl with
+  | Some acl ->
+      make_transform_callback_with_acl
+        ~acl
+        ?ctx
+        ?forwarder_events
+        forwarding_endpoint
+  | None -> make_transform_callback ?ctx ?forwarder_events forwarding_endpoint

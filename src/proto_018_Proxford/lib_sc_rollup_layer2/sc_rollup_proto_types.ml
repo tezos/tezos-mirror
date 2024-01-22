@@ -138,33 +138,17 @@ module Inbox = struct
          Octez_smart_rollup.Inbox.versioned_encoding
     |> Octez_smart_rollup.Inbox.of_versioned
 
-  (* Workaround because history_proof encoding not in Alpha_context *)
-  let proto_history_proof_encoding :
-      Sc_rollup.Inbox.history_proof Data_encoding.t =
-    let level_proof_encoding =
-      let open Data_encoding in
-      conv
-        (fun {Sc_rollup.Inbox.hash; level} -> (hash, level))
-        (fun (hash, level) -> {hash; level})
-        (obj2
-           (req "hash" Sc_rollup.Inbox_merkelized_payload_hashes.Hash.encoding)
-           (req "level" Raw_level.encoding))
-    in
-    Sc_rollup.Inbox.Skip_list.encoding
-      Sc_rollup.Inbox.Hash.encoding
-      level_proof_encoding
-
   let history_proof_of_octez (hist : Octez_smart_rollup.Inbox.history_proof) :
       history_proof =
     hist
     |> Data_encoding.Binary.to_string_exn
          Octez_smart_rollup.Inbox.history_proof_encoding
-    |> Data_encoding.Binary.of_string_exn proto_history_proof_encoding
+    |> Data_encoding.Binary.of_string_exn Sc_rollup.Inbox.history_proof_encoding
 
   let history_proof_to_octez (hist : history_proof) :
       Octez_smart_rollup.Inbox.history_proof =
     hist
-    |> Data_encoding.Binary.to_string_exn proto_history_proof_encoding
+    |> Data_encoding.Binary.to_string_exn Sc_rollup.Inbox.history_proof_encoding
     |> Data_encoding.Binary.of_string_exn
          Octez_smart_rollup.Inbox.history_proof_encoding
 end
@@ -455,10 +439,12 @@ module Kind = struct
   let of_octez : Octez_smart_rollup.Kind.t -> t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> Riscv
 
   let to_octez : t -> Octez_smart_rollup.Kind.t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> Riscv
 end
 
 module Constants = struct
@@ -466,20 +452,24 @@ module Constants = struct
     Constants.Parametric.sc_rollup_reveal_activation_level
 
   let reveal_activation_level_of_octez
-      Octez_smart_rollup.Rollup_constants.{blake2B; metadata; dal_page} :
-      reveal_activation_level =
+      Octez_smart_rollup.Rollup_constants.
+        {blake2B; metadata; dal_page; dal_parameters} : reveal_activation_level
+      =
     {
       raw_data = {blake2B = Raw_level.of_int32_exn blake2B};
       metadata = Raw_level.of_int32_exn metadata;
       dal_page = Raw_level.of_int32_exn dal_page;
+      dal_parameters = Raw_level.of_int32_exn dal_parameters;
     }
 
   let reveal_activation_level_to_octez
-      Constants.Parametric.{raw_data = {blake2B}; metadata; dal_page} :
+      Constants.Parametric.
+        {raw_data = {blake2B}; metadata; dal_page; dal_parameters} :
       Octez_smart_rollup.Rollup_constants.reveal_activation_level =
     {
       blake2B = Raw_level.to_int32 blake2B;
       metadata = Raw_level.to_int32 metadata;
       dal_page = Raw_level.to_int32 dal_page;
+      dal_parameters = Raw_level.to_int32 dal_parameters;
     }
 end

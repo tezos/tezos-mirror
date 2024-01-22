@@ -288,7 +288,7 @@ module Slack = struct
       match s.[i] with
       | '&' -> Buffer.add_string buffer "&amp;"
       | '<' -> Buffer.add_string buffer "&lt;"
-      | '>' -> Buffer.add_string buffer ">gt;"
+      | '>' -> Buffer.add_string buffer "&gt;"
       | c -> Buffer.add_char buffer c
     done
 
@@ -900,7 +900,7 @@ let wrap_body title filename team timeout body argument =
       current_test := None ;
       unit)
 
-let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
+let register ~__FILE__ ~title ~tags ?uses ?team ~executors ~timeout body =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
@@ -909,6 +909,7 @@ let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
     ~__FILE__
     ~title
     ~tags
+    ?uses
     (wrap_body title __FILE__ team timeout body)
 
 let update_grafana_dashboard (dashboard : Grafana.dashboard) =

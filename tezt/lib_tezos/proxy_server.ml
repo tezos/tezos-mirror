@@ -45,6 +45,10 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; BG.gray|]
 end
 
+let rpc_host = "127.0.0.1"
+
+let rpc_scheme = "http"
+
 open Parameters
 include Daemon.Make (Parameters)
 
@@ -78,7 +82,7 @@ let connection_arguments_and_port ?rpc_port node =
          set TEZOS_LOG to "rpc->debug", just like you would do with a node.
       *)
       "--rpc-addr";
-      "http://127.0.0.1:" ^ string_of_int rpc_port;
+      Format.sprintf "%s://%s:%d" rpc_scheme rpc_host rpc_port;
     ],
     rpc_port )
 
@@ -87,11 +91,11 @@ let spawn ?rpc_port ?(args = []) node =
   Process.spawn
     ~name:Parameters.base_default_name
     ~color:Parameters.default_colors.(0)
-    Constant.tezos_proxy_server
+    (Uses.path Constant.octez_proxy_server)
     args
 
 let create ?runner ?name ?rpc_port ?(args = []) node =
-  let path = Constant.tezos_proxy_server in
+  let path = Uses.path Constant.octez_proxy_server in
   let user_arguments =
     List.map
       (function
@@ -152,3 +156,7 @@ let init ?runner ?name ?rpc_port ?event_level ?event_sections_levels ?args node
   let* () = run ?event_level ?event_sections_levels endpoint [] in
   let* () = wait_for_ready endpoint in
   return endpoint
+
+let as_rpc_endpoint t =
+  let state = t.persistent_state in
+  {Endpoint.scheme = rpc_scheme; host = rpc_host; port = state.rpc_port}

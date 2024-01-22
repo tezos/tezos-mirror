@@ -32,7 +32,7 @@ module Time = Tezos_base.Time.System
 type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Proxy_server of Proxy_server.t  (** A proxy server *)
-  | Foreign_endpoint of Foreign_endpoint.t  (** A service not managed by Tezt *)
+  | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
 (** A string representation of an endpoint suitable to be used as a CLI
     argument (e.g., [http://localhost:5893]). *)
@@ -103,6 +103,12 @@ val base_dir : t -> string
     always created. *)
 val additional_bootstraps : t -> Account.key list
 
+(** Call [Daemon.Make.wait_for] on a [Node] or [Proxy_server] endpoint.
+
+    Fail if the endpoint is a [Foreign_endpoint]. *)
+val endpoint_wait_for :
+  ?where:string -> endpoint -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** Create a client.
 
     The standard output and standard error output of the node will
@@ -169,10 +175,10 @@ val string_of_path : path -> string
 type query_string = (string * string) list
 
 (** HTTP methods for RPCs. *)
-type meth = GET | PUT | POST | PATCH | DELETE
+type meth = RPC_core.verb = GET | PUT | POST | PATCH | DELETE
 
 (** Data type for RPCs. *)
-type data = Data of JSON.u | File of string
+type data = RPC_core.data
 
 (** A lowercase string of the method. *)
 val string_of_meth : meth -> string
@@ -411,7 +417,8 @@ val import_encrypted_secret_key :
   ?force:bool ->
   ?endpoint:endpoint ->
   t ->
-  Account.key ->
+  Account.secret_key ->
+  alias:string ->
   password:string ->
   unit Lwt.t
 
@@ -421,24 +428,48 @@ val spawn_import_encrypted_secret_key :
   ?force:bool ->
   ?endpoint:endpoint ->
   t ->
-  Account.key ->
+  Account.secret_key ->
+  alias:string ->
   Process.t * Lwt_io.output_channel
 
 (** Run [octez-client import secret key]. *)
-val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
+val import_secret_key :
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  unit Lwt.t
 
 (** Run [octez-client import secret key] for remote signer. *)
 val import_signer_key :
-  ?endpoint:endpoint -> ?force:bool -> t -> Account.key -> Uri.t -> unit Lwt.t
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  t ->
+  public_key_hash:string ->
+  alias:string ->
+  Uri.t ->
+  unit Lwt.t
 
 (** Same as [import_secret_key] for signer, but do not wait for the
     process to exit. *)
 val spawn_import_signer_key :
-  ?endpoint:endpoint -> ?force:bool -> t -> Account.key -> Uri.t -> Process.t
+  ?endpoint:endpoint ->
+  ?force:bool ->
+  t ->
+  public_key_hash:string ->
+  alias:string ->
+  Uri.t ->
+  Process.t
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
 val spawn_import_secret_key :
-  ?endpoint:endpoint -> t -> Account.key -> Process.t
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  Process.t
 
 (** Run [octez-client activate protocol].
 
@@ -523,9 +554,11 @@ val bake_for :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
   ?expect_failure:bool ->
   t ->
   unit Lwt.t
@@ -537,7 +570,10 @@ val bake_for :
 
     Uses the node provided via argument [node] if any. Otherwise, it
     searches for a node in the client's mode, and fails if no node is
-    found. *)
+    found.
+
+    @param level_before If provided, check that the node is at this
+    level before baking. *)
 val bake_for_and_wait :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
@@ -548,12 +584,35 @@ val bake_for_and_wait :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
+  ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
   t ->
   unit Lwt.t
+
+(** Same as {!bake_for_and_wait}, but return the new level. *)
+val bake_for_and_wait_level :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?ignore_node_mempool:bool ->
+  ?count:int ->
+  ?force:bool ->
+  ?context_path:string ->
+  ?level_before:int ->
+  ?node:Node.t ->
+  ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
+  t ->
+  int Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
@@ -566,9 +625,11 @@ val spawn_bake_for :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?ignore_node_mempool:bool ->
+  ?count:int ->
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
+  ?state_recorder:bool ->
   t ->
   Process.t
 
@@ -672,7 +733,8 @@ val spawn_list_known_addresses : t -> Process.t
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
-val gen_keys : ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
+val gen_keys :
+  ?force:bool -> ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
 
 (** A helper to run [octez-client gen keys] followed by
     [octez-client show address] to get the generated key. *)
@@ -831,7 +893,7 @@ val multiple_transfers :
 
 (** Run octez-client register key <delegate> as delegate. *)
 val register_delegate :
-  ?endpoint:endpoint -> delegate:string -> t -> string Lwt.t
+  ?endpoint:endpoint -> ?wait:string -> delegate:string -> t -> string Lwt.t
 
 (** Run octez-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
@@ -1307,6 +1369,8 @@ val run_script :
   ?trace_stack:bool ->
   ?level:int ->
   ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1326,6 +1390,8 @@ val spawn_run_script :
   ?trace_stack:bool ->
   ?level:int ->
   ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1352,6 +1418,8 @@ val run_script_at :
   ?now:string ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   storage:string ->
   input:string ->
   t ->
@@ -1371,11 +1439,55 @@ val spawn_run_script_at :
   ?now:string ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   storage:string ->
   input:string ->
   t ->
   string list ->
   Protocol.t ->
+  Process.t
+
+(** Run [octez-client run michelson code .. on stack ..]. *)
+val run_code :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  ?amount:Tez.t ->
+  ?balance:Tez.t ->
+  ?source:string ->
+  ?payer:string ->
+  ?self_address:string ->
+  ?gas:int ->
+  ?mode:normalize_mode ->
+  ?level:int ->
+  ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
+  src:string ->
+  stack:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [run_code] but do not wait for the process to exit. *)
+val spawn_run_code :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
+  ?no_base_dir_warnings:bool ->
+  ?amount:Tez.t ->
+  ?balance:Tez.t ->
+  ?source:string ->
+  ?payer:string ->
+  ?self_address:string ->
+  ?gas:int ->
+  ?mode:normalize_mode ->
+  ?level:int ->
+  ?now:string ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
+  src:string ->
+  stack:string ->
+  t ->
   Process.t
 
 (** Run [octez-client register global constant value from src].
@@ -1586,6 +1698,8 @@ val spawn_run_tzip4_view :
   ?payer:string ->
   ?gas:int ->
   ?unparsing_mode:normalize_mode ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   entrypoint:string ->
   contract:string ->
   ?input:string ->
@@ -1605,6 +1719,8 @@ val run_tzip4_view :
   ?payer:string ->
   ?gas:int ->
   ?unparsing_mode:normalize_mode ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   entrypoint:string ->
   contract:string ->
   ?input:string ->
@@ -1619,6 +1735,8 @@ val spawn_run_view :
   ?payer:string ->
   ?gas:int ->
   ?unparsing_mode:normalize_mode ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   view:string ->
   contract:string ->
   ?input:string ->
@@ -1638,6 +1756,8 @@ val run_view :
   ?payer:string ->
   ?gas:int ->
   ?unparsing_mode:normalize_mode ->
+  ?other_contracts:string ->
+  ?extra_big_maps:string ->
   view:string ->
   contract:string ->
   ?input:string ->
@@ -1736,6 +1856,7 @@ module Sc_rollup : sig
   val originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
+    ?force:bool ->
     ?burn_cap:Tez.t ->
     ?whitelist:string list ->
     alias:string ->
@@ -1750,6 +1871,7 @@ module Sc_rollup : sig
   val spawn_originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
+    ?force:bool ->
     ?burn_cap:Tez.t ->
     ?whitelist:string list ->
     alias:string ->
@@ -1765,6 +1887,8 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    ?fee:Tez.t ->
+    ?fee_cap:Tez.t ->
     msg:string ->
     src:string ->
     t ->
@@ -1775,6 +1899,8 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    ?fee:Tez.t ->
+    ?fee_cap:Tez.t ->
     msg:string ->
     src:string ->
     t ->
@@ -2282,6 +2408,7 @@ val init_with_node :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
+  ?rpc_local:bool ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2315,6 +2442,7 @@ val init_with_protocol :
   ?parameter_file:string ->
   ?timestamp:timestamp ->
   ?keys:Account.key list ->
+  ?rpc_local:bool ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -2462,7 +2590,7 @@ val convert_script_to_json :
 
 (** Convert the given Michelson constant to JSON string. *)
 val convert_data_to_json :
-  ?endpoint:endpoint -> data:string -> t -> JSON.u Lwt.t
+  ?endpoint:endpoint -> data:string -> ?typecheck:string -> t -> JSON.u Lwt.t
 
 (** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t
@@ -2871,3 +2999,114 @@ val get_timestamp :
 (** Same as [get_timestamp], but do not wait for the process to exit. *)
 val spawn_get_timestamp :
   ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> Process.t
+
+(** Run [octez-client publish dal commitment <commitment> from <src> for slot
+    <slot_index> with proof <proof>]. *)
+val publish_dal_commitment :
+  ?hooks:Process_hooks.t ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  commitment:string ->
+  slot_index:int ->
+  proof:string ->
+  t ->
+  unit Runnable.process
+
+(** Return the information stored in the given endpoint as a foreign
+    endpoint. *)
+val as_foreign_endpoint : endpoint -> Endpoint.t
+
+module RPC : sig
+  (** Perform RPC calls using [octez-client]. *)
+
+  (** RPC calls performed this way are slower and should only be used to test
+      the [rpc] command of the client. *)
+
+  (** Call an RPC using [octez-client rpc].
+
+      The response body is parsed as JSON, then decoded using the decode function
+      of the RPC description.
+
+      The following arguments:
+      - [log_command];
+      - [log_status_on_exit];
+      - [log_output];
+      - [better_errors];
+      - [endpoint];
+      - [hooks];
+      - [env];
+      - [protocol_hash];
+      are passed to [Client.rpc]. *)
+  val call :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    t ->
+    'result RPC_core.t ->
+    'result Lwt.t
+
+  (** Call an RPC, but do not parse the client output. *)
+  val call_raw :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    t ->
+    'result RPC_core.t ->
+    string Lwt.t
+
+  (** Call an RPC, but do not decode the client output, only parse it. *)
+  val call_json :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    t ->
+    'result RPC_core.t ->
+    JSON.t Lwt.t
+
+  (** Get the schema of an RPC as JSON. *)
+  val schema :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    t ->
+    'result RPC_core.t ->
+    JSON.t Lwt.t
+
+  (** Same as [call_raw], but do not wait for the process to exit.
+
+      Because this function is mostly used to test error cases, the response body
+      is not decoded. *)
+  val spawn :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    t ->
+    'result RPC_core.t ->
+    JSON.t Runnable.process
+end

@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_lib_prod)
+ (public_name octez-evm-node-libs.evm_node_lib_prod)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.rpc-http
+  octez-libs.tezos-workers
+  octez-libs.rpc-http-client-unix
+  octez-version.value
+  octez-libs.stdlib-unix
+  octez-evm-node-libs.evm_node_lib_prod_encoding
+  lwt-exit
+  octez-evm-node-libs.evm_node_config)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_rpc_http
+  -open Tezos_workers
+  -open Tezos_stdlib_unix
+  -open Evm_node_lib_prod_encoding
+  -open Evm_node_config))

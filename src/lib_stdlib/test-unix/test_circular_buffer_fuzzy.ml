@@ -254,7 +254,7 @@ let () =
             read_data ~without_invalid_argument read_len right_state
           in
           if left_has_raised then
-            if right_has_raised then Lwt.return true
+            if right_has_raised then Lwt.return_true
             else
               QCheck2.Test.fail_report "Different behaviors (invalid_argument)"
           else

@@ -1,7 +1,6 @@
 open Gossipsub_intf
-module Span = Gossipsub.Worker.GS.Span
 
-let per_topic_score_limits : (Gossipsub.topic, Span.t) topic_score_limits =
+let per_topic_score_limits : (Types.Topic.t, Types.Span.t) topic_score_limits =
   let open Gossipsub.Worker.Default_parameters.Topic_score in
   Topic_score_limits_single
     {

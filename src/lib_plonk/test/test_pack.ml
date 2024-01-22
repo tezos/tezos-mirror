@@ -29,13 +29,13 @@ module Internal = struct
   let test_verifier_srs () =
     let n = 2 in
     let pp_prv, pp_vrf = setup n (snd Plonk_test.Helpers.srs) in
-    assert (Plonk.Bls.G1.eq pp_prv.g1_t pp_vrf)
+    assert (Kzg.Bls.G1.eq pp_prv.g1_t pp_vrf)
 end
 
 module External = struct
   open Aggregation.Pack
-  open Plonk.Bls
-  open Plonk.Utils
+  open Kzg.Bls
+  open Kzg.Utils
 
   let with_time f =
     let start_time = Sys.time () in
@@ -54,7 +54,7 @@ module External = struct
     let pp_prv, pp_vrf = setup n srs in
     let data = Array.init n (fun _i -> G1.random ()) in
     let cmt, t1 = with_time @@ fun () -> commit pp_prv data in
-    let transcript = Transcript.expand commitment_t cmt Bytes.empty in
+    let transcript = Transcript.expand commitment_t cmt Transcript.empty in
     let r, transcript = Fr_generation.random_fr transcript in
     let ((packed, proof), prover_transcript), t2 =
       with_time @@ fun () -> prove_single pp_prv transcript r data
@@ -63,7 +63,7 @@ module External = struct
       with_time @@ fun () ->
       verify_single pp_vrf transcript cmt r (packed, proof)
     in
-    assert (Bytes.equal prover_transcript verifier_transcript) ;
+    assert (Transcript.equal prover_transcript verifier_transcript) ;
     assert b ;
     Format.printf "\nTime commit (single): %f s\n" t1 ;
     Format.printf "Time aggregate and prove (single): %f s\n" t2 ;
@@ -82,7 +82,9 @@ module External = struct
     let instances = List.init nb_instances (fun _ -> generate_instance ()) in
     let datas, cmts = List.split instances in
 
-    let transcript = Transcript.list_expand commitment_t cmts Bytes.empty in
+    let transcript =
+      Transcript.list_expand commitment_t cmts Transcript.empty
+    in
     let r, transcript = Fr_generation.random_fr transcript in
 
     let ((packed_map, proof), prover_transcript), t1 =
@@ -93,7 +95,7 @@ module External = struct
     in
     Format.printf "Time aggregate and prove: %f s\n" t1 ;
     Format.printf "Time verify: %f s\n" t2 ;
-    assert (Bytes.equal prover_transcript verifier_transcript) ;
+    assert (Transcript.equal prover_transcript verifier_transcript) ;
     assert b
 end
 

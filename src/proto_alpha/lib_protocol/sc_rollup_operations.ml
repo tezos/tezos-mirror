@@ -28,19 +28,11 @@ open Alpha_context
 
 type ('a, 'b) error_container = {given : 'a; last_update : 'b}
 
-type last_whitelist_update = {message_index : Z.t; outbox_level : Raw_level.t}
-
-let last_whitelist_update_encoding =
-  Data_encoding.(
-    conv
-      (fun {message_index; outbox_level} -> (message_index, outbox_level))
-      (fun (message_index, outbox_level) -> {message_index; outbox_level})
-      (obj2 (req "message_index" n) (req "outbox_level" Raw_level.encoding)))
-
 type outdated_whitelist_update =
-  | Outdated_message_index of (Z.t, last_whitelist_update) error_container
+  | Outdated_message_index of
+      (Z.t, Sc_rollup.Whitelist.last_whitelist_update) error_container
   | Outdated_outbox_level of
-      (Raw_level.t, last_whitelist_update) error_container
+      (Raw_level.t, Sc_rollup.Whitelist.last_whitelist_update) error_container
 
 let outdated_whitelist_update_encoding =
   Data_encoding.(
@@ -51,7 +43,9 @@ let outdated_whitelist_update_encoding =
           (Tag 0)
           (obj2
              (req "message_index" n)
-             (req "last_whitelist_update" last_whitelist_update_encoding))
+             (req
+                "last_whitelist_update"
+                Sc_rollup.Whitelist.last_whitelist_update_encoding))
           (function
             | Outdated_message_index {given; last_update} ->
                 Some (given, last_update)
@@ -63,7 +57,9 @@ let outdated_whitelist_update_encoding =
           (Tag 1)
           (obj2
              (req "outbox_level" Raw_level.encoding)
-             (req "last_whitelist_update" last_whitelist_update_encoding))
+             (req
+                "last_whitelist_update"
+                Sc_rollup.Whitelist.last_whitelist_update_encoding))
           (function
             | Outdated_outbox_level {given; last_update} ->
                 Some (given, last_update)
@@ -85,6 +81,7 @@ type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
   ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
+  whitelist_update : Sc_rollup.Whitelist.update option;
 }
 
 let () =
@@ -181,82 +178,84 @@ let rec validate_ty :
     a Script_typed_ir.entrypoints_node ->
     ret continuation ->
     ret tzresult =
- fun ty {nested = nested_entrypoints; at_node} k ->
-  let open Script_typed_ir in
-  match at_node with
-  | Some {name = _; original_type_expr = _} ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
-         We currently don't support entrypoints as the entrypoint information
-         for L1 to L2 messages is not propagated to the rollup. *)
-      error Sc_rollup_invalid_parameters_type
-  | None -> (
-      match ty with
-      (* Valid primitive types. *)
-      | Unit_t -> (k [@ocaml.tailcall]) ()
-      | Int_t -> (k [@ocaml.tailcall]) ()
-      | Nat_t -> (k [@ocaml.tailcall]) ()
-      | Signature_t -> (k [@ocaml.tailcall]) ()
-      | String_t -> (k [@ocaml.tailcall]) ()
-      | Bytes_t -> (k [@ocaml.tailcall]) ()
-      | Key_hash_t -> (k [@ocaml.tailcall]) ()
-      | Key_t -> (k [@ocaml.tailcall]) ()
-      | Timestamp_t -> (k [@ocaml.tailcall]) ()
-      | Address_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
-      | Bool_t -> (k [@ocaml.tailcall]) ()
-      | Never_t -> (k [@ocaml.tailcall]) ()
-      | Chain_id_t -> (k [@ocaml.tailcall]) ()
-      (* Valid collection types. *)
-      | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Option_t (ty, _, _) ->
-          (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Pair_t (ty1, ty2, _, _) ->
-          (* Entrypoints may not be nested in pairs, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            no_entrypoints
-            no_entrypoints
-            k
-      | Or_t (ty1, ty2, _, _) ->
-          let entrypoints_l, entrypoints_r =
-            match nested_entrypoints with
-            | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-            | Entrypoints_Or {left; right} -> (left, right)
-          in
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            entrypoints_l
-            entrypoints_r
-            k
-      | Map_t (key_ty, val_ty, _) ->
-          (* Entrypoints may not be nested in maps, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            key_ty
-            val_ty
-            no_entrypoints
-            no_entrypoints
-            k
-      (* Invalid types. *)
-      | Mutez_t -> error Sc_rollup_invalid_parameters_type
-      | Big_map_t (_key_ty, _val_ty, _) ->
-          error Sc_rollup_invalid_parameters_type
-      | Contract_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_deprecated_t _ ->
-          error Sc_rollup_invalid_parameters_type
-      | Sapling_state_t _ -> error Sc_rollup_invalid_parameters_type
-      | Operation_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_key_t -> error Sc_rollup_invalid_parameters_type
-      | Lambda_t (_, _, _) -> error Sc_rollup_invalid_parameters_type)
+  let open Result_syntax in
+  fun ty {nested = nested_entrypoints; at_node} k ->
+    let open Script_typed_ir in
+    match at_node with
+    | Some {name = _; original_type_expr = _} ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+           We currently don't support entrypoints as the entrypoint information
+           for L1 to L2 messages is not propagated to the rollup. *)
+        tzfail Sc_rollup_invalid_parameters_type
+    | None -> (
+        match ty with
+        (* Valid primitive types. *)
+        | Unit_t -> (k [@ocaml.tailcall]) ()
+        | Int_t -> (k [@ocaml.tailcall]) ()
+        | Nat_t -> (k [@ocaml.tailcall]) ()
+        | Signature_t -> (k [@ocaml.tailcall]) ()
+        | String_t -> (k [@ocaml.tailcall]) ()
+        | Bytes_t -> (k [@ocaml.tailcall]) ()
+        | Key_hash_t -> (k [@ocaml.tailcall]) ()
+        | Key_t -> (k [@ocaml.tailcall]) ()
+        | Timestamp_t -> (k [@ocaml.tailcall]) ()
+        | Address_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
+        | Bool_t -> (k [@ocaml.tailcall]) ()
+        | Never_t -> (k [@ocaml.tailcall]) ()
+        | Chain_id_t -> (k [@ocaml.tailcall]) ()
+        (* Valid collection types. *)
+        | Ticket_t (ty, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Option_t (ty, _, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Pair_t (ty1, ty2, _, _) ->
+            (* Entrypoints may not be nested in pairs, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              no_entrypoints
+              no_entrypoints
+              k
+        | Or_t (ty1, ty2, _, _) ->
+            let entrypoints_l, entrypoints_r =
+              match nested_entrypoints with
+              | Entrypoints_None -> (no_entrypoints, no_entrypoints)
+              | Entrypoints_Or {left; right} -> (left, right)
+            in
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              entrypoints_l
+              entrypoints_r
+              k
+        | Map_t (key_ty, val_ty, _) ->
+            (* Entrypoints may not be nested in maps, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              key_ty
+              val_ty
+              no_entrypoints
+              no_entrypoints
+              k
+        (* Invalid types. *)
+        | Mutez_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Big_map_t (_key_ty, _val_ty, _) ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Contract_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_deprecated_t _ ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_state_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Operation_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_key_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Lambda_t (_, _, _) -> tzfail Sc_rollup_invalid_parameters_type)
 
 and validate_two_tys :
     type a ac b bc ret.
@@ -276,16 +275,16 @@ let validate_parameters_ty :
     (a, ac) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
     context tzresult =
- fun ctxt parameters_ty entrypoints ->
   let open Result_syntax in
-  let* ctxt =
-    Gas.consume
-      ctxt
-      (Sc_rollup_costs.is_valid_parameters_ty_cost
-         ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
-  in
-  let+ () = validate_ty parameters_ty entrypoints ok in
-  ctxt
+  fun ctxt parameters_ty entrypoints ->
+    let* ctxt =
+      Gas.consume
+        ctxt
+        (Sc_rollup_costs.is_valid_parameters_ty_cost
+           ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
+    in
+    let+ () = validate_ty parameters_ty entrypoints return in
+    ctxt
 
 let validate_untyped_parameters_ty ctxt parameters_ty =
   let open Result_syntax in
@@ -325,7 +324,7 @@ let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
   let boot_sector_size_in_bytes = String.length boot_sector in
   let*? ctxt =
     match kind with
-    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith ->
+    | Sc_rollup.Kind.Wasm_2_0_0 | Example_arith | Riscv ->
         (*
 
            We do not really care about the precision of the gas model
@@ -425,8 +424,8 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     match
       Data_encoding.Binary.of_string_opt PVM.output_proof_encoding output_proof
     with
-    | Some x -> ok x
-    | None -> error Sc_rollup_invalid_output_proof
+    | Some x -> Ok x
+    | None -> Result_syntax.tzfail Sc_rollup_invalid_output_proof
   in
   (* Verify that the states match. *)
   let* {Sc_rollup.Commitment.compressed_state; _}, ctxt =
@@ -536,7 +535,14 @@ let execute_outbox_message_transaction ctxt ~transactions ~rollup =
       ctxt
       ticket_token_diffs
   in
-  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
+  return
+    ( {
+        paid_storage_size_diff;
+        ticket_receipt;
+        operations;
+        whitelist_update = None;
+      },
+      ctxt )
 
 let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
     ~outbox_level ~message_index =
@@ -551,34 +557,29 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
             (List.is_empty whitelist)
             Sc_rollup_errors.Sc_rollup_empty_whitelist
         in
-        let* ctxt, last_whitelist_update =
-          Sc_rollup.Whitelist.find_last_whitelist_update ctxt rollup
+        let* ( ctxt,
+               (Sc_rollup.Whitelist.
+                  {
+                    message_index = latest_message_index;
+                    outbox_level = latest_outbox_level;
+                  } as last_update) ) =
+          Sc_rollup.Whitelist.get_last_whitelist_update ctxt rollup
+        in
+        (* Do not apply whitelist update if a previous whitelist update
+           occurred with a greater message index for a given outbox level,
+           or with a greater outbox level. *)
+        let* () =
+          fail_when
+            (Raw_level.(latest_outbox_level = outbox_level)
+            && Compare.Z.(latest_message_index >= message_index))
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_message_index {given = message_index; last_update}))
         in
         let* () =
-          match last_whitelist_update with
-          | None -> return_unit
-          | Some (latest_outbox_level, latest_message_index) ->
-              let last_update =
-                {
-                  message_index = latest_message_index;
-                  outbox_level = latest_outbox_level;
-                }
-              in
-              (* Do not apply whitelist update if a previous whitelist update
-                 occurred with a greater message index for a given outbox level,
-                 or with a greater outbox level. *)
-              let* () =
-                fail_when
-                  (Raw_level.(latest_outbox_level = outbox_level)
-                  && Compare.Z.(latest_message_index >= message_index))
-                  (Sc_rollup_outdated_whitelist_update
-                     (Outdated_message_index
-                        {given = message_index; last_update}))
-              in
-              fail_when
-                Raw_level.(outbox_level < latest_outbox_level)
-                (Sc_rollup_outdated_whitelist_update
-                   (Outdated_outbox_level {given = outbox_level; last_update}))
+          fail_when
+            Raw_level.(outbox_level < latest_outbox_level)
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_outbox_level {given = outbox_level; last_update}))
         in
         let* ctxt, new_storage_size =
           Sc_rollup.Whitelist.replace ctxt rollup ~whitelist
@@ -589,7 +590,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
           Sc_rollup.Whitelist.set_last_whitelist_update
             ctxt
             rollup
-            (outbox_level, message_index)
+            {outbox_level; message_index}
         in
         let* ctxt, paid_storage_size_diff =
           Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size
@@ -599,6 +600,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
               paid_storage_size_diff = Z.add paid_storage_size_diff size_diff;
               ticket_receipt = [];
               operations = [];
+              whitelist_update = Some (Private whitelist);
             },
             ctxt )
     | None ->
@@ -608,6 +610,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
               paid_storage_size_diff = Z.zero;
               ticket_receipt = [];
               operations = [];
+              whitelist_update = Some Public;
             },
             ctxt )
   else tzfail Sc_rollup_errors.Sc_rollup_is_public

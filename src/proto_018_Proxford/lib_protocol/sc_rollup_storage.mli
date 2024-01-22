@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [originate context ~kind ~parameters_ty ~genesis_commitment] produces an
+(** [originate ?whitelist context ~kind ~parameters_ty ~genesis_commitment] produces an
    address [a] for a smart contract rollup using the origination nonce found in
    [context]. This function also initializes the storage with a new
    entry indexed by [a] to remember the [kind] of the rollup at
@@ -32,6 +32,7 @@
 
    Also returns the number of allocated bytes.  *)
 val originate :
+  ?whitelist:Sc_rollup_whitelist_repr.t ->
   Raw_context.t ->
   kind:Sc_rollups.Kind.t ->
   parameters_ty:Script_repr.lazy_expr ->
@@ -43,7 +44,7 @@ val originate :
   tzresult
   Lwt.t
 
-(** [raw_originate context ~kind ~parameters_ty ~genesis_commitment ~address] is
+(** [raw_originate ?whitelist context ~kind ~parameters_ty ~genesis_commitment ~address] is
     exactly {!originate} but provides the rollup's address ([address]) instead
     of randomly generating it.
 
@@ -51,6 +52,7 @@ val originate :
     smart rollups only.
 *)
 val raw_originate :
+  ?whitelist:Sc_rollup_whitelist_repr.t ->
   Raw_context.t ->
   kind:Sc_rollups.Kind.t ->
   parameters_ty:Script_repr.lazy_expr ->

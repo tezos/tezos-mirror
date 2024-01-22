@@ -27,7 +27,7 @@ open Injector_sigs
 
 type state = {
   cctxt : Client_context.full;
-  fee_parameters : Configuration.fee_parameters;
+  fee_parameters : Operation_kind.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
 }
@@ -35,14 +35,14 @@ type state = {
 module Parameters :
   PARAMETERS
     with type state = state
-     and type Tag.t = Configuration.operation_kind
+     and type Tag.t = Operation_kind.t
      and type Operation.t = L1_operation.t = struct
   type nonrec state = state
 
-  let events_section = ["sc_rollup_node"]
+  let events_section = ["smart_rollup_node"]
 
-  module Tag : TAG with type t = Configuration.operation_kind = struct
-    type t = Configuration.operation_kind
+  module Tag : TAG with type t = Operation_kind.t = struct
+    type t = Operation_kind.t
 
     let compare = Stdlib.compare
 
@@ -50,14 +50,11 @@ module Parameters :
 
     let hash = Hashtbl.hash
 
-    let string_of_tag = Configuration.string_of_operation_kind
+    let string_of_tag = Operation_kind.to_string
 
     let pp ppf t = Format.pp_print_string ppf (string_of_tag t)
 
-    let encoding : t Data_encoding.t =
-      let open Data_encoding in
-      string_enum
-        (List.map (fun t -> (string_of_tag t, t)) Configuration.operation_kinds)
+    let encoding : t Data_encoding.t = Operation_kind.encoding
   end
 
   module Operation = L1_operation
@@ -71,6 +68,8 @@ module Parameters :
     | Cement -> 1
     | Timeout -> 1
     | Refute -> 1
+    | Recover -> 1
+    | Execute_outbox_message -> 1
 
   let operation_tag : Operation.t -> Tag.t = function
     | Add_messages _ -> Add_messages
@@ -78,12 +77,14 @@ module Parameters :
     | Publish _ -> Publish
     | Timeout _ -> Timeout
     | Refute _ -> Refute
+    | Recover_bond _ -> Recover
+    | Execute_outbox_message _ -> Execute_outbox_message
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in
-    Configuration.Operation_kind_map.find operation_kind fee_parameters
+    Operation_kind.Map.find operation_kind fee_parameters
     |> Option.value
-         ~default:(Configuration.default_fee_parameter ~operation_kind ())
+         ~default:(Configuration.default_fee_parameter operation_kind)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
@@ -127,3 +128,11 @@ module Parameters :
 end
 
 include Injector_functor.Make (Parameters)
+
+let check_and_add_pending_operation (mode : Configuration.mode)
+    (operation : L1_operation.t) =
+  let open Lwt_result_syntax in
+  if Configuration.(can_inject mode (Parameters.operation_tag operation)) then
+    let* hash = add_pending_operation operation in
+    return (Some hash)
+  else return None

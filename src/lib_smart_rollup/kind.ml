@@ -24,15 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Example_arith | Wasm_2_0_0
+type t = Example_arith | Wasm_2_0_0 | Riscv
 
-let all = [Example_arith; Wasm_2_0_0]
+let all = [Example_arith; Wasm_2_0_0; Riscv]
 
-let to_string = function Example_arith -> "arith" | Wasm_2_0_0 -> "wasm_2_0_0"
+let to_string = function
+  | Example_arith -> "arith"
+  | Wasm_2_0_0 -> "wasm_2_0_0"
+  | Riscv -> "riscv"
 
 let of_string = function
   | "arith" -> Some Example_arith
   | "wasm_2_0_0" -> Some Wasm_2_0_0
+  | "riscv" -> Some Riscv
   | _ -> None
 
 let encoding =
@@ -44,4 +48,5 @@ let equal x y =
   match (x, y) with
   | Example_arith, Example_arith -> true
   | Wasm_2_0_0, Wasm_2_0_0 -> true
+  | Riscv, Riscv -> true
   | _ -> false

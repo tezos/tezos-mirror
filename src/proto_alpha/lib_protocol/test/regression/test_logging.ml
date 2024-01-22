@@ -140,7 +140,7 @@ let pp_trace fmt = function
 
 let logger () :
     (unit -> trace_element list tzresult Lwt.t) * Script_typed_ir.logger =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Script_typed_ir in
   let log : log_element list ref = ref [] in
   let logger =
@@ -162,14 +162,12 @@ let logger () :
       end)
   in
   let assemble_log () =
-    let open Environment.Error_monad in
     let+ l =
       List.map_es
         (function
           | With_stack (ctxt, instr, loc, stack, stack_ty, indent) ->
-              let+ stack =
-                Lwt.map Environment.wrap_tzresult
-                @@ Traced_interpreter.unparse_stack ctxt (stack, stack_ty)
+              let+@ stack =
+                Traced_interpreter.unparse_stack ctxt (stack, stack_ty)
               in
               TInstr (loc, Gas.level ctxt, instr, stack, indent)
           | Ctrl cont -> return @@ TCtrl cont)
@@ -256,7 +254,7 @@ let fail_on_error f () =
   let open Lwt_syntax in
   let* result = f () in
   match result with
-  | Ok () -> return ()
+  | Ok () -> return_unit
   | Error e -> Test.fail "%a" Error_monad.pp_print_trace e
 
 (* Make sure that after a snapshot the snapshotted version of the test

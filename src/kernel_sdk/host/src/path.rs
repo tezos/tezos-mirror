@@ -119,7 +119,7 @@ impl core::fmt::Display for PathError {
 ///   around and copied, since they don't own their underlying data.
 ///
 /// Otherwise, you can use [OwnedPath].
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RefPath<'a> {
     inner: &'a str,
 }
@@ -290,7 +290,7 @@ mod owned {
     ///
     /// Useful when a new path is being constructed at runtime, which is not a sub-path of an
     /// already existing path (in which case you may use [RefPath]).
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct OwnedPath {
         inner: String,
     }

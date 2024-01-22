@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_ethereum"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+thiserror.workspace = true
+
+primitive-types.workspace = true
+ethereum.workspace = true
+ethbloom.workspace = true
+
+rlp.workspace = true
+hex.workspace = true
+
+sha3.workspace = true
+tezos_crypto_rs.workspace = true
+tezos_data_encoding = "0.5"
+libsecp256k1.workspace = true
+
+tezos-smart-rollup-encoding.workspace = true

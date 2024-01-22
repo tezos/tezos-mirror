@@ -1,0 +1,33 @@
+diff --git a/src/proto_alpha/lib_protocol/block_header_repr.ml b/src/proto_alpha/lib_protocol/block_header_repr.ml
+index e4665a9315..1ff962ba3e 100644
+--- a/src/proto_alpha/lib_protocol/block_header_repr.ml
++++ b/src/proto_alpha/lib_protocol/block_header_repr.ml
+@@ -362,16 +362,18 @@ let check_timestamp round_durations ~timestamp ~round ~predecessor_timestamp
+   else error (Wrong_timestamp (timestamp, expected_timestamp))
+ 
+ module Proof_of_work = struct
+-  let check_hash hash stamp_threshold =
+-    let bytes = Block_hash.to_bytes hash in
+-    let word = TzEndian.get_int64 bytes 0 in
+-    Compare.Uint64.(word <= stamp_threshold)
+-
+-  let check_header_proof_of_work_stamp shell contents stamp_threshold =
+-    let hash =
+-      hash {shell; protocol_data = {contents; signature = Signature.zero}}
+-    in
+-    check_hash hash stamp_threshold
++  let check_hash _hash _stamp_threshold =
++    (* let bytes = Block_hash.to_bytes hash in *)
++    (* let word = TzEndian.get_int64 bytes 0 in *)
++    true
++  (* Compare.Uint64.(word <= stamp_threshold) *)
++
++  let check_header_proof_of_work_stamp _shell _contents _stamp_threshold =
++    (* let hash = *)
++    (*   hash {shell; protocol_data = {contents; signature = Signature.zero}} *)
++    (* in *)
++    (* check_hash hash stamp_threshold *)
++    true
+ 
+   let check_proof_of_work_stamp ~proof_of_work_threshold block =
+     if

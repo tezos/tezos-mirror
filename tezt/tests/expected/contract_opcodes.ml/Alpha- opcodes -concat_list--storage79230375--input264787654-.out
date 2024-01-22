@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (just consumed gas: 10.864)
+  - location: 8 (just consumed gas: 10.763)
     [ (Pair { "a" ; "b" ; "c" } "") ]
   - location: 8 (just consumed gas: 0.010)
     [ { "a" ; "b" ; "c" } ]
@@ -17,13 +17,13 @@ trace
   - location: 12 (just consumed gas: 0.010)
     [ { "a" ; "b" ; "c" }
       "" ]
-  - location: 13 (just consumed gas: 0)
+  - location: 13 (just consumed gas: 0.030)
     [ "a"
       "" ]
   - location: 15 (just consumed gas: 0.010)
     [ ""
       "a" ]
-  - location: 16 (just consumed gas: 0)
+  - location: 16 (just consumed gas: 0.010)
     [ "a" ]
   - location: 18 (just consumed gas: 0.010)
     [ {}
@@ -33,20 +33,20 @@ trace
       {} ]
   - location: 21 (just consumed gas: 0.010)
     [ { "a" } ]
-  - location: 16 (just consumed gas: 0.025)
+  - location: 16 (just consumed gas: 0.035)
     [ ""
       { "a" } ]
   - location: 22 (just consumed gas: 0.010)
     [ { "" ; "a" } ]
   - location: 23 (just consumed gas: 0.120)
     [ "a" ]
-  - location: 13 (just consumed gas: 0.015)
+  - location: 13 (just consumed gas: 0.025)
     [ "b"
       "a" ]
   - location: 15 (just consumed gas: 0.010)
     [ "a"
       "b" ]
-  - location: 16 (just consumed gas: 0)
+  - location: 16 (just consumed gas: 0.010)
     [ "b" ]
   - location: 18 (just consumed gas: 0.010)
     [ {}
@@ -56,20 +56,20 @@ trace
       {} ]
   - location: 21 (just consumed gas: 0.010)
     [ { "b" } ]
-  - location: 16 (just consumed gas: 0.025)
+  - location: 16 (just consumed gas: 0.035)
     [ "a"
       { "b" } ]
   - location: 22 (just consumed gas: 0.010)
     [ { "a" ; "b" } ]
   - location: 23 (just consumed gas: 0.121)
     [ "ab" ]
-  - location: 13 (just consumed gas: 0.015)
+  - location: 13 (just consumed gas: 0.025)
     [ "c"
       "ab" ]
   - location: 15 (just consumed gas: 0.010)
     [ "ab"
       "c" ]
-  - location: 16 (just consumed gas: 0)
+  - location: 16 (just consumed gas: 0.010)
     [ "c" ]
   - location: 18 (just consumed gas: 0.010)
     [ {}
@@ -79,14 +79,14 @@ trace
       {} ]
   - location: 21 (just consumed gas: 0.010)
     [ { "c" } ]
-  - location: 16 (just consumed gas: 0.025)
+  - location: 16 (just consumed gas: 0.035)
     [ "ab"
       { "c" } ]
   - location: 22 (just consumed gas: 0.010)
     [ { "ab" ; "c" } ]
   - location: 23 (just consumed gas: 0.121)
     [ "abc" ]
-  - location: 13 (just consumed gas: 0.015)
+  - location: 13 (just consumed gas: 0.035)
     [ "abc" ]
   - location: 24 (just consumed gas: 0.010)
     [ {}

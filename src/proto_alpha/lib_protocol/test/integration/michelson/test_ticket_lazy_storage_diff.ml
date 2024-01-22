@@ -82,12 +82,14 @@ let assert_equal_balances ~loc ctxt given expected =
   let* ctxt, tbs1 =
     List.fold_left_map_es
       (fun ctxt ((ticketer, content), delta) ->
-        make_ex_token
-          ctxt
-          ~ticketer
-          ~type_exp:"string"
-          ~content_exp:(Printf.sprintf "%S" content)
-        >|=? fun (token, ctxt) -> (ctxt, (token, Z.of_int delta)))
+        let+ token, ctxt =
+          make_ex_token
+            ctxt
+            ~ticketer
+            ~type_exp:"string"
+            ~content_exp:(Printf.sprintf "%S" content)
+        in
+        (ctxt, (token, Z.of_int delta)))
       ctxt
       expected
   in

@@ -469,6 +469,7 @@ module Kind = struct
   let of_octez : Octez_smart_rollup.Kind.t -> t = function
     | Example_arith -> Example_arith
     | Wasm_2_0_0 -> Wasm_2_0_0
+    | Riscv -> invalid_arg "Riscv rollup is inactive in this protocol"
 
   let to_octez : t -> Octez_smart_rollup.Kind.t = function
     | Example_arith -> Example_arith

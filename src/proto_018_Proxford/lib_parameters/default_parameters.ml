@@ -92,7 +92,7 @@ let default_dal =
       number_of_slots = 256;
       attestation_lag = 4;
       attestation_threshold = 50;
-      blocks_per_epoch = 32l;
+      blocks_per_epoch = 1l;
       cryptobox_parameters = default_cryptobox_parameters;
     }
 
@@ -114,6 +114,18 @@ let constants_mainnet =
             };
         } =
     Constants.Generated.generate ~consensus_committee_size
+  in
+  let dal_activation_level =
+    if default_dal.feature_enable then Raw_level.root
+    else
+      (* Deactivate the reveal if the dal is not enabled. *)
+      (* https://gitlab.com/tezos/tezos/-/issues/5968
+         Encoding error with Raw_level
+
+         We set the activation level to [pred max_int] to deactivate
+         the feature. The [pred] is needed to not trigger an encoding
+         exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
+      Raw_level.of_int32_exn Int32.(pred max_int)
   in
   {
     Constants.Parametric.preserved_cycles = 5;
@@ -177,10 +189,11 @@ let constants_mainnet =
     consensus_threshold;
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
-    max_slashing_period = 2;
     limit_of_delegation_over_baking = 9;
-    percentage_of_frozen_deposits_slashed_per_double_baking = 10;
-    percentage_of_frozen_deposits_slashed_per_double_attestation = 50;
+    percentage_of_frozen_deposits_slashed_per_double_baking =
+      Protocol.Int_percentage.p5;
+    percentage_of_frozen_deposits_slashed_per_double_attestation =
+      Protocol.Int_percentage.p50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;
@@ -195,7 +208,6 @@ let constants_mainnet =
     dal = default_dal;
     sc_rollup =
       {
-        enable = true;
         arith_pvm_enable = false;
         (* The following value is chosen to prevent spam. *)
         origination_size = 6_314;
@@ -231,18 +243,11 @@ let constants_mainnet =
           {
             raw_data = {blake2B = Raw_level.root};
             metadata = Raw_level.root;
-            dal_page =
-              (if default_dal.feature_enable then Raw_level.root
-              else
-                (* Deactivate the reveal if the dal is not enabled. *)
-                (* https://gitlab.com/tezos/tezos/-/issues/5968
-                   Encoding error with Raw_level
-
-                   We set the activation level to [pred max_int] to deactivate
-                   the feature. The [pred] is needed to not trigger an encoding
-                   exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
-                Raw_level.of_int32_exn Int32.(pred max_int));
+            dal_page = dal_activation_level;
+            dal_parameters = dal_activation_level;
           };
+        private_enable = true;
+        riscv_pvm_enable = false;
       };
     zk_rollup =
       {
@@ -262,11 +267,16 @@ let constants_mainnet =
           {
             issuance_ratio_min = Q.(5 // 10000);
             issuance_ratio_max = Q.(1 // 20);
-            max_bonus = 50_000_000_000_000L;
-            growth_rate = 115_740_740L;
+            max_bonus =
+              Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn
+                Q.(5 // 100);
+            (* 0.01% per 1% per day *)
+            growth_rate = Q.(1 // 100);
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
+        activation_vote_enable = false;
+        autostaking_enable = true;
       };
   }
 
@@ -296,7 +306,7 @@ let constants_sandbox =
         {
           constants_mainnet.dal with
           number_of_slots = 16;
-          blocks_per_epoch = 2l;
+          blocks_per_epoch = 1l;
           cryptobox_parameters =
             derive_cryptobox_parameters
               ~redundancy_factor:8
@@ -315,7 +325,6 @@ let constants_sandbox =
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
-    max_slashing_period = 2;
     limit_of_delegation_over_baking = 19;
   }
 
@@ -331,7 +340,7 @@ let constants_test =
         {
           constants_mainnet.dal with
           number_of_slots = 8;
-          blocks_per_epoch = 2l;
+          blocks_per_epoch = 1l;
           cryptobox_parameters =
             derive_cryptobox_parameters
               ~redundancy_factor:4
@@ -349,7 +358,6 @@ let constants_test =
     vdf_difficulty = 50_000L;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
-    max_slashing_period = 2;
     limit_of_delegation_over_baking =
       19
       (* Not 9 so that multiplication by a percentage and

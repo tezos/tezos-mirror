@@ -57,7 +57,7 @@ let test_input_com () =
   assert (cs.public_input_size = 1) ;
   let plonk_circuit = Plonk.Circuit.to_plonk cs in
   let cname = "" in
-  let circuits_map = Plonk.SMap.singleton cname (plonk_circuit, 1) in
+  let circuits_map = Kzg.SMap.singleton cname (plonk_circuit, 1) in
   let zero_knowledge = false in
   let pp_prv, pp_vrf =
     Main.setup ~zero_knowledge circuits_map ~srs:Helpers.srs
@@ -74,9 +74,16 @@ let test_input_com () =
     [input_com_y.public; input_com_x1x2.public]
   in
   let inputs = Main.{input_commitments; witness = private_inputs} in
-  let inputs_map = Plonk.SMap.singleton cname [inputs] in
+  let inputs_map = Kzg.SMap.singleton cname [inputs] in
   let verifier_inputs =
-    Plonk.SMap.singleton cname ([public], [verifier_input_commitments])
+    Kzg.SMap.singleton
+      cname
+      Main.
+        {
+          nb_proofs = 1;
+          public = [public];
+          commitments = [verifier_input_commitments];
+        }
   in
   let proof = Main.prove pp_prv ~inputs:inputs_map in
   let verif_ok = Main.verify pp_vrf ~inputs:verifier_inputs proof in

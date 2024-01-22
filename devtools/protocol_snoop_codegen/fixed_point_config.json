@@ -1,0 +1,7 @@
+{
+    "precision": 6,
+    "max_relative_error": 0.1,
+    "cast_mode": "Round",
+    "inverse_scaling": 10,
+    "resolution": 5
+}

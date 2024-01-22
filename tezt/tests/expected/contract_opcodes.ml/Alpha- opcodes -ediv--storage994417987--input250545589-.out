@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 25 (just consumed gas: 25.562)
+  - location: 25 (just consumed gas: 24.814)
     [ (Pair (Pair -8 2) None None None None) ]
   - location: 25 (just consumed gas: 0.010)
     [ (Pair -8 2) ]
@@ -22,13 +22,13 @@ trace
     [ 8
       2
       (Pair -8 2) ]
-  - location: 29 (just consumed gas: 0)
+  - location: 29 (just consumed gas: 0.010)
     [ 2
       (Pair -8 2) ]
   - location: 31 (just consumed gas: 0.020)
     [ 2
       (Pair -8 2) ]
-  - location: 29 (just consumed gas: 0.025)
+  - location: 29 (just consumed gas: 0.035)
     [ 8
       2
       (Pair -8 2) ]
@@ -71,7 +71,7 @@ trace
       (Pair -8 2)
       (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
-  - location: 41 (just consumed gas: 0)
+  - location: 41 (just consumed gas: 0.010)
     [ 2
       (Pair -8 2)
       (Some (Pair 4 0))
@@ -81,7 +81,7 @@ trace
       (Pair -8 2)
       (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
-  - location: 41 (just consumed gas: 0.025)
+  - location: 41 (just consumed gas: 0.035)
     [ -8
       2
       (Pair -8 2)
@@ -108,28 +108,21 @@ trace
       (Some (Pair -4 0))
       (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
-  - location: 49 (just consumed gas: 0)
+  - location: 49 (just consumed gas: 0.023)
     [ (Some (Pair 4 0))
       (Some (Pair 4 0)) ]
   - location: 52 (just consumed gas: 0.010)
     [ (Pair (Some (Pair 4 0)) (Some (Pair 4 0))) ]
-  - location: 49 (just consumed gas: 0.025)
-    [ (Some (Pair -4 0))
-      (Pair (Some (Pair 4 0)) (Some (Pair 4 0))) ]
-  - location: 49 (just consumed gas: 0.010)
+  - location: 49 (just consumed gas: 0.045)
     [ (Some (Pair -4 0))
       (Some (Pair -4 0))
       (Pair (Some (Pair 4 0)) (Some (Pair 4 0))) ]
-  - location: 49 (just consumed gas: 0)
-    [ (Some (Pair -4 0))
-      (Some (Pair -4 0))
-      (Pair (Some (Pair 4 0)) (Some (Pair 4 0))) ]
-  - location: 53 (just consumed gas: 0)
+  - location: 53 (just consumed gas: 0.010)
     [ (Some (Pair -4 0))
       (Pair (Some (Pair 4 0)) (Some (Pair 4 0))) ]
   - location: 55 (just consumed gas: 0.010)
     [ (Pair (Some (Pair -4 0)) (Some (Pair 4 0)) (Some (Pair 4 0))) ]
-  - location: 53 (just consumed gas: 0.025)
+  - location: 53 (just consumed gas: 0.035)
     [ (Some (Pair -4 0))
       (Pair (Some (Pair -4 0)) (Some (Pair 4 0)) (Some (Pair 4 0))) ]
   - location: 56 (just consumed gas: 0.010)

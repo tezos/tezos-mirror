@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
 open Identities
 
 let nb_plookup_wires = 3
@@ -112,8 +112,11 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     let h1g = get_answer answers GX h1_name in
     let h2g = get_answer answers GX h2_name in
 
-    let l1 = Fr_generation.evaluate_l1 ~domain_size:n ~generator x in
-    let ln_p_1 = Fr_generation.evaluate_l0 ~domain_size:n x in
+    let l1, ln_p_1 =
+      let n = Z.of_int n in
+      let xn_1 = Scalar.(sub (pow x n) one / of_z n) in
+      (Scalar.(generator * xn_1 / sub x generator), Scalar.(xn_1 / sub x one))
+    in
 
     let z_m_1 = Scalar.(z @- one) in
     let x_m_1 = Scalar.(x @- one) in
@@ -561,7 +564,7 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
     let final_size = size_domain - 1 in
     (* /!\ We remove here the last value of each wire, this is ok as it always corresponds to padding. *)
     let padded_f_list =
-      SMap.map (fun w -> Array.resize w final_size) wires_to_agg
+      SMap.map (fun w -> resize_array w final_size) wires_to_agg
     in
     let f_agg =
       Plookup_poly.compute_f_aggregation gates padded_f_list alpha final_size

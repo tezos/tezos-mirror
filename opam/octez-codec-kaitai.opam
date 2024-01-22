@@ -1,0 +1,42 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "kaitai-of-data-encoding"
+  "kaitai"
+  "octez-libs"
+  "octez-shell-libs"
+  "octez-version"
+]
+depopts: [
+  "octez-protocol-005-PsBabyM1-libs"
+  "octez-protocol-006-PsCARTHA-libs"
+  "octez-protocol-007-PsDELPH1-libs"
+  "octez-protocol-008-PtEdo2Zk-libs"
+  "octez-protocol-009-PsFLoren-libs"
+  "octez-protocol-010-PtGRANAD-libs"
+  "octez-protocol-011-PtHangz2-libs"
+  "octez-protocol-012-Psithaca-libs"
+  "octez-protocol-013-PtJakart-libs"
+  "octez-protocol-014-PtKathma-libs"
+  "octez-protocol-015-PtLimaPt-libs"
+  "octez-protocol-016-PtMumbai-libs"
+  "octez-protocol-017-PtNairob-libs"
+  "octez-protocol-018-Proxford-libs"
+  "octez-protocol-alpha-libs"
+]
+build: [
+  ["rm" "-r" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: `octez-codec-kaitai` binary to generate kaitai descriptions"

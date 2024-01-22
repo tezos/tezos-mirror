@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'evm_kernel'
+version = '0.1.0'
+edition = '2021'
+build = "build.rs"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+
+primitive-types.workspace = true
+num-traits.workspace = true
+
+rlp.workspace = true
+hex.workspace = true
+
+sha3.workspace = true
+libsecp256k1.workspace = true
+tezos_crypto_rs.workspace = true
+
+ethereum.workspace = true
+ethbloom.workspace = true
+
+evm.workspace = true
+evm-execution.workspace = true
+tezos_ethereum.workspace = true
+tezos-evm-logging.workspace = true
+
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-entrypoint.workspace = true
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup-installer-config.workspace = true
+tezos-smart-rollup-storage.workspace = true
+
+tezos_data_encoding.workspace = true
+
+[dev-dependencies]
+tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-panic-hook.workspace = true
+
+[features]
+default = ["panic-hook"]
+panic-hook = []
+debug = ["tezos-evm-logging/debug"]

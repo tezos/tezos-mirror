@@ -108,6 +108,12 @@ impl MockHost {
             origination_level: NAIROBI_ACTIVATION_LEVEL,
         });
 
+        // Ensure reboots correctly initialised for testing without using
+        // `run_level` API.
+        let reboots = MAXIMUM_REBOOTS_PER_INPUT;
+        let bytes = reboots.to_le_bytes().to_vec();
+        state.store.set_value(REBOOT_COUNTER_KEY, bytes);
+
         state.curr_level = NAIROBI_ACTIVATION_LEVEL;
 
         let info = info_for_level(state.curr_level as i32);

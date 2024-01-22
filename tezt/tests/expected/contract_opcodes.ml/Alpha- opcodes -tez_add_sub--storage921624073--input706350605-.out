@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (just consumed gas: 16.905)
+  - location: 12 (just consumed gas: 16.709)
     [ (Pair (Pair 2310000 1010000) None) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair 2310000 1010000) ]
@@ -22,20 +22,20 @@ trace
     [ 2310000
       (Pair 2310000 1010000)
       (Pair 2310000 1010000) ]
-  - location: 16 (just consumed gas: 0)
+  - location: 16 (just consumed gas: 0.010)
     [ (Pair 2310000 1010000)
       (Pair 2310000 1010000) ]
   - location: 18 (just consumed gas: 0.010)
     [ 1010000
       (Pair 2310000 1010000) ]
-  - location: 16 (just consumed gas: 0.025)
+  - location: 16 (just consumed gas: 0.035)
     [ 2310000
       1010000
       (Pair 2310000 1010000) ]
   - location: 19 (just consumed gas: 0.020)
     [ 3320000
       (Pair 2310000 1010000) ]
-  - location: 20 (just consumed gas: 0)
+  - location: 20 (just consumed gas: 0.010)
     [ (Pair 2310000 1010000) ]
   - location: 22 (just consumed gas: 0.010)
     [ (Pair 2310000 1010000)
@@ -43,20 +43,20 @@ trace
   - location: 23 (just consumed gas: 0.010)
     [ 2310000
       (Pair 2310000 1010000) ]
-  - location: 24 (just consumed gas: 0)
+  - location: 24 (just consumed gas: 0.010)
     [ (Pair 2310000 1010000) ]
   - location: 26 (just consumed gas: 0.010)
     [ 1010000 ]
-  - location: 24 (just consumed gas: 0.025)
+  - location: 24 (just consumed gas: 0.035)
     [ 2310000
       1010000 ]
   - location: 27 (just consumed gas: 0.015)
     [ (Some 1300000) ]
-  - location: 29 (just consumed gas: 0)
+  - location: 29 (just consumed gas: 0.010)
     [ 1300000 ]
-  - location: 29 (just consumed gas: 0.015)
+  - location: 29 (just consumed gas: 0.025)
     [ 1300000 ]
-  - location: 20 (just consumed gas: 0.025)
+  - location: 20 (just consumed gas: 0.035)
     [ 3320000
       1300000 ]
   - location: 35 (just consumed gas: 0.010)

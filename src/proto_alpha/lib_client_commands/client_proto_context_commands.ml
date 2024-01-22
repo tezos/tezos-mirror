@@ -821,6 +821,31 @@ let commands_ro () =
                .unsigned_encoding_with_legacy_attestation_name)
         in
         return_unit);
+    command
+      ~group
+      ~desc:"Get the frozen deposits limit of a delegate."
+      no_options
+      (prefixes ["get"; "deposits"; "limit"; "for"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source delegate"
+      @@ stop)
+      (fun () delegate (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* deposit =
+          get_frozen_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            delegate
+        in
+        let*! () =
+          match deposit with
+          | None -> cctxt#answer "unlimited"
+          | Some limit ->
+              cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
+        in
+        return_unit);
   ]
 
 (* ----------------------------------------------------------------------------*)
@@ -2002,11 +2027,6 @@ let commands_rw () =
            source
            cctxt ->
         let contract = Contract.Implicit source in
-        let arg =
-          (* Is there a better printer? *)
-          Some (Int64.to_string (Tez.to_mutez amount))
-        in
-        let amount = Tez.zero in
         let entrypoint = Some Entrypoint.unstake in
         (* TODO #6162
            (unless --force)
@@ -2028,7 +2048,7 @@ let commands_rw () =
             gas_limit,
             storage_limit,
             counter,
-            arg,
+            None,
             no_print_source,
             fee_parameter,
             entrypoint,
@@ -2729,6 +2749,83 @@ let commands_rw () =
             ~dry_run
             proposal
             ballot
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Set the deposits limit of a registered delegate."
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args)
+      (prefixes ["set"; "deposits"; "limit"; "for"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source contract"
+      @@ prefix "to"
+      @@ tez_param
+           ~name:"deposits limit"
+           ~desc:"the maximum amount of frozen deposits"
+      @@ stop)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+           mgr
+           limit
+           (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+        let* (_ : _ Injection.result) =
+          set_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~simulation
+            ~fee_parameter
+            ?fee
+            mgr
+            ~src_pk
+            ~manager_sk
+            (Some limit)
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Remove the deposits limit of a registered delegate."
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args)
+      (prefixes ["unset"; "deposits"; "limit"; "for"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"source contract"
+      @@ stop)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+           mgr
+           (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+        let* (_ : _ Injection.result) =
+          set_deposits_limit
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~simulation
+            ~fee_parameter
+            ?fee
+            mgr
+            ~src_pk
+            ~manager_sk
+            None
         in
         return_unit);
     command
@@ -3560,7 +3657,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Publish a DAL commitment on L1 for the given level and slot index"
+      ~desc:"Publish a DAL commitment on L1 for the given slot index"
       (args7
          fee_arg
          dry_run_switch
@@ -3583,13 +3680,6 @@ let commands_rw () =
            ~name:"DAL slot index"
            ~desc:"The index of the DAL slot."
            int_parameter
-      @@ prefixes ["at"; "level"]
-      @@ param
-           ~name:"publication level"
-           ~desc:
-             "The publication level is the level at which the commitment is \
-              expected to be included in an L1 block."
-           (raw_level_parameter ())
       @@ prefixes ["with"; "proof"]
       @@ param
            ~name:"commitment proof"
@@ -3606,15 +3696,12 @@ let commands_rw () =
            commitment
            source
            slot_index
-           published_level
            commitment_proof
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* {parametric = {dal = {number_of_slots; _}; _}; _} =
-          Alpha_services.Constants.all
-            cctxt
-            (cctxt#chain, `Level (Raw_level.to_int32 published_level))
+          Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0)
         in
         let* slot_index =
           match

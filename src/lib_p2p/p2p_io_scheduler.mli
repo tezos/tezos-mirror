@@ -70,6 +70,10 @@ val write :
     added to [conn]'s write queue, [false] if it has been dropped. *)
 val write_now : connection -> Bytes.t -> bool
 
+(** [set_peer_id ~peer_id conn] sets the peer id where [conn] is connected to.
+   *)
+val set_peer_id : peer_id:P2p_peer.Id.t -> connection -> unit
+
 (** Returns the [readable] of an abstract [connection] *)
 val to_readable : connection -> P2p_buffer_reader.readable
 
@@ -85,16 +89,22 @@ val global_stat : t -> P2p_stat.t
     by [sched]. *)
 val iter_connection : t -> (connection -> unit) -> unit
 
-(** [close conn] returns after any pending data has been sent and the
-   canceler of [conn] has been triggered.
+(** Stores a reason for which it will be closed in a near future. *)
+val add_closing_reason : reason:P2p_disconnection_reason.t -> connection -> unit
 
-   It does not wait for the canceler callbacks, so there is no
-   guarantee that the file descriptor is already closed, but it will
-   eventually be closed.
+(** [close ?reason conn] set the closing reason and returns after any pending
+    data has been sent and the canceler of [conn] has been triggered.
 
-   If timeout is set, the canceler will be triggered after the
-   timeout, even if pending data remains to be sent. *)
-val close : ?timeout:float -> connection -> unit tzresult Lwt.t
+    It does not wait for the canceler callbacks, so there is no guarantee that
+    the file descriptor is already closed, but it will eventually be closed.
+
+    If timeout is set, the canceler will be triggered after the timeout, even
+    if pending data remains to be sent. *)
+val close :
+  ?timeout:float ->
+  ?reason:P2p_disconnection_reason.t ->
+  connection ->
+  unit tzresult Lwt.t
 
 (** [shutdown sched] returns after all connections managed by [sched]
     have been closed and [sched]'s inner worker has successfully

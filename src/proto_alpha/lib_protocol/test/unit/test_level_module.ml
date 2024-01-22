@@ -34,15 +34,15 @@
 open Protocol
 
 let test_create_cycle_eras () =
-  let empty_cycle_eras =
-    Level_repr.create_cycle_eras [] |> Environment.wrap_tzresult
+  let open Lwt_result_wrap_syntax in
+  let@ empty_cycle_eras = Level_repr.create_cycle_eras [] in
+  let* () =
+    Assert.proto_error_with_info
+      ~loc:__LOC__
+      empty_cycle_eras
+      "Invalid cycle eras"
   in
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    empty_cycle_eras
-    "Invalid cycle eras"
-  >>=? fun () ->
-  let increasing_first_levels =
+  let@ increasing_first_levels =
     [
       Level_repr.
         {
@@ -58,14 +58,15 @@ let test_create_cycle_eras () =
         blocks_per_commitment = 2l;
       };
     ]
-    |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
+    |> Level_repr.create_cycle_eras
   in
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    increasing_first_levels
-    "Invalid cycle eras"
-  >>=? fun () ->
-  let increasing_first_cycles =
+  let* () =
+    Assert.proto_error_with_info
+      ~loc:__LOC__
+      increasing_first_levels
+      "Invalid cycle eras"
+  in
+  let@ increasing_first_cycles =
     [
       Level_repr.
         {
@@ -81,7 +82,7 @@ let test_create_cycle_eras () =
         blocks_per_commitment = 2l;
       };
     ]
-    |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
+    |> Level_repr.create_cycle_eras
   in
   Assert.proto_error_with_info
     ~loc:__LOC__
@@ -183,6 +184,7 @@ let test_case_3 =
     ] )
 
 let test_level_from_raw () =
+  let open Lwt_result_wrap_syntax in
   List.iter_es
     (fun (cycle_eras, test_cases) ->
       List.iter_es
@@ -195,46 +197,47 @@ let test_level_from_raw () =
           let raw_level =
             Raw_level_repr.of_int32_exn (Int32.of_int input_level)
           in
-          Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
-          >>?= fun cycle_eras ->
+          let*?@ cycle_eras = Level_repr.create_cycle_eras cycle_eras in
           let level_from_raw =
             Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
           in
-          Assert.equal_int
-            ~loc:__LOC__
-            (Int32.to_int (Raw_level_repr.to_int32 level_from_raw.level))
-            level
-          >>=? fun () ->
-          Assert.equal_int
-            ~loc:__LOC__
-            (Int32.to_int level_from_raw.level_position)
-            level_position
-          >>=? fun () ->
-          Assert.equal_int
-            ~loc:__LOC__
-            (Int32.to_int (Cycle_repr.to_int32 level_from_raw.cycle))
-            cycle
-          >>=? fun () ->
-          Assert.equal_int
-            ~loc:__LOC__
-            (Int32.to_int level_from_raw.cycle_position)
-            cycle_position
-          >>=? fun () ->
-          Assert.equal_bool
-            ~loc:__LOC__
-            level_from_raw.expected_commitment
-            expected_commitment
-          >>=? fun () ->
+          let* () =
+            Assert.equal_int
+              ~loc:__LOC__
+              (Int32.to_int (Raw_level_repr.to_int32 level_from_raw.level))
+              level
+          in
+          let* () =
+            Assert.equal_int
+              ~loc:__LOC__
+              (Int32.to_int level_from_raw.level_position)
+              level_position
+          in
+          let* () =
+            Assert.equal_int
+              ~loc:__LOC__
+              (Int32.to_int (Cycle_repr.to_int32 level_from_raw.cycle))
+              cycle
+          in
+          let* () =
+            Assert.equal_int
+              ~loc:__LOC__
+              (Int32.to_int level_from_raw.cycle_position)
+              cycle_position
+          in
+          let* () =
+            Assert.equal_bool
+              ~loc:__LOC__
+              level_from_raw.expected_commitment
+              expected_commitment
+          in
           let offset =
             Int32.neg (Int32.add Int32.one (Int32.of_int input_level))
           in
-          let res =
+          let@ res =
             Level_repr.level_from_raw_with_offset ~cycle_eras ~offset raw_level
           in
-          Assert.proto_error
-            ~loc:__LOC__
-            (Environment.wrap_tzresult res)
-            (fun err ->
+          Assert.proto_error ~loc:__LOC__ res (fun err ->
               let error_info =
                 Error_monad.find_info_of_error (Environment.wrap_tzerror err)
               in
@@ -243,6 +246,7 @@ let test_level_from_raw () =
     [test_case_1; test_case_2; test_case_3]
 
 let test_first_level_in_cycle () =
+  let open Lwt_result_wrap_syntax in
   let cycle_eras = fst test_case_3 in
   let test_cases =
     (* cycle, level *)
@@ -258,8 +262,7 @@ let test_first_level_in_cycle () =
     ]
   in
   let f (input_cycle, level) =
-    Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
-    >>?= fun cycle_eras ->
+    let*?@ cycle_eras = Level_repr.create_cycle_eras cycle_eras in
     let input_cycle = Cycle_repr.of_int32_exn input_cycle in
     let level_res =
       Level_repr.first_level_in_cycle_from_eras ~cycle_eras input_cycle

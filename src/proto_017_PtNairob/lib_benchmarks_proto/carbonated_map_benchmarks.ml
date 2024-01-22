@@ -84,11 +84,10 @@ module Fold_benchmark : Benchmark.S = struct
   let fold_model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:(fv "fold_const")
-           ~coeff:(fv "fold_cost_per_item"))
+      (Model.affine
+         ~name
+         ~intercept:(fv "fold_const")
+         ~coeff:(fv "fold_cost_per_item"))
 
   let models = [("carbonated_map", fold_model)]
 
@@ -174,8 +173,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
         ( "carbonated_map",
           Model.make
             ~conv:(fun () -> ())
-            ~model:
-              (Model.unknown_const1 ~name ~const:(compare_var CS.type_name)) );
+            (Model.unknown_const1 ~name ~const:(compare_var CS.type_name)) );
       ]
 
     let benchmark rng_state _conf () =
@@ -241,11 +239,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
         ( "carbonated_map",
           Model.make
             ~conv:(fun {size} -> (size, ()))
-            ~model:
-              (find_model
-                 ~name
-                 ~intercept:(fv "intercept")
-                 ~traverse_overhead:(fv "traversal_overhead")) );
+            (find_model
+               ~name
+               ~intercept:(fv "intercept")
+               ~traverse_overhead:(fv "traversal_overhead")) );
       ]
 
     let benchmark rng_state (config : config) () =
@@ -317,7 +314,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
         ( "carbonated_map",
           Model.make
             ~conv:(fun () -> ())
-            ~model:(Model.unknown_const1 ~name ~const:(fv "intercept")) );
+            (Model.unknown_const1 ~name ~const:(fv "intercept")) );
       ]
 
     let benchmark rng_state (_config : config) () =

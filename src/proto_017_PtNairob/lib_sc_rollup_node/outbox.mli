@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,4 +33,12 @@ open Protocol.Alpha_context
 val proof_of_output :
   Node_context.rw ->
   Sc_rollup.output ->
+  (Octez_smart_rollup.Commitment.Hash.t * string) tzresult Lwt.t
+
+(** [proof_of_output_at node_ctxt ~level ~message_index] returns the last cemented
+    commitment hash and the proof of the output in the LCC. *)
+val proof_of_output_simple :
+  Node_context.rw ->
+  outbox_level:Raw_level.t ->
+  message_index:int ->
   (Octez_smart_rollup.Commitment.Hash.t * string) tzresult Lwt.t

@@ -88,8 +88,8 @@ val await_protocol_activation :
 val get_attestable_slots :
   Tezos_rpc.Context.generic ->
   public_key_hash ->
-  level:int32 ->
-  Tezos_dal_node_services.Services.Types.attestable_slots tzresult Lwt.t
+  attested_level:int32 ->
+  Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t
 
 (** [register_dal_profiles ctxt delegates] calls the DAL node RPC PATCH
     /profiles/ to register each profile corresponding to a delegate in

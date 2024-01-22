@@ -78,7 +78,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := Some y ;
-            return ())
+            return_unit)
           o
       in
       return !acc)
@@ -90,7 +90,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := Some y ;
-            return ())
+            return_unit)
           o
       in
       return !acc)
@@ -102,7 +102,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := Some y ;
-            return ())
+            return_unit)
           o
       in
       return !acc)

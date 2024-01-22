@@ -72,6 +72,8 @@ module Kind = struct
 
   type event = Event_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type increase_paid_storage = Increase_paid_storage_kind
 
   type update_consensus_key = Update_consensus_key_kind
@@ -116,6 +118,7 @@ module Kind = struct
     | Delegation_manager_kind : delegation manager
     | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
@@ -186,13 +189,9 @@ let to_watermark = function
   | Preattestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
-  | Dal_attestation chain_id
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
-
-     We reuse the watermark of an attestation. This is because this
-     operation is temporary and aims to be merged with an attestation
-     later on. Moreover, there is a leak of abstraction with the shell
-     which makes adding a new watermark a bit awkward. *)
+  | Dal_attestation chain_id ->
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id))
   | Attestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
@@ -208,6 +207,10 @@ let of_watermark = function
         | '\x13' ->
             Option.map
               (fun chain_id -> Attestation chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x14' ->
+            Option.map
+              (fun chain_id -> Dal_attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -290,7 +293,7 @@ and _ contents =
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : Signature.public_key_hash;
-      fee : Tez_repr.tez;
+      fee : Tez_repr.t;
       counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
@@ -301,7 +304,7 @@ and _ contents =
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
-      amount : Tez_repr.tez;
+      amount : Tez_repr.t;
       parameters : Script_repr.lazy_expr;
       entrypoint : Entrypoint_repr.t;
       destination : Contract_repr.t;
@@ -310,7 +313,7 @@ and _ manager_operation =
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
-      credit : Tez_repr.tez;
+      credit : Tez_repr.t;
     }
       -> Kind.origination manager_operation
   | Delegation :
@@ -320,6 +323,9 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  | Set_deposits_limit :
+      Tez_repr.t option
+      -> Kind.set_deposits_limit manager_operation
   | Increase_paid_storage : {
       amount_in_bytes : Z.t;
       destination : Contract_hash.t;
@@ -407,6 +413,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
+  | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
@@ -476,7 +483,7 @@ type error += Contents_list_error of string (* `Permanent *)
 let of_list l =
   match of_list_internal l with
   | Ok contents -> Ok contents
-  | Error s -> error @@ Contents_list_error s
+  | Error s -> Result_syntax.tzfail @@ Contents_list_error s
 
 let tx_rollup_operation_tag_offset = 150
 
@@ -675,7 +682,18 @@ module Encoding = struct
           inj = (fun value -> Register_global_constant {value});
         }
 
-    (* Tag 5 was for Set_deposits_limit. *)
+    let set_deposits_limit_case =
+      MCase
+        {
+          tag = 5;
+          name = "set_deposits_limit";
+          encoding = obj1 (opt "limit" Tez_repr.encoding);
+          select =
+            (function
+            | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
+          proj = (function Set_deposits_limit key -> key);
+          inj = (fun key -> Set_deposits_limit key);
+        }
 
     let increase_paid_storage_case =
       MCase
@@ -1161,9 +1179,9 @@ module Encoding = struct
 
   let dal_attestation_encoding =
     obj3
-      (req "attestor" Signature.Public_key_hash.encoding)
       (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
+      (req "slot" Slot_repr.encoding)
 
   let dal_attestation_case =
     Case
@@ -1174,12 +1192,11 @@ module Encoding = struct
         select =
           (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_attestation
-                 Dal_attestation_repr.{attestor; attestation; level}) ->
-            (attestor, attestation, level));
+          (fun (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
+            (attestation, level, slot));
         inj =
-          (fun (attestor, attestation, level) ->
-            Dal_attestation Dal_attestation_repr.{attestor; attestation; level});
+          (fun (attestation, level, slot) ->
+            Dal_attestation Dal_attestation_repr.{attestation; level; slot});
       }
 
   let seed_nonce_revelation_case =
@@ -1444,7 +1461,8 @@ module Encoding = struct
   let register_global_constant_case =
     make_manager_case 111 Manager_operations.register_global_constant_case
 
-  (* 112 was for Set_deposits_limit. *)
+  let set_deposits_limit_case =
+    make_manager_case 112 Manager_operations.set_deposits_limit_case
 
   let increase_paid_storage_case =
     make_manager_case 113 Manager_operations.increase_paid_storage_case
@@ -1532,6 +1550,7 @@ module Encoding = struct
       PCase transaction_case;
       PCase origination_case;
       PCase delegation_case;
+      PCase set_deposits_limit_case;
       PCase increase_paid_storage_case;
       PCase update_consensus_key_case;
       PCase drain_delegate_case;
@@ -1679,6 +1698,7 @@ module Encoding = struct
     (packed_contents, prefix)
 
   let protocol_data_binary_encoding =
+    let open Result_syntax in
     conv_with_guard
       (fun (Operation_data {contents; signature}) ->
         let contents_list =
@@ -1699,7 +1719,6 @@ module Encoding = struct
         in
         (contents_and_signature_prefix, sig_suffix))
       (fun (contents_and_signature_prefix, suffix) ->
-        let open Result_syntax in
         let* Contents_list contents, prefix =
           of_contents_and_signature_prefix contents_and_signature_prefix
         in
@@ -1929,13 +1948,15 @@ let unsigned_operation_length (type kind)
     (shell, Contents_list protocol_data.contents)
 
 let check_signature (type kind) key chain_id (op : kind operation) =
+  let open Result_syntax in
   let serialized_operation = serialize_unsigned_operation op in
   let check ~watermark signature =
-    if Signature.check ~watermark key signature serialized_operation then Ok ()
-    else error Invalid_signature
+    if Signature.check ~watermark key signature serialized_operation then
+      return_unit
+    else tzfail Invalid_signature
   in
   match op.protocol_data.signature with
-  | None -> error Missing_signature
+  | None -> tzfail Missing_signature
   | Some signature ->
       let watermark =
         match op.protocol_data.contents with
@@ -1984,6 +2005,8 @@ let equal_manager_operation_kind :
   | Delegation _, _ -> None
   | Register_global_constant _, Register_global_constant _ -> Some Eq
   | Register_global_constant _, _ -> None
+  | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
+  | Set_deposits_limit _, _ -> None
   | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
   | Increase_paid_storage _, _ -> None
   | Update_consensus_key _, Update_consensus_key _ -> Some Eq
@@ -2132,6 +2155,13 @@ type round_infos = {level : int32; round : int}
    convert into an {!int}. *)
 type attestation_infos = {round : round_infos; slot : int}
 
+(** [dal_attestation_infos] gives the weight of DAL attestation. *)
+type dal_attestation_infos = {
+  level : int32;
+  slot : int;
+  number_of_attested_slots : int;
+}
+
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
 type double_baking_infos = {round : round_infos; bh_hash : Block_hash.t}
@@ -2196,7 +2226,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 
     The [weight] of a {!Dal_attestation} depends on the pair of
    the size of its bitset, {!Dal_attestation_repr.t}, and the
-   signature of its attestor {! Signature.Public_key_hash.t}.
+   signature of its attester {! Signature.Public_key_hash.t}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2226,10 +2256,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : attestation_infos -> consensus_pass_type weight
-  | Weight_dal_attestation :
-      (* attestor * num_attestations * level *)
-      (Signature.Public_key_hash.t * int * int32)
-      -> consensus_pass_type weight
+  | Weight_dal_attestation : dal_attestation_infos -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
       -> voting_pass_type weight
@@ -2328,14 +2355,16 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_consensus_content consensus_content) )
-  | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
-    ->
+  | Single (Dal_attestation Dal_attestation_repr.{attestation; level; slot}) ->
       W
         ( Consensus,
           Weight_dal_attestation
-            ( attestor,
-              Dal_attestation_repr.occupied_size_in_bits attestation,
-              Raw_level_repr.to_int32 level ) )
+            {
+              level = Raw_level_repr.to_int32 level;
+              slot = Slot_repr.to_int slot;
+              number_of_attested_slots =
+                Dal_attestation_repr.number_of_attested_slots attestation;
+            } )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2408,7 +2437,7 @@ let compare_reverse (cmp : 'a -> 'a -> int) a b = cmp b a
    parameter from valid operations and put (-1) to the [round] in the
    unreachable path where the original round fails to convert in
    {!int}. *)
-let compare_round_infos infos1 infos2 =
+let compare_round_infos (infos1 : round_infos) (infos2 : round_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:Compare.Int32.compare
     ~cmp_snd:Compare.Int.compare
@@ -2462,19 +2491,19 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_attestation} are compared in the
-   lexicographic order of their pairs of bitsets size and attestor
-   hash. *)
-let compare_dal_attestation (attestor1, attestations1, level1)
-    (attestor2, attestations2, level2) =
+(** Two valid {!Dal_attestation} are compared in the lexicographic order of
+    their level, slot, number of attested slots, and attester hash. *)
+let compare_dal_attestation_infos
+    {level = level1; slot = slot1; number_of_attested_slots = n1}
+    {level = level2; slot = slot2; number_of_attested_slots = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
-         ~cmp_snd:Compare.Int.compare)
-    ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, attestations1), attestor1)
-    ((level2, attestations2), attestor2)
+         ~cmp_snd:(compare_reverse Compare.Int.compare))
+    ~cmp_snd:(compare_reverse Compare.Int.compare)
+    ((level1, slot1), n1)
+    ((level2, slot2), n2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2497,9 +2526,8 @@ let compare_consensus_weight w1 w2 =
       compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preattestation infos1, Weight_attestation infos2 ->
       compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_attestation (attestor1, size1, lvl1),
-      Weight_dal_attestation (attestor2, size2, lvl2) ) ->
-      compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
+  | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->
+      compare_dal_attestation_infos infos1 infos2
   | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
     ->
       -1

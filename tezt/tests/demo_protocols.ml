@@ -33,7 +33,7 @@
 
 let check_protocol ?protocol_hash ~__LOC__ client expected =
   let* {protocol; _} =
-    RPC.Client.call ?protocol_hash client @@ RPC.get_chain_block_metadata ()
+    Client.RPC.call ?protocol_hash client @@ RPC.get_chain_block_metadata ()
   in
   Check.(
     (protocol = expected)
@@ -44,7 +44,7 @@ let check_protocol ?protocol_hash ~__LOC__ client expected =
 
 let check_level ?protocol_hash ~__LOC__ client expected =
   let* header =
-    RPC.Client.call ?protocol_hash client @@ RPC.get_chain_block_header ()
+    Client.RPC.call ?protocol_hash client @@ RPC.get_chain_block_header ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
   Check.(
@@ -180,7 +180,7 @@ module Demo_noops = struct
     Log.info "Forge and bake a block" ;
     let* () =
       let genesis_rpc_call =
-        RPC.Client.call ~protocol_hash:Protocol.genesis_hash client
+        Client.RPC.call ~protocol_hash:Protocol.genesis_hash client
       in
       let message = "Hello world" in
       let data =

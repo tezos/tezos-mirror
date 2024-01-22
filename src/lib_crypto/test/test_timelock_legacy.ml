@@ -147,19 +147,33 @@ let test_sampler_and_get_plaintext_size () =
   | _ -> assert false
 
 let tests =
+  let jsoo_backend =
+    match Sys.backend_type with
+    | Other "js_of_ocaml" -> true
+    | Native | Bytecode | Other _ -> false
+  in
+  let dont_run_in_js x = if jsoo_backend then None else Some x in
   [
     ( "timelock legacy",
-      [
-        ("timelock legacy: raw scenario short", `Quick, test_raw_scenario 5);
-        ("timelock legacy: raw scenario", `Quick, test_raw_scenario 1000);
-        ("timelock legacy: raw scenario long", `Slow, test_raw_scenario 100000);
-        ( "timelock legacy: high level scenario",
-          `Quick,
-          test_high_level_scenario );
-        ("timelock legacy: bench", `Slow, bench);
-        ("timelock legacy: negative test", `Quick, test_negative);
-        ( "timelock legacy: samplertest",
-          `Quick,
-          test_sampler_and_get_plaintext_size );
-      ] );
+      List.filter_map
+        (fun x -> x)
+        [
+          Some
+            ("timelock legacy: raw scenario short", `Quick, test_raw_scenario 5);
+          Some ("timelock legacy: raw scenario", `Quick, test_raw_scenario 1000);
+          dont_run_in_js
+            ( "timelock legacy: raw scenario long",
+              `Slow,
+              test_raw_scenario 100000 );
+          Some
+            ( "timelock legacy: high level scenario",
+              `Quick,
+              test_high_level_scenario );
+          dont_run_in_js ("timelock legacy: bench", `Slow, bench);
+          Some ("timelock legacy: negative test", `Quick, test_negative);
+          Some
+            ( "timelock legacy: samplertest",
+              `Quick,
+              test_sampler_and_get_plaintext_size );
+        ] );
   ]

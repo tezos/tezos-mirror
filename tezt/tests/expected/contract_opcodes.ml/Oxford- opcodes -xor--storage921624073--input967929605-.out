@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/xor.tz on storage None and input 'Right (Pair 1 0)' --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/xor.tz on storage None and input 'Right (Pair 1 0)' --level 1 --trace-stack
 storage
   (Some (Right 1))
 emitted operations
@@ -7,11 +7,11 @@ emitted operations
 big_map diff
   
 trace
-  - location: 16 (just consumed gas: 11.026)
+  - location: 16 (just consumed gas: 10.744)
     [ (Pair (Right (Pair 1 0)) None) ]
   - location: 16 (just consumed gas: 0.010)
     [ (Right (Pair 1 0)) ]
-  - location: 17 (just consumed gas: 0)
+  - location: 17 (just consumed gas: 0.010)
     [ (Pair 1 0) ]
   - location: 24 (just consumed gas: 0.010)
     [ 1
@@ -20,7 +20,7 @@ trace
     [ 1 ]
   - location: 26 (just consumed gas: 0.010)
     [ (Right 1) ]
-  - location: 17 (just consumed gas: 0.015)
+  - location: 17 (just consumed gas: 0.025)
     [ (Right 1) ]
   - location: 28 (just consumed gas: 0.010)
     [ (Some (Right 1)) ]

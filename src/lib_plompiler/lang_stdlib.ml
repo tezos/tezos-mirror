@@ -27,6 +27,71 @@
 
 open Lang_core
 
+module type Limb_list = sig
+  (** Input for a Plompiler program. *)
+  type 'a input
+
+  (** Element of the native scalar field. *)
+  type scalar
+
+  (** Representation of values. *)
+  type 'a repr
+
+  (** Plompiler program. *)
+  type 'a t
+
+  (** Representation of elements. *)
+  type tl
+
+  (** [input_bytes ~le b] returns the representation of [b]
+      that Plompiler expects as input.
+      [le] can be used to set the endianness. *)
+  val input_bytes : le:bool -> bytes -> tl input
+
+  (** [constant ~le b] returns the constant [b] as a Plompiler value.
+      [le] can be used to set the endianness. *)
+  val constant : le:bool -> bytes -> tl repr t
+
+  (** [of_scalar ~total_nb_bits b] converts the scalar [b] of size
+      [total_nb_bits] in bits into the [tl] representation. *)
+  val of_scalar : total_nb_bits:int -> scalar repr -> tl repr t
+
+  (** [to_scalar b] return the scalar representing the value [b]. *)
+  val to_scalar : tl repr -> scalar repr t
+
+  (** [of_bool_list b] converts the list of bits in little-endian
+      order into the [tl] representation. *)
+  val of_bool_list : bool list repr -> tl repr t
+
+  (** [to_bool_list b] returns the list of bits in little-endian
+      order, representing the value [b]. *)
+  val to_bool_list : tl repr -> bool list repr t
+
+  (** [xor a b] returns the exclusive disjunction of [a] and [b]. *)
+  val xor : tl repr -> tl repr -> tl repr t
+
+  (** [band a b] returns the conjunction of [a] and [b]. *)
+  val band : tl repr -> tl repr -> tl repr t
+
+  (** [not b] returns the negation of [b]. *)
+  val not : tl repr -> tl repr t
+
+  (** [rotate_right b n] shifts the bits right by n positions,
+      so that each bit is less significant.
+      The least significant bit becomes the most significant
+      i.e. it is "rotated".
+      [rotate_right bs (length bl) = bl] *)
+  val rotate_right : tl repr -> int -> tl repr t
+
+  (** [shift_right b n] shifts all bits right by n positions,
+      so that each bit is less significant.
+      The least signigicant bit is lost and the most significant bit is
+      set to zero.
+      More precisely, if we interpret the [b] as an integer,
+      [shift_right b n = b / 2^n] *)
+  val shift_right : tl repr -> int -> tl repr t
+end
+
 (** The {!LIB} module type extends the core language defined in {!Lang_core.COMMON}
     by adding functions that build upon those primitives.
 *)
@@ -132,49 +197,34 @@ module type LIB = sig
   module Bytes : sig
     (** Little-endian representation of bytes.
         First element of the list is the Least Significant Bit. *)
-    type bl = bool list
-
-    (** [input_bytes ~le bs] returns the representation of [bs]
-        that Plompiler expects as input. *)
-    val input_bytes : le:bool -> bytes -> bl Input.t
-
-    (** [constant ~le bs] returns a value holding the bytes [bs].
-      [le] can be used to set the endianness. *)
-    val constant : le:bool -> bytes -> bl repr t
+    include
+      Limb_list
+        with type tl = bool list
+         and type scalar = scalar
+         and type 'a repr = 'a repr
+         and type 'a t = 'a t
+         and type 'a input = 'a Input.t
 
     (** [constant_uint32 ~le n] returns a value holding the bytes correspoding
       to the uint [n].
       [le] can be used to set the endianness. *)
-    val constant_uint32 : le:bool -> Stdint.uint32 -> bl repr t
+    val constant_uint32 : le:bool -> Stdint.uint32 -> tl repr t
 
     (** [length b] returns the length of [b] in bits. *)
-    val length : bl repr -> int
+    val length : tl repr -> int
 
     (** [concat bs] returns the concatenation of the bitlists in [bs]. *)
-    val concat : bl repr array -> bl repr
+    val concat : tl repr array -> tl repr
 
     (** [add b1 b2] computes the addition of [b1] and [b2]. *)
-    val add : ?ignore_carry:bool -> bl repr -> bl repr -> bl repr t
-
-    (** [xor b1 b2] computes the bitwise xor between [b1] and [b2]. *)
-    val xor : bl repr -> bl repr -> bl repr t
-
-    (** [not b] computes the bitwise negation of [b]. *)
-    val not : bl repr -> bl repr t
-
-    (** [band b1 b2] computes the bitwise conjunction between [b1] and [b2]. *)
-    val band : bl repr -> bl repr -> bl repr t
+    val add : ?ignore_carry:bool -> tl repr -> tl repr -> tl repr t
 
     (** [rotate_left bl n] shifts the bits left by n positions,
       so that each bit is more significant.
       The most significant bit becomes the least significant
       i.e. it is "rotated".
       [rotate_left bl (length bl) = bl] *)
-    val rotate_left : bl repr -> int -> bl repr t
-
-    (** [rotate_right bl n] shifts the bits right by n positions.
-        Similar to {!rotate_left}, but to the right. *)
-    val rotate_right : bl repr -> int -> bl repr t
+    val rotate_left : tl repr -> int -> tl repr t
 
     (** [shift_left bl n] shifts all bits left by n positions,
       so that each bit is more significant.
@@ -182,47 +232,21 @@ module type LIB = sig
       set to zero.
       More precisely, if we interpret the [bl] as an integer
        [shift_left bl i = bl * 2^i mod 2^{length a}] *)
-    val shift_left : bl repr -> int -> bl repr t
-
-    (** [shift_right bl n] shifts all bits right by n positions.
-        Similar to {!shift_left}, but to the right. *)
-    val shift_right : bl repr -> int -> bl repr t
-
-    module Internal : sig
-      val xor_lookup : bl repr -> bl repr -> bl repr t
-
-      val band_lookup : bl repr -> bl repr -> bl repr t
-
-      val not_lookup : bl repr -> bl repr t
-    end
+    val shift_left : tl repr -> int -> tl repr t
   end
 
+  (** This module is a more generic version of Bytes, where each scalar
+     stores an [nb_bits]-bit number. *)
   module Limbs (N : sig
     val nb_bits : int
   end) : sig
-    (* This module is a more generic version of Bytes, where each scalar
-       stores an [nb_bits]-bit number. *)
-    type sl = scalar list
-
-    val of_bytes : Bytes.bl repr -> sl repr t
-
-    val to_bytes : sl repr -> Bytes.bl repr t
-
-    val to_scalar : sl repr -> scalar repr t
-
-    val of_scalar : total_nb_bits:int -> scalar repr -> sl repr t
-
-    val constant : le:bool -> bytes -> sl repr t
-
-    val xor_lookup : sl repr -> sl repr -> sl repr t
-
-    val band_lookup : sl repr -> sl repr -> sl repr t
-
-    val bnot_lookup : sl repr -> sl repr t
-
-    val rotate_right_lookup : sl repr -> int -> sl repr t
-
-    val shift_right_lookup : sl repr -> int -> sl repr t
+    include
+      Limb_list
+        with type tl = scalar list
+         and type scalar = scalar
+         and type 'a repr = 'a repr
+         and type 'a t = 'a t
+         and type 'a input = 'a Input.t
   end
 
   (** [add2 p1 p2] returns the pair [(fst p1 + fst p2, snd p1 + snd p2)]. *)
@@ -689,12 +713,28 @@ module Lib (C : COMMON) = struct
   end
 
   module Bytes = struct
+    type 'a input = 'a Input.t
+
+    type nonrec scalar = scalar
+
+    type nonrec 'a repr = 'a repr
+
+    type nonrec 'a t = 'a t
+
     (* first element of the list is the Least Significant Bit *)
-    type bl = bool list
+    type tl = bool list
 
     let input_bitlist l = Input.list (List.map Input.bool l)
 
     let input_bytes ~le b = input_bitlist @@ Utils.bitlist ~le b
+
+    let of_bool_list x = ret x
+
+    let to_bool_list x = ret x
+
+    let of_scalar ~total_nb_bits x = bits_of_scalar ~nb_bits:total_nb_bits x
+
+    let to_scalar = Num.scalar_of_bytes
 
     let constant ~le b =
       let bl = Utils.bitlist ~le b in
@@ -715,7 +755,7 @@ module Lib (C : COMMON) = struct
 
     let length b = List.length (of_list b)
 
-    let concat : bl repr array -> bl repr =
+    let concat : tl repr array -> tl repr =
      fun bs ->
       let bs = Array.to_list bs in
       let bs = List.rev bs in
@@ -806,40 +846,40 @@ module Lib (C : COMMON) = struct
         List.filteri (fun j _x -> j >= i) l @ List.init i (fun _ -> zero)
       in
       ret @@ to_list res
-
-    module Internal = struct
-      let xor_lookup a b =
-        check_args_length "Bytes.xor_lookup" a b ;
-        let* l = map2M Bool.Internal.xor_lookup (of_list a) (of_list b) in
-        ret @@ to_list l
-
-      let band_lookup a b =
-        check_args_length "Bytes.band_lookup" a b ;
-        let* l = map2M Bool.Internal.band_lookup (of_list a) (of_list b) in
-        ret @@ to_list l
-
-      let not_lookup b =
-        let* l = mapM Bool.Internal.bnot_lookup (of_list b) in
-        ret @@ to_list l
-    end
   end
 
   module Limbs (N : sig
     val nb_bits : int
   end) =
   struct
-    module Limb = Limb (N)
+    type 'a input = 'a Input.t
 
-    type sl = scalar list
+    type nonrec scalar = scalar
+
+    type nonrec 'a repr = 'a repr
+
+    type nonrec 'a t = 'a t
+
+    module LimbN = Limb (N)
+
+    type tl = scalar list
 
     let nb_bits = N.nb_bits
 
-    let of_bytes x =
+    let input_bytes ~le b =
+      let bl = Utils.bitlist ~le b in
+      let limbs = Utils.limbs_of_bool_list ~nb_bits bl in
+      let r = List.map S.of_int limbs in
+      Input.with_assertion
+        (fun x -> iterM (Num.range_check ~nb_bits) (of_list x))
+        (Input.list (List.map Input.scalar r))
+
+    let of_bool_list x =
       let bl = Utils.split_exactly (of_list x) nb_bits in
       let* r = mapM (fun x -> Num.scalar_of_bytes (to_list x)) bl in
       ret @@ to_list r
 
-    let to_bytes l =
+    let to_bool_list l =
       let* lb =
         mapM
           (fun z ->
@@ -859,16 +899,16 @@ module Lib (C : COMMON) = struct
       let* r = mapM (fun x -> Num.constant @@ S.of_int x) limbs in
       ret @@ to_list r
 
-    let xor_lookup a b =
-      let* r = map2M Limb.xor_lookup (of_list a) (of_list b) in
+    let xor a b =
+      let* r = map2M LimbN.xor_lookup (of_list a) (of_list b) in
       ret @@ to_list r
 
-    let band_lookup a b =
-      let* r = map2M Limb.band_lookup (of_list a) (of_list b) in
+    let band a b =
+      let* r = map2M LimbN.band_lookup (of_list a) (of_list b) in
       ret @@ to_list r
 
-    let bnot_lookup b =
-      let* r = mapM Limb.bnot_lookup (of_list b) in
+    let not b =
+      let* r = mapM LimbN.bnot_lookup (of_list b) in
       ret @@ to_list r
 
     let rotate_or_shift_right_rem0 ~is_shift a ind =
@@ -886,11 +926,11 @@ module Lib (C : COMMON) = struct
       let a = Array.of_list (of_list a) in
       let len = Array.length a in
       let get_i i : scalar repr t =
-        if i < len - 1 then Limb.rotate_right_lookup a.(i) a.(i + 1) rem
+        if i < len - 1 then LimbN.rotate_right_lookup a.(i) a.(i + 1) rem
         else
           let* zero = Num.zero in
           let a0 = if is_shift then zero else a.(0) in
-          Limb.rotate_right_lookup a.(i) a0 rem
+          LimbN.rotate_right_lookup a.(i) a0 rem
       in
       let* r = mapM get_i (List.init len (fun i -> i)) in
       ret @@ to_list r
@@ -901,9 +941,9 @@ module Lib (C : COMMON) = struct
       let* res = rotate_or_shift_right_rem0 ~is_shift a ind in
       if rem > 0 then rotate_or_shift_right_rem ~is_shift res rem else ret res
 
-    let rotate_right_lookup a i = rotate_or_shift_right ~is_shift:false a i
+    let rotate_right a i = rotate_or_shift_right ~is_shift:false a i
 
-    let shift_right_lookup a i = rotate_or_shift_right ~is_shift:true a i
+    let shift_right a i = rotate_or_shift_right ~is_shift:true a i
   end
 
   let add2 p1 p2 =

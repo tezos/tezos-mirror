@@ -3,12 +3,12 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "17.2"
+    "version": "18.1"
   },
   "paths": {
     "/ban_operation": {
       "post": {
-        "description": "Remove an operation from the mempool if present, reverting its effect if it was applied. Add it to the set of banned operations to prevent it from being fetched/processed/injected in the future. Note: If the baker has already received the operation, then it's necessary to restart it to flush the operation from it.",
+        "description": "Remove an operation from the mempool if present. Also add it to the set of banned operations to prevent it from being fetched/processed/injected in the future. Note: If the baker has already received the operation, then it's necessary to restart it to flush the operation from it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -116,9 +116,26 @@
         "description": "Monitor the mempool operations.",
         "parameters": [
           {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "applied",
             "in": "query",
-            "description": "Include applied operations (set by default)",
+            "description": "(DEPRECATED use validated instead) Include validated operations",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validated",
+            "in": "query",
+            "description": "Include validated operations (set by default)",
             "required": true,
             "schema": {
               "type": "string"
@@ -176,43 +193,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "description": "An operation's shell header.",
-                    "type": "object",
-                    "properties": {
-                      "hash": {
-                        "$ref": "#/components/schemas/Operation_hash"
-                      },
-                      "protocol": {
-                        "type": "string",
-                        "enum": [
-                          "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                  "oneOf": [
+                    {
+                      "title": "monitor_operations_encoding",
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V1"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error_opt"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents"
                         ]
-                      },
-                      "branch": {
-                        "$ref": "#/components/schemas/block_hash"
-                      },
-                      "contents": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
-                        }
-                      },
-                      "signature": {
-                        "$ref": "#/components/schemas/Signature.V1"
-                      },
-                      "error": {
-                        "$ref": "#/components/schemas/error_opt"
                       }
                     },
-                    "required": [
-                      "hash",
-                      "protocol",
-                      "branch",
-                      "contents"
-                    ]
-                  }
+                    {
+                      "title": "monitor_operations_encoding_with_legacy_attestation_name",
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V1"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error_opt"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents"
+                        ]
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -245,7 +307,16 @@
           {
             "name": "applied",
             "in": "query",
-            "description": "Include applied operations (true by default)",
+            "description": "(DEPRECATED use validated instead) Include validated operations",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validated",
+            "in": "query",
+            "description": "Include validated operations (true by default)",
             "required": true,
             "schema": {
               "type": "string"
@@ -305,7 +376,246 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "new_encoding_pending_operations",
+                      "title": "pending_operations_encoding",
+                      "type": "object",
+                      "properties": {
+                        "validated": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "branch",
+                              "contents"
+                            ]
+                          }
+                        },
+                        "refused": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "error"
+                            ]
+                          }
+                        },
+                        "outdated": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "error"
+                            ]
+                          }
+                        },
+                        "branch_refused": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "error"
+                            ]
+                          }
+                        },
+                        "branch_delayed": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "error"
+                            ]
+                          }
+                        },
+                        "unprocessed": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/017-PtNairob.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature.V1"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "validated",
+                        "refused",
+                        "outdated",
+                        "branch_refused",
+                        "branch_delayed",
+                        "unprocessed"
+                      ]
+                    },
+                    {
+                      "title": "pending_operations_encoding_with_legacy_attestation_name",
                       "type": "object",
                       "properties": {
                         "applied": {
@@ -770,7 +1080,7 @@
                                   "$ref": "#/components/schemas/Operation_hash"
                                 },
                                 {
-                                  "$ref": "#/components/schemas/next_operation"
+                                  "$ref": "#/components/schemas/next_operation_with_legacy_attestation_name"
                                 }
                               ]
                             }
@@ -3422,7 +3732,7 @@
           }
         ]
       },
-      "next_operation": {
+      "next_operation_with_legacy_attestation_name": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {

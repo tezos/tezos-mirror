@@ -7,7 +7,7 @@ include: .gitlab/ci/jobs/coverage/common.yml
 unified_coverage:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_e2etest_dependencies
     - .template__coverage_report
   rules:
     # We do not run this job when margebot triggers the
@@ -16,13 +16,16 @@ unified_coverage:
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: never
     - when: on_success
+  variables:
+    # This inhibites the Makefile's opam version check, which this
+    # job's opam-less image cannot pass.
+    TEZOS_WITHOUT_OPAM: "true"
   # This job requires all bisect_ppx artifacts from the stage test, so we override
   # the `dependencies: []` in `.default_settings` with a list of jobs.
   # Each new job in the stage test needs to be manually added to this list.
   # /!\ Warning: this list is read by `scripts/ci/download_coverage/download.ml`.
   # The 'dependencies' field must be followed directly by the 'script' field.
   dependencies:
-    - "test-liquidity-baking-scripts"
     - "tezt 1/60"
     - "tezt 2/60"
     - "tezt 3/60"
@@ -84,8 +87,18 @@ unified_coverage:
     - "tezt 58/60"
     - "tezt 59/60"
     - "tezt 60/60"
+    - "tezt-greedy-4k 1/4"
+    - "tezt-greedy-4k 2/4"
+    - "tezt-greedy-4k 3/4"
+    - "tezt-greedy-4k 4/4"
+    - "tezt-greedy-3k 1/1"
     - "unit:non-proto-x86_64"
     - "unit:proto-x86_64"
+    - "unit:other-x86_64"
   script:
-    # On the development branches, we compute coverage
-    - ./scripts/ci/report_coverage.sh
+    # On the development branches, we compute coverage.
+    # TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+    # We propagate the exit code to temporarily allow corrupted coverage files.
+    - ./scripts/ci/report_coverage.sh || exit $?
+  allow_failure:
+    exit_codes: 64

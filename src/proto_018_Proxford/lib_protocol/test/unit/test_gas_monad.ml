@@ -38,22 +38,23 @@ module GM = Gas_monad
 let ten_milligas = Gas.fp_of_milligas_int 10
 
 let new_context ~limit =
-  Context.init1 () >>=? fun (b, _contract) ->
-  Incremental.begin_construction b >|=? fun inc ->
+  let open Lwt_result_syntax in
+  let* b, _contract = Context.init1 () in
+  let+ inc = Incremental.begin_construction b in
   Gas.set_limit (Incremental.alpha_ctxt inc) limit
 
 let assert_gas_exhaustion ~loc ctxt gas_monad =
   match GM.run ctxt gas_monad with
-  | Error _ -> return ()
+  | Error _ -> return_unit
   | _ -> failwith "%s: expected gas-exhaustion error" loc
 
 let assert_equal_gas ~loc g1 g2 =
   Assert.equal ~loc Gas.Arith.equal "Compare gas" Gas.Arith.pp g1 g2
 
 let assert_inner_errors ~loc ctxt gas_monad ~errors ~remaining_gas =
+  let open Lwt_result_syntax in
   match GM.run ctxt gas_monad with
   | Ok (Error e, ctxt) ->
-      let open Lwt_result_syntax in
       let* () =
         Assert.assert_equal_list
           ~loc
@@ -80,7 +81,10 @@ let assert_success ~loc ctxt gas_monad ~result ~remaining_gas =
         (Gas.fp_of_milligas_int remaining_gas)
   | _ -> failwith "%s: expected successful result `%d' but got error" loc result
 
-let with_context f ~limit = new_context ~limit >>=? f
+let with_context f ~limit =
+  let open Lwt_result_syntax in
+  let* ctxt = new_context ~limit in
+  f ctxt
 
 (** Test that consuming more gas than remaining results in a gas-exhaustion
     error.  *)
@@ -191,7 +195,7 @@ let test_syntax_module () =
     (none, nil, t, f, one, two)
   in
   match GM.run ctxt gas_monad with
-  | Ok (Ok (None, [], true, false, 1, 2), _ctxt) -> return ()
+  | Ok (Ok (None, [], true, false, 1, 2), _ctxt) -> return_unit
   | _ -> failwith "Expected `Ok (None, [], true, false, 1, 2)`"
 
 let tests =

@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
+open Plonk.Identities
 
 module type S = sig
-  module PC : Kzg.PC_for_distribution_sig
+  module PC : Polynomial_commitment.PC_for_distribution_sig
 
   include Plonk.Polynomial_protocol.S with module PC := PC
 
@@ -38,8 +39,8 @@ module type S = sig
     n:int ->
     alpha:Scalar.t ->
     nb_of_t_chunks:int ->
-    Evaluations.t Plonk.SMap.t ->
-    Evaluations.polynomial Plonk.SMap.t
+    Evaluations.t Kzg.SMap.t ->
+    Evaluations.polynomial Kzg.SMap.t
 end
 
 module type Super = sig
@@ -55,11 +56,12 @@ module type Super = sig
     n:int ->
     alpha:Scalar.t ->
     nb_of_t_chunks:int ->
-    Evaluations.t Plonk.SMap.t ->
-    Evaluations.polynomial Plonk.SMap.t
+    Evaluations.t Kzg.SMap.t ->
+    Evaluations.polynomial Kzg.SMap.t
 end
 
-module Make (PC : Kzg.PC_for_distribution_sig) : S with module PC = PC = struct
+module Make (PC : Polynomial_commitment.PC_for_distribution_sig) :
+  S with module PC = PC = struct
   module PP = Plonk.Polynomial_protocol.Make_impl (PC)
   module PC = PC
 

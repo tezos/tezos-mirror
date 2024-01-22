@@ -61,10 +61,18 @@ module Consensus_conflict_map = Map.Make (struct
     Round.compare round1 round2
 end)
 
+module Dal_conflict_map = Map.Make (struct
+  type t = Slot.t * Raw_level.t
+
+  let compare (slot1, level1) (slot2, level2) =
+    Compare.or_else (Raw_level.compare level1 level2) @@ fun () ->
+    Slot.compare slot1 slot2
+end)
+
 type consensus_state = {
   preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_seen : Operation_hash.t Consensus_conflict_map.t;
-  dal_attestation_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
+  dal_attestation_seen : Operation_hash.t Dal_conflict_map.t;
 }
 
 let consensus_conflict_map_encoding =
@@ -79,6 +87,15 @@ let consensus_conflict_map_encoding =
           (tup3 Slot.encoding Raw_level.encoding Round.encoding)
           Operation_hash.encoding))
 
+let dal_conflict_map_encoding =
+  let open Data_encoding in
+  conv
+    (fun map -> Dal_conflict_map.bindings map)
+    (fun l ->
+      Dal_conflict_map.(List.fold_left (fun m (k, v) -> add k v m) empty l))
+    (list
+       (tup2 (tup2 Slot.encoding Raw_level.encoding) Operation_hash.encoding))
+
 let consensus_state_encoding =
   let open Data_encoding in
   def "consensus_state"
@@ -90,15 +107,13 @@ let consensus_state_encoding =
        (obj3
           (req "preattestations_seen" consensus_conflict_map_encoding)
           (req "attestations_seen" consensus_conflict_map_encoding)
-          (req
-             "dal_attestation_seen"
-             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
+          (req "dal_attestation_seen" dal_conflict_map_encoding))
 
 let empty_consensus_state =
   {
     preattestations_seen = Consensus_conflict_map.empty;
     attestations_seen = Consensus_conflict_map.empty;
-    dal_attestation_seen = Signature.Public_key_hash.Map.empty;
+    dal_attestation_seen = Dal_conflict_map.empty;
   }
 
 type voting_state = {
@@ -383,6 +398,8 @@ type validation_state = {
 
 let ok_unit = Result_syntax.return_unit
 
+let result_error = Result_syntax.tzfail
+
 let init_info ctxt mode chain_id ~predecessor_level_and_round =
   let consensus_info =
     Option.map (init_consensus_info ctxt) predecessor_level_and_round
@@ -428,18 +445,19 @@ let get_initial_ctxt {info; _} = info.ctxt
 module Consensus = struct
   open Validate_errors.Consensus
 
-  let check_frozen_deposits_are_positive ctxt delegate_pkh =
+  let check_delegate_is_not_forbidden ctxt delegate_pkh =
     fail_when
       (Delegate.is_forbidden_delegate ctxt delegate_pkh)
-      (Zero_frozen_deposits delegate_pkh)
+      (Forbidden_delegate delegate_pkh)
 
   let get_delegate_details slot_map kind slot =
+    let open Result_syntax in
     match slot_map with
-    | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
+    | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
     | Some slot_map -> (
         match Slot.Map.find slot slot_map with
-        | None -> error (Wrong_slot_used_for_consensus_operation {kind})
-        | Some x -> ok x)
+        | None -> tzfail (Wrong_slot_used_for_consensus_operation {kind})
+        | Some x -> return x)
 
   (** When validating a block (ie. in [Application],
       [Partial_validation], and [Construction] modes), any
@@ -455,16 +473,22 @@ module Consensus = struct
        error when it is not needed. *)
     if Raw_level.equal expected provided then Result.return_unit
     else if Raw_level.(expected > provided) then
-      error (Consensus_operation_for_old_level {kind; expected; provided})
-    else error (Consensus_operation_for_future_level {kind; expected; provided})
+      result_error
+        (Consensus_operation_for_old_level {kind; expected; provided})
+    else
+      result_error
+        (Consensus_operation_for_future_level {kind; expected; provided})
 
   let check_round kind expected provided =
     (* We use [if] instead of [error_unless] to avoid computing the
        error when it is not needed. *)
-    if Round.equal expected provided then Result.return_unit
+    if Round.equal expected provided then ok_unit
     else if Round.(expected > provided) then
-      error (Consensus_operation_for_old_round {kind; expected; provided})
-    else error (Consensus_operation_for_future_round {kind; expected; provided})
+      result_error
+        (Consensus_operation_for_old_round {kind; expected; provided})
+    else
+      result_error
+        (Consensus_operation_for_future_round {kind; expected; provided})
 
   let check_payload_hash kind expected provided =
     error_unless
@@ -480,7 +504,7 @@ module Consensus = struct
     let open Lwt_result_syntax in
     let*? locked_round =
       match block_info.locked_round with
-      | Some locked_round -> ok locked_round
+      | Some locked_round -> Ok locked_round
       | None ->
           (* A preexisting block whose fitness has no locked round
              should contain no preattestations. *)
@@ -495,9 +519,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation checks for Construction mode.
@@ -526,9 +548,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation/attestation checks for Mempool mode.
@@ -562,10 +582,12 @@ module Consensus = struct
     let*? () =
       if Raw_level.(succ level < consensus_info.predecessor_level) then
         let expected = consensus_info.predecessor_level and provided = level in
-        error (Consensus_operation_for_old_level {kind; expected; provided})
+        result_error
+          (Consensus_operation_for_old_level {kind; expected; provided})
       else if Raw_level.(level > vi.current_level.level) then
         let expected = consensus_info.predecessor_level and provided = level in
-        error (Consensus_operation_for_future_level {kind; expected; provided})
+        result_error
+          (Consensus_operation_for_future_level {kind; expected; provided})
       else ok_unit
     in
     let* (_ctxt : t), consensus_key =
@@ -636,7 +658,7 @@ module Consensus = struct
   let wrap_preattestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
-        error
+        result_error
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Preattestation; conflict})
 
@@ -694,14 +716,14 @@ module Consensus = struct
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
       match Consensus.attestation_branch vi.ctxt with
-      | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
+      | Some ((_branch : Block_hash.t), payload_hash) -> Ok payload_hash
       | None ->
           (* [Consensus.attestation_branch] only returns [None] when the
              predecessor is the block that activates the first protocol
              of the Tenderbake family; this block should not be
              attested. This can only happen in tests and test
              networks. *)
-          error Unexpected_attestation_in_block
+          result_error Unexpected_attestation_in_block
     in
     let kind = Attestation in
     let*? () = check_level kind consensus_info.predecessor_level level in
@@ -710,9 +732,7 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.attestation_slot_map kind slot
     in
-    let* () =
-      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
-    in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   let check_attestation vi ~check_signature
@@ -764,7 +784,7 @@ module Consensus = struct
   let wrap_attestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
-        error
+        result_error
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
@@ -803,32 +823,60 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with attestations_seen}}
 
-  let check_dal_attestation vi (operation : Kind.dal_attestation operation) =
-    (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
-       This is a temporary operation. Some checks are missing for the
-       moment. In particular, the signature is not
-       checked. Consequently, it is really important to ensure this
-       operation cannot be included into a block when the feature flag
-       is not set. This is done in order to avoid modifying the
-       attestation encoding. However, once the DAL is ready, this
-       operation should be merged with an attestation or at least
-       refined. *)
+  let check_dal_attestation vi ~check_signature
+      (operation : Kind.dal_attestation operation) =
+    (* DAL/TODO https://gitlab.com/tezos/tezos/-/issues/3115
+       This is a temporary operation to avoid modifying the attestation
+       encoding. At some point, this operation should be merged with an
+       attestation. *)
     let open Lwt_result_syntax in
     let (Single (Dal_attestation op)) = operation.protocol_data.contents in
-    let*? () =
+    let*? consensus_info =
+      Option.value_e
+        ~error:(trace_of_error Consensus_operation_not_allowed)
+        vi.consensus_info
+    in
+    let get_consensus_key () =
+      match vi.mode with
+      | Application _ | Partial_validation _ | Construction _ ->
+          let*? consensus_key, _voting_power =
+            get_delegate_details
+              consensus_info.attestation_slot_map
+              Dal_attestation
+              op.slot
+          in
+          return consensus_key
+      | Mempool ->
+          let* (_ctxt : t), consensus_key =
+            Stake_distribution.slot_owner
+              vi.ctxt
+              (Level.from_raw vi.ctxt op.level)
+              op.slot
+          in
+          return consensus_key
+    in
+    let* consensus_key =
       (* Note that this function checks the dal feature flag. *)
-      Dal_apply.validate_attestation vi.ctxt op
+      Dal_apply.validate_attestation vi.ctxt get_consensus_key op
+    in
+    let*? () =
+      if check_signature then
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
+      else ok_unit
     in
     return_unit
 
   let check_dal_attestation_conflict vs oph
       (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attestation = _; level; slot})) =
       operation.protocol_data.contents
     in
     match
-      Signature.Public_key_hash.Map.find_opt
-        attestor
+      Dal_conflict_map.find_opt
+        (slot, level)
         vs.consensus_state.dal_attestation_seen
     with
     | None -> ok_unit
@@ -838,12 +886,12 @@ module Consensus = struct
   let wrap_dal_attestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
-        error
+        result_error
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
   let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attestation = _; level; slot})) =
       operation.protocol_data.contents
     in
     {
@@ -852,20 +900,20 @@ module Consensus = struct
         {
           vs.consensus_state with
           dal_attestation_seen =
-            Signature.Public_key_hash.Map.add
-              attestor
+            Dal_conflict_map.add
+              (slot, level)
               oph
               vs.consensus_state.dal_attestation_seen;
         };
     }
 
   let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
-    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
+    let (Single (Dal_attestation {attestation = _; level; slot})) =
       operation.protocol_data.contents
     in
     let dal_attestation_seen =
-      Signature.Public_key_hash.Map.remove
-        attestor
+      Dal_conflict_map.remove
+        (slot, level)
         vs.consensus_state.dal_attestation_seen
     in
     {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
@@ -934,6 +982,17 @@ module Consensus = struct
     let block_state = may_update_attestation_power info block_state power in
     let operation_state = add_attestation operation_state oph operation in
     return {info; operation_state; block_state}
+
+  let validate_dal_attestation ~check_signature info operation_state block_state
+      oph operation =
+    let open Lwt_result_syntax in
+    let* () = check_dal_attestation info ~check_signature operation in
+    let*? () =
+      check_dal_attestation_conflict operation_state oph operation
+      |> wrap_dal_attestation_conflict
+    in
+    let operation_state = add_dal_attestation operation_state oph operation in
+    return {info; operation_state; block_state}
 end
 
 (** {2 Validation of voting operations}
@@ -966,7 +1025,7 @@ module Voting = struct
   let check_proposal_list_sanity proposals =
     let open Result_syntax in
     let* () =
-      match proposals with [] -> error Empty_proposals | _ :: _ -> ok_unit
+      match proposals with [] -> tzfail Empty_proposals | _ :: _ -> ok_unit
     in
     let* (_ : Protocol_hash.Set.t) =
       List.fold_left_e
@@ -986,7 +1045,7 @@ module Voting = struct
     match current_period.Voting_period.kind with
     | Proposal -> ok_unit
     | (Exploration | Cooldown | Promotion | Adoption) as current ->
-        error (Wrong_voting_period_kind {current; expected = [Proposal]})
+        result_error (Wrong_voting_period_kind {current; expected = [Proposal]})
 
   let check_in_listings ctxt source =
     let open Lwt_result_syntax in
@@ -1039,7 +1098,7 @@ module Voting = struct
            current function is only called in [check_proposals] after a
            successful call to {!Voting_period.get_current}. *)
         ok_unit
-    | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
+    | _ :: _ :: _ -> result_error Testnet_dictator_multiple_proposals
 
   (** Check that a Proposals operation can be safely applied.
 
@@ -1128,7 +1187,7 @@ module Voting = struct
   let wrap_proposals_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
-        error Validate_errors.Voting.(Conflicting_proposals conflict)
+        result_error Validate_errors.Voting.(Conflicting_proposals conflict)
 
   let add_proposals vs oph (operation : Kind.proposals operation) =
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
@@ -1157,7 +1216,7 @@ module Voting = struct
     match current_period.Voting_period.kind with
     | Exploration | Promotion -> ok_unit
     | (Cooldown | Proposal | Adoption) as current ->
-        error
+        result_error
           (Wrong_voting_period_kind
              {current; expected = [Exploration; Promotion]})
 
@@ -1233,7 +1292,7 @@ module Voting = struct
 
   let wrap_ballot_conflict = function
     | Ok () -> ok_unit
-    | Error conflict -> error (Conflicting_ballot conflict)
+    | Error conflict -> result_error (Conflicting_ballot conflict)
 
   let add_ballot vs oph (operation : Kind.ballot operation) =
     let (Single (Ballot {source; _})) = operation.protocol_data.contents in
@@ -1255,10 +1314,10 @@ module Anonymous = struct
   open Validate_errors.Anonymous
 
   let check_activate_account vi (operation : Kind.activate_account operation) =
+    let open Lwt_result_syntax in
     let (Single (Activate_account {id = edpkh; activation_code})) =
       operation.protocol_data.contents
     in
-    let open Lwt_result_syntax in
     let blinded_pkh =
       Blinded_public_key_hash.of_ed25519_pkh activation_code edpkh
     in
@@ -1287,7 +1346,7 @@ module Anonymous = struct
         let (Single (Activate_account {id = edpkh; _})) =
           operation.protocol_data.contents
         in
-        error (Conflicting_activation {edpkh; conflict})
+        result_error (Conflicting_activation {edpkh; conflict})
 
   let add_activate_account vs oph (operation : Kind.activate_account operation)
       =
@@ -1317,7 +1376,7 @@ module Anonymous = struct
     let open Result_syntax in
     let current_cycle = vi.current_level.cycle in
     let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
-    let max_slashing_period = Constants.max_slashing_period vi.ctxt in
+    let max_slashing_period = Constants.max_slashing_period in
     let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
     let* () =
       error_unless
@@ -1451,7 +1510,7 @@ module Anonymous = struct
 
   let wrap_denunciation_conflict kind = function
     | Ok () -> ok_unit
-    | Error conflict -> error (Conflicting_denunciation {kind; conflict})
+    | Error conflict -> result_error (Conflicting_denunciation {kind; conflict})
 
   let add_double_attesting_evidence (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
@@ -1678,7 +1737,7 @@ module Anonymous = struct
       Contract.get_balance info.ctxt (Contract.Implicit delegate)
     in
     let*? origination_burn =
-      if is_destination_allocated then ok Tez.zero
+      if is_destination_allocated then Ok Tez.zero
       else
         let cost_per_byte = Constants.cost_per_byte info.ctxt in
         let origination_size = Constants.origination_size info.ctxt in
@@ -1723,7 +1782,8 @@ module Anonymous = struct
     in
     function
     | Ok () -> ok_unit
-    | Error conflict -> error (Conflicting_drain_delegate {delegate; conflict})
+    | Error conflict ->
+        result_error (Conflicting_drain_delegate {delegate; conflict})
 
   let add_drain_delegate state oph (operation : Kind.drain_delegate Operation.t)
       =
@@ -1776,7 +1836,7 @@ module Anonymous = struct
 
   let wrap_seed_nonce_revelation_conflict = function
     | Ok () -> ok_unit
-    | Error conflict -> error (Conflicting_nonce_revelation conflict)
+    | Error conflict -> result_error (Conflicting_nonce_revelation conflict)
 
   let add_seed_nonce_revelation vs oph
       (operation : Kind.seed_nonce_revelation operation) =
@@ -1821,7 +1881,7 @@ module Anonymous = struct
 
   let wrap_vdf_revelation_conflict = function
     | Ok () -> ok_unit
-    | Error conflict -> error (Conflicting_vdf_revelation conflict)
+    | Error conflict -> result_error (Conflicting_vdf_revelation conflict)
 
   let add_vdf_revelation vs oph =
     {
@@ -1854,6 +1914,67 @@ module Manager = struct
     total_gas_used : Gas.Arith.fp;
   }
 
+  let check_source_and_counter ~expected_source ~source ~previous_counter
+      ~counter =
+    let open Result_syntax in
+    let* () =
+      error_unless
+        (Signature.Public_key_hash.equal expected_source source)
+        Inconsistent_sources
+    in
+    error_unless
+      Manager_counter.(succ previous_counter = counter)
+      Inconsistent_counters
+
+  let rec check_batch_tail_sanity :
+      type kind.
+      public_key_hash ->
+      Manager_counter.t ->
+      kind Kind.manager contents_list ->
+      unit tzresult =
+    let open Result_syntax in
+    fun expected_source previous_counter -> function
+      | Single (Manager_operation {operation = Reveal _key; _}) ->
+          tzfail Incorrect_reveal_position
+      | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
+          tzfail Incorrect_reveal_position
+      | Single (Manager_operation {source; counter; _}) ->
+          check_source_and_counter
+            ~expected_source
+            ~source
+            ~previous_counter
+            ~counter
+      | Cons (Manager_operation {source; counter; _}, rest) ->
+          let* () =
+            check_source_and_counter
+              ~expected_source
+              ~source
+              ~previous_counter
+              ~counter
+          in
+          check_batch_tail_sanity source counter rest
+
+  let check_batch :
+      type kind.
+      kind Kind.manager contents_list ->
+      (public_key_hash * public_key option * Manager_counter.t) tzresult =
+    let open Result_syntax in
+    fun contents_list ->
+      match contents_list with
+      | Single (Manager_operation {source; operation = Reveal key; counter; _})
+        ->
+          return (source, Some key, counter)
+      | Single (Manager_operation {source; counter; _}) ->
+          return (source, None, counter)
+      | Cons
+          (Manager_operation {source; operation = Reveal key; counter; _}, rest)
+        ->
+          let* () = check_batch_tail_sanity source counter rest in
+          return (source, Some key, counter)
+      | Cons (Manager_operation {source; counter; _}, rest) ->
+          let* () = check_batch_tail_sanity source counter rest in
+          return (source, None, counter)
+
   (** Check a few simple properties of the batch, and return the
       initial {!batch_state} and the contract public key.
 
@@ -1878,66 +1999,6 @@ module Manager = struct
       several managers to group-sign a sequence of operations. *)
   let check_sanity_and_find_public_key vi
       (contents_list : _ Kind.manager contents_list) =
-    let open Result_syntax in
-    let check_source_and_counter ~expected_source ~source ~previous_counter
-        ~counter =
-      let* () =
-        error_unless
-          (Signature.Public_key_hash.equal expected_source source)
-          Inconsistent_sources
-      in
-      error_unless
-        Manager_counter.(succ previous_counter = counter)
-        Inconsistent_counters
-    in
-    let rec check_batch_tail_sanity :
-        type kind.
-        public_key_hash ->
-        Manager_counter.t ->
-        kind Kind.manager contents_list ->
-        unit tzresult =
-     fun expected_source previous_counter -> function
-      | Single (Manager_operation {operation = Reveal _key; _}) ->
-          error Incorrect_reveal_position
-      | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
-          error Incorrect_reveal_position
-      | Single (Manager_operation {source; counter; _}) ->
-          check_source_and_counter
-            ~expected_source
-            ~source
-            ~previous_counter
-            ~counter
-      | Cons (Manager_operation {source; counter; _}, rest) ->
-          let open Result_syntax in
-          let* () =
-            check_source_and_counter
-              ~expected_source
-              ~source
-              ~previous_counter
-              ~counter
-          in
-          check_batch_tail_sanity source counter rest
-    in
-    let check_batch :
-        type kind.
-        kind Kind.manager contents_list ->
-        (public_key_hash * public_key option * Manager_counter.t) tzresult =
-     fun contents_list ->
-      match contents_list with
-      | Single (Manager_operation {source; operation = Reveal key; counter; _})
-        ->
-          ok (source, Some key, counter)
-      | Single (Manager_operation {source; counter; _}) ->
-          ok (source, None, counter)
-      | Cons
-          (Manager_operation {source; operation = Reveal key; counter; _}, rest)
-        ->
-          check_batch_tail_sanity source counter rest >>? fun () ->
-          ok (source, Some key, counter)
-      | Cons (Manager_operation {source; counter; _}, rest) ->
-          check_batch_tail_sanity source counter rest >>? fun () ->
-          ok (source, None, counter)
-    in
     let open Lwt_result_syntax in
     let*? source, revealed_key, first_counter = check_batch contents_list in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
@@ -1982,9 +2043,6 @@ module Manager = struct
         && storage_limit >= Z.zero)
       Fees.Storage_limit_too_high
 
-  let assert_sc_rollup_feature_enabled vi =
-    error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
-
   let assert_pvm_kind_enabled vi kind =
     error_when
       ((not (Constants.sc_rollup_arith_pvm_enable vi.ctxt))
@@ -1993,7 +2051,7 @@ module Manager = struct
 
   let assert_not_zero_messages messages =
     match messages with
-    | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
+    | [] -> result_error Sc_rollup_errors.Sc_rollup_add_zero_messages
     | _ -> ok_unit
 
   let assert_zk_rollup_feature_enabled vi =
@@ -2025,12 +2083,66 @@ module Manager = struct
            trace to this effect. *)
         record_trace Gas.Gas_limit_too_high
 
+  let check_kind_specific_content (type kind)
+      (contents : kind Kind.manager contents) remaining_gas vi =
+    let open Result_syntax in
+    let (Manager_operation
+          {
+            source;
+            fee = _;
+            counter = _;
+            operation;
+            gas_limit = _;
+            storage_limit = _;
+          }) =
+      contents
+    in
+    match operation with
+    | Reveal pk -> Contract.check_public_key pk source
+    | Transaction {parameters; _} ->
+        let* (_ : Gas.Arith.fp) =
+          consume_decoding_gas remaining_gas parameters
+        in
+        return_unit
+    | Origination {script; _} ->
+        let* remaining_gas = consume_decoding_gas remaining_gas script.code in
+        let* (_ : Gas.Arith.fp) =
+          consume_decoding_gas remaining_gas script.storage
+        in
+        return_unit
+    | Register_global_constant {value} ->
+        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
+        return_unit
+    | Delegation (Some pkh) -> Delegate.check_not_tz4 pkh
+    | Update_consensus_key pk -> Delegate.Consensus_key.check_not_tz4 pk
+    | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
+        return_unit
+    | Transfer_ticket {contents; ty; _} ->
+        let* remaining_gas = consume_decoding_gas remaining_gas contents in
+        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
+        return_unit
+    | Sc_rollup_originate {kind; _} -> assert_pvm_kind_enabled vi kind
+    | Sc_rollup_add_messages {messages; _} -> assert_not_zero_messages messages
+    | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
+    | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
+    | Sc_rollup_recover_bond _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
+           Should we successfully precheck Sc_rollup_recover_bond and any
+           (simple) Sc rollup operation, or should we add some some checks to make
+           the operations Branch_delayed if they cannot be successfully
+           prechecked? *)
+        return_unit
+    | Dal_publish_slot_header slot_header ->
+        Dal_apply.validate_publish_slot_header vi.ctxt slot_header
+    | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
+        assert_zk_rollup_feature_enabled vi
+
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check
       remaining_block_gas =
     let open Lwt_result_syntax in
     let (Manager_operation
-          {source; fee; counter = _; operation; gas_limit; storage_limit}) =
+          {source; fee; counter = _; operation = _; gas_limit; storage_limit}) =
       contents
     in
     let*? () = check_gas_limit vi ~gas_limit in
@@ -2069,56 +2181,11 @@ module Manager = struct
         batch_state.is_allocated
         (Contract_storage.Empty_implicit_contract source)
     in
-    let*? () =
-      let open Result_syntax in
-      match operation with
-      | Reveal pk -> Contract.check_public_key pk source
-      | Transaction {parameters; _} ->
-          let* (_ : Gas.Arith.fp) =
-            consume_decoding_gas remaining_gas parameters
-          in
-          return_unit
-      | Origination {script; _} ->
-          let* remaining_gas = consume_decoding_gas remaining_gas script.code in
-          let* (_ : Gas.Arith.fp) =
-            consume_decoding_gas remaining_gas script.storage
-          in
-          return_unit
-      | Register_global_constant {value} ->
-          let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
-          return_unit
-      | Delegation (Some pkh) -> Delegate.check_not_tz4 pkh
-      | Update_consensus_key pk -> Delegate.Consensus_key.check_not_tz4 pk
-      | Delegation None | Increase_paid_storage _ -> return_unit
-      | Transfer_ticket {contents; ty; _} ->
-          let* remaining_gas = consume_decoding_gas remaining_gas contents in
-          let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
-          return_unit
-      | Sc_rollup_originate {kind; _} ->
-          let* () = assert_sc_rollup_feature_enabled vi in
-          assert_pvm_kind_enabled vi kind
-      | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
-      | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _ ->
-          assert_sc_rollup_feature_enabled vi
-      | Sc_rollup_add_messages {messages; _} ->
-          let* () = assert_sc_rollup_feature_enabled vi in
-          assert_not_zero_messages messages
-      | Sc_rollup_recover_bond _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
-             Should we successfully precheck Sc_rollup_recover_bond and any
-             (simple) Sc rollup operation, or should we add some some checks to make
-             the operations Branch_delayed if they cannot be successfully
-             prechecked? *)
-          assert_sc_rollup_feature_enabled vi
-      | Dal_publish_slot_header slot_header ->
-          Dal_apply.validate_publish_slot_header vi.ctxt slot_header
-      | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
-          assert_zk_rollup_feature_enabled vi
-    in
+    let*? () = check_kind_specific_content contents remaining_gas vi in
     (* Gas should no longer be consumed below this point, because it
-       would not take into account any gas consumed during the pattern
-       matching right above. If you really need to consume gas here, then you
-       must make this pattern matching return the [remaining_gas].*)
+       would not take into account any gas consumed by
+       {!check_kind_specific_content}. If you really need to consume gas here, then you
+       must make {!check_kind_specific_content} return the [remaining_gas].*)
     let* balance, is_allocated =
       Contract.simulate_spending
         vi.ctxt
@@ -2228,7 +2295,7 @@ module Manager = struct
     in
     function
     | Ok () -> ok_unit
-    | Error conflict -> error (Manager_restriction {source; conflict})
+    | Error conflict -> result_error (Manager_restriction {source; conflict})
 
   let add_manager_operation (type kind) vs oph
       (operation : kind Kind.manager operation) =
@@ -2337,7 +2404,7 @@ let begin_any_application ctxt chain_id ~predecessor_level
       ~expected_commitment:current_level.expected_commitment
   in
   let* () =
-    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+    Consensus.check_delegate_is_not_forbidden ctxt block_producer.delegate
   in
   let* ctxt, _slot, _payload_producer =
     (* We just make sure that this call will not fail in apply.ml *)
@@ -2409,7 +2476,7 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
   let* () =
-    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+    Consensus.check_delegate_is_not_forbidden ctxt block_producer.delegate
   in
   let* ctxt, _slot, _payload_producer =
     (* We just make sure that this call will not fail in apply.ml *)
@@ -2457,7 +2524,8 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_attestation info ~check_signature operation
       in
       return_unit
-  | Single (Dal_attestation _) -> Consensus.check_dal_attestation info operation
+  | Single (Dal_attestation _) ->
+      Consensus.check_dal_attestation info ~check_signature operation
   | Single (Proposals _) ->
       Voting.check_proposals info ~check_signature operation
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
@@ -2717,16 +2785,13 @@ let validate_operation ?(check_signature = true)
             oph
             operation
       | Single (Dal_attestation _) ->
-          let open Consensus in
-          let* () = check_dal_attestation info operation in
-          let*? () =
-            check_dal_attestation_conflict operation_state oph operation
-            |> wrap_dal_attestation_conflict
-          in
-          let operation_state =
-            add_dal_attestation operation_state oph operation
-          in
-          return {info; operation_state; block_state}
+          Consensus.validate_dal_attestation
+            ~check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
       | Single (Proposals _) ->
           let open Voting in
           let* () = check_proposals info ~check_signature operation in

@@ -95,7 +95,7 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
     This function just creates a value of type [t], it does not call {!val:run}.
 
-    The path to the baker binary is chosen from the [protocol].
+   [path] provides the path to the baker binary, the default being the one derived from the [protocol].
 
     The standard output and standard error output of the baker will
     be logged with prefix [name] and color [color].
@@ -125,8 +125,8 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
     passed. The default value is [Some Pass].
 
-    [operations_pool] and [force_apply] are passed to the baker daemon through
-    the flag [--operations-pool] and [--force_apply].
+    [operations_pool], [force_apply] and [state_recorder] are passed to the baker 
+    daemon through the flag [--operations-pool], [--force_apply] and [--record-state].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
 
@@ -139,6 +139,7 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
  *)
 val create :
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
@@ -151,8 +152,49 @@ val create :
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
   Node.t ->
   Client.t ->
+  t
+
+(** Similar to {!create}, but nodes RPCs addresses, wallet base directory and L1
+    data directory are directly provided instead of a {!Client.t}, a {!Node.t}
+    and optionally a {!Dal_node.t}.
+
+    The [node_data_dir] parameter provides the (local) node's data directory
+    used for baking.
+
+    The [node_rpc_endpoint] parameter provides the (local) node's RPC server
+    endpoint to which the baker will connect to.
+
+    The [base_dir] parameter contains needed information about the wallets used
+    by the baker.
+
+    If [dal_node_rpc_endpoint] is specified, then it provides the DAL node RPC
+    server's endpoint that the baker queries in order to determine the
+    attestations it sends to the L1 node. A [--dal_node] argument is passed
+    to specify the DAL node's endpoint.
+ *)
+val create_from_uris :
+  protocol:Protocol.t ->
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?event_pipe:string ->
+  ?runner:Runner.t ->
+  ?delegates:string list ->
+  ?votefile:string ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
+  base_dir:string ->
+  node_data_dir:string ->
+  node_rpc_endpoint:Endpoint.t ->
+  unit ->
   t
 
 (** Initialize a baker.
@@ -185,9 +227,9 @@ val create :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile], [liquidity_baking_toggle_vote], [force_apply] respectively
-    [operations_pool] are passed to the baker daemon through the flags
-    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply]
+    [votefile], [liquidity_baking_toggle_vote], [force_apply], [state_recorder]
+    respectively [operations_pool] are passed to the baker daemon through the flags
+    [--votefile], [--liquidity-baking-toggle-vote], [--should-apply], [--record-state]
     respectively [--operations-pool].
 
     If [remote_mode] is specified, the baker will run in RPC-only mode.
@@ -210,6 +252,7 @@ val init :
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
   ?minimal_nanotez_per_gas_unit:int ->
+  ?state_recorder:bool ->
   Node.t ->
   Client.t ->
   t Lwt.t

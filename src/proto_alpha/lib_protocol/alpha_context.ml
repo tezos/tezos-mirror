@@ -63,10 +63,12 @@ module Sc_rollup = struct
   end
 
   module Metadata = Sc_rollup_metadata_repr
+  module Dal_parameters = Sc_rollup_dal_parameters_repr
   module Dissection_chunk = Sc_rollup_dissection_chunk_repr
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
+  module Riscv_PVM = Sc_rollup_riscv
 
   module Inbox_message = struct
     include Sc_rollup_inbox_message_repr
@@ -285,9 +287,10 @@ module Gas = struct
   let consume = Raw_context.consume_gas
 
   let consume_from available_gas cost =
+    let open Result_syntax in
     match raw_consume available_gas cost with
-    | Some remaining_gas -> ok remaining_gas
-    | None -> error Operation_quota_exceeded
+    | Some remaining_gas -> return remaining_gas
+    | None -> tzfail Operation_quota_exceeded
 
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 
@@ -315,18 +318,23 @@ module Script = struct
   type consume_deserialization_gas = Always | When_needed
 
   let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let open Result_syntax in
     let gas_cost =
       match consume_deserialization_gas with
       | Always -> Script_repr.stable_force_decode_cost lexpr
       | When_needed -> Script_repr.force_decode_cost lexpr
     in
-    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
-    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
+    let* ctxt = Raw_context.consume_gas ctxt gas_cost in
+    let+ v = Script_repr.force_decode lexpr in
+    (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
-    >>? fun ctxt ->
-    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+    let open Result_syntax in
+    let* ctxt =
+      Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    in
+    let+ v = Script_repr.force_bytes lexpr in
+    (v, ctxt)
 
   let consume_decoding_gas available_gas lexpr =
     let gas_cost = Script_repr.stable_force_decode_cost lexpr in
@@ -417,12 +425,14 @@ module Big_map = struct
     Storage.Big_map.Contents.list_key_values ?offset ?length (c, m)
 
   let exists c id =
-    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) >>?= fun c ->
-    Storage.Big_map.Key_type.find c id >>=? fun kt ->
+    let open Lwt_result_syntax in
+    let*? c = Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) in
+    let* kt = Storage.Big_map.Key_type.find c id in
     match kt with
     | None -> return (c, None)
     | Some kt ->
-        Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
+        let+ kv = Storage.Big_map.Value_type.get c id in
+        (c, Some (kt, kv))
 
   type update = Big_map.update = {
     key : Script_repr.expr;
@@ -486,7 +496,28 @@ module Bond_id = struct
   module Internal_for_tests = Contract_storage
 end
 
-module Receipt = Receipt_repr
+module Receipt = struct
+  type unstaked_frozen_staker = Unstaked_frozen_staker_repr.t =
+    | Single of Contract_repr.t * Signature.public_key_hash
+    | Shared of Signature.public_key_hash
+
+  type frozen_staker = Frozen_staker_repr.t = private
+    | Baker of Signature.public_key_hash
+    | Single_staker of {
+        staker : Contract_repr.t;
+        delegate : Signature.public_key_hash;
+      }
+    | Shared_between_stakers of {delegate : Signature.public_key_hash}
+
+  let frozen_baker = Frozen_staker_repr.baker
+
+  let frozen_single_staker = Frozen_staker_repr.single_staker
+
+  let frozen_shared_between_stakers = Frozen_staker_repr.shared_between_stakers
+
+  include Receipt_repr
+end
+
 module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
@@ -494,11 +525,6 @@ module Delegate = struct
   include Delegate_missed_attestations_storage
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
-
-  type deposits = Deposits_repr.t = {
-    initial_amount : Tez.t;
-    current_amount : Tez.t;
-  }
 
   let last_cycle_before_deactivation =
     Delegate_activation_storage.last_cycle_before_deactivation
@@ -511,6 +537,8 @@ module Delegate = struct
 
   let deactivated = Delegate_activation_storage.is_inactive
 
+  let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden
+
   module Consensus_key = Delegate_consensus_key
 
   module Rewards = struct
@@ -520,9 +548,24 @@ module Delegate = struct
       include Delegate_rewards.For_RPC
       include Adaptive_issuance_storage.For_RPC
     end
+
+    module Internal_for_tests = Adaptive_issuance_storage.Internal_for_tests
   end
 
   module Staking_parameters = Delegate_staking_parameters
+  module Shared_stake = Shared_stake
+
+  module For_RPC = struct
+    include For_RPC
+
+    let current_cycle_denunciations_list ctxt =
+      let open Lwt_syntax in
+      let* r = Storage.Current_cycle_denunciations.bindings ctxt in
+      let r =
+        List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
+      in
+      return r
+  end
 end
 
 module Stake_distribution = struct
@@ -542,6 +585,22 @@ module Stake_distribution = struct
     return (Stake_repr.get_frozen total_stake)
 
   module For_RPC = Delegate_sampler.For_RPC
+
+  module Internal_for_tests = struct
+    let get_selected_distribution = Stake_storage.get_selected_distribution
+  end
+end
+
+module Staking = struct
+  include Staking
+
+  let stake = stake ~for_next_cycle_use_only_after_slashing:false
+
+  let request_unstake =
+    request_unstake ~for_next_cycle_use_only_after_slashing:false
+
+  let finalize_unstake =
+    finalize_unstake ~for_next_cycle_use_only_after_slashing:false
 end
 
 module Nonce = Nonce_storage
@@ -570,7 +629,9 @@ module Consensus = struct
   include Raw_context.Consensus
 
   let load_attestation_branch ctxt =
-    Storage.Tenderbake.Attestation_branch.find ctxt >>=? function
+    let open Lwt_result_syntax in
+    let* result = Storage.Tenderbake.Attestation_branch.find ctxt in
+    match result with
     | Some attestation_branch ->
         Raw_context.Consensus.set_attestation_branch ctxt attestation_branch
         |> return
@@ -584,11 +645,13 @@ end
 let prepare_first_block = Init_storage.prepare_first_block
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
-  Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
-  >>=? fun (ctxt, balance_updates, origination_results) ->
-  Consensus.load_attestation_branch ctxt >>=? fun ctxt ->
-  Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
-  Adaptive_issuance_storage.load_reward_coeff ctxt >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates, origination_results =
+    Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+  in
+  let* ctxt = Consensus.load_attestation_branch ctxt in
+  let* ctxt = Forbidden_delegates_storage.load ctxt in
+  let* ctxt = Adaptive_issuance_storage.load_reward_coeff ctxt in
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =
@@ -653,6 +716,9 @@ module Cache = Cache_repr
 module Unstake_requests = struct
   include Unstake_requests_storage
 
+  let prepare_finalize_unstake =
+    prepare_finalize_unstake ~for_next_cycle_use_only_after_slashing:false
+
   module For_RPC = struct
     let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
       Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
@@ -673,9 +739,15 @@ end
 
 module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
 
-module Staking_pseudotokens = struct
+module Staking_pseudotoken = struct
   include Staking_pseudotoken_repr
+  module For_RPC = Staking_pseudotoken_repr
+  module Internal_for_tests = Staking_pseudotoken_repr
+end
+
+module Staking_pseudotokens = struct
   include Staking_pseudotokens_storage
+  module For_RPC = Staking_pseudotokens_storage.For_RPC
 end
 
 module Internal_for_tests = struct

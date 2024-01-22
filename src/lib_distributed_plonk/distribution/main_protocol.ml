@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
-open Plonk.Utils
+open Kzg.Bls
+open Kzg.Utils
 open Plonk.Identities
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 let nb_wires = Plompiler.Csir.nb_wires_arch
 
@@ -43,12 +43,10 @@ module type S = sig
 
   type gate_randomness = {beta : Scalar.t; gamma : Scalar.t; delta : Scalar.t}
 
-  val build_gates_randomness : bytes -> gate_randomness * bytes
+  val build_gates_randomness : Transcript.t -> gate_randomness * Transcript.t
 
   val filter_prv_pp_circuits :
     prover_public_parameters -> 'a SMap.t -> prover_public_parameters
-
-  val hash_verifier_inputs : verifier_inputs -> bytes
 
   module Prover : sig
     val build_all_keys_z : prover_public_parameters -> string list
@@ -141,7 +139,7 @@ module type S = sig
   val commit_to_plook_rc :
     prover_public_parameters ->
     (int * int) SMap.t ->
-    bytes ->
+    Transcript.t ->
     Evaluations.t SMap.t list SMap.t ->
     commit_to_plook_rc_reply * commit_to_plook_rc_remember
 
@@ -150,7 +148,7 @@ module type S = sig
 
   val kzg_eval_at_x :
     prover_public_parameters ->
-    PP.transcript ->
+    Transcript.t ->
     (PP.PC.secret * PP.PC.Commitment.prover_aux) list ->
     scalar ->
     PP.PC.answer list
@@ -181,7 +179,7 @@ module type S = sig
    *)
   val get_gen_n_nbt : prover_public_parameters -> scalar * int * int
 
-  val get_transcript : prover_public_parameters -> bytes
+  val get_transcript : prover_public_parameters -> Transcript.t
 
   val check_no_zk : prover_public_parameters -> unit
 end
@@ -266,7 +264,7 @@ module Common (PP : Polynomial_protocol.S) = struct
          Implement Plookup
       *)
       let all_keys = build_all_keys_z pp in
-      PP.PC.Commitment.commit ~all_keys pp.common_pp.pp_public_parameters f_map
+      PP.PC.commit ~all_keys pp.common_pp.pp_public_parameters f_map
     in
     ( {batched_wires_map; cmt; f_map; prover_aux},
       {beta = rd.beta; gamma = rd.gamma} )
@@ -357,10 +355,7 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     let cmt =
       let all_keys = build_all_keys_z pp in
-      Commitment.commit
-        ~all_keys
-        pp.common_pp.pp_public_parameters
-        f_map_perm_rc
+      PP.PC.commit ~all_keys pp.common_pp.pp_public_parameters f_map_perm_rc
     in
     (f_map_perm_rc, evaluated_perm_ids, cmt)
 

@@ -53,10 +53,10 @@ exception Fixed_point_transform_error of fixed_point_transform_error
 
 let default_options =
   {
-    precision = 4;
+    precision = 6;
     max_relative_error = 0.1;
     cast_mode = Round;
-    inverse_scaling = 3;
+    inverse_scaling = 10;
     resolution = 5;
   }
 
@@ -358,6 +358,8 @@ end)
 end = struct
   type size = X.size
 
+  let size_ty = X.size_ty
+
   type 'a repr = Term : 'a X.repr -> 'a repr | Float : float -> X.size repr
 
   let {precision; max_relative_error; cast_mode; inverse_scaling; resolution} =
@@ -439,15 +441,18 @@ end = struct
 
   let eq = lift_binop X.eq
 
-  let lam (type a b) ~name (f : a repr -> b repr) : (a -> b) repr =
+  let lam' (type a b) ~name (ty : a Costlang.Ty.t) (f : a repr -> b repr) :
+      (a -> b) repr =
     Term
-      (X.lam ~name (fun x ->
-           match f (Term x) with Term y -> y | Float f -> X.float f))
+      (X.lam' ~name ty (fun x ->
+           match f (Term x) with Term y -> y | Float f -> cast_and_snap f))
+
+  let lam ~name = lam' ~name size_ty
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with
     | Term fn, Term arg -> Term (X.app fn arg)
-    | Term fn, Float f -> Term (X.app fn (X.float f))
+    | Term fn, Float f -> Term (X.app fn (cast_and_snap f))
     | Float _, _ -> assert false
 
   let let_ (type a b) ~name (m : a repr) (fn : a repr -> b repr) : b repr =
@@ -455,11 +460,11 @@ end = struct
     | Term m ->
         Term
           (X.let_ ~name m (fun x ->
-               match fn (Term x) with Term y -> y | Float f -> X.float f))
+               match fn (Term x) with Term y -> y | Float f -> cast_and_snap f))
     | Float f ->
         Term
-          (X.let_ ~name (X.float f) (fun x ->
-               match fn (Term x) with Term y -> y | Float f -> X.float f))
+          (X.let_ ~name (cast_and_snap f) (fun x ->
+               match fn (Term x) with Term y -> y | Float f -> cast_and_snap f))
 
   let if_ cond ift iff = Term (X.if_ (prj cond) (prj ift) (prj iff))
 end

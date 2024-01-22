@@ -51,10 +51,10 @@ let install_boot_sector kind state boot_sector =
   PVM.install_boot_sector state boot_sector
 
 let get_status node_ctxt state =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
-  let+ status = PVM.get_status state in
-  PVM.string_of_status status
+  let*! status = PVM.get_status state in
+  return (PVM.string_of_status status)
 
 let get_current_level kind state =
   let open Lwt_option_syntax in
@@ -80,3 +80,38 @@ let info_per_level_serialized ~predecessor ~predecessor_timestamp =
   let open Sc_rollup_inbox_message_repr in
   unsafe_to_string
     (info_per_level_serialized ~predecessor ~predecessor_timestamp)
+
+let find_whitelist_update_output_index _node_ctxt _state ~outbox_level:_ =
+  Lwt.return_none
+
+let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
+    =
+  let open Lwt_result_syntax in
+  let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let outbox_level = Raw_level.of_int32_exn outbox_level in
+  let*! outbox = PVM.get_outbox outbox_level state in
+  let output = List.nth outbox message_index in
+  match output with
+  | None -> invalid_arg "invalid index"
+  | Some output -> (
+      let*! proof = PVM.produce_output_proof node_ctxt.context state output in
+      match proof with
+      | Ok proof ->
+          let serialized_proof =
+            Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
+          in
+          return serialized_proof
+      | Error err ->
+          failwith
+            "Error producing outbox proof (%a)"
+            Environment.Error_monad.pp
+            err)
+
+module Wasm_2_0_0 = struct
+  let decode_durable_state =
+    Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
+
+  let proof_mem_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree
+
+  let proof_fold_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
+end

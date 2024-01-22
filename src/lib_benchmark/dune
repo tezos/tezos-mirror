@@ -19,7 +19,10 @@
   pyml
   ocamlgraph
   ocaml-migrate-parsetree)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (deps %{workspace_root}/.ocamlformat))
  (preprocess (pps ppx_expect))
  (flags
   (:standard)

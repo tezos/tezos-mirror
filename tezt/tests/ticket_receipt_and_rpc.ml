@@ -44,7 +44,7 @@ let rpc_check_ticket_balance client ~contract ~ticketer ~content_type ~content
            content)
   in
   let* actual =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.post_chain_block_context_contract_ticket_balance
          ~id:contract
          ~data:post_body
@@ -181,7 +181,7 @@ let test_ticket_receipt_and_rpc =
     [kt_a; kt_b; kt_c]
     |> Lwt_list.iter_s @@ fun contract ->
        let* _ =
-         RPC.Client.call ~hooks client
+         Client.RPC.call ~hooks client
          @@ RPC.get_chain_block_context_contract_all_ticket_balances
               ~id:contract
               ()
@@ -193,7 +193,7 @@ let test_ticket_receipt_and_rpc =
     (* Check regressions for the [all_ticket_balances] RPC when called for
        implicit. *)
     let*? process =
-      RPC.Client.spawn ~hooks client
+      Client.RPC.spawn ~hooks client
       @@ RPC.get_chain_block_context_contract_all_ticket_balances
            ~id:tz_a.public_key_hash
            ()

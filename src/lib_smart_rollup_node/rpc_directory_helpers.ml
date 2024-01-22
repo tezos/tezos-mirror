@@ -68,6 +68,15 @@ module Make_sub_directory (S : PARAM) = struct
     !directory
     |> Tezos_rpc.Directory.map (fun prefix ->
            context_of_prefix node_ctxt prefix)
+
+  let gen_register service f =
+    directory := Tezos_rpc.Directory.gen_register !directory service f
+
+  let gen_register0 service f =
+    gen_register (Tezos_rpc.Service.subst0 service) @@ fun ctxt query input ->
+    match ctxt with
+    | Error e -> Tezos_rpc.Answer.fail e
+    | Ok ctxt -> f ctxt query input
 end
 
 module Make_directory (S : PARAM_PREFIX) = struct

@@ -292,8 +292,8 @@ let high_fee_diagnostic (infos : infos) op =
   validate_ko_diagnostic infos op expect_failure
 
 let test_high_fee infos kind =
-  let open Lwt_result_syntax in
-  let*? fee = Tez.(one +? default_fund) |> Environment.wrap_tzresult in
+  let open Lwt_result_wrap_syntax in
+  let*?@ fee = Tez.(one +? default_fund) in
   let* op =
     select_op
       {
@@ -497,9 +497,10 @@ let test_low_gas_limit_no_consumer infos kind =
 let flag_expect_failure flags errs =
   match errs with
   | [
-   Environment.Ecoproto_error Validate_errors.Manager.Sc_rollup_feature_disabled;
+   Environment.Ecoproto_error
+     Validate_errors.Manager.Sc_rollup_arith_pvm_disabled;
   ]
-    when flags.scoru = false ->
+    when flags.scoru_arith = false ->
       return_unit
   | [Environment.Ecoproto_error Dal_errors.Dal_feature_disabled]
     when flags.dal = false ->
@@ -521,9 +522,9 @@ let flag_expect_failure flags errs =
    See [is_disabled] and the [flags] in `manager_operation_helpers`.
    We assume that only one flag is set at false in flag.
 
-   In order to forge Toru, Scoru or Dal operation when the correspondong
+   In order to forge Scoru or Dal operation when the corresponding
    feature is disable, we use a [infos_op] with default requirements,
-   so that we have a Tx_rollup.t and a Sc_rollup.t. *)
+   so that we have a Sc_rollup.t. *)
 let test_feature_flags infos kind =
   let open Lwt_result_syntax in
   let* counter =
@@ -608,8 +609,10 @@ let tests =
         not_gas_consum,
         mk_default );
       ("dal disabled", test_feature_flags, all, mk_flags disabled_dal);
-      ("toru disabled", test_feature_flags, all, mk_flags disabled_toru);
-      ("scoru disabled", test_feature_flags, all, mk_flags disabled_scoru);
+      ( "scoru arith disabled",
+        test_feature_flags,
+        [K_Sc_rollup_origination],
+        mk_flags disabled_scoru_arith );
       ("zkru disabled", test_feature_flags, all, mk_flags disabled_zkru);
     ]
 

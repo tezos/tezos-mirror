@@ -24,16 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type PRINTABLE = sig
-  type t
-
-  val pp : Format.formatter -> t -> unit
-end
-
 module type ITERABLE = sig
   type t
 
-  include Compare.S with type t := t
+  include COMPARABLE with type t := t
 
   include PRINTABLE with type t := t
 
@@ -59,8 +53,20 @@ module type AUTOMATON_SUBCONFIG = sig
   module Message : sig
     include PRINTABLE
 
-    (** [valid] performs an application layer-level validity check on a message. *)
-    val valid : t -> Message_id.t -> [`Valid | `Unknown | `Invalid]
+    (** [valid] performs an application layer-level validity check on a message
+        id and a message if given.
+
+        The message id (and message if any) could either be [`Valid] in the
+        current context or [`Invalid], meaning that it is/they are not valid (in
+        the present time, in the past and in the future). The application layer
+        could also return [`Outdated] or [`Unknown] if the message id is
+        outdated or if the application doesn't care about validity. In this
+        case, the application might omit some costly validity checks. *)
+    val valid :
+      ?message:t ->
+      message_id:Message_id.t ->
+      unit ->
+      [`Valid | `Unknown | `Outdated | `Invalid]
   end
 end
 
@@ -410,12 +416,14 @@ module type SCORE = sig
 
   val pp_value : Format.formatter -> value -> unit
 
+  module Introspection : sig
+    (** Convert a score value into a float.  *)
+    val to_float : value -> float
+  end
+
   module Internal_for_tests : sig
     val get_topic_params :
       ('topic, 'span) score_limits -> 'topic -> 'span per_topic_score_limits
-
-    (** Convert a score value into a float.  *)
-    val to_float : value -> float
 
     (** [is_active topic t] returns [true] if the peer's score for [topic] is marked as active,
         and [false] otherwise. *)
@@ -500,6 +508,12 @@ module type MESSAGE_CACHE = sig
   (** Shift the sliding window by one slot (usually corresponding to one
       heartbeat tick). *)
   val shift : t -> t
+
+  module Introspection : sig
+    module Map : Map.S with type key = Int64.t
+
+    val get_message_ids : t -> Message_id.t list Topic.Map.t Map.t
+  end
 
   module Internal_for_tests : sig
     val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
@@ -609,6 +623,8 @@ module type AUTOMATON = sig
         (** The messages ids we want to request from the peer which sent us an
             IHave message. The implementation honors the
             [max_sent_iwant_per_heartbeat] limit. *)
+    | Invalid_message_id : [`IHave] output
+        (** A message id received via IHave message is invalid. *)
     | Iwant_from_peer_with_low_score : {
         score : Score.t;
         threshold : float;
@@ -899,20 +915,18 @@ module type AUTOMATON = sig
       val iter : (Peer.t -> connection -> unit) -> t -> unit
 
       val peers_in_topic : Topic.t -> t -> Peer.Set.t
+
+      val peers_per_topic_map : t -> Peer.Set.t Topic.Map.t
     end
 
-    module Message_cache : sig
-      type t
-
-      val get_message_for_peer :
-        Peer.t -> Message_id.t -> t -> (t * Message.t * int) option
-
-      val seen_message : Message_id.t -> t -> bool
-
-      module Internal_for_tests : sig
-        val get_access_counters : t -> (Message_id.t * int Peer.Map.t) Seq.t
-      end
-    end
+    module Message_cache :
+      MESSAGE_CACHE
+        with type Peer.t = Peer.t
+         and type 'a Peer.Map.t = 'a Peer.Map.t
+         and type Topic.t = Topic.t
+         and type Message_id.t = Message_id.t
+         and type Message.t = Message.t
+         and type Time.t = Time.t
 
     type view = {
       limits : limits;
@@ -1046,6 +1060,9 @@ module type WORKER_CONFIGURATION = sig
     (** Returns and removes all available elements of the stream l without
         blocking. *)
     val get_available : 'a t -> 'a list
+
+    (** Returns the number of elements in the stream. *)
+    val length : 'a t -> int
   end
 end
 
@@ -1080,7 +1097,12 @@ module type WORKER = sig
       layer. *)
   type p2p_input =
     | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
-    | New_connection of {peer : GS.Peer.t; direct : bool; outbound : bool}
+    | New_connection of {
+        peer : GS.Peer.t;
+        direct : bool;
+        trusted : bool;
+        bootstrap : bool;
+      }
     | Disconnection of {peer : GS.Peer.t}
 
   (** The different kinds of input events that could be received from the
@@ -1089,6 +1111,10 @@ module type WORKER = sig
     | Publish_message of message_with_header
     | Join of GS.Topic.t
     | Leave of GS.Topic.t
+
+  (** A peer's origin is either another peer (i.e. advertised via PX), or none
+      if it is trusted. *)
+  type peer_origin = PX of GS.Peer.t | Trusted
 
   (** The different kinds of outputs that could be emitted by the worker for the
       P2P layer. *)
@@ -1099,12 +1125,12 @@ module type WORKER = sig
         (** End the connection with the peer [peer]. *)
     | Kick of {peer : GS.Peer.t}
         (** Kick the peer [peer]: the peer is disconnected and blacklisted.*)
-    | Connect of {px : GS.Peer.t; origin : GS.Peer.t}
+    | Connect of {peer : GS.Peer.t; origin : peer_origin}
         (** Inform the p2p_output messages processor that we want to connect to
-            the peer [px] advertised by some other peer [origin]. *)
-    | Forget of {px : GS.Peer.t; origin : GS.Peer.t}
+            the peer [peer] advertised by some other peer [origin]. *)
+    | Forget of {peer : GS.Peer.t; origin : GS.Peer.t}
         (** Inform the p2p_output messages processor that we don't want to
-            connect to the peer [px] advertised by some other peer [origin]. *)
+            connect to the peer [peer] advertised by some other peer [origin]. *)
 
   (** The application layer will be advertised about full messages it's
       interested in. *)
@@ -1129,7 +1155,7 @@ module type WORKER = sig
 
   (** [start topics state] runs the (not already started) worker whose [state]
       is given together with the initial list of [topics] the caller is interested in. *)
-  val start : GS.Topic.t list -> t -> t
+  val start : GS.Topic.t list -> t -> unit
 
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
   val shutdown : t -> unit Monad.t
@@ -1150,6 +1176,10 @@ module type WORKER = sig
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
 
+  (** [input_events_stream t] returns the input stream in which we push events
+      to be processed by the worker. *)
+  val input_events_stream : t -> event Stream.t
+
   (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
   val is_subscribed : t -> GS.Topic.t -> bool
 
@@ -1158,4 +1188,47 @@ module type WORKER = sig
 
   (** Pretty-printer for values of type {!app_output}. *)
   val pp_app_output : Format.formatter -> app_output -> unit
+
+  (** Introspection and stats facilities *)
+  module Introspection : sig
+    (** A record containing some stats about what happened in the Gossipsub
+        worker.  *)
+    type stats = private {
+      mutable count_topics : int64;
+          (** Counts the number of topics of the node. It's the diff between Join
+            and Leave topics events. *)
+      mutable count_connections : int64;
+          (** Counts the number of connections of the node. It's the diff between
+            New_connection and Disconnection events. *)
+      mutable count_bootstrap_connections : int64;
+          (** Counts the number of connections of the node to bootstrap
+            peers. It's a refinement of [count_connections] for when the remote
+            peer declares itself as a bootstrap peer. *)
+      mutable count_sent_app_messages : int64;  (** Count sent app messages. *)
+      mutable count_sent_grafts : int64;  (** Count sent grafts. *)
+      mutable count_sent_prunes : int64;  (** Count sent prunes. *)
+      mutable count_sent_ihaves : int64;  (** Count sent ihaves. *)
+      mutable count_sent_iwants : int64;  (** Count sent iwants. *)
+      mutable count_recv_valid_app_messages : int64;
+          (** Count received app messages that are known to be valid. *)
+      mutable count_recv_invalid_app_messages : int64;
+          (** Count received app messages that are known to be invalid. *)
+      mutable count_recv_unknown_validity_app_messages : int64;
+          (** Count received app messages we won't validate. *)
+      mutable count_recv_grafts : int64;
+          (** Count successfully received & processed grafts. *)
+      mutable count_recv_prunes : int64;
+          (** Count successfully received & processed prunes. *)
+      mutable count_recv_ihaves : int64;
+          (** Count successfully received & processed ihaves. *)
+      mutable count_recv_iwants : int64;
+          (** Count successfully received & processed iwants. *)
+    }
+
+    val empty_stats : unit -> stats
+  end
+
+  val stats : t -> Introspection.stats
+
+  val state : t -> GS.Introspection.view
 end

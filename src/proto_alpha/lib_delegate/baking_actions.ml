@@ -420,7 +420,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   in
   return updated_state
 
-let inject_preattestations state ~preattestations =
+let sign_consensus_votes state operations kind =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -430,10 +430,83 @@ let inject_preattestations state ~preattestations =
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
-  let* signed_operations =
-    List.filter_map_es
-      (fun (((consensus_key, _) as delegate), consensus_content) ->
-        let*! () = Events.(emit signing_preattestation delegate) in
+  (* Hypothesis: all consensus votes have the same round and level *)
+  match operations with
+  | [] -> return_nil
+  | (_, (consensus_content : consensus_content)) :: _ ->
+      let level = Raw_level.to_int32 consensus_content.level in
+      let round = consensus_content.round in
+      (* Filter all operations that don't satisfy the highwatermark *)
+      let* authorized_consensus_votes =
+        cctxt#with_lock @@ fun () ->
+        let* highwatermarks = Baking_highwatermarks.load cctxt block_location in
+        let may_sign_consensus_vote =
+          match kind with
+          | `Preattestation -> Baking_highwatermarks.may_sign_preattestation
+          | `Attestation -> Baking_highwatermarks.may_sign_attestation
+        in
+        let*! authorized_operations =
+          List.filter_s
+            (fun (((consensus_key, _delegate_pkh) as delegate), _) ->
+              let may_sign =
+                may_sign_consensus_vote
+                  highwatermarks
+                  ~delegate:consensus_key.public_key_hash
+                  ~level
+                  ~round
+              in
+              if may_sign || state.global_state.config.force then
+                Lwt.return_true
+              else
+                let*! () =
+                  match kind with
+                  | `Preattestation ->
+                      Events.(
+                        emit
+                          skipping_preattestation
+                          ( delegate,
+                            [
+                              Baking_highwatermarks.Block_previously_preattested
+                                {round; level};
+                            ] ))
+                  | `Attestation ->
+                      Events.(
+                        emit
+                          skipping_attestation
+                          ( delegate,
+                            [
+                              Baking_highwatermarks.Block_previously_attested
+                                {round; level};
+                            ] ))
+                in
+                Lwt.return_false)
+            operations
+        in
+        (* Record all consensus votes new highwatermarks as one batch *)
+        let* () =
+          let delegates =
+            List.map
+              (fun ((ck, _), _) -> ck.public_key_hash)
+              authorized_operations
+          in
+          let record_all_consensus_vote =
+            match kind with
+            | `Preattestation ->
+                Baking_highwatermarks.record_all_preattestations
+            | `Attestation -> Baking_highwatermarks.record_all_attestations
+          in
+          record_all_consensus_vote
+            highwatermarks
+            cctxt
+            block_location
+            ~delegates
+            ~level
+            ~round
+        in
+        return authorized_operations
+      in
+      let forge_and_sign_consensus_vote : type a. _ -> a contents_list -> _ =
+       fun ((consensus_key, _) as delegate) contents ->
         let shell =
           (* The branch is the latest finalized block. *)
           {
@@ -441,155 +514,88 @@ let inject_preattestations state ~preattestations =
               state.level_state.latest_proposal.predecessor.shell.predecessor;
           }
         in
-        let contents = Single (Preattestation consensus_content) in
+        let watermark =
+          match kind with
+          | `Preattestation ->
+              Operation.(to_watermark (Preattestation chain_id))
+          | `Attestation -> Operation.(to_watermark (Attestation chain_id))
+        in
+        let unsigned_operation = (shell, Contents_list contents) in
+        let unsigned_operation_bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Operation.unsigned_encoding
+            unsigned_operation
+        in
         let level = Raw_level.to_int32 consensus_content.level in
         let round = consensus_content.round in
         let sk_uri = consensus_key.secret_key_uri in
-        let* may_sign =
-          cctxt#with_lock (fun () ->
-              let* may_sign =
-                Baking_highwatermarks.may_sign_preattestation
-                  cctxt
-                  block_location
-                  ~delegate:consensus_key.public_key_hash
-                  ~level
-                  ~round
-              in
-              match may_sign with
-              | true ->
-                  let* () =
-                    Baking_highwatermarks.record_preattestation
-                      cctxt
-                      block_location
-                      ~delegate:consensus_key.public_key_hash
-                      ~level
-                      ~round
-                  in
-                  return_true
-              | false -> return state.global_state.config.force)
-        in
         let*! signature =
-          if may_sign then
-            let unsigned_operation = (shell, Contents_list contents) in
-            let watermark =
-              Operation.(to_watermark (Preattestation chain_id))
-            in
-            let unsigned_operation_bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Operation.unsigned_encoding_with_legacy_attestation_name
-                unsigned_operation
-            in
-            Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-          else
-            tzfail
-              (Baking_highwatermarks.Block_previously_preattested {round; level})
+          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
         in
         match signature with
         | Error err ->
-            let*! () = Events.(emit skipping_preattestation (delegate, err)) in
+            let*! () =
+              match kind with
+              | `Preattestation ->
+                  Events.(emit skipping_preattestation (delegate, err))
+              | `Attestation ->
+                  Events.(emit skipping_attestation (delegate, err))
+            in
             return_none
         | Ok signature ->
             let protocol_data =
               Operation_data {contents; signature = Some signature}
             in
             let operation : Operation.packed = {shell; protocol_data} in
-            return_some (delegate, operation, level, round))
-      preattestations
-  in
+            return_some (delegate, operation, level, round)
+      in
+      List.filter_map_es
+        (fun (delegate, consensus_content) ->
+          let event =
+            match kind with
+            | `Preattestation -> Events.signing_preattestation
+            | `Attestation -> Events.signing_attestation
+          in
+          let*! () = Events.(emit event delegate) in
+          match kind with
+          | `Attestation ->
+              forge_and_sign_consensus_vote
+                delegate
+                (Single (Attestation consensus_content))
+          | `Preattestation ->
+              forge_and_sign_consensus_vote
+                delegate
+                (Single (Preattestation consensus_content)))
+        authorized_consensus_votes
+
+let inject_consensus_vote state preattestations kind =
+  let open Lwt_result_syntax in
+  let cctxt = state.global_state.cctxt in
+  let chain_id = state.global_state.chain_id in
+  let* signed_operations = sign_consensus_votes state preattestations kind in
   (* TODO: add a RPC to inject multiple operations *)
+  let fail_inject_event, injected_event =
+    match kind with
+    | `Preattestation ->
+        (Events.failed_to_inject_preattestation, Events.preattestation_injected)
+    | `Attestation ->
+        (Events.failed_to_inject_attestation, Events.attestation_injected)
+  in
   List.iter_ep
     (fun (delegate, operation, level, round) ->
       protect
         ~on_error:(fun err ->
-          let*! () =
-            Events.(emit failed_to_inject_preattestation (delegate, err))
-          in
+          let*! () = Events.(emit fail_inject_event (delegate, err)) in
           return_unit)
         (fun () ->
           let* oph =
             Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
           in
           let*! () =
-            Events.(emit preattestation_injected (oph, delegate, level, round))
+            Events.(emit injected_event (oph, delegate, level, round))
           in
           return_unit))
     signed_operations
-
-let sign_attestations state attestations =
-  let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  (* N.b. signing a lot of operations may take some time *)
-  (* Don't parallelize signatures: the signer might not be able to
-     handle concurrent requests *)
-  let block_location =
-    Baking_files.resolve_location ~chain_id `Highwatermarks
-  in
-  List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
-      let*! () = Events.(emit signing_attestation delegate) in
-      let shell =
-        (* The branch is the latest finalized block. *)
-        {
-          Tezos_base.Operation.branch =
-            state.level_state.latest_proposal.predecessor.shell.predecessor;
-        }
-      in
-      let contents =
-        (* No preattestations are included *)
-        Single (Attestation consensus_content)
-      in
-      let level = Raw_level.to_int32 consensus_content.level in
-      let round = consensus_content.round in
-      let sk_uri = consensus_key.secret_key_uri in
-      let* may_sign =
-        cctxt#with_lock (fun () ->
-            let* may_sign =
-              Baking_highwatermarks.may_sign_attestation
-                cctxt
-                block_location
-                ~delegate:consensus_key.public_key_hash
-                ~level
-                ~round
-            in
-            match may_sign with
-            | true ->
-                let* () =
-                  Baking_highwatermarks.record_attestation
-                    cctxt
-                    block_location
-                    ~delegate:consensus_key.public_key_hash
-                    ~level
-                    ~round
-                in
-                return_true
-            | false -> return state.global_state.config.force)
-      in
-      let*! signature =
-        if may_sign then
-          let watermark = Operation.(to_watermark (Attestation chain_id)) in
-          let unsigned_operation = (shell, Contents_list contents) in
-          let unsigned_operation_bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Operation.unsigned_encoding_with_legacy_attestation_name
-              unsigned_operation
-          in
-          Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
-        else
-          tzfail
-            (Baking_highwatermarks.Block_previously_attested {round; level})
-      in
-      match signature with
-      | Error err ->
-          let*! () = Events.(emit skipping_attestation (delegate, err)) in
-          return_none
-      | Ok signature ->
-          let protocol_data =
-            Operation_data {contents; signature = Some signature}
-          in
-          let operation : Operation.packed = {shell; protocol_data} in
-          return_some (delegate, operation, level, round))
-    attestations
 
 let sign_dal_attestations state attestations =
   let open Lwt_result_syntax in
@@ -605,7 +611,7 @@ let sign_dal_attestations state attestations =
     }
   in
   List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
+    (fun (((consensus_key, _) as delegate), consensus_content, published_level) ->
       let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
       let contents = Single (Dal_attestation consensus_content) in
       let unsigned_operation = (shell, Contents_list contents) in
@@ -631,32 +637,11 @@ let sign_dal_attestations state attestations =
           in
           let operation : Operation.packed = {shell; protocol_data} in
           return_some
-            (delegate, operation, consensus_content.Dal.Attestation.attestation))
+            ( delegate,
+              operation,
+              consensus_content.Dal.Attestation.attestation,
+              published_level ))
     attestations
-
-let inject_attestations state ~attestations =
-  let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  let* signed_operations = sign_attestations state attestations in
-  (* TODO: add a RPC to inject multiple operations *)
-  List.iter_ep
-    (fun (delegate, operation, level, round) ->
-      protect
-        ~on_error:(fun err ->
-          let*! () =
-            Events.(emit failed_to_inject_attestation (delegate, err))
-          in
-          return_unit)
-        (fun () ->
-          let* oph =
-            Node_rpc.inject_operation cctxt ~chain:(`Hash chain_id) operation
-          in
-          let*! () =
-            Events.(emit attestation_injected (oph, delegate, level, round))
-          in
-          return_unit))
-    signed_operations
 
 let inject_dal_attestations state attestations =
   let open Lwt_result_syntax in
@@ -664,7 +649,10 @@ let inject_dal_attestations state attestations =
   let chain_id = state.global_state.chain_id in
   let* signed_operations = sign_dal_attestations state attestations in
   List.iter_ep
-    (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
+    (fun ( delegate,
+           signed_operation,
+           (attestation : Dal.Attestation.t),
+           published_level ) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn
           Operation.encoding_with_legacy_attestation_name
@@ -677,8 +665,12 @@ let inject_dal_attestations state attestations =
           encoded_op
       in
       let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
+      let attestation_level = state.level_state.current_level in
       let*! () =
-        Events.(emit dal_attestation_injected (oph, delegate, bitset_int))
+        Events.(
+          emit
+            dal_attestation_injected
+            (oph, delegate, bitset_int, published_level, attestation_level))
       in
       return_unit)
     signed_operations
@@ -704,23 +696,26 @@ let only_if_dal_feature_enabled state ~default_value f =
     | Some ctxt -> f ctxt
   else return default_value
 
-let get_dal_attestations state ~level =
+let get_dal_attestations state =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
+      let attestation_level = state.level_state.current_level in
+      let attested_level = Int32.succ attestation_level in
       let delegates =
         List.map
-          (fun delegate_slot -> delegate_slot.consensus_key_and_delegate)
+          (fun delegate_slot ->
+            (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
           (Delegate_slots.own_delegates state.level_state.delegate_slots)
       in
       let signing_key delegate = (fst delegate).public_key_hash in
       let* attestations =
         List.fold_left_es
-          (fun acc delegate ->
+          (fun acc (delegate, first_slot) ->
             let*! tz_res =
               Node_rpc.get_attestable_slots
                 dal_node_rpc_ctxt
                 (signing_key delegate)
-                ~level
+                ~attested_level
             in
             match tz_res with
             | Error errs ->
@@ -730,14 +725,21 @@ let get_dal_attestations state ~level =
                 return acc
             | Ok res -> (
                 match res with
-                | Tezos_dal_node_services.Services.Types.Not_in_committee ->
-                    return acc
-                | Attestable_slots attestation ->
+                | Tezos_dal_node_services.Types.Not_in_committee -> return acc
+                | Attestable_slots {slots = attestation; published_level} ->
                     if List.exists Fun.id attestation then
-                      return ((delegate, attestation) :: acc)
+                      return
+                        ((delegate, attestation, published_level, first_slot)
+                        :: acc)
                     else
                       (* No slot is attested, no need to send an attestation, at least
                          for now. *)
+                      let*! () =
+                        Events.(
+                          emit
+                            dal_attestation_void
+                            (delegate, attestation_level, published_level))
+                      in
                       return acc))
           []
           delegates
@@ -746,7 +748,7 @@ let get_dal_attestations state ~level =
         state.global_state.constants.parametric.dal.number_of_slots
       in
       List.map
-        (fun (delegate, attestation_flags) ->
+        (fun (delegate, attestation_flags, published_level, first_slot) ->
           let attestation =
             List.fold_left_i
               (fun i acc flag ->
@@ -759,17 +761,17 @@ let get_dal_attestations state ~level =
           ( delegate,
             Dal.Attestation.
               {
-                attestor = signing_key delegate;
                 attestation;
-                level = Raw_level.of_int32_exn level;
-              } ))
+                level = Raw_level.of_int32_exn attestation_level;
+                slot = first_slot;
+              },
+            published_level ))
         attestations
       |> return)
 
 let get_and_inject_dal_attestations state =
   let open Lwt_result_syntax in
-  let level = Int32.succ state.level_state.current_level in
-  let* attestations = get_dal_attestations state ~level in
+  let* attestations = get_dal_attestations state in
   inject_dal_attestations state attestations
 
 let prepare_waiting_for_quorum state =
@@ -879,7 +881,7 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
       new_round_proposal.block.round
   else
     let new_round_state =
-      {current_round; current_phase = Idle; delayed_prequorum = None}
+      {current_round; current_phase = Idle; delayed_quorum = None}
     in
     let new_state = {state with round_state = new_round_state} in
     let*! new_state = handle_proposal new_state in
@@ -901,11 +903,11 @@ let rec perform_action ~state_recorder state (action : action) =
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
   | Inject_preattestations {preattestations} ->
-      let* () = inject_preattestations state ~preattestations in
+      let* () = inject_consensus_vote state preattestations `Preattestation in
       perform_action ~state_recorder state Watch_proposal
   | Inject_attestations {attestations} ->
       let* () = state_recorder ~new_state:state in
-      let* () = inject_attestations state ~attestations in
+      let* () = inject_consensus_vote state attestations `Attestation in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
       let*! () = start_waiting_for_attestation_quorum state in

@@ -1,0 +1,2 @@
+[env]
+CC_wasm32_unknown_unknown="clang"

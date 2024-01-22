@@ -106,7 +106,8 @@ let wait_conns ?timeout ~pool n =
 let close_active_conns pool =
   P2p_pool.Connection.fold
     ~init:Lwt.return_unit
-    ~f:(fun _ conn _ -> P2p_conn.disconnect ~wait:true conn)
+    ~f:(fun _ conn _ ->
+      P2p_conn.disconnect ~reason:(User "closed by test") ~wait:true conn)
     pool
 
 let canceler = Lwt_canceler.create () (* unused *)
@@ -213,6 +214,52 @@ let run_nodes ~addr ?port client server =
   let*! _ = Lwt_utils_unix.safe_close main_socket in
   return_unit
 
+(* for fd tests *)
+let run_nodes_fd ~addr ?port client server =
+  let open Lwt_result_syntax in
+  let p =
+    match port with
+    | None ->
+        glob_port := None ;
+        None
+    | Some p ->
+        glob_port := Some (p + 1) ;
+        Some p
+  in
+  let* main_socket, p = listen ?port:p addr in
+  let* server_node =
+    Process.detach ~prefix:"server: " (fun channel ->
+        Lwt.finalize
+          (fun () ->
+            let* () = server channel main_socket in
+            return_unit)
+          (fun () ->
+            let*! r = Lwt_utils_unix.safe_close main_socket in
+            match r with
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+                Lwt.return_unit
+            | Ok () -> Lwt.return_unit))
+  in
+  let* client_node =
+    Process.detach ~prefix:"client: " (fun channel ->
+        let*! () =
+          let*! r = Lwt_utils_unix.safe_close main_socket in
+          match r with
+          | Error trace ->
+              Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+              Lwt.return_unit
+          | Ok () -> Lwt.return_unit
+        in
+        let* () = client channel addr p in
+        return_unit)
+  in
+  let nodes = [server_node; client_node] in
+  Lwt.ignore_result (sync_nodes nodes) ;
+  let* () = Process.wait_all nodes in
+  let*! _ = Lwt_utils_unix.safe_close main_socket in
+  return_unit
+
 let raw_accept sched main_socket =
   let open Lwt_syntax in
   let* r = P2p_fd.accept main_socket in
@@ -268,7 +315,7 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   let open Lwt_result_syntax in
   let*! r = raw_connect sched addr port in
   match r with
-  | Error (`Connection_refused | `Unexpected_error _) -> Lwt.fail Cant_connect
+  | Error (`Connection_failed | `Unexpected_error _) -> Lwt.fail Cant_connect
   | Ok fd ->
       P2p_socket.authenticate
         ~canceler

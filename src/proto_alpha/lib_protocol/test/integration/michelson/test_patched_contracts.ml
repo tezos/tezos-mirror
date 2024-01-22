@@ -105,7 +105,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
       "Expr hash doesn't match"
       legacy_script_hash
       (Script_expr_hash.hash_bytes [bytes]) ;
-    return ()
+    return_unit
 
   (* Test that the binary-encoded versions of the patched contracts used during the
      migration correspond to the content of the `./patched_contracts/<hash>.tz`
@@ -133,7 +133,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
             diff
         in
         Alcotest.fail msg
-    | None -> return ()
+    | None -> return_unit
 
   (* Test that the diff files `./patched_contracts/<hash>.diff`
      are the results of the `diff` command on the corresponding
@@ -159,24 +159,23 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     in
     let*! actual_diff = Lwt_process.pread ~cwd:path diff_cmd in
     Alcotest.(check string) "same diff" expected_diff actual_diff ;
-    return ()
+    return_unit
 
   let typecheck_patched_script code () =
-    let open Lwt_result_syntax in
+    let open Lwt_result_wrap_syntax in
     (* Number 3 below controls how many accounts should be
        created. This number shouldn't be too small or the context
        won't have enough at least [minimal_stake] tokens. *)
     let* block, _contracts = Context.init3 () in
     let* inc = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt inc in
-    let* _code, _ctxt =
-      Lwt.map Environment.wrap_tzresult
-      @@ Script_ir_translator.parse_code
-           ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-           ~code:(Script_repr.lazy_expr code)
-           ctxt
+    let*@ _code, _ctxt =
+      Script_ir_translator.parse_code
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+        ~code:(Script_repr.lazy_expr code)
+        ctxt
     in
-    return ()
+    return_unit
 
   let tests (patch : Patches.t) =
     let script_hash = Patches.script_hash patch in

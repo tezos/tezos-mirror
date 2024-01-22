@@ -86,7 +86,7 @@ struct
           q
           acc)
       Lwt.return_ok
-      (function Error e -> Lwt.return_error e | e -> Lwt.fail e)
+      (function Error e -> Lwt.return_error e | e -> Lwt.reraise e)
 
   let peek q =
     match oldest_elements q 1 (fun _ _ _ -> ()) with

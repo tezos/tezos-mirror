@@ -112,14 +112,16 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
 
   type tree = Ctx.Tree.tree
 
-  let initial_tree ~version ?(ticks_per_snapshot = default_max_tick)
+  let initial_tree ~version ?tree ?(ticks_per_snapshot = default_max_tick)
       ?(max_reboots = Constants.maximum_reboots_per_input)
       ?(from_binary = false)
       ?(outbox_validity_period = default_outbox_validity_period)
       ?(outbox_message_limit = default_outbox_message_limit) code =
-    let open Lwt.Syntax in
+    let open Lwt_syntax in
     let max_tick_Z = Z.of_int64 ticks_per_snapshot in
-    let* tree = Ctx.empty_tree () in
+    let* tree =
+      match tree with None -> Ctx.empty_tree () | Some tree -> return tree
+    in
     let* tree = Wasm.initial_state version tree in
     let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
     let* tree =

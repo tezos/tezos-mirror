@@ -77,7 +77,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := y ;
-            return ())
+            return_unit)
           (Set.of_list xs)
       in
       return !acc)
@@ -89,7 +89,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := y ;
-            return ())
+            return_unit)
           (Set.of_list xs)
       in
       return !acc)
@@ -101,7 +101,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := y ;
-            return ())
+            return_unit)
           (Set.of_list xs)
       in
       return !acc)
@@ -113,7 +113,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := y ;
-            return ())
+            return_unit)
           (Set.of_list xs)
       in
       return !acc)
@@ -125,7 +125,7 @@ let iter =
           (fun x ->
             let* y = f x in
             acc := y ;
-            return ())
+            return_unit)
           (Set.of_list xs)
       in
       return !acc)

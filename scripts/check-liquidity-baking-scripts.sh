@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 set -e
 
@@ -31,7 +31,7 @@ PROTOCOL_DIR="${2}"
 echo "* Configuration"
 # --------------------
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 TOP_DIR="$SCRIPT_DIR"/..
 cd "$TOP_DIR" || exit
 
@@ -54,7 +54,7 @@ echo "* Step 1: Setup the LIGO compiler"
 #   https://gitlab.com/ligolang/ligo/-/releases/0.9.0-liquidity-baking
 #
 rm -fr ligo
-wget --quiet https://gitlab.com/ligolang/ligo/-/jobs/1291756399/artifacts/raw/ligo -O ligo
+curl --silent https://gitlab.com/ligolang/ligo/-/jobs/1291756399/artifacts/raw/ligo --output ligo
 chmod a+rx ligo
 LIGO=$(pwd)/ligo
 
@@ -63,7 +63,7 @@ echo "* Step 2: Retrieve and compile the LIGO scripts"
 # ----------------------------------------------------
 
 retrieve () {
-  wget --quiet https://gitlab.com/dexter2tz/dexter2tz/-/raw/"$COMMIT_HASH"/"$1" -O "$2"
+  curl --silent https://gitlab.com/dexter2tz/dexter2tz/-/raw/"$COMMIT_HASH"/"$1" --output "$2"
 }
 
 retrieve dexter.liquidity_baking.mligo cpmm.mligo
@@ -92,7 +92,7 @@ source_hex () {
     file=$1
     line=$2
     output=$3
-    echo -n '0x' > "$output"
+    printf '0x' > "$output"
     sed -n "${line}"p "$file" | tr -d '"' | tr -d ' ' >> "$output"
 }
 

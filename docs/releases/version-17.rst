@@ -1,4 +1,4 @@
-Version 17.2
+Version 17.3
 ============
 
 Version 17.0 contains a new version (V9) of the protocol environment,
@@ -19,20 +19,22 @@ In addition, it improves the performance of RPC responses when requesting older 
 
 Version 17.2 adds a filtering mechanism which enables the Octez baker to remove ill-formed operations.
 
+Version 17.3 improves Nairobi protocol plugins to discard operations with invalid WASM proofs earlier.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v17.2
+  git checkout v17.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v17.2`` Docker images of Octez.
+If you are using Docker instead, use the ``v17.3`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -40,6 +42,7 @@ You can also install Octez using Opam by running ``opam install octez``.
 Changelog
 ---------
 
+- `Version 17.3 <../CHANGES.html#version-17-3>`_
 - `Version 17.2 <../CHANGES.html#version-17-2>`_
 - `Version 17.1 <../CHANGES.html#version-17-1>`_
 - `Version 17.0 <../CHANGES.html#version-17-0>`_

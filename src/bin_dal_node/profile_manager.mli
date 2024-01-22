@@ -28,6 +28,9 @@
 (** A profile manager context stores profile-specific data used by the daemon.  *)
 type t
 
+(** [is_bootstrap_profile t] returns [true] if the node has a bootstrap profile. *)
+val is_bootstrap_profile : t -> bool
+
 (** The empty profile manager context. *)
 val empty : t
 
@@ -35,15 +38,21 @@ val empty : t
 val bootstrap_profile : t
 
 (** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
-    registers operator profiles (attestor or producer).
+    registers operator profiles (attester or producer).
     If the current profile is a bootstrap profile, it will return [None] as bootstrap
     profiles are incompatible with operator profiles. *)
 val add_operator_profiles :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
-  Services.Types.operator_profiles ->
+  Types.operator_profiles ->
   t option
+
+(** Checks that each producer profile only refers to slot indexes strictly
+    smaller than [number_of_slots]. This may not be the case when the profile
+    context is first built because there is no information about the number of
+    slots. Returns an [Invalid_slot_index] error if the check fails. *)
+val validate_slot_indexes : t -> number_of_slots:int -> unit tzresult
 
 (** [on_new_head t proto_parameters gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
@@ -55,7 +64,7 @@ val on_new_head :
   unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
-val get_profiles : t -> Services.Types.profiles
+val get_profiles : t -> Types.profiles
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
@@ -63,5 +72,4 @@ val get_attestable_slots :
   Store.node_store ->
   Dal_plugin.proto_parameters ->
   attested_level:int32 ->
-  (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
-  Lwt.t
+  (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t

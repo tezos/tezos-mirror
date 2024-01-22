@@ -52,11 +52,16 @@ __pycache__
 /tezos-smart-rollup-client-*
 /octez-smart-rollup-client-*
 /octez-smart-rollup-wasm-*
-/octez-evm-proxy-server
+/octez-evm-node
 /tezos-dal-node
 /octez-dal-node
 /octez-dac-*
 /octez-binaries
+/octez-injector-server
+/octogram
+/simulation-scenario
+/safety-checker
+/risc-v-sandbox
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -67,8 +72,16 @@ __pycache__
 /_coverage_output/*.coverage
 /_coverage_report
 
+contrib/kaitai-struct-files/doc
+
 *.install
 .merlin
+
+*.deb
+*.rpm
+scripts/pkg-common/baker-binaries
+scripts/pkg-common/smartrollup-binaries
+scripts/pkg-common/client-binaries
 
 *~
 \#*\#
@@ -96,10 +109,17 @@ target
 
 evm_kernel.wasm
 evm_installer.wasm
+evm_kernel_unstripped.wasm
+evm-evaluation-assessor
 sequenced_kernel.wasm
 smart-rollup-installer
 _evm_installer_preimages/
 tx_kernel.wasm
+tx_kernel_dal.wasm
+tx-demo-collector
+dal_echo_kernel.wasm
+risc-v-dummy.elf
+sequencer.wasm
 
 # Terraform
 
@@ -115,8 +135,8 @@ crash.log
 crash.*.log
 
 # Exclude all .tfvars files, which are likely to contain sensitive data, such as
-# password, private keys, and other secrets. These should not be part of version 
-# control as they are data points which are potentially sensitive and subject 
+# password, private keys, and other secrets. These should not be part of version
+# control as they are data points which are potentially sensitive and subject
 # to change depending on the environment.
 *.tfvars
 *.tfvars.json

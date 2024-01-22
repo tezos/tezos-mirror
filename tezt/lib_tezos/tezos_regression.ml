@@ -49,6 +49,7 @@ let replace_variables string =
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)
       ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
+      ("/127.0.0.1:\\d{4,5}/", "/127.0.0.1:[PORT]/");
     ]
   in
   List.fold_left
@@ -83,3 +84,8 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
   {Process.on_spawn; on_log}
 
 let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
+
+let rpc_hooks : RPC_core.rpc_hooks =
+  let on_request input = replace_variables input |> Regression.capture in
+  let on_response output = replace_variables output |> Regression.capture in
+  {on_request; on_response}

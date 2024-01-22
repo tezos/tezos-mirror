@@ -53,7 +53,7 @@ let double_consensus_already_denounced_waiter accuser oph =
 
 let get_double_consensus_denounciation_hash consensus_name client =
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let ops = JSON.(mempool |-> "validated" |> as_list) in
@@ -82,10 +82,10 @@ let double_attestation_init
       unit Lwt.t) consensus_name protocol () =
   let* node, client = Client.init_with_protocol ~protocol `Client () in
   let* accuser = Accuser.init ~event_level:`Debug ~protocol node in
-  let* () = repeat 5 (fun () -> Client.bake_for client) in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Recover available slots for %s." Constant.bootstrap1.alias ;
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~delegate:Constant.bootstrap1.public_key_hash
          ()
@@ -103,7 +103,7 @@ let double_attestation_init
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -165,6 +165,7 @@ let double_attestation_wrong_slot =
     ~title:"double attestation using wrong slot"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "attestation"; "accuser"; "slot"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot attest_utils protocol
 
 let double_preattestation_wrong_slot =
@@ -173,6 +174,7 @@ let double_preattestation_wrong_slot =
     ~title:"double preattestation using wrong slot"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "preattestation"; "accuser"; "slot"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot preattest_utils protocol
 
 let double_consensus_wrong_block_payload_hash
@@ -182,7 +184,7 @@ let double_consensus_wrong_block_payload_hash
     double_attestation_init consensus_for consensus_name protocol ()
   in
   let* header =
-    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
+    Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
   in
   let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
@@ -203,7 +205,7 @@ let double_consensus_wrong_block_payload_hash
     "Inject another invalid %s and wait for already_denounced event"
     consensus_name ;
   let* header =
-    RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~3" ()
+    Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~3" ()
   in
   let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
   let op =
@@ -230,6 +232,7 @@ let double_attestation_wrong_block_payload_hash =
     ~title:"double attestation using wrong block_payload_hash"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "attestation"; "accuser"; "block_payload_hash"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash attest_utils protocol
 
@@ -239,6 +242,7 @@ let double_preattestation_wrong_block_payload_hash =
     ~title:"double preattestation using wrong block_payload_hash"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "preattestation"; "accuser"; "block_payload_hash"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash preattest_utils protocol
 
@@ -291,6 +295,7 @@ let double_attestation_wrong_branch =
     ~title:"double attestation using wrong branch"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "attestation"; "accuser"; "branch"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch attest_utils protocol
 
 let double_preattestation_wrong_branch =
@@ -299,6 +304,7 @@ let double_preattestation_wrong_branch =
     ~title:"double preattestation using wrong branch"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["double"; "preattestation"; "accuser"; "branch"; "node"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch preattest_utils protocol
 
 let consensus_operation_too_old_waiter accuser =
@@ -310,6 +316,7 @@ let operation_too_old =
     ~title:"operation too old"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["accuser"; "old"; "operation"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
   let* accuser =
@@ -318,7 +325,7 @@ let operation_too_old =
        accuser. *)
     Accuser.init ~preserved_levels:0 ~event_level:`Debug ~protocol node
   in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
@@ -331,7 +338,7 @@ let operation_too_old =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -343,7 +350,7 @@ let operation_too_old =
     JSON.(content |-> "block_payload_hash" |> as_string)
   in
   Log.info "Bake 1 block." ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   Log.info
     "Craft and inject an attestation 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
@@ -377,12 +384,13 @@ let operation_too_far_in_future =
     ~title:"operation too far in the future"
     ~supports:Protocol.(From_protocol (number Nairobi))
     ~tags:["accuser"; "future"; "operation"]
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
   let* accuser =
     Accuser.init ~preserved_levels:2 ~event_level:`Debug ~protocol node
   in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
@@ -395,7 +403,7 @@ let operation_too_far_in_future =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
   let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
@@ -410,7 +418,7 @@ let operation_too_far_in_future =
     Constant.bootstrap1.alias
     level ;
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~delegate:Constant.bootstrap1.public_key_hash
          ~level

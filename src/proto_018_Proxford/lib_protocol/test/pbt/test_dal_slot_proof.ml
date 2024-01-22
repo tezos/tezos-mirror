@@ -72,7 +72,7 @@ struct
       - every element in the list of levels represents the slots of a single level.
       - each slot of a given level is not confirmed iff the boolean is true. *)
   let populate_slots_history (levels_data : levels) =
-    let open Result_syntax in
+    let open Result_wrap_syntax in
     (* Make and insert a slot. *)
     let slot_data =
       Bytes.init
@@ -93,11 +93,9 @@ struct
       let slot =
         Dal_slot_repr.Header.{id = {published_level = level; index}; commitment}
       in
-      let* cell, cache =
+      let*@ cell, cache =
         if skip_slot then return (cell, cache)
-        else
-          Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
-          |> Environment.wrap_tzresult
+        else Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
       in
       return (cell, cache, (polynomial, slot, skip_slot) :: slots_info)
     in
@@ -118,10 +116,10 @@ struct
     let open Result_syntax in
     if skip_slot then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
-      return None
+      return_none
     else
       let* page_info, page_id = mk_page_info slot poly in
-      return @@ Some (page_info, page_id)
+      return_some (page_info, page_id)
 
   (** This function returns information of a page to prove that it is
       unconfirmed, if the page's slot is skipped, the information look correct
@@ -141,7 +139,7 @@ struct
     let* _page_info, page_id = mk_page_info ~level slot poly in
     (* We should not provide the page's info if we want to build an
        unconfirmation proof. *)
-    return @@ Some (None, page_id)
+    return_some (None, page_id)
 
   (** This helper function allows to test DAL's {!produce_proof} and
       {!verify_proof} functions, using the data constructed from

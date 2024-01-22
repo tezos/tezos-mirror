@@ -16,7 +16,17 @@ echo "Query GitLab to get generic package URL"
 # :gitlab_api_url/projects/:id/packages
 web_path=$(curl -fsSL -X GET \
                 -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_package_name}" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_package_name}" \
+           | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
+
+deb_web_path=$(curl -fsSL -X GET \
+                    -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_deb_package_name}" \
+           | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
+
+rpm_web_path=$(curl -fsSL -X GET \
+                    -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_rpm_package_name}" \
            | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
 if [ -z "${web_path}" ]
@@ -24,7 +34,23 @@ then
   echo "Error: could not find package matching version ${gitlab_package_version}"
   exit 1
 else
-  gitlab_package_url="https://${CI_SERVER_HOST}${web_path}"
+  gitlab_binaries_url="https://${CI_SERVER_HOST}${web_path}"
+fi
+
+if [ -z "${deb_web_path}" ]
+then
+  echo "Error: could not find debian package matching version ${gitlab_package_version}"
+  exit 1
+else
+  gitlab_deb_packages_url="https://${CI_SERVER_HOST}${deb_web_path}"
+fi
+
+if [ -z "${rpm_web_path}" ]
+then
+  echo "Error: could not find rpm package matching version ${gitlab_package_version}"
+  exit 1
+else
+  gitlab_rpm_packages_url="https://${CI_SERVER_HOST}${rpm_web_path}"
 fi
 
 if [ "${CI_PROJECT_NAMESPACE}" = "tezos" ]
@@ -65,4 +91,6 @@ release-cli create \
   --assets-link="{\"name\":\"Changelog\",\"url\":\"https://tezos.gitlab.io/CHANGES.html#version-${gitlab_release_no_dot}\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Announcement\",\"url\":\"https://tezos.gitlab.io/releases/version-${gitlab_release_major_version}.html\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
-  --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_package_url}\",\"link_type\":\"package\"}"
+  --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_deb_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Red Hat packages\",\"url\":\"${gitlab_rpm_packages_url}\",\"link_type\":\"package\"}"

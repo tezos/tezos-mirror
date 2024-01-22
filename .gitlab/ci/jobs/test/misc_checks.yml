@@ -1,14 +1,61 @@
 misc_checks:
   extends:
-    - .test_template
-  # These tests are not flaky at all so we overwrite the retry value
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies
+  stage: "test"
   needs: [trigger]
-  retry: 1
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
+    - eval $(opam env)
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci lint-misc-check
+    - ./scripts/ci/take_ownership.sh
+    - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
+
+kaitai_checks:
+  extends:
+    - .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 0
+  needs: [trigger]
+  needs:
+    - "build_x86_64-released"
+  script:
+    - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
+
+check_lift_limits_patch:
+  extends:
+    - .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 0
+  needs: [trigger]
+  rules:
+    - changes:
+        - src/bin_tps_evaluation/lift_limits.patch
+        - src/proto_alpha/lib_protocol/main.ml
+      when: on_success
+  script:
+    # Check that the patch only modifies the
+    # src/proto_alpha/lib_protocol. If not, the rules above have to be
+    # updated.
+    - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) = "src/proto_alpha/lib_protocol/main.ml" ]'
+    - git apply src/bin_tps_evaluation/lift_limits.patch
+    - dune build @src/proto_alpha/lib_protocol/check
+
+commit_titles:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies
+  stage: "test"
+  needs: [trigger]
+  script:
+    # Check commit messages
+    - ./scripts/ci/check_commit_messages.sh || exit $?
+  allow_failure:
+    # ./scripts/ci/check_commit_messages.sh exits with code 65 when a
+    # git history contains invalid commits titles in situations where
+    # that is allowed.
+    exit_codes: [65]

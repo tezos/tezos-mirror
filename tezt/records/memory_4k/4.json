@@ -1,0 +1,75 @@
+[
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p-maintenance-init-expected_connections",
+    "tags": [
+      "p2p",
+      "node",
+      "maintenance",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "9808228",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p-swap-disable",
+    "tags": [
+      "p2p",
+      "node",
+      "swap",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "28973722",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: bootstrap: many nodes bootstrap",
+    "tags": [
+      "nairobi",
+      "synchronisation_threshold",
+      "bootstrap",
+      "threshold",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "52823570",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: bootstrap: many nodes bootstrap",
+    "tags": [
+      "oxford",
+      "synchronisation_threshold",
+      "bootstrap",
+      "threshold",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "52982790",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: many nodes bootstrap",
+    "tags": [
+      "alpha",
+      "synchronisation_threshold",
+      "bootstrap",
+      "threshold",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "53747957",
+      "count": "1"
+    }
+  }
+]

@@ -50,13 +50,14 @@ type argument =
   | Disable_p2p_swap
   | Peer of string
   | No_bootstrap_peers
-  | Disable_operations_precheck
   | Media_type of media_type
   | Metadata_size_limit of int option
   | Metrics_addr of string
   | Cors_origin of string
   | Disable_mempool
   | Version
+  | RPC_additional_addr of string
+  | RPC_additional_addr_local of string
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -79,7 +80,6 @@ let make_argument = function
   | Disable_p2p_swap -> ["--disable-p2p-swap"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
-  | Disable_operations_precheck -> ["--disable-mempool-precheck"]
   | Media_type media_type -> ["--media-type"; string_of_media_type media_type]
   | Metadata_size_limit None -> ["--metadata-size-limit"; "unlimited"]
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
@@ -87,6 +87,8 @@ let make_argument = function
   | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
   | Disable_mempool -> ["--disable-mempool"]
   | Version -> ["--version"]
+  | RPC_additional_addr addr -> ["--rpc-addr"; addr]
+  | RPC_additional_addr_local addr -> ["--local-rpc-addr"; addr]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -106,7 +108,6 @@ let is_redundant = function
   | Disable_p2p_maintenance, Disable_p2p_maintenance
   | Disable_p2p_swap, Disable_p2p_swap
   | No_bootstrap_peers, No_bootstrap_peers
-  | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version ->
@@ -125,13 +126,14 @@ let is_redundant = function
   | Disable_p2p_maintenance, _
   | Disable_p2p_swap, _
   | No_bootstrap_peers, _
-  | Disable_operations_precheck, _
   | Media_type _, _
   | Metadata_size_limit _, _
   | Peer _, _
   | Metrics_addr _, _
   | Cors_origin _, _
   | Disable_mempool, _
+  | RPC_additional_addr _, _
+  | RPC_additional_addr_local _, _
   | Version, _ ->
       false
 
@@ -143,6 +145,9 @@ module Parameters = struct
     net_addr : string option;
     mutable net_port : int;
     advertised_net_port : int option;
+    metrics_addr : string option;
+    metrics_port : int;
+    rpc_local : bool;
     rpc_host : string;
     rpc_port : int;
     rpc_tls : tls_config option;
@@ -192,6 +197,8 @@ let advertised_net_port node = node.persistent_state.advertised_net_port
 
 let rpc_scheme node =
   match node.persistent_state.rpc_tls with Some _ -> "https" | None -> "http"
+
+let rpc_local node = node.persistent_state.rpc_local
 
 let rpc_host node = node.persistent_state.rpc_host
 
@@ -298,8 +305,8 @@ module Config_file = struct
   let update node update = read node |> update |> write node
 
   let set_prevalidator ?(operations_request_timeout = 10.)
-      ?(max_refused_operations = 1000) ?(operations_batch_size = 50)
-      ?(disable_operations_precheck = false) old_config =
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
+      =
     let prevalidator =
       `O
         [
@@ -307,7 +314,6 @@ module Config_file = struct
           ( "max_refused_operations",
             `Float (float_of_int max_refused_operations) );
           ("operations_batch_size", `Float (float_of_int operations_batch_size));
-          ("disable_precheck", `Bool disable_operations_precheck);
         ]
       |> JSON.annotate ~origin:"set_prevalidator"
     in
@@ -625,10 +631,12 @@ let wait_for_level node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
-let get_level node =
+let get_last_seen_level node =
   match node.status with
   | Running {session_state = {level = Known level; _}; _} -> level
   | Not_running | Running _ -> 0
+
+let get_level node = wait_for_level node 0
 
 let wait_for_identity node =
   match node.status with
@@ -685,10 +693,10 @@ let wait_for_disconnections node disconnections =
   let* () = wait_for_ready node in
   waiter
 
-let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_addr ?net_port ?advertised_net_port
-    ?(rpc_host = "localhost") ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
-    arguments =
+let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
+    ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
+    ?metrics_port ?(rpc_local = false) ?(rpc_host = "localhost") ?rpc_port
+    ?rpc_tls ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -698,6 +706,9 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
   in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
+  in
+  let metrics_port =
+    match metrics_port with None -> Port.fresh () | Some port -> port
   in
   let arguments = add_default_arguments arguments in
   let default_expected_pow =
@@ -716,9 +727,12 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         net_addr;
         net_port;
         advertised_net_port;
+        rpc_local;
         rpc_host;
         rpc_port;
         rpc_tls;
+        metrics_addr;
+        metrics_port;
         allow_all_rpc;
         default_arguments = arguments;
         arguments;
@@ -780,14 +794,16 @@ let remove_peers_json_file node =
     line arguments needed to spawn a [command] like [run]
     or [replay] for the given [node] and extra [arguments]. *)
 let runlike_command_arguments node command arguments =
-  let net_addr, rpc_addr =
+  let net_addr, rpc_addr, metrics_addr =
     match node.persistent_state.runner with
     | None ->
         ( Option.value ~default:"127.0.0.1" node.persistent_state.net_addr ^ ":",
-          node.persistent_state.rpc_host ^ ":" )
+          node.persistent_state.rpc_host ^ ":",
+          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
+          ^ ":" )
     | Some _ ->
         (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:")
+        ("0.0.0.0:", "0.0.0.0:", "0.0.0.0:")
   in
   let arguments =
     List.fold_left
@@ -816,7 +832,10 @@ let runlike_command_arguments node command arguments =
   in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
-  :: "--rpc-addr"
+  :: "--metrics-addr"
+  :: (metrics_addr ^ string_of_int node.persistent_state.metrics_port)
+  :: (if node.persistent_state.rpc_local then "--local-rpc-addr"
+     else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
   :: command_args
 
@@ -877,8 +896,9 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
-    ?event_sections_levels ?patch_config ?snapshot arguments =
+    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_local ?rpc_host
+    ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
+    ?snapshot arguments =
   (* The single process argument does not exist in the configuration
      file of the node. It is only known as a command-line option. As a
      consequence, we filter Singleprocess from the list of arguments
@@ -895,6 +915,9 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?event_pipe
       ?net_port
       ?advertised_net_port
+      ?metrics_addr
+      ?metrics_port
+      ?rpc_local
       ?rpc_host
       ?rpc_port
       ?rpc_tls
@@ -948,3 +971,45 @@ let get_version node =
     spawn_command node version_flag |> Process.check_and_read_stdout
   in
   return @@ String.trim output
+
+let as_rpc_endpoint (t : t) =
+  let state = t.persistent_state in
+  let scheme = if Option.is_some state.rpc_tls then "https" else "http" in
+  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+module RPC = struct
+  module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
+    let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        node rpc =
+      RPC_core.call
+        ?rpc_hooks
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+
+    let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+        node rpc =
+      RPC_core.call_raw
+        ?rpc_hooks
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+
+    let call_json ?rpc_hooks ?log_request ?log_response_status
+        ?log_response_body node rpc =
+      RPC_core.call_json
+        ?rpc_hooks
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_rpc_endpoint node)
+        rpc
+  end
+
+  include RPC_callers
+  include RPC
+end

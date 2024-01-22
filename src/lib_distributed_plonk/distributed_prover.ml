@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
-open Utils
+open Kzg.Bls
+open Kzg.Utils
 open Identities
 open Communication
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module MP : Plonk.Main_protocol.S
@@ -135,7 +135,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     let t =
       compute_t ~n ~alpha ~nb_of_t_chunks (SMap.singleton "batched" batched_ids)
     in
-    let cm_t, t_prover_aux = PC.Commitment.commit pc_public_parameters t in
+    let cm_t, t_prover_aux = PC.commit pc_public_parameters t in
     let transcript = Transcript.expand PC.Commitment.t cm_t transcript in
     let* pc_answers_worker =
       dmap
@@ -293,7 +293,8 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     let pp = filter_prv_pp_circuits pp inputs in
     let pp =
       update_prover_public_parameters
-        (hash_verifier_inputs (to_verifier_inputs pp inputs))
+        verifier_inputs_t
+        (to_verifier_inputs pp inputs)
         pp
     in
     let* pp_proof, _transcript, (perm_and_plook, wires_cm, _, _, _) =
@@ -302,7 +303,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     return {perm_and_plook; wires_cm; pp_proof}
 end
 
-module PC_Kzg = Distribution.Kzg.Kzg_impl
+module PC_Kzg = Distribution.Polynomial_commitment.Kzg_impl
 module PP_Kzg = Distribution.Polynomial_protocol.Make (PC_Kzg)
 module Main_Kzg = Distribution.Main_protocol.Make (PP_Kzg)
 module PC_Pack = Distribution.Kzg_pack.Kzg_pack_impl
@@ -411,7 +412,7 @@ module Super_impl (PI : Aplonk.Pi_parameters.S) = struct
     let open Main_Pack in
     let open D in
     (* TODO: can we commit only to the hidden pi?*)
-    let public_inputs_map, cms_pi = hash_pi pp input_commit_funcs inputs in
+    let public_inputs_map, cms_pi = commit_pi pp input_commit_funcs inputs in
     (* add the PI in the transcript *)
     let pp = update_prv_pp_transcript_with_pi pp cms_pi in
     let* ( (pp_proof, PP.{answers; batch; alpha; x; r; cms_answers; t_answers}),

@@ -7,7 +7,7 @@ include: .gitlab/ci/jobs/coverage/common.yml
 unified_coverage:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
     - .template__coverage_report
   dependencies: []
   variables:

@@ -36,6 +36,7 @@ type ('msg, 'peer, 'conn) t = {
   negotiated_version : Network_version.t;
   mutable last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option;
   mutable wait_close : bool;
+  mutable disconnect_reason : P2p_disconnection_reason.t option;
   mutable worker : unit Lwt.t option;
   peer_id : P2p_peer.Id.t;
   trusted_node : bool;
@@ -150,6 +151,7 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
       canceler;
       greylister;
       wait_close = false;
+      disconnect_reason = None;
       last_sent_swap_request = None;
       negotiated_version;
       worker = None;
@@ -246,13 +248,16 @@ let local_metadata t = P2p_socket.local_metadata t.conn
 
 let remote_metadata t = P2p_socket.remote_metadata t.conn
 
-let disconnect ?(wait = false) t =
+let disconnect ?(wait = false) ~reason t =
   let open Lwt_syntax in
   let* () = Events.(emit disconnect) t.peer_id in
   t.wait_close <- wait ;
+  t.disconnect_reason <- Some reason ;
   shutdown t
 
-let close t = P2p_socket.close ~wait:t.wait_close t.conn
+let close ~reason t = P2p_socket.close ~wait:t.wait_close ~reason t.conn
+
+let disconnect_reason t = t.disconnect_reason
 
 let equal_sock t t' = P2p_socket.equal t.conn t'.conn
 

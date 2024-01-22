@@ -8,6 +8,9 @@
 #![cfg_attr(not(any(test, feature = "testing")), no_std)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+#[cfg(all(target_arch = "riscv64", feature = "proto-alpha"))]
+pub mod riscv64_syscalls;
+
 pub mod rollup_host;
 pub mod smart_rollup_core;
 

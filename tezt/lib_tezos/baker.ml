@@ -41,16 +41,18 @@ module Parameters = struct
     protocol : Protocol.t;
     delegates : string list;
     runner : Runner.t option;
-    node : Node.t;
-    client : Client.t;
+    base_dir : string;
+    node_data_dir : string;
+    node_rpc_endpoint : Endpoint.t;
+    dal_node_rpc_endpoint : Endpoint.t option;
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
     force_apply : bool;
     remote_mode : bool;
     operations_pool : string option;
-    dal_node : Dal_node.t option;
     minimal_nanotez_per_gas_unit : int option;
+    state_recorder : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -92,13 +94,15 @@ let liquidity_baking_votefile ?path vote =
       ]) ;
   votefile
 
-let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
-    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
-    ?(remote_mode = false) ?operations_pool ?dal_node
-    ?minimal_nanotez_per_gas_unit node client =
+let create_from_uris ~protocol ?(path = Protocol.baker protocol) ?name ?color
+    ?event_pipe ?runner ?(delegates = []) ?votefile
+    ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
+    ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
+    ?minimal_nanotez_per_gas_unit ?(state_recorder = false) ~base_dir
+    ~node_data_dir ~node_rpc_endpoint () =
   let baker =
     create
-      ~path:(Protocol.baker protocol)
+      ~path
       ?name
       ?color
       ?event_pipe
@@ -107,20 +111,48 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         protocol;
         delegates;
         runner;
-        node;
-        client;
+        base_dir;
+        node_data_dir;
+        node_rpc_endpoint;
         pending_ready = [];
         votefile;
         liquidity_baking_toggle_vote;
         remote_mode;
         force_apply;
         operations_pool;
-        dal_node;
+        dal_node_rpc_endpoint;
         minimal_nanotez_per_gas_unit;
+        state_recorder;
       }
   in
   on_stdout baker (handle_raw_stdout baker) ;
   baker
+
+let create ~protocol ?path ?name ?color ?event_pipe ?runner ?(delegates = [])
+    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
+    ?(remote_mode = false) ?operations_pool ?dal_node
+    ?minimal_nanotez_per_gas_unit ?(state_recorder = false) node client =
+  let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
+  create_from_uris
+    ~protocol
+    ?path
+    ?name
+    ?color
+    ?event_pipe
+    ?runner
+    ~delegates
+    ?votefile
+    ~liquidity_baking_toggle_vote
+    ~force_apply
+    ~remote_mode
+    ?operations_pool
+    ?minimal_nanotez_per_gas_unit
+    ?dal_node_rpc_endpoint
+    ~state_recorder
+    ~base_dir:(Client.base_dir client)
+    ~node_data_dir:(Node.data_dir node)
+    ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
+    ()
 
 let run ?event_level ?event_sections_levels (baker : t) =
   (match baker.status with
@@ -128,11 +160,9 @@ let run ?event_level ?event_sections_levels (baker : t) =
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
   let delegates = baker.persistent_state.delegates in
   let runner = baker.persistent_state.runner in
-  let node = baker.persistent_state.node in
-  let client = baker.persistent_state.client in
-  let node_addr =
-    Printf.sprintf "http://%s:%d" (Node.rpc_host node) (Node.rpc_port node)
-  in
+  let node_data_dir = baker.persistent_state.node_data_dir in
+  let base_dir = baker.persistent_state.base_dir in
+  let node_addr = Endpoint.as_string baker.persistent_state.node_rpc_endpoint in
   let votefile =
     Cli_arg.optional_arg "votefile" Fun.id baker.persistent_state.votefile
   in
@@ -154,12 +184,8 @@ let run ?event_level ?event_sections_levels (baker : t) =
   let dal_node_endpoint =
     Cli_arg.optional_arg
       "dal-node"
-      (fun node ->
-        Printf.sprintf
-          "http://%s:%d"
-          (Dal_node.rpc_host node)
-          (Dal_node.rpc_port node))
-      baker.persistent_state.dal_node
+      Endpoint.as_string
+      baker.persistent_state.dal_node_rpc_endpoint
   in
   let minimal_nanotez_per_gas_unit =
     Cli_arg.optional_arg
@@ -167,15 +193,18 @@ let run ?event_level ?event_sections_levels (baker : t) =
       (fun nanotez_per_gas -> string_of_int nanotez_per_gas)
       baker.persistent_state.minimal_nanotez_per_gas_unit
   in
+  let state_recorder =
+    Cli_arg.optional_switch "record-state" baker.persistent_state.state_recorder
+  in
   let run_args =
     if baker.persistent_state.remote_mode then ["remotely"]
-    else ["with"; "local"; "node"; Node.data_dir node]
+    else ["with"; "local"; "node"; node_data_dir]
   in
   let arguments =
-    ["--endpoint"; node_addr; "--base-dir"; Client.base_dir client; "run"]
+    ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
     @ operations_pool @ dal_node_endpoint @ delegates
-    @ minimal_nanotez_per_gas_unit
+    @ minimal_nanotez_per_gas_unit @ state_recorder
   in
 
   let on_terminate _ =
@@ -210,8 +239,8 @@ let wait_for_ready baker =
 
 let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
     ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?force_apply
-    ?remote_mode ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit node
-    client =
+    ?remote_mode ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit
+    ?state_recorder node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -227,6 +256,7 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
       ?operations_pool
       ?dal_node
       ?minimal_nanotez_per_gas_unit
+      ?state_recorder
       ~delegates
       node
       client

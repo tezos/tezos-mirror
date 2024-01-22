@@ -174,9 +174,9 @@ The *values* of protocol constants in any given protocol can be found using spec
 Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:
 
-- :ref:`proof-of-stake parameters <ps_constants_nairobi>`.
+- :ref:`proof-of-stake parameters <ps_constants_nairobi>`
 - :ref:`consensus-related parameters <cs_constants_nairobi>`
-- :ref:`randomness generation parameters <rg_constants_nairobi>`.
+- :ref:`randomness generation parameters <rg_constants_nairobi>`
 
 See also
 ~~~~~~~~

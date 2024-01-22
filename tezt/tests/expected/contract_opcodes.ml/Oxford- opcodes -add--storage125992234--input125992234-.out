@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/add.tz on storage Unit and input Unit --level 1 --trace-stack
+./octez-client --protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/add.tz on storage Unit and input Unit --level 1 --trace-stack
 storage
   Unit
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (just consumed gas: 67.729)
+  - location: 7 (just consumed gas: 67.780)
     [ (Pair Unit Unit) ]
   - location: 7 (just consumed gas: 0.010)
     [ Unit ]
@@ -31,9 +31,9 @@ trace
   - location: 21 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 22 (just consumed gas: 0.015)
+  - location: 22 (just consumed gas: 0.025)
     [ Unit ]
   - location: 28 (just consumed gas: 0.010)
     [ 2
@@ -55,9 +55,9 @@ trace
   - location: 41 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 42 (just consumed gas: 0)
+  - location: 42 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 42 (just consumed gas: 0.015)
+  - location: 42 (just consumed gas: 0.025)
     [ Unit ]
   - location: 48 (just consumed gas: 0.010)
     [ 2
@@ -79,9 +79,9 @@ trace
   - location: 61 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 62 (just consumed gas: 0)
+  - location: 62 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 62 (just consumed gas: 0.015)
+  - location: 62 (just consumed gas: 0.025)
     [ Unit ]
   - location: 68 (just consumed gas: 0.010)
     [ 2
@@ -103,9 +103,9 @@ trace
   - location: 81 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 82 (just consumed gas: 0)
+  - location: 82 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 82 (just consumed gas: 0.015)
+  - location: 82 (just consumed gas: 0.025)
     [ Unit ]
   - location: 88 (just consumed gas: 0.010)
     [ 2
@@ -127,9 +127,9 @@ trace
   - location: 101 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 102 (just consumed gas: 0)
+  - location: 102 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 102 (just consumed gas: 0.015)
+  - location: 102 (just consumed gas: 0.025)
     [ Unit ]
   - location: 108 (just consumed gas: 0.010)
     [ 60
@@ -151,9 +151,9 @@ trace
   - location: 121 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 122 (just consumed gas: 0)
+  - location: 122 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 122 (just consumed gas: 0.015)
+  - location: 122 (just consumed gas: 0.025)
     [ Unit ]
   - location: 128 (just consumed gas: 0.010)
     [ "2019-09-09T12:08:37Z"
@@ -175,9 +175,9 @@ trace
   - location: 141 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 142 (just consumed gas: 0)
+  - location: 142 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 142 (just consumed gas: 0.015)
+  - location: 142 (just consumed gas: 0.025)
     [ Unit ]
   - location: 148 (just consumed gas: 0.010)
     [ 1000
@@ -199,9 +199,9 @@ trace
   - location: 161 (just consumed gas: 0.010)
     [ True
       Unit ]
-  - location: 162 (just consumed gas: 0)
+  - location: 162 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 162 (just consumed gas: 0.015)
+  - location: 162 (just consumed gas: 0.025)
     [ Unit ]
   - location: 168 (just consumed gas: 0.010)
     [ {}

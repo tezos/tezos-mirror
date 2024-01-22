@@ -306,7 +306,9 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           (* Here P2p_pool.tear_down_connections is called instead of
              P2p_pool.destroy because there is not data-dir and it is required
              to save the known peers list. *)
-          let*! () = P2p_pool.tear_down_connections pool in
+          let*! () =
+            P2p_pool.tear_down_connections ~reason:Pool_destroyed pool
+          in
           let*! () = P2p_io_scheduler.shutdown sched in
           let*! () = Event.(emit bye) () in
           return_unit))

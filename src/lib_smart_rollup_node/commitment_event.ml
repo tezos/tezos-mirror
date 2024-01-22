@@ -28,44 +28,28 @@ open Publisher_worker_types
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"; "commitment"]
+  let section = ["smart_rollup_node"; "commitment"]
 
   let starting =
     declare_0
       ~section
-      ~name:"sc_rollup_commitment_publisher_starting"
+      ~name:"smart_rollup_node_commitment_publisher_starting"
       ~msg:"Starting commitment publisher for the smart rollup node"
-      ~level:Notice
+      ~level:Info
       ()
 
   let stopping =
     declare_0
       ~section
-      ~name:"sc_rollup_node_commitment_publisher_stopping"
+      ~name:"smart_rollup_node_commitment_publisher_stopping"
       ~msg:"Stopping commitment publisher for the smart rollup node"
-      ~level:Notice
+      ~level:Info
       ()
-
-  let commitment_will_not_be_published =
-    declare_5
-      ~section
-      ~name:"sc_rollup_node_commitment_will_not_be_published"
-      ~msg:
-        "Commitment will not be published: its inbox level is less or equal \
-         than the last cemented commitment level {lcc_level} - predecessor: \
-         {predecessor}, inbox_level: {inbox_level}, compressed_state: \
-         {compressed_state}, number_of_ticks: {number_of_ticks}"
-      ~level:Notice
-      ("lcc_level", Data_encoding.int32)
-      ("predecessor", Commitment.Hash.encoding)
-      ("inbox_level", Data_encoding.int32)
-      ("compressed_state", State_hash.encoding)
-      ("number_of_ticks", Data_encoding.int64)
 
   let last_cemented_commitment_updated =
     declare_2
       ~section
-      ~name:"sc_rollup_node_lcc_updated"
+      ~name:"smart_rollup_node_commitment_lcc_updated"
       ~msg:
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
@@ -76,7 +60,7 @@ module Simple = struct
   let last_published_commitment_updated =
     declare_2
       ~section
-      ~name:"sc_rollup_node_lpc_updated"
+      ~name:"smart_rollup_node_commitment_lpc_updated"
       ~msg:
         "Last published commitment was updated to hash {hash} at inbox level \
          {level}"
@@ -87,49 +71,48 @@ module Simple = struct
   let compute_commitment =
     declare_1
       ~section
-      ~name:"sc_rollup_node_commitment_process_head"
+      ~name:"smart_rollup_node_commitment_compute"
       ~msg:"Computing and storing new commitment for level {level}"
+      ~level:Info
+      ("level", Data_encoding.int32)
+
+  let new_commitment =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_new_commitment"
+      ~msg:"New commitment {hash} for inbox level {level}"
       ~level:Notice
+      ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
   let publish_commitment =
     declare_2
       ~section
-      ~name:"sc_rollup_node_publish_commitment"
+      ~name:"smart_rollup_node_commitment_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
-      ~level:Notice
+      ~level:Info
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
-  let commitment_parent_is_not_lcc =
+  let recover_bond =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_recover_bond"
+      ~msg:"Recover bond for {staker}"
+      ~level:Info
+      ("staker", Signature.Public_key_hash.encoding)
+
+  let publish_execute_whitelist_update =
     declare_3
       ~section
-      ~name:"sc_rollup_commitment_parent_is_not_lcc"
+      ~name:"smart_rollup_node_publish_execute_whitelist_update"
       ~msg:
-        "Trying to publish a commitment at inbox level {level} whose parent is \
-         the last cemented commitment, but the commitment's predecessor hash \
-         {predecessor_hash} differs from the last cemented commitment hash \
-         {lcc_hash}. This is a critical error, and the rollup node will be \
-         terminated."
-      ~level:Fatal
-      ("level", Data_encoding.int32)
-      ("predecessor_hash", Commitment.Hash.encoding)
-      ("lcc_hash", Commitment.Hash.encoding)
-
-  let commitment_stored =
-    declare_5
-      ~section
-      ~name:"sc_rollup_node_commitment_stored"
-      ~msg:
-        "Commitment {commitment_hash} was stored - predecessor: {predecessor}, \
-         inbox_level: {inbox_level}, compressed_state: {compressed_state}, \
-         number_of_ticks: {number_of_ticks}"
-      ~level:Notice
-      ("commitment_hash", Commitment.Hash.encoding)
-      ("predecessor", Commitment.Hash.encoding)
-      ("inbox_level", Data_encoding.int32)
-      ("compressed_state", State_hash.encoding)
-      ("number_of_ticks", Data_encoding.int64)
+        "Publishing execute whitelist update for cemented commitment {hash}, \
+         outbox level {outbox_level} and index {message_index}"
+      ~level:Info
+      ("hash", Commitment.Hash.encoding)
+      ("outbox_level", Data_encoding.int32)
+      ("message_index", Data_encoding.int31)
 
   module Publisher = struct
     let section = section @ ["publisher"]
@@ -138,7 +121,7 @@ module Simple = struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"[Warning] Request {view} failed ({worker_status}): {errors}"
         ~level:Warning
         ("view", Request.encoding)
         ~pp1:Request.pp
@@ -166,26 +149,6 @@ let stopping = Simple.(emit stopping)
 
 let section = Simple.section
 
-let emit_commitment_event f commitment_hash
-    Commitment.{predecessor; inbox_level; compressed_state; number_of_ticks} =
-  Simple.(
-    emit
-      f
-      ( commitment_hash,
-        predecessor,
-        inbox_level,
-        compressed_state,
-        number_of_ticks ))
-
-let commitment_will_not_be_published lcc_level
-    Commitment.{predecessor; inbox_level; compressed_state; number_of_ticks} =
-  Simple.(
-    emit
-      commitment_will_not_be_published
-      (lcc_level, predecessor, inbox_level, compressed_state, number_of_ticks))
-
-let commitment_stored = emit_commitment_event Simple.commitment_stored
-
 let last_cemented_commitment_updated head level =
   Simple.(emit last_cemented_commitment_updated (head, level))
 
@@ -194,11 +157,15 @@ let last_published_commitment_updated head level =
 
 let compute_commitment level = Simple.(emit compute_commitment level)
 
+let new_commitment head level = Simple.(emit new_commitment (head, level))
+
 let publish_commitment head level =
   Simple.(emit publish_commitment (head, level))
 
-let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
-  Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))
+let recover_bond staker = Simple.(emit recover_bond staker)
+
+let publish_execute_whitelist_update hash level index =
+  Simple.(emit publish_execute_whitelist_update (hash, level, index))
 
 module Publisher = struct
   let request_failed view worker_status errors =

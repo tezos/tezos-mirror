@@ -46,6 +46,7 @@ type simulate_input = {
   messages : string list;
   reveal_pages : string list option;
   insight_requests : insight_request list;
+  log_kernel_debug_file : string option;
 }
 
 type commitment_info = {
@@ -115,11 +116,11 @@ module Encodings = struct
 
   let simulate_input =
     conv
-      (fun {messages; reveal_pages; insight_requests} ->
-        (messages, reveal_pages, insight_requests))
-      (fun (messages, reveal_pages, insight_requests) ->
-        {messages; reveal_pages; insight_requests})
-    @@ obj3
+      (fun {messages; reveal_pages; insight_requests; log_kernel_debug_file} ->
+        (messages, reveal_pages, insight_requests, log_kernel_debug_file))
+      (fun (messages, reveal_pages, insight_requests, log_kernel_debug_file) ->
+        {messages; reveal_pages; insight_requests; log_kernel_debug_file})
+    @@ obj4
          (req
             "messages"
             (list hex_string)
@@ -133,6 +134,13 @@ module Encodings = struct
             (list insight_request)
             []
             ~description:"Paths in the PVM to inspect after the simulation")
+         (opt
+            "log_kernel_debug_file"
+            string
+            ~description:
+              "File in which to emit kernel logs. This file will be created in \
+               <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
+               data directory of the rollup node.")
 
   let commitment_info =
     conv
@@ -225,6 +233,19 @@ module Query = struct
         req "outbox_level" Raw_level.of_int32_exn outbox_level)
     |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
            Some (Raw_level.to_int32 o))
+    |> seal
+
+  let message_index_query =
+    let open Tezos_rpc.Query in
+    query (fun message_index ->
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        req "index" (fun o -> o) message_index)
+    |+ opt_field "index" Tezos_rpc.Arg.uint (fun o -> Some o)
     |> seal
 end
 
@@ -424,5 +445,18 @@ module Block = struct
               (req "commitment" Sc_rollup.Commitment.Hash.encoding)
               (req "proof" Encodings.hex_string))
         (path / "proofs" / "outbox")
+
+    let outbox_proof_simple =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Generate serialized output proof for some outbox message at level \
+           and index"
+        ~query:Query.message_index_query
+        ~output:
+          Data_encoding.(
+            obj2
+              (req "commitment" Sc_rollup.Commitment.Hash.encoding)
+              (req "proof" Encodings.hex_string))
+        (path / "proofs" / "outbox" /: level_param / "messages")
   end
 end

@@ -23,6 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Benchmarks_shell
 module Context = Tezos_protocol_environment.Context
 module Shell_monad = Tezos_error_monad.Error_monad
@@ -33,21 +34,23 @@ let purpose =
 
 let ns = Namespace.make Shell_namespace.ns "io"
 
-let fv s = Free_variable.of_namespace (ns s)
+let ns2 s1 s2 = Namespace.(cons (cons (Shell_namespace.ns "io") s1) s2)
 
-let read_model =
-  Model.bilinear_affine
-    ~name:(ns "read_model")
-    ~intercept:(fv "read_latency")
-    ~coeff1:(fv "depth")
-    ~coeff2:(fv "storage_bytes")
+let fv s1 s2 = Free_variable.of_namespace (ns2 s1 s2)
 
-let write_model =
+let read_model ~name =
   Model.bilinear_affine
-    ~name:(ns "write_model")
-    ~intercept:(fv "write_latency")
-    ~coeff1:(fv "keys_written")
-    ~coeff2:(fv "storage_bytes")
+    ~name:(ns2 name "read_model")
+    ~intercept:(fv name "read_latency")
+    ~coeff1:(fv name "depth")
+    ~coeff2:(fv name "storage_bytes_read")
+
+let write_model ~name =
+  Model.bilinear_affine
+    ~name:(ns2 name "write_model")
+    ~intercept:(fv name "write_latency")
+    ~coeff1:(fv name "keys_written")
+    ~coeff2:(fv name "storage_bytes_write")
 
 module Helpers = struct
   (* Samples keys in an alphabet of [card] elements. *)
@@ -56,22 +59,9 @@ module Helpers = struct
     let i = string_of_int (Random.int card) in
     "key" ^ i
 
-  let make_key_sampler ~card =
-    assert (card > 0) ;
-    let suffixes = Array.init card string_of_int in
-    fun () ->
-      let i = Random.int card in
-      "key" ^ suffixes.(i)
-
   let random_key rng_state ~card ~depth =
     let depth = Base_samplers.sample_in_interval rng_state ~range:depth in
-    let rec loop depth acc =
-      if depth = 0 then List.rev acc
-      else
-        let key = sample_key ~card in
-        loop (depth - 1) (key :: acc)
-    in
-    loop depth []
+    Stdlib.List.init depth (fun _ -> sample_key ~card)
 
   (* Initializes a context by setting random bytes for each key in the
      given [key_set]. *)
@@ -148,6 +138,15 @@ module Context_size_dependent_shared = struct
     temp_dir : string option;
   }
 
+  (* This config creates:
+     - 1 target file of at most 1MB
+     - At most 65536 files of 1KB
+
+     - Files are scattered in directories of depth 10 to 1000
+     - Commit for each 10_000 file additions
+
+     In total, 66.5MB of max file contents. Produces a context file of 2GB.
+  *)
   let default_config =
     {
       depth = {min = 10; max = 1000};
@@ -244,18 +243,9 @@ module Context_size_dependent_shared = struct
           ]
         in
         Sparse_vec.String.of_list keys
-
-  let read_access =
-    Model.make
-      ~conv:(function
-        | Random_context_random_access {depth; storage_bytes; _} ->
-            (depth, (storage_bytes, ())))
-      ~model:read_model
-
-  let group = Benchmark.Group "io_read"
 end
 
-module Context_size_dependent_read_bench : Benchmark.Simple = struct
+module Context_size_dependent_read_bench = struct
   (* ----------------------------------------------------------------------- *)
   (* Benchmark def *)
 
@@ -338,12 +328,19 @@ module Context_size_dependent_read_bench : Benchmark.Simple = struct
     in
     Generator.With_context {workload; closure; with_context}
 
-  let model = read_access
+  let group = Benchmark.Group "io"
+
+  let model =
+    Model.make
+      ~conv:(function
+        | Random_context_random_access {depth; storage_bytes; _} ->
+            (depth, (storage_bytes, ())))
+      (read_model ~name:"context_dependent")
 end
 
 let () = Registration.register_simple (module Context_size_dependent_read_bench)
 
-module Context_size_dependent_write_bench : Benchmark.Simple = struct
+module Context_size_dependent_write_bench = struct
   include Context_size_dependent_shared
 
   (* ----------------------------------------------------------------------- *)
@@ -364,7 +361,14 @@ module Context_size_dependent_write_bench : Benchmark.Simple = struct
   let write_storage context key bytes =
     Lwt_main.run (Tezos_protocol_environment.Context.add context key bytes)
 
-  let model = read_access
+  let group = Benchmark.Group "io"
+
+  let model =
+    Model.make
+      ~conv:(function
+        | Random_context_random_access {depth; storage_bytes; _} ->
+            (depth, (storage_bytes, ())))
+      (write_model ~name:"context_dependent")
 
   let create_benchmark ~rng_state cfg =
     let insertions =
@@ -501,6 +505,17 @@ module Irmin_pack_shared = struct
          (req "commit_batch_size" int)
          (opt "temp_dir" string))
 
+  (* This config creates:
+     - 1 big directory with [256, 8192] items
+       - 1 of the item of the big directory is the target file of at most 50KB
+       - The other files in the big directory have 1KB each.
+     - and at most 65536 files of 1KB each
+
+     - Files and the big directory are scattered in directories of depth 3 to 30.
+     - Commit for each 10_000 file additions
+
+     In total, out 73.85MB of file contents. Produces a context file around 2.2GB.
+  *)
   let default_config =
     {
       depth = {min = 3; max = 30};
@@ -537,13 +552,13 @@ module Irmin_pack_shared = struct
           rng_state
           ~range:{min = 256; max = cfg.irmin_pack_max_width}
       in
-      let directories =
+      let files_under_big_directory =
         Array.init dir_width (fun i -> prefix @ [irmin_pack_key i])
       in
-      (prefix, directories)
+      (prefix, files_under_big_directory)
 end
 
-module Irmin_pack_read_bench : Benchmark.Simple = struct
+module Irmin_pack_read_bench = struct
   include Irmin_pack_shared
 
   let prepare_irmin_directory rng_state ~cfg ~key_set =
@@ -552,26 +567,27 @@ module Irmin_pack_read_bench : Benchmark.Simple = struct
         "Irmin_pack_read_bench: irmin_pack_max_width < 256, invalid \
          configuration"
     else
-      let _prefix, directories =
+      let _prefix, files_under_big_directory =
         sample_irmin_directory rng_state ~cfg ~key_set
       in
-      let dir_width = Array.length directories in
+      let dir_width = Array.length files_under_big_directory in
       let target_index = Random.int dir_width in
-      let target_key = directories.(target_index) in
+      let target_key = files_under_big_directory.(target_index) in
       let value_size =
         Base_samplers.sample_in_interval rng_state ~range:cfg.storage_chunks
         * cfg.storage_chunk_bytes
       in
       let key_set =
         let acc = ref key_set in
-        for index = 0 to Array.length directories - 1 do
-          let key = directories.(index) in
-          if index = target_index then acc := Key_map.insert key value_size !acc
-          else acc := Key_map.insert key cfg.default_storage_bytes !acc
-        done ;
+        Array.iteri
+          (fun index key ->
+            if index = target_index then
+              acc := Key_map.insert key value_size !acc
+            else acc := Key_map.insert key cfg.default_storage_bytes !acc)
+          files_under_big_directory ;
         !acc
       in
-      (target_key, value_size, key_set, directories)
+      (target_key, value_size, key_set, files_under_big_directory)
 
   let name = ns "IRMIN_PACK_READ"
 
@@ -608,9 +624,9 @@ module Irmin_pack_read_bench : Benchmark.Simple = struct
       ~conv:(function
         | Irmin_pack_read {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
-      ~model:read_model
+      (read_model ~name:"irmin")
 
-  let group = Benchmark.Group "io_read"
+  let group = Benchmark.Group "io"
 
   let workload_encoding =
     let open Data_encoding in
@@ -692,7 +708,7 @@ end
 
 let () = Registration.register_simple (module Irmin_pack_read_bench)
 
-module Irmin_pack_write_bench : Benchmark.Simple = struct
+module Irmin_pack_write_bench = struct
   include Irmin_pack_shared
 
   let prepare_irmin_directory rng_state ~cfg ~key_set ~bench_init =
@@ -786,9 +802,9 @@ module Irmin_pack_write_bench : Benchmark.Simple = struct
       ~conv:(function
         | Irmin_pack_write {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:write_model
+      (write_model ~name:"irmin")
 
-  let group = Benchmark.Group "io_write"
+  let group = Benchmark.Group "io"
 
   let write_storage context key bytes =
     Lwt_main.run (Context.add context key bytes)
@@ -879,16 +895,16 @@ end
 
 let () = Registration.register_simple (module Irmin_pack_write_bench)
 
-module Read_random_key_bench : Benchmark.Simple_with_num = struct
+module Read_random_key_bench = struct
   type config = {
     existing_context : string * Context_hash.t;
-    subdirectory : string list;
+    subdirectory : string;
   }
 
   let default_config =
     {
       existing_context = ("/no/such/directory", Context_hash.zero);
-      subdirectory = ["no"; "such"; "key"];
+      subdirectory = "/no/such/key";
     }
 
   let config_encoding =
@@ -898,7 +914,7 @@ module Read_random_key_bench : Benchmark.Simple_with_num = struct
       (fun (existing_context, subdirectory) -> {existing_context; subdirectory})
       (obj2
          (req "existing_context" (tup2 string Context_hash.encoding))
-         (req "subdirectory" (list string)))
+         (req "subdirectory" string))
 
   let name = ns "READ_RANDOM_KEY"
 
@@ -930,13 +946,13 @@ module Read_random_key_bench : Benchmark.Simple_with_num = struct
         in
         Sparse_vec.String.of_list keys
 
-  let group = Benchmark.Group "io_read"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
       ~conv:(function
         | Read_random_key {depth; storage_bytes} -> (depth, (storage_bytes, ())))
-      ~model:read_model
+      (read_model ~name:"random")
 
   let make_bench rng_state config keys () =
     let card = Array.length keys in
@@ -975,17 +991,25 @@ module Read_random_key_bench : Benchmark.Simple_with_num = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     let base_dir, context_hash = config.existing_context in
+    (* files under [config.subdirectory] *)
     let tree =
       Io_helpers.with_context ~base_dir ~context_hash (fun context ->
-          Io_stats.load_tree context config.subdirectory)
+          Io_stats.load_tree context
+          @@ Option.value_f ~default:(fun () ->
+                 Stdlib.failwith
+                   (Format.asprintf
+                      "%a: invalid config subdirectory"
+                      Namespace.pp
+                      name))
+          @@ Io_helpers.split_absolute_path config.subdirectory)
     in
-    let keys = Array.of_seq (Io_helpers.Key_map.to_seq tree) in
+    let keys = Array.of_seq @@ Io_helpers.Key_map.to_seq tree in
     List.repeat bench_num (make_bench rng_state config keys)
 end
 
 let () = Registration.register_simple_with_num (module Read_random_key_bench)
 
-module Write_random_keys_bench : Benchmark.Simple_with_num = struct
+module Write_random_keys_bench = struct
   open Base_samplers
 
   type config = {
@@ -994,7 +1018,7 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
     storage_chunks : range;
     max_written_keys : int;
     temp_dir : string option;
-    subdirectory : string list;
+    subdirectory : string;
   }
 
   let default_config =
@@ -1004,7 +1028,7 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
       storage_chunks = {min = 1; max = 1000};
       max_written_keys = 10_000;
       temp_dir = None;
-      subdirectory = ["no"; "such"; "key"];
+      subdirectory = "/no/such/key";
     }
 
   let config_encoding =
@@ -1045,7 +1069,7 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
          (req "storage_chunks" range_encoding)
          (req "max_written_keys" int)
          (req "temp_dir" (option string))
-         (req "subdirectory" (list string)))
+         (req "subdirectory" string))
 
   let name = ns "WRITE_RANDOM_KEYS"
 
@@ -1080,25 +1104,23 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
         in
         Sparse_vec.String.of_list keys
 
-  let group = Benchmark.Group "io_write"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
       ~conv:(function
         | Write_random_keys {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:write_model
+      (write_model ~name:"random")
 
   let write_storage context key bytes =
     Lwt_main.run (Context.add context key bytes)
 
-  let make_bench rng_state (cfg : config) (keys : (string list * int) Seq.t) ()
-      =
-    let keys = List.of_seq keys in
-    let total_keys_in_directory = List.length keys in
+  let make_bench rng_state (cfg : config) (keys : (string list * int) list) () =
+    let total_keys_under_directory = List.length keys in
     let number_of_keys_written =
       min
-        total_keys_in_directory
+        total_keys_under_directory
         (Random.State.int rng_state cfg.max_written_keys)
     in
     let keys_written_to, _keys_not_written_to =
@@ -1118,11 +1140,13 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
           (Namespace.basename name)
           (Random.int 65536)
       in
+      (* copying the original context for EACH test *)
       Io_helpers.copy_rec source_base_dir target_base_dir ;
       Format.eprintf "Finished copying original context to %s@." target_base_dir ;
       let context, index =
         Io_helpers.load_context_from_disk target_base_dir context_hash
       in
+      (* overwrite [keys_written_to].  The times of the writes are not measured. *)
       let context =
         List.fold_left
           (fun context (key, _) ->
@@ -1149,6 +1173,7 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
       finalizer () ;
       result
     in
+    (* This only measure the time to commit *)
     let closure context =
       Lwt_main.run
         (let open Lwt_syntax in
@@ -1163,11 +1188,19 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     let base_dir, context_hash = config.existing_context in
+    (* files under [config.subdirectory] *)
     let tree =
       Io_helpers.with_context ~base_dir ~context_hash (fun context ->
-          Io_stats.load_tree context config.subdirectory)
+          Io_stats.load_tree context
+          @@ Option.value_f ~default:(fun () ->
+                 Stdlib.failwith
+                   (Format.asprintf
+                      "%a: invalid config subdirectory"
+                      Namespace.pp
+                      name))
+          @@ Io_helpers.split_absolute_path config.subdirectory)
     in
-    let keys = Io_helpers.Key_map.to_seq tree in
+    let keys = List.of_seq @@ Io_helpers.Key_map.to_seq tree in
     List.repeat bench_num (make_bench rng_state config keys)
 end
 

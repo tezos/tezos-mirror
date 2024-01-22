@@ -44,7 +44,7 @@ let num_bootstrap_accounts = Array.length Account.Bootstrap.keys
 
 let rpc_get_timestamp node block_level =
   let* header =
-    RPC.call node
+    Node.RPC.call node
     @@ RPC.get_chain_block_header ~block:(string_of_int block_level) ()
   in
   let timestamp_s = JSON.(header |-> "timestamp" |> as_string) in
@@ -99,7 +99,7 @@ let nodes_measure_levels nodes levels =
         return (block_timestamp -. start_block_timestamp)
       in
       let* round =
-        RPC.call node
+        Node.RPC.call node
         @@ RPC.get_chain_block_helper_round ~block:(string_of_int level) ()
       in
       Log.info
@@ -514,16 +514,18 @@ module Long_dynamic_bake = struct
     (* Kill a baker and spawn a new every [kill_baker_period] *)
     let rec loop_kill_bakers cycle (dead_baker_handle, kill_queue) =
       let* () = Lwt_unix.sleep kill_baker_period in
-      if Node.get_level node_hd < max_level then (
+      let* head_level = Node.get_level node_hd in
+      if head_level < max_level then (
         (* cyclically kill bakers *)
         let dead_baker_handle', kill_queue = Inf.next kill_queue in
         let* killed_baker =
           Sandbox.remove_baker_from_node sandbox dead_baker_handle'
         in
+        let* head_level = Node.get_level node_hd in
         Log.info
           "Cycle %d (head level %d): killed baker %s from handle #%d"
           cycle
-          (Node.get_level node_hd)
+          head_level
           (Baker.name killed_baker)
           dead_baker_handle' ;
 
@@ -534,10 +536,11 @@ module Long_dynamic_bake = struct
         let* _, new_baker =
           Sandbox.add_baker_to_node sandbox dead_baker_handle
         in
+        let* head_level = Node.get_level node_hd in
         Log.info
           "Cycle %d (head level %d): added baker %s to handle #%d"
           cycle
-          (Node.get_level node_hd)
+          head_level
           (Baker.name new_baker)
           dead_baker_handle ;
 
@@ -549,7 +552,8 @@ module Long_dynamic_bake = struct
     (* Inject a transaction every [add_operation_period] *)
     let rec loop_generate_operations keys clients =
       let* () = Lwt_unix.sleep add_operation_period in
-      if Node.get_level node_hd < max_level then
+      let* head_level = Node.get_level node_hd in
+      if head_level < max_level then
         let client, clients = Inf.next clients in
         let* keys =
           let giver_index, keys = Inf.next keys in
@@ -566,9 +570,10 @@ module Long_dynamic_bake = struct
           in
           let amount = Tez.of_int (1 + Random.int 10) in
           let* () = Client.transfer ~wait:"1" ~amount ~giver ~receiver client in
+          let* head_level = Node.get_level node_hd in
           Log.info
             "Level %d: sent %s from %s to %s with client %s"
-            (Node.get_level node_hd)
+            head_level
             (Tez.to_string amount)
             giver
             receiver

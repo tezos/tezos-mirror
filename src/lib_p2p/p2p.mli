@@ -119,6 +119,9 @@ type ('msg, 'peer_meta, 'conn_meta) t
 
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
+(** A connection to a peer *)
+type ('msg, 'peer_meta, 'conn_meta) connection
+
 val announced_version : ('msg, 'peer_meta, 'conn_meta) net -> Network_version.t
 
 val pool :
@@ -137,10 +140,26 @@ val faked_network :
   'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net
 
-(** Main network initialization function *)
+(** Main network initialization function
+
+    [received_msg_hook] is a function that is called every time a message
+    ['msg] is received.
+    [sent_msg_hook] is a function that is called every time a message
+    ['msg] is sent.
+    [broadcasted_msg_hook] is a function that is called every time a message
+    ['msg] is broadcasted.
+    *)
 val create :
   config:config ->
   limits:Tezos_p2p_services.P2p_limits.t ->
+  ?received_msg_hook:(('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit) ->
+  ?sent_msg_hook:(('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit) ->
+  ?broadcasted_msg_hook:
+    (('msg, 'peer_meta, 'conn_meta) connection P2p_peer.Table.t ->
+    ?except:(('msg, 'peer_meta, 'conn_meta) connection -> bool) ->
+    ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
+    'msg ->
+    unit) ->
   'peer_meta P2p_params.peer_meta_config ->
   'conn_meta P2p_params.conn_meta_config ->
   'msg P2p_params.message_config ->
@@ -159,9 +178,6 @@ val roll : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** Close all connections properly *)
 val shutdown : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
-
-(** A connection to a peer *)
-type ('msg, 'peer_meta, 'conn_meta) connection
 
 (** Access the domain of active peers *)
 val connections :
@@ -213,6 +229,7 @@ val negotiated_version :
 val disconnect :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ?wait:bool ->
+  reason:string ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   unit Lwt.t
 
@@ -265,7 +282,7 @@ val try_send :
   'msg ->
   bool
 
-(** [broadcast connections ~except ~(alt:if_conn,then_msg) msg] will
+(** [broadcast net connections ~except ~(alt:if_conn,then_msg) msg] will
     send messages to all [connections] that do not satisfy the
     predicate [except]. [alt] can be used to send an alternative
     message [then_msg] to connections that do satisfy the [if_conn]
@@ -276,6 +293,7 @@ val try_send :
     actually received (https://gitlab.com/tezos/tezos/-/issues/4205).
 *)
 val broadcast :
+  ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection P2p_peer.Table.t ->
   ?except:(('msg, 'peer_meta, 'conn_meta) connection -> bool) ->
   ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
@@ -333,11 +351,13 @@ val watcher :
 (**/**)
 
 module Internal_for_tests : sig
-  (** [broadcast_conns connections ~except ~(alt:if_conn,then_msg)
-      msg] is similarly to broadcast.
-      But it exposes the internal `connection = P2p_conn.t` type for
-      testing purposes *)
-  val broadcast_conns :
+  (** [raw_broadcast connections ~except ~(alt:if_conn,then_msg)
+      msg] is similarly to broadcast, but for testing purposes:
+      - it exposes the internal `connection = P2p_conn.t` type,
+      - it does not notify broadcasted hooks,
+      - it does not require an argument of type net.
+  *)
+  val raw_broadcast :
     ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_peer.Table.t ->
     ?except:(('msg, 'peer_meta, 'conn_meta) P2p_conn.t -> bool) ->
     ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->

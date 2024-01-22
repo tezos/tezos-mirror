@@ -106,6 +106,8 @@ module Kind : sig
 
   type event = Event_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type increase_paid_storage = Increase_paid_storage_kind
 
   type update_consensus_key = Update_consensus_key_kind
@@ -150,6 +152,7 @@ module Kind : sig
     | Delegation_manager_kind : delegation manager
     | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
@@ -367,6 +370,12 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  (* [Set_deposits_limit] sets an optional limit for frozen deposits
+     of a contract at a lower value than the maximum limit.  When None,
+     the limit in unset back to the default maximum limit. *)
+  | Set_deposits_limit :
+      Tez_repr.t option
+      -> Kind.set_deposits_limit manager_operation
   (* [Increase_paid_storage] allows a sender to pay to increase the paid storage of
      some contract by some amount. *)
   | Increase_paid_storage : {
@@ -414,6 +423,7 @@ and _ manager_operation =
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
       parameters_ty : Script_repr.lazy_expr;
+      whitelist : Sc_rollup_whitelist_repr.t option;
     }
       -> Kind.sc_rollup_originate manager_operation
   (* [Sc_rollup_add_messages] adds messages to the smart rollups' inbox. *)
@@ -607,12 +617,12 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    operations being of the same kind, we compare their [slot]: the
    The smaller being the better, assuming that the more slots an attester
    has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Attestation] to a {!Preattestation}, the
+   and comparing an {!Attestation} to a {!Preattestation}, the
    {!Attestation} is better.
 
-   Two {!Dal_attestation} ops are compared in the lexicographic
-   order of the pair of their number of attested slots as available
-   and their attesters.
+   Two {!Dal_attestation} ops are compared in the lexicographic order of the
+   tuple of their level, their slot, their number of slots attested as
+   available, and their attesters' hash.
 
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
@@ -718,6 +728,8 @@ module Encoding : sig
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
 
+  val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
+
   val increase_paid_storage_case : Kind.increase_paid_storage Kind.manager case
 
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
@@ -775,6 +787,8 @@ module Encoding : sig
     val update_consensus_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
+
+    val set_deposits_limit_case : Kind.set_deposits_limit case
 
     val increase_paid_storage_case : Kind.increase_paid_storage case
 
