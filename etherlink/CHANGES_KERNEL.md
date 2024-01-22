@@ -4,6 +4,8 @@
 
 ### Features
 
+- Implement Call stipend for inner call with transfer. (!11587)
+
 ### Bug fixes
 
 - Fix minimum gas price used for charging fees: should be `base_fee_per_gas`, instead of `1 wei`. (!11509)
