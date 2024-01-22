@@ -648,16 +648,17 @@ let test_attestation_threshold ~sufficient_threshold () =
         | Validate_errors.Block.Not_enough_attestations _ -> true
         | _ -> false)
 
-let test_two_dal_attestations_with_same_attester () =
+let test_two_attestations_with_same_attester () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
-  let* op1 = Op.raw_dal_attestation attested_block in
-  let op1 = Stdlib.Option.get op1 in
-  let attestation =
-    Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
+  let* op1 = Op.raw_attestation attested_block in
+  let dal_content =
+    let attestation =
+      Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
+    in
+    {attestation}
   in
-  let* op2 = Op.raw_dal_attestation ~attestation attested_block in
-  let op2 = Stdlib.Option.get op2 in
+  let* op2 = Op.raw_attestation ~dal_content attested_block in
   let*! res =
     Block.bake
       ~baking_mode:Application
@@ -668,7 +669,7 @@ let test_two_dal_attestations_with_same_attester () =
     | Validate_errors.(
         Consensus.Conflicting_consensus_operation
           {
-            kind = Dal_attestation;
+            kind = Attestation;
             conflict = Operation_conflict {existing; new_operation};
           }) ->
         Operation_hash.equal existing (Operation.hash op1)
@@ -729,9 +730,9 @@ let tests =
       `Quick
       (test_attestation_threshold ~sufficient_threshold:false);
     Tztest.tztest
-      "two DAL attestations with same attester in a block"
+      "two attestations with same attester in a block"
       `Quick
-      test_two_dal_attestations_with_same_attester;
+      test_two_attestations_with_same_attester;
   ]
 
 let () =

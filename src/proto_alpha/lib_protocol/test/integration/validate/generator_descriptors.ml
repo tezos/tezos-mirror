@@ -634,24 +634,6 @@ let attestation_descriptor =
         List.filter_map_es gen state.delegates);
   }
 
-let dal_attestation_descriptor =
-  let open Lwt_result_syntax in
-  {
-    parameters =
-      (fun params ->
-        let dal = {params.constants.dal with feature_enable = true} in
-        let constants = {params.constants with dal} in
-        {params with constants});
-    required_cycle = (fun _ -> 1);
-    required_block = (fun _ -> 1);
-    prelude = (On 1, fun state -> return ([], state));
-    opt_prelude = None;
-    candidates_generator =
-      (fun state ->
-        let gen (delegate, _) = Op.dal_attestation ~delegate state.block in
-        List.filter_map_es gen state.delegates);
-  }
-
 module Manager = Manager_operation_helpers
 
 let required_nb_account = 7
@@ -806,7 +788,6 @@ let manager_descriptor max_batch_size nb_accounts =
 type op_kind =
   | KAttestation
   | KPreattestation
-  | KDalattestation
   | KBallotExp
   | KBallotProm
   | KProposals
@@ -823,7 +804,6 @@ let op_kind_of_packed_operation op =
   match contents with
   | Single (Preattestation _) -> KPreattestation
   | Single (Attestation _) -> KAttestation
-  | Single (Dal_attestation _) -> KDalattestation
   | Single (Seed_nonce_revelation _) -> KNonce
   | Single (Vdf_revelation _) -> KVdf
   | Single (Double_attestation_evidence _) -> KDbl_consensus
@@ -844,7 +824,6 @@ let pp_op_kind fmt kind =
     | KManager -> "manager"
     | KAttestation -> "attestation"
     | KPreattestation -> "preattestation"
-    | KDalattestation -> "dal_attestation"
     | KBallotExp -> "ballot"
     | KBallotProm -> "ballot"
     | KProposals -> "proposals"
@@ -859,7 +838,6 @@ let descriptor_of ~nb_bootstrap ~max_batch_size = function
   | KManager -> manager_descriptor max_batch_size nb_bootstrap
   | KAttestation -> attestation_descriptor
   | KPreattestation -> preattestation_descriptor
-  | KDalattestation -> dal_attestation_descriptor
   | KBallotExp -> ballot_exploration_descriptor
   | KBallotProm -> ballot_promotion_descriptor
   | KProposals -> proposal_descriptor
@@ -886,7 +864,6 @@ let non_exclusive_kinds =
     KManager;
     KAttestation;
     KPreattestation;
-    KDalattestation;
     KActivate;
     KDbl_consensus;
     KDbl_baking;

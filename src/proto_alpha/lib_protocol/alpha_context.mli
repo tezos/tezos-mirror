@@ -2724,13 +2724,6 @@ module Dal : sig
   module Attestation : sig
     type t = private Bitset.t
 
-    type operation = {
-      attestation : t;
-      level : Raw_level.t;
-      round : Round.t;
-      slot : Slot.t;
-    }
-
     type shard_index = int
 
     module Shard_map : Map.S with type key = shard_index
@@ -2916,7 +2909,6 @@ module Dal_errors : sig
   type error +=
     | Dal_feature_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
-    | Dal_attestation_unexpected_size of {expected : int; got : int}
     | Dal_publish_slot_header_invalid_index of {
         given : Dal.Slot_index.t;
         maximum : Dal.Slot_index.t;
@@ -2932,17 +2924,7 @@ module Dal_errors : sig
         attester : Signature.Public_key_hash.t;
         level : Raw_level.t;
       }
-    | Dal_operation_for_old_level of {
-        expected : Raw_level.t;
-        given : Raw_level.t;
-      }
-    | Dal_operation_for_future_level of {
-        expected : Raw_level.t;
-        given : Raw_level.t;
-      }
-    | Dal_attestation_for_wrong_round of {expected : Round.t; given : Round.t}
     | Dal_cryptobox_error of {explanation : string}
-    | Dal_unexpected_attestation_at_root_level
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and
@@ -4352,8 +4334,6 @@ module Kind : sig
 
   type attestation = attestation_consensus_kind consensus
 
-  type dal_attestation = Dal_attestation_kind
-
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type vdf_revelation = Vdf_revelation_kind
@@ -4495,7 +4475,6 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
-  | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
@@ -4694,7 +4673,6 @@ module Operation : sig
   type consensus_watermark =
     | Attestation of Chain_id.t
     | Preattestation of Chain_id.t
-    | Dal_attestation of Chain_id.t
 
   val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -4785,8 +4763,6 @@ module Operation : sig
     val endorsement_with_dal_case : Kind.attestation case
 
     val attestation_with_dal_case : Kind.attestation case
-
-    val dal_attestation_case : Kind.dal_attestation case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

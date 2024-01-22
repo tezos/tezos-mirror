@@ -1086,7 +1086,7 @@ let balance_updates_of_single_content :
     type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
-  | Dal_attestation_result _ | Proposals_result | Ballot_result -> []
+  | Proposals_result | Ballot_result -> []
   | Preattestation_result {balance_updates; _}
   | Attestation_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates

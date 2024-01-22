@@ -69,23 +69,15 @@ module Consensus = struct
 
   (** This type is only used in consensus operation errors to make
       them more informative. *)
-  type consensus_operation_kind =
-    | Preattestation
-    | Attestation
-    | Dal_attestation
+  type consensus_operation_kind = Preattestation | Attestation
 
   let consensus_operation_kind_encoding =
     Data_encoding.string_enum
-      [
-        ("Preattestation", Preattestation);
-        ("Attestation", Attestation);
-        ("Dal_attestation", Dal_attestation);
-      ]
+      [("Preattestation", Preattestation); ("Attestation", Attestation)]
 
   let consensus_operation_kind_pp fmt = function
     | Preattestation -> Format.fprintf fmt "Preattestation"
     | Attestation -> Format.fprintf fmt "Attestation"
-    | Dal_attestation -> Format.fprintf fmt "Dal_attestation"
 
   (** Errors for preattestation and attestation. *)
   type error +=

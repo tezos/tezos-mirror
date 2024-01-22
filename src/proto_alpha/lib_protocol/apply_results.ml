@@ -890,10 +890,6 @@ type 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.attestation contents_result
-  | Dal_attestation_result : {
-      delegate : Signature.Public_key_hash.t;
-    }
-      -> Kind.dal_attestation contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1200,24 +1196,6 @@ module Encoding = struct
           (fun (balance_updates, delegate, consensus_power, consensus_key) ->
             Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power});
-      }
-
-  let dal_attestation_case =
-    Case
-      {
-        op_case = Operation.Encoding.dal_attestation_case;
-        encoding = obj1 (req "delegate" Signature.Public_key_hash.encoding);
-        select =
-          (function
-          | Contents_result (Dal_attestation_result _ as op) -> Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Dal_attestation _ as op), res) ->
-              Some (op, res)
-          | _ -> None);
-        proj = (function Dal_attestation_result {delegate} -> delegate);
-        inj = (fun delegate -> Dal_attestation_result {delegate});
       }
 
   let seed_nonce_revelation_case =
@@ -1531,7 +1509,6 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preattestation_result _) -> None
           | Contents_result (Attestation_result _) -> None
-          | Contents_result (Dal_attestation_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
@@ -1796,7 +1773,6 @@ let common_cases =
   [
     seed_nonce_revelation_case;
     vdf_revelation_case;
-    dal_attestation_case;
     double_baking_evidence_case;
     activate_account_case;
     proposals_case;
@@ -2041,8 +2017,6 @@ let kind_equal :
   | Attestation _, _ -> None
   | Preattestation _, Preattestation_result _ -> Some Eq
   | Preattestation _, _ -> None
-  | Dal_attestation _, Dal_attestation_result _ -> Some Eq
-  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq

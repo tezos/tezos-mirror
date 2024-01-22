@@ -72,10 +72,6 @@ and 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.attestation contents_result
-  | Dal_attestation_result : {
-      delegate : Signature.Public_key_hash.t;
-    }
-      -> Kind.dal_attestation contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result

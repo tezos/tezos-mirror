@@ -123,8 +123,6 @@ let covalidation_sanity () =
           | Single (Preattestation _), _ -> assert false
           | Single (Attestation _), KAttestation -> return_unit
           | Single (Attestation _), _ -> assert false
-          | Single (Dal_attestation _), KDalattestation -> return_unit
-          | Single (Dal_attestation _), _ -> assert false
           | Single (Seed_nonce_revelation _), KNonce -> return_unit
           | Single (Seed_nonce_revelation _), _ -> assert false
           | Single (Vdf_revelation _), KVdf -> return_unit

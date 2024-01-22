@@ -123,7 +123,6 @@ type descriptor = {
 type op_kind =
   | KAttestation
   | KPreattestation
-  | KDalattestation
   | KBallotExp
   | KBallotProm
   | KProposals

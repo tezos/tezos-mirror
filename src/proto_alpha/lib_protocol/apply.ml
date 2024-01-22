@@ -2220,7 +2220,6 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   match operation.protocol_data.contents with
   | Single (Preattestation _) -> ctxt
   | Single (Attestation _) -> ctxt
-  | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_attestation_evidence _
@@ -2474,34 +2473,6 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preattestation ctxt mode consensus_content
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
-  | Single (Dal_attestation {level; attestation; slot; _}) ->
-      (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
-
-         This is a temporary operation. This is done in order to avoid modifying
-         the attestation encoding and to use a committee that changes less
-         often. However, once the DAL will be ready, this operation should be
-         merged with an attestation or at least refined. *)
-      let* ctxt, consensus_key =
-        match mode with
-        | Application _ | Full_construction _ ->
-            let*? consensus_key, _power =
-              find_in_slot_map slot (Consensus.allowed_attestations ctxt)
-            in
-            let*? ctxt =
-              Dal_apply.apply_attestation ctxt consensus_key level attestation
-            in
-            return (ctxt, consensus_key)
-        | Partial_construction _ ->
-            (* We do not record the DAL attestation for the same reason, we do
-               not record the consensus attestation; see reasoning in
-               {record_attestation}. *)
-            let level = Level.from_raw ctxt level in
-            Stake_distribution.slot_owner ctxt level slot
-      in
-      return
-        ( ctxt,
-          Single_result
-            (Dal_attestation_result {delegate = consensus_key.delegate}) )
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in
