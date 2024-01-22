@@ -33,3 +33,8 @@ val execute_and_inspect :
   Sequencer_context.t ->
   input:Simulation.Encodings.simulate_input ->
   bytes option list tzresult Lwt.t
+
+(** [current_block_height evm_state] returns the height of the latest block
+    produced by the kernel. *)
+val current_block_height :
+  Sequencer_context.evm_state -> Ethereum_types.block_height Lwt.t

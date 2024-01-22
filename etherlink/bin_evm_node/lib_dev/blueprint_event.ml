@@ -42,6 +42,14 @@ let worker_enters_degraded_mode =
     ~level:Error
     ("level", Data_encoding.n)
 
+let invalid_blueprint =
+  declare_1
+    ~section
+    ~name:"evm_node_dev_blueprint_invalid"
+    ~msg:"Produced an invalid blueprint at level {level}"
+    ~level:Error
+    ("level", Data_encoding.n)
+
 let publisher_is_ready () = emit publisher_ready ()
 
 let publisher_shutdown () = emit publisher_shutdown ()
@@ -49,3 +57,5 @@ let publisher_shutdown () = emit publisher_shutdown ()
 let blueprint_injected level = emit blueprint_injection level
 
 let entered_degraded_mode level = emit worker_enters_degraded_mode level
+
+let invalid_blueprint_produced level = emit invalid_blueprint level

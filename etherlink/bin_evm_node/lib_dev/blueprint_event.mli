@@ -24,3 +24,8 @@ val blueprint_injected : Z.t -> unit Lwt.t
 (** [entered_degraded_mode level] advertizes that the worker will
     no longer forward blueprints to the rollup node. *)
 val entered_degraded_mode : Z.t -> unit Lwt.t
+
+(** [invalid_blueprint_produced level] advertizes that the sequencer has tried
+    to produce a blueprint which does not result in the publication of a new
+    Ethereum block. *)
+val invalid_blueprint_produced : Z.t -> unit Lwt.t

@@ -5,10 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module TreeEncoding =
+module Wasm_utils =
   Wasm_utils.Make
     (Tezos_tree_encoding.Encodings_util.Make (Sequencer_context.Context))
-module Wasm = Wasm_debugger.Make (TreeEncoding)
+module Wasm = Wasm_debugger.Make (Wasm_utils)
 
 let execute ?(commit = false) ctxt inbox =
   let open Lwt_result_syntax in
@@ -61,6 +61,19 @@ let inspect evm_state key =
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
   let* value = Wasm.Commands.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
+
+let current_block_height evm_state =
+  let open Lwt_syntax in
+  let* current_block_number =
+    inspect evm_state Durable_storage_path.Block.current_number
+  in
+  match current_block_number with
+  | None -> return (Ethereum_types.Block_height Z.zero)
+  | Some current_block_number ->
+      let (Qty current_block_number) =
+        Ethereum_types.decode_number current_block_number
+      in
+      return (Ethereum_types.Block_height current_block_number)
 
 let execute_and_inspect ctxt
     ~input:Simulation.Encodings.{messages; insight_requests; _} =
