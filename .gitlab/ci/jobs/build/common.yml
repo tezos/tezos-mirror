@@ -23,8 +23,6 @@
     - .tags_template__build_arm64
   variables:
     ARCH: "arm64"
-    # Disable coverage for arm64
-    COVERAGE_OPTIONS: ""
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always

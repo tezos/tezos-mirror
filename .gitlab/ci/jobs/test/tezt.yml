@@ -60,8 +60,6 @@ tezt:static-binaries:
     - oc.tezt:fetch-records
   variables:
     TESTS: "cli"
-    # Disable coverage
-    BISECT_FILE: ""
   before_script:
     - mv octez-binaries/x86_64/octez-* .
 
