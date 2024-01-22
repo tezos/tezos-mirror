@@ -1,25 +1,9 @@
-<!-- EVM merge request template. -->
+<!-- Etherlink sequencer merge request template. -->
 
 # Context
 
-<!--
-Describe the feature this MR introduces or the bug that it fixes.
-
-Refer to corresponding issues if applicable (writing "Related: `<issue number>` or "Fixes: `<issue number>`" accordingly).
-
-Specify related merge requests, specifically dependencies. -->
-
 # Manually testing the MR
 
-You can always manually test merge request by playing with the debugger:
-
-```
-make -f kernels.mk evm_kernel.wasm
-rlwrap ./octez-smart-rollup-wasm-debugger --kernel evm_kernel.wasm --inputs tezt/tests/evm_kernel_inputs/inputs.json
-```
-
-<!--
-Describe how reviewers and approvers can test this MR. -->
 
 # Checklist
 
@@ -30,10 +14,10 @@ Describe how reviewers and approvers can test this MR. -->
 - [X] Select suitable reviewers using the `Reviewers` field below.
 - [X] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
 
-/assign me
+/assign @alocascio @lthms @sribaroud @vch9
 
-/assign_reviewer @picdc @rodibozman @vch9
+/assign_reviewer @alocascio @lthms @sribaroud @vch9
 
-/labels ~kernel::EVM
+/labels ~evm::sequencer
 
-/milestone %"Deploy Uniswap on EVM smart rollups"
+/milestone %"Etherlink: sequencers"
