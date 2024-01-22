@@ -16,11 +16,10 @@ oc.unified_coverage:
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: never
     - changes:
-        paths:
-          - src/**/*
-          - tezt/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - tezt/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   variables:
     # This inhibites the Makefile's opam version check, which this

@@ -6,11 +6,10 @@ build_get_contracts:
     - .oc.build_template
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - devtools/get_contracts/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - devtools/get_contracts/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   script:
     - dune build @devtools/get_contracts/check

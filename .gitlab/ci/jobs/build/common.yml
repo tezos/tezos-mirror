@@ -32,10 +32,9 @@
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
       when: on_success
     - changes:
-        paths:
-          - src/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
 

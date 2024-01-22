@@ -67,11 +67,10 @@ oc.script:b58_prefix:
     - .needs__trigger
   rules:
     - changes:
-        paths:
-          - scripts/b58_prefix/b58_prefix.py
-          - scripts/b58_prefix/test_b58_prefix.py
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - scripts/b58_prefix/b58_prefix.py
+        - scripts/b58_prefix/test_b58_prefix.py
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   stage: test
   before_script:

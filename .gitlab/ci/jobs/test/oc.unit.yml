@@ -56,10 +56,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: always
     - changes:
-        paths:
-          - src/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
 
 
 oc.unit:non-proto-x86_64:

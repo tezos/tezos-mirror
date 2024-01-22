@@ -6,11 +6,10 @@ kaitai_checks:
     - "oc.build_x86_64-released"
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - contrib/*kaitai*/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   needs:
     - "oc.build_x86_64-released"
@@ -24,11 +23,10 @@ kaitai_e2e_checks:
   needs: [kaitai_checks]
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - contrib/*kaitai*/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   before_script:
     - . ./scripts/version.sh

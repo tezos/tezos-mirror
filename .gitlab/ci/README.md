@@ -65,3 +65,32 @@ A job's `before_script:` section should be used to:
 
 For consistency, these actions (or a subset thereof) should be taken
 in the order listed above.
+
+# Prefer the simple form
+
+Some clauses, like `needs:` or `rules:changes:`, accepts a simple and
+a full form. For instance, in the simple form, `rules:changes` takes a
+list of strings::
+
+```
+job_foo:
+  rules:
+    - changes:
+      - bar
+      - baz
+```
+
+whereas in the full form, changes takes an object, whose key `paths`
+serve the same purpose as the simple form. The following example is
+equivalent to the above definition of `job_foo`, using the full form:
+
+```
+job_foo:
+  rules:
+    - changes:
+        paths:
+          - bar
+          - baz
+```
+
+Unless necessary, use the simple form.
