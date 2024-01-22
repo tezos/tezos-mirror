@@ -36,7 +36,7 @@ val execute_and_inspect :
 val current_block_height : t -> Ethereum_types.block_height Lwt.t
 
 type apply_result =
-  | Apply_success of t * Ethereum_types.block_height
+  | Apply_success of t * Ethereum_types.block_height * Ethereum_types.block_hash
   | Apply_failure
 
 (** [apply_blueprint ~config state payload] applies the blueprint [payload] on

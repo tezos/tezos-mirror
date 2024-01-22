@@ -13,6 +13,8 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
       (** Number for the next bluerpint to be produced. *)
+  mutable current_block_hash : Ethereum_types.block_hash;
+      (** Hash of the latest processed block *)
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
 }
 

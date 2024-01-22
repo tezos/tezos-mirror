@@ -547,6 +547,18 @@ let blueprint_number_arg =
        ~placeholder:"0"
        ~default:"0"
 
+let parent_hash_arg =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  parameter (fun _ hash -> return hash)
+  |> default_arg
+       ~long:"parent-hash"
+       ~doc:"Blueprint's parent hash"
+       ~placeholder:
+         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+       ~default:
+         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
 let secret_key_arg =
   let open Tezos_clic in
   (* This is `Bootstrap.bootstrap1.secret_key` in
@@ -926,13 +938,14 @@ let make_dev_messages ~kind ~smart_rollup_address s =
   let s = Ethereum_types.hex_of_string s in
   let*? messages =
     match kind with
-    | `Blueprint (secret_key, timestamp, number) ->
+    | `Blueprint (secret_key, timestamp, number, parent_hash) ->
         let Sequencer_blueprint.{to_publish; _} =
           Sequencer_blueprint.create
             ~secret_key
             ~timestamp
             ~smart_rollup_address
             ~number:(Ethereum_types.quantity_of_z number)
+            ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
             ~transactions:
               [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
             ~delayed_transactions:[]
@@ -953,12 +966,13 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args6
+    (args7
        devmode_arg
        rollup_address_arg
        blueprint_mode_arg
        timestamp_arg
        blueprint_number_arg
+       parent_hash_arg
        secret_key_arg)
     (prefixes ["chunk"; "data"]
     @@ param
@@ -971,12 +985,17 @@ let chunker_command =
            as_blueprint,
            blueprint_timestamp,
            blueprint_number,
+           blueprint_parent_hash,
            secret_key )
          data
          () ->
       let kind =
         if as_blueprint then
-          `Blueprint (secret_key, blueprint_timestamp, blueprint_number)
+          `Blueprint
+            ( secret_key,
+              blueprint_timestamp,
+              blueprint_number,
+              blueprint_parent_hash )
         else `Transaction
       in
       let print_chunks smart_rollup_address s =
