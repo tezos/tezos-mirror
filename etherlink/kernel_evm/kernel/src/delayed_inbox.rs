@@ -7,9 +7,9 @@ use crate::{
 use anyhow::Result;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
-    rlp_helpers::FromRlpBytes, transaction::TRANSACTION_HASH_SIZE,
-    tx_common::EthereumTransactionCommon,
+    transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
 };
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedTransaction>);
@@ -17,10 +17,10 @@ pub struct DelayedInbox(LinkedList<Hash, DelayedTransaction>);
 pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
 
 // Tag that indicates the delayed transaction is a eth transaction.
-pub const DELAYED_TRANSACTION_TAG: u8 = 0x00;
+pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
 
 // Tag that indicates the delayed transaction is a deposit.
-pub const DELAYED_DEPOSIT_TAG: u8 = 0x01;
+pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 
 /// Hash of a transaction
 ///
@@ -30,7 +30,7 @@ pub struct Hash([u8; TRANSACTION_HASH_SIZE]);
 
 impl Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.append(&self.0.to_vec());
+        s.encoder().encode_value(&self.0);
     }
 }
 
@@ -81,7 +81,7 @@ impl Decodable for DelayedTransaction {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if !decoder.item_count()? != 2 {
+        if decoder.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let tag: u8 = decoder.at(0)?.as_val()?;
@@ -93,9 +93,8 @@ impl Decodable for DelayedTransaction {
                 Ok(Self::Ethereum(delayed_tx))
             }
             DELAYED_DEPOSIT_TAG => {
-                let payload: Vec<u8> = payload.as_val()?;
-                let delayed_tx = FromRlpBytes::from_rlp_bytes(&payload)?;
-                Ok(DelayedTransaction::Deposit(delayed_tx))
+                let deposit = Deposit::decode(&payload)?;
+                Ok(DelayedTransaction::Deposit(deposit))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -119,6 +118,101 @@ impl DelayedInbox {
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
         };
         self.0.push(host, &Hash(tx_hash), &delayed_transaction)?;
+        log!(
+            host,
+            Info,
+            "Saved transaction {} in the delayed inbox",
+            hex::encode(tx_hash)
+        );
         Ok(())
+    }
+
+    pub fn find_and_remove_transaction<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        tx_hash: Hash,
+    ) -> Result<Option<Transaction>> {
+        log!(
+            host,
+            Info,
+            "Removing transaction {} from the delayed inbox",
+            hex::encode(tx_hash)
+        );
+        let tx = self.0.remove(host, &tx_hash)?.map(|delayed| match delayed {
+            DelayedTransaction::Ethereum(tx) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Ethereum(tx),
+            },
+            DelayedTransaction::Deposit(deposit) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Deposit(deposit),
+            },
+        });
+
+        Ok(tx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DelayedInbox;
+    use super::Hash;
+    use crate::inbox::Transaction;
+    use primitive_types::{H160, U256};
+
+    use crate::inbox::TransactionContent::Ethereum;
+    use tezos_ethereum::{
+        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    };
+
+    use tezos_smart_rollup_mock::MockHost;
+
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
+    }
+
+    fn tx_(i: u64) -> EthereumTransactionCommon {
+        EthereumTransactionCommon {
+            type_: tezos_ethereum::transaction::TransactionType::Legacy,
+            chain_id: Some(U256::one()),
+            nonce: U256::from(i),
+            max_priority_fee_per_gas: U256::from(40000000u64),
+            max_fee_per_gas: U256::from(40000000u64),
+            gas_limit: 21000u64,
+            to: address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
+            value: U256::from(500000000u64),
+            data: vec![],
+            access_list: vec![],
+            signature: None,
+        }
+    }
+
+    fn dummy_transaction(i: u8) -> Transaction {
+        Transaction {
+            tx_hash: [i; TRANSACTION_HASH_SIZE],
+            content: Ethereum(tx_(i.into())),
+        }
+    }
+
+    #[test]
+    fn test_delayed_inbox_roundtrip() {
+        let mut host = MockHost::default();
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+
+        let tx: Transaction = dummy_transaction(0);
+        delayed_inbox
+            .save_transaction(&mut host, tx.clone())
+            .expect("Tx should be saved in the delayed inbox");
+
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
+
+        let read_tx = delayed_inbox
+            .find_and_remove_transaction(&mut host, Hash(tx.tx_hash))
+            .expect("Reading from the delayed inbox should work")
+            .expect("Transaction should be in the delayed inbox");
+        assert_eq!(tx, read_tx)
     }
 }
