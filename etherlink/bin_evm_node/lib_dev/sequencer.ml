@@ -8,8 +8,6 @@
 module MakeBackend (Ctxt : sig
   val ctxt : Sequencer_context.t
 
-  val rollup_node_endpoint : Uri.t
-
   val secret_key : Signature.secret_key
 end) : Services_backend_sig.Backend = struct
   module READER = struct
@@ -46,11 +44,7 @@ end) : Services_backend_sig.Backend = struct
           ~transactions:messages
           ~number
       in
-      let* () =
-        Rollup_node_services.publish
-          ~rollup_node_endpoint:Ctxt.rollup_node_endpoint
-          inputs
-      in
+      let* () = Blueprints_publisher.publish next inputs in
       ctxt.next_blueprint_number <- Qty (Z.succ next) ;
       (* Execute the blueprint. *)
       let inputs =
@@ -75,8 +69,6 @@ end
 
 module Make (Ctxt : sig
   val ctxt : Sequencer_context.t
-
-  val rollup_node_endpoint : Uri.t
 
   val secret_key : Signature.secret_key
 end) =
