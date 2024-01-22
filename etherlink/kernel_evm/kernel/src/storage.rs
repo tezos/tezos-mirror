@@ -153,7 +153,7 @@ pub fn read_current_block_number<Host: Runtime>(host: &Host) -> Result<U256, Err
     Ok(U256::from_little_endian(&buffer))
 }
 
-pub fn read_current_block_hash<Host: Runtime>(host: &mut Host) -> Result<H256, Error> {
+pub fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
     let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_HASH)?;
     let mut buffer = [0_u8; 32];
     store_read_slice(host, &path, &mut buffer, 32)?;

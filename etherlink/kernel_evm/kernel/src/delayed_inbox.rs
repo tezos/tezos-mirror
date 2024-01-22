@@ -26,7 +26,7 @@ pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 /// Hash of a transaction
 ///
 /// It represents the key of the transaction in the delayed inbox.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hash(pub [u8; TRANSACTION_HASH_SIZE]);
 
 impl Encodable for Hash {

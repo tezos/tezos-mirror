@@ -7,10 +7,10 @@ use crate::error::{Error, StorageError};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::stage_one::Configuration;
 use crate::storage::{
-    read_current_block_number, read_rlp, store_read_slice, store_rlp, write_u256,
+    self, read_current_block_number, read_rlp, store_read_slice, store_rlp, write_u256,
 };
-use crate::DelayedInbox;
-use primitive_types::U256;
+use crate::{delayed_inbox, DelayedInbox};
+use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers;
 use tezos_evm_logging::{log, Level::*};
@@ -192,27 +192,76 @@ fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error>
     }
 }
 
+/// Possible errors when validating a blueprint
+/// Only used for test, as all errors are handled in the same way
+#[derive(Debug, PartialEq)]
+pub enum BlueprintValidity {
+    Valid(Blueprint),
+    InvalidParentHash,
+    DecoderError(DecoderError),
+    DelayedHashMissing(delayed_inbox::Hash),
+}
+
+/// Check that the parent hash of the [blueprint_with_hashes] is equal
+/// to the current block hash
+fn valid_parent_hash<Host: Runtime>(
+    host: &Host,
+    blueprint_with_hashes: &BlueprintWithDelayedHashes,
+) -> bool {
+    let genesis_parent = |_| {
+        H256::from_slice(
+            &hex::decode(
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            )
+            .unwrap(),
+        )
+    };
+    let current_block_hash =
+        storage::read_current_block_hash(host).unwrap_or_else(genesis_parent);
+    current_block_hash == blueprint_with_hashes.parent_hash
+}
+
 fn fetch_delayed_txs<Host: Runtime>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<Option<Blueprint>> {
+) -> anyhow::Result<BlueprintValidity> {
     let mut delayed_txs = vec![];
     for tx_hash in blueprint_with_hashes.delayed_hashes {
         let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
         match tx {
             Some(tx) => delayed_txs.push(tx),
-            None => return Ok(None),
+            None => return Ok(BlueprintValidity::DelayedHashMissing(tx_hash)),
         }
     }
     delayed_txs.extend(blueprint_with_hashes.blueprint.transactions);
-    Ok(Some(Blueprint {
+    Ok(BlueprintValidity::Valid(Blueprint {
         transactions: delayed_txs,
         timestamp: blueprint_with_hashes.blueprint.timestamp,
     }))
 }
 
-fn read_all_chunks<Host: Runtime>(
+fn parse_and_validate_blueprint<Host: Runtime>(
+    host: &mut Host,
+    bytes: &[u8],
+    delayed_inbox: &mut DelayedInbox,
+) -> anyhow::Result<BlueprintValidity> {
+    // Decode
+    match rlp::decode(bytes) {
+        Err(e) => Ok(BlueprintValidity::DecoderError(e)),
+        Ok(blueprint_with_hashes) => {
+            // Validate parent hash
+            if !valid_parent_hash(host, &blueprint_with_hashes) {
+                Ok(BlueprintValidity::InvalidParentHash)
+            } else {
+                // Fetch delayed transactions
+                fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)
+            }
+        }
+    }
+}
+
+fn read_all_chunks_and_validate<Host: Runtime>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
@@ -234,29 +283,25 @@ fn read_all_chunks<Host: Runtime>(
     match config {
         Configuration::Proxy => Ok(None),
         Configuration::Sequencer { delayed_inbox, .. } => {
-            // We flatten all reading/decoding errors into an Option
-            // Any such failure will be handled by removing the blueprint
-            let blueprint_with_hashes: Option<BlueprintWithDelayedHashes> =
-                rlp::decode(&chunks.concat()).ok();
-            let blueprint = blueprint_with_hashes.and_then(|blueprint| {
-                fetch_delayed_txs(host, blueprint, delayed_inbox)
-                    .ok()
-                    .flatten()
-            });
-            match blueprint {
-                Some(_) => (),
-                None => {
-                    log!(
-                        host,
-                        Info,
-                        "Deleting blueprint at path {} as it cannot be parsed",
-                        blueprint_path
-                    );
-                    // Remove invalid blueprint from storage
-                    host.store_delete(blueprint_path)?
-                }
-            };
-            Ok(blueprint)
+            let validity = parse_and_validate_blueprint(
+                host,
+                chunks.concat().as_slice(),
+                delayed_inbox,
+            )?;
+            if let BlueprintValidity::Valid(blueprint) = validity {
+                Ok(Some(blueprint))
+            } else {
+                log!(
+                    host,
+                    Info,
+                    "Deleting invalid blueprint at path {}, error: {:?}",
+                    blueprint_path,
+                    validity
+                );
+                // Remove invalid blueprint from storage
+                host.store_delete(blueprint_path)?;
+                Ok(None)
+            }
         }
     }
 }
@@ -274,7 +319,8 @@ pub fn read_next_blueprint<Host: Runtime>(
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
             // All chunks are available
-            let blueprint = read_all_chunks(host, &blueprint_path, nb_chunks, config)?;
+            let blueprint =
+                read_all_chunks_and_validate(host, &blueprint_path, nb_chunks, config)?;
             Ok(blueprint)
         } else {
             Ok(None)
@@ -293,6 +339,7 @@ pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
@@ -323,7 +370,7 @@ mod tests {
         };
 
         // Create empty blueprint with an invalid delayed hash
-        let empty_bluerpint = Blueprint {
+        let empty_blueprint = Blueprint {
             timestamp: Timestamp::from(42),
             transactions: vec![],
         };
@@ -339,22 +386,37 @@ mod tests {
             BlueprintWithDelayedHashes {
                 delayed_hashes: vec![dummy_tx_hash],
                 parent_hash: dummy_parent_hash,
-                blueprint: empty_bluerpint,
+                blueprint: empty_blueprint.clone(),
             };
-        let chunk = rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
+        let blueprint_with_hashes_bytes =
+            rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
         let signature = Signature::from_base58_check(
           "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
       ).expect("signature decoding should work");
 
         let seq_blueprint = SequencerBlueprint {
             blueprint: UnsignedSequencerBlueprint {
-                chunk: chunk.into(),
+                chunk: blueprint_with_hashes_bytes.clone().into(),
                 number: U256::from(0),
                 nb_chunks: 1u16,
                 chunk_index: 0u16,
             },
             signature,
         };
+
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+        // Blueprint should have invalid parent hash
+        let validity = parse_and_validate_blueprint(
+            &mut host,
+            blueprint_with_hashes_bytes.as_ref(),
+            &mut delayed_inbox,
+        )
+        .expect("Should be able to parse blueprint");
+        assert_eq!(
+            validity,
+            BlueprintValidity::DelayedHashMissing(dummy_tx_hash)
+        );
 
         // Store blueprint
         store_sequencer_blueprint(&mut host, seq_blueprint)
@@ -375,6 +437,57 @@ mod tests {
         let number = read_next_blueprint_number(&host)
             .expect("Should be able to read next blueprint number");
         assert!(number.is_zero());
+
+        // The blueprint 0 should have been removed
+        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        assert!(!exists);
+
+        // Test with invalid parent hash
+        let blueprint_with_invalid_parent_hash: BlueprintWithDelayedHashes =
+            BlueprintWithDelayedHashes {
+                delayed_hashes: vec![],
+                parent_hash: H256::zero(),
+                blueprint: empty_blueprint,
+            };
+        let blueprint_with_hashes_bytes =
+            rlp::Encodable::rlp_bytes(&blueprint_with_invalid_parent_hash);
+        let signature = Signature::from_base58_check(
+          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
+      ).expect("signature decoding should work");
+
+        let seq_blueprint = SequencerBlueprint {
+            blueprint: UnsignedSequencerBlueprint {
+                chunk: blueprint_with_hashes_bytes.clone().into(),
+                number: U256::from(0),
+                nb_chunks: 1u16,
+                chunk_index: 0u16,
+            },
+            signature,
+        };
+
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+        // Blueprint should have invalid parent hash
+        let validity = parse_and_validate_blueprint(
+            &mut host,
+            blueprint_with_hashes_bytes.as_ref(),
+            &mut delayed_inbox,
+        )
+        .expect("Should be able to parse blueprint");
+        assert_eq!(validity, BlueprintValidity::InvalidParentHash);
+
+        // Store blueprint
+        store_sequencer_blueprint(&mut host, seq_blueprint)
+            .expect("Should be able to store sequencer blueprint");
+        // Blueprint 0 should be stored
+        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        assert!(exists);
+
+        // Reading the next blueprint should be None, as the parent hash
+        // is invalid
+        let blueprint = read_next_blueprint(&mut host, &mut config)
+            .expect("Reading next blueprint should work");
+        assert!(blueprint.is_none());
 
         // The blueprint 0 should have been removed
         let exists = host.store_has(&blueprint_path).unwrap().is_some();
