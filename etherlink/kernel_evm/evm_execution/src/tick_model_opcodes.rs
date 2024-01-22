@@ -188,8 +188,9 @@ const MODEL_0X53: u64 = MODEL_0X52;
 // Average: 2178; Standard deviation: 51
 const MODEL_0X54: u64 = 2280;
 
-// Average: 6088; Standard deviation: 1032
-const MODEL_0X55: u64 = 8152;
+// Manually patched, the model is
+// constant in ticks: 567242 in average, 59454 as standard deviation
+const MODEL_0X55: u64 = 620_000;
 
 // Average: 954; Standard deviation: 0
 const MODEL_0X56: u64 = 954;
@@ -518,7 +519,7 @@ pub fn ticks(opcode: &Opcode, gas: u64) -> u64 {
         0x52 => MODEL_0X52 * gas,
         0x53 => MODEL_0X53 * gas,
         0x54 => MODEL_0X54 * gas,
-        0x55 => MODEL_0X55 * gas,
+        0x55 => MODEL_0X55, // Manually patched: the model is constant in ticks
         0x56 => MODEL_0X56 * gas,
         0x57 => MODEL_0X57 * gas,
         0x58 => MODEL_0X58 * gas,

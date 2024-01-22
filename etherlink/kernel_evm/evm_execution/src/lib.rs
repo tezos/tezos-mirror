@@ -709,7 +709,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 620000,
         }));
 
         assert_eq!(expected_result, result);
@@ -1405,7 +1405,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 962434148,
+            estimated_ticks_used: 428861740,
         }));
 
         // assert that call succeeds
