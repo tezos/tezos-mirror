@@ -59,7 +59,9 @@ let make_blueprint_chunks ~timestamp ~transactions =
          transactions)
   in
   let timestamp = Value (Helpers.timestamp_to_bytes timestamp) in
-  let blob = List [messages; timestamp] |> encode in
+  (* To be added in a future MR *)
+  let delayed_transaction_hashes = List [] in
+  let blob = List [delayed_transaction_hashes; messages; timestamp] |> encode in
   match String.chunk_bytes max_chunk_size blob with
   | Ok chunks -> chunks
   | Error _ ->
