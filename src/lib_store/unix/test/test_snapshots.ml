@@ -391,11 +391,7 @@ let make_tests speed genesis_parameters =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
   let {
     Parameters.constants =
-      {
-        Constants.Parametric.blocks_per_cycle;
-        blocks_preservation_cycles = preserved_cycles;
-        _;
-      };
+      {Constants.Parametric.blocks_per_cycle; blocks_preservation_cycles; _};
     _;
   } =
     genesis_parameters
@@ -406,13 +402,13 @@ let make_tests speed genesis_parameters =
     match speed with
     | `Slow ->
         [
-          preserved_cycles * blocks_per_cycle;
-          ((2 * preserved_cycles) + 1) * blocks_per_cycle;
+          blocks_preservation_cycles * blocks_per_cycle;
+          ((2 * blocks_preservation_cycles) + 1) * blocks_per_cycle;
           65;
           77;
           89;
         ]
-    | `Quick -> [((2 * preserved_cycles) + 1) * blocks_per_cycle; 77]
+    | `Quick -> [((2 * blocks_preservation_cycles) + 1) * blocks_per_cycle; 77]
   in
   let exporter_history_modes =
     let open History_mode in

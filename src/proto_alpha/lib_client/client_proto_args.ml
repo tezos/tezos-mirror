@@ -684,9 +684,9 @@ let preserved_levels_arg =
     ~default:"200"
     (Tezos_clic.parameter (fun _ s ->
          try
-           let preserved_cycles = int_of_string s in
-           if preserved_cycles < 0 then tzfail (Bad_preserved_levels s)
-           else return preserved_cycles
+           let preserved_levels = int_of_string s in
+           if preserved_levels < 0 then tzfail (Bad_preserved_levels s)
+           else return preserved_levels
          with _ -> tzfail (Bad_preserved_levels s)))
 
 let no_print_source_flag =
