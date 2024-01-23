@@ -589,8 +589,12 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
       Store.Shards.save_and_notify shard_store shards_watcher
     in
     fun Types.Message.{share; _} Types.Message_id.{commitment; shard_index; _} ->
-      Seq.return {Cryptobox.share; index = shard_index}
-      |> save_and_notify commitment |> Errors.to_tzresult
+      let res =
+        Seq.return {Cryptobox.share; index = shard_index}
+        |> save_and_notify commitment |> Errors.to_tzresult
+      in
+      Amplificator.amplify shard_store ;
+      res
   in
   Lwt.dont_wait
     (fun () ->
