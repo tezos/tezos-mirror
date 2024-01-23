@@ -49,6 +49,21 @@ val start :
   #Client_context.full ->
   t Lwt.t
 
+(** [create ~name ~reconnection_delay ?protocols cctxt] creates a Layer 1
+    context without connecting to a Tezos node. Use {!connect} to connect to
+    start monitoring heads. If [protocols] is provided, only heads of these
+    protocols will be monitored. *)
+val create :
+  name:string ->
+  reconnection_delay:float ->
+  ?protocols:Protocol_hash.t list ->
+  #Client_context.full ->
+  t
+
+(** Connect a Layer 1 context created with {!create} to the L1 node for
+    monitoring.  *)
+val connect : t -> t tzresult Lwt.t
+
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 
