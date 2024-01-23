@@ -230,7 +230,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     for tx_hash in blueprint_with_hashes.delayed_hashes {
         let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
         match tx {
-            Some(tx) => delayed_txs.push(tx),
+            Some(tx) => delayed_txs.push(tx.0),
             None => return Ok(BlueprintValidity::DelayedHashMissing(tx_hash)),
         }
     }
