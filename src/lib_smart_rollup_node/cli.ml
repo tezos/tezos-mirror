@@ -456,6 +456,12 @@ let uncompressed : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Produce an uncompressed snapshot."
     ()
 
+let compact : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"compact"
+    ~doc:"Produce a compact snapshot with a single commit for the context."
+    ()
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
