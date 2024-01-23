@@ -11,8 +11,8 @@ src_dir=$(dirname "$scripts_dir")
 script_inputs_dir="$src_dir/script-inputs"
 
 binaries="$(cat "$script_inputs_dir/released-executables")"
-deb_packages="$(ls ./octez-*.deb)"
-rpm_packages="$(ls ./octez-*.rpm)"
+deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"
+rpm_packages="$(find . -maxdepth 1 -name octez-\*.rpm)"
 
 ### Compute GitLab release names
 
