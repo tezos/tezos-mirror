@@ -7,6 +7,7 @@
 pub mod backend;
 pub mod bus;
 pub mod csregisters;
+mod interpreter;
 pub mod memory_backend;
 mod mode;
 pub mod registers;
