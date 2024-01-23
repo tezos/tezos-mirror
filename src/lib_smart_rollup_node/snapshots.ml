@@ -432,18 +432,22 @@ let operator_local_file_regexp =
 
 let snapshotable_files_regexp =
   Re.Str.regexp
-    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|context/.*\\|metadata$\\)"
+    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
-let export ~no_checks ~compression ~data_dir ~dest ~filename =
+let with_locks ~data_dir f =
+  Format.eprintf "Acquiring GC lock@." ;
+  (* Take GC lock first in order to not prevent progression of rollup node. *)
+  Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
+  Format.eprintf "Acquiring process lock@." ;
+  Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir) f
+
+let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
   let* snapshot_file =
-    Format.eprintf "Acquiring GC lock@." ;
-    (* Take GC lock first in order to not prevent progression of rollup node. *)
-    Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
-    Format.eprintf "Acquiring process lock@." ;
-    Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
-    @@ fun () ->
-    let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+    let with_locks =
+      if take_locks then with_locks ~data_dir else fun f -> f ()
+    in
+    with_locks @@ fun () ->
     let dest_file_name =
       match filename with
       | Some f ->
@@ -500,8 +504,97 @@ let export ~no_checks ~compression ~data_dir ~dest ~filename =
     | No | On_the_fly -> snapshot_file
     | After -> compress ~snapshot_file
   in
+  return snapshot_file
+
+let export ~no_checks ~compression ~data_dir ~dest ~filename =
+  let open Lwt_result_syntax in
+  let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+  let* snapshot_file =
+    export_dir metadata ~take_locks:true ~compression ~data_dir ~dest ~filename
+  in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
+
+let export_compact ~compression ~data_dir ~dest ~filename =
+  let open Lwt_result_syntax in
+  let* snapshot_metadata =
+    pre_export_checks_and_get_snapshot_metadata ~data_dir
+  in
+  Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
+  let tmp_context_dir = Configuration.default_context_dir tmp_dir in
+  let tmp_store_dir = Configuration.default_storage_dir tmp_dir in
+  let*! () = Lwt_utils_unix.create_dir tmp_context_dir in
+  let*! () = Lwt_utils_unix.create_dir tmp_store_dir in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  let context_dir = Configuration.default_context_dir data_dir in
+  let* store =
+    Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." data_dir
+    | Some m -> Ok m
+  in
+  let* head = get_head store in
+  let level = head.Sc_rollup_block.header.level in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store level
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
+  let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
+  let* first_level = first_available_level ~data_dir store in
+  let* first_block_hash =
+    Store.Levels_to_hashes.find store.levels_to_hashes first_level
+  in
+  let first_block_hash =
+    WithExceptions.Option.get first_block_hash ~loc:__LOC__
+  in
+  let* first_block = Store.L2_blocks.read store.l2_blocks first_block_hash in
+  let _, first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
+  Format.eprintf "Exporting context snapshot with first level %ld@." first_level ;
+  let* () =
+    Context.export_snapshot
+      context
+      (Smart_rollup_context_hash.to_context_hash first_block.context)
+      ~path:tmp_context_dir
+  in
+  let ( // ) = Filename.concat in
+  let copy_dir a =
+    let dir = data_dir // a in
+    if Sys.file_exists dir && Sys.is_directory dir then
+      copy_dir dir (tmp_dir // a)
+  in
+  let copy_file a =
+    let path = data_dir // a in
+    if Sys.file_exists path then copy_file ~src:path ~dst:(tmp_dir // a)
+  in
+  Format.eprintf "Acquiring process lock@." ;
+  let* () =
+    Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
+    @@ fun () ->
+    Format.eprintf "Copying data@." ;
+    Snapshot_utils.copy_dir store_dir tmp_store_dir ;
+    copy_file "metadata" ;
+    return_unit
+  in
+  copy_dir "wasm_2_0_0" ;
+  copy_dir "arith" ;
+  copy_dir "riscv" ;
+  let compression =
+    match compression with
+    | After ->
+        (* We've already copied data *)
+        On_the_fly
+    | _ -> compression
+  in
+  export_dir
+    snapshot_metadata
+    ~take_locks:false
+    ~compression
+    ~data_dir:tmp_dir
+    ~dest
+    ~filename
 
 let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
   let open Lwt_result_syntax in
