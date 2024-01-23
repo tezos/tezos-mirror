@@ -382,10 +382,7 @@ let data_dir_arg =
   Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the EVM node data directory. Default value is %s"
-         default)
+    ~doc:"The path to the EVM node data directory"
     ~default
     Params.string
 
@@ -496,10 +493,7 @@ let secret_key_arg =
   Params.secret_key
   |> default_arg
        ~long:"secret-key"
-       ~doc:
-         (Format.sprintf
-            "Unencrypted secret key to sign the blueprints,. Defaults to %s."
-            default_sk)
+       ~doc:"Unencrypted secret key to sign the blueprints."
        ~placeholder:"edsk..."
        ~default:default_sk
 
