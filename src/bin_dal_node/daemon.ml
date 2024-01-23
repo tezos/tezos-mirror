@@ -582,19 +582,19 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
+let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
   let open Gossipsub in
   let shards_handler ({shard_store; shards_watcher; _} : Store.node_store) =
     let save_and_notify =
       Store.Shards.save_and_notify shard_store shards_watcher
     in
     fun Types.Message.{share; _} Types.Message_id.{commitment; shard_index; _} ->
-      let res =
+      let open Lwt_result_syntax in
+      let* () =
         Seq.return {Cryptobox.share; index = shard_index}
         |> save_and_notify commitment |> Errors.to_tzresult
       in
-      Amplificator.amplify shard_store ;
-      res
+      Amplificator.amplify shard_store commitment node_ctxt
   in
   Lwt.dont_wait
     (fun () ->
@@ -735,7 +735,7 @@ let run ~data_dir configuration_override =
       metrics_server
   in
   let* rpc_server = RPC_server.(start config ctxt) in
-  connect_gossipsub_with_p2p gs_worker transport_layer store ;
+  connect_gossipsub_with_p2p gs_worker transport_layer store ctxt ;
   (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
