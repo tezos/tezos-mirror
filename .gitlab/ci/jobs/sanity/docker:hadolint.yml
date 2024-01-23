@@ -1,0 +1,11 @@
+# Templates in this file have almost all the elements of jobs: everything but `rules`.
+# They are intended to be extended into one MR pipeline job and one scheduled pipeline
+# job. See other files in this directory extending these templates.
+
+.docker:hadolint:
+  extends:
+    - .default_settings_template
+  image: hadolint/hadolint:2.9.3-debian
+  script:
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile

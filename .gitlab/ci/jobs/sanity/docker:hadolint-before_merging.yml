@@ -1,3 +1,5 @@
+include: .gitlab/ci/jobs/sanity/docker:hadolint.yml
+
 docker:hadolint-before_merging:
   extends:
     - .docker:hadolint

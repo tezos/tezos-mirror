@@ -146,14 +146,6 @@
   services:
     - docker:${DOCKER_VERSION}-dind
 
-.docker:hadolint:
-  extends:
-    - .default_settings_template
-  image: hadolint/hadolint:2.9.3-debian
-  script:
-    - hadolint build.Dockerfile
-    - hadolint Dockerfile
-
 .oc.misc_checks:
   extends:
     - .default_settings_template
