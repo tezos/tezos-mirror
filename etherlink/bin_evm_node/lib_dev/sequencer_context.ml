@@ -5,41 +5,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context = Tezos_context_disk.Context_binary
+module Bare_context = struct
+  module Tree = Irmin_context.Tree
 
-type index = Context.index
+  type t = Irmin_context.rw
 
-type store = Context.t
+  type index = Irmin_context.rw_index
 
-type evm_state = Context.tree
+  type nonrec tree = Irmin_context.tree
+
+  let init ?patch_context:_ ?readonly:_ ?index_log_size:_ path =
+    let open Lwt_syntax in
+    let* res = Irmin_context.load ~cache_size:100_000 Read_write path in
+    match res with
+    | Ok res -> return res
+    | Error _ -> Lwt.fail_with "could not initialize the context"
+
+  let empty index = Irmin_context.empty index
+end
+
+type evm_state = Irmin_context.PVMState.value
 
 type t = {
   data_dir : string;
-  index : index;
-  store : store;
-  evm_state : evm_state;
+  context : Irmin_context.rw;
   kernel : string;
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
 }
-
-(** The EVM/PVM local state used by the sequencer. *)
-module EVMState = struct
-  let key = ["evm_state"]
-
-  let get store =
-    let open Lwt_result_syntax in
-    let*! tree_opt = Context.find_tree store key in
-    match tree_opt with
-    | Some tree -> return tree
-    | None -> failwith "The EVM state was not found"
-
-  let set ctxt tree =
-    let open Lwt_syntax in
-    let* store = Context.add_tree ctxt.store key tree in
-    return {ctxt with store}
-end
 
 type metadata = {
   checkpoint : Context_hash.t;
@@ -74,29 +68,25 @@ let load_metadata ~data_dir index =
     let {checkpoint; next_blueprint_number} =
       Data_encoding.Json.destruct metadata_encoding content
     in
-    let*! store = Context.checkout_exn index checkpoint in
-    let* evm_state = EVMState.get store in
-    return (store, evm_state, next_blueprint_number, true)
+    let*! context = Irmin_context.checkout_exn index checkpoint in
+    return (context, next_blueprint_number, true)
   else
-    let store = Context.empty index in
-    let evm_state = Context.Tree.empty store in
-    return (store, evm_state, Ethereum_types.Qty Z.zero, false)
+    let context = Irmin_context.empty index in
+    return (context, Ethereum_types.Qty Z.zero, false)
 
 let init ~data_dir ~kernel ~preimages ~smart_rollup_address =
   let open Lwt_result_syntax in
-  let*! index = Context.init (store_path ~data_dir) in
-  let* store, evm_state, next_blueprint_number, loaded =
-    load_metadata ~data_dir index
+  let* index =
+    Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
   in
+  let* context, next_blueprint_number, loaded = load_metadata ~data_dir index in
   let smart_rollup_address =
     Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
   return
     ( {
-        index;
-        store;
+        context;
         data_dir;
-        evm_state;
         kernel;
         preimages;
         smart_rollup_address;
@@ -104,21 +94,28 @@ let init ~data_dir ~kernel ~preimages ~smart_rollup_address =
       },
       loaded )
 
-let commit ctxt evm_state =
+let commit (ctxt : t) evm_state =
   let open Lwt_result_syntax in
-  let*! ctxt = EVMState.set ctxt evm_state in
-  let*! checkpoint = Context.commit ~time:Time.Protocol.epoch ctxt.store in
+  let*! context = Irmin_context.PVMState.set ctxt.context evm_state in
+  let*! checkpoint = Irmin_context.commit context in
   let* () =
     store_metadata
       ~data_dir:ctxt.data_dir
       {checkpoint; next_blueprint_number = ctxt.next_blueprint_number}
   in
-  return {ctxt with evm_state}
+  return {ctxt with context}
 
 let sync ctxt =
   let open Lwt_result_syntax in
-  let*! () = Context.sync ctxt.index in
-  let* store, evm_state, next_blueprint_number, _loaded =
-    load_metadata ~data_dir:ctxt.data_dir ctxt.index
+  let* index =
+    Irmin_context.load
+      ~cache_size:100_000
+      Read_write
+      (store_path ~data_dir:ctxt.data_dir)
   in
-  return {ctxt with store; evm_state; next_blueprint_number}
+  let* context, next_blueprint_number, _loaded =
+    load_metadata ~data_dir:ctxt.data_dir index
+  in
+  return {ctxt with context; next_blueprint_number}
+
+let evm_state {context; _} = Irmin_context.PVMState.get context

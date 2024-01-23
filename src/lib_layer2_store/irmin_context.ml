@@ -68,6 +68,23 @@ type hash = Context_hash.t
 
 type path = string list
 
+module Tree :
+  Tezos_context_sigs.Context.TREE
+    with type tree = IStore.tree
+     and type key = string list
+     and type value = bytes
+     and type t = rw = struct
+  include IStoreTree
+
+  type t = rw
+
+  type tree = IStore.tree
+
+  type key = string list
+
+  type value = bytes
+end
+
 let () = assert (Context_hash.size = IStore.Hash.hash_size)
 
 let impl_name = "Irmin"
@@ -120,6 +137,13 @@ let checkout index key =
   | Some commit ->
       let tree = IStore.Commit.tree commit in
       return_some {index; tree}
+
+let checkout_exn index key =
+  let open Lwt_syntax in
+  let* context = checkout index key in
+  match context with
+  | Some context -> return context
+  | None -> Lwt.fail_with "No store found"
 
 let empty index = {index; tree = IStore.Tree.empty ()}
 
@@ -245,6 +269,13 @@ module PVMState = struct
   let empty () = IStore.Tree.empty ()
 
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
+
+  let get ctxt =
+    let open Lwt_syntax in
+    let* pvm_state = find ctxt in
+    match pvm_state with
+    | Some store -> return store
+    | None -> Lwt.fail_with "No pvm_state found"
 
   let lookup tree path = IStore.Tree.find tree path
 
