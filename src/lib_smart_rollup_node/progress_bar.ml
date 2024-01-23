@@ -65,13 +65,18 @@ module Lwt = struct
         ()
     in
     let display = Display.start ~config (Multi.line line) in
-    let [report] = Display.reporters display in
-    let* () = flush () in
-    let report n =
-      report n ;
-      flush ()
-    in
-    f report
+    Lwt.finalize
+      (fun () ->
+        let [report] = Display.reporters display in
+        let* () = flush () in
+        let report n =
+          report n ;
+          flush ()
+        in
+        f report)
+      (fun () ->
+        Display.finalise display ;
+        Lwt.return_unit)
 
   let with_reporter_no_tty {when_no_tty; _} f =
     let open Lwt_syntax in
