@@ -203,6 +203,106 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   let*! () = unlock node_ctxt in
   return_unit
 
+module For_snapshots = struct
+  let create_node_context cctxt current_protocol store context ~data_dir =
+    let open Lwt_result_syntax in
+    let loser_mode = Loser_mode.no_failures in
+    let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
+    let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
+    let index_buffer_size = Configuration.default_index_buffer_size in
+    let irmin_cache_size = Configuration.default_irmin_cache_size in
+    let l1_rpc_timeout = Configuration.default_l1_rpc_timeout in
+    let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+    let*? metadata =
+      match metadata with
+      | None -> error_with "Missing metadata file for snapshot node context"
+      | Some m -> Ok m
+    in
+    let mode = Configuration.Observer in
+    let*? operators =
+      Purpose.make_operator
+        ~needed_purposes:(Configuration.purposes_of_mode mode)
+        []
+    in
+    let config =
+      Configuration.
+        {
+          sc_rollup_address = metadata.rollup_address;
+          boot_sector_file = None;
+          operators;
+          rpc_addr = Configuration.default_rpc_addr;
+          rpc_port = Configuration.default_rpc_port;
+          metrics_addr = None;
+          reconnection_delay = 1.;
+          fee_parameters = Configuration.default_fee_parameters;
+          mode;
+          loser_mode;
+          dal_node_endpoint = None;
+          dac_observer_endpoint = None;
+          dac_timeout = None;
+          batcher = Configuration.default_batcher;
+          injector = Configuration.default_injector;
+          l1_blocks_cache_size;
+          l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
+          prefetch_blocks = None;
+          log_kernel_debug = false;
+          no_degraded = false;
+          gc_parameters = Configuration.default_gc_parameters;
+          history_mode = None;
+          cors = Resto_cohttp.Cors.default;
+          l1_rpc_timeout;
+          pre_images_endpoint = None;
+        }
+    in
+    let*? l1_ctxt =
+      Layer1.create
+        ~name:"smart_rollup_node.snapshot"
+        ~reconnection_delay:config.reconnection_delay
+        ~l1_blocks_cache_size
+        cctxt
+    in
+    let* lcc = Store.Lcc.read store.Store.lcc in
+    let lcc =
+      match lcc with
+      | Some lcc -> lcc
+      | None ->
+          {
+            commitment = metadata.genesis_info.commitment_hash;
+            level = metadata.genesis_info.level;
+          }
+    in
+    let* lpc = Store.Lpc.read store.Store.lpc in
+    let*! lockfile =
+      Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
+    in
+    let global_block_watcher = Lwt_watcher.create_input () in
+    return
+      {
+        config;
+        cctxt = (cctxt :> Client_context.full);
+        dal_cctxt = None;
+        dac_client = None;
+        data_dir;
+        l1_ctxt;
+        genesis_info = metadata.genesis_info;
+        lcc = Reference.new_ lcc;
+        lpc = Reference.new_ lpc;
+        private_info = Reference.new_ None;
+        kind = metadata.kind;
+        injector_retention_period = 0;
+        block_finality_time = 2;
+        lockfile;
+        store = Node_context.Node_store.of_store store;
+        context;
+        kernel_debug_logger = (fun _ -> Lwt.return_unit);
+        finaliser = Lwt.return;
+        current_protocol;
+        global_block_watcher;
+      }
+end
+
 module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
       kind =

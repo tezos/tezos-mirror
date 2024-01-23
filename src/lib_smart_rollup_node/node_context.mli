@@ -27,7 +27,7 @@
 
 (** This module describes the execution context of the node. *)
 
-type lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
 
 type genesis_info = Metadata.genesis_info = {
   level : int32;
@@ -61,6 +61,8 @@ module Node_store : sig
     'a store ->
     Configuration.history_mode option ->
     unit tzresult Lwt.t
+
+  val of_store : 'a Store.t -> 'a store
 end
 
 type debug_logger = string -> unit Lwt.t
