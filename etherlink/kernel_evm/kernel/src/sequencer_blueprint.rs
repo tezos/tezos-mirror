@@ -6,8 +6,60 @@ use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::Signature;
 use tezos_ethereum::rlp_helpers::{
-    self, append_u16_le, append_u256_le, decode_field_u16_le, decode_field_u256_le,
+    self, append_timestamp, append_u16_le, append_u256_le, decode_field_u16_le,
+    decode_field_u256_le, decode_timestamp,
 };
+
+use crate::{blueprint::Blueprint, delayed_inbox::Hash};
+
+#[derive(Debug, Clone)]
+pub struct BlueprintWithDelayedHashes {
+    pub delayed_hashes: Vec<Hash>,
+    pub blueprint: Blueprint,
+}
+
+impl Encodable for BlueprintWithDelayedHashes {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let BlueprintWithDelayedHashes {
+            delayed_hashes,
+            blueprint:
+                Blueprint {
+                    transactions,
+                    timestamp,
+                },
+        } = self;
+        stream.begin_list(3);
+        stream.append_list(delayed_hashes);
+        stream.append_list(transactions);
+        append_timestamp(stream, *timestamp);
+    }
+}
+
+impl Decodable for BlueprintWithDelayedHashes {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 3 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let delayed_hashes =
+            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "delayed_hashes")?;
+        let transactions =
+            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
+        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+
+        Ok(Self {
+            delayed_hashes,
+            blueprint: Blueprint {
+                transactions,
+                timestamp,
+            },
+        })
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct UnsignedSequencerBlueprint {
