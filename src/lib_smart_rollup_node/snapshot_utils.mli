@@ -72,3 +72,10 @@ val compress : snapshot_file:string -> string
 (** [read_metadata reader ~snapshot_file] reads the metadata from the snapshot
     file without extracting it. *)
 val read_metadata : reader -> snapshot_file:string -> snapshot_metadata
+
+(** [copy_file ~src ~dst] copies the file [src] to [dst]. *)
+val copy_file : src:string -> dst:string -> unit
+
+(** [copy_dir ?perm src dst] copies the content of directory [src] in the
+    directory [dst] (created with [perm], [0o755] by default). *)
+val copy_dir : ?perm:int -> string -> string -> unit
