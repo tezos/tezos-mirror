@@ -23,11 +23,13 @@ const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
 const commander = require('commander');
+const { mkdirSync } = require('node:fs')
 
 commander
     .usage('[OPTIONS]')
     .option('-i, --include <regex>', 'Only consider benchmark scripts matching <regex>')
     .option('-e, --exclude <regex>', 'Exclude benchmark scripts matching <regex>')
+    .option('-o, --output-dir <path>', "Output directory")
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -42,8 +44,9 @@ function filter_name(name) {
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
 const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
-const OUTPUT_DIRECTORY = external.output()
-
+const OUTPUT_DIRECTORY = commander.opts().outputDir ? commander.opts().outputDir : external.output()
+mkdirSync(OUTPUT_DIRECTORY, { recursive: true })
+console.log(`Output directory ${OUTPUT_DIRECTORY}`)
 
 function sumArray(arr) {
     return arr.reduce((acc, curr) => acc + curr, 0);
