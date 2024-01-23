@@ -612,12 +612,16 @@ mod tests {
         (host, list)
     }
 
+    fn elements() -> impl Strategy<Value = HashMap<[u8; TRANSACTION_HASH_SIZE], u8>> {
+        prop::collection::hash_map(any::<[u8; 32]>(), any::<u8>(), 1..10)
+    }
+
     proptest! {
 
         #![proptest_config(ProptestConfig::with_cases(50))]
 
         #[test]
-        fn test_pushed_elements_are_present(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_pushed_elements_are_present(elements in elements()) {
             let (host, list) = fill_list(&elements);
             for (id, elt) in & elements {
                 let read: u8 = list.find(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
@@ -625,9 +629,8 @@ mod tests {
             }
         }
 
-
         #[test]
-        fn test_push_element_create_non_empty_list(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_push_element_create_non_empty_list(elements in elements()) {
             let mut host = MockHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -651,7 +654,7 @@ mod tests {
         }
 
         #[test]
-        fn test_remove_returns_the_appropriate_element(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_remove_returns_the_appropriate_element(elements in elements()) {
             let (mut host, mut list) = fill_list(&elements);
             let mut length : u64 = elements.len().try_into().unwrap();
             for (id, elt) in &elements {
@@ -663,7 +666,7 @@ mod tests {
         }
 
         #[test]
-        fn test_remove_everything_creates_the_empty_list(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_remove_everything_creates_the_empty_list(elements in elements()) {
             let (mut host, mut list) = fill_list(&elements);
             for (id, _) in elements {
                 let _: u8 = list.remove(&mut host, &Hash(id)).expect("storage should work").expect("element should be present");
@@ -672,7 +675,7 @@ mod tests {
         }
 
         #[test]
-        fn test_list_is_kept_between_reboots(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_list_is_kept_between_reboots(elements in elements()) {
             let mut host = MockHost::default();
             let path = RefPath::assert_from(b"/list");
             for (id, elt) in &elements {
@@ -692,7 +695,7 @@ mod tests {
         }
 
         #[test]
-        fn test_pop_first_after_push(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_pop_first_after_push(elements in elements()) {
             let mut host = MockHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -705,7 +708,7 @@ mod tests {
         }
 
         #[test]
-        fn test_pop_first_keep_the_order(elements: HashMap<[u8; TRANSACTION_HASH_SIZE], u8>) {
+        fn test_pop_first_keep_the_order(elements in elements()) {
             let mut host = MockHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
