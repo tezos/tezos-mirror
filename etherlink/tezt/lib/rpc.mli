@@ -29,3 +29,7 @@ end
 (** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
     provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_block : ?timestamp:string -> Evm_node.t -> int32 Lwt.t
+
+(** [inject_upgrade ~payload evm_node] calls the private RPC [injectUpgrade].
+    It will store the [payload] under the kernel upgrade path. *)
+val inject_upgrade : payload:string -> Evm_node.t -> unit Lwt.t
