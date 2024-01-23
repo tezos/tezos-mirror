@@ -4,8 +4,7 @@
 # The objective is not to run computing when it is not
 # necessary and the decision to do so belongs to the developer
 #
-# §2: Gitlab CI needs at least one job definition, otherwise we're stuck with
-# this error: 'Jobs config should contain at least one visible job'
+# §2: We also perform some fast sanity checks.
 trigger:
   extends:
     - .default_settings_template
@@ -19,6 +18,9 @@ trigger:
   timeout: "10m"
   script:
     - echo 'Trigger pipeline 🤠'
+    # Check that .gitlab-ci.yml's  'build_deps_image_version' and
+    # 'scripts/version.sh's 'opam_repository_tag' are the same.
+    - ./scripts/ci/check_opam_repository_tag.sh
     # Check that the Alpine version of the trigger job's image
     # corresponds to the value in scripts/version.sh.
     - ./scripts/ci/check_alpine_version.sh
