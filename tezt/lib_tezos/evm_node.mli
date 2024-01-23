@@ -150,3 +150,10 @@ type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
 (** [txpool_content evm_node] returns the transaction hash and nonce
     contained in the `pending` and `queued` pools. *)
 val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
+
+(** [upgrade_payload ~root_hash ~activation_timestamp] gives the
+    upgrade payload to put in a upgrade message, it will upgrade to
+    [root_hash] at the first block after [activation_timestamp] (in
+    RFC3399 format). *)
+val upgrade_payload :
+  root_hash:string -> activation_timestamp:string -> string Lwt.t

@@ -10,8 +10,13 @@ use anyhow::Context;
 use rlp::Decodable;
 use rlp::DecoderError;
 use rlp::Encodable;
+use tezos_ethereum::rlp_helpers::append_timestamp;
+use tezos_ethereum::rlp_helpers::decode_field;
+use tezos_ethereum::rlp_helpers::decode_timestamp;
+use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -20,22 +25,37 @@ use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
     pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
+    pub activation_timestamp: Timestamp,
 }
 
 impl Decodable for KernelUpgrade {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        let hash: Vec<u8> = decoder.as_val()?;
-        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hash
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let preimage_hash: Vec<u8> = decode_field(&next(&mut it)?, "preimage_hash")?;
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = preimage_hash
             .try_into()
             .map_err(|_| DecoderError::RlpInvalidLength)?;
+        let activation_timestamp = decode_timestamp(&next(&mut it)?)?;
 
-        Ok(Self { preimage_hash })
+        Ok(Self {
+            preimage_hash,
+            activation_timestamp,
+        })
     }
 }
 
 impl Encodable for KernelUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
         stream.append_iter(self.preimage_hash);
+        append_timestamp(stream, self.activation_timestamp);
     }
 }
 
@@ -119,7 +139,10 @@ mod tests {
         let (preimage_hash, original_kernel) = preliminary_upgrade(&mut host);
         let preimage_hash = preimage_hash.into();
 
-        let kernel_upgrade = KernelUpgrade { preimage_hash };
+        let kernel_upgrade = KernelUpgrade {
+            preimage_hash,
+            activation_timestamp: Timestamp::from(0),
+        };
         store_kernel_upgrade(&mut host, &kernel_upgrade)
             .expect("It should be able to store");
 

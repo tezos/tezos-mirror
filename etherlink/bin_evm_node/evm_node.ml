@@ -330,6 +330,24 @@ module Params = struct
           else Time_between_blocks (Float.of_string s)
         in
         Lwt.return_ok time_between_blocks)
+
+  let timestamp =
+    let open Lwt_result_syntax in
+    Tezos_clic.parameter (fun _ timestamp ->
+        let timestamp = String.trim timestamp in
+        match Time.Protocol.of_notation timestamp with
+        | Some t -> return t
+        | None -> (
+            match
+              Int64.of_string_opt timestamp
+              |> Option.map Time.Protocol.of_seconds
+            with
+            | Some t -> return t
+            | None ->
+                failwith
+                  "Timestamp must be either in RFC3399 format  (e.g., \
+                   [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
+                   the {!Time.Protocol.epoch}."))
 end
 
 let rpc_addr_arg =
@@ -408,12 +426,6 @@ let rollup_address_arg =
        ~default:Tezos_crypto.Hashed.Smart_rollup_address.(to_b58check zero)
        ~placeholder:"sr1..."
 
-let data_parameter =
-  Tezos_clic.param
-    ~name:"data"
-    ~desc:"Data to prepare and chunk with the EVM rollup format"
-    Params.string
-
 let kernel_arg =
   Tezos_clic.arg
     ~long:"kernel"
@@ -451,22 +463,7 @@ let blueprint_mode_arg =
     ()
 
 let timestamp_arg =
-  let open Lwt_result_syntax in
-  let open Tezos_clic in
-  parameter (fun _ timestamp ->
-      let timestamp = String.trim timestamp in
-      match Time.Protocol.of_notation timestamp with
-      | Some t -> return t
-      | None -> (
-          match
-            Int64.of_string_opt timestamp |> Option.map Time.Protocol.of_seconds
-          with
-          | Some t -> return t
-          | None ->
-              failwith
-                "Timestamp must be either in RFC3399 format (e.g., \
-                 [\"1970-01-01T00:00:00Z\"]) or in number of seconds since the \
-                 {!Time.Protocol.epoch}."))
+  Params.timestamp
   |> Tezos_clic.default_arg
        ~long:"timestamp"
        ~doc:""
@@ -770,7 +767,12 @@ let chunker_command =
        timestamp_arg
        blueprint_number_arg
        secret_key_arg)
-    (prefixes ["chunk"; "data"] @@ data_parameter @@ stop)
+    (prefixes ["chunk"; "data"]
+    @@ param
+         ~name:"data"
+         ~desc:"Data to prepare and chunk with the EVM rollup format"
+         Params.string
+    @@ stop)
     (fun ( devmode,
            rollup_address,
            as_blueprint,
@@ -798,8 +800,40 @@ let chunker_command =
       in
       print_chunks rollup_address data)
 
+let make_upgrade_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Create bytes payload for the upgrade entrypoint"
+    no_options
+    (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
+    @@ param
+         ~name:"preimage_hash"
+         ~desc:"Root hash of the kernel to upgrade to"
+         Params.string
+    @@ prefixes ["at"; "activation"; "timestamp"]
+    @@ param
+         ~name:"activation_timestamp"
+         ~desc:
+           "After activation timestamp, the kernel will upgrade to this value"
+         Params.timestamp
+    @@ stop)
+    (fun () root_hash activation_timestamp () ->
+      let open Rlp in
+      let activation_timestamp =
+        Evm_node_lib_dev.Helpers.timestamp_to_bytes activation_timestamp
+      in
+      let root_hash_bytes = Hex.to_bytes_exn (`Hex root_hash) in
+      let kernel_upgrade =
+        List [Value root_hash_bytes; Value activation_timestamp]
+      in
+      let payload = encode kernel_upgrade in
+      Printf.printf "%s" Hex.(of_bytes payload |> show) ;
+      return_unit)
+
 (* List of program commands *)
-let commands = [proxy_command; sequencer_command; chunker_command]
+let commands =
+  [proxy_command; sequencer_command; chunker_command; make_upgrade_command]
 
 let global_options = Tezos_clic.no_options
 

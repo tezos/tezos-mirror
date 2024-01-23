@@ -112,6 +112,7 @@ val setup_l1 :
 (** [originate_sc_rollup] is a wrapper above {!Client.originate_sc_rollup} that
     waits for the block to be included. *)
 val originate_sc_rollup :
+  ?keys:string list ->
   ?hooks:Process_hooks.t ->
   ?burn_cap:Tez.t ->
   ?whitelist:string list ->

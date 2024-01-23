@@ -242,7 +242,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Originates the bridge. *)
   let* bridge =
@@ -255,7 +255,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Originates the administrator contract. *)
   let* admin =
@@ -268,7 +268,7 @@ let setup_l1_contracts ~admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   return {exchanger; bridge; admin}
 
@@ -342,6 +342,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
   in
   let* sc_rollup_address =
     originate_sc_rollup
+      ~keys:[]
       ~kind:pvm_kind
       ~boot_sector:("file:" ^ output)
       ~parameters_ty:evm_type
@@ -352,7 +353,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   (* EVM Kernel installation level. *)
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   let* mode =
@@ -593,7 +594,7 @@ let test_originate_evm_kernel =
   @@ fun ~protocol:_ ~evm_setup:{client; node; sc_rollup_node; _} ->
   (* First run of the installed EVM kernel, it will initialize the directory
      "eth_accounts". *)
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* first_evm_run_level = Node.get_level node in
   let* level =
     Sc_rollup_node.wait_for_level
@@ -1961,7 +1962,7 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~evm_node ~sc_rollup_node
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   unit
@@ -2184,7 +2185,8 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
+let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0")
+    ?(from_ghostnet = false) ?evm_setup ?rollup_address ?(should_fail = false)
     ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
@@ -2198,7 +2200,12 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
        } =
     match evm_setup with
     | Some evm_setup -> return evm_setup
-    | None -> setup_evm_kernel ?with_administrator ~admin:(Some admin) protocol
+    | None ->
+        setup_evm_kernel
+          ?timestamp
+          ?with_administrator
+          ~admin:(Some admin)
+          protocol
   in
   let l1_contracts =
     match l1_contracts with
@@ -2209,8 +2216,12 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     Option.value ~default:sc_rollup_address rollup_address
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
+  let* payload =
+    let* {root_hash; _} =
+      Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
+    in
+    if from_ghostnet then return root_hash
+    else Evm_node.upgrade_payload ~root_hash ~activation_timestamp
   in
   let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
@@ -2224,7 +2235,7 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
         ~amount:Tez.zero
         ~giver:upgrador.public_key_hash
         ~receiver:l1_contracts.admin
-        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address root_hash)
+        ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
         ~burn_cap:Tez.one
         client
     in
@@ -2236,25 +2247,6 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
     ~error_msg:(sf "Unexpected `boot.wasm`.") ;
   return
     (sc_rollup_node, node, client, evm_node, kernel_boot_wasm_before_upgrade)
-
-let test_kernel_upgrade_to_debug =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["debug"; "upgrade"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-        Constant.WASM.debug_kernel;
-      ])
-    ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
-  @@ fun protocol ->
-  let* _ =
-    gen_test_kernel_upgrade ~installee:Constant.WASM.debug_kernel protocol
-  in
-  unit
 
 let test_kernel_upgrade_evm_to_evm =
   Protocol.register_test
@@ -2597,6 +2589,7 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   (* Upgrade the kernel. *)
   let* _ =
     gen_test_kernel_upgrade
+      ~from_ghostnet:true
       ~evm_setup
       ~installee:Constant.WASM.evm_kernel
       ~admin
@@ -2742,7 +2735,7 @@ let test_deposit_dailynet =
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap1.public_key_hash
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   let* () =
     Sc_rollup_node.run
@@ -2980,6 +2973,69 @@ let test_kernel_upgrade_version_change =
     unit
   in
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+
+(** This tests that giving epoch (or any timestamps from the past) as
+    the activation timestamp results in a immediate upgrade. *)
+let test_kernel_upgrade_epoch =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "upgrade"; "timestamp"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
+      ])
+    ~title:"Upgrade immediatly when activation timestamp is epoch"
+  @@ fun protocol ->
+  let* _ =
+    gen_test_kernel_upgrade
+      ~activation_timestamp:"0"
+      ~installee:Constant.WASM.debug_kernel
+      protocol
+  in
+  unit
+
+(** This tests that the kernel waits the activation timestamp to apply
+    the upgrade.  *)
+let test_kernel_upgrade_delay =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "upgrade"; "timestamp"; "delay"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
+      ])
+    ~title:"Upgrade after a delay when activation timestamp is in the future"
+  @@ fun protocol ->
+  let timestamp = Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z")) in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  (* It shoulnd't be upgrade in a single block, which {!gen_test_kernel_upgrade}
+     expect. *)
+  let* sc_rollup_node, node, client, evm_node, _ =
+    gen_test_kernel_upgrade
+      ~timestamp
+      ~activation_timestamp
+      ~installee:Constant.WASM.debug_kernel
+      ~should_fail:true
+      protocol
+  in
+  let* _ =
+    repeat 5 (fun _ ->
+        let* _ = next_evm_level ~sc_rollup_node ~node ~client ~evm_node in
+        unit)
+  in
+  let kernel_debug_content = read_file (Uses.path Constant.WASM.debug_kernel) in
+  let* kernel = get_kernel_boot_wasm ~sc_rollup_node in
+  Check.((kernel <> kernel_debug_content) string)
+    ~error_msg:(sf "The kernel hasn't upgraded") ;
+  unit
 
 let test_transaction_storage_before_and_after_migration =
   Protocol.register_test
@@ -4138,7 +4194,8 @@ let register_evm_node ~protocols =
   test_deposit_and_withdraw protocols ;
   test_estimate_gas protocols ;
   test_estimate_gas_additionnal_field protocols ;
-  test_kernel_upgrade_to_debug protocols ;
+  test_kernel_upgrade_epoch protocols ;
+  test_kernel_upgrade_delay protocols ;
   test_kernel_upgrade_evm_to_evm protocols ;
   test_kernel_upgrade_wrong_key protocols ;
   test_kernel_upgrade_wrong_rollup_address protocols ;

@@ -360,6 +360,7 @@ mod tests {
     use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
+    use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [
@@ -520,8 +521,13 @@ mod tests {
         .unwrap()
         .try_into()
         .unwrap();
+        let activation_timestamp = Timestamp::from(0i64);
 
-        let kernel_upgrade_payload = preimage_hash.to_vec();
+        let kernel_upgrade = KernelUpgrade {
+            preimage_hash,
+            activation_timestamp,
+        };
+        let kernel_upgrade_payload = kernel_upgrade.rlp_bytes().to_vec();
 
         // Create a transfer from the bridge contract, that act as the
         // dictator (or administrator).
@@ -543,7 +549,11 @@ mod tests {
             read_inbox(&mut host, [0; 20], None, Some(sender), None, None)
                 .unwrap()
                 .unwrap();
-        let expected_upgrade = Some(KernelUpgrade { preimage_hash });
+        let expected_upgrade = Some(KernelUpgrade {
+            preimage_hash,
+            activation_timestamp,
+        });
+
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
 

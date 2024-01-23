@@ -245,8 +245,8 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
-let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
-    ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
+let originate_sc_rollup ?keys ?hooks ?(burn_cap = Tez.(of_int 9999999))
+    ?whitelist ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
     ?(parameters_ty = "string") ?(boot_sector = default_boot_sector_of ~kind)
     client =
   let* sc_rollup =
@@ -262,7 +262,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
         ~boot_sector
         client)
   in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ?keys client in
   return sc_rollup
 
 (* Configuration of a rollup node

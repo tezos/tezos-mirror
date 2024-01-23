@@ -7,14 +7,15 @@
 
 use crate::apply::{apply_transaction, ExecutionInfo};
 use crate::blueprint_storage::{drop_head_blueprint, read_next_blueprint};
-use crate::current_timestamp;
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::init_account_index;
+use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
+use crate::{current_timestamp, upgrade};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
@@ -131,9 +132,18 @@ fn next_bip_from_blueprints<Host: Runtime>(
     current_constants: &BlockConstants,
     tick_counter: &TickCounter,
     config: &mut Configuration,
+    kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<Option<BlockInProgress>, anyhow::Error> {
     match read_next_blueprint(host, config)? {
         Some(blueprint) => {
+            if let Some(kernel_upgrade) = kernel_upgrade {
+                if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
+                    upgrade::upgrade(host, kernel_upgrade.preimage_hash)?;
+                    // We abort the call, as there is no blueprint to execute,
+                    // the kernel will reboot.
+                    return Ok(None);
+                }
+            }
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
                 current_block_number,
@@ -202,6 +212,8 @@ pub fn produce<Host: KernelRuntime>(
     base_fee_per_gas: U256,
     config: &mut Configuration,
 ) -> Result<ComputationResult, anyhow::Error> {
+    let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
+
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
             Ok(block) => (
@@ -254,6 +266,7 @@ pub fn produce<Host: KernelRuntime>(
         &current_constants,
         &tick_counter,
         config,
+        &kernel_upgrade,
     )? {
         match compute_bip(
             host,
