@@ -33,6 +33,7 @@ type error +=
   | Invalid_shards_commitment_association
   | Invalid_degree_strictly_less_than_expected of {given : int; expected : int}
   | Prover_SRS_not_loaded
+  | Invalid_number_of_needed_shards of int
 
 let () =
   register_error_kind
@@ -144,6 +145,32 @@ let polynomial_from_shards cryptobox shards =
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
       Error [Merging_failed msg]
+
+let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
+  let open Lwt_result_syntax in
+  let*? shards =
+    Seq_s.take
+      ~when_negative_length:
+        [Invalid_number_of_needed_shards number_of_needed_shards]
+      number_of_needed_shards
+      shards
+  in
+  (* Note: this [seq_of_seq_s] function consumes the input sequence
+     and resolves all its promises. It's OK here because we capped the
+     size of the input to number_of_needed_shards which is reasonably
+     small. *)
+  let rec seq_of_seq_s (s : 'a Seq_s.t) : 'a Seq.t Lwt.t =
+    let open Lwt_syntax in
+    let* n = s () in
+    match n with
+    | Nil -> return (fun () -> Seq.Nil)
+    | Cons (x, s) ->
+        let* s = seq_of_seq_s s in
+        return (fun () -> Seq.Cons (x, s))
+  in
+  let*! shards = seq_of_seq_s shards in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
+  return polynomial
 
 let commit cryptobox polynomial =
   match Cryptobox.commit cryptobox polynomial with

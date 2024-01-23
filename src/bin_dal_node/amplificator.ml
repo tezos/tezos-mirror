@@ -26,5 +26,18 @@ let amplify (shard_store : Store.Shards.t) commitment node_ctxt =
          should have already been started previously. *)
       if number_of_already_stored_shards <> number_of_needed_shards then
         return_unit
-      else (* We have enough shards to reconstruct the whole slot. *)
+      else
+        (* We have enough shards to reconstruct the whole slot. *)
+        let shards =
+          Store.Shards.read_all shard_store commitment ~number_of_shards
+          |> Seq_s.filter_map (function
+                 | _, index, Ok share -> Some Cryptobox.{index; share}
+                 | _ -> None)
+        in
+        let* _polynomial =
+          Slot_manager_legacy.polynomial_from_shards_lwt
+            cryptobox
+            shards
+            ~number_of_needed_shards
+        in
         return_unit

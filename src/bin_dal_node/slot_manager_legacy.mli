@@ -73,3 +73,12 @@ val save_shards :
   Cryptobox.commitment ->
   Cryptobox.shard Seq.t ->
   unit tzresult Lwt.t
+
+(* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
+   tzresult. The argument [number_of_needed_shards] is used to cap the
+   number of Lwt promises resolved from the shard sequence. *)
+val polynomial_from_shards_lwt :
+  Cryptobox.t ->
+  Cryptobox.shard Seq_s.t ->
+  number_of_needed_shards:int ->
+  Cryptobox.polynomial tzresult Lwt.t
