@@ -10,7 +10,7 @@
     "carbonated_map/find/traversal_overhead": 2,
     "carbonated_map/fold_const": 50,
     "carbonated_map/fold_cost_per_item": 24,
-    "dal/publish_slot_header_const": 16300000,
+    "dal/publish_slot_header_const": 1160000,
     "encoding/B58CHECK_DECODING_CHAIN_ID_const": 1600,
     "encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_bls_const": 3600,
     "encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519_const": 3300,
