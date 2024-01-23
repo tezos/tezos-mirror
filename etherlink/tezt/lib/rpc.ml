@@ -58,11 +58,17 @@ module Syntax = struct
     | Error err -> f err
 end
 
-let produce_block_request =
-  Evm_node.{method_ = "produceBlock"; parameters = `Null}
+let produce_block_request ?timestamp () =
+  let parameters =
+    match timestamp with None -> `Null | Some timestamp -> `String timestamp
+  in
+  Evm_node.{method_ = "produceBlock"; parameters}
 
-let produce_block evm_node =
+let produce_block ?timestamp evm_node =
   let* json =
-    Evm_node.call_evm_rpc ~private_:true evm_node produce_block_request
+    Evm_node.call_evm_rpc
+      ~private_:true
+      evm_node
+      (produce_block_request ?timestamp ())
   in
   return JSON.(json |-> "result" |> as_string |> Int32.of_string)
