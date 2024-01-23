@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,6 +42,7 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | D_Ticket
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
@@ -378,6 +380,7 @@ let string_of_prim prim =
   | D_Some -> "D_Some"
   | D_True -> "D_True"
   | D_Unit -> "D_Unit"
+  | D_Ticket -> "D_Ticket"
   | I_PACK -> "I_PACK"
   | I_UNPACK -> "I_UNPACK"
   | I_BLAKE2B -> "I_BLAKE2B"
@@ -537,7 +540,7 @@ let kind (x : prim) =
   match x with
   | K_parameter | K_storage | K_code -> Keyword_kind
   | D_Hole | D_False | D_Elt | D_Left | D_None | D_Pair | D_Right | D_Some
-  | D_True | D_Unit ->
+  | D_True | D_Unit | D_Ticket ->
       Data_kind
   | I_PACK | I_UNPACK | I_BLAKE2B | I_SHA256 | I_SHA512 | I_ABS | I_ADD
   | I_AMOUNT | I_AND | I_BALANCE | I_CAR | I_CDR | I_CHAIN_ID

@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,6 +50,7 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | D_Ticket
   | D_Lambda_rec
   | I_PACK
   | I_UNPACK
@@ -206,7 +208,7 @@ type namespace =
 let namespace = function
   | K_code | K_view | K_parameter | K_storage -> Keyword_namespace
   | D_Elt | D_False | D_Left | D_None | D_Pair | D_Right | D_Some | D_True
-  | D_Unit | D_Lambda_rec ->
+  | D_Unit | D_Lambda_rec | D_Ticket ->
       Constant_namespace
   | I_ABS | I_ADD | I_ADDRESS | I_AMOUNT | I_AND | I_APPLY | I_BALANCE
   | I_BLAKE2B | I_CAR | I_CAST | I_CDR | I_CHAIN_ID | I_CHECK_SIGNATURE
@@ -262,6 +264,7 @@ let string_of_prim = function
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
+  | D_Ticket -> "Ticket"
   | D_Lambda_rec -> "Lambda_rec"
   | I_PACK -> "PACK"
   | I_UNPACK -> "UNPACK"
@@ -423,6 +426,7 @@ let prim_of_string =
   | "Some" -> return D_Some
   | "True" -> return D_True
   | "Unit" -> return D_Unit
+  | "Ticket" -> return D_Ticket
   | "Lambda_rec" -> return D_Lambda_rec
   | "PACK" -> return I_PACK
   | "UNPACK" -> return I_UNPACK
@@ -792,9 +796,11 @@ let prim_encoding =
          ("LAMBDA_REC", I_LAMBDA_REC);
          ("TICKET", I_TICKET);
          ("BYTES", I_BYTES);
-         ("NAT", I_NAT)
+         ("NAT", I_NAT);
+         (* Alpha_019 addition *)
+         ("Ticket", D_Ticket);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
-         (* Keep the comment above at the end of the list *);
+         (* Keep the comment above at the end of the list *)
        ]
 
 let () =
