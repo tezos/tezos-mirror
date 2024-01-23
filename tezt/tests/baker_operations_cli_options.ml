@@ -158,7 +158,7 @@ let with_http_server file presence f =
   in
   Lwt.finalize
     (fun () ->
-      let base_uri = sf "http://localhost:%d/" port in
+      let base_uri = sf "http://%s:%d/" Constant.default_host port in
       f base_uri)
     (fun () ->
       Lwt.wakeup_later http_server_stopper () ;

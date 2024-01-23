@@ -2792,7 +2792,9 @@ let test_reveals_fetch_remote =
     ~root:pre_images_dir
     ~on_request:(fun _ -> fetched := true)
   @@ fun () ->
-  let pre_images_endpoint = sf "http://localhost:%d" provider_port in
+  let pre_images_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
   Log.info "Run rollup node." ;
   let* () =
     Sc_rollup_node.run

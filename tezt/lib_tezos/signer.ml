@@ -38,7 +38,7 @@ module Parameters = struct
   let base_default_name = "signer"
 
   let default_uri () =
-    Uri.make ~scheme:"http" ~host:"localhost" ~port:(Port.fresh ()) ()
+    Uri.make ~scheme:"http" ~host:Constant.default_host ~port:(Port.fresh ()) ()
 
   let default_colors =
     Log.Color.
@@ -120,7 +120,9 @@ let run signer =
   | Running _ -> Test.fail "signer %s is already running" signer.name) ;
   let runner = signer.persistent_state.runner in
   let host =
-    Option.value ~default:"localhost" (Uri.host signer.persistent_state.uri)
+    Option.value
+      ~default:Constant.default_host
+      (Uri.host signer.persistent_state.uri)
   in
   let port_args =
     match Uri.port signer.persistent_state.uri with

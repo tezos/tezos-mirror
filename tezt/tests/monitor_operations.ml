@@ -83,7 +83,9 @@ let monitor_operations =
   (* Step 2 *)
   (* call the monitor_operations RPC *)
   let monitor_path =
-    sf "http://localhost:%d/chains/main/mempool/monitor_operations"
+    sf
+      "http://%s:%d/chains/main/mempool/monitor_operations"
+      Constant.default_host
     @@ Node.rpc_port node
   in
   let proc_monitor = Process.spawn "curl" [monitor_path] in

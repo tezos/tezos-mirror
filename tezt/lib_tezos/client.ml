@@ -188,7 +188,7 @@ let endpoint_arg ?(endpoint : endpoint option) client =
   (* pass [?endpoint] first: it has precedence over client.mode *)
   match either endpoint (mode_to_endpoint client.mode) with
   | None -> []
-  | Some e -> ["--endpoint"; string_of_endpoint ~hostname:true e]
+  | Some e -> ["--endpoint"; string_of_endpoint e]
 
 let media_type_arg client =
   match client with

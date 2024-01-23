@@ -867,7 +867,8 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     (* To test the monitor_operations rpc we use curl since the client does
        not support streaming RPCs yet. *)
     sf
-      "http://localhost:%d/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true"
+      "http://%s:%d/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true"
+      Constant.default_host
       (get_client_port client)
   in
   let proc_monitor =

@@ -58,7 +58,7 @@ let test_preflight =
   let* node, _client =
     Client.init_with_protocol ~nodes_args `Client ~protocol ()
   in
-  let origin = "localhost" in
+  let origin = Constant.default_host in
   let port = Node.rpc_port node in
   let headers =
     [
@@ -91,7 +91,7 @@ let test_request =
   let* node, _client =
     Client.init_with_protocol ~nodes_args `Client ~protocol ()
   in
-  let origin = "localhost" in
+  let origin = Constant.default_host in
   let port = Node.rpc_port node in
   let headers = [("Origin", origin); ("Content-Type", "application/json")] in
   let uri =

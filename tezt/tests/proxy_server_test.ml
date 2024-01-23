@@ -240,7 +240,7 @@ let test_proxy_server_serve_unsupported =
   let p =
     sf
       "http://%s:%d/chains/main/blocks/head/header"
-      "localhost"
+      Constant.default_host
       (Proxy_server.rpc_port _ps)
   in
   let r = Process.spawn "curl" ["-v"; p] in
