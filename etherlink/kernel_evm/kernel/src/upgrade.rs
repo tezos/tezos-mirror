@@ -65,6 +65,13 @@ pub fn store_kernel_upgrade<Host: Runtime>(
     host: &mut Host,
     kernel_upgrade: &KernelUpgrade,
 ) -> Result<(), anyhow::Error> {
+    log!(
+        host,
+        Info,
+        "An upgrade to {} is planned for {}",
+        hex::encode(kernel_upgrade.preimage_hash),
+        kernel_upgrade.activation_timestamp
+    );
     let path = OwnedPath::from(KERNEL_UPGRADE);
     let bytes = &kernel_upgrade.rlp_bytes();
     host.store_write_all(&path, bytes)
