@@ -123,7 +123,7 @@ let setup_sequencer ?time_between_blocks
     in
     Evm_node.Sequencer
       {
-        kernel = output;
+        initial_kernel = output;
         preimage_dir = preimages_dir;
         private_rpc_port;
         time_between_blocks;
