@@ -35,6 +35,10 @@ Node
 - Introduced a new ``--local-rpc-addr`` that starts the RPC server
   locally, not using the dedicated RPC-process.
 
+- Added ``--max-active-rpc-connections <NUM>`` that limits the number
+  of active RPC connections per server to the provided argument. The
+  default limit is set to 100.
+
 Client
 ------
 
