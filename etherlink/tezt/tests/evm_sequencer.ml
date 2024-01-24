@@ -570,6 +570,58 @@ let test_delayed_transfer_is_included =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+(** test to initialise a sequencer data dir based on a rollup node
+        data dir *)
+let test_init_from_rollup_node_data_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rollup_node"; "init"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Init evm node sequencer data dir from a rollup node data dir"
+  @@ fun protocol ->
+  let* {sc_rollup_node; evm_node; client; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  (* a sequencer is needed to produce an initial block *)
+  let* () =
+    repeat 5 (fun () ->
+        let* _l2_lvl = Rpc.produce_block evm_node in
+        let* _lvl = Client.bake_for_and_wait client in
+        let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+        unit)
+  in
+  let* () = Evm_node.terminate evm_node in
+  let* proxy_node =
+    Evm_node.init
+      ~mode:(Proxy {devmode = false})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let evm_node' =
+    Evm_node.create
+      ~mode:(Evm_node.mode evm_node)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
+  let* () = Evm_node.run evm_node' in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy_node in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
+  Check.((sequencer_head.number = rollup_node_head.number) int32)
+    ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
+  let* _l2_lvl = Rpc.produce_block evm_node in
+  let* _lvl = Client.bake_for_and_wait client in
+  let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy_node in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
+  Check.((sequencer_head.number = rollup_node_head.number) int32)
+    ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
+  unit
+
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
@@ -578,4 +630,5 @@ let () =
   test_send_transaction_to_delayed_inbox [Alpha] ;
   test_send_deposit_to_delayed_inbox [Alpha] ;
   test_rpc_produceBlock [Alpha] ;
-  test_delayed_transfer_is_included [Alpha]
+  test_delayed_transfer_is_included [Alpha] ;
+  test_init_from_rollup_node_data_dir [Alpha]

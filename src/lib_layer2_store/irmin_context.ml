@@ -195,6 +195,22 @@ let is_gc_finished index = IStore.Gc.is_finished index.repo
 
 let index context = context.index
 
+let export_snapshot {index = {path = _; repo}; _} context_hash ~path =
+  let open Lwt_result_syntax in
+  let*! commit_opt =
+    IStore.Commit.of_hash repo (hash_to_istore_hash context_hash)
+  in
+  match commit_opt with
+  | None ->
+      failwith
+        "Cannot export context snapshot: unknown context hash %a"
+        Context_hash.pp
+        context_hash
+  | Some commit ->
+      let h = IStore.Commit.key commit in
+      let*! () = IStore.create_one_commit_store repo h path in
+      return_unit
+
 module Proof (Hash : sig
   type t
 
