@@ -236,12 +236,25 @@ end = struct
        see the {bitset} field. *)
     bitset : Lwt_bytes.t;
     (* This bitset encodes which values are present. *)
+    count : int;
+    (* The number of values. This is the same as the number of bits which are
+       set in the bitset. *)
     cache : 'value Cache.t;
     (* This cache keeps in memory values accessed recently. It is bounded by the
        maximum number of values the file can contain. It is cleaned up only once
        the file is removed from the LRU (see {lru}). *)
     lru_node : string LRU.node; (* LRU node associated with the current file. *)
   }
+
+  let number_of_set_bits (bitset : Lwt_bytes.t) size : int =
+    let count = ref 0 in
+    for i = 0 to size - 1 do
+      (* We don't count the entries being concurrently written (byte
+         `\002`) as present because reading them now would fail with a
+         Corrupted_data error. *)
+      if bitset.{i} = '\001' then count := !count + 1
+    done ;
+    !count
 
   (* This datatype represents a virtual file and its current status (opening,
      opened, closing). *)
@@ -412,7 +425,8 @@ end = struct
     let open Lwt_syntax in
     let index = layout.index_of key in
     let filepath = layout.filepath in
-    match (key_exists opened_file index, override) with
+    let key_already_present = key_exists opened_file index in
+    match (key_already_present, override) with
     | `Corrupted, false ->
         Lwt.return
           ( opened_file,
@@ -458,6 +472,12 @@ end = struct
               Lwt_bytes.blit_from_bytes bytes 0 mmap 0 layout.value_size ;
               Cache.replace opened_file.cache index data ;
               opened_file.bitset.{index} <- '\001' ;
+              (* If the key was not yet present, increment the [count] field *)
+              let opened_file =
+                if key_already_present = `Not_found then
+                  {opened_file with count = opened_file.count + 1}
+                else opened_file
+              in
               return (opened_file, Ok ())))
 
   let remove_with_opened_file files lru filepath opened_file =
@@ -642,7 +662,14 @@ end = struct
         ~size:bitset_size
         ()
     in
-    return {fd; bitset; cache = Cache.create 101; lru_node}
+    return
+      {
+        fd;
+        bitset;
+        count = number_of_set_bits bitset bitset_size;
+        cache = Cache.create 101;
+        lru_node;
+      }
 
   (* This function aims to be used when a write action is performed on
      a file that does not exist yet. *)
@@ -658,7 +685,7 @@ end = struct
     let bitset =
       Lwt_bytes.map_file ~fd:unix_fd ~shared:true ~size:bitset_size ()
     in
-    return {fd; bitset; cache = Cache.create 101; lru_node}
+    return {fd; bitset; count = 0; cache = Cache.create 101; lru_node}
 
   (* This function is associated with the [Read] and [Value_exists] actions. *)
   let may_load_file files last_actions lru filepath =
