@@ -114,7 +114,14 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
   in
   Lwt.catch
     (fun () ->
-      let*! () = RPC_server.launch ~host server ~callback mode in
+      let*! () =
+        RPC_server.launch
+          ~host
+          server
+          ~callback
+          ~max_active_connections:params.config.rpc.max_active_rpc_connections
+          mode
+      in
       return server)
     (function
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
