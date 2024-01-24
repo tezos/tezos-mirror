@@ -6,7 +6,7 @@ Some of these tools are included in the Octez repository, because of a close cou
 They provide, for example, support for profiling or for benchmarking different subsystems of Octez.
 
 On the other hand, contributing to the development of the Octez repository requires installing some additional infrastructure, which is not needed by regular Octez users.
-For instance, developers need Python for building the documentation, and also because :src:`the pre-commit hook <scripts/pre_commit/pre_commit.py>` (which executes some custom checks before committing changes) is currently written in Python.
+For instance, developers need Python for building the documentation.
 
 The tools for platform developers, as well as the configuration of the additional infrastructure, are documented in the following pages.
 

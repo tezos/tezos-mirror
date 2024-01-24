@@ -309,18 +309,3 @@ Regression tests are registered with ``Regression.register`` instead of
 ``Test.register``. Use ``Regression.capture`` or ``Regression.hooks`` to
 capture output that you want to be stable. Regression tests can be used
 both in unit tests and integration tests.
-
-Pre-commit hook
----------------
-
-The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
-hook located in :src:`scripts/pre_commit/pre_commit.py`
-executes modified Tezt tests automatically. It looks for staged files
-(the default) or modified files (if ``--unstaged`` is passed) in
-:src:`tezt/tests` and executes them. This avoids
-pushing commits that will break the CI. It is also handy to execute
-the relevant subset of tests by calling
-``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
-
-We refer to the header of ``pre_commit.py`` and its ``--help`` flag
-for additional instructions.
