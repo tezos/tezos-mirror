@@ -13,6 +13,8 @@
 - Fix a bug where creating a create a contract with not enough funds was allowed. (!11526)
 - Hands the return to the current context when the creation of a contract fails. (!11546)
 - Fix a bug where for non-existing address default hash was used rather than zero hash. (!11665)
+- Fix a bug where nonce and code shouldn't be set when SELFDESTRUCT is called
+  in initialisation code. (!11637)
 
 ### Breaking changes
 
