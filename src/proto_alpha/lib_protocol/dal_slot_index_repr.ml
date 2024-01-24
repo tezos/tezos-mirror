@@ -84,3 +84,5 @@ let slots_range ~number_of_slots ~lower ~upper =
 
 let slots_range_opt ~number_of_slots ~lower ~upper =
   Option.of_result @@ slots_range ~number_of_slots ~lower ~upper
+
+let is_succ t ~succ = Compare.Int.(t + 1 = succ)

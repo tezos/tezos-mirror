@@ -70,3 +70,6 @@ val slots_range :
     [None] instead of an error. *)
 val slots_range_opt :
   number_of_slots:int -> lower:int -> upper:int -> t list option
+
+(** [is_succ elt ~succ] returns true if and only if elt + 1 = succ. *)
+val is_succ : t -> succ:t -> bool
