@@ -603,7 +603,15 @@ let run ~data_dir configuration_override =
 
              Additionally, we set [max_sent_iwant_per_heartbeat = 0]
              so bootstrap nodes do not download any shards via IHave/IWant
-             transfers. *)
+             transfers.
+
+             Also, we set [prune_backoff = 10] so that bootstrap nodes send PX
+             peers quicker. In particular, we want to avoid the following
+             scenario: a peer receives a Prune from the bootstrap node, then
+             disconnects for some reason and reconnects within the backoff
+             period; with a large backoff, its first Graft will be answered with
+             a no PX Prune, and therefore the peer will have to wait for the new
+             backoff timeout to be able to obtain PX peers. *)
           {
             limits with
             max_sent_iwant_per_heartbeat = 0;
@@ -612,6 +620,7 @@ let run ~data_dir configuration_override =
             degree_out = 0;
             degree_optimal = 0;
             degree_score = 0;
+            prune_backoff = Ptime.Span.of_int_s 10;
           }
       | Operator _ -> limits
     in
