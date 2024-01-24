@@ -127,6 +127,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap1) client =
 
 let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
@@ -147,6 +148,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
       ~sequencer_administrator:l1_contracts.sequencer_admin
+      ?delayed_inbox_timeout
       ()
   in
   let config =
