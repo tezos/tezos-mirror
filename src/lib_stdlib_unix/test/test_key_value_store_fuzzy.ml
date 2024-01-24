@@ -427,47 +427,39 @@ let run_scenario
   let right = R.init ~lru_size layout_of in
   let action, next_actions = scenario in
   let n = ref 0 in
-  let compare_result ~finalization (file, key) left_result right_result =
-    let finalization = if finalization then "(finalization) " else "" in
+  let compare_tzresult finalization pp_while pp_val left_result right_result =
+    let pp_result fmt = function
+      | Ok v -> pp_val fmt v
+      | Error err -> Error_monad.pp_print_trace fmt err
+    in
+    let fail () =
+      failwith
+        "%s Unexpected different value while %a.@.For run %d at %s:@.Expected: \
+         %a@.Got: %a@."
+        finalization
+        pp_while
+        ()
+        !n
+        dir_path
+        pp_result
+        right_result
+        pp_result
+        left_result
+    in
     match (left_result, right_result) with
     | Ok left_value, Ok right_value ->
-        if left_value = right_value then return_unit
-        else
-          failwith
-            "%s Unexpected different value while reading key %s/%d.@.For run \
-             %d at %s:@.Expected: %s@.Got: %s@."
-            finalization
-            file
-            key
-            !n
-            dir_path
-            (Bytes.to_string right_value)
-            (Bytes.to_string left_value)
+        if left_value = right_value then return_unit else fail ()
     | Error _, Error _ -> return_unit
-    | Ok value, Error err ->
-        failwith
-          "%s Unexpected different result while reading key %s/%d.@. For run \
-           %d at %s:@.Expected: %a@.Got: %s"
-          finalization
-          file
-          key
-          !n
-          dir_path
-          Error_monad.pp_print_trace
-          err
-          (Bytes.to_string value)
-    | Error err, Ok value ->
-        failwith
-          "%s Unexpected different result while reading key %s/%d.@. For run \
-           %d at %s:@.Expected: %s@.Got: %a"
-          finalization
-          file
-          key
-          !n
-          dir_path
-          (Bytes.to_string value)
-          Error_monad.pp_print_trace
-          err
+    | Ok _, Error _ | Error _, Ok _ -> fail ()
+  in
+  let compare_result ~finalization (file, key) left_result right_result =
+    let finalization = if finalization then "(finalization) " else "" in
+    compare_tzresult
+      finalization
+      (fun fmt () -> Format.fprintf fmt "reading key %s/%d" file key)
+      (fun fmt b -> Format.fprintf fmt "%s" (Bytes.to_string b))
+      left_result
+      right_result
   in
   let rec run_actions action next_actions promises_running_seq =
     incr n ;
