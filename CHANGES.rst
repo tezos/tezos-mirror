@@ -54,6 +54,10 @@ Node
   RPC. Instead, use the ``/monitor/applied_blocks`` RPC that has the
   same behaviour.
 
+- Added ``--max-active-rpc-connections <NUM>`` that limits the number
+  of active RPC connections per server to the provided argument. The
+  default limit is set to 100.
+
 Client
 ------
 
