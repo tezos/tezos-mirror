@@ -304,3 +304,9 @@ module Acl = struct
     in
     Internal_for_test.resolve_domain_names resolve
 end
+
+let launch ?host server ?conn_closed ?callback ?(max_active_connections = 100)
+    mode =
+  (* TODO: backport max_active_connections in resto *)
+  Conduit_lwt_unix.set_max_active max_active_connections ;
+  launch ?host server ?conn_closed ?callback mode
