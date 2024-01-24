@@ -3,15 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
+use crate::blueprint_storage::{
+    store_immediate_blueprint, store_inbox_blueprint, store_sequencer_blueprint,
+};
 use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
 use crate::read_last_info_per_level_timestamp;
-use crate::Timestamp;
 use anyhow::Ok;
+use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -40,6 +42,39 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     Ok(())
 }
 
+fn fetch_timed_out_transactions<Host: Runtime>(
+    host: &mut Host,
+    delayed_inbox: &mut DelayedInbox,
+) -> anyhow::Result<()> {
+    let timeout = crate::storage::delayed_inbox_timeout(host)?;
+    let timestamp = current_timestamp(host);
+    // Number for the first forced blueprint
+    let base = crate::blueprint_storage::read_next_blueprint_number(host)?;
+    // Accumulator of how many blueprints we fetched
+    let mut offset: u32 = 0;
+
+    while let Some(timed_out) =
+        delayed_inbox.next_delayed_inbox_blueprint(host, timestamp, timeout)?
+    {
+        log!(
+            host,
+            Info,
+            "Creating blueprint from timed out delayed transactions of length {}",
+            timed_out.len()
+        );
+        // Create a new blueprint with the timed out transactions
+        let blueprint = Blueprint {
+            transactions: timed_out,
+            timestamp,
+        };
+        // Store the blueprint.
+        store_immediate_blueprint(host, blueprint, base.add(offset))?;
+        offset += 1;
+    }
+
+    Ok(())
+}
+
 fn fetch_sequencer_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
@@ -58,23 +93,27 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         Some(delayed_bridge),
         Some(sequencer),
     )? {
-        let timestamp = read_last_info_per_level_timestamp(host)
-            .unwrap_or_else(|_| Timestamp::from(0));
+        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         // Store the transactions in the delayed inbox.
         for transaction in transactions {
-            delayed_inbox.save_transaction(host, transaction, timestamp)?;
+            delayed_inbox.save_transaction(host, transaction, previous_timestamp)?;
         }
-
-        // Store the blueprints.
-        for seq_blueprint in sequencer_blueprints {
-            log!(
-                host,
-                Debug,
-                "Storing chunk {} of sequencer blueprint number {}",
-                seq_blueprint.blueprint.chunk_index,
-                seq_blueprint.blueprint.number
-            );
-            store_sequencer_blueprint(host, seq_blueprint)?
+        // Check if there are timed-out transactions in the delayed inbox
+        let timed_out = delayed_inbox.first_has_timed_out(host)?;
+        if timed_out {
+            fetch_timed_out_transactions(host, delayed_inbox)?
+        } else {
+            // Store the sequencer blueprints.
+            for seq_blueprint in sequencer_blueprints {
+                log!(
+                    host,
+                    Debug,
+                    "Storing chunk {} of sequencer blueprint number {}",
+                    seq_blueprint.blueprint.chunk_index,
+                    seq_blueprint.blueprint.number
+                );
+                store_sequencer_blueprint(host, seq_blueprint)?
+            }
         }
     }
     Ok(())
