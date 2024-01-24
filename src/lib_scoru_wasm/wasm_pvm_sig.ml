@@ -64,6 +64,7 @@ module type Internal_for_tests = sig
   val compute_step_many_until :
     wasm_entrypoint:string ->
     ?max_steps:int64 ->
+    ?hooks:Hooks.t ->
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     (pvm_state -> bool Lwt.t) ->
@@ -71,8 +72,6 @@ module type Internal_for_tests = sig
     (tree * int64) Lwt.t
 
   include Unsafe with type tree := tree
-
-  include Wasm_vm_sig.Internal_for_tests with type state := tree
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)

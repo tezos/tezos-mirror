@@ -274,13 +274,20 @@ let apply_fast ?(images = Preimage_map.empty) tree =
         | Some preimage -> Lwt.return preimage)
     | _ -> Stdlib.failwith "only reveal_preimage is available"
   in
+  let hooks =
+    Hooks.(
+      no_hooks
+      |> on_fast_exec_completed (fun () ->
+             run_counter := Int32.succ !run_counter ;
+             Lwt_syntax.return_unit))
+  in
   let+ tree =
     Wasm_utils.eval_until_input_requested
       ~reveal_builtins:(Some reveal_builtins)
         (* We override the builtins to provide our own [reveal_preimage]
            implementation. This allows us to rune Fast Exec with
            kernels that want to reveal stuff. *)
-      ~after_fast_exec:(fun () -> run_counter := Int32.succ !run_counter)
+      ~hooks
       ~fast_exec:true
       ~max_steps:Int64.max_int
       tree
