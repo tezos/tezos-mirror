@@ -3168,4 +3168,43 @@ mod test {
 
         assert_eq!(H256::zero(), hash)
     }
+
+    #[test]
+    fn create_contract_with_selfdestruct_init_code() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+        let withdrawal_contract =
+            H160::from_str("2adc25665018aa1fe0e6bc666dac8fc2697ff9ba").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::one(),
+        );
+
+        set_balance(&mut handler, &caller, U256::from(1000000000));
+
+        let code = hex::decode("732adc25665018aa1fe0e6bc666dac8fc2697ff9baff00").unwrap(); // transfer balance to 0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba and selfdestruct
+
+        let result = handler
+            .create_contract(caller, Some(U256::one()), code, None)
+            .unwrap();
+
+        let suicided_contract = result.new_address.unwrap();
+
+        assert_eq!(result.reason, ExitReason::Succeed(ExitSucceed::Suicided));
+        assert_eq!(get_balance(&mut handler, &withdrawal_contract), U256::one());
+        assert_eq!(get_balance(&mut handler, &caller), U256::from(999999999));
+        assert!(!handler.exists(suicided_contract));
+    }
 }
