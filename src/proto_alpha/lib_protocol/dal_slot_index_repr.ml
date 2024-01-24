@@ -58,7 +58,7 @@ let check_is_in_range ~number_of_slots slot_index =
   error_unless
     Compare.Int.(slot_index >= zero && slot_index < number_of_slots)
     (Invalid_slot_index
-       {given = slot_index; min = zero; max = number_of_slots + 1})
+       {given = slot_index; min = zero; max = number_of_slots - 1})
 
 let of_int ~number_of_slots slot_index =
   let open Result_syntax in
