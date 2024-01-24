@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-KERNELS=evm_kernel.wasm sequenced_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf jstz
+KERNELS=evm_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf jstz
 SDK_DIR=src/kernel_sdk
 RISC_V_DIR=src/risc_v
 RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
@@ -12,7 +12,6 @@ RISC_V_JSTZ_DIR=src/risc_v/jstz
 RISC_V_TESTS_DIR=src/risc_v/tests
 EVM_DIR=etherlink/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
-SEQUENCER_DIR=src/kernel_sequencer
 EVM_KERNEL_PREIMAGES=_evm_installer_preimages
 EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
@@ -81,11 +80,6 @@ sequencer.wasm::
 	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
 
-sequenced_kernel.wasm:
-	@make -C src/kernel_sequencer build
-	@cp src/kernel_sequencer/target/wasm32-unknown-unknown/release/examples/sequenced_kernel.wasm $@
-	@wasm-strip $@
-
 .PHONY: tx_demo_collector
 tx_demo_collector:
 	@make -C src/kernel_tx_demo build
@@ -136,14 +130,12 @@ clang-supports-wasm:
 build-dev-deps: clang-supports-wasm build-deps
 	@make -C ${SDK_DIR} build-dev-deps
 	@make -C ${EVM_DIR} build-dev-deps
-	@make -C ${SEQUENCER_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
 
 .PHONY: build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
 	@make -C ${EVM_DIR} build-deps
-	@make -C ${SEQUENCER_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
 	@make -C ${RISC_V_DIR} build-deps
 
@@ -156,7 +148,6 @@ test:
 	@make -C ${SDK_DIR} test
 	@make -C ${RISC_V_DIR} test
 	@make -C ${EVM_DIR} test
-	@make -C ${SEQUENCER_DIR} test
 	@make -C ${DEMO_DIR} test
 
 .PHONY: check
@@ -164,7 +155,6 @@ check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_DIR} check
 	@make -C ${EVM_DIR} check
-	@make -C ${SEQUENCER_DIR} check
 	@make -C ${DEMO_DIR} check
 	@make -C ${RISC_V_TESTS_DIR} check
 
@@ -185,7 +175,6 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${RISC_V_DIR} clean
 	@make -C ${EVM_DIR} clean
-	@make -C ${SEQUENCER_DIR} clean
 	@make -C ${DEMO_DIR} clean
 	@rm -rf ${EVM_KERNEL_PREIMAGES}
 	@rm -f risc-v-sandbox
