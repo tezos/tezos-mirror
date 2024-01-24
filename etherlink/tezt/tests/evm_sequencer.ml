@@ -17,6 +17,15 @@ open Sc_rollup_helpers
 open Rpc.Syntax
 open Contract_path
 
+module Sequencer_rpc = struct
+  let get_blueprint evm_node number =
+    Runnable.run
+    @@ Curl.get
+         ~args:["--fail"]
+         (Evm_node.endpoint evm_node ^ "/sequencer/blueprint/"
+        ^ Int64.to_string number)
+end
+
 let uses _protocol =
   [
     Constant.octez_smart_rollup_node;
@@ -279,6 +288,43 @@ let test_resilient_to_rollup_node_disconnect =
 
   unit
 
+let test_can_fetch_blueprint =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "data"]
+    ~title:"Sequencer can provide blueprints on demand"
+    ~uses
+  @@ fun protocol ->
+  let* {evm_node; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
+  let number_of_blocks = 5 in
+  let* _ =
+    repeat number_of_blocks (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
+
+  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. evm_node 5 in
+
+  let* blueprints =
+    fold number_of_blocks [] (fun i acc ->
+        let* blueprint =
+          Sequencer_rpc.get_blueprint evm_node Int64.(of_int @@ (i + 1))
+        in
+        return (blueprint :: acc))
+  in
+
+  (* Test for uniqueness  *)
+  let blueprints_uniq =
+    List.sort_uniq
+      (fun b1 b2 -> String.compare (JSON.encode b1) (JSON.encode b2))
+      blueprints
+  in
+  if List.length blueprints = List.length blueprints_uniq then unit
+  else
+    Test.fail
+      ~__LOC__
+      "At least two blueprints from a different level are equal."
+
 let test_send_transaction_to_delayed_inbox =
   Protocol.register_test
     ~__FILE__
@@ -398,6 +444,7 @@ let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
   test_resilient_to_rollup_node_disconnect [Alpha] ;
+  test_can_fetch_blueprint [Alpha] ;
   test_send_transaction_to_delayed_inbox [Alpha] ;
   test_send_deposit_to_delayed_inbox [Alpha] ;
   test_rpc_produceBlock [Alpha]

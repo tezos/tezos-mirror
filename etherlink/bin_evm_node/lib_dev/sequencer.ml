@@ -60,8 +60,9 @@ end) : Services_backend_sig.Backend = struct
       in
 
       if Z.(equal (succ before_height) after_height) then (
-        let*! () = Blueprint_event.blueprint_produced next in
+        let* () = Blueprint_store.store ctxt inputs (Qty after_height) in
         ctxt.next_blueprint_number <- Qty (Z.succ after_height) ;
+        let*! () = Blueprint_event.blueprint_produced next in
         let _ = Sequencer_context.commit ctxt evm_state in
         let* () = Blueprints_publisher.publish next inputs in
         return_unit)
