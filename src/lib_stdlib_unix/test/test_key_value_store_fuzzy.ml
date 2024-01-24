@@ -82,6 +82,8 @@ module type S = sig
     ('file * 'key * 'value tzresult) Seq_s.t
 
   val remove_file : ('file, 'key, 'value) t -> 'file -> unit tzresult Lwt.t
+
+  val count_values : ('file, 'key, 'value) t -> 'file -> int tzresult Lwt.t
 end
 
 let value_size = 1
@@ -121,6 +123,13 @@ module R : S = struct
       (fun (file', _) value -> if file = file' then None else Some value)
       t ;
     Lwt.return (Ok ())
+
+  let count_values t file =
+    Lwt_result_syntax.return
+    @@ Stdlib.Hashtbl.fold
+         (fun (file', _) _ count -> if file = file' then count + 1 else count)
+         t
+         0
 end
 
 module Helpers = struct
@@ -158,6 +167,7 @@ module Helpers = struct
     | Read_value of key
     | Read_values of key Seq.t
     | Remove_file of string
+    | Count_values of string
 
   let seq_gen ~size_seq value_gen =
     let open QCheck2.Gen in
@@ -205,6 +215,7 @@ module Helpers = struct
         in
         Format.fprintf fmt "R[%s]" str_keys
     | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
+    | Count_values file -> Format.fprintf fmt "COUNT[file=%s]" file
 
   type bind = Sequential | Parallel
 
@@ -504,6 +515,17 @@ let run_scenario
           let right_promise = R.remove_file right file in
 
           tzjoin [left_promise; right_promise]
+      | Count_values file ->
+          let left_promise = L.count_values left file in
+          let right_promise = R.count_values right file in
+          let*! left_result = left_promise in
+          let*! right_result = right_promise in
+          compare_tzresult
+            ""
+            (fun fmt () -> Format.fprintf fmt "counting values in file %s" file)
+            (fun fmt -> Format.fprintf fmt "%d")
+            left_result
+            right_result
     in
     let finalize () =
       let left = L.init ~lru_size:number_of_files layout_of in
