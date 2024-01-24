@@ -9,7 +9,7 @@ documentation:build_all:
     - .tags_template__build
     - .needs__trigger
     - .rules__octez_docs_changes
-  stage: build
+  stage: doc
   before_script:
     - eval $(opam env)
     - . $HOME/.venv/bin/activate
