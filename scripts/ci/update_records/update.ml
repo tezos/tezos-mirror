@@ -2,27 +2,21 @@ open Tezt
 open Base
 open Tezt_gitlab
 
-let usage () =
-  prerr_endline
-    {|Usage: dune exec scripts/ci/update_records/update.exe -- -a from=[<PIPELINE_ID> | last-merged-pipeline]
+let section =
+  Clap.section
+    "UPDATE TEZT RECORDS"
+    ~description:
+      {|Update records in tezt/records by fetching them from a pipeline.
 
-Example: to fetch test result records from
-https://gitlab.com/tezos/tezos/-/pipelines/426773806, run
-(from the root of the repository):
+Example: to fetch test result records from https://gitlab.com/tezos/tezos/-/pipelines/426773806, run (from the root of the repository):
 
-dune exec scripts/ci/update_records/update.exe -- -a from=426773806
+dune exec scripts/ci/update_records/update.exe -- --from 426773806
 
-You can use the PROJECT environment variable to specify which GitLab
-repository to fetch records from. Default is: tezos/tezos
+You can use the PROJECT environment variable to specify which GitLab repository to fetch records from. Default is: tezos/tezos
 
-The script can also be used to fetch records from the last successful pipeline on the
-latest MR merged to the default branch (configurable through the DEFAULT_BRANCH
-environment variable) for a given PROJECT:
+The script can also be used to fetch records from the last successful pipeline on the latest MR merged to the default branch (configurable through the DEFAULT_BRANCH environment variable) for a given PROJECT:
 
-dune exec scripts/ci/update_records/update.exe -- -a from=last-merged-pipeline
-
-|} ;
-  exit 1
+dune exec scripts/ci/update_records/update.exe -- --from last-merged-pipeline|}
 
 let project = Sys.getenv_opt "PROJECT" |> Option.value ~default:"tezos/tezos"
 
@@ -84,19 +78,35 @@ let fetch_pipeline_records_from_jobs pipeline =
 
 type from = Pipeline of int | Last_merged_pipeline
 
-let cli_get_from =
-  match Cli.get ~default:None (fun s -> Some (Some s)) "from" with
-  | Some "last-merged-pipeline" -> Last_merged_pipeline
-  | Some s -> (
-      match int_of_string_opt s with Some i -> Pipeline i | None -> usage ())
-  | None -> usage ()
+let cli_from_type =
+  let parse = function
+    | "last-merged-pipeline" -> Some Last_merged_pipeline
+    | s -> Option.map (fun x -> Pipeline x) (int_of_string_opt s)
+  in
+  let show = function
+    | Pipeline id -> string_of_int id
+    | Last_merged_pipeline -> "last-merged-pipeline"
+  in
+  Clap.typ ~name:"from" ~dummy:Last_merged_pipeline ~parse ~show
+
+let cli_from =
+  Clap.default
+    cli_from_type
+    ~section
+    ~long:"from"
+    ~placeholder:"PIPELINE"
+    ~description:
+      "The ID of the pipeline to fetch records from. Also accepts \
+       'last-merged-pipeline', which denotes the last pipeline for the latest \
+       merge commit on the default branch."
+    Last_merged_pipeline
 
 let () =
   (* Register a test to benefit from error handling of Test.run,
      as well as [Background.start] etc. *)
   ( Test.register ~__FILE__ ~title:"update records" ~tags:["update"] @@ fun () ->
     let* new_records =
-      match cli_get_from with
+      match cli_from with
       | Pipeline pipeline_id -> fetch_pipeline_records_from_jobs pipeline_id
       | Last_merged_pipeline ->
           let* pipeline_id =

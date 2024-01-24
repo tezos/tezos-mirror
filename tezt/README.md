@@ -64,7 +64,7 @@ This directory contains the following subdirectories:
   Records are used by the CI to distribute tests in jobs of roughly equal duration.
   To update it, get a recent CI pipeline ID and run (from the root of the Tezos repository):
 
-        dune exec scripts/ci/update_records/update.exe -- -i -a from=PIPELINE_ID
+        dune exec scripts/ci/update_records/update.exe -- -i --from PIPELINE_ID
         git add tezt/records
         git commit -m 'Tezt: update records'
 
