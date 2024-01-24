@@ -234,6 +234,19 @@ module Handler = struct
               let pctxt = Node_context.get_profile_ctxt ctxt in
               match config.Configuration_file.profiles with
               | Bootstrap -> return @@ Profile_manager.bootstrap_profile
+              | Random_observer -> (
+                  let slot_index =
+                    Random.int proto_parameters.number_of_slots
+                  in
+                  match
+                    Profile_manager.add_operator_profiles
+                      pctxt
+                      proto_parameters
+                      (Node_context.get_gs_worker ctxt)
+                      [Observer {slot_index}]
+                  with
+                  | None -> fail Errors.[Profile_incompatibility]
+                  | Some pctxt -> return pctxt)
               | Operator operator_profiles -> (
                   match
                     Profile_manager.add_operator_profiles
@@ -622,7 +635,7 @@ let run ~data_dir configuration_override =
             degree_score = 0;
             prune_backoff = Ptime.Span.of_int_s 10;
           }
-      | Operator _ -> limits
+      | Random_observer | Operator _ -> limits
     in
     let gs_worker =
       Gossipsub.Worker.(

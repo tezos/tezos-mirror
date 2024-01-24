@@ -36,7 +36,10 @@ let merge_profiles ~from_config_file ~from_cli =
       | Bootstrap, Bootstrap -> Bootstrap
       | Operator _, Bootstrap -> Bootstrap
       | Bootstrap, Operator op -> Operator op
-      | Operator op1, Operator op2 -> Operator (op1 @ op2))
+      | Operator op1, Operator op2 -> Operator (op1 @ op2)
+      | Random_observer, Random_observer -> Random_observer
+      | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
+      | (Operator _ | Bootstrap), Random_observer -> Random_observer)
 
 let merge
     Cli.

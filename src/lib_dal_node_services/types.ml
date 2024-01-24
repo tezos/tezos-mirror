@@ -297,10 +297,11 @@ type slot_header = {
 type operator_profile =
   | Attester of Tezos_crypto.Signature.public_key_hash
   | Producer of {slot_index : int}
+  | Observer of {slot_index : int}
 
 type operator_profiles = operator_profile list
 
-type profiles = Bootstrap | Operator of operator_profiles
+type profiles = Bootstrap | Operator of operator_profiles | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -412,6 +413,12 @@ let operator_profile_encoding =
         (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
         (function Producer {slot_index} -> Some ((), slot_index) | _ -> None)
         (function (), slot_index -> Producer {slot_index});
+      case
+        ~title:"observer"
+        (Tag 2)
+        (obj2 (req "kind" (constant "observer")) (req "slot_index" int31))
+        (function Observer {slot_index} -> Some ((), slot_index) | _ -> None)
+        (function (), slot_index -> Observer {slot_index});
     ]
 
 let profiles_encoding =
@@ -434,6 +441,12 @@ let profiles_encoding =
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)
         (function (), operator_profiles -> Operator operator_profiles);
+      case
+        ~title:"Random_observer"
+        (Tag 3)
+        (obj1 (req "kind" (constant "random_observer")))
+        (function Random_observer -> Some () | _ -> None)
+        (function () -> Random_observer);
     ]
 
 let with_proof_encoding =
