@@ -76,16 +76,23 @@ let fetch_pipeline_records_from_jobs pipeline =
   (* Return the list of new records *)
   Lwt_list.map_p fetch_record records
 
-type from = Pipeline of int | Last_merged_pipeline
+type from =
+  | Pipeline of int
+  | Last_merged_pipeline
+  | Last_successful_schedule_extended_test
 
 let cli_from_type =
   let parse = function
     | "last-merged-pipeline" -> Some Last_merged_pipeline
+    | "last-successful-schedule-extended-test" ->
+        Some Last_successful_schedule_extended_test
     | s -> Option.map (fun x -> Pipeline x) (int_of_string_opt s)
   in
   let show = function
     | Pipeline id -> string_of_int id
     | Last_merged_pipeline -> "last-merged-pipeline"
+    | Last_successful_schedule_extended_test ->
+        "last-successful-schedule-extended-test"
   in
   Clap.typ ~name:"from" ~dummy:Last_merged_pipeline ~parse ~show
 
@@ -101,19 +108,24 @@ let cli_from =
        merge commit on the default branch."
     Last_merged_pipeline
 
+let schedule_extended_test_rex = rex "^\\[schedule_extended_test\\] "
+
 let () =
   (* Register a test to benefit from error handling of Test.run,
      as well as [Background.start] etc. *)
   ( Test.register ~__FILE__ ~title:"update records" ~tags:["update"] @@ fun () ->
-    let* new_records =
+    let* pipeline_id =
       match cli_from with
-      | Pipeline pipeline_id -> fetch_pipeline_records_from_jobs pipeline_id
+      | Pipeline pipeline_id -> return pipeline_id
       | Last_merged_pipeline ->
-          let* pipeline_id =
-            Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
-          in
-          fetch_pipeline_records_from_jobs pipeline_id
+          Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
+      | Last_successful_schedule_extended_test ->
+          Gitlab_util.get_last_successful_schedule_pipeline
+            ~project
+            ~matching:schedule_extended_test_rex
+            ()
     in
+    let* new_records = fetch_pipeline_records_from_jobs pipeline_id in
     remove_existing_records new_records ;
     unit ) ;
   Test.run ()
