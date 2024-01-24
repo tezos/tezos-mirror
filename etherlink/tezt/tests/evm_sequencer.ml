@@ -1137,7 +1137,67 @@ let test_upgrade_kernel_sync =
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head shouldn't be the same after upgrade" ;
+  unit
 
+let test_delayed_transfer_timeout =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
+    ~title:"Delayed transaction timeout"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {
+         client;
+         node;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         sequencer;
+         proxy;
+       } =
+    setup_sequencer ~delayed_inbox_timeout:3 protocol
+  in
+  (* Kill the sequencer *)
+  let* () = Evm_node.terminate sequencer in
+  let endpoint = Evm_node.endpoint proxy in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let sender = Eth_account.bootstrap_accounts.(0).address in
+  let _ = Rpc.block_number proxy in
+  let receiver = Eth_account.bootstrap_accounts.(1).address in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let raw_transfer =
+    "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~node
+      raw_transfer
+  in
+  (* Bake a few blocks, should be enough for the tx to time out and be
+     forced *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((sender_balance_prev > sender_balance_next) Wei.typ)
+    ~error_msg:"Expected a smaller balance" ;
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
   unit
 
 (** This tests the situation where force kernel upgrade happens too soon. *)
@@ -1352,4 +1412,5 @@ let () =
   test_upgrade_kernel_sync [Alpha] ;
   test_force_kernel_upgrade [Alpha] ;
   test_force_kernel_upgrade_too_early [Alpha] ;
-  test_external_transaction_to_delayed_inbox_fails [Alpha]
+  test_external_transaction_to_delayed_inbox_fails [Alpha] ;
+  test_delayed_transfer_timeout [Alpha]
