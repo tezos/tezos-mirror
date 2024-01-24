@@ -15,6 +15,7 @@
   octez-shell-libs.client-base-unix
   octez-l2-libs.smart-rollup
   octez-smart-rollup-node-lib
+  octez-l2-libs.layer2_store
   octez_smart_rollup_node_PtNairob
   octez_smart_rollup_node_Proxford
   (select void_for_linking-octez_smart_rollup_node_alpha from
@@ -28,7 +29,8 @@
   -open Octez_alcotezt
   -open Tezos_client_base_unix
   -open Octez_smart_rollup
-  -open Octez_smart_rollup_node))
+  -open Octez_smart_rollup_node
+  -open Tezos_layer2_store))
 
 (rule
  (action

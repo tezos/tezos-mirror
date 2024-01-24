@@ -64,11 +64,28 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = Smart_rollup_context_hash.t
+type hash = Context_hash.t
 
 type path = string list
 
-let () = assert (Smart_rollup_context_hash.size = IStore.Hash.hash_size)
+module Tree :
+  Tezos_context_sigs.Context.TREE
+    with type tree = IStore.tree
+     and type key = string list
+     and type value = bytes
+     and type t = rw = struct
+  include IStoreTree
+
+  type t = rw
+
+  type tree = IStore.tree
+
+  type key = string list
+
+  type value = bytes
+end
+
+let () = assert (Context_hash.size = IStore.Hash.hash_size)
 
 let impl_name = "Irmin"
 
@@ -76,10 +93,10 @@ let equality_witness : (repo, tree) Context_sigs.equality_witness =
   (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
 
 let hash_to_istore_hash h =
-  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+  Context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
+  IStore.Hash.to_raw_string h |> Context_hash.of_string_exn
 
 let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
  fun ~cache_size mode path ->
@@ -121,6 +138,13 @@ let checkout index key =
       let tree = IStore.Commit.tree commit in
       return_some {index; tree}
 
+let checkout_exn index key =
+  let open Lwt_syntax in
+  let* context = checkout index key in
+  match context with
+  | Some context -> return context
+  | None -> Lwt.fail_with "No store found"
+
 let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
@@ -135,8 +159,7 @@ let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
   let istore_hash = hash_to_istore_hash hash in
   let* commit_opt = IStore.Commit.of_hash index.repo istore_hash in
   match commit_opt with
-  | None ->
-      Fmt.failwith "%a: unknown context hash" Smart_rollup_context_hash.pp hash
+  | None -> Fmt.failwith "%a: unknown context hash" Context_hash.pp hash
   | Some commit -> (
       let finished = function
         | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
@@ -246,6 +269,13 @@ module PVMState = struct
   let empty () = IStore.Tree.empty ()
 
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
+
+  let get ctxt =
+    let open Lwt_syntax in
+    let* pvm_state = find ctxt in
+    match pvm_state with
+    | Some store -> return store
+    | None -> Lwt.fail_with "No pvm_state found"
 
   let lookup tree path = IStore.Tree.find tree path
 

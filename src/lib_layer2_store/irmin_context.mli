@@ -52,9 +52,16 @@ type rw = [`Read | `Write] t
 (** Read-only context {!t}. *)
 type ro = [`Read] t
 
+module Tree :
+  Tezos_context_sigs.Context.TREE
+    with type t := rw
+     and type key := string list
+     and type value := bytes
+     and type tree := tree
+
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
-type hash = Smart_rollup_context_hash.t
+type hash = Context_hash.t
 
 (** The type of commits for the context. *)
 type commit
@@ -90,6 +97,8 @@ val commit : ?message:string -> [> `Write] t -> hash Lwt.t
     context. If there is no commit that corresponds to [hash], it returns
     [None].  *)
 val checkout : 'a index -> hash -> 'a t option Lwt.t
+
+val checkout_exn : 'a index -> hash -> 'a t Lwt.t
 
 (** [empty ctxt] is the context with an empty content for the repository [ctxt]. *)
 val empty : 'a index -> 'a t
@@ -180,6 +189,8 @@ module PVMState : sig
 
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : _ t -> value option Lwt.t
+
+  val get : _ t -> value Lwt.t
 
   (** [lookup state path] returns the data stored for the path [path] in the PVM
       state [state].  *)

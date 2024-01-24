@@ -24,23 +24,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
+module Simple = struct
+  include Internal_event.Simple
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Smart_rollup_context_hash"
+  let section = ["layer2_store"]
 
-      let title = "A base58-check encoded hash of a Smart rollup node context"
+  let starting_context_gc =
+    declare_1
+      ~section
+      ~name:"starting_context_gc"
+      ~level:Info
+      ~msg:"Starting context garbage collection for commit {context_hash}"
+      ("context_hash", Context_hash.encoding)
+      ~pp1:Context_hash.pp
 
-      let b58check_prefix = "\008\209\216\166"
+  let context_gc_already_launched =
+    declare_0
+      ~section
+      ~name:"gc_already_launched"
+      ~level:Info
+      ~msg:
+        "An attempt to launch context GC was made, but a previous GC run has \
+         not yet finished. No action was taken"
+      ()
 
-      let size = None
-    end)
+  let ending_context_gc =
+    declare_2
+      ~section
+      ~name:"ending_context_gc"
+      ~level:Info
+      ~msg:
+        "Context garbage collection finished in {duration} (finalised in \
+         {finalisation})"
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
+      ("finalisation", Time.System.Span.encoding)
 
-let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54
+  let context_gc_failure =
+    declare_1
+      ~section
+      ~name:"gc_failure"
+      ~level:Warning
+      ~msg:"[Warning] Context garbage collection failed: {error}"
+      ("error", Data_encoding.string)
 
-let to_context_hash hash = to_bytes hash |> Context_hash.of_bytes_exn
+  let context_gc_launch_failure =
+    declare_1
+      ~section
+      ~name:"context_gc_launch_failure"
+      ~level:Warning
+      ~msg:"[Warning] Context garbage collection launch failed: {error}"
+      ("error", Data_encoding.string)
+end
 
-let of_context_hash hash = Context_hash.to_bytes hash |> of_bytes_exn
+let starting_context_gc hash = Simple.(emit starting_context_gc) hash
+
+let context_gc_already_launched () =
+  Simple.(emit context_gc_already_launched) ()
+
+let ending_context_gc t = Simple.(emit ending_context_gc) t
+
+let context_gc_failure msg = Simple.(emit context_gc_failure) msg
+
+let context_gc_launch_failure msg = Simple.(emit context_gc_launch_failure) msg

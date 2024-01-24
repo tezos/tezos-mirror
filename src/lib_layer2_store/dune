@@ -13,7 +13,9 @@
   octez-internal-libs.irmin
   aches-lwt
   octez-libs.stdlib-unix
-  octez-libs.tezos-context.encoding)
+  octez-libs.tezos-context.encoding
+  octez-libs.context.sigs
+  octez-libs.tezos-context.helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

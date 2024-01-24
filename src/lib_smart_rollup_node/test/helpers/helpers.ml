@@ -90,7 +90,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   let inbox_witness = Inbox.current_witness inbox in
-  let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
+  let ctxt = Context.empty node_ctxt.context in
   let num_ticks = 0L in
   let initial_tick = Z.zero in
   let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
@@ -99,7 +99,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let*! genesis_state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
   let*! ctxt = Context.PVMState.set ctxt state in
-  let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
+  let*! context_hash = Context.commit ctxt in
   let commitment =
     Commitment.genesis_commitment
       ~origination_level:node_ctxt.genesis_info.level
@@ -115,7 +115,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context = Smart_rollup_context_hash.of_context_hash context_hash;
         inbox_witness;
         inbox_hash;
       }

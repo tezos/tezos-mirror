@@ -25,3 +25,7 @@
 (*****************************************************************************)
 
 include Tezos_crypto.Intfs.HASH
+
+val to_context_hash : t -> Context_hash.t
+
+val of_context_hash : Context_hash.t -> t

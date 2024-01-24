@@ -13,9 +13,8 @@ end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
       let open Lwt_result_syntax in
-      let* Sequencer_context.{evm_state; _} =
-        Sequencer_context.sync Ctxt.ctxt
-      in
+      let* ctxt = Sequencer_context.sync Ctxt.ctxt in
+      let*! evm_state = Sequencer_context.evm_state ctxt in
       let*! res = Sequencer_state.inspect evm_state path in
       return res
   end
@@ -51,8 +50,9 @@ end) : Services_backend_sig.Backend = struct
           (function `External payload -> `Input ("\001" ^ payload))
           inputs
       in
+      let*! evm_state = Sequencer_context.evm_state ctxt in
       let*! (Block_height before_height) =
-        Sequencer_state.current_block_height ctxt.Sequencer_context.evm_state
+        Sequencer_state.current_block_height evm_state
       in
       let* ctxt, evm_state = Sequencer_state.execute ctxt exec_inputs in
       let*! (Block_height after_height) =

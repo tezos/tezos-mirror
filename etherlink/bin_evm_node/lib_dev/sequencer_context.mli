@@ -5,19 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context : Tezos_tree_encoding.Encodings_util.Bare_tezos_context_sig
+module Bare_context :
+  Tezos_tree_encoding.Encodings_util.Bare_tezos_context_sig
+    with type index = Irmin_context.rw_index
+     and type t = Irmin_context.rw
+     and type tree = Irmin_context.tree
 
-type index
-
-type store
-
-type evm_state = Context.tree
+type evm_state = Irmin_context.PVMState.value
 
 type t = {
   data_dir : string;  (** Data dir of the EVM node. *)
-  index : index;  (** Irmin index. *)
-  store : store;  (** Irmin store. *)
-  evm_state : evm_state;  (** EVM local state of the sequencer. *)
+  context : Irmin_context.rw;  (** Irmin read and write context. *)
   kernel : string;  (** Path to the kernel to execute. *)
   preimages : string;  (** Path to the preimages directory. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -45,3 +43,5 @@ val commit : t -> evm_state -> t tzresult Lwt.t
 (** [sync ctxt] synchronizes the [ctxt] based on on-disk information, loads the
     latest checkpoint. *)
 val sync : t -> t tzresult Lwt.t
+
+val evm_state : t -> evm_state Lwt.t

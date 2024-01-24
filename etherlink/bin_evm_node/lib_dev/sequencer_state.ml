@@ -7,7 +7,7 @@
 
 module Wasm_utils =
   Wasm_utils.Make
-    (Tezos_tree_encoding.Encodings_util.Make (Sequencer_context.Context))
+    (Tezos_tree_encoding.Encodings_util.Make (Sequencer_context.Bare_context))
 module Wasm = Wasm_debugger.Make (Wasm_utils)
 
 let execute ?(commit = false) ctxt inbox =
@@ -21,8 +21,9 @@ let execute ?(commit = false) ctxt inbox =
       ~destination:ctxt.Sequencer_context.smart_rollup_address
       ()
   in
+  let*! evm_state = Sequencer_context.evm_state ctxt in
   let* evm_state, _, _, _ =
-    Wasm.Commands.eval 0l inbox config Inbox ctxt.Sequencer_context.evm_state
+    Wasm.Commands.eval 0l inbox config Inbox evm_state
   in
   let* ctxt =
     if commit then Sequencer_context.commit ctxt evm_state else return ctxt
@@ -31,15 +32,15 @@ let execute ?(commit = false) ctxt inbox =
 
 let init ~secret_key ~smart_rollup_address ~rollup_node_endpoint ctxt =
   let open Lwt_result_syntax in
+  let evm_state = Irmin_context.PVMState.empty () in
   let* evm_state =
     Wasm.start
-      ~tree:ctxt.Sequencer_context.evm_state
+      ~tree:evm_state
       Tezos_scoru_wasm.Wasm_pvm_state.V3
-      ctxt.kernel
+      ctxt.Sequencer_context.kernel
   in
-  let ctxt =
-    {ctxt with evm_state; next_blueprint_number = Ethereum_types.(Qty Z.one)}
-  in
+  let* ctxt = Sequencer_context.commit ctxt evm_state in
+  let ctxt = {ctxt with next_blueprint_number = Ethereum_types.(Qty Z.one)} in
   (* Create the first empty block. *)
   let inputs =
     Sequencer_blueprint.create

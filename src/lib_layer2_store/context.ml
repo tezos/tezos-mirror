@@ -37,7 +37,7 @@ type ('repo, 'tree) pvm_context_impl =
 
 let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
 
-type hash = Smart_rollup_context_hash.t
+type hash = Context_hash.t
 
 type 'a t =
   | Context : {
