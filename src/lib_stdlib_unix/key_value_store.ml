@@ -193,6 +193,8 @@ module Files : sig
   val value_exists :
     'value t -> ('key, 'value) layout -> 'key -> bool tzresult Lwt.t
 
+  val count_values : 'value t -> ('key, 'value) layout -> int tzresult Lwt.t
+
   val remove : 'value t -> ('key, 'value) layout -> unit tzresult Lwt.t
 end = struct
   module LRU = Ringo.LRU_Collection
@@ -278,6 +280,9 @@ end = struct
     | Value_exists of ('value opened_file option * bool tzresult) Lwt.t
       (* The promise returned by [value_exists] contains the file read,
          if it exists, as well as the existence of the key. *)
+    | Count_values of ('value opened_file option * int tzresult) Lwt.t
+      (* The promise returned by [count_values] contains the file read,
+         if it exists, as well as the number of keys. *)
     | Remove of unit Lwt.t
   (* The promise returned by [remove] contains nothing. *)
 
@@ -354,6 +359,9 @@ end = struct
         let* file, _ = p in
         return_some file
     | Value_exists p ->
+        let* file, _ = p in
+        return file
+    | Count_values p ->
         let* file, _ = p in
         return file
     | Remove p ->
@@ -550,6 +558,17 @@ end = struct
               )
         | `Found -> Lwt.return (Some opened_file, Ok true)
         | `Not_found -> Lwt.return (Some opened_file, Ok false)
+      in
+      generic_action
+        files
+        last_actions
+        layout.filepath
+        ~on_file_closed
+        ~on_file_opened
+
+    let count_values ~on_file_closed files last_actions layout =
+      let on_file_opened opened_file =
+        Lwt.return (Some opened_file, Ok opened_file.count)
       in
       generic_action
         files
@@ -758,6 +777,28 @@ end = struct
       let+ _, exists = p in
       exists
 
+  (* Very similar to [value_exists] action except we look at the
+     [count] counter instead of the bitset. *)
+  let count_values {files; last_actions; lru; closed} layout =
+    let open Lwt_syntax in
+    if !closed then
+      Lwt.return
+        (Error (Error_monad.TzTrace.make (Closed {action = "count_values"})))
+    else
+      let on_file_closed ~on_file_opened =
+        let* r = may_load_file files last_actions lru layout.filepath in
+        match r with
+        | None -> return (None, Ok 0)
+        | Some opened_file_promise ->
+            Table.replace files layout.filepath (Opening opened_file_promise) ;
+            let* opened_file = opened_file_promise in
+            on_file_opened opened_file
+      in
+      let p = Action.count_values ~on_file_closed files last_actions layout in
+      Table.replace last_actions layout.filepath (Count_values p) ;
+      let+ _, count = p in
+      count
+
   let write ?(override = false) {files; last_actions; lru; closed} layout key
       data =
     let open Lwt_syntax in
@@ -863,6 +904,12 @@ let value_exists :
  fun {files; layout_of} file key ->
   let layout = layout_of file in
   Files.value_exists files layout key
+
+let count_values :
+    type file key value. (file, key, value) t -> file -> int tzresult Lwt.t =
+ fun {files; layout_of} file ->
+  let layout = layout_of file in
+  Files.count_values files layout
 
 let write_values ?override t seq =
   Seq.ES.iter

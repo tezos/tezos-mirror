@@ -158,3 +158,6 @@ val values_exist :
     issued before the [remove_file], it will returns the corresponding
     value that was stored, and then the file will be removed. *)
 val remove_file : ('file, 'key, 'value) t -> 'file -> unit tzresult Lwt.t
+
+(** This function returns the number of entries for a given file. *)
+val count_values : ('file, 'key, 'value) t -> 'file -> int tzresult Lwt.t
