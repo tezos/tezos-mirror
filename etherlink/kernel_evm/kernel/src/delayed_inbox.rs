@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 
 use crate::{
+    current_timestamp,
     inbox::{Deposit, Transaction, TransactionContent},
     linked_list::LinkedList,
+    storage,
 };
 use anyhow::Result;
 use rlp::{Decodable, DecoderError, Encodable};
@@ -17,6 +19,10 @@ use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
 pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
+
+// Maximum number of transaction included in a blueprint when
+// forcing timed-out transactions from the delayed inbox.
+pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: usize = 1000;
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
@@ -166,6 +172,22 @@ impl DelayedInbox {
         Ok(())
     }
 
+    fn transaction_from_delayed(
+        tx_hash: Hash,
+        delayed: DelayedTransaction,
+    ) -> Transaction {
+        match delayed {
+            DelayedTransaction::Ethereum(tx) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Ethereum(tx),
+            },
+            DelayedTransaction::Deposit(deposit) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::Deposit(deposit),
+            },
+        }
+    }
+
     pub fn find_and_remove_transaction<Host: Runtime>(
         &mut self,
         host: &mut Host,
@@ -181,25 +203,100 @@ impl DelayedInbox {
             |DelayedInboxItem {
                  transaction,
                  timestamp,
-             }| match transaction {
-                DelayedTransaction::Ethereum(tx) => (
-                    Transaction {
-                        tx_hash: tx_hash.0,
-                        content: TransactionContent::Ethereum(tx),
-                    },
+             }| {
+                (
+                    Self::transaction_from_delayed(tx_hash, transaction),
                     timestamp,
-                ),
-                DelayedTransaction::Deposit(deposit) => (
-                    Transaction {
-                        tx_hash: tx_hash.0,
-                        content: TransactionContent::Deposit(deposit),
-                    },
-                    timestamp,
-                ),
+                )
             },
         );
 
         Ok(tx)
+    }
+
+    // Returns the oldest tx in the delayed inbox (and its hash) if it
+    // timed out
+    fn first_if_timed_out<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        now: Timestamp,
+        timeout: u64,
+    ) -> Result<Option<(Hash, DelayedTransaction)>> {
+        let to_pop = self.0.first_with_id(host)?.and_then(
+            |(
+                tx_hash,
+                DelayedInboxItem {
+                    transaction,
+                    timestamp,
+                },
+            )| {
+                if now.as_u64() - timestamp.as_u64() >= timeout {
+                    log!(
+                        host,
+                        Info,
+                        "Delayed transaction {} timed out",
+                        hex::encode(tx_hash)
+                    );
+                    Some((tx_hash, transaction))
+                } else {
+                    None
+                }
+            },
+        );
+        Ok(to_pop)
+    }
+
+    fn pop_first_if_timed_out<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        now: Timestamp,
+        timeout: u64,
+    ) -> Result<Option<Transaction>> {
+        let to_pop = self.first_if_timed_out(host, now, timeout)?;
+        match to_pop {
+            None => Ok(None),
+            Some((hash, delayed)) => {
+                let _ = self.0.remove(host, &hash)?;
+                let transaction = Self::transaction_from_delayed(hash, delayed);
+                Ok(Some(transaction))
+            }
+        }
+    }
+
+    /// Returns whether the oldest tx in the delayed inbox has timed out.
+    pub fn first_has_timed_out<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+    ) -> Result<bool> {
+        let now = current_timestamp(host);
+        let timeout = storage::delayed_inbox_timeout(host)?;
+        let popped = self.first_if_timed_out(host, now, timeout)?;
+        Ok(popped.is_some())
+    }
+
+    /// Computes the next vector of timed-out delayed transactions.
+    /// If there are no timed-out transactions, None is returned to
+    /// signal that we're done.
+    pub fn next_delayed_inbox_blueprint<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        now: Timestamp,
+        timeout: u64,
+    ) -> Result<Option<Vec<Transaction>>> {
+        let mut popped: Vec<Transaction> = vec![];
+        while let Some(tx) = self.pop_first_if_timed_out(host, now, timeout)? {
+            popped.push(tx);
+            // Check if the number of transactions has reached the limit per
+            // blueprint
+            if popped.len() >= MAX_DELAYED_INBOX_BLUEPRINT_LENGTH {
+                break;
+            }
+        }
+        Ok(if popped.is_empty() {
+            None
+        } else {
+            Some(popped)
+        })
     }
 }
 

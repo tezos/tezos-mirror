@@ -408,6 +408,13 @@ where
         Ok(Some(front.get_data(host, &self.path)?))
     }
 
+    /// Returns the first element of the list alongside its id
+    /// or `None` if it is empty.
+    pub fn first_with_id(&self, host: &impl Runtime) -> Result<Option<(Id, Elt)>> {
+        let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
+        Ok(Some((front.id.clone(), front.get_data(host, &self.path)?)))
+    }
+
     /// Removes the first element of the list and returns it
     pub fn pop_first(&mut self, host: &mut impl Runtime) -> Result<Option<Elt>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {return Ok(None)};
