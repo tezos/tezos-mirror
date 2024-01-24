@@ -594,7 +594,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
         Seq.return {Cryptobox.share; index = shard_index}
         |> save_and_notify commitment |> Errors.to_tzresult
       in
-      Amplificator.amplify shard_store commitment node_ctxt
+      Amplificator.amplify shard_store node_store commitment node_ctxt
   in
   Lwt.dont_wait
     (fun () ->

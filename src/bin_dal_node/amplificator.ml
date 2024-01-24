@@ -5,14 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let amplify (shard_store : Store.Shards.t) commitment node_ctxt =
+let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
+    commitment node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->
       (* The cryptobox is not yet available so we cannot reconstruct
          slots yet. *)
       return_unit
-  | Ready {cryptobox; _} ->
+  | Ready {cryptobox; shards_proofs_precomputation; _} ->
       let dal_parameters = Cryptobox.parameters cryptobox in
       let number_of_shards = dal_parameters.number_of_shards in
       let redundancy_factor = dal_parameters.redundancy_factor in
@@ -34,10 +35,24 @@ let amplify (shard_store : Store.Shards.t) commitment node_ctxt =
                  | _, index, Ok share -> Some Cryptobox.{index; share}
                  | _ -> None)
         in
-        let* _polynomial =
+        let* polynomial =
           Slot_manager_legacy.polynomial_from_shards_lwt
             cryptobox
             shards
             ~number_of_needed_shards
+        in
+        let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
+        let* commitment =
+          Slot_manager.add_commitment slot_store slot cryptobox
+          |> Errors.to_tzresult
+        in
+        let* (_ : unit option) =
+          Slot_manager.add_commitment_shards
+            ~shards_proofs_precomputation
+            slot_store
+            cryptobox
+            commitment
+            ~with_proof:true
+          |> Errors.to_option_tzresult
         in
         return_unit
