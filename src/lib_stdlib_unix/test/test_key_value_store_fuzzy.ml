@@ -200,7 +200,11 @@ module Helpers = struct
         ~number_of_keys_per_file
       |> map (fun x -> Read_values x)
     in
-    oneof [write_value; read_value; read_values; remove_file]
+    let count_values =
+      key_gen ~number_of_files ~number_of_keys_per_file
+      |> map (fun (file, _) -> Count_values file)
+    in
+    oneof [write_value; read_value; read_values; remove_file; count_values]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
