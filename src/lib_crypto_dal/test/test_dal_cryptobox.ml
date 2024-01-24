@@ -40,13 +40,12 @@ module Test = struct
      note that this function does not run in constant time (the higher
      [lower_bound - upper_bound] is, the smaller is the probability to loop) ;
      in our tests this is fine because [upper_bound] >> [lower_bound].
-     This function fails if [n = lower_bound = upper_bound] *)
+     This function fails if [lower_bound >= upper_bound] *)
   let rec generate_different_from n (lower_bound, upper_bound) =
-    assert (not (n = lower_bound && n = upper_bound)) ;
+    assert (lower_bound < upper_bound) ;
     let open QCheck2.Gen in
-    let generated = int_range lower_bound upper_bound in
-    let* generated_int = generated in
-    if generated_int <> n then generated
+    let* generated_int = int_range lower_bound upper_bound in
+    if generated_int <> n then return generated_int
     else generate_different_from n (lower_bound, upper_bound)
 
   let generate_bytes ~size_different_from:n
