@@ -53,7 +53,6 @@ oc.unified_coverage:
     - "tezt 28/60"
     - "tezt 29/60"
     - "tezt 30/60"
-    - "tezt 20/60"
     - "tezt 31/60"
     - "tezt 32/60"
     - "tezt 33/60"
