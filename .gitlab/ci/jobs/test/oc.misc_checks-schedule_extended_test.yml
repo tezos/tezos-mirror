@@ -1,0 +1,8 @@
+# As 'oc.misc_checks' in 'oc.misc_checks:before_merging.yml' but does
+# not check the license header of newly added OCaml files.
+oc.misc_checks:
+  extends:
+    - .oc.misc_checks
+  script:
+    - ./scripts/ci/lint_misc_check.sh
+    - scripts/check_wasm_pvm_regressions.sh check

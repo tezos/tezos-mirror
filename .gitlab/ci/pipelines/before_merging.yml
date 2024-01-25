@@ -4,7 +4,7 @@ include:
 
   # Stage: sanity
   - .gitlab/ci/jobs/sanity/sanity_ci.yml
-  - .gitlab/ci/jobs/sanity/docker:hadolint.yml
+  - .gitlab/ci/jobs/sanity/docker:hadolint-before_merging.yml
 
   # Stage: package
   - .gitlab/ci/jobs/packaging/opam:prepare.yml
@@ -28,7 +28,9 @@ include:
   # Stage: test
   - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
+  - .gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
+  - .gitlab/ci/jobs/test/commit_titles.yml
   - .gitlab/ci/jobs/test/oc.semgrep.yml
   - .gitlab/ci/jobs/test/oc.unit.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml

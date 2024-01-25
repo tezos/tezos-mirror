@@ -1,0 +1,6 @@
+include: .gitlab/ci/jobs/sanity/docker:hadolint.yml
+
+docker:hadolint-schedule_extended_test:
+  extends:
+    - .docker:hadolint
+  stage: sanity
