@@ -370,6 +370,20 @@ impl CSRegister {
         (self as usize >> 10) & 0b11 == 0b11
     }
 
+    /// Enforce the WPRI and WLRL field specifications.
+    ///
+    /// Either return the value to be written, or None to signify that no write is necessary,
+    /// to leave existing value in its place.
+    #[inline(always)]
+    pub fn make_value_writable(self, value: CSRValue) -> Option<CSRValue> {
+        // respect the reserved WPRI fields, setting them 0
+        let value = self.clear_wpri_fields(value);
+        // apply WARL rules
+        let value = self.transform_warl_fields(value)?;
+        // check if value is legal w.r.t. WLRL fields
+        self.is_legal(value).then_some(value)
+    }
+
     const WPRI_MASK_EMPTY: CSRValue = CSRValue::MAX;
 
     const WPRI_MASK_MSTATUS: CSRValue =
@@ -493,7 +507,7 @@ impl CSRegister {
     ///
     /// Section 2.3 - privileged spec
     #[inline(always)]
-    fn is_legal(self, new_value: CSRValue) -> bool {
+    pub fn is_legal(self, new_value: CSRValue) -> bool {
         let legal_values = self.legal_values();
         // if no legal values are defined, then the register is not WLRL
         legal_values.is_empty() || legal_values.contains(&new_value)
@@ -693,7 +707,7 @@ impl<M: backend::Manager> CSRegisters<M> {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
-        if let Some(value) = self.make_value_writable(reg, value) {
+        if let Some(value) = reg.make_value_writable(value) {
             self.registers.write(reg as usize, value);
         }
     }
@@ -712,7 +726,7 @@ impl<M: backend::Manager> CSRegisters<M> {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
-        if let Some(value) = self.make_value_writable(reg, value) {
+        if let Some(value) = reg.make_value_writable(value) {
             self.registers.replace(reg as usize, value)
         } else {
             self.registers.read(reg as usize)
@@ -739,20 +753,6 @@ impl<M: backend::Manager> CSRegisters<M> {
         let new_value = old_value & !bits;
         self.write(reg, new_value);
         old_value
-    }
-
-    /// Enforce the WPRI and WLRL field specifications.
-    ///
-    /// Either return the value to be written, or None to signify that no write is necessary,
-    /// to leave existing value in its place.
-    #[inline(always)]
-    fn make_value_writable(&self, reg: CSRegister, value: CSRValue) -> Option<CSRValue> {
-        // respect the reserved WPRI fields, setting them 0
-        let value = reg.clear_wpri_fields(value);
-        // apply WARL rules
-        let value = reg.transform_warl_fields(value)?;
-        // check if value is legal w.r.t. WLRL fields
-        reg.is_legal(value).then_some(value)
     }
 }
 
