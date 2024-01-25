@@ -50,12 +50,6 @@ pub mod constants {
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 
-    /// The maximum gas limit allowed for a transaction. We need to set a limit
-    /// on the gas so we can consider the transaction in a reboot. If we don't
-    /// set a limit, we could reboot again and again until the transaction
-    /// fits in a reboot, which will never happen.
-    pub const MAX_TRANSACTION_GAS_LIMIT: u64 = MAX_ALLOWED_TICKS / TICKS_PER_GAS;
-
     /// Overapproximation of the upper bound of the number of ticks used to
     /// fetch the inbox. Considers an inbox with the size of a full block, and
     /// apply a tick model affine in the size of the inbox.

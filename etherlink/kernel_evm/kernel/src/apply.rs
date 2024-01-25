@@ -36,7 +36,6 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{index_account, read_ticketer};
-use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{tick_model, CONFIG};
 
 // This implementation of `Transaction` is used to share the logic of
@@ -188,7 +187,6 @@ fn account<Host: Runtime>(
 pub enum Validity {
     Valid(H160),
     InvalidChainId,
-    InvalidGasLimit,
     InvalidSignature,
     InvalidNonce,
     InvalidPrePay,
@@ -212,11 +210,6 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     {
         log!(host, Debug, "Transaction status: ERROR_CHAINID");
         return Ok(Validity::InvalidChainId);
-    }
-    // Gas limit is bounded.
-    if transaction.execution_gas_limit() > MAX_TRANSACTION_GAS_LIMIT {
-        log!(host, Debug, "Transaction status: ERROR_GASLIMIT");
-        return Ok(Validity::InvalidGasLimit);
     }
     // The transaction signature is valid.
     let caller = match transaction.caller() {
@@ -544,7 +537,7 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{apply::Validity, tick_model::constants::MAX_TRANSACTION_GAS_LIMIT};
+    use crate::apply::Validity;
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
@@ -776,51 +769,6 @@ mod tests {
         );
         assert_eq!(
             Validity::InvalidChainId,
-            res.expect("Verification should not have raise an error"),
-            "Transaction should have been rejected"
-        );
-    }
-
-    #[test]
-    fn test_tx_is_invalid_wrong_gas_limit() {
-        let mut host = MockHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
-        let block_constants = mock_block_constants();
-
-        // setup
-        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let gas_price = U256::from(21000);
-        let balance = U256::from(21000) * gas_price;
-        let mut transaction = EthereumTransactionCommon::new(
-            TransactionType::Eip1559,
-            Some(CHAIN_ID.into()),
-            U256::from(0),
-            U256::zero(),
-            U256::from(21000),
-            MAX_TRANSACTION_GAS_LIMIT + 1,
-            Some(H160::zero()),
-            U256::zero(),
-            vec![],
-            vec![],
-            None,
-        );
-        // sign tx
-        transaction = resign(transaction);
-
-        // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
-
-        // act
-        let res = is_valid_ethereum_transaction_common(
-            &mut host,
-            &mut evm_account_storage,
-            &transaction,
-            &block_constants,
-            gas_price,
-        );
-        assert_eq!(
-            Validity::InvalidGasLimit,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
