@@ -168,20 +168,33 @@ where
         || handler.pre_pay_transactions(caller, gas_limit, effective_gas_price)?
     {
         let result = if let Some(address) = address {
-            handler.call_contract(caller, address, value, call_data, gas_limit, false)?
+            handler.call_contract(caller, address, value, call_data, gas_limit, false)
         } else {
             // This is a create-contract transaction
-            handler.create_contract(caller, value, call_data, gas_limit)?
+            handler.create_contract(caller, value, call_data, gas_limit)
         };
 
-        handler.increment_nonce(caller)?;
+        match result {
+            Ok(result) => {
+                handler.increment_nonce(caller)?;
 
-        if do_refund(&result, pay_for_gas) {
-            let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-            handler.repay_gas(caller, unused_gas, effective_gas_price)?;
+                if do_refund(&result, pay_for_gas) {
+                    let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+                    handler.repay_gas(caller, unused_gas, effective_gas_price)?
+                }
+
+                Ok(Some(result))
+            }
+            // In case of `OutOfTicks` the gas is entirely refunded as it will
+            // be repaid in the next attempt
+            Err(EthereumError::OutOfTicks) => {
+                if pay_for_gas {
+                    handler.repay_gas(caller, gas_limit, effective_gas_price)?;
+                }
+                Err(EthereumError::OutOfTicks)
+            }
+            Err(e) => Err(e),
         }
-
-        Ok(Some(result))
     } else {
         // caller was unable to pay for the gas limit
         if pay_for_gas {
