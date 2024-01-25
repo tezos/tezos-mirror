@@ -103,3 +103,9 @@ oc.compile_sources_bullseye:
   extends: .oc.compile_sources_template
   script:
     - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+
+oc.compile_sources_mantic:
+  image: ocaml/opam:ubuntu-23.10
+  extends: .oc.compile_sources_template
+  script:
+    - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}

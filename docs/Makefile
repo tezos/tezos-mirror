@@ -135,6 +135,7 @@ installcheck:
 	scripts/test_install_scripts.sh install-opam-focal
 	scripts/test_install_scripts.sh compile-release-sources-bullseye
 	scripts/test_install_scripts.sh compile-sources-bullseye
+	scripts/test_install_scripts.sh compile-sources-mantic
 
 # build dune targets together to avoid concurrent dunes
 docexes:
