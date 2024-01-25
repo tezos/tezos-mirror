@@ -1,6 +1,7 @@
 .oc.base-test-install-scripts-template:
   stage: test
-  needs: [trigger]
+  extends:
+    - .needs__trigger
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always

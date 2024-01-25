@@ -1,4 +1,7 @@
 include:
+  # Stage: trigger
+  - .gitlab/ci/jobs/trigger/trigger.yml
+
   # Stage: sanity
   - .gitlab/ci/jobs/sanity/sanity_ci.yml
   - .gitlab/ci/jobs/sanity/docker:hadolint.yml

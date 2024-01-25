@@ -1,8 +1,8 @@
 .oc.install_python_debian_ubuntu_template:
   extends:
     - .default_settings_template
+    - .needs__trigger
   stage: doc
-  needs: [trigger]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always

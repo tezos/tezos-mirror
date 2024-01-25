@@ -7,9 +7,9 @@ documentation:build_all:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
     - .tags_template__build
+    - .needs__trigger
     - .rules__octez_docs_changes
   stage: build
-  needs: [trigger]
   before_script:
     - eval $(opam env)
     - . $HOME/.venv/bin/activate

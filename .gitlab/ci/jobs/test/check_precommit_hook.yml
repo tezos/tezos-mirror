@@ -2,6 +2,7 @@ check_precommit_hook:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
+    - .needs__trigger
   rules:
     - changes:
         paths:
@@ -10,7 +11,6 @@ check_precommit_hook:
           - .gitlab-ci.yml
       when: on_success
   stage: test
-  needs: [trigger]
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.

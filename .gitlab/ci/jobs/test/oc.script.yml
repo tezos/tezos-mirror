@@ -16,6 +16,7 @@ oc.script:snapshot_alpha_and_link:
     - eval $(opam env)
   needs:
     - job: trigger
+      optional: true
     - job: "oc.build_x86_64-released"
       optional: true
     - job: "oc.build_x86_64-exp-dev-extra"
@@ -39,8 +40,8 @@ oc.script:test-gen-genesis:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
     - .rules__octez_changes
+    - .needs__trigger
   stage: test
-  needs: [trigger]
   before_script:
     - eval $(opam env)
     - cd scripts/gen-genesis
@@ -63,6 +64,7 @@ oc.script:b58_prefix:
     - .default_settings_template
     # Requires Python
     - .image_template__runtime_build_test_dependencies
+    - .needs__trigger
   rules:
     - changes:
         paths:
@@ -72,7 +74,6 @@ oc.script:b58_prefix:
           - .gitlab-ci.yml
       when: on_success
   stage: test
-  needs: [trigger]
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.

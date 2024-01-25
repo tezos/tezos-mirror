@@ -25,6 +25,12 @@
 .tags_template__no_gcp_arm64:
   tags: ["arm64"]
 
+# Run on after job 'trigger'. Run immediately if there is no 'trigger' job (i.e. non-before_merging pipelines).
+.needs__trigger:
+  needs:
+    - job: trigger
+      optional: true
+
 # Only if octez source code has changed
 .rules__octez_changes:
   rules:
@@ -119,8 +125,8 @@
   extends:
     - .default_settings_template
     - .image_template__rust_toolchain
+    - .needs__trigger
     - .rules__octez_changes
-  needs: [trigger]
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo

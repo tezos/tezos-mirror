@@ -1,0 +1,26 @@
+# Trigger
+#
+# §1: The purpose of this job is to launch the CI manually in certain cases.
+# The objective is not to run computing when it is not
+# necessary and the decision to do so belongs to the developer
+#
+# §2: We also perform some fast sanity checks.
+trigger:
+  extends:
+    - .default_settings_template
+    - .image_template__alpine
+  stage: trigger
+  rules:
+  - if: $CI_MERGE_REQUEST_ASSIGNEES !~ /nomadic-margebot/
+    when: manual
+  - when: always
+  allow_failure: false
+  timeout: "10m"
+  script:
+    - echo 'Trigger pipeline 🤠'
+    # Check that .gitlab-ci.yml's  'build_deps_image_version' and
+    # 'scripts/version.sh's 'opam_repository_tag' are the same.
+    - ./scripts/ci/check_opam_repository_tag.sh
+    # Check that the Alpine version of the trigger job's image
+    # corresponds to the value in scripts/version.sh.
+    - ./scripts/ci/check_alpine_version.sh

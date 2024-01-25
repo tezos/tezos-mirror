@@ -47,9 +47,9 @@ opam:prepare:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies
+    - .needs__trigger
     - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
-  needs: [trigger]
   before_script:
     - eval $(opam env)
   script:

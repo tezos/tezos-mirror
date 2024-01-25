@@ -1,6 +1,7 @@
 oc.semgrep:
   extends:
     - .default_settings_template
+    - .needs__trigger
   rules:
     - changes:
         paths:
@@ -21,7 +22,6 @@ oc.semgrep:
   # Last update: 20212-01-03
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: test
-  needs: [trigger]
   script:
     - echo "OCaml code linting. For information on how to reproduce locally, check out scripts/semgrep/README.md"
     - sh ./scripts/semgrep/lint-all-ocaml-sources.sh

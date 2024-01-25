@@ -80,6 +80,6 @@
     - .oc.build
     # These job are the main bottleneck since a lot of tests depend on
     # them.  So we start them even before sanity_ci.
-  needs: [trigger]
+    - .needs__trigger
   variables:
     ARCH: "x86_64"

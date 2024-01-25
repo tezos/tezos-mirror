@@ -142,31 +142,17 @@ stages:
   - publish_package_gitlab
   - manual
 
-# Trigger
+# Dummy job.
 #
-# §1: The purpose of this job is to launch the CI manually in certain cases.
-# The objective is not to run computing when it is not
-# necessary and the decision to do so belongs to the developer
+# This fixes the "configuration must contain at least one
+# visible job" error in GitLab when using includes.
 #
-# §2: Gitlab CI needs at least one job definition, otherwise we're stuck with
-# this error: 'Jobs config should contain at least one visible job'
-trigger:
-  extends:
-    - .default_settings_template
-    - .image_template__alpine
-  stage: trigger
+# For more info, see: https://gitlab.com/gitlab-org/gitlab/-/issues/341693
+dummy_job:
   rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_ASSIGNEES
-      !~ /nomadic-margebot/
-    when: manual
-  - when: always
-  allow_failure: false
-  timeout: "10m"
+    - if: '"foo" == "bar"'
   script:
-    - echo 'Trigger pipeline 🤠'
-    # Check that the Alpine version of the trigger job's image
-    # corresponds to the value in scripts/version.sh.
-    - ./scripts/ci/check_alpine_version.sh
+    - 'echo "This job will never execute"'
 
 include:
   # /!\ These rules should be be mutually exclusive and kept in sync
