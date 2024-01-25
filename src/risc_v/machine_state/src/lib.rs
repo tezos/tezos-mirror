@@ -11,7 +11,7 @@ pub mod memory_backend;
 mod mode;
 pub mod registers;
 
-use bus::main_memory;
+use bus::{main_memory, Bus};
 
 /// RISC-V hart state
 pub struct HartState<M: backend::Manager> {
@@ -202,7 +202,7 @@ pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>);
 /// Machine state
 pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
     pub hart: HartState<M>,
-    pub bus: bus::Bus<ML, M>,
+    pub bus: Bus<ML, M>,
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
@@ -210,7 +210,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     pub fn new_in(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
         Self {
             hart: HartState::new_in(space.0),
-            bus: bus::Bus::new_in(space.1),
+            bus: Bus::new_in(space.1),
         }
     }
 }

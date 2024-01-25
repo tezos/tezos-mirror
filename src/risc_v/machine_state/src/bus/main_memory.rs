@@ -51,6 +51,11 @@ pub trait MainMemoryLayout: backend::Layout {
     type Region32<M: backend::Manager>: backend::VolatileRegion<u32>;
     type Region64<M: backend::Manager>: backend::VolatileRegion<u64>;
 
+    const LEN8: usize;
+    const LEN16: usize;
+    const LEN32: usize;
+    const LEN64: usize;
+
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
     fn offset(loc: &backend::PlacedOf<Self>) -> usize;
@@ -63,6 +68,11 @@ impl<const LEN8: usize, const LEN16: usize, const LEN32: usize, const LEN64: usi
     type Region16<M: backend::Manager> = M::VolatileRegion<u16, LEN16>;
     type Region32<M: backend::Manager> = M::VolatileRegion<u32, LEN32>;
     type Region64<M: backend::Manager> = M::VolatileRegion<u64, LEN64>;
+
+    const LEN8: usize = LEN8;
+    const LEN16: usize = LEN16;
+    const LEN32: usize = LEN32;
+    const LEN64: usize = LEN64;
 
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
         space
@@ -131,17 +141,31 @@ macro_rules! impl_volatile_region {
             for MainMemory<L, M>
         {
             #[inline(always)]
-            fn read(&self, addr: super::Address) -> $int {
+            fn read(&self, addr: super::Address) -> Result<$int, super::OutOfBounds> {
+                if addr as usize >= L::LEN8 {
+                    return Err(super::OutOfBounds);
+                }
+
                 // TODO: Check alignment
                 let index = addr as usize / mem::size_of::<$int>();
-                backend::VolatileRegion::read(&self.$field, index)
+                Ok(backend::VolatileRegion::read(&self.$field, index))
             }
 
             #[inline(always)]
-            fn write(&mut self, addr: super::Address, value: $int) {
+            fn write(
+                &mut self,
+                addr: super::Address,
+                value: $int,
+            ) -> Result<(), super::OutOfBounds> {
+                if addr as usize >= L::LEN8 {
+                    return Err(super::OutOfBounds);
+                }
+
                 // TODO: Check alignment
                 let index = addr as usize / mem::size_of::<$int>();
-                backend::VolatileRegion::write(&mut self.$field, index, value)
+                backend::VolatileRegion::write(&mut self.$field, index, value);
+
+                Ok(())
             }
         }
     };
@@ -165,25 +189,31 @@ pub mod tests {
         let mut backend = factory.make::<T1K>();
         let mut memory = backend.allocate(T1K::placed().into_location());
 
-        memory.write(0, 0x1122334455667788u64);
+        memory.write(0, 0x1122334455667788u64).unwrap();
 
-        assert_eq!(Addressable::<u64>::read(&memory, 0), 0x1122334455667788);
+        macro_rules! check_address {
+            ($ty:ty, $addr:expr, $value:expr) => {
+                assert_eq!(Addressable::<$ty>::read(&memory, $addr), Ok($value));
+            };
+        }
 
-        assert_eq!(Addressable::<u32>::read(&memory, 0), 0x55667788);
-        assert_eq!(Addressable::<u32>::read(&memory, 4), 0x11223344);
+        check_address!(u64, 0, 0x1122334455667788);
 
-        assert_eq!(Addressable::<u16>::read(&memory, 0), 0x7788);
-        assert_eq!(Addressable::<u16>::read(&memory, 2), 0x5566);
-        assert_eq!(Addressable::<u16>::read(&memory, 4), 0x3344);
-        assert_eq!(Addressable::<u16>::read(&memory, 6), 0x1122);
+        check_address!(u32, 0, 0x55667788);
+        check_address!(u32, 4, 0x11223344);
 
-        assert_eq!(Addressable::<u8>::read(&memory, 0), 0x88);
-        assert_eq!(Addressable::<u8>::read(&memory, 1), 0x77);
-        assert_eq!(Addressable::<u8>::read(&memory, 2), 0x66);
-        assert_eq!(Addressable::<u8>::read(&memory, 3), 0x55);
-        assert_eq!(Addressable::<u8>::read(&memory, 4), 0x44);
-        assert_eq!(Addressable::<u8>::read(&memory, 5), 0x33);
-        assert_eq!(Addressable::<u8>::read(&memory, 6), 0x22);
-        assert_eq!(Addressable::<u8>::read(&memory, 7), 0x11);
+        check_address!(u16, 0, 0x7788);
+        check_address!(u16, 2, 0x5566);
+        check_address!(u16, 4, 0x3344);
+        check_address!(u16, 6, 0x1122);
+
+        check_address!(u8, 0, 0x88);
+        check_address!(u8, 1, 0x77);
+        check_address!(u8, 2, 0x66);
+        check_address!(u8, 3, 0x55);
+        check_address!(u8, 4, 0x44);
+        check_address!(u8, 5, 0x33);
+        check_address!(u8, 6, 0x22);
+        check_address!(u8, 7, 0x11);
     }
 }
