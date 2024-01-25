@@ -1,3 +1,5 @@
+// SputnikVM - Apache 2.0 LICENSE - https://github.com/rust-ethereum/evm/blob/master/LICENSE
+
 /// The precomputed values for BLAKE2b [from the spec](https://tools.ietf.org/html/rfc7693#section-2.7)
 /// There are 10 16-byte arrays - one for each round
 /// the entries are calculated from the sigma constants.
