@@ -30,9 +30,6 @@ use primitive_types::{H160, H256, U256};
 pub const STORAGE_VERSION: u64 = 3;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
-const SMART_ROLLUP_ADDRESS: RefPath =
-    RefPath::assert_from(b"/metadata/smart_rollup_address");
-
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
@@ -107,22 +104,6 @@ pub fn store_read_slice<Host: Runtime, T: Path>(
             actual: size,
         }))
     }
-}
-
-pub fn read_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-) -> Result<[u8; 20], Error> {
-    let mut buffer = [0u8; 20];
-    store_read_slice(host, &SMART_ROLLUP_ADDRESS, &mut buffer, 20)?;
-    Ok(buffer)
-}
-
-pub fn store_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-    smart_rollup_address: &[u8; 20],
-) -> Result<(), Error> {
-    host.store_write(&SMART_ROLLUP_ADDRESS, smart_rollup_address, 0)
-        .map_err(Error::from)
 }
 
 /// Read a single unsigned 256 bit value from storage at the path given.

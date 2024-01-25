@@ -10,7 +10,6 @@ use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::{fetch, Configuration};
-use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 use crate::Error::UpgradeError;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
@@ -109,15 +108,8 @@ pub fn stage_one<Host: Runtime>(
 fn retrieve_smart_rollup_address<Host: Runtime>(
     host: &mut Host,
 ) -> Result<[u8; 20], Error> {
-    match read_smart_rollup_address(host) {
-        Ok(smart_rollup_address) => Ok(smart_rollup_address),
-        Err(_) => {
-            let rollup_metadata = Runtime::reveal_metadata(host);
-            let address = rollup_metadata.raw_rollup_address;
-            store_smart_rollup_address(host, &address)?;
-            Ok(address)
-        }
-    }
+    let rollup_metadata = Runtime::reveal_metadata(host);
+    Ok(rollup_metadata.raw_rollup_address)
 }
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
