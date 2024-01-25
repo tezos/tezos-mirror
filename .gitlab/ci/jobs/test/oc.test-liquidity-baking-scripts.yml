@@ -4,12 +4,11 @@ oc.test-liquidity-baking-scripts:
   extends: .test_template
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - scripts/ci/test_liquidity_baking_scripts.sh
-          - scripts/check-liquidity-baking-scripts.sh
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - scripts/ci/test_liquidity_baking_scripts.sh
+        - scripts/check-liquidity-baking-scripts.sh
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   dependencies:
     - "oc.build_x86_64-released"

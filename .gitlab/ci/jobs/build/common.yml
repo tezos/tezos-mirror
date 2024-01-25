@@ -4,13 +4,6 @@
     - .rules__octez_changes
   variables:
     ARCH: ""
-    # We fix the value of GIT_{SHORTREF,DATETIME,VERSION} (these are
-    # read by src/lib_version and output by the binaries `--version`
-    # option). Fixing these values on development builds improves
-    # cache usage.
-    GIT_SHORTREF: "00000000"
-    GIT_DATETIME: "1970-01-01 00:00:00 +0000%"
-    GIT_VERSION: "dev"
   script:
     - ./scripts/ci/build_full_unreleased.sh
   artifacts:
@@ -39,10 +32,9 @@
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
       when: on_success
     - changes:
-        paths:
-          - src/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
 

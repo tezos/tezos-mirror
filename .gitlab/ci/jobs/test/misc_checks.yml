@@ -6,14 +6,11 @@ kaitai_checks:
     - "oc.build_x86_64-released"
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - contrib/*kaitai*/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
-  # These tests are not flaky at all so we overwrite the retry value
-  retry: 0
   needs:
     - "oc.build_x86_64-released"
   script:
@@ -23,16 +20,13 @@ kaitai_e2e_checks:
   extends:
     - .default_settings_template
     - .image_template__runtime_client_libs_dependencies
-  # These tests are not flaky at all so we overwrite the retry value
-  retry: 0
   needs: [kaitai_checks]
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - contrib/*kaitai*/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   before_script:
     - . ./scripts/version.sh
@@ -53,8 +47,6 @@ oc.check_lift_limits_patch:
   extends:
     - .test_template
     - .needs__trigger
-  # These tests are not flaky at all so we overwrite the retry value
-  retry: 0
   rules:
     - changes:
         - src/bin_tps_evaluation/lift_limits.patch

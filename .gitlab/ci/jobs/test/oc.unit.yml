@@ -2,6 +2,7 @@
   extends:
     - .test_template
     - .rules__octez_changes
+    - .oc.template__retry_flaky
   variables:
     ARCH: ""
     MAKE_TARGETS: ""
@@ -55,10 +56,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: always
     - changes:
-        paths:
-          - src/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
 
 
 oc.unit:non-proto-x86_64:

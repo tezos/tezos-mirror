@@ -35,28 +35,26 @@
 .rules__octez_changes:
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - etherlink/**/*
-          - tezt/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
-          - michelson_test_scripts/**/*
-          - tzt_reference_test_suite/**/*
+        - src/**/*
+        - etherlink/**/*
+        - tezt/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+        - michelson_test_scripts/**/*
+        - tzt_reference_test_suite/**/*
       when: on_success
 
 # Only if octez source code has changed or Marge Bot is the trigger
 .rules__octez_changes_or_margebot:
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - etherlink/**/*
-          - tezt/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
-          - michelson_test_scripts/**/*
-          - tzt_reference_test_suite/**/*
+        - src/**/*
+        - etherlink/**/*
+        - tezt/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+        - michelson_test_scripts/**/*
+        - tzt_reference_test_suite/**/*
       when: on_success
     - if: '$GITLAB_USER_LOGIN == "nomadic-margebot"'
       when: on_success
@@ -65,18 +63,17 @@
 .rules__octez_docs_changes:
   rules:
     - changes:
-        paths:
-          - scripts/**/*/
-          - script-inputs/**/*/
-          - src/**/*
-          - tezt/**/*
-          - vendors/**/*
-          - dune
-          - dune-project
-          - dune-workspace
-          - docs/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - scripts/**/*/
+        - script-inputs/**/*/
+        - src/**/*
+        - tezt/**/*
+        - vendors/**/*
+        - dune
+        - dune-project
+        - dune-workspace
+        - docs/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
 
 # Only if the dependencies of the Octez Docker changed or if we're on
@@ -109,6 +106,10 @@
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
     SLACK_COVERAGE_CHANNEL: "C02PHBE7W73"
+
+# Enables retries for flaky test jobs.
+.oc.template__retry_flaky:
+  retry: 2
 
 .oc.build_template:
   extends:
@@ -163,13 +164,12 @@
     # The linting job runs over the set of [source_directories]
     # defined in [scripts/lint.sh] that must be included here:
     - changes:
-        paths:
-        - src/**/*
-        - tezt/**/*
-        - devtools/**/*
-        - scripts/**/*
-        - docs/**/*
-        - contrib/**/*
-        - etherlink/**/*
-        - .gitlab-ci.yml
-        - .gitlab/**/*
+      - src/**/*
+      - tezt/**/*
+      - devtools/**/*
+      - scripts/**/*
+      - docs/**/*
+      - contrib/**/*
+      - etherlink/**/*
+      - .gitlab-ci.yml
+      - .gitlab/**/*

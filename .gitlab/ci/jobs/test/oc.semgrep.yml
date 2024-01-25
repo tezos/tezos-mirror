@@ -4,13 +4,12 @@ oc.semgrep:
     - .needs__trigger
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - tezt/**/*
-          - devtools/**/*
-          - scripts/semgrep/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - src/**/*
+        - tezt/**/*
+        - devtools/**/*
+        - scripts/semgrep/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   # We specify the image by hash to avoid flakiness. Indeed, if we took the
   # latest release, then an update in the parser or analyser could result in new

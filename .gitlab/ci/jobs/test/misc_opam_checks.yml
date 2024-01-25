@@ -2,6 +2,8 @@ misc_opam_checks:
   extends:
     - .test_template
     - .needs__trigger
+    # This job is flaky due to e.g. network issues.
+    - .oc.template__retry_flaky
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh

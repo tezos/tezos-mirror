@@ -11,7 +11,6 @@
   before_script:
     - . ./scripts/version.sh
     - eval $(opam env)
-  retry: 2
 
 # Merge coverage files after the execution
 .oc.template__coverage_files:
@@ -106,6 +105,7 @@
     - .image_template__runtime_e2etest_dependencies
     - .oc.template__coverage_files
     - .tezt_template
+    - .oc.template__retry_flaky
   variables:
     # Certain tests can be blacklisted by modifying the TESTS variable.
     # Do not tests with the tag 'ci_disabled' and 'flaky'.

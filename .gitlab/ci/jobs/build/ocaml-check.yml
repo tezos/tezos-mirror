@@ -5,12 +5,11 @@ ocaml-check:
     - .needs__trigger
   rules:
     - changes:
-        paths:
-          - src/**/*
-          - tezt/**/*
-          - .gitlab/**/*
-          - .gitlab-ci.yml
-          - devtools/**/*
+        - src/**/*
+        - tezt/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+        - devtools/**/*
       when: on_success
   script:
     - dune build @check

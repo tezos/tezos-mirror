@@ -5,10 +5,9 @@ check_precommit_hook:
     - .needs__trigger
   rules:
     - changes:
-        paths:
-          - scripts/pre_commit/pre_commit.py
-          - .gitlab/**/*
-          - .gitlab-ci.yml
+        - scripts/pre_commit/pre_commit.py
+        - .gitlab/**/*
+        - .gitlab-ci.yml
       when: on_success
   stage: test
   before_script:
