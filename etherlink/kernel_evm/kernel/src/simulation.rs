@@ -14,6 +14,7 @@ use crate::{
     tick_model, CONFIG,
 };
 
+use evm_execution::run_transaction;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
@@ -114,7 +115,7 @@ impl Evaluation {
             block_fees.base_fee_per_gas()
         };
 
-        let outcome = evm_execution::run_transaction(
+        let outcome = run_transaction(
             host,
             &current_constants,
             &mut evm_account_storage,
@@ -188,9 +189,67 @@ enum TxValidationOutcome {
     NotCorrectSignature,
     InvalidChainId,
     MaxGasFeeTooLow,
+    OutOfTicks,
 }
 
 impl TxValidation {
+    // Run the transaction and checks if it fails with "OutOfTicks". It might
+    // fail for other reasons, but in that case it is still correct.
+    pub fn would_exhaust_ticks<Host: Runtime>(
+        host: &mut Host,
+        transaction: &EthereumTransactionCommon,
+        caller: &H160,
+    ) -> Result<bool, anyhow::Error> {
+        let chain_id = retrieve_chain_id(host)?;
+        let block_fees = retrieve_block_fees(host)?;
+
+        let current_constants = match storage::read_current_block(host) {
+            Ok(block) => block.constants(chain_id, block_fees),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                BlockConstants::first_block(timestamp, chain_id, block_fees)
+            }
+        };
+
+        let mut evm_account_storage = account_storage::init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+        let precompiles = precompiles::precompile_set::<Host>();
+        let tx_data_size = transaction.data.len() as u64;
+        let allocated_ticks =
+            tick_model::estimate_remaining_ticks_for_transaction_execution(
+                0,
+                tx_data_size,
+            );
+
+        let gas_price = if let Ok(gas_price) =
+            transaction.effective_gas_price(block_fees.base_fee_per_gas())
+        {
+            gas_price
+        } else {
+            block_fees.base_fee_per_gas()
+        };
+
+        match run_transaction(
+            host,
+            &current_constants,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            transaction.to,
+            *caller,
+            transaction.data.clone(),
+            Some(transaction.gas_limit), // gas could be omitted
+            gas_price,
+            Some(transaction.value),
+            false,
+            allocated_ticks,
+        ) {
+            Err(evm_execution::EthereumError::OutOfTicks) => Ok(true),
+            _ => Ok(false),
+        }
+    }
+
     /// Execute the simulation
     pub fn run<Host: Runtime>(
         &self,
@@ -218,6 +277,11 @@ impl TxValidation {
         // Check if the chain id is correct
         if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
             return Ok(TxValidationOutcome::InvalidChainId);
+        }
+        // Check if running the transaction (assuming it is valid) would run out
+        // of ticks.
+        if let Ok(true) = Self::would_exhaust_ticks(host, tx, &caller) {
+            return Ok(TxValidationOutcome::OutOfTicks);
         }
         // Check if the gas price is high enough
         if tx.max_fee_per_gas < block_fees.base_fee_per_gas()
@@ -393,6 +457,18 @@ fn store_tx_validation_outcome<Host: Runtime>(
         TxValidationOutcome::MaxGasFeeTooLow => {
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Max gas fee too low.".to_vec()))
+        }
+        TxValidationOutcome::OutOfTicks => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(
+                host,
+                Some(
+                    b"The transaction would exhaust all the ticks it is allocated. \
+                      Try reducing its gas consumption or splitting the call in \
+                      multiple steps, if possible."
+                        .to_vec(),
+                ),
+            )
         }
     }
 }
