@@ -171,13 +171,37 @@ let apply_and_clear_current_cycle_denunciations ctxt =
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     {reward; amount_to_burn}
   in
-  let* ctxt, slashings, balance_updates =
+  let* ctxt, slashings, balance_updates, remaining_denunciations =
     Storage.Current_cycle_denunciations.fold
       ctxt
       ~order:`Undefined
-      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, []))
+      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, [], []))
       ~f:(fun delegate denunciations acc ->
-        let*? ctxt, slashings, balance_updates = acc in
+        let*? ctxt, slashings, balance_updates, remaining_denunciations = acc in
+        (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
+           end of this period, we "delay" the current cycle's misbehaviour's denunciations,
+           while we apply the older denunciations.
+           Indeed, we apply denunciations in the cycle following the misbehaviour, so that
+           the time between the misbehaviour and the slashing is at most
+           [max_slashing_period = 2] cycles. *)
+        let denunciations_to_apply, denunciations_to_delay =
+          if not (Constants_storage.adaptive_issuance_ns_enable ctxt) then
+            (denunciations, [])
+          else
+            List.partition
+              (fun denunciation ->
+                let level =
+                  denunciation.Denunciations_repr.misbehaviour.level
+                in
+                let misb_cycle =
+                  (Level_repr.level_from_raw
+                     ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                     level)
+                    .cycle
+                in
+                Cycle_repr.(misb_cycle < current_cycle))
+              denunciations
+        in
         let+ ctxt, percentage, balance_updates =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
@@ -200,11 +224,12 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                   .cycle
               in
               let get_initial_frozen_deposits_of_misbehaviour_cycle =
-                if Cycle_repr.(equal current_cycle misbehaviour_cycle) then
+                if Cycle_repr.equal current_cycle misbehaviour_cycle then
                   Delegate_storage.initial_frozen_deposits
-                else if Cycle_repr.(equal previous_cycle misbehaviour_cycle)
-                then Delegate_storage.initial_frozen_deposits_of_previous_cycle
-                else fun _ _ -> return Tez_repr.zero
+                else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
+                  Delegate_storage.initial_frozen_deposits_of_previous_cycle
+                else fun (_ : Raw_context.t) (_ : Signature.public_key_hash) ->
+                  return Tez_repr.zero
                 (* (denunciation applied too late)
                    We could assert false, but we can also be permissive
                    while keeping the same invariants *)
@@ -305,12 +330,28 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                 punish_balance_updates @ reward_balance_updates
                 @ balance_updates ))
             (ctxt, Int_percentage.p0, balance_updates)
-            denunciations
+            denunciations_to_apply
         in
         let slashings =
           Signature.Public_key_hash.Map.add delegate percentage slashings
         in
-        (ctxt, slashings, balance_updates))
+        ( ctxt,
+          slashings,
+          balance_updates,
+          (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
   let*! ctxt = Storage.Current_cycle_denunciations.clear ctxt in
+  let*! ctxt =
+    List.fold_left_s
+      (fun ctxt (delegate, current_cycle_denunciations) ->
+        match current_cycle_denunciations with
+        | [] -> Lwt.return ctxt
+        | _ ->
+            Storage.Current_cycle_denunciations.add
+              ctxt
+              delegate
+              current_cycle_denunciations)
+      ctxt
+      remaining_denunciations
+  in
   return (ctxt, slashings, balance_updates)
