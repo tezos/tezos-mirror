@@ -67,12 +67,6 @@ fn compute<Host: Runtime>(
     );
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
-        // is reboot necessary ?
-        if block_in_progress.would_overflow() {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
-            // there should be an upper bound on gasLimit
-            return Ok(ComputationResult::RebootNeeded);
-        }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 

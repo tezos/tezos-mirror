@@ -320,15 +320,6 @@ impl BlockInProgress {
         !self.tx_queue.is_empty()
     }
 
-    pub fn would_overflow(&self) -> bool {
-        match self.tx_queue.front() {
-            Some(transaction) => {
-                tick_model::estimate_would_overflow(self.estimated_ticks, transaction)
-            }
-            None => false, // should not happen, but false is a safe value anyway
-        }
-    }
-
     pub fn make_receipt(
         &mut self,
         receipt_info: TransactionReceiptInfo,
