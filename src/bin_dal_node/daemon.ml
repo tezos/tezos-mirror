@@ -304,15 +304,15 @@ module Handler = struct
 
   (* Monitor heads and store *finalized* published slot headers indexed by block
      hash. A slot header is considered finalized when it is in a block with at
-     least one other block on top of it, as guaranteed by Tenderbake. Note that
-     this means that shard propagation is delayed by one level with respect to
+     least two other blocks on top of it, as guaranteed by Tenderbake. Note that
+     this means that shard propagation is delayed by two levels with respect to
      the publication level of the corresponding slot header. *)
   let new_head ctxt cctxt =
     let open Lwt_result_syntax in
     let handler _stopper (head_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready ready_ctxt ->
+      | Ready ready_ctxt -> (
           let Node_context.
                 {
                   plugin = (module Plugin);
@@ -320,7 +320,7 @@ module Handler = struct
                   cryptobox;
                   shards_proofs_precomputation = _;
                   plugin_proto;
-                  last_seen_head;
+                  last_processed_level;
                 } =
             ready_ctxt
           in
@@ -339,15 +339,13 @@ module Handler = struct
                head_level
                proto_parameters.attestation_lag) ;
 
-          let process_block block_proto block_level =
+          let process_block block_level =
             let block = `Level block_level in
             let* block_info =
               Plugin.block_info cctxt ~block ~metadata:`Always
             in
-            let*? block_round =
-              let shell_header = Plugin.block_shell_header block_info in
-              Plugin.get_round shell_header.fitness
-            in
+            let shell_header = Plugin.block_shell_header block_info in
+            let*? block_round = Plugin.get_round shell_header.fitness in
             let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
               Slot_manager.store_slot_headers
@@ -406,40 +404,50 @@ module Handler = struct
                 (Node_context.get_gs_worker ctxt)
                 committee
             in
+            (* This should be the last modification of this node's (ready) context. *)
+            let*? () =
+              Node_context.update_last_processed_level ctxt ~level:block_level
+            in
             Dal_metrics.layer1_block_finalized ~block_level ;
             Dal_metrics.layer1_block_finalized_round ~block_round ;
             let*! () =
               Event.(emit layer1_node_final_block (block_level, block_round))
             in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
+               Note that the first processed block is special: in contrast to
+               the general case, as implemented by this function, the plugin was
+               set before processing the block, by
+               [resolve_plugin_and_set_ready], not after processing the
+               block. *)
             may_update_plugin
               cctxt
               ctxt
               ~block
               ~current_proto:plugin_proto
-              ~block_proto
+              ~block_proto:shell_header.proto_level
           in
-          let* () =
-            match last_seen_head with
-            | Some {level = last_head_level; proto}
-              when Int32.(succ last_head_level = head_level) ->
-                if last_head_level > 1l then process_block proto last_head_level
-                else
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
-                     [last_head_level = 1] is a special migration block: in
-                     contrast to the general case, as implemented by this
-                     function, the plugin was set before processing the block,
-                     by [resolve_plugin_and_set_ready], not after processing the
-                     block. We do not process the block at level 1. *)
-                  return_unit
-            | _ -> return_unit
-          in
-          let head_info =
-            Node_context.{proto = header.shell.proto_level; level = head_level}
-          in
-          let*? () = Node_context.update_last_seen_head ctxt head_info in
-          return_unit
+          match last_processed_level with
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849
+             Depending on the profile, also process blocks in the past, that is,
+             when [last_processed_level < head_level - 3]. *)
+          | Some last_processed_level
+            when Int32.(sub head_level last_processed_level = 3l) ->
+              (* Then the block at level [last_processed_level + 1] is final
+                 (not only its payload), therefore its DAL attestations are
+                 final. *)
+              process_block (Int32.succ last_processed_level)
+          | None ->
+              (* This is the first time we process a block. *)
+              if head_level > 3l then process_block (Int32.sub head_level 2l)
+              else
+                (* We do not process the block at level 1, as it will not contain DAL
+                   information, and it has no round. *)
+                return_unit
+          | Some _ ->
+              (* This case is unreachable, assuming [Monitor_services.heads] does not
+                 skip levels. *)
+              return_unit)
     in
-
     let*! () = Event.(emit layer1_node_tracking_started ()) in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
         If the layer1 node reboots, the rpc stream breaks.*)
