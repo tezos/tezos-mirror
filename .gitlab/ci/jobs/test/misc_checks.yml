@@ -43,7 +43,6 @@ kaitai_checks:
       when: on_success
   # These tests are not flaky at all so we overwrite the retry value
   retry: 0
-  needs: [trigger]
   needs:
     - "oc.build_x86_64-released"
   script:
