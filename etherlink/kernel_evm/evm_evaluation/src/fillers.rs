@@ -103,7 +103,13 @@ fn check_should_not_exist(
             false
         };
 
-        if balance_is_zero && no_code {
+        let nonce_is_zero = if let Ok(nonce) = account.nonce(host) {
+            nonce == U256::zero()
+        } else {
+            false
+        };
+
+        if balance_is_zero && no_code && nonce_is_zero {
             write_host!(host, "Account {} rightfully does not exist.", hex_address);
         } else {
             write_host!(host, "Account {} should not exist.", hex_address);
