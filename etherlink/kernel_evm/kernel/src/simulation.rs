@@ -222,8 +222,7 @@ impl TxValidation {
                 tx_data_size,
             );
 
-        let gas_price = if let Ok(gas_price) =
-            transaction.effective_gas_price(block_fees.base_fee_per_gas())
+        let gas_price = if let Ok(gas_price) = transaction.overall_gas_price(&block_fees)
         {
             gas_price
         } else {
@@ -284,9 +283,7 @@ impl TxValidation {
             return Ok(TxValidationOutcome::OutOfTicks);
         }
         // Check if the gas price is high enough
-        if tx.max_fee_per_gas < block_fees.base_fee_per_gas()
-            || tx.max_fee_per_gas < tx.max_priority_fee_per_gas
-        {
+        if tx.max_fee_per_gas < block_fees.base_fee_per_gas() {
             return Ok(TxValidationOutcome::MaxGasFeeTooLow);
         }
         // TODO: #6498

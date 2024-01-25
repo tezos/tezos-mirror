@@ -15,7 +15,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use tezos_data_encoding::enc::BinWriter;
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
@@ -57,13 +57,14 @@ impl Transaction {
         }
     }
 
-    // This function returns effective_gas_price
-    // For more details see the first paragraph here https://eips.ethereum.org/EIPS/eip-1559#specification
-    fn gas_price(&self, block_base_fee_per_gas: U256) -> Result<U256, anyhow::Error> {
+    // This function returns effective_gas_price of the transaction.
+    //
+    // This includes both the gas paid for execution, and for the additional flat & data-availability fees.
+    fn overall_gas_price(&self, block_fees: &BlockFees) -> Result<U256, anyhow::Error> {
         match &self.content {
             TransactionContent::Deposit(_) => Ok(U256::zero()),
             TransactionContent::Ethereum(transaction) => {
-                transaction.effective_gas_price(block_base_fee_per_gas)
+                transaction.overall_gas_price(block_fees)
             }
         }
     }
@@ -99,6 +100,7 @@ pub struct TransactionReceiptInfo {
     pub effective_gas_price: U256,
 }
 
+#[derive(Debug)]
 pub struct TransactionObjectInfo {
     pub from: H160,
     pub gas_used: U256,
@@ -137,12 +139,12 @@ fn make_object_info(
     from: H160,
     index: u32,
     gas_used: U256,
-    block_base_fee_per_gas: U256,
+    block_fees: &BlockFees,
 ) -> Result<TransactionObjectInfo, anyhow::Error> {
     Ok(TransactionObjectInfo {
         from,
         gas_used,
-        gas_price: transaction.gas_price(block_base_fee_per_gas)?,
+        gas_price: transaction.overall_gas_price(block_fees)?,
         hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
@@ -255,12 +257,8 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         return Ok(Validity::InvalidCode);
     }
 
-    // EIP 1559 checks
     // ensure that the user was willing to at least pay the base fee
-    // and that max is greater than both fees
-    if transaction.max_fee_per_gas < block_constant.base_fee_per_gas()
-        || transaction.max_fee_per_gas < transaction.max_priority_fee_per_gas
-    {
+    if transaction.max_fee_per_gas < block_constant.base_fee_per_gas() {
         log!(host, Debug, "Transaction status: ERROR_MAX_BASE_FEE");
         return Ok(Validity::InvalidMaxBaseFee);
     }
@@ -283,8 +281,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     transaction: &EthereumTransactionCommon,
     allocated_ticks: u64,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
-    let effective_gas_price =
-        transaction.effective_gas_price(block_constants.base_fee_per_gas())?;
+    let effective_gas_price = block_constants.base_fee_per_gas();
     let caller = match is_valid_ethereum_transaction_common(
         host,
         evm_account_storage,
@@ -528,7 +525,7 @@ pub fn apply_transaction<Host: Runtime>(
                 caller,
                 index,
                 gas_used,
-                block_constants.base_fee_per_gas(),
+                &block_constants.block_fees,
             )?;
 
             let receipt_info = make_receipt_info(
@@ -826,40 +823,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tx_is_invalid_max_fee_less_than_priority_fee() {
-        let mut host = MockHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
-        let block_constants = mock_block_constants();
-
-        // setup
-        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
-        let gas_price = U256::from(21000);
-        let balance = U256::from(21000) * gas_price;
-        let mut transaction = valid_tx();
-        // set a max_priority_fee bigger than,
-        transaction.max_priority_fee_per_gas = U256::from(22000);
-        transaction = resign(transaction);
-
-        // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
-
-        // act
-        let res = is_valid_ethereum_transaction_common(
-            &mut host,
-            &mut evm_account_storage,
-            &transaction,
-            &block_constants,
-            gas_price,
-        );
-        assert_eq!(
-            Validity::InvalidMaxBaseFee,
-            res.expect("Verification should not have raise an error"),
-            "Transaction should have been rejected"
-        );
-    }
-
-    #[test]
     // when the user specify a max fee per gas lower than base fee,
     // the function should fail gracefully
     fn test_no_underflow_make_object_tx() {
@@ -880,12 +843,14 @@ mod tests {
             )),
         };
 
+        let block_fees = BlockFees::new(U256::from(9));
+
         let obj = make_object_info(
             &transaction,
             H160::zero(),
             0u32,
             U256::from(21_000),
-            U256::from(9),
+            &block_fees,
         );
         assert!(obj.is_err())
     }

@@ -850,12 +850,13 @@ mod tests {
         );
 
         let sender = dummy_eth_caller();
+        let initial_sender_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
             &mut evm_account_storage,
             &sender,
-            U256::from(10000000000000000000u64),
+            initial_sender_balance,
         );
 
         produce(
@@ -872,8 +873,14 @@ mod tests {
         let dest_balance =
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
-        assert_eq!(sender_balance, U256::from(9999999159500000000u64));
-        assert_eq!(dest_balance, U256::from(500000000u64))
+        let expected_dest_balance = U256::from(500000000u64);
+        let expected_gas = 21000;
+        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas;
+        let expected_sender_balance =
+            initial_sender_balance - expected_dest_balance - expected_fees;
+
+        assert_eq!(dest_balance, expected_dest_balance);
+        assert_eq!(sender_balance, expected_sender_balance);
     }
 
     #[test]

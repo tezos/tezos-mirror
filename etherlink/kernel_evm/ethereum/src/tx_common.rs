@@ -19,6 +19,7 @@ use thiserror::Error;
 
 use crate::{
     access_list::AccessList,
+    block::BlockFees,
     rlp_helpers::{
         append_h256, append_option, append_vec, decode_field, decode_field_h256,
         decode_list, decode_option, next,
@@ -69,13 +70,16 @@ pub struct EthereumTransactionCommon {
     /// A scalar value equal to the number of transactions sent by the sender
     pub nonce: U256,
 
-    /// Amount of fee to be paid per gas in addition
-    /// to the base_fee_per_gas in order
-    /// to incentivize miners to include the transaction.
-    /// base_fee_per_gas is re-evaluated every block
-    /// from the actual usage of gas in the previous block.
+    /// Normally, this would be a fee paid per gas in addition to base fee per gas.
+    /// This would incentivise miners to include the transaction.
     /// More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
-    pub max_priority_fee_per_gas: U256,
+    ///
+    /// We choose to ignore this, however, as we actually do not implement eip-1559
+    /// mechanism exactly. The sequencer is compensated via the data availability fee
+    /// and gas fee.
+    ///
+    /// We keep this field purely for compatibility with existing ethereum tooling.
+    max_priority_fee_per_gas: U256,
     /// Maximum amount of fee to be paid per gas.
     /// Thus, as a transaction might be included in the block
     /// with higher base_fee_per_gas then one
@@ -551,22 +555,21 @@ impl EthereumTransactionCommon {
         }
     }
 
-    /// Returns effective_gas_price of the transaction.
+    /// Returns overall_gas_price of the transaction.
     ///
-    /// For more details see [eip-1559](https://eips.ethereum.org/EIPS/eip-1559#specification).
-    pub fn effective_gas_price(
+    /// *NB* this is not the gas price used _for execution_, but rather the gas price that
+    /// should be reported in the transaction receipt.
+    pub fn overall_gas_price(
         &self,
-        block_base_fee_per_gas: U256,
+        block_fees: &BlockFees,
     ) -> Result<U256, anyhow::Error> {
-        let priority_fee_per_gas = U256::min(
-            self.max_priority_fee_per_gas,
-            self.max_fee_per_gas
-                .checked_sub(block_base_fee_per_gas)
-                .ok_or_else(|| anyhow::anyhow!("Underflow when calculating gas price"))?,
-        );
-        priority_fee_per_gas
-            .checked_add(block_base_fee_per_gas)
-            .ok_or_else(|| anyhow::anyhow!("Overflow"))
+        let block_base_fee_per_gas = block_fees.base_fee_per_gas();
+
+        if self.max_fee_per_gas >= block_base_fee_per_gas {
+            Ok(block_base_fee_per_gas)
+        } else {
+            Err(anyhow::anyhow!("Underflow when calculating gas price"))
+        }
     }
 
     /// Returns the gas limit for executing this transaction.
