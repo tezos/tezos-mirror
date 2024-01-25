@@ -244,10 +244,10 @@ pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::csregisters::xstatus::{ExtensionValue, FieldValue, MPPValue, SPPValue, XLenValue};
+
     #[test]
     fn test_status_fields() {
-        use crate::csregisters::xstatus::{ExtensionValue, FieldValue};
-
         let field = bool::new(0xF0F0_0000_AAAA_0001);
         assert!(field);
 
@@ -255,7 +255,19 @@ pub mod tests {
         assert!(!field);
 
         let field = ExtensionValue::new(0b1111_0010);
-        assert!(field == ExtensionValue::Clean);
+        assert_eq!(field, ExtensionValue::Clean);
         assert_eq!(field.raw_bits(), 0b10);
+
+        let field = XLenValue::new(0b01);
+        assert_eq!(field, XLenValue::MXL32);
+        assert_eq!(field.raw_bits(), 0b01);
+
+        let field = MPPValue::new(0b1010);
+        assert_eq!(field, MPPValue::User);
+        assert_eq!(field.raw_bits(), 0b00);
+
+        let field = SPPValue::new(0b111);
+        assert_eq!(field, SPPValue::Supervisor);
+        assert_eq!(field.raw_bits(), 0b1);
     }
 }
