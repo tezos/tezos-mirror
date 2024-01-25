@@ -2665,6 +2665,212 @@ mod test {
         }
     }
 
+    // Caller nonce is bumped at each contract creation
+    #[test]
+    fn test_caller_nonce_after_create() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller =
+            H160::from_str("0xd0bBEc6D2c628b7e2E6D5556daA14a5181b604C5").unwrap();
+
+        let sub_contract =
+            H160::from_str("0xd807115ef18e7e9b8e54188b4e9ef514277a0740").unwrap();
+
+        let contract_address =
+            H160::from_str("0x7658771dc6af74a3d2f8499d349ff9c1a0df8826").unwrap();
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            10000000.into(),
+        );
+
+        // init_code is the input to deploy the following contract.
+        // This contract tries to create a contract at the sub_contract, the creation within the creation will fail
+        // But the creation will success
+        // PUSH5 0x6001600155
+        // PUSH1 0
+        // MSTORE
+        // PUSH1 5
+        // PUSH1 27
+        // PUSH1 0
+        // CREATE
+        let init_code = hex::decode("6460016001556000526005601b6000f0")
+            .expect("Failed to decode call data");
+
+        let gas_limit = 300_000;
+        let gas_price = U256::from(1);
+
+        // Test contract nonce before creation
+        let contract = EthereumAccount::from_address(&contract_address).unwrap();
+        let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+
+        assert_eq!(U256::zero(), original_contract_nonce);
+
+        // Test the nonce of the sub contract that will be created within contract creation
+        let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
+        let original_sub_nonce = sub_contract_account
+            .nonce(&mock_runtime)
+            .unwrap_or_default();
+
+        assert_eq!(U256::zero(), original_sub_nonce);
+
+        let result_init = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            init_code,
+            Some(gas_limit),
+            gas_price,
+            None,
+            true,
+            10_000_000_000,
+            false,
+            false,
+        );
+
+        let result_init = unwrap_outcome!(&result_init, true);
+
+        match &result_init.reason {
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)) => {
+                let contract = EthereumAccount::from_address(&contract_address).unwrap();
+                let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+                // Check that even if the contract fails to create another contract (due to a collision),
+                // the nonce of contract_address is still bumped
+                assert_eq!(caller_nonce, U256::from(2));
+
+                // The sub contract has been created at 0xd807115ef18e7e9b8e54188b4e9ef514277a0740 and
+                // its nonce is incremented to 1
+                let sub_contract_created =
+                    EthereumAccount::from_address(&sub_contract).unwrap();
+                let sub_contract_nonce = sub_contract_created
+                    .nonce(&mock_runtime)
+                    .unwrap_or_default();
+                assert_eq!(sub_contract_nonce, U256::from(1));
+            }
+            exit_error => panic!(
+                "ExitReason: {:?}. Expect ExitReason::Succeed(ExitSucceed::Stopped)",
+                exit_error
+            ),
+        }
+    }
+
+    // This test is the same as test_caller_nonce_after_create but with a collision
+    // The nonce of the caller 'contract' should still be incremented
+    #[test]
+    fn test_caller_nonce_after_create_collision() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller =
+            H160::from_str("0xd0bBEc6D2c628b7e2E6D5556daA14a5181b604C5").unwrap();
+
+        let sub_contract =
+            H160::from_str("0xd807115ef18e7e9b8e54188b4e9ef514277a0740").unwrap();
+
+        let contract_address =
+            H160::from_str("0x7658771dc6af74a3d2f8499d349ff9c1a0df8826").unwrap();
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            10000000.into(),
+        );
+
+        // Set the code of sub_contract to set up a collision
+        set_account_code(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &sub_contract,
+            hex::decode("B0B0FACE")
+                .expect("Failed to decode contract code")
+                .as_slice(),
+        );
+
+        // init_code is the input to deploy the following contract.
+        // This contract tries to create a contract at the sub_contract, the creation within the creation will fail
+        // But the creation will success
+        // PUSH5 0x6001600155
+        // PUSH1 0
+        // MSTORE
+        // PUSH1 5
+        // PUSH1 27
+        // PUSH1 0
+        // CREATE
+        let init_code = hex::decode("6460016001556000526005601b6000f0")
+            .expect("Failed to decode call data");
+
+        let gas_limit = 300_000;
+        let gas_price = U256::from(1);
+
+        // Test contract nonce before creation
+        let contract = EthereumAccount::from_address(&contract_address).unwrap();
+        let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+
+        assert_eq!(U256::zero(), original_contract_nonce);
+
+        // Test the nonce of the sub contract that will be created within contract creation
+        let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
+        let original_sub_nonce = sub_contract_account
+            .nonce(&mock_runtime)
+            .unwrap_or_default();
+
+        assert_eq!(U256::zero(), original_sub_nonce);
+
+        let result_init = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            init_code,
+            Some(gas_limit),
+            gas_price,
+            None,
+            true,
+            10_000_000_000,
+            false,
+            false,
+        );
+
+        let result_init = unwrap_outcome!(&result_init, true);
+
+        match &result_init.reason {
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)) => {
+                // Check that even if the contract fails to create another contract (due to a collision),
+                // the nonce of contract_address is still bumped
+                let contract = EthereumAccount::from_address(&contract_address).unwrap();
+                let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+                assert_eq!(caller_nonce, U256::from(2));
+
+                // The sub contract has a collision, so its nonce should not change
+                let sub_contract_created =
+                    EthereumAccount::from_address(&sub_contract).unwrap();
+                let sub_contract_nonce = sub_contract_created
+                    .nonce(&mock_runtime)
+                    .unwrap_or_default();
+                assert_eq!(sub_contract_nonce, original_sub_nonce);
+            }
+            exit_error => panic!(
+                "ExitReason: {:?}. Expect ExitReason::Succeed(ExitSucceed::Stopped)",
+                exit_error
+            ),
+        }
+    }
+
     // Test case from https://eips.ethereum.org/EIPS/eip-684 with modification
     #[test]
     fn test_create_to_address_with_non_zero_nonce_returns_error() {

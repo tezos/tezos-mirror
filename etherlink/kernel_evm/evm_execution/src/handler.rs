@@ -3692,6 +3692,78 @@ mod test {
         )
     }
 
+    // According EIP-2929, the created address should still be hot even if the creation fails
+    #[test]
+    fn address_still_marked_as_hot_after_creation_fails() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let gas_price = U256::from(21000);
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+            true,
+        );
+
+        let contrac_addr =
+            H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
+        let expected_address = handler.create_address(CreateScheme::Legacy {
+            caller: contrac_addr,
+        });
+
+        // Tries to CREATE a contract (that will revert)
+        let contract_code = vec![
+            Opcode::PUSH5.as_u8(),
+            0x60,
+            0x00,
+            0x60,
+            0x00,
+            0xfd,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x05,
+            Opcode::PUSH1.as_u8(),
+            0x1b,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::CREATE.as_u8(),
+        ];
+        set_code(&mut handler, &contrac_addr, contract_code);
+        let input = vec![0_u8];
+        let transaction_context =
+            TransactionContext::new(caller, contrac_addr, U256::zero());
+        let transfer: Option<Transfer> = None;
+
+        handler
+            .begin_initial_transaction(false, Some(1000000))
+            .unwrap();
+
+        let _ = handler.execute_call(contrac_addr, transfer, input, transaction_context);
+
+        let exist = handler.is_colliding(expected_address).unwrap();
+
+        assert!(!exist, "Expected address should not exist");
+
+        // After the `execute_call` expected address should be marked as hot
+        let is_hot = handler.is_address_hot(expected_address).unwrap();
+
+        assert!(is_hot, "Expected address is cold where it should be hot");
+    }
+
     #[test]
     fn precompile_failure_are_not_fatal() {
         let mut host = MockHost::default();
