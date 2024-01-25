@@ -674,21 +674,14 @@ let sequencer_command =
       let* smart_rollup_address =
         Rollup_node_services.smart_rollup_address rollup_node_endpoint
       in
-      let* ctxt, loaded =
+      let* () = Blueprints_publisher.start {rollup_node_endpoint} in
+      let* ctxt =
         Sequencer_context.init
           ~data_dir
           ~kernel:config.mode.kernel
           ~preimages:config.mode.preimages
           ~smart_rollup_address
-      in
-      let* ctxt =
-        if loaded then return ctxt
-        else
-          Sequencer_state.init
-            ~secret_key:sequencer
-            ~rollup_node_endpoint
-            ~smart_rollup_address
-            ctxt
+          ~secret_key:sequencer
       in
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
@@ -714,7 +707,6 @@ let sequencer_command =
       let* server, private_server =
         seq_start config ~directory ~private_directory
       in
-      let* () = Blueprints_publisher.start {rollup_node_endpoint} in
       let (_ : Lwt_exit.clean_up_callback_id) =
         install_finalizer_seq server private_server
       in

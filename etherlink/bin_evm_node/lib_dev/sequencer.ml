@@ -32,51 +32,26 @@ end) : Services_backend_sig.Backend = struct
   module Publisher = struct
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
-      let open Ethereum_types in
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
       (* Create the blueprint with the messages. *)
-      let (Ethereum_types.(Qty next) as number) = ctxt.next_blueprint_number in
-      let inputs =
+      let blueprint =
         Sequencer_blueprint.create
           ~secret_key:Ctxt.secret_key
           ~timestamp
           ~smart_rollup_address
           ~transactions:messages
-          ~number
+          ~number:ctxt.next_blueprint_number
       in
-      (* Execute the blueprint. *)
-      let exec_inputs =
-        List.map
-          (function `External payload -> `Input ("\001" ^ payload))
-          inputs
-      in
-      let*! evm_state = Sequencer_context.evm_state ctxt in
-      let*! (Block_height before_height) =
-        Sequencer_state.current_block_height evm_state
-      in
-      let* ctxt, evm_state = Sequencer_state.execute ctxt exec_inputs in
-      let*! (Block_height after_height) =
-        Sequencer_state.current_block_height evm_state
-      in
-
-      if Z.(equal (succ before_height) after_height) then (
-        let* () = Blueprint_store.store ctxt inputs (Qty after_height) in
-        ctxt.next_blueprint_number <- Qty (Z.succ after_height) ;
-        let*! () = Blueprint_event.blueprint_produced next in
-        let _ = Sequencer_context.commit ctxt evm_state in
-        let* () = Blueprints_publisher.publish next inputs in
-        return_unit)
-      else
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
-        let*! () = Blueprint_event.invalid_blueprint_produced next in
-        return_unit
+      (* Apply the blueprint *)
+      let* _ctxt = Sequencer_context.apply_blueprint ctxt blueprint in
+      return_unit
   end
 
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
-      let* raw_insights = Sequencer_state.execute_and_inspect ctxt ~input in
+      let* raw_insights = Sequencer_context.execute_and_inspect ctxt ~input in
       match Simulation.Encodings.insights_from_list raw_insights with
       | Some i -> return i
       | None -> Error_monad.failwith "Invalid insights format"

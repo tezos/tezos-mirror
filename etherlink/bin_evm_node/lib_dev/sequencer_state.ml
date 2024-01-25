@@ -5,57 +5,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Ethereum_types
+
+module Bare_context = struct
+  module Tree = Irmin_context.Tree
+
+  type t = Irmin_context.rw
+
+  type index = Irmin_context.rw_index
+
+  type nonrec tree = Irmin_context.tree
+
+  let init ?patch_context:_ ?readonly:_ ?index_log_size:_ path =
+    let open Lwt_syntax in
+    let* res = Irmin_context.load ~cache_size:100_000 Read_write path in
+    match res with
+    | Ok res -> return res
+    | Error _ -> Lwt.fail_with "could not initialize the context"
+
+  let empty index = Irmin_context.empty index
+end
+
+type t = Irmin_context.PVMState.value
+
 module Wasm_utils =
-  Wasm_utils.Make
-    (Tezos_tree_encoding.Encodings_util.Make (Sequencer_context.Bare_context))
+  Wasm_utils.Make (Tezos_tree_encoding.Encodings_util.Make (Bare_context))
 module Wasm = Wasm_debugger.Make (Wasm_utils)
 
-let execute ?(commit = false) ctxt inbox =
+let execute ~config evm_state inbox =
   let open Lwt_result_syntax in
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
-  let config =
-    Config.config
-      ~preimage_directory:ctxt.Sequencer_context.preimages
-      ~kernel_debug:true
-      ~destination:ctxt.Sequencer_context.smart_rollup_address
-      ()
-  in
-  let*! evm_state = Sequencer_context.evm_state ctxt in
   let* evm_state, _, _, _ =
     Wasm.Commands.eval 0l inbox config Inbox evm_state
   in
-  let* ctxt =
-    if commit then Sequencer_context.commit ctxt evm_state else return ctxt
-  in
-  return (ctxt, evm_state)
+  return evm_state
 
-let init ~secret_key ~smart_rollup_address ~rollup_node_endpoint ctxt =
+let init ~kernel =
   let open Lwt_result_syntax in
   let evm_state = Irmin_context.PVMState.empty () in
   let* evm_state =
-    Wasm.start
-      ~tree:evm_state
-      Tezos_scoru_wasm.Wasm_pvm_state.V3
-      ctxt.Sequencer_context.kernel
+    Wasm.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
-  let* ctxt = Sequencer_context.commit ctxt evm_state in
-  let ctxt = {ctxt with next_blueprint_number = Ethereum_types.(Qty Z.one)} in
-  (* Create the first empty block. *)
-  let inputs =
-    Sequencer_blueprint.create
-      ~secret_key
-      ~timestamp:(Helpers.now ())
-      ~smart_rollup_address
-      ~transactions:[]
-      ~number:Ethereum_types.(Qty Z.zero)
-  in
-  let* () = Rollup_node_services.publish ~rollup_node_endpoint inputs in
-  let inputs =
-    List.map (function `External payload -> `Input ("\001" ^ payload)) inputs
-  in
-  let* ctxt, _evm_state = execute ~commit:true ctxt inputs in
-  return ctxt
+  return evm_state
 
 let inspect evm_state key =
   let open Lwt_syntax in
@@ -69,15 +61,18 @@ let current_block_height evm_state =
     inspect evm_state Durable_storage_path.Block.current_number
   in
   match current_block_number with
-  | None -> return (Ethereum_types.Block_height Z.zero)
+  | None ->
+      (* No block has been created yet and we are waiting for genesis,
+         whose number will be [zero]. Since the semantics of [apply_blueprint]
+         is to verify the block height has been incremented once, we default to
+         [-1]. *)
+      return (Block_height Z.(pred zero))
   | Some current_block_number ->
-      let (Qty current_block_number) =
-        Ethereum_types.decode_number current_block_number
-      in
-      return (Ethereum_types.Block_height current_block_number)
+      let (Qty current_block_number) = decode_number current_block_number in
+      return (Block_height current_block_number)
 
-let execute_and_inspect ctxt
-    ~input:Simulation.Encodings.{messages; insight_requests; _} =
+let execute_and_inspect ~config
+    ~input:Simulation.Encodings.{messages; insight_requests; _} ctxt =
   let open Lwt_result_syntax in
   let keys =
     List.map
@@ -90,6 +85,22 @@ let execute_and_inspect ctxt
   in
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
-  let* _ctxt, evm_state = execute ctxt messages in
+  let* evm_state = execute ~config ctxt messages in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
+
+type error += Cannot_apply_blueprint
+
+let apply_blueprint ~config evm_state (blueprint : Blueprint_types.t) =
+  let open Lwt_result_syntax in
+  let exec_inputs =
+    List.map
+      (function `External payload -> `Input ("\001" ^ payload))
+      blueprint
+  in
+  let*! (Block_height before_height) = current_block_height evm_state in
+  let* evm_state = execute ~config evm_state exec_inputs in
+  let*! (Block_height after_height) = current_block_height evm_state in
+  if Z.(equal (succ before_height) after_height) then
+    return (evm_state, Block_height after_height)
+  else tzfail Cannot_apply_blueprint

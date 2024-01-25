@@ -20,5 +20,5 @@ let register ctxt dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
-      let* blueprint = Blueprint_store.find ctxt number in
+      let* blueprint = Sequencer_context.find_blueprint ctxt number in
       return_ok blueprint)
