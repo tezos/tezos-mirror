@@ -14,7 +14,6 @@ oc.build:dpkg:amd64:
     - . ./scripts/version.sh
     - apt update
     - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev
-    - wget https://sh.rustup.rs/rustup-init.sh
   artifacts:
     paths:
       - octez-*.deb
