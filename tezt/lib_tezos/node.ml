@@ -808,9 +808,14 @@ let runlike_command_arguments node command arguments =
   let net_addr, rpc_addr, metrics_addr =
     match node.persistent_state.runner with
     | None ->
-        ( Option.value ~default:"127.0.0.1" node.persistent_state.net_addr ^ ":",
+        ( Option.value
+            ~default:Constant.default_host
+            node.persistent_state.net_addr
+          ^ ":",
           node.persistent_state.rpc_host ^ ":",
-          Option.value ~default:"127.0.0.1" node.persistent_state.metrics_addr
+          Option.value
+            ~default:Constant.default_host
+            node.persistent_state.metrics_addr
           ^ ":" )
     | Some _ ->
         (* FIXME spawn an ssh tunnel in case of remote host *)

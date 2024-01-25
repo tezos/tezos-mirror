@@ -83,7 +83,7 @@ let connection_arguments ?rpc_addr ?rpc_port () =
   in
   ( ["--rpc-port"; string_of_int rpc_port]
     @ optional_arg "rpc-addr" Fun.id rpc_addr,
-    Option.value ~default:"127.0.0.1" rpc_addr,
+    Option.value ~default:Constant.default_host rpc_addr,
     rpc_port )
 
 let trigger_ready sc_node value =
@@ -334,7 +334,7 @@ let endpoint ?(private_ = false) (evm_node : t) =
     if private_ then
       match evm_node.persistent_state.mode with
       | Sequencer {private_rpc_port; _} ->
-          ("127.0.0.1", private_rpc_port, "/private")
+          (Constant.default_host, private_rpc_port, "/private")
       | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
     else
       ( evm_node.persistent_state.rpc_addr,

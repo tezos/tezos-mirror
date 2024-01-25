@@ -45,7 +45,7 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; BG.gray|]
 end
 
-let rpc_host = "127.0.0.1"
+let rpc_host = Constant.default_host
 
 let rpc_scheme = "http"
 

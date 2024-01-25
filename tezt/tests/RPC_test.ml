@@ -1579,7 +1579,7 @@ let test_blacklist address () =
   unit
 
 let binary_regression_test () =
-  let node = Node.create ~rpc_host:"127.0.0.1" [] in
+  let node = Node.create [] in
   let endpoint = Client.(Node node) in
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in

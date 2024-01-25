@@ -47,7 +47,7 @@ type argument =
 val rpc_port : t -> int
 
 (** Get the RPC host of a proxy server. It's the host to
-    do requests to. Its value is ["127.0.0.1"]. *)
+    do requests to. Its value is [Constant.default_host]. *)
 val rpc_host : string
 
 (** Get the RPC scheme of a proxy server. Its value is ["http"]. *)

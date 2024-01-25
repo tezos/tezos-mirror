@@ -816,7 +816,7 @@ module Connect_handler = struct
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
-    let addr_of_port port = "127.0.0.1:" ^ string_of_int port in
+    let addr_of_port port = sf "%s:%d" Constant.default_host port in
     let create_node ?chain_name ?peer_port port =
       let peer_arg =
         Option.map (fun p -> Node.Peer (addr_of_port p)) peer_port

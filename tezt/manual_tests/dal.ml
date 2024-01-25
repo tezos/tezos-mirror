@@ -101,7 +101,7 @@ let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
     match (net_addr, net_port) with
     | None, None -> None
     | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
-    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | None, Some port -> Some (sf "%s:%d" Constant.default_host port)
     | Some addr, Some port -> Some (sf "%s:%d" addr port)
   in
   let public_addr =
@@ -113,7 +113,7 @@ let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
     match (metrics_addr, metrics_port) with
     | None, None -> None
     | Some addr, None -> Some (sf "%s:%d" addr @@ Port.fresh ())
-    | None, Some port -> Some (sf "127.0.0.1:%d" port)
+    | None, Some port -> Some (sf "%s:%d" Constant.default_host port)
     | Some addr, Some port -> Some (sf "%s:%d" addr port)
   in
 
