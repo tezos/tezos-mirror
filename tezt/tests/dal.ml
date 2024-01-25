@@ -489,8 +489,9 @@ let get_validated_dal_attestations_in_mempool node for_level =
       let contents = JSON.(op |-> "contents" |> geti 0) in
       let level = JSON.(contents |-> "level" |> as_int) in
       level = for_level
-      && JSON.(contents |-> "kind" |> as_string)
-         |> String.equal "dal_attestation")
+      && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
+         String.equal kind "attestation_with_dal"
+         || String.equal kind "endorsement_with_dal")
     validated
   |> return
 
@@ -1308,11 +1309,11 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
 
   let wait_block_processing2 = wait_for_layer1_final_block dal_node pub_level in
-  let* () = bake_for client in
+  let* () = bake_for ~count:2 client in
   let* () = wait_block_processing2 in
 
   Log.info
-    "After baking one more block, the slots' status is as expected (eg for \
+    "After baking two more blocks, the slots' status is as expected (eg for \
      published slots it's Waiting_attestation)" ;
   let ok = [slot0; slot1; slot2_b] in
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
@@ -1363,7 +1364,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let attested = [slot0; slot2_b] in
   let unattested = [slot1] in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
-  let* () = repeat (lag - 2) (fun () -> bake_for client) in
+  let* () = bake_for ~count:(lag - 3) client in
   let* _op_hash =
     inject_dal_attestations ~nb_slots (List.map fst attested) client
   in
@@ -1371,7 +1372,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     let attested_level = pub_level + lag in
     wait_for_layer1_final_block dal_node attested_level
   in
-  let* () = repeat 2 (fun () -> bake_for client) in
+  let* () = bake_for ~count:3 client in
   let* () = wait_block_processing3 in
 
   let* () =
@@ -2222,10 +2223,9 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let* () = publish Constant.bootstrap1 ~index:0 slot1_content in
   let* () = publish Constant.bootstrap2 ~index:2 slot2_content in
   let wait_block_processing = wait_for_layer1_final_block dal_node level in
-  (* bake two blocks: at [level + 1] the commitments are published, at [level +
-     2] the commitments become final *)
-  let* () = bake_for client in
-  let* () = bake_for client in
+  (* bake three blocks: at [level + 1] the commitments are published, at [level +
+     3] the commitments become final *)
+  let* () = bake_for ~count:3 client in
   let* () = wait_block_processing in
   Log.info "Check attestability of slots." ;
   let attested_level = level + parameters.attestation_lag in
@@ -2372,7 +2372,14 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   let last_level_of_first_baker =
     intermediary_level + parameters.attestation_lag
   in
-  let last_level_of_second_baker = max_level + parameters.attestation_lag in
+  let last_level_of_second_baker = max_level + parameters.attestation_lag + 1 in
+  (* We need this level to be processed by the DAL node in order to make the
+     necessary checks. *)
+  let wait_for_dal_node =
+    wait_for_layer1_final_block
+      dal_node
+      (max_level + parameters.attestation_lag - 1)
+  in
 
   Log.info
     "Run the first baker for all delegates till at least level %d."
@@ -2413,6 +2420,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
     "Run the second baker for some (not all) delegates till at least level %d."
     last_level_of_second_baker ;
   let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
+  let* () = wait_for_dal_node in
 
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =
@@ -2510,7 +2518,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     iter from_level
   in
-  let wait_block_processing = wait_for_layer1_head dal_node last_level in
+  let wait_block_processing = wait_for_layer1_head dal_node (last_level + 1) in
 
   let* () =
     publish_and_bake
@@ -2524,6 +2532,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       ~to_level:last_level
       not_all_delegates
   in
+  let* () = bake_for client in
   let* _lvl = wait_block_processing in
 
   Log.info "Check the attestation status of the published slots." ;
@@ -2846,7 +2855,7 @@ let e2e_tests =
   let test1 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 2;
+      attestation_lag = 3;
       block_delay = 6;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
@@ -2856,7 +2865,7 @@ let e2e_tests =
   let test2 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 2;
+      attestation_lag = 3;
       block_delay = 2;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
@@ -2866,7 +2875,7 @@ let e2e_tests =
   let mainnet1 =
     {
       constants = Protocol.Constants_mainnet;
-      attestation_lag = 2;
+      attestation_lag = 3;
       block_delay = 10;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
@@ -3437,9 +3446,8 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   in
 
   (* We bake a block that includes a [slot_header] operation. And then another
-     block so that this operation is final. *)
-  let* () = bake_for client in
-  let* () = bake_for client in
+     two blocks so that this operation is final. *)
+  let* () = bake_for ~count:3 client in
   let* () = Lwt.join waiter_publish_list
   and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
@@ -3695,9 +3703,8 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
       ~is_trusted:false
   in
   let* () = List.map (Dal_node.run ~wait_ready:true) nodes |> Lwt.join in
-  Log.info "Bake two times to finalize a block." ;
-  let* () = bake_for client in
-  let* () = bake_for client in
+  Log.info "Bake a block and then another two to finalize it." ;
+  let* () = bake_for ~count:3 client in
   Log.info "Wait for dal_node2 and dal_node3 to find each other." ;
 
   let* () =
@@ -3894,9 +3901,9 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     let* () = repeat blocks_till_migration (fun () -> bake_for client) in
 
     Log.info "Migrated to %s" (Protocol.name migrate_to) ;
-    (* The plugin will change after the following block, as the migration block
+    (* The plugin will change after the two blocks, as the migration block
        is not yet finalized. *)
-    let* () = bake_for client in
+    let* () = bake_for ~count:2 client in
     wait_for_plugin
   in
   test_l1_migration_scenario

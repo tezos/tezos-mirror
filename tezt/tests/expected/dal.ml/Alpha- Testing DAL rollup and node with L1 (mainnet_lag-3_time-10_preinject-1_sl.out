@@ -34,7 +34,7 @@ This sequence of operations was run:
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 
-./octez-client --wait none send smart rollup message '[" dal:256:2:256:5 "]' from bootstrap2
+./octez-client --wait none send smart rollup message '[" dal:256:3:256:5 "]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.826 units (will add 100 for safety)
 Estimated storage: no bytes added
