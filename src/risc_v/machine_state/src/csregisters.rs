@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod xstatus;
+
 use crate::backend::{self, Region};
 use crate::mode::Mode;
 
