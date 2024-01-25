@@ -82,7 +82,7 @@ depends: [
   "pyml" { >= "20220905" }
   "qcheck-alcotest" { >= "0.20" }
   "qcheck-core"
-  "re" { >= "1.9.0" }
+  "re" { >= "1.10.0" }
   "repr"
   "resto" { >= "1.2" }
   "resto-acl" { >= "1.2" }
