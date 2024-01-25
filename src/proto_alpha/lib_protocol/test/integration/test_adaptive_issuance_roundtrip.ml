@@ -424,16 +424,38 @@ module State = struct
     (state, total_burnt)
 
   let apply_all_slashes_at_cycle_end current_cycle (state : t) : t =
+    let to_slash_later, to_slash_now =
+      if
+        not
+          state.constants
+            .Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
+            .ns_enable
+      then ([], state.pending_slashes)
+      else
+        List.partition
+          (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
+            let cycle =
+              Block.current_cycle_of_level
+                ~blocks_per_cycle:
+                  state.constants
+                    .Protocol.Alpha_context.Constants.Parametric
+                     .blocks_per_cycle
+                ~current_level:
+                  (Protocol.Raw_level_repr.to_int32 misbehaviour.level)
+            in
+            Cycle.(cycle = current_cycle))
+          state.pending_slashes
+    in
     let state, total_burnt =
       List.fold_left
         (fun (acc_state, acc_total) x ->
           let state, burnt = apply_slashing x acc_state in
           (state, Tez.(acc_total +! burnt)))
         (state, Tez.zero)
-        state.pending_slashes
+        to_slash_now
     in
     let total_supply = Tez.(state.total_supply -! total_burnt) in
-    {state with pending_slashes = []; total_supply}
+    {state with pending_slashes = to_slash_later; total_supply}
 
   (** Given an account name and new account state, updates [state] accordingly
       Preferably use other specific update functions *)
@@ -1086,101 +1108,111 @@ let exec_op f =
 (* ======== Definition of basic actions ======== *)
 
 (** Initialize the test, given some initial parameters *)
-let begin_test ~activate_ai ?(burn_rewards = false)
+let begin_test ~activate_ai ?(burn_rewards = false) ?(ns_enable_fork = false)
     ?(constants : Protocol.Alpha_context.Constants.Parametric.t option)
     ?(constants_list :
        (string * Protocol.Alpha_context.Constants.Parametric.t) list option)
     delegates_name_list : (unit, t) scenarios =
-  (match (constants, constants_list) with
-  | None, None -> Stdlib.failwith "No constants provided to begin_test"
-  | Some _, Some _ ->
-      Stdlib.failwith
-        "You cannot provide ~constants and ~constants_list to begin_test"
-  | None, Some constants_list -> list_to_branch constants_list
-  | Some constants, None -> Action (fun () -> return constants))
-  --> exec (fun (constants : Protocol.Alpha_context.Constants.Parametric.t) ->
-          let open Lwt_result_syntax in
-          Log.info ~color:begin_end_color "-- Begin test --" ;
-          let bootstrap = "__bootstrap__" in
-          let delegates_name_list = bootstrap :: delegates_name_list in
-          (* Override threshold value if activate *)
-          let constants =
-            if activate_ai then (
-              Log.info ~color:event_color "Setting ai threshold to 0" ;
-              {
-                constants with
-                adaptive_issuance =
-                  {
-                    constants.adaptive_issuance with
-                    launch_ema_threshold = 0l;
-                    activation_vote_enable = true;
-                  };
-              })
-            else constants
-          in
-          let n = List.length delegates_name_list in
-          let* block, delegates = Context.init_with_constants_n constants n in
-          let*? init_level = Context.get_level (B block) in
-          let init_staked = Tez.of_mutez 200_000_000_000L in
-          let*? account_map =
-            List.fold_left2
-              ~when_different_lengths:
-                [Inconsistent_number_of_bootstrap_accounts]
-              (fun account_map name contract ->
-                let liquid =
-                  Tez.(Account.default_initial_balance -! init_staked)
-                in
-                let frozen_deposits = Frozen_tez.init init_staked name name in
-                let frozen_rights =
-                  List.fold_left
-                    (fun map cycle -> CycleMap.add cycle init_staked map)
-                    CycleMap.empty
-                    Cycle.(root ---> add root constants.preserved_cycles)
-                in
-                let pkh = Context.Contract.pkh contract in
-                let account =
-                  init_account
-                    ~delegate:name
-                    ~pkh
-                    ~contract
-                    ~parameters:default_params
-                    ~liquid
-                    ~frozen_deposits
-                    ~frozen_rights
-                    ()
-                in
-                let account_map = String.Map.add name account account_map in
-                let balance, total_balance =
-                  balance_and_total_balance_of_account name account_map
-                in
-                Log.debug "Initial balance for %s:\n%a" name balance_pp balance ;
-                Log.debug "Initial total balance: %a" Tez.pp total_balance ;
-                account_map)
-              String.Map.empty
-              delegates_name_list
-              delegates
-          in
-          let* total_supply = Context.get_total_supply (B block) in
-          let state =
-            State.
-              {
-                account_map;
-                total_supply;
-                constants;
-                param_requests = [];
-                activate_ai;
-                baking_policy = None;
-                last_level_rewards = init_level;
-                snapshot_balances = String.Map.empty;
-                saved_rate = None;
-                burn_rewards;
-                pending_operations = [];
-                pending_slashes = [];
-                double_signings = [];
-              }
-          in
-          let* () = check_all_balances block state in
-          return (block, state))
+  let f ns_enable =
+    (match (constants, constants_list) with
+    | None, None -> Stdlib.failwith "No constants provided to begin_test"
+    | Some _, Some _ ->
+        Stdlib.failwith
+          "You cannot provide ~constants and ~constants_list to begin_test"
+    | None, Some constants_list -> list_to_branch constants_list
+    | Some constants, None -> Action (fun () -> return constants))
+    --> exec (fun (constants : Protocol.Alpha_context.Constants.Parametric.t) ->
+            let open Lwt_result_syntax in
+            Log.info ~color:begin_end_color "-- Begin test --" ;
+            let bootstrap = "__bootstrap__" in
+            let delegates_name_list = bootstrap :: delegates_name_list in
+            (* Override threshold value if activate *)
+            let constants =
+              if activate_ai then (
+                Log.info ~color:event_color "Setting ai threshold to 0" ;
+                {
+                  constants with
+                  adaptive_issuance =
+                    {
+                      constants.adaptive_issuance with
+                      launch_ema_threshold = 0l;
+                      activation_vote_enable = true;
+                      ns_enable;
+                    };
+                })
+              else constants
+            in
+            let n = List.length delegates_name_list in
+            let* block, delegates = Context.init_with_constants_n constants n in
+            let*? init_level = Context.get_level (B block) in
+            let init_staked = Tez.of_mutez 200_000_000_000L in
+            let*? account_map =
+              List.fold_left2
+                ~when_different_lengths:
+                  [Inconsistent_number_of_bootstrap_accounts]
+                (fun account_map name contract ->
+                  let liquid =
+                    Tez.(Account.default_initial_balance -! init_staked)
+                  in
+                  let frozen_deposits = Frozen_tez.init init_staked name name in
+                  let frozen_rights =
+                    List.fold_left
+                      (fun map cycle -> CycleMap.add cycle init_staked map)
+                      CycleMap.empty
+                      Cycle.(root ---> add root constants.preserved_cycles)
+                  in
+                  let pkh = Context.Contract.pkh contract in
+                  let account =
+                    init_account
+                      ~delegate:name
+                      ~pkh
+                      ~contract
+                      ~parameters:default_params
+                      ~liquid
+                      ~frozen_deposits
+                      ~frozen_rights
+                      ()
+                  in
+                  let account_map = String.Map.add name account account_map in
+                  let balance, total_balance =
+                    balance_and_total_balance_of_account name account_map
+                  in
+                  Log.debug
+                    "Initial balance for %s:\n%a"
+                    name
+                    balance_pp
+                    balance ;
+                  Log.debug "Initial total balance: %a" Tez.pp total_balance ;
+                  account_map)
+                String.Map.empty
+                delegates_name_list
+                delegates
+            in
+            let* total_supply = Context.get_total_supply (B block) in
+            let state =
+              State.
+                {
+                  account_map;
+                  total_supply;
+                  constants;
+                  param_requests = [];
+                  activate_ai;
+                  baking_policy = None;
+                  last_level_rewards = init_level;
+                  snapshot_balances = String.Map.empty;
+                  saved_rate = None;
+                  burn_rewards;
+                  pending_operations = [];
+                  pending_slashes = [];
+                  double_signings = [];
+                }
+            in
+            let* () = check_all_balances block state in
+            return (block, state))
+  in
+  if ns_enable_fork then
+    Tag "ns_enable = true" --> f true |+ Tag "ns_enable = false" --> f false
+  else f false
 
 (** Set delegate parameters for the given delegate *)
 let set_delegate_params delegate_name parameters : (t, t) scenarios =
@@ -1350,35 +1382,24 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let open Protocol.Denunciations_repr in
   let* denunciations_rpc = Context.get_denunciations (B block) in
-  let denunciations_obj_equal
-      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2; _}) =
+  let denunciations_obj_equal (pkh_1, {rewarded = r1; misbehaviour = m1; _})
+      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
     Signature.Public_key_hash.equal pkh_1 pkh_2
     && Signature.Public_key_hash.equal r1 r2
     && Stdlib.(m1.kind = m2.kind)
-    && Stdlib.(mc1 = mc2)
   in
-  let compare_denunciations
-      (pkh_1, {rewarded = r1; misbehaviour = m1; misbehaviour_cycle = mc1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; misbehaviour_cycle = mc2; _}) =
+  let compare_denunciations (pkh_1, {rewarded = r1; misbehaviour = m1; _})
+      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
     let c1 = Signature.Public_key_hash.compare pkh_1 pkh_2 in
     if c1 <> 0 then c1
     else
       let c2 = Signature.Public_key_hash.compare r1 r2 in
       if c2 <> 0 then c2
       else
-        let c3 =
-          match (m1.kind, m2.kind) with
-          | Double_baking, Double_attesting -> -1
-          | x, y when x = y -> 0
-          | _ -> 1
-        in
-        if c3 <> 0 then c3
-        else
-          match (mc1, mc2) with
-          | Current, Previous -> -1
-          | x, y when x = y -> 0
-          | _ -> 1
+        match (m1.kind, m2.kind) with
+        | Double_baking, Double_attesting -> -1
+        | x, y when x = y -> 0
+        | _ -> 1
   in
   let denunciations_rpc = List.sort compare_denunciations denunciations_rpc in
   let denunciations_state =
@@ -1386,10 +1407,10 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
   in
   let denunciations_equal = List.equal denunciations_obj_equal in
   let denunciations_obj_pp fmt
-      (pkh, {rewarded; misbehaviour; misbehaviour_cycle; operation_hash = _}) =
+      (pkh, {rewarded; misbehaviour; operation_hash = _}) =
     Format.fprintf
       fmt
-      "slashed: %a; rewarded: %a; kind: %s; cycle: %s@."
+      "slashed: %a; rewarded: %a; kind: %s@."
       Signature.Public_key_hash.pp
       pkh
       Signature.Public_key_hash.pp
@@ -1397,9 +1418,6 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       (match misbehaviour.kind with
       | Double_baking -> "double baking"
       | Double_attesting -> "double attesting")
-      (match misbehaviour_cycle with
-      | Current -> "current"
-      | Previous -> "previous")
   in
   let denunciations_pp = Format.pp_print_list denunciations_obj_pp in
   let* () =
@@ -1587,12 +1605,6 @@ let update_state_denunciation (block, state)
            following cycle? *)
         return (state, denounced)
       else
-        let misbehaviour_cycle =
-          if Cycle.(ds_cycle = inclusion_cycle) then
-            Protocol.Denunciations_repr.Current
-          else if Cycle.(succ ds_cycle = inclusion_cycle) then Previous
-          else assert false
-        in
         let kind =
           match kind with
           | Double_baking -> Protocol.Misbehaviour_repr.Double_baking
@@ -1630,7 +1642,6 @@ let update_state_denunciation (block, state)
             {
               Protocol.Denunciations_repr.rewarded;
               misbehaviour;
-              misbehaviour_cycle;
               operation_hash = Operation_hash.zero;
               (* unused *)
             } )
@@ -2510,6 +2521,7 @@ module Slashing = struct
     in
     begin_test
       ~activate_ai:true
+      ~ns_enable_fork:true
       ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> (Tag "No AI" --> next_cycle
@@ -2526,7 +2538,12 @@ module Slashing = struct
          --> check_snapshot_balances "before slash"
          --> exec_unit check_pending_slashings
          --> next_cycle
-         --> assert_failure (check_snapshot_balances "before slash")
+         --> assert_failure
+               (exec_unit (fun (_block, state) ->
+                    if state.State.constants.adaptive_issuance.ns_enable then
+                      failwith "ns_enable = true: slash not applied yet"
+                    else return_unit)
+               --> check_snapshot_balances "before slash")
          --> exec_unit check_pending_slashings
          --> next_block
         |+ Tag "denounce too late" --> next_cycle --> next_cycle
@@ -2575,6 +2592,7 @@ module Slashing = struct
     in
     begin_test
       ~activate_ai:false
+      ~ns_enable_fork:true
       ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> set_baker "bootstrap1"
@@ -2646,6 +2664,7 @@ module Slashing = struct
     let constants = init_constants ~autostaking_enable:false () in
     begin_test
       ~activate_ai:false
+      ~ns_enable_fork:true
       ~constants
       ["delegate"; "bootstrap1"; "bootstrap2"]
     --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
@@ -2659,7 +2678,7 @@ module Slashing = struct
       let constants =
         init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
       in
-      begin_test ~activate_ai:false ~constants ["delegate"]
+      begin_test ~activate_ai:false ~ns_enable_fork:true ~constants ["delegate"]
       --> next_cycle
       --> loop
             6
@@ -2683,7 +2702,7 @@ module Slashing = struct
     let constants =
       init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
     in
-    begin_test ~activate_ai:false ~constants ["delegate"]
+    begin_test ~activate_ai:false ~ns_enable_fork:true ~constants ["delegate"]
     --> next_cycle
     --> (Tag "stake" --> stake "delegate" Half
         |+ Tag "unstake" --> unstake "delegate" Half)
@@ -2715,7 +2734,11 @@ module Slashing = struct
         edge_of_baking_over_staking = Q.one;
       }
     in
-    begin_test ~activate_ai:true ~constants [delegate_name; faucet_name]
+    begin_test
+      ~activate_ai:true
+      ~ns_enable_fork:true
+      ~constants
+      [delegate_name; faucet_name]
     --> set_baker faucet_name
     --> set_delegate_params "delegate" init_params
     --> init_delegators delegators_list
@@ -2766,7 +2789,7 @@ module Slashing = struct
     let constants = init_constants ~autostaking_enable:false () in
     let amount = Amount (Tez.of_mutez 333_000_000_000L) in
     let preserved_cycles = constants.preserved_cycles in
-    begin_test ~activate_ai:true ~constants ["delegate"]
+    begin_test ~activate_ai:true ~ns_enable_fork:false ~constants ["delegate"]
     --> next_block --> wait_ai_activation
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -2790,7 +2813,7 @@ module Slashing = struct
     let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
     let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
     let preserved_cycles = constants.preserved_cycles in
-    begin_test ~activate_ai:true ~constants ["delegate"]
+    begin_test ~activate_ai:true ~ns_enable_fork:false ~constants ["delegate"]
     --> next_block --> wait_ai_activation
     --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
     --> next_cycle
@@ -2810,10 +2833,18 @@ module Slashing = struct
   let test_mini_slash =
     let constants = init_constants ~autostaking_enable:false () in
     (Tag "Yes AI"
-     --> begin_test ~activate_ai:true ~constants ["delegate"; "baker"]
+     --> begin_test
+           ~activate_ai:true
+           ~ns_enable_fork:false
+           ~constants
+           ["delegate"; "baker"]
      --> next_block --> wait_ai_activation
     |+ Tag "No AI"
-       --> begin_test ~activate_ai:false ~constants ["delegate"; "baker"])
+       --> begin_test
+             ~activate_ai:false
+             ~ns_enable_fork:false
+             ~constants
+             ["delegate"; "baker"])
     --> unstake "delegate" (Amount Tez.one_mutez)
     --> set_baker "baker" --> next_cycle
     --> ((Tag "7% slash" --> double_bake "delegate" --> make_denunciations ()
@@ -2826,7 +2857,11 @@ module Slashing = struct
 
   let test_slash_rounding =
     let constants = init_constants ~autostaking_enable:false () in
-    begin_test ~activate_ai:true ~constants ["delegate"; "baker"]
+    begin_test
+      ~activate_ai:true
+      ~ns_enable_fork:true
+      ~constants
+      ["delegate"; "baker"]
     --> set_baker "baker" --> next_block --> wait_ai_activation
     --> unstake "delegate" (Amount (Tez.of_mutez 2L))
     --> next_cycle --> double_bake "delegate" --> double_bake "delegate"
