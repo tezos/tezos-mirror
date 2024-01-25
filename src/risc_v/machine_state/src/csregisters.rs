@@ -311,6 +311,7 @@ impl CSRegister {
     // Since read-only misa.MXL = 0b10, we have MXLEN = 64 from table 3.1
     const MXLEN: u64 = 64;
     const SXLEN: u64 = CSRegister::MXLEN;
+    const MXL_ENCODING: CSRValue = 0b10;
 
     /// Determine the priviledge level required to access this CSR.
     #[inline(always)]
@@ -501,7 +502,7 @@ impl CSRegister {
     /// Value for CSR `misa`, see section 3.1.1 & tables 3.1 (MXL) & 3.2 (Extensions)
     const WARL_MISA_VALUE: CSRValue = {
         /* MXLEN encoding of 64 bits */
-        const MXL_ENCODING: u64 = 0b10 << 62;
+        const MXL_MASK: u64 = CSRegister::MXL_ENCODING << 62;
         /* Extensions (A + C + D + F + I + M + S + U) */
         const ATOMIC_EXT: u64 = 1 << 0;
         const COMPRESSED_EXT: u64 = 1 << 2;
@@ -512,7 +513,7 @@ impl CSRegister {
         const SUPERVISOR_EXT: u64 = 1 << 18;
         const USER_EXT: u64 = 1 << 20;
         /* MXL */
-        MXL_ENCODING |
+        MXL_MASK |
         /* Extensions */
         ATOMIC_EXT |
         COMPRESSED_EXT |
