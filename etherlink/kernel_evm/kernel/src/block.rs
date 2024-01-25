@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{apply_transaction, ExecutionInfo};
+use crate::apply::{apply_transaction, ExecutionInfo, ExecutionResult};
 use crate::blueprint_storage::{drop_head_blueprint, read_next_blueprint};
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
@@ -87,7 +87,7 @@ fn compute<Host: Runtime>(
             accounts_index,
             allocated_ticks,
         )? {
-            Some(ExecutionInfo {
+            ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
                 object_info,
                 estimated_ticks_used,
@@ -106,7 +106,7 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks
                 );
             }
-            None => {
+            ExecutionResult::Invalid => {
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
@@ -114,6 +114,10 @@ fn compute<Host: Runtime>(
                     "Estimated ticks after tx: {}",
                     block_in_progress.estimated_ticks
                 );
+            }
+            ExecutionResult::OutOfTicks => {
+                // Next commit
+                todo!()
             }
         };
     }
