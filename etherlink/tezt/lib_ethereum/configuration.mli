@@ -18,6 +18,6 @@ val make_config :
   ?administrator:string ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
-  ?base_fee:Wei.t ->
+  ?flat_fee:Wei.t ->
   unit ->
   [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option

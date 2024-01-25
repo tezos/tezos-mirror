@@ -60,5 +60,5 @@ val kernel_boot_wasm : path
 (** [delayed_bridge_path] is the path to the delayed transaction bridge contract. *)
 val delayed_bridge_path : path
 
-(** [base_fee_path] is the path to the base fee, charged on every transaction. *)
-val base_fee_path : path
+(** [flat_fee_path] is the path to the flat fee, charged on every transaction. *)
+val flat_fee_path : path
