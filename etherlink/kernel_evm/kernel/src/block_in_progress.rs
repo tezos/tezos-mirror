@@ -316,6 +316,10 @@ impl BlockInProgress {
         self.tx_queue.pop_front()
     }
 
+    pub fn repush_tx(&mut self, tx: Transaction) {
+        self.tx_queue.push_front(tx)
+    }
+
     pub fn has_tx(&self) -> bool {
         !self.tx_queue.is_empty()
     }

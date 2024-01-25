@@ -58,6 +58,7 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
+    is_first_block_of_reboot: bool,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -65,6 +66,7 @@ fn compute<Host: Runtime>(
         "Queue length {}.",
         block_in_progress.queue_length()
     );
+    let mut is_first_transaction = true;
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
@@ -116,10 +118,22 @@ fn compute<Host: Runtime>(
                 );
             }
             ExecutionResult::OutOfTicks => {
-                // Next commit
-                todo!()
+                // Is is the first block processed in this reboot. Aditionnaly,
+                // it is the first transaction processed from this block in this
+                // reboot. The tick limit cannot be larger.
+                if is_first_transaction && is_first_block_of_reboot {
+                    log!(
+                        host,
+                        Debug,
+                        "Transaction is discarded as it uses too much ticks to be applied in a kernel run."
+                    );
+                } else {
+                    block_in_progress.repush_tx(transaction);
+                    return Ok(ComputationResult::RebootNeeded);
+                }
             }
         };
+        is_first_transaction = false;
     }
     Ok(ComputationResult::Finished)
 }
@@ -167,6 +181,7 @@ fn compute_bip<Host: KernelRuntime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
+    first_block_of_reboot: &mut bool,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -175,6 +190,7 @@ fn compute_bip<Host: KernelRuntime>(
         precompiles,
         evm_account_storage,
         accounts_index,
+        *first_block_of_reboot,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -197,7 +213,9 @@ fn compute_bip<Host: KernelRuntime>(
             *current_constants = new_block
                 .constants(current_constants.chain_id, current_constants.block_fees);
             // Drop the processed blueprint from the storage
-            drop_head_blueprint(host)?
+            drop_head_blueprint(host)?;
+
+            *first_block_of_reboot = false;
         }
     }
     Ok(result)
@@ -233,6 +251,7 @@ pub fn produce<Host: KernelRuntime>(
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
     let mut tick_counter = TickCounter::new(0u64);
+    let mut first_block_of_reboot = true;
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(host)? {
@@ -247,8 +266,11 @@ pub fn produce<Host: KernelRuntime>(
             &mut evm_account_storage,
             &mut accounts_index,
             &mut tick_counter,
+            &mut first_block_of_reboot,
         )? {
-            ComputationResult::Finished => storage::delete_block_in_progress(host)?,
+            ComputationResult::Finished => {
+                storage::delete_block_in_progress(host)?;
+            }
             ComputationResult::RebootNeeded => {
                 return Ok(ComputationResult::RebootNeeded)
             }
@@ -275,6 +297,7 @@ pub fn produce<Host: KernelRuntime>(
             &mut evm_account_storage,
             &mut accounts_index,
             &mut tick_counter,
+            &mut first_block_of_reboot,
         )? {
             ComputationResult::Finished => (),
             ComputationResult::RebootNeeded => {
@@ -1078,6 +1101,7 @@ mod tests {
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
+            true,
         )
         .expect("Should have computed block");
 
