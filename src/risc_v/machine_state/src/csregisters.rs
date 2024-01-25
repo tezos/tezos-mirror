@@ -17,7 +17,7 @@ pub enum Privilege {
 }
 
 /// Get the bitmask formed of `n` ones.
-const fn ones(n: u64) -> u64 {
+pub const fn ones(n: u64) -> u64 {
     !0 >> (64 - n)
 }
 
@@ -572,6 +572,8 @@ impl CSRegister {
                     _ => return None,
                 }
             }
+            CSRegister::mstatus => xstatus::apply_warl_mstatus(new_value),
+            CSRegister::sstatus => xstatus::apply_warl_sstatus(new_value),
             _ => new_value,
         };
         Some(write_value)
@@ -660,7 +662,7 @@ impl CSRegister {
 }
 
 /// Value in a CSR
-type CSRValue = u64;
+pub type CSRValue = u64;
 
 /// RISC-V exceptions
 #[derive(PartialEq, Eq)]
@@ -703,13 +705,54 @@ pub struct CSRegisters<M: backend::Manager> {
 }
 
 impl<M: backend::Manager> CSRegisters<M> {
+    /// sstatus is just a restricted view of mstatus.
+    /// to maintain consistency, when writing to sstatus we actually write to mstatus,
+    /// while preserving old field values in mstatus only fields
+    ///
+    /// Sections 3.1.6 & 4.1.1
+    #[inline(always)]
+    fn transform_write(&self, reg: CSRegister, value: CSRValue) -> (CSRegister, CSRValue) {
+        match reg {
+            CSRegister::sstatus => {
+                let mstatus = self.registers.read(CSRegister::mstatus as usize);
+                let sstatus_only = xstatus::sstatus_from_mstatus(value);
+                let mstatus_only = mstatus & !xstatus::SSTATUS_FIELDS_MASK;
+                (CSRegister::mstatus, sstatus_only | mstatus_only)
+            }
+            _ => (reg, value),
+        }
+    }
+
+    /// sstatus is just a restricted view of mstatus.
+    /// to maintain consistency, when writing to sstatus we actually write to mstatus,
+    /// while preserving old field values in mstatus only fields
+    ///
+    /// `mstatus_value` holds the value of `mstatus` if known, `None` otherwise.
+    /// `mstatus` is read only if `sstatus` is requested and `mstatus` is not known already
+    ///
+    /// Sections 3.1.6 & 4.1.1
+    #[inline(always)]
+    fn transform_read(&self, reg: CSRegister, mstatus_value: Option<CSRValue>) -> CSRValue {
+        let read_mstatus = || self.registers.read(CSRegister::mstatus as usize);
+
+        match reg {
+            CSRegister::sstatus => {
+                let mstatus = mstatus_value.unwrap_or_else(read_mstatus);
+                xstatus::sstatus_from_mstatus(mstatus)
+            }
+            CSRegister::mstatus => mstatus_value.unwrap_or_else(read_mstatus),
+            _ => self.registers.read(reg as usize),
+        }
+    }
+
     /// Write to a CSR.
     #[inline(always)]
     pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-
+        // extra function to read mstatus if needed
         if let Some(value) = reg.make_value_writable(value) {
+            let (reg, value) = self.transform_write(reg, value);
             self.registers.write(reg as usize, value);
         }
     }
@@ -719,7 +762,11 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn read(&mut self, reg: CSRegister) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        self.registers.read(reg as usize)
+
+        // sstatus is just a restricted view of mstatus.
+        // to maintain consistency, when reading sstatus
+        // just return mstatus with only the sstatus fields, making the other fields 0
+        self.transform_read(reg, None)
     }
 
     /// Replace the CSR value, returning the previous value.
@@ -729,9 +776,12 @@ impl<M: backend::Manager> CSRegisters<M> {
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
         if let Some(value) = reg.make_value_writable(value) {
-            self.registers.replace(reg as usize, value)
+            let (upd_reg, value) = self.transform_write(reg, value);
+            let old_value = self.registers.replace(upd_reg as usize, value);
+
+            self.transform_read(reg, Some(old_value))
         } else {
-            self.registers.read(reg as usize)
+            self.read(reg)
         }
     }
 
