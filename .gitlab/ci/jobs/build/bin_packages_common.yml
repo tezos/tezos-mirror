@@ -1,6 +1,7 @@
 .bin_packages_common:
    extends:
     - .default_settings_template
+   needs: []
    variables:
      TARGET: ""
      OCTEZ_PKGMAINTAINER: "nomadic-labs"
@@ -20,3 +21,27 @@
     name: "${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
     expire_in: 1 day
     when: on_success
+
+.bin_packages_dpkg:
+  image: debian:bookworm
+  variables:
+    TARGET: "dpkg"
+  before_script:
+    - . ./scripts/version.sh
+    - apt update
+    - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev protobuf-compiler
+  artifacts:
+    paths:
+      - octez-*.deb
+
+.bin_packages_rpm:
+  image: fedora:39
+  variables:
+    TARGET: "rpm"
+  before_script:
+    - . ./scripts/version.sh
+    - dnf update -y
+    - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel
+  artifacts:
+    paths:
+      - octez-*.rpm
