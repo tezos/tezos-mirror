@@ -1,6 +1,7 @@
 //! Module containing helpers for `mstatus` and `sstatus` registers.
 //!
-//! `sstatus` is a restricted view of `mstatus` being a shadow of it at the same time
+//! The `sstatus` register is a subset of the `mstatus` register.
+//! This mechanism is described as "shadow" CSRs in RISC-V spec.
 
 // Allow unused setters & getters
 #![allow(dead_code)]
@@ -43,7 +44,7 @@ impl FieldValue for MPPValue {
             0b00 => MPPValue::User,
             0b01 => MPPValue::Supervisor,
             0b11 => MPPValue::Machine,
-            // WARL field, invalid value considered User
+            // WARL field, invalid value `10`is considered User
             0b10 => MPPValue::User,
             _ => unreachable!(),
         }
@@ -66,7 +67,6 @@ impl FieldValue for SPPValue {
         match value & 1 {
             0b0 => SPPValue::User,
             0b1 => SPPValue::Supervisor,
-            // WARL field, invalid value considered User
             _ => unreachable!(),
         }
     }
@@ -117,7 +117,6 @@ impl FieldValue for ExtensionValue {
             0b01 => ExtensionValue::Initial,
             0b10 => ExtensionValue::Clean,
             0b11 => ExtensionValue::Dirty,
-            // WARL field, invalid value considered Off
             _ => unreachable!(),
         }
     }

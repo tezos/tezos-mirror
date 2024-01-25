@@ -375,10 +375,10 @@ impl CSRegister {
     /// Enforce the WPRI and WLRL field specifications.
     ///
     /// Either return the value to be written, or None to signify that no write is necessary,
-    /// to leave existing value in its place.
+    /// leaving the existing value in its place.
     #[inline(always)]
     pub fn make_value_writable(self, value: CSRValue) -> Option<CSRValue> {
-        // respect the reserved WPRI fields, setting them 0
+        // respect the reserved WPRI fields, setting them to 0
         let value = self.clear_wpri_fields(value);
         // apply WARL rules
         let value = self.transform_warl_fields(value)?;
@@ -705,9 +705,8 @@ pub struct CSRegisters<M: backend::Manager> {
 }
 
 impl<M: backend::Manager> CSRegisters<M> {
-    /// sstatus is just a restricted view of mstatus.
-    /// to maintain consistency, when writing to sstatus we actually write to mstatus,
-    /// while preserving old field values in mstatus only fields
+    /// Transform the write operation to account for shadow registers.
+    /// (e.g. `sstatus` register)
     ///
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
@@ -723,9 +722,8 @@ impl<M: backend::Manager> CSRegisters<M> {
         }
     }
 
-    /// sstatus is just a restricted view of mstatus.
-    /// to maintain consistency, when writing to sstatus we actually write to mstatus,
-    /// while preserving old field values in mstatus only fields
+    /// Transform a read operation to account for shadow registers.
+    /// (e.g. `sstatus` register)
     ///
     /// `mstatus_value` holds the value of `mstatus` if known, `None` otherwise.
     /// `mstatus` is read only if `sstatus` is requested and `mstatus` is not known already
