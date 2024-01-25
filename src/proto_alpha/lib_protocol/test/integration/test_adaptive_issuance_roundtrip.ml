@@ -406,13 +406,11 @@ module State = struct
 
   let apply_slashing
       ( culprit,
-        Protocol.Denunciations_repr.
-          {rewarded; misbehaviour; misbehaviour_cycle; operation_hash} )
-      current_cycle (state : t) : t * Tez.t =
+        Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
+      (state : t) : t * Tez.t =
     let account_map, total_burnt =
       apply_slashing
-        (culprit, {rewarded; misbehaviour; misbehaviour_cycle; operation_hash})
-        current_cycle
+        (culprit, {rewarded; misbehaviour; operation_hash})
         state.constants
         state.account_map
     in
@@ -429,7 +427,7 @@ module State = struct
     let state, total_burnt =
       List.fold_left
         (fun (acc_state, acc_total) x ->
-          let state, burnt = apply_slashing x current_cycle acc_state in
+          let state, burnt = apply_slashing x acc_state in
           (state, Tez.(acc_total +! burnt)))
         (state, Tez.zero)
         state.pending_slashes

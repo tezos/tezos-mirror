@@ -116,22 +116,11 @@ let punish_double_signing ctxt ~operation_hash
         Storage.Current_cycle_denunciations.find ctxt delegate
       in
       let denunciations = Option.value denunciations_opt ~default:[] in
-      let cycle =
-        if Cycle_repr.(level.cycle = current_cycle) then
-          Denunciations_repr.Current
-        else if Cycle_repr.(succ level.cycle = current_cycle) then
-          Denunciations_repr.Previous
-        else
-          (* [max_slashing_period = 2] according to
-             {!Constants_repr.check_constants}. *)
-          assert false
-      in
       let denunciations =
         Denunciations_repr.add
           operation_hash
           rewarded
           misbehaviour
-          cycle
           denunciations
       in
       let*! ctxt =
@@ -192,8 +181,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
         let+ ctxt, percentage, balance_updates =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
-                 Denunciations_repr.
-                   {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
+                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
               let slashing_percentage =
                 match misbehaviour.kind with
                 | Double_baking ->
@@ -205,15 +193,21 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                     .percentage_of_frozen_deposits_slashed_per_double_attestation
                       ctxt
               in
-              let ( misbehaviour_cycle,
-                    get_initial_frozen_deposits_of_misbehaviour_cycle ) =
-                match misbehaviour_cycle with
-                | Current ->
-                    (current_cycle, Delegate_storage.initial_frozen_deposits)
-                | Previous ->
-                    ( previous_cycle,
-                      Delegate_storage.initial_frozen_deposits_of_previous_cycle
-                    )
+              let misbehaviour_cycle =
+                (Level_repr.level_from_raw
+                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                   misbehaviour.level)
+                  .cycle
+              in
+              let get_initial_frozen_deposits_of_misbehaviour_cycle =
+                if Cycle_repr.(equal current_cycle misbehaviour_cycle) then
+                  Delegate_storage.initial_frozen_deposits
+                else if Cycle_repr.(equal previous_cycle misbehaviour_cycle)
+                then Delegate_storage.initial_frozen_deposits_of_previous_cycle
+                else fun _ _ -> return Tez_repr.zero
+                (* (denunciation applied too late)
+                   We could assert false, but we can also be permissive
+                   while keeping the same invariants *)
               in
               let* frozen_deposits =
                 let* initial_amount =

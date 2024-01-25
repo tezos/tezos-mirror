@@ -1013,9 +1013,8 @@ let balance_and_total_balance_of_account account_name account_map =
 
 let apply_slashing
     ( culprit,
-      Protocol.Denunciations_repr.
-        {rewarded; misbehaviour; misbehaviour_cycle; operation_hash = _} )
-    current_cycle constants account_map =
+      Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash = _}
+    ) constants account_map =
   let find_account_name_from_pkh_exn pkh account_map =
     match
       Option.map
@@ -1030,15 +1029,14 @@ let apply_slashing
     | None -> assert false
     | Some x -> x
   in
+  let slashed_cycle =
+    Block.current_cycle_of_level
+      ~blocks_per_cycle:
+        constants.Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
+      ~current_level:(Protocol.Raw_level_repr.to_int32 misbehaviour.level)
+  in
   let culprit_name = find_account_name_from_pkh_exn culprit account_map in
   let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
-  let slashed_cycle =
-    match misbehaviour_cycle with
-    | Current -> current_cycle
-    | Previous ->
-        Cycle.pred current_cycle
-        |> Option.value_f ~default:(fun _ -> assert false)
-  in
   let slashed_pct =
     match misbehaviour.kind with
     | Double_baking ->
