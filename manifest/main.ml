@@ -265,7 +265,7 @@ let qcheck_alcotest =
 
 let qcheck_core = external_lib "qcheck-core" V.True
 
-let re = external_lib ~js_compatible:true "re" V.(at_least "1.9.0")
+let re = external_lib ~js_compatible:true "re" V.(at_least "1.10.0")
 
 let repr = external_lib "repr" V.True
 
