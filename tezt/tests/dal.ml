@@ -4616,6 +4616,437 @@ let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
   let* () = wait_for_dal_node in
   check_history 1
 
+module Amplification = struct
+  let step_counter = ref 0
+
+  let info msg =
+    let prefix : string = Format.asprintf "Step %d" !step_counter in
+    let () = incr step_counter in
+    Log.info ~prefix msg
+
+  (* Test the amplification feature: once it has seen enough (but not
+     necessarily all) shards of a given slot, an observer DAL node is
+     able to reconstruct the complete slot and send the missing shards
+     on the DAL network.
+
+     To test this feature, we need a DAL network on which some shards
+     have been lost and need to be recomputed. This is achieved by
+     building a network with a single slot producer and several
+     attesters corresponding to different bakers; the slot producer is
+     only connected to some attesters so the shards needed by the
+     other attesters are lost.
+
+     More precisely, the DAL network we build is composed of (omitting
+     the bootstrap DAL node):
+
+     slot producer --- 3 attesters --- observer --- 2 attesters
+
+     This topology is obtained by making the slot producer ban the
+     nodes which should not be connected to it (the observer and 2
+     attesters). For this reason, we call "banned attesters" the 2
+     attesters which are only connected to the observer node and
+     "non-banned attesters" the 3 attesters which are connected to
+     both the slot producer and the observer.
+  *)
+
+  (* In amplification tests, we have one attester DAL node per
+     boostrap baker. For convenience, we bundle the dal node process
+     together with information about the corresponding bootstrap
+     baker. *)
+  type attester = {
+    dal_node : Dal_node.t;
+    account : Account.key;
+    pkh : string;
+    index : int; (* From 0 to 4. *)
+    name : string; (* From "attester1" to "attester5" *)
+    mutable peer_id : string option;
+        (* Delayed and cached call to Dal_node.read_identity *)
+  }
+
+  let attester_peer_id (attester : attester) =
+    match attester.peer_id with
+    | Some pid -> pid
+    | None ->
+        let pid = Dal_node.read_identity attester.dal_node in
+        attester.peer_id <- Some pid ;
+        pid
+
+  let test_amplification _protocol dal_parameters _cryptobox node client
+      dal_bootstrap =
+    let number_of_banned_attesters = 2 in
+    let amplification_is_implemented = false in
+    let slot_index = 0 in
+    (* Parameters and constants. *)
+    let {
+      Dal.Parameters.attestation_lag;
+      attestation_threshold;
+      number_of_slots;
+      cryptobox =
+        {Dal.Cryptobox.slot_size; number_of_shards; redundancy_factor; _};
+      _;
+    } =
+      dal_parameters
+    in
+
+    (* Note: we don't need to configure and start the DAL bootstrap
+       node because it is the node started by the
+       scenario_with_layer1_and_dal_nodes wrapper. Instead, we check
+       that the dal node passed as argument to this test function is a
+       running bootstrap DAL node. If not, this means that we forgot
+       to register the test with ~bootstrap_profile:true *)
+    let* () =
+      check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap
+    in
+    info "bootstrap DAL node is running" ;
+
+    (* When configuring the other DAL nodes, we use dal_bootstrap as
+       the single peer. *)
+    let peers = [Dal_node.listen_addr dal_bootstrap] in
+
+    (* Create and configure all nodes: a slot producer, an observer,
+       and one attester per bootstrap baker. *)
+    let make_attester index (account : Account.key) : attester Lwt.t =
+      let name = Printf.sprintf "attester%d" (index + 1) in
+      let pkh = account.public_key_hash in
+      let dal_node = Dal_node.create ~name ~node () in
+      let* () = Dal_node.init_config ~attester_profiles:[pkh] ~peers dal_node in
+      let* () = Dal_node.run ~wait_ready:true dal_node in
+      return {name; index; dal_node; pkh; account; peer_id = None}
+    in
+    let* all_attesters =
+      Lwt_list.mapi_p make_attester (Array.to_list Account.Bootstrap.keys)
+    in
+    info "attester DAL node ready" ;
+    let banned_attesters, non_banned_attesters =
+      List.partition
+        (fun attester -> attester.index < number_of_banned_attesters)
+        all_attesters
+    in
+    let slot_producer = Dal_node.create ~name:"producer" ~node () in
+    let* () =
+      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+    in
+    (* Promise which will be resolved once the slot producer will be
+       connected to all the other DAL nodes (all attesters + observer
+       + bootstrap). We will wait for this to happen before banning
+       the observer and some of the attesters. *)
+    let wait_for_connections_of_producer_promise =
+      Dal_node.wait_for_connections slot_producer (2 + List.length all_attesters)
+    in
+
+    let* () = Dal_node.run ~wait_ready:true slot_producer in
+    let observer = Dal_node.create ~name:"observer" ~node () in
+    let* () =
+      Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
+    in
+    let* () = Dal_node.run ~wait_ready:true observer in
+
+    (* Check that the DAL nodes have the expected profiles. *)
+    let* () =
+      check_profiles
+        ~__LOC__
+        slot_producer
+        ~expected:Dal_RPC.(Operator [Producer slot_index])
+    in
+    let slot_producer_peer_id = Dal_node.read_identity slot_producer in
+    info "Slot producer DAL node is running" ;
+
+    let* () =
+      check_profiles
+        ~__LOC__
+        observer
+        ~expected:Dal_RPC.(Operator [Observer slot_index])
+    in
+    let observer_peer_id = Dal_node.read_identity observer in
+    info "Observer DAL node is running" ;
+
+    let* () =
+      Lwt.join
+      @@ List.map
+           (fun attester ->
+             check_profiles
+               ~__LOC__
+               attester.dal_node
+               ~expected:Dal_RPC.(Operator [Attester attester.pkh]))
+           all_attesters
+    in
+    info "Attesters are running" ;
+
+    (* Now that all the DAL nodes are running, we need some of them to
+       establish grafted connections. The connections between
+       attesters and the slot producer have no reason to be grafted on
+       other slot indices than the one the slot producer is subscribed
+       to, so we instruct [check_events_with_topic] to skip all events
+       but the one for [slot_index]. *)
+    let already_seen_slots =
+      Array.init number_of_slots (fun index -> slot_index <> index)
+    in
+    (* Wait for a GRAFT message between an attester and either a the
+       producer the observer, in any direction. *)
+    let check_graft_promise (producer_or_observer, peer_id) attester =
+      let graft_from_attester_promise =
+        check_events_with_topic
+          ~event_with_topic:(Graft (attester_peer_id attester))
+          producer_or_observer
+          ~num_slots:number_of_slots
+          ~already_seen_slots
+          attester.pkh
+      in
+      let graft_from_producer_or_observer_promise =
+        check_events_with_topic
+          ~event_with_topic:(Graft peer_id)
+          attester.dal_node
+          ~num_slots:number_of_slots
+          ~already_seen_slots
+          attester.pkh
+      in
+      Lwt.pick
+        [graft_from_attester_promise; graft_from_producer_or_observer_promise]
+    in
+    (* We don't care if the slot producer establishes full connections
+       with the DAL nodes it is about to ban so we only wait for the
+       GRAFT messages between:
+       - the slot producer and the non-banned attesters,
+       - the observer and all the attesters *)
+    let check_graft_promises =
+      List.map
+        (check_graft_promise (slot_producer, slot_producer_peer_id))
+        non_banned_attesters
+      @ List.map
+          (check_graft_promise (observer, observer_peer_id))
+          all_attesters
+    in
+    info "Waiting for grafting of the attester - producer/observer connections" ;
+    (* Each attester DAL node won't join the DAL network until it has
+       processed some finalized L1 block in which the associated baker
+       is reported to have some rights. For this to happen, we need to
+       bake a few blocks. *)
+    let* () = bake_for ~count:3 client in
+    let* () = Lwt.join check_graft_promises in
+    info "Attester - producer connections grafted" ;
+
+    (* Wait for producer to be connected to all the dal nodes it wants
+       to ban because they cannot be banned earlier. *)
+    let* () = wait_for_connections_of_producer_promise in
+
+    let ban_p2p_peer this_node ~peer =
+      let this_dal_node, this_id = this_node in
+      let peer_dal_node, peer_id = peer in
+      let acl = "ban" in
+      let p =
+        let* () = Dal_node.wait_for_disconnection this_dal_node ~peer_id
+        and* () =
+          Dal_node.wait_for_disconnection peer_dal_node ~peer_id:this_id
+        in
+        unit
+      in
+      let* () =
+        Dal_RPC.call this_dal_node
+        @@ Dal_RPC.patch_p2p_peers_by_id ~peer_id ~acl ()
+      in
+      p
+    in
+
+    (* Slot producer bans observer and banned_attesters. *)
+    let* () =
+      ban_p2p_peer
+        (slot_producer, slot_producer_peer_id)
+        ~peer:(observer, observer_peer_id)
+    in
+    let* () =
+      Lwt.join
+      @@ List.map
+           (fun attester ->
+             ban_p2p_peer
+               (slot_producer, slot_producer_peer_id)
+               ~peer:(attester.dal_node, attester_peer_id attester))
+           banned_attesters
+    in
+    info "DAL network is ready" ;
+
+    let* level_before_publication = Client.level client in
+    let publication_level = level_before_publication + 1 in
+    let attested_level = publication_level + attestation_lag in
+    let attestation_level = attested_level - 1 in
+
+    let* assigned_shard_indices_non_banned =
+      Lwt_list.map_p
+        (fun attester ->
+          Dal_RPC.(
+            call attester.dal_node
+            @@ get_assigned_shard_indices
+                 ~level:attestation_level
+                 ~pkh:attester.pkh))
+        non_banned_attesters
+    in
+    let* assigned_shard_indices_banned =
+      Lwt_list.map_p
+        (fun attester ->
+          Dal_RPC.(
+            call attester.dal_node
+            @@ get_assigned_shard_indices
+                 ~level:attestation_level
+                 ~pkh:attester.pkh))
+        banned_attesters
+    in
+    let total_number_of_assigned_shards =
+      List.fold_left
+        (fun acc l -> acc + List.length l)
+        0
+        assigned_shard_indices_non_banned
+    in
+
+    (* Check that the non-banned attesters have collectively enough
+       assigned shards to reconstruct the slot. *)
+    Check.(
+      number_of_shards / redundancy_factor < total_number_of_assigned_shards)
+      ~__LOC__
+      Check.int
+      ~error_msg:
+        "Non-banned attesters don't have enough rights to reconstruct slots, \
+         (needed: %L, actual: %R)" ;
+    (* Check that no non-banned attester has enough
+       assigned shards to attest the slot alone. *)
+    List.iter2
+      (fun assigned_shard_indices attester ->
+        Check.(
+          attestation_threshold * number_of_shards / 100
+          > List.length assigned_shard_indices)
+          ~__LOC__
+          Check.int
+          ~error_msg:
+            ("Attester " ^ attester.name
+           ^ " has enough right to attest alone, (needed: %L shards, actual: \
+              %R)"))
+      assigned_shard_indices_non_banned
+      non_banned_attesters ;
+    (* Check that no initial attester has enough
+       assigned shards to reconstruct. *)
+    List.iter2
+      (fun assigned_shard_indices attester ->
+        Check.(
+          number_of_shards / redundancy_factor
+          > List.length assigned_shard_indices)
+          ~__LOC__
+          Check.int
+          ~error_msg:
+            ("Attester " ^ attester.name
+           ^ " has enough rights to reconstruct alone, (needed: %L, actual: %R)"
+            ))
+      assigned_shard_indices_non_banned
+      non_banned_attesters ;
+
+    (* Wait until the given [dal_node] receives all the shards whose
+       indices are [shards] for the given [commitment]. *)
+    let wait_for_shards ~dal_node ~shards commitment =
+      let nshards = List.length shards in
+      let count = ref 0 in
+      let* () =
+        Lwt.join
+        @@ List.map
+             (fun shard_index ->
+               let* () =
+                 wait_for_stored_slot ~shard_index dal_node commitment
+               in
+               let () = incr count in
+               let () =
+                 Log.info
+                   "Dal node %s has received %d/%d shards"
+                   (Dal_node.name dal_node)
+                   !count
+                   nshards
+               in
+               unit)
+             shards
+      in
+      let () =
+        Log.info "Dal node %s has received its shards" (Dal_node.name dal_node)
+      in
+      unit
+    in
+    info "Waiting for shards" ;
+
+    let wait_shards_reach_attesters commitment attesters assigned_shard_indices
+        message =
+      let* () =
+        Lwt.join
+        @@ List.map2
+             (fun {dal_node; _} shards ->
+               wait_for_shards ~dal_node ~shards commitment)
+             attesters
+             assigned_shard_indices
+      in
+      info message ;
+      unit
+    in
+
+    let wait_shards_reach_observer commitment =
+      let* () =
+        Lwt.join
+        @@ List.map2
+             (fun attester shards ->
+               let* () =
+                 wait_for_shards ~dal_node:observer ~shards commitment
+               in
+               let () =
+                 Log.info
+                   "Dal node %s has sent its shards to observer"
+                   attester.name
+               in
+               unit)
+             non_banned_attesters
+             assigned_shard_indices_non_banned
+      in
+      info "Non-banned attesters have transmitted their shards to the observer" ;
+      unit
+    in
+
+    (* Wait until everyone has reveived the needed shards (first the
+       non-banned attesters, then the observer, and finally the banned
+       attesters). *)
+    let wait_slot commitment =
+      let wait_non_banned_promise =
+        wait_shards_reach_attesters
+          commitment
+          non_banned_attesters
+          assigned_shard_indices_non_banned
+          "Non-banned attesters have received their shards"
+      in
+
+      let wait_banned_promise =
+        wait_shards_reach_attesters
+          commitment
+          banned_attesters
+          assigned_shard_indices_banned
+          "Banned attesters have received their shards"
+      in
+
+      let wait_observer_promise = wait_shards_reach_observer commitment in
+
+      let* () = wait_non_banned_promise in
+      let* () = wait_observer_promise in
+
+      if amplification_is_implemented then wait_banned_promise else unit
+    in
+    let* publication_level_bis, _commitment =
+      publish_store_and_wait_slot
+        node
+        client
+        slot_producer
+        Constant.bootstrap1
+        ~index:slot_index
+        ~wait_slot
+        ~number_of_extra_blocks_to_bake:2
+      @@ Helpers.make_slot ~slot_size "content"
+    in
+    Check.(publication_level_bis = publication_level)
+      ~__LOC__
+      Check.int
+      ~error_msg:
+        "Commitment published at unexpected level: expected: %R, actual: %L" ;
+    unit
+end
+
 module Tx_kernel_e2e = struct
   open Tezos_protocol_alpha.Protocol
   open Tezt_tx_kernel
@@ -5329,6 +5760,20 @@ let register ~protocols =
     ~producer_profiles:[15]
     "commitments history RPCs"
     test_commitments_history_rpcs
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["amplification"]
+    ~bootstrap_profile:true
+    ~redundancy_factor:2
+      (* With a redundancy factor of 4 or more, not much luck is
+         needed for a bootstrap account (with 1/5 of the stake) to be
+         assigned enough shards to reconstruct alone. Since the
+         redundancy factor must be a power of 2, we use 2 which means
+         that half of the shards are needed to perform a
+         reconstruction. *)
+    ~number_of_slots:1
+    "banned attesters receive their shards thanks to amplification"
+    Amplification.test_amplification
     protocols ;
 
   (* Tests with all nodes *)
