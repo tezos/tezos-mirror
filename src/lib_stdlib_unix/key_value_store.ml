@@ -193,6 +193,8 @@ module Files : sig
   val value_exists :
     'value t -> ('key, 'value) layout -> 'key -> bool tzresult Lwt.t
 
+  val count_values : 'value t -> ('key, 'value) layout -> int tzresult Lwt.t
+
   val remove : 'value t -> ('key, 'value) layout -> unit tzresult Lwt.t
 end = struct
   module LRU = Ringo.LRU_Collection
@@ -236,12 +238,25 @@ end = struct
        see the {bitset} field. *)
     bitset : Lwt_bytes.t;
     (* This bitset encodes which values are present. *)
+    count : int;
+    (* The number of values. This is the same as the number of bits which are
+       set in the bitset. *)
     cache : 'value Cache.t;
     (* This cache keeps in memory values accessed recently. It is bounded by the
        maximum number of values the file can contain. It is cleaned up only once
        the file is removed from the LRU (see {lru}). *)
     lru_node : string LRU.node; (* LRU node associated with the current file. *)
   }
+
+  let number_of_set_bits (bitset : Lwt_bytes.t) size : int =
+    let count = ref 0 in
+    for i = 0 to size - 1 do
+      (* We don't count the entries being concurrently written (byte
+         `\002`) as present because reading them now would fail with a
+         Corrupted_data error. *)
+      if bitset.{i} = '\001' then count := !count + 1
+    done ;
+    !count
 
   (* This datatype represents a virtual file and its current status (opening,
      opened, closing). *)
@@ -265,6 +280,9 @@ end = struct
     | Value_exists of ('value opened_file option * bool tzresult) Lwt.t
       (* The promise returned by [value_exists] contains the file read,
          if it exists, as well as the existence of the key. *)
+    | Count_values of ('value opened_file option * int tzresult) Lwt.t
+      (* The promise returned by [count_values] contains the file read,
+         if it exists, as well as the number of keys. *)
     | Remove of unit Lwt.t
   (* The promise returned by [remove] contains nothing. *)
 
@@ -343,6 +361,9 @@ end = struct
     | Value_exists p ->
         let* file, _ = p in
         return file
+    | Count_values p ->
+        let* file, _ = p in
+        return file
     | Remove p ->
         let* () = p in
         return_none
@@ -412,7 +433,8 @@ end = struct
     let open Lwt_syntax in
     let index = layout.index_of key in
     let filepath = layout.filepath in
-    match (key_exists opened_file index, override) with
+    let key_already_present = key_exists opened_file index in
+    match (key_already_present, override) with
     | `Corrupted, false ->
         Lwt.return
           ( opened_file,
@@ -458,6 +480,12 @@ end = struct
               Lwt_bytes.blit_from_bytes bytes 0 mmap 0 layout.value_size ;
               Cache.replace opened_file.cache index data ;
               opened_file.bitset.{index} <- '\001' ;
+              (* If the key was not yet present, increment the [count] field *)
+              let opened_file =
+                if key_already_present = `Not_found then
+                  {opened_file with count = opened_file.count + 1}
+                else opened_file
+              in
               return (opened_file, Ok ())))
 
   let remove_with_opened_file files lru filepath opened_file =
@@ -530,6 +558,17 @@ end = struct
               )
         | `Found -> Lwt.return (Some opened_file, Ok true)
         | `Not_found -> Lwt.return (Some opened_file, Ok false)
+      in
+      generic_action
+        files
+        last_actions
+        layout.filepath
+        ~on_file_closed
+        ~on_file_opened
+
+    let count_values ~on_file_closed files last_actions layout =
+      let on_file_opened opened_file =
+        Lwt.return (Some opened_file, Ok opened_file.count)
       in
       generic_action
         files
@@ -642,7 +681,14 @@ end = struct
         ~size:bitset_size
         ()
     in
-    return {fd; bitset; cache = Cache.create 101; lru_node}
+    return
+      {
+        fd;
+        bitset;
+        count = number_of_set_bits bitset bitset_size;
+        cache = Cache.create 101;
+        lru_node;
+      }
 
   (* This function aims to be used when a write action is performed on
      a file that does not exist yet. *)
@@ -658,7 +704,7 @@ end = struct
     let bitset =
       Lwt_bytes.map_file ~fd:unix_fd ~shared:true ~size:bitset_size ()
     in
-    return {fd; bitset; cache = Cache.create 101; lru_node}
+    return {fd; bitset; count = 0; cache = Cache.create 101; lru_node}
 
   (* This function is associated with the [Read] and [Value_exists] actions. *)
   let may_load_file files last_actions lru filepath =
@@ -730,6 +776,28 @@ end = struct
       Table.replace last_actions layout.filepath (Value_exists p) ;
       let+ _, exists = p in
       exists
+
+  (* Very similar to [value_exists] action except we look at the
+     [count] counter instead of the bitset. *)
+  let count_values {files; last_actions; lru; closed} layout =
+    let open Lwt_syntax in
+    if !closed then
+      Lwt.return
+        (Error (Error_monad.TzTrace.make (Closed {action = "count_values"})))
+    else
+      let on_file_closed ~on_file_opened =
+        let* r = may_load_file files last_actions lru layout.filepath in
+        match r with
+        | None -> return (None, Ok 0)
+        | Some opened_file_promise ->
+            Table.replace files layout.filepath (Opening opened_file_promise) ;
+            let* opened_file = opened_file_promise in
+            on_file_opened opened_file
+      in
+      let p = Action.count_values ~on_file_closed files last_actions layout in
+      Table.replace last_actions layout.filepath (Count_values p) ;
+      let+ _, count = p in
+      count
 
   let write ?(override = false) {files; last_actions; lru; closed} layout key
       data =
@@ -836,6 +904,12 @@ let value_exists :
  fun {files; layout_of} file key ->
   let layout = layout_of file in
   Files.value_exists files layout key
+
+let count_values :
+    type file key value. (file, key, value) t -> file -> int tzresult Lwt.t =
+ fun {files; layout_of} file ->
+  let layout = layout_of file in
+  Files.count_values files layout
 
 let write_values ?override t seq =
   Seq.ES.iter

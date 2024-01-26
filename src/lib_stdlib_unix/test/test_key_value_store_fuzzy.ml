@@ -82,6 +82,8 @@ module type S = sig
     ('file * 'key * 'value tzresult) Seq_s.t
 
   val remove_file : ('file, 'key, 'value) t -> 'file -> unit tzresult Lwt.t
+
+  val count_values : ('file, 'key, 'value) t -> 'file -> int tzresult Lwt.t
 end
 
 let value_size = 1
@@ -121,6 +123,13 @@ module R : S = struct
       (fun (file', _) value -> if file = file' then None else Some value)
       t ;
     Lwt.return (Ok ())
+
+  let count_values t file =
+    Lwt_result_syntax.return
+    @@ Stdlib.Hashtbl.fold
+         (fun (file', _) _ count -> if file = file' then count + 1 else count)
+         t
+         0
 end
 
 module Helpers = struct
@@ -158,6 +167,7 @@ module Helpers = struct
     | Read_value of key
     | Read_values of key Seq.t
     | Remove_file of string
+    | Count_values of string
 
   let seq_gen ~size_seq value_gen =
     let open QCheck2.Gen in
@@ -190,7 +200,11 @@ module Helpers = struct
         ~number_of_keys_per_file
       |> map (fun x -> Read_values x)
     in
-    oneof [write_value; read_value; read_values; remove_file]
+    let count_values =
+      key_gen ~number_of_files ~number_of_keys_per_file
+      |> map (fun (file, _) -> Count_values file)
+    in
+    oneof [write_value; read_value; read_values; remove_file; count_values]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
@@ -205,6 +219,7 @@ module Helpers = struct
         in
         Format.fprintf fmt "R[%s]" str_keys
     | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
+    | Count_values file -> Format.fprintf fmt "COUNT[file=%s]" file
 
   type bind = Sequential | Parallel
 
@@ -427,47 +442,39 @@ let run_scenario
   let right = R.init ~lru_size layout_of in
   let action, next_actions = scenario in
   let n = ref 0 in
-  let compare_result ~finalization (file, key) left_result right_result =
-    let finalization = if finalization then "(finalization) " else "" in
+  let compare_tzresult finalization pp_while pp_val left_result right_result =
+    let pp_result fmt = function
+      | Ok v -> pp_val fmt v
+      | Error err -> Error_monad.pp_print_trace fmt err
+    in
+    let fail () =
+      failwith
+        "%s Unexpected different value while %a.@.For run %d at %s:@.Expected: \
+         %a@.Got: %a@."
+        finalization
+        pp_while
+        ()
+        !n
+        dir_path
+        pp_result
+        right_result
+        pp_result
+        left_result
+    in
     match (left_result, right_result) with
     | Ok left_value, Ok right_value ->
-        if left_value = right_value then return_unit
-        else
-          failwith
-            "%s Unexpected different value while reading key %s/%d.@.For run \
-             %d at %s:@.Expected: %s@.Got: %s@."
-            finalization
-            file
-            key
-            !n
-            dir_path
-            (Bytes.to_string right_value)
-            (Bytes.to_string left_value)
+        if left_value = right_value then return_unit else fail ()
     | Error _, Error _ -> return_unit
-    | Ok value, Error err ->
-        failwith
-          "%s Unexpected different result while reading key %s/%d.@. For run \
-           %d at %s:@.Expected: %a@.Got: %s"
-          finalization
-          file
-          key
-          !n
-          dir_path
-          Error_monad.pp_print_trace
-          err
-          (Bytes.to_string value)
-    | Error err, Ok value ->
-        failwith
-          "%s Unexpected different result while reading key %s/%d.@. For run \
-           %d at %s:@.Expected: %s@.Got: %a"
-          finalization
-          file
-          key
-          !n
-          dir_path
-          (Bytes.to_string value)
-          Error_monad.pp_print_trace
-          err
+    | Ok _, Error _ | Error _, Ok _ -> fail ()
+  in
+  let compare_result ~finalization (file, key) left_result right_result =
+    let finalization = if finalization then "(finalization) " else "" in
+    compare_tzresult
+      finalization
+      (fun fmt () -> Format.fprintf fmt "reading key %s/%d" file key)
+      (fun fmt b -> Format.fprintf fmt "%s" (Bytes.to_string b))
+      left_result
+      right_result
   in
   let rec run_actions action next_actions promises_running_seq =
     incr n ;
@@ -512,6 +519,17 @@ let run_scenario
           let right_promise = R.remove_file right file in
 
           tzjoin [left_promise; right_promise]
+      | Count_values file ->
+          let left_promise = L.count_values left file in
+          let right_promise = R.count_values right file in
+          let*! left_result = left_promise in
+          let*! right_result = right_promise in
+          compare_tzresult
+            ""
+            (fun fmt () -> Format.fprintf fmt "counting values in file %s" file)
+            (fun fmt -> Format.fprintf fmt "%d")
+            left_result
+            right_result
     in
     let finalize () =
       let left = L.init ~lru_size:number_of_files layout_of in
