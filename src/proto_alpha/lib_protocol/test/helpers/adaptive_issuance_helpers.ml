@@ -951,6 +951,8 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
           account_map
       | Some delegate_name ->
           let old_account_map = account_map in
+          (* If self stake, then try to stake from unstake.
+             Returns the amount that remains to be staked from liquid *)
           let account_map, amount =
             if delegate_name = staker_name then
               stake_from_unstake
@@ -962,9 +964,11 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
             else (account_map, amount)
           in
           if Tez.(staker.liquid < amount) then
-            (* Invalid amount: operation will fail *)
+            (* Not enough liquid balance: operation will fail *)
             old_account_map
           else if delegate_name = staker_name then
+            (* If self stake: increase frozen deposits and decrease liquid balance.
+               "add_current" is easy to resolve since there is no pseudotokens *)
             let f delegate =
               let frozen_deposits =
                 Frozen_tez.add_current
@@ -977,10 +981,14 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
             in
             update_account ~f delegate_name account_map
           else
+            (* If external stake: *)
             let delegate_account =
               String.Map.find delegate_name account_map
               |> Option.value_f ~default:(fun _ -> assert false)
             in
+            (* Call stake_values_real to know the actual amount staked and the pseudotokens minted *)
+            (* amount_q would be the effective stake on the delegate's side, while
+               amount is the amount removed from the liquid balance *)
             let pseudo, amount_q = stake_values_real amount delegate_account in
             let f_staker staker =
               let liquid = Tez.(staker.liquid -! amount) in
@@ -990,6 +998,13 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
               {staker with liquid; staking_delegator_numerator}
             in
             let f_delegate delegate =
+              (* The difference between the actual amount and the effective amount is
+                 "distributed" amongst current stake holders.
+                 Indeed, when trading in "amount", the staker receives "pseudo" pseudotokens
+                 valued at "amount_q". So the total amount of value is increased by "amount_q".
+                 Then, "portion" is added to the total, so it must be distributed.
+                 This means that the order is important: first you add_current_q, then
+                 you add the portion to all *)
               let portion = Partial_tez.(of_tez amount - amount_q) in
               let frozen_deposits =
                 Frozen_tez.add_current_q
@@ -1003,7 +1018,6 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
                   frozen_deposits.co_current
               in
               let frozen_deposits = {frozen_deposits with co_current} in
-
               let staking_delegate_denominator =
                 Z.add delegate.staking_delegate_denominator pseudo
               in
@@ -1025,6 +1039,8 @@ let apply_unstake cycle amount staker_name account_map =
           | None -> raise Not_found
           | Some delegate ->
               if delegate_name = staker_name then
+                (* Case self stake *)
+                (* No pseudotokens : no problem *)
                 let frozen_deposits, amount_unstaked =
                   Frozen_tez.sub_current
                     amount
@@ -1043,17 +1059,30 @@ let apply_unstake cycle amount staker_name account_map =
                 in
                 update_account ~f:(fun _ -> delegate) delegate_name account_map
               else
+                (* Case external stake *)
                 let staked_amount =
                   Frozen_tez.get staker_name delegate.frozen_deposits
                 in
                 let pseudotokens, amount_q =
                   if Partial_tez.(staked_amount <= of_tez amount) then
+                    (* Unstake all case *)
                     (staker.staking_delegator_numerator, staked_amount)
-                  else unstake_values_real amount delegate
+                  else
+                    (* The staker requests "amount".
+                       It translates to some "pseudotokens", valued at "amount_q".
+                       If those pseudotokens would give strictly more than the requested amount,
+                       then give one less pseudotoken. The actual amount unstaked is always lower than
+                       the requested amount (except in the unstake all case) *)
+                    unstake_values_real amount delegate
                 in
+                (* Actual unstaked amount (that will be finalized) *)
                 let amount = Partial_tez.to_tez ~round:`Down amount_q in
+                (* Delta from pseudotokens' value, to be redistributed amongst all remaining stakers
+                   (including current if still staking) *)
                 let portion = Partial_tez.(amount_q - of_tez amount) in
                 let f_staker staker =
+                  (* The staker's account representation doesn't change much,
+                     the unstake request is stored on the delegate's side *)
                   let staking_delegator_numerator =
                     Z.sub staker.staking_delegator_numerator pseudotokens
                   in
@@ -1066,18 +1095,23 @@ let apply_unstake cycle amount staker_name account_map =
                   let staking_delegate_denominator =
                     Z.sub delegate.staking_delegate_denominator pseudotokens
                   in
+                  (* Just like in stake *)
+                  (* Do the effective unstake *)
                   let frozen_deposits =
                     Frozen_tez.sub_current_q
                       amount_q
                       staker_name
                       delegate.frozen_deposits
                   in
+                  (* Apply the delta *)
                   let co_current =
                     Frozen_tez.add_q_to_all_co_current
                       portion
                       frozen_deposits.co_current
                   in
                   let frozen_deposits = {frozen_deposits with co_current} in
+                  (* Add unstake request
+                     Note that "amount" might not be the initial requested amount *)
                   let unstaked_frozen =
                     Unstaked_frozen.add_unstake
                       cycle
