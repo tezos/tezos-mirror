@@ -110,9 +110,10 @@ let last_preserved_block_level c =
   | Some cycle -> (first_level_in_cycle c cycle).level
 
 let last_finalized_block_level c =
-  (* Not implemented yet. We use the last_preserved_block_level by
-     default.*)
-  last_preserved_block_level c
+  let current = Raw_context.current_level c in
+  let current_raw = current.level in
+  let finalized_level = Raw_level_repr.sub current_raw 2 in
+  match finalized_level with None -> Raw_level_repr.root | Some l -> l
 
 let last_of_a_cycle ctxt level =
   let cycle_eras = Raw_context.cycle_eras ctxt in

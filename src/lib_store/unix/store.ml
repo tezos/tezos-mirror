@@ -88,6 +88,7 @@ and chain_state = {
   (* Following fields are not safe to update concurrently and must be
      manipulated carefuly: *)
   current_head_data : block_descriptor Stored_data.t;
+  mutable last_finalized_block_level : Int32.t option;
   cementing_highwatermark_data : int32 option Stored_data.t;
   target_data : block_descriptor option Stored_data.t;
   checkpoint_data : block_descriptor Stored_data.t;
@@ -452,7 +453,7 @@ module Block = struct
           message;
           max_operations_ttl;
           last_preserved_block_level;
-          _;
+          last_finalized_block_level;
         };
       block_metadata;
       ops_metadata;
@@ -581,10 +582,22 @@ module Block = struct
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)
         in
-        let*! () =
-          Shared.use chain_store.chain_state (fun {validated_blocks; _} ->
-              Block_lru_cache.remove validated_blocks hash ;
-              Lwt.return_unit)
+        let* () =
+          Shared.update_with chain_store.chain_state (fun chain_state ->
+              Block_lru_cache.remove chain_state.validated_blocks hash ;
+              let new_last_finalized_block_level =
+                match chain_state.last_finalized_block_level with
+                | None -> Some last_finalized_block_level
+                | Some prev_lfbl ->
+                    Some (Int32.max last_finalized_block_level prev_lfbl)
+              in
+              let new_chain_state =
+                {
+                  chain_state with
+                  last_finalized_block_level = new_last_finalized_block_level;
+                }
+              in
+              return (Some new_chain_state, ()))
         in
         Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
@@ -1303,7 +1316,10 @@ module Chain = struct
       ~checkpoint ~target =
     let open Lwt_result_syntax in
     let new_checkpoint =
-      if Compare.Int32.(snd new_head_lfbl > snd checkpoint) then new_head_lfbl
+      (* Ensure that the checkpoint is not above the current head *)
+      if Compare.Int32.(snd new_head_lfbl > snd checkpoint) then
+        if Compare.Int32.(snd new_head_lfbl > snd new_head) then new_head
+        else new_head_lfbl
       else checkpoint
     in
     match target with
@@ -1462,18 +1478,24 @@ module Chain = struct
             chain_state
             cementing_highwatermark
         in
-        let*! lfbl_block_opt =
-          Block.locked_read_block_by_level_opt
-            chain_store
-            new_head
-            new_head_lpbl
+        let* lfbl_block_opt =
+          match chain_state.last_finalized_block_level with
+          | None -> return_none
+          | Some lfbl ->
+              let distance =
+                Int32.(to_int @@ max 0l (sub (Block.level new_head) lfbl))
+              in
+              Block_store.read_block
+                chain_store.block_store
+                ~read_metadata:false
+                (Block (Block.hash new_head, distance))
         in
         let* new_checkpoint, new_target =
           match lfbl_block_opt with
           | None ->
-              (* This case may occur when importing a rolling
-                 snapshot where the lafl block is not known.
-                 We may use the checkpoint instead. *)
+              (* This case may occur when importing a rolling snapshot
+                 where the lfbl block is not known or when a node was
+                 just started. We may use the checkpoint instead. *)
               return (checkpoint, target)
           | Some lfbl_block ->
               may_update_checkpoint_and_target
@@ -1760,6 +1782,7 @@ module Chain = struct
         ~initial_data:Chain_id.Map.empty
     in
     let current_head = genesis_block in
+    let last_finalized_block_level = None in
     let active_testchain = None in
     let mempool = Mempool.empty in
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
@@ -1769,6 +1792,7 @@ module Chain = struct
     return
       {
         current_head_data;
+        last_finalized_block_level;
         cementing_highwatermark_data;
         target_data;
         checkpoint_data;
@@ -1856,6 +1880,7 @@ module Chain = struct
     match o with
     | None -> failwith "load_store: cannot read head"
     | Some current_head ->
+        let last_finalized_block_level = None in
         let active_testchain = None in
         let mempool = Mempool.empty in
         let live_blocks = Block_hash.Set.empty in
@@ -1865,6 +1890,7 @@ module Chain = struct
         return
           {
             current_head_data;
+            last_finalized_block_level;
             cementing_highwatermark_data;
             target_data;
             checkpoint_data;
