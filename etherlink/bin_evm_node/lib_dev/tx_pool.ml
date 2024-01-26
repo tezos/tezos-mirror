@@ -228,7 +228,7 @@ module Request = struct
         | Delayed delayed ->
             Format.fprintf
               ppf
-              "Add tx [%a] to tx-pool"
+              "Add delayed inbox tx [%a] to tx-pool"
               Ethereum_types.Delayed_transaction.pp_short
               delayed)
     | Inject_transactions (force, timestamp) ->
