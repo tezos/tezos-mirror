@@ -8488,7 +8488,7 @@ let _tezt_etherlink =
 let _evm_node =
   public_exe
     (sf "octez-evm-node")
-    ~internal_name:(sf "evm_node")
+    ~internal_name:(sf "main")
     ~path:"etherlink/bin_evm_node"
     ~opam:"octez-evm-node"
     ~synopsis:
