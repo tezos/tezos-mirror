@@ -1,0 +1,9 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+oc.docker:rust-toolchain:
+  extends:
+    - .oc.docker:rust-toolchain_template
+    - .needs__trigger
+    # This job runs whenever the image itself changes or when the
+    # `build_kernels` or `test_kernels` runs.
+    - .rules__octez_changes_or_kernels

@@ -2,6 +2,7 @@ include:
   # Stage: build
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-release.yml
   - .gitlab/ci/jobs/build/oc.build:static-arm64-linux-binaries-release.yml
+  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-test.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-test.yml
   - .gitlab/ci/jobs/build/bin_packages.yml

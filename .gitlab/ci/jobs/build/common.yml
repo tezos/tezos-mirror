@@ -57,10 +57,22 @@
     paths:
       - "octez-binaries/$ARCH/*"
 
+.oc.docker:rust-toolchain_template:
+  extends:
+    - .image_template__docker
+    - .docker_auth_template
+  stage: build
+  variables:
+    # These image are not built for external use.
+    CI_DOCKER_HUB: "false"
+  script:
+    - ./scripts/ci/docker_rust_toolchain_build.sh
+
 .oc.build_docker_release_template:
   extends:
     - .image_template__docker
     - .docker_auth_template
+  needs: [oc.docker:rust-toolchain]
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
     IMAGE_ARCH_PREFIX: ""
