@@ -11,6 +11,7 @@
 - Fix minimum gas price used for charging fees: should be `base_fee_per_gas`, instead of `1 wei`. (!11509)
 - Fix an overflow bug when prepaying transactions/repaying gas. (!11545)
 - Fix a bug where creating a create a contract with not enough funds was allowed. (!11526)
+- Hands the return to the current context when the creation of a contract fails. (!11546)
 
 ### Breaking changes
 

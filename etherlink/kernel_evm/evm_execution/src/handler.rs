@@ -649,6 +649,62 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    fn end_create(
+        &mut self,
+        runtime: evm::Runtime,
+        sub_context_result: Result<ExitReason, EthereumError>,
+        address: H160,
+    ) -> Result<CreateOutcome, EthereumError> {
+        match sub_context_result {
+            Ok(sub_context_result @ ExitReason::Succeed(_)) => {
+                let code_out = runtime.machine().return_value();
+
+                if code_out.first() == Some(&0xef) {
+                    // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
+                    return Ok((
+                        ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+                        None,
+                        vec![],
+                    ));
+                }
+
+                if code_out.len() > MAX_CODE_SIZE {
+                    // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
+                    return Ok((
+                        ExitReason::Error(ExitError::CreateContractLimit),
+                        None,
+                        vec![],
+                    ));
+                }
+
+                if let Err(err) = self.record_deposit(code_out.len()) {
+                    return Ok((ExitReason::Error(err), None, vec![]));
+                }
+
+                self.set_contract_code(address, code_out)?;
+                // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
+                // A created smart contract nonce must start at 1.
+                self.increment_nonce(address)?;
+
+                Ok((sub_context_result, Some(address), vec![]))
+            }
+            Ok(sub_context_result @ ExitReason::Revert(_)) => {
+                // EIP-140: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
+                // In case of a REVERT in a context of a CREATE, CREATE2, the error message
+                // is available in the returndata buffer
+                Ok((sub_context_result, None, runtime.machine().return_value()))
+            }
+            // Since the sub context failed, return address 0 (`None` in our case) (https://www.evm.codes/#f0?fork=shanghai)
+            Ok(sub_context_result @ ExitReason::Error(_)) => {
+                Ok((sub_context_result, None, vec![]))
+            }
+            Ok(sub_context_result @ ExitReason::Fatal(_)) => {
+                Ok((sub_context_result, None, vec![]))
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     /// Create a contract
     ///
     /// Performs the actual contract creation for both transactions initiated
@@ -737,40 +793,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let result = self.execute(&mut runtime);
 
-        // FIXME should only be succeed with return value
-        // issue: https://gitlab.com/tezos/tezos/-/issues/4869
-        if let Ok(ExitReason::Succeed(_)) = result {
-            let code_out = runtime.machine().return_value();
-
-            if code_out.first() == Some(&0xef) {
-                // EIP-3541: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md
-                return Ok((
-                    ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
-                    None,
-                    vec![],
-                ));
-            }
-
-            if code_out.len() > MAX_CODE_SIZE {
-                // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
-                return Ok((
-                    ExitReason::Error(ExitError::CreateContractLimit),
-                    None,
-                    vec![],
-                ));
-            }
-
-            if let Err(err) = self.record_deposit(code_out.len()) {
-                return Ok((ExitReason::Error(err), None, vec![]));
-            }
-
-            self.set_contract_code(address, code_out)?;
-            // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
-            // A created smart contract nonce must start at 1.
-            self.increment_nonce(address)?;
-        }
-
-        Ok((result?, Some(address), vec![]))
+        self.end_create(runtime, result, address)
     }
 
     /// Call a contract
@@ -2469,6 +2492,69 @@ mod test {
                     .unwrap()
                 );
                 assert_eq!(handler.gas_used(), 0);
+            }
+            Err(err) => {
+                panic!("Expected Ok, but got {:?}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn contract_create_has_return_when_revert() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(117);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+        );
+
+        let value = U256::zero();
+        let create_scheme = CreateScheme::Legacy { caller };
+
+        // The code of the contract revert with 0x18 (equivalent to 24)
+        let initial_code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0x18,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x20,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::REVERT.as_u8(),
+        ];
+
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_create(caller, create_scheme, value, initial_code, false);
+
+        match result {
+            Ok(result) => {
+                // Expecting to revert with 0x18 in the return vector
+                let expected_result = (
+                    ExitReason::Revert(ExitRevert::Reverted),
+                    None,
+                    vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 24,
+                    ],
+                );
+                assert_eq!(result, expected_result);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
