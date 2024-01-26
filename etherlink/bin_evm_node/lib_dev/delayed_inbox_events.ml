@@ -23,7 +23,7 @@ module Event = struct
       ~section
       ~name:"evm_node_dev_delayed_inbox_add_transaction"
       ~msg:"Add delayed transaction {transaction} to the tx-pool"
-      ~level:Info
+      ~level:Notice
       ("transaction", Ethereum_types.Delayed_transaction.encoding)
       ~pp1:Ethereum_types.Delayed_transaction.pp_short
 
