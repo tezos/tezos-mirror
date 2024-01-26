@@ -137,6 +137,7 @@ let setup_sequencer ?time_between_blocks
         private_rpc_port;
         time_between_blocks;
         sequencer;
+        genesis_timestamp = None;
       }
   in
   let* evm_node =

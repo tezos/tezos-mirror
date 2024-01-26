@@ -15,18 +15,21 @@ type t = {
       (** Number for the next bluerpint to be produced. *)
 }
 
-(** [init ~data_dir ~kernel ~preimages ~smart_rollup_address] creates
-    a context where it initializes the {!type-index}, and use a
-    checkpoint mechanism to load the latest {!type-store} if any.
+(** [init ?genesis_timestamp ~data_dir ~kernel ~preimages
+    ~smart_rollup_address] creates a context where it initializes the
+    {!type-index}, and use a checkpoint mechanism to load the latest
+    {!type-store} if any.
 
     If the context does not already exist, this function also produces and
     publishes the genesis blueprint. *)
 val init :
+  ?genesis_timestamp:Time.Protocol.t ->
   data_dir:string ->
   kernel:string ->
   preimages:string ->
   smart_rollup_address:string ->
   secret_key:Signature.secret_key ->
+  unit ->
   t tzresult Lwt.t
 
 (** [init_from_rollup_node ~data_dir

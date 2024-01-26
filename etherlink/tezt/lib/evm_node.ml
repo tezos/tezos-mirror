@@ -34,6 +34,7 @@ type mode =
       private_rpc_port : int;
       time_between_blocks : time_between_blocks option;
       sequencer : string;
+      genesis_timestamp : Client.timestamp option;
     }
   | Proxy of {devmode : bool}
 
@@ -280,6 +281,7 @@ let run_args evm_node =
           private_rpc_port;
           time_between_blocks;
           sequencer;
+          genesis_timestamp;
         } ->
         [
           "run";
@@ -303,6 +305,11 @@ let run_args evm_node =
               | Nothing -> "none"
               | Time_between_blocks f -> Format.sprintf "%.3f" f)
             time_between_blocks
+        @ Cli_arg.optional_arg
+            "genesis-timestamp"
+            (fun timestamp ->
+              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
+            genesis_timestamp
   in
   mode_args @ shared_args
 

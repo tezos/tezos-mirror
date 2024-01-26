@@ -474,6 +474,15 @@ let timestamp_arg =
        ~placeholder:"1970-01-01T00:00:00Z"
        ~default:"0"
 
+let genesis_timestamp_arg =
+  Params.timestamp
+  |> Tezos_clic.arg
+       ~long:"genesis-timestamp"
+       ~doc:
+         "Timestamp used for the genesis block, uses machine's clock if not \
+          provided"
+       ~placeholder:"1970-01-01T00:00:00Z"
+
 let blueprint_number_arg =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -614,7 +623,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args10
+    (args11
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -624,7 +633,8 @@ let sequencer_command =
        verbose_arg
        kernel_arg
        preimages_arg
-       time_between_blocks_arg)
+       time_between_blocks_arg
+       genesis_timestamp_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -648,7 +658,8 @@ let sequencer_command =
            verbose,
            kernel,
            preimages,
-           time_between_blocks )
+           time_between_blocks,
+           genesis_timestamp )
          rollup_node_endpoint
          sequencer
          () ->
@@ -679,11 +690,13 @@ let sequencer_command =
       let* () = Blueprints_publisher.start {rollup_node_endpoint} in
       let* ctxt =
         Sequencer_context.init
+          ?genesis_timestamp
           ~data_dir
           ~kernel:config.mode.kernel
           ~preimages:config.mode.preimages
           ~smart_rollup_address
           ~secret_key:sequencer
+          ()
       in
       let module Sequencer = Sequencer.Make (struct
         let ctxt = ctxt
