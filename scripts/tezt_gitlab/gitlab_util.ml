@@ -56,3 +56,43 @@ let get_last_merged_pipeline ~project ~default_branch () =
           aux (commit_parent :: commits))
   in
   aux commits
+
+let get_last_successful_schedule_pipeline ?matching ~project () =
+  Log.info
+    "Fetching successful scheduled pipeline for %s%s..."
+    project
+    (match matching with
+    | None -> ""
+    | Some pattern -> sf " matching %S" (show_rex pattern)) ;
+  let* pipelines =
+    Gitlab.(
+      project_pipelines
+        ~project
+        ~order_by:"id"
+        ~sort:"desc"
+        ~source:"schedule"
+        ~status:"success"
+        ()
+      |> get)
+  in
+  let pipelines = JSON.as_list pipelines in
+  Log.info "Found %d successful scheduled pipelines." (List.length pipelines) ;
+  let pipelines =
+    match matching with
+    | None -> pipelines
+    | Some pattern ->
+        let pipelines =
+          Fun.flip List.filter pipelines @@ fun pipeline ->
+          let name = JSON.(pipeline |-> "name" |> as_string) in
+          name =~ pattern
+        in
+        Log.debug "%d of those match the pattern." (List.length pipelines) ;
+        pipelines
+  in
+  match pipelines with
+  | [] -> Test.fail "no satisfying pipeline found"
+  | pipeline :: _ ->
+      let id = JSON.(pipeline |-> "id" |> as_int) in
+      let name = JSON.(pipeline |-> "name" |> as_string) in
+      Log.info "Selected pipeline: %d (%s)" id name ;
+      return id
