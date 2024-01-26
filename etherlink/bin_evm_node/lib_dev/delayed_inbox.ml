@@ -150,7 +150,7 @@ let fetch_delayed_transactions ~hashes ~level worker =
       in
       match bytes with
       | Ok (Some bytes) ->
-          return (Ethereum_types.Delayed_transaction.of_bytes bytes)
+          return (Ethereum_types.Delayed_transaction.of_bytes hash bytes)
       | _ ->
           let* () =
             Delayed_inbox_events.transaction_fetch_failed ~tx_hash:hash ~level

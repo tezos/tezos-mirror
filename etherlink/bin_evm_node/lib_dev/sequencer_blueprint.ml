@@ -51,6 +51,15 @@ let encode_transaction hash raw =
 let encode_delayed_transaction = function
   | Delayed_transaction.Transaction {hash; raw_tx} ->
       encode_transaction (hash_to_bytes hash) raw_tx
+  | Deposit {hash; raw_deposit} ->
+      let open Rlp in
+      let hash = hash_to_bytes hash in
+      let rlp = decode_exn (Bytes.of_string raw_deposit) in
+      List
+        [
+          Value (hash |> Bytes.of_string);
+          List [Value (Bytes.of_string "\002"); rlp];
+        ]
 
 let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
   let open Rlp in

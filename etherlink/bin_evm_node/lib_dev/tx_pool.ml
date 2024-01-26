@@ -285,7 +285,8 @@ let on_transaction state transaction =
   let open Lwt_result_syntax in
   match transaction with
   | Transaction transaction -> on_normal_transaction state transaction
-  | Delayed (Transaction {hash; _} as delayed_transaction) ->
+  | Delayed delayed_transaction ->
+      let hash = Ethereum_types.Delayed_transaction.hash delayed_transaction in
       let* () = on_delayed_transaction state delayed_transaction in
       return (Ok hash)
 
