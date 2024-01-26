@@ -36,9 +36,11 @@ let of_delegate ctxt delegate =
 
 let pending_updates ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let activation_delay =
+    Constants_storage.delegate_parameters_activation_delay ctxt
+  in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let to_cycle = Cycle_repr.add current_cycle (preserved_cycles + 1) in
+  let to_cycle = Cycle_repr.add current_cycle (activation_delay + 1) in
   List.filter_map_es
     (fun cycle ->
       let open Lwt_result_syntax in
@@ -52,8 +54,10 @@ let register_update ctxt delegate t =
   let open Lwt_result_syntax in
   let update_cycle =
     let current_level = Raw_context.current_level ctxt in
-    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-    Cycle_repr.add current_level.cycle (preserved_cycles + 1)
+    let activation_delay =
+      Constants_storage.delegate_parameters_activation_delay ctxt
+    in
+    Cycle_repr.add current_level.cycle (activation_delay + 1)
   in
   let*! ctxt =
     Storage.Pending_staking_parameters.add
