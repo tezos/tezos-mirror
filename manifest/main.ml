@@ -2812,15 +2812,15 @@ let _octez_p2p_tests =
         astring;
       ]
 
-let tezt_ethereum =
+let tezt_etherlink =
   private_lib
-    "tezt_ethereum"
-    ~path:"etherlink/tezt/lib_ethereum"
+    "tezt_etherlink"
+    ~path:"etherlink/tezt/lib"
     ~opam:"tezt-etherlink"
     ~bisect_ppx:No
     ~deps:
       [
-        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         octez_crypto;
         tezt_tezos |> open_;
@@ -4377,7 +4377,7 @@ let _tezt_testnet_scenarios =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_ethereum |> open_;
+        tezt_etherlink |> open_;
       ]
 
 let octogram =
@@ -8478,7 +8478,7 @@ let _tezt_etherlink =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_ethereum |> open_;
+        tezt_etherlink |> open_;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true

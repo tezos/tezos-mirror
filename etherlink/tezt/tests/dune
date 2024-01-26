@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt_ethereum
+  tezt_etherlink
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
@@ -19,7 +19,7 @@
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_ethereum)
+  -open Tezt_etherlink)
  (modules evm_rollup evm_sequencer))
 
 (executable

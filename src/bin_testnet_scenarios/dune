@@ -8,11 +8,11 @@
  (libraries
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt_ethereum)
+  tezt_etherlink)
  (flags
   (:standard)
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_ethereum))
+  -open Tezt_etherlink))
