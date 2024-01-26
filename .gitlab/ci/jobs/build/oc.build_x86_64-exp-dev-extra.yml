@@ -7,11 +7,7 @@ oc.build_x86_64-exp-dev-extra:
   extends:
     - .tags_template__build
     - .oc.build_x86_64
-    # Produced artifacts may be needed later by tools that download
-    # them to build a specific snapshot of octez (e.g., for
-    # weeklynets), that's why - at least for the time being - we run
-    # this job everytime when pipeline is by Marge Bot.
-    - .rules__octez_changes_or_margebot
+    - .rules__octez_changes
   variables:
     EXECUTABLE_FILES: "script-inputs/experimental-executables script-inputs/dev-executables"
     # BUILD_EXTRA contains dune targets that should be built in addition to EXECUTABLE_FILES above.

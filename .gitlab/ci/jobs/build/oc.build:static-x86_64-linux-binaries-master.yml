@@ -1,0 +1,12 @@
+include: .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries.yml
+
+# this is the same as
+# oc.build:static-x86_64-linux-binaries-experimental.yml, but for the
+# master branch pipeline only
+oc.build:static-x86_64-linux-binaries:
+  extends:
+    - .oc.build:static-x86_64-linux-binaries
+  variables:
+    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+  rules:
+    - when: always

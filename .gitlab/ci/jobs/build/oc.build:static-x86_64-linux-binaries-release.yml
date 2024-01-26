@@ -1,13 +1,10 @@
-include: .gitlab/ci/jobs/build/common.yml
+include: .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries.yml
 
 # See comments in oc.build:static-x86_64-linux-binaries-experimental.yml.
 oc.build:static-x86_64-linux-binaries:
   extends:
-    - .tags_template__build
-    - .needs__trigger
-    - .oc.build_static_binaries_template
+    - .oc.build:static-x86_64-linux-binaries
   variables:
-    ARCH: "x86_64"
     EXECUTABLE_FILES: "script-inputs/released-executables"
   # Extend the lifespan to prevent failure for external tools using artifacts.
   artifacts:
