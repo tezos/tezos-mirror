@@ -177,7 +177,6 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
   unit
 
