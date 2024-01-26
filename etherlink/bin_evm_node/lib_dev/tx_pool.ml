@@ -276,9 +276,8 @@ let on_delayed_transaction state delayed_tx =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
-  let open Ethereum_types.Delayed_transaction in
   (* Add the tx to the pool*)
-  let*? pool = Pool.add_delayed pool (Transaction delayed_tx) in
+  let*? pool = Pool.add_delayed pool delayed_tx in
   state.pool <- pool ;
   return_unit
 
@@ -286,9 +285,9 @@ let on_transaction state transaction =
   let open Lwt_result_syntax in
   match transaction with
   | Transaction transaction -> on_normal_transaction state transaction
-  | Delayed (Transaction delayed_transaction) ->
+  | Delayed (Transaction {hash; _} as delayed_transaction) ->
       let* () = on_delayed_transaction state delayed_transaction in
-      return (Ok delayed_transaction.Ethereum_types.Delayed_transaction.hash)
+      return (Ok hash)
 
 let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     =

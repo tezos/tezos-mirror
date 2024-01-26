@@ -1146,13 +1146,12 @@ let filter_changes_encoding =
     ]
 
 module Delayed_transaction = struct
-  type transaction = {
-    hash : hash;
-    raw_tx : string;
-        (* Binary string, so that it integrates smoothly with the tx-pool. *)
-  }
-
-  type t = Transaction of transaction
+  type t =
+    | Transaction of {
+        hash : hash;
+        raw_tx : string;
+            (* Binary string, so that it integrates smoothly with the tx-pool. *)
+      }
 
   let hash = function Transaction {hash; _} -> hash
 
