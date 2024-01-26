@@ -29,6 +29,14 @@ val init :
   secret_key:Signature.secret_key ->
   t tzresult Lwt.t
 
+(** [init_from_rollup_node ~data_dir
+    ~rollup_node_data_dir ~inspect_current_blueprint_number]
+    initialises the irmin context and metadata of the evm using the
+    latest known evm state of the given rollup
+    node. *)
+val init_from_rollup_node :
+  data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
+
 (** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
     to disk the changes, and update the checkpoint. *)
 val commit : t -> Sequencer_state.t -> t tzresult Lwt.t

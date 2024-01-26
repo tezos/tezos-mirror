@@ -833,9 +833,34 @@ let make_upgrade_command =
       Printf.printf "%s" Hex.(of_bytes payload |> show) ;
       return_unit)
 
+let init_from_rollup_node_command =
+  let open Tezos_clic in
+  let rollup_node_data_dir_param =
+    Tezos_clic.param
+      ~name:"rollup-node-data-dir"
+      ~desc:(Format.sprintf "The path to the rollup node data directory.")
+      Params.string
+  in
+  command
+    ~desc:
+      "initialises the EVM node data-dir using the data-dir of a rollup node."
+    (args1 data_dir_arg)
+    (prefixes ["init"; "from"; "rollup"; "node"]
+    @@ rollup_node_data_dir_param @@ stop)
+    (fun data_dir rollup_node_data_dir () ->
+      Evm_node_lib_dev.Sequencer_context.init_from_rollup_node
+        ~data_dir
+        ~rollup_node_data_dir)
+
 (* List of program commands *)
 let commands =
-  [proxy_command; sequencer_command; chunker_command; make_upgrade_command]
+  [
+    proxy_command;
+    sequencer_command;
+    chunker_command;
+    make_upgrade_command;
+    init_from_rollup_node_command;
+  ]
 
 let global_options = Tezos_clic.no_options
 

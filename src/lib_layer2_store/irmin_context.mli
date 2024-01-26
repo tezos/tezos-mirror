@@ -125,6 +125,16 @@ val is_gc_finished : [> `Write] index -> bool
     GC run is currently ongoing. *)
 val wait_gc_completion : [> `Write] index -> unit Lwt.t
 
+(** [export_snapshot index context_hash ~path] exports the context corresponding
+    to [context_hash], if found in [index], into the given folder path. As the
+    export uses the GC's behaviour to extract a single commit into a standalone
+    fresh store, it is not possible to export a snapshot while a GC is
+    running. This call will hang until the GC has finished.
+
+    Note: there is no associated [import_snapshot] function as the import
+    consist in copying the exported Irmin store. *)
+val export_snapshot : _ t -> hash -> path:string -> unit tzresult Lwt.t
+
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig
   type t
