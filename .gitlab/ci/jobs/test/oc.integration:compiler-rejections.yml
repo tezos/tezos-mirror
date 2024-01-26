@@ -1,4 +1,6 @@
 oc.integration:compiler-rejections:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .rules__octez_changes
   script:
     - dune build @runtest_rejections

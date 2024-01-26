@@ -23,8 +23,6 @@
     - .tags_template__build_arm64
   variables:
     ARCH: "arm64"
-    # Disable coverage for arm64
-    COVERAGE_OPTIONS: ""
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
@@ -82,6 +80,8 @@
 .oc.build_x86_64:
   extends:
     - .oc.build
+    # Add coverage instrumentation for the integration tests.
+    - .oc.template__coverage_instrumentation
     # These job are the main bottleneck since a lot of tests depend on
     # them.  So we start them even before sanity_ci.
     - .needs__trigger

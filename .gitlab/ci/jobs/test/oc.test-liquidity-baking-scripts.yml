@@ -1,7 +1,8 @@
 include: .gitlab/ci/jobs/test/common.yml
 
 oc.test-liquidity-baking-scripts:
-  extends: .test_template
+  extends:
+    - .test_template
   rules:
     - changes:
         - src/**/*

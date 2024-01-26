@@ -49,7 +49,9 @@ oc.script:test-gen-genesis:
     - dune build gen_genesis.exe
 
 oc.script:test_release_versions:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .rules__octez_changes
   before_script:
     - ./scripts/ci/take_ownership.sh
     - . ./scripts/version.sh

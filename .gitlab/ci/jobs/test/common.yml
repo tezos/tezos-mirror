@@ -2,7 +2,6 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies
-    - .oc.template__coverage
     - .rules__octez_changes
   needs:
     - "oc.build_x86_64-released"
@@ -11,18 +10,6 @@
   before_script:
     - . ./scripts/version.sh
     - eval $(opam env)
-
-# Merge coverage files after the execution
-.oc.template__coverage_files:
-  extends:
-    - .oc.template__coverage
-    - .rules__octez_changes
-  artifacts:
-    name: "coverage-files-$CI_JOB_ID"
-    paths:
-      - $BISECT_FILE
-    expire_in: 1 day
-    when: on_success
 
 # We use the --job option to split tests into jobs of roughly the same
 # duration. This is based on a file that contains timings of test results,
@@ -33,9 +20,6 @@
 .tezt_template:
   variables:
     JUNIT: "tezt-junit.xml"
-    # if we do not set BISECT_FILE here, it will be empty, and include the
-    # full CI_PROJECT_DIR in artifacts as per the template .tezt_template.
-    BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
     TEZT_VARIANT: ""
   artifacts:
     reports:
@@ -45,7 +29,6 @@
       - tezt.log
       - tezt-*.log
       - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
-      - $BISECT_FILE
       - $JUNIT
     # The record artifacts (tezt-results-$CI_NODE_INDEX.json) should
     # be stored for as long as a given commit on master is expected to
@@ -96,14 +79,16 @@
         --record tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
         --job-count ${TEZT_PARALLEL:-3}
         --retry ${TEZT_RETRY:-1}
-    - ./scripts/ci/merge_coverage.sh
+    # Only merge coverage traces if coverage output is enabled.
+    - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
 
-# Common template for tezt jobs that use x86_64 binaries.
+# Common template for tezt jobs that use x86_64 binaries and produce
+# coverage.
 .tezt_tests:
   extends:
     - .test_template
     - .image_template__runtime_e2etest_dependencies
-    - .oc.template__coverage_files
+    - .oc.template__coverage_output_artifact
     - .tezt_template
     - .oc.template__retry_flaky
   variables:
@@ -127,3 +112,11 @@
   parallel: 60
   tags:
     - gcp_tezt
+  # Add [BISECT_FILE] to the set of artifacts defined in [.tezt_template]
+  artifacts:
+    paths:
+      - tezt.log
+      - tezt-*.log
+      - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
+      - $JUNIT
+      - $BISECT_FILE
