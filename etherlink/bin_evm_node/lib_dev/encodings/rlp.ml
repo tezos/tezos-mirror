@@ -199,6 +199,11 @@ let decode_z bytes = decode_z bytes 0 (Bytes.length bytes)
 
 let decode str = decode str 0 |> Result.map fst
 
+let decode_exn str =
+  match decode str with
+  | Ok v -> v
+  | Error _ -> raise (Invalid_argument "Decode failed")
+
 let rec pp ppf = function
   | Value data -> Hex.pp ppf (Hex.of_bytes data)
   | List items ->
