@@ -98,6 +98,7 @@ type argument =
   | Version  (** [--version] *)
   | RPC_additional_addr of string  (** [--rpc-addr] *)
   | RPC_additional_addr_local of string  (** [--local-rpc-addr] *)
+  | Max_active_rpc_connections of int  (** [--max-active-rpc-connections] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -138,6 +139,8 @@ type t
 
     Default value for [allow_all_rpc] is [true].
 
+    Default value for [max_active_rpc_connections] is [500].
+
     The argument list is a list of configuration options that the node
     should run with. It is passed to the first run of [octez-node config init].
     It is also passed to all runs of [octez-node run] that occur before
@@ -163,6 +166,7 @@ val create :
   ?rpc_port:int ->
   ?rpc_tls:tls_config ->
   ?allow_all_rpc:bool ->
+  ?max_active_rpc_connections:int ->
   argument list ->
   t
 
