@@ -707,6 +707,7 @@ let sequencer_command =
       let* directory =
         dev_directory config ((module Sequencer), smart_rollup_address)
       in
+      let directory = directory |> Sequencer_service.register ctxt in
       let private_directory =
         dev_private_directory config ((module Sequencer), smart_rollup_address)
       in
