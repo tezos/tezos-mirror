@@ -93,7 +93,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
         let setup_file =
           let path =
             Option.value
-              ~default:(project_root // "etherlink/kernel_evm/config/dev.yaml")
+              ~default:(project_root // "etherlink/config/dev.yaml")
               config.setup_file
           in
           `Path path

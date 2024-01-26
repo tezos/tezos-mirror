@@ -68,16 +68,16 @@ endif
 
 evm_benchmark_installer.wasm::
 	@${MAKE} -f kernels.mk \
-	EVM_CONFIG=etherlink/kernel_evm/config/benchmarking.yaml \
+	EVM_CONFIG=etherlink/config/benchmarking.yaml \
 	EVM_KERNEL_FEATURES=benchmark,debug \
 	evm_unstripped_installer.wasm
 	cp evm_unstripped_installer.wasm $@
 
 evm_installer_dev.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/dev.yaml evm_installer.wasm
+	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm
 
 sequencer.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/kernel_evm/config/sequencer.yaml evm_installer.wasm
+	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
 
 .PHONY: tx_demo_collector
