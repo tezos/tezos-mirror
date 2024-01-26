@@ -20,16 +20,33 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    let encode_transaction ~smart_rollup_address:_ ~transaction =
-      let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-      let tx_hash =
-        Ethereum_types.(
-          Hash Hex.(of_string tx_hash_str |> show |> hex_of_string))
+    type transactions = {
+      raw : string list;
+      delayed : Ethereum_types.Delayed_transaction.t list;
+    }
+
+    type messages = transactions
+
+    let encode_transactions ~smart_rollup_address:_
+        ~(transactions : transactions) =
+      let open Result_syntax in
+      let delayed_hashes =
+        List.map Ethereum_types.Delayed_transaction.hash transactions.delayed
       in
-      Result_syntax.return (tx_hash, [transaction])
+      let hashes =
+        List.map
+          (fun transaction ->
+            let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
+            Ethereum_types.(
+              Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
+          transactions.raw
+      in
+      return (delayed_hashes @ hashes, transactions)
   end
 
   module Publisher = struct
+    type messages = TxEncoder.messages
+
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
       let* ctxt = Sequencer_context.sync Ctxt.ctxt in
@@ -39,7 +56,8 @@ end) : Services_backend_sig.Backend = struct
           ~secret_key:Ctxt.secret_key
           ~timestamp
           ~smart_rollup_address
-          ~transactions:messages
+          ~transactions:messages.TxEncoder.raw
+          ~delayed_transactions:messages.TxEncoder.delayed
           ~number:ctxt.next_blueprint_number
       in
       (* Apply the blueprint *)

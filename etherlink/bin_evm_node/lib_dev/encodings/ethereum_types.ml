@@ -965,6 +965,8 @@ module Address = struct
   let to_string = address_to_string
 
   let of_string = address_of_string
+
+  let encoding = address_encoding
 end
 
 module AddressMap = MapMake (Address)
@@ -1142,3 +1144,49 @@ let filter_changes_encoding =
         (function Log f -> Some f | _ -> None)
         (fun f -> Log f);
     ]
+
+module Delayed_transaction = struct
+  type transaction = {
+    hash : hash;
+    raw_tx : string;
+        (* Binary string, so that it integrates smoothly with the tx-pool. *)
+  }
+
+  type t = Transaction of transaction
+
+  let hash = function Transaction {hash; _} -> hash
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"transaction"
+          (obj2 (req "hash" hash_encoding) (req "raw_tx" string))
+          (function Transaction {hash; raw_tx} -> Some (hash, raw_tx))
+          (function hash, raw_tx -> Transaction {hash; raw_tx});
+      ]
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with
+    | Ok (Rlp.List [Value tag; content]) -> (
+        match (Bytes.to_string tag, content) with
+        | "\x01", Rlp.Value raw_tx ->
+            let hash =
+              raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
+              |> Hex.show |> hash_of_string
+            in
+            Some (Transaction {hash; raw_tx = Bytes.to_string raw_tx})
+        | _ -> None)
+    | _ -> None
+
+  let pp fmt transaction =
+    match transaction with
+    | Transaction {raw_tx; _} ->
+        Format.fprintf fmt "%a" Hex.pp (Hex.of_string raw_tx)
+
+  let pp_short fmt transaction =
+    match transaction with
+    | Transaction {hash = Hash (Hex h); _} -> Format.pp_print_string fmt h
+end

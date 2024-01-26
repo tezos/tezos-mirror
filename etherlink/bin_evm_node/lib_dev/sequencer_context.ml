@@ -105,23 +105,23 @@ let execute =
     let* ctxt = if commit then perform_commit ctxt evm_state else return ctxt in
     return (ctxt, evm_state)
 
-let apply_blueprint ctxt blueprint =
+let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
   let open Lwt_result_syntax in
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.next_blueprint_number in
   let*! try_apply =
-    Sequencer_state.apply_blueprint ~config evm_state blueprint
+    Sequencer_state.apply_blueprint ~config evm_state to_execute
   in
 
   match try_apply with
   | Ok (evm_state, Block_height blueprint_number)
     when Z.equal blueprint_number next ->
-      let* () = store_blueprint ctxt blueprint (Qty blueprint_number) in
+      let* () = store_blueprint ctxt to_execute (Qty blueprint_number) in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       let*! () = Blueprint_event.blueprint_produced blueprint_number in
       let* ctxt = commit ctxt evm_state in
-      let* () = Blueprints_publisher.publish next blueprint in
+      let* () = Blueprints_publisher.publish next to_publish in
       return ctxt
   | Ok _ | Error (Sequencer_state.Cannot_apply_blueprint :: _) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
@@ -160,6 +160,7 @@ let init ~data_dir ~kernel ~preimages ~smart_rollup_address ~secret_key =
           ~timestamp:(Helpers.now ())
           ~smart_rollup_address
           ~transactions:[]
+          ~delayed_transactions:[]
           ~number:Ethereum_types.(Qty Z.zero)
       in
       apply_blueprint ctxt genesis

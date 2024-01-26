@@ -150,7 +150,9 @@ let install_finalizer_seq server private_server =
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
   let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
   let* () = Evm_node_lib_dev.Blueprints_publisher.shutdown () in
-  Evm_node_lib_dev.Blueprint_event.publisher_shutdown ()
+  let* () = Evm_node_lib_dev.Blueprint_event.publisher_shutdown () in
+  let* () = Evm_node_lib_dev.Delayed_inbox.shutdown () in
+  Evm_node_lib_dev.Delayed_inbox_events.shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -697,6 +699,9 @@ let sequencer_command =
             mode = Sequencer;
           }
       in
+      let* () =
+        Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
+      in
       let* directory =
         dev_directory config ((module Sequencer), smart_rollup_address)
       in
@@ -731,15 +736,17 @@ let make_dev_messages ~kind ~smart_rollup_address s =
   let*? messages =
     match kind with
     | `Blueprint (secret_key, timestamp, number) ->
-        Sequencer_blueprint.create
-          ~secret_key
-          ~timestamp
-          ~smart_rollup_address
-          ~number:(Ethereum_types.quantity_of_z number)
-          ~transactions:
-            [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
-        |> List.map (fun (`External s) -> s)
-        |> Result.ok
+        let Sequencer_blueprint.{to_publish; _} =
+          Sequencer_blueprint.create
+            ~secret_key
+            ~timestamp
+            ~smart_rollup_address
+            ~number:(Ethereum_types.quantity_of_z number)
+            ~transactions:
+              [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
+            ~delayed_transactions:[]
+        in
+        to_publish |> List.map (fun (`External s) -> s) |> Result.ok
     | `Transaction ->
         Transaction_format.make_encoded_messages
           ~smart_rollup_address
