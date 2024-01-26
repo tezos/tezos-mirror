@@ -1165,6 +1165,8 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               activation_vote_enable =
                 c.adaptive_issuance.activation_vote_enable;
               autostaking_enable = c.adaptive_issuance.autostaking_enable;
+              force_activation = false;
+              ns_enable = false;
             }
         in
         let issuance_weights : Constants_parametric_repr.issuance_weights =

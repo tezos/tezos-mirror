@@ -163,6 +163,8 @@ type adaptive_issuance = {
   adaptive_rewards_params : adaptive_rewards_params;
   activation_vote_enable : bool;
   autostaking_enable : bool;
+  force_activation : bool;
+  ns_enable : bool;
 }
 
 type issuance_weights = {
@@ -437,19 +439,25 @@ let adaptive_issuance_encoding =
            adaptive_rewards_params;
            activation_vote_enable;
            autostaking_enable;
+           force_activation;
+           ns_enable;
          } ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         launch_ema_threshold,
         adaptive_rewards_params,
         activation_vote_enable,
-        autostaking_enable ))
+        autostaking_enable,
+        force_activation,
+        ns_enable ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
            launch_ema_threshold,
            adaptive_rewards_params,
            activation_vote_enable,
-           autostaking_enable ) ->
+           autostaking_enable,
+           force_activation,
+           ns_enable ) ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
@@ -457,14 +465,18 @@ let adaptive_issuance_encoding =
         adaptive_rewards_params;
         activation_vote_enable;
         autostaking_enable;
+        force_activation;
+        ns_enable;
       })
-    (obj6
+    (obj8
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
        (req "adaptive_issuance_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
        (req "adaptive_issuance_activation_vote_enable" bool)
-       (req "autostaking_enable" bool))
+       (req "autostaking_enable" bool)
+       (req "adaptive_issuance_force_activation" bool)
+       (req "ns_enable" bool))
 
 let issuance_weights_encoding =
   let open Data_encoding in

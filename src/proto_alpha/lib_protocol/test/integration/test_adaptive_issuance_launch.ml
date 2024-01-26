@@ -461,8 +461,96 @@ let test_does_not_launch_without_feature_flag threshold vote_duration () =
   in
   return_unit
 
+(* Test that with force_activation feature flag set, the feature activates
+   without waiting for the activation vote *)
+let test_launch_without_vote () =
+  let open Lwt_result_wrap_syntax in
+  (* Initialize the state with a single delegate. *)
+  let constants =
+    let default_constants = Default_parameters.constants_test in
+    let issuance_weights =
+      {
+        Default_parameters.constants_test.issuance_weights with
+        base_total_issued_per_minute = Tez.zero;
+      }
+    in
+    let adaptive_issuance =
+      {default_constants.adaptive_issuance with force_activation = true}
+    in
+    let consensus_threshold = 0 in
+    {
+      default_constants with
+      consensus_threshold;
+      issuance_weights;
+      adaptive_issuance;
+    }
+  in
+  let* block, delegate = Context.init_with_constants1 constants in
+  let delegate_pkh = Context.Contract.pkh delegate in
+  let* block = Block.bake block in
+
+  (* AI should be activated and launch cycle is current cycle (0) *)
+  let* launch_cycle_opt =
+    Context.get_adaptive_issuance_launch_cycle (B block)
+  in
+  let* launch_cycle = Assert.get_some ~loc:__LOC__ launch_cycle_opt in
+  let* () = Assert.equal_int32 ~loc:__LOC__ (Cycle.to_int32 launch_cycle) 0l in
+
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 200_000_000_000L)
+  in
+  (* feature flag is set, AI should be active, let's use the stake function to check *)
+  let* operation =
+    stake
+      (B block)
+      delegate
+      (Protocol.Alpha_context.Tez.of_mutez_exn 180_000_000_000L)
+  in
+  let* block = Block.bake ~operation block in
+  (* Wait until total frozen stake is updated *)
+  let start_cycle = Block.current_cycle block in
+  let* block =
+    Block.bake_while
+      ~invariant:(fun block ->
+        assert_total_frozen_stake
+          ~loc:__LOC__
+          block
+          (Protocol.Alpha_context.Tez.of_mutez_exn 200_000_000_000L))
+      (fun block ->
+        let current_cycle = Block.current_cycle block in
+        Protocol.Alpha_context.Cycle.(
+          current_cycle <= add start_cycle constants.preserved_cycles))
+      block
+  in
+  let* block = Block.bake block in
+
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 380_000_000_000L)
+  in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:true
+      ~expected_staked:380_000_000_000L
+      ~expected_delegated:0L
+      ~expected_ext_staked:0L
+  in
+  return_unit
+
 let tests =
   [
+    Tztest.tztest
+      "Launch with force_activation feature flag set activates AI immediately"
+      `Quick
+      test_launch_without_vote;
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance launches (very low threshold, vote enabled)"

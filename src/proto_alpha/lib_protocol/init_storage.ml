@@ -209,7 +209,14 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   let*! ctxt =
     Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   in
-  return ctxt
+  if Constants_storage.adaptive_issuance_force_activation ctxt then
+    let ctxt = Raw_context.set_adaptive_issuance_enable ctxt in
+    let* ctxt =
+      let current_cycle = (Level_storage.current ctxt).cycle in
+      Storage.Adaptive_issuance.Activation.update ctxt (Some current_cycle)
+    in
+    return ctxt
+  else return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let open Lwt_result_syntax in

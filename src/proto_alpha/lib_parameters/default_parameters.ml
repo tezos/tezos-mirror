@@ -295,6 +295,8 @@ let constants_mainnet =
           };
         activation_vote_enable = false;
         autostaking_enable = true;
+        force_activation = false;
+        ns_enable = false;
       };
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
        Enable once at least the following is done:
