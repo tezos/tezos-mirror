@@ -364,12 +364,12 @@ type request = {method_ : string; parameters : JSON.u}
 
 let request_to_JSON {method_; parameters} : JSON.u =
   `O
-    [
-      ("jsonrpc", `String "2.0");
-      ("method", `String method_);
-      ("params", parameters);
-      ("id", `String "0");
-    ]
+    ([
+       ("jsonrpc", `String "2.0");
+       ("method", `String method_);
+       ("id", `String "0");
+     ]
+    @ if parameters == `Null then [] else [("params", parameters)])
 
 let build_request request =
   request_to_JSON request |> JSON.annotate ~origin:"evm_node"
