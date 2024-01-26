@@ -190,7 +190,7 @@ module For_RPC = struct
       else
         List.fold_left
           (fun acc Denunciations_repr.{misbehaviour; misbehaviour_cycle; _} ->
-            match (misbehaviour_cycle, misbehaviour) with
+            match (misbehaviour_cycle, misbehaviour.kind) with
             | Current, _ -> acc
             | Previous, Double_baking ->
                 Int_percentage.add_bounded

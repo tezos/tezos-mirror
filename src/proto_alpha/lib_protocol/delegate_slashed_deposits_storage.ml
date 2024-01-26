@@ -50,16 +50,9 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** [punish_double_signing ctxt misbehaviour delegate level] record
-    in the context that the given [delegate] has now been slashed for the
-    double signing event [misbehaviour] for the given [level] and return the amounts of the
-    frozen deposits to burn and to reward the denuncer.
-
-    The double signing event corresponds to a field in {!Storage.slashed_level}.
-*)
-let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
-    delegate (level : Level_repr.t) ~rewarded :
-    (Raw_context.t * bool) tzresult Lwt.t =
+let punish_double_signing ctxt ~operation_hash
+    (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
+    ~rewarded : (Raw_context.t * bool) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -69,7 +62,7 @@ let punish_double_signing ctxt ~operation_hash (misbehaviour : Misbehaviour.t)
   in
   let already_slashed, updated_slashed, slashing_percentage =
     let Storage.{for_double_baking; for_double_attesting} = slashed in
-    match misbehaviour with
+    match misbehaviour.kind with
     | Double_baking ->
         ( for_double_baking,
           {slashed with for_double_baking = true},
@@ -202,7 +195,7 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                  Denunciations_repr.
                    {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
               let slashing_percentage =
-                match misbehaviour with
+                match misbehaviour.kind with
                 | Double_baking ->
                     Constants_storage
                     .percentage_of_frozen_deposits_slashed_per_double_baking

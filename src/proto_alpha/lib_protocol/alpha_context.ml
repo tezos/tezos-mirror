@@ -519,6 +519,7 @@ module Receipt = struct
 end
 
 module Consensus_key = Delegate_consensus_key
+module Misbehaviour = Misbehaviour_repr
 
 module Delegate = struct
   include Delegate_storage

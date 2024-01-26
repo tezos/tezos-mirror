@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Double_baking | Double_attesting
+type kind = Double_baking | Double_attesting
 
-let encoding =
+let kind_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
@@ -25,3 +25,21 @@ let encoding =
         (function Double_attesting -> Some () | _ -> None)
         (fun () -> Double_attesting);
     ]
+
+type t = {
+  kind : kind;
+  level : Raw_level_repr.t;
+  round : Round_repr.t;
+  slot : Slot_repr.t;
+}
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {kind; level; round; slot} -> (kind, level, round, slot))
+    (fun (kind, level, round, slot) -> {kind; level; round; slot})
+    (obj4
+       (req "kind" kind_encoding)
+       (req "level" Raw_level_repr.encoding)
+       (req "round" Round_repr.encoding)
+       (req "slot" Slot_repr.encoding))

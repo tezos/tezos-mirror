@@ -2190,6 +2190,13 @@ module Consensus_key : sig
   val pkh : pk -> t
 end
 
+(** This module re-exports definitions from {!Misbehaviour_repr}. *)
+module Misbehaviour : sig
+  type kind = Double_baking | Double_attesting
+
+  type t = {kind : kind; level : Raw_level.t; round : Round.t; slot : Slot.t}
+end
+
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_consensus_key}, {!Delegate_missed_attestations_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},

@@ -2392,12 +2392,20 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
       let* ctxt, consensus_pk1 =
         Stake_distribution.slot_owner ctxt level e1.slot
       in
+      let misbehaviour =
+        {
+          Misbehaviour.kind = Double_attesting;
+          level = e1.level;
+          round = e1.round;
+          slot = e1.slot;
+        }
+      in
       punish_delegate
         ctxt
         ~operation_hash
         consensus_pk1.delegate
         level
-        Double_attesting
+        misbehaviour
         mk_result
         ~payload_producer
 
@@ -2411,12 +2419,20 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
   let committee_size = Constants.consensus_committee_size ctxt in
   let*? slot1 = Round.to_slot round1 ~committee_size in
   let* ctxt, consensus_pk1 = Stake_distribution.slot_owner ctxt level slot1 in
+  let misbehaviour =
+    {
+      Misbehaviour.kind = Double_baking;
+      level = raw_level;
+      round = round1;
+      slot = slot1;
+    }
+  in
   punish_delegate
     ctxt
     ~operation_hash
     consensus_pk1.delegate
     level
-    Double_baking
+    misbehaviour
     ~payload_producer
     (fun forbidden_delegate balance_updates ->
       Double_baking_evidence_result {forbidden_delegate; balance_updates})
