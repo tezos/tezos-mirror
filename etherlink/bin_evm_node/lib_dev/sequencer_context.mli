@@ -5,14 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Bare_context :
-  Tezos_tree_encoding.Encodings_util.Bare_tezos_context_sig
-    with type index = Irmin_context.rw_index
-     and type t = Irmin_context.rw
-     and type tree = Irmin_context.tree
-
-type evm_state = Irmin_context.PVMState.value
-
 type t = {
   data_dir : string;  (** Data dir of the EVM node. *)
   context : Irmin_context.rw;  (** Irmin read and write context. *)
@@ -27,21 +19,49 @@ type t = {
     a context where it initializes the {!type-index}, and use a
     checkpoint mechanism to load the latest {!type-store} if any.
 
-    Also returns a boolean denoting whether the context was initialized or not.
-*)
+    If the context does not already exist, this function also produces and
+    publishes the genesis blueprint. *)
 val init :
   data_dir:string ->
   kernel:string ->
   preimages:string ->
   smart_rollup_address:string ->
-  (t * bool) tzresult Lwt.t
+  secret_key:Signature.secret_key ->
+  t tzresult Lwt.t
 
 (** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
     to disk the changes, and update the checkpoint. *)
-val commit : t -> evm_state -> t tzresult Lwt.t
+val commit : t -> Sequencer_state.t -> t tzresult Lwt.t
 
 (** [sync ctxt] synchronizes the [ctxt] based on on-disk information, loads the
     latest checkpoint. *)
 val sync : t -> t tzresult Lwt.t
 
-val evm_state : t -> evm_state Lwt.t
+(** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
+val evm_state : t -> Sequencer_state.t Lwt.t
+
+(** [execute ?commit ctxt messages] executes [messages] on the freshest
+    EVM state stored in [ctxt].
+
+    If [commit = true], the resulting EVM state is committed in [ctxt] (that
+    is, it becomes the freshest one). *)
+val execute :
+  ?commit:bool ->
+  t ->
+  [< `Input of string] list ->
+  (t * Sequencer_state.t) tzresult Lwt.t
+
+(** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
+    state, and returns [input.insights_requests]. *)
+val execute_and_inspect :
+  input:Simulation.Encodings.simulate_input ->
+  t ->
+  bytes option list tzresult Lwt.t
+
+val find_blueprint :
+  t -> Ethereum_types.quantity -> Blueprint_types.t option Lwt.t
+
+(** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
+    state stored under [ctxt]. It commits the result if the blueprint produces
+    the expected block. *)
+val apply_blueprint : t -> Blueprint_types.t -> t tzresult Lwt.t

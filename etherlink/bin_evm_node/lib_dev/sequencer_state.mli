@@ -5,36 +5,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [execute ?commit ctxt messages] executes [messages] on the local
-    EVM state of [ctxt], commits to disk if [commit] is true. Returns
-    the modified EVM state even if it's not commited. *)
+type t = Irmin_context.PVMState.value
+
+(** [execute ~config evm_state messages] executes [messages] on the local
+    [evm_state]. *)
 val execute :
-  ?commit:bool ->
-  Sequencer_context.t ->
-  [< `Input of string] list ->
-  (Sequencer_context.t * Sequencer_context.evm_state) tzresult Lwt.t
+  config:Config.config -> t -> [< `Input of string] list -> t tzresult Lwt.t
 
-(** [init ~secret_key ~smart_rollup_address ~rollup_node_endpoint ctxt]
-    initializes the local state in [ctxt], produces and publishes the
-    genesis block. *)
-val init :
-  secret_key:Signature.secret_key ->
-  smart_rollup_address:string ->
-  rollup_node_endpoint:Uri.t ->
-  Sequencer_context.t ->
-  Sequencer_context.t tzresult Lwt.t
+(** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
+val init : kernel:string -> t tzresult Lwt.t
 
-(** [inspect evm_state key] inspects [key] in [evm_state]. *)
-val inspect : Sequencer_context.evm_state -> string -> bytes option Lwt.t
+(** [inspect evm_state key] returns the value stored under [key] in
+    [evm_state], if any. *)
+val inspect : t -> string -> bytes option Lwt.t
 
-(** [execute_and_inspect ctxt ~input] executes [input] in [ctxt] and
-    returns the [input.insights_requests]. *)
+(** [execute_and_inspect ~config ~input evm_state] executes [input] within
+    [evm_state], and returns [input.insights_requests]. *)
 val execute_and_inspect :
-  Sequencer_context.t ->
+  config:Config.config ->
   input:Simulation.Encodings.simulate_input ->
+  t ->
   bytes option list tzresult Lwt.t
 
 (** [current_block_height evm_state] returns the height of the latest block
     produced by the kernel. *)
-val current_block_height :
-  Sequencer_context.evm_state -> Ethereum_types.block_height Lwt.t
+val current_block_height : t -> Ethereum_types.block_height Lwt.t
+
+type error += Cannot_apply_blueprint
+
+val apply_blueprint :
+  config:Config.config ->
+  t ->
+  Blueprint_types.t ->
+  (t * Ethereum_types.block_height) tzresult Lwt.t
