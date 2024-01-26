@@ -16,6 +16,7 @@ set -eu
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_package_name}/${gitlab_package_version}"
 gitlab_octez_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_deb_package_name}/${gitlab_package_version}"
 gitlab_octez_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rpm_package_name}/${gitlab_package_version}"
+gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
@@ -88,7 +89,7 @@ done
 # => create and upload manually
 echo 'Upload tarball of source code and its checksums'
 
-source_tarball="${gitlab_octez_package_name}.tar.bz2"
+source_tarball="${gitlab_octez_source_package_name}.tar.bz2"
 
 # We are using the export-subst feature of git configured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive

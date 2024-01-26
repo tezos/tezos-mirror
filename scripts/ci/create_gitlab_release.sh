@@ -34,6 +34,7 @@ if [ -z "${web_path}" ]; then
   exit 1
 else
   gitlab_binaries_url="https://${CI_SERVER_HOST}${web_path}"
+  gitlab_octez_source_url="${gitlab_binaries_url}/${gitlab_octez_package_name}.tar.bz2"
 fi
 
 if [ -z "${deb_web_path}" ]; then
@@ -88,4 +89,5 @@ release-cli create \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_deb_packages_url}\",\"link_type\":\"package\"}" \
-  --assets-link="{\"name\":\"Red Hat packages\",\"url\":\"${gitlab_rpm_packages_url}\",\"link_type\":\"package\"}"
+  --assets-link="{\"name\":\"Red Hat packages\",\"url\":\"${gitlab_rpm_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Octez source\",\"url\":\"${gitlab_octez_source_url}\",\"link_type\":\"other\"}"
