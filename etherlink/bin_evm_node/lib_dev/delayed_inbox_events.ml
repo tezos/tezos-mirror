@@ -34,8 +34,8 @@ module Event = struct
       ~section
       ~name:"evm_node_dev_delayed_inbox_fetch_succeeded"
       ~msg:
-        "Fetching delayed inbox for level {level} succeeded, {nb} transactions \
-         fetched"
+        "Fetching delayed inbox for level {level} succeeded, {nb} new \
+         transactions fetched"
       ~level:Notice
       ("level", Data_encoding.int32)
       ~pp1:pp_int32
