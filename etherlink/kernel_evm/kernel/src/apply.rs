@@ -214,7 +214,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         return Ok(Validity::InvalidChainId);
     }
     // Gas limit is bounded.
-    if transaction.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
+    if transaction.execution_gas_limit() > MAX_TRANSACTION_GAS_LIMIT {
         log!(host, Debug, "Transaction status: ERROR_GASLIMIT");
         return Ok(Validity::InvalidGasLimit);
     }
@@ -247,10 +247,10 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     };
 
     // The sender account balance contains at least the cost.
-    let cost = U256::from(transaction.gas_limit).saturating_mul(effective_gas_price);
+    let execution_gas_limit = U256::from(transaction.execution_gas_limit());
+    let cost = execution_gas_limit.saturating_mul(effective_gas_price);
     // The sender can afford the max gas fee he set, see EIP-1559
-    let max_fee =
-        U256::from(transaction.gas_limit).saturating_mul(transaction.max_fee_per_gas);
+    let max_fee = execution_gas_limit.saturating_mul(transaction.max_fee_per_gas);
     if balance < cost || balance < max_fee {
         log!(host, Debug, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
@@ -305,7 +305,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
 
     let to = transaction.to;
     let call_data = transaction.data.clone();
-    let gas_limit = transaction.gas_limit;
+    let gas_limit = transaction.execution_gas_limit();
     let value = transaction.value;
     let execution_outcome = match run_transaction(
         host,
@@ -605,19 +605,19 @@ mod tests {
     }
 
     fn valid_tx() -> EthereumTransactionCommon {
-        let transaction = EthereumTransactionCommon {
-            type_: TransactionType::Eip1559,
-            chain_id: Some(CHAIN_ID.into()),
-            nonce: U256::from(0),
-            max_priority_fee_per_gas: U256::zero(),
-            max_fee_per_gas: U256::from(21000),
-            gas_limit: 21000,
-            to: Some(H160::zero()),
-            value: U256::zero(),
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        };
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(CHAIN_ID.into()),
+            U256::from(0),
+            U256::zero(),
+            U256::from(21000),
+            21000,
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            None,
+        );
         // sign tx
         resign(transaction)
     }
@@ -791,8 +791,20 @@ mod tests {
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
         let balance = U256::from(21000) * gas_price;
-        let mut transaction = valid_tx();
-        transaction.gas_limit = MAX_TRANSACTION_GAS_LIMIT + 1;
+        let mut transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(CHAIN_ID.into()),
+            U256::from(0),
+            U256::zero(),
+            U256::from(21000),
+            MAX_TRANSACTION_GAS_LIMIT + 1,
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            None,
+        );
+        // sign tx
         transaction = resign(transaction);
 
         // fund account
@@ -887,19 +899,19 @@ mod tests {
     fn test_no_underflow_make_object_tx() {
         let transaction = Transaction {
             tx_hash: [0u8; TRANSACTION_HASH_SIZE],
-            content: TransactionContent::Ethereum(EthereumTransactionCommon {
-                type_: TransactionType::Eip1559,
-                chain_id: Some(U256::from(1)),
-                nonce: U256::from(1),
-                max_priority_fee_per_gas: U256::zero(),
-                max_fee_per_gas: U256::from(1),
-                gas_limit: 21000,
-                to: Some(H160::zero()),
-                value: U256::zero(),
-                data: vec![],
-                access_list: vec![],
-                signature: None,
-            }),
+            content: TransactionContent::Ethereum(EthereumTransactionCommon::new(
+                TransactionType::Eip1559,
+                Some(U256::from(1)),
+                U256::from(1),
+                U256::zero(),
+                U256::from(1),
+                21000,
+                Some(H160::zero()),
+                U256::zero(),
+                vec![],
+                vec![],
+                None,
+            )),
         };
 
         let obj = make_object_info(

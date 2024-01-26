@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -87,12 +87,14 @@ pub struct EthereumTransactionCommon {
     /// More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
     pub max_fee_per_gas: U256,
 
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later
-    pub gas_limit: u64,
+    /// The maximum amount of gas that the user is willing to pay.
+    ///
+    /// *NB* this is inclusive of any additional fees that are paid, prior to execution:
+    /// - flat fee
+    /// - data availability fee
+    ///
+    /// For the execution gas limit, see [execution_gas_limit].
+    gas_limit: u64,
     /// The 160-bit address of the message call’s recipient
     /// or, for a contract creation transaction
     pub to: Option<H160>,
@@ -113,6 +115,35 @@ pub struct EthereumTransactionCommon {
 }
 
 impl EthereumTransactionCommon {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        type_: TransactionType,
+        chain_id: Option<U256>,
+        nonce: U256,
+        max_priority_fee_per_gas: U256,
+        max_fee_per_gas: U256,
+        gas_limit: u64,
+        to: Option<H160>,
+        value: U256,
+        data: Vec<u8>,
+        access_list: AccessList,
+        signature: Option<TxSignature>,
+    ) -> Self {
+        Self {
+            type_,
+            chain_id,
+            nonce,
+            max_priority_fee_per_gas,
+            max_fee_per_gas,
+            gas_limit,
+            to,
+            value,
+            data,
+            access_list,
+            signature,
+        }
+    }
+
     // This decoding function encapsulates logic of decoding (v, r, s).
     // There might be 3 possible cases:
     // - unsigned NON-legacy: (0, 0, 0)
@@ -536,6 +567,17 @@ impl EthereumTransactionCommon {
         priority_fee_per_gas
             .checked_add(block_base_fee_per_gas)
             .ok_or_else(|| anyhow::anyhow!("Overflow"))
+    }
+
+    /// Returns the gas limit for executing this transaction.
+    ///
+    /// This is strictly lower than the gas limit set by the user, as additional gas is required
+    /// in order to pay for the *flat fee* and *data availability fee*.
+    ///
+    /// The user pre-pays this (in addition to the flat fee & data availability fee) prior to execution.
+    /// If execution does not use all of the execution gas limit, they will be partially refunded.
+    pub fn execution_gas_limit(&self) -> u64 {
+        self.gas_limit
     }
 }
 

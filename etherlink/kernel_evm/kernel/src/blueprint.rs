@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
@@ -63,19 +63,19 @@ mod tests {
         Some(H160::from_slice(data))
     }
     fn tx_(i: u64) -> EthereumTransactionCommon {
-        EthereumTransactionCommon {
-            type_: tezos_ethereum::transaction::TransactionType::Legacy,
-            chain_id: Some(U256::one()),
-            nonce: U256::from(i),
-            max_priority_fee_per_gas: U256::from(40000000u64),
-            max_fee_per_gas: U256::from(40000000u64),
-            gas_limit: 21000u64,
-            to: address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
-            value: U256::from(500000000u64),
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        }
+        EthereumTransactionCommon::new(
+            tezos_ethereum::transaction::TransactionType::Legacy,
+            Some(U256::one()),
+            U256::from(i),
+            U256::from(40000000u64),
+            U256::from(40000000u64),
+            21000u64,
+            address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
+            U256::from(500000000u64),
+            vec![],
+            vec![],
+            None,
+        )
     }
 
     fn dummy_transaction(i: u8) -> Transaction {

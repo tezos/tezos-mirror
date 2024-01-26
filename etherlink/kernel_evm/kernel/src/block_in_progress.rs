@@ -436,23 +436,23 @@ mod tests {
     }
 
     fn dummy_etc(i: u8) -> EthereumTransactionCommon {
-        EthereumTransactionCommon {
-            type_: TransactionType::Legacy,
-            chain_id: Some(U256::from(i)),
-            nonce: U256::from(i),
-            max_fee_per_gas: U256::from(i),
-            max_priority_fee_per_gas: U256::from(i),
-            gas_limit: i.into(),
-            to: None,
-            value: U256::from(i),
-            data: Vec::new(),
-            access_list: vec![],
-            signature: Some(new_sig_unsafe(
+        EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(U256::from(i)),
+            U256::from(i),
+            U256::from(i),
+            U256::from(i),
+            i.into(),
+            None,
+            U256::from(i),
+            Vec::new(),
+            vec![],
+            Some(new_sig_unsafe(
                 (36 + i * 2).into(), // need to be consistent with chain_id
                 H256::from([i; 32]),
                 H256::from([i; 32]),
             )),
-        }
+        )
     }
 
     fn dummy_tx_eth(i: u8) -> Transaction {

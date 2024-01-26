@@ -113,7 +113,7 @@ fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
     match &transaction.content {
         crate::inbox::TransactionContent::Deposit(_) => constants::TICKS_FOR_DEPOSIT,
         crate::inbox::TransactionContent::Ethereum(eth) => {
-            average_ticks_of_gas(eth.gas_limit)
+            average_ticks_of_gas(eth.execution_gas_limit())
                 .saturating_add(ticks_of_transaction_overhead(tx_data_size))
         }
     }

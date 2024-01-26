@@ -227,7 +227,7 @@ impl TxValidation {
             return Ok(TxValidationOutcome::InvalidChainId);
         }
         // Check if the gas limit is not too high
-        if tx.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
+        if tx.execution_gas_limit() > MAX_TRANSACTION_GAS_LIMIT {
             return Ok(TxValidationOutcome::GasLimitTooHigh);
         }
         // Check if the gas price is high enough
@@ -787,19 +787,19 @@ mod tests {
 
             let signature = TxSignature::new(v, r, s).unwrap();
 
-            EthereumTransactionCommon {
-                type_: TransactionType::Legacy,
-                chain_id: Some(1337.into()),
-                nonce: 0.into(),
-                max_priority_fee_per_gas: U256::default(),
-                max_fee_per_gas: U256::default(),
-                gas_limit: 2000000,
-                to: Some(H160::default()),
-                value: U256::default(),
-                data: vec![],
-                signature: Some(signature),
-                access_list: Vec::default(),
-            }
+            EthereumTransactionCommon::new(
+                TransactionType::Legacy,
+                Some(1337.into()),
+                0.into(),
+                U256::default(),
+                U256::default(),
+                2000000,
+                Some(H160::default()),
+                U256::default(),
+                vec![],
+                Vec::default(),
+                Some(signature),
+            )
         };
 
         let hex = "f8628080831e84809400000000000000000000000000000000000000008080820a96a00c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5a0630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e";
@@ -836,19 +836,19 @@ mod tests {
     fn test_tx_validation_gas_price() {
         let mut host = MockHost::default();
 
-        let transaction = EthereumTransactionCommon {
-            type_: TransactionType::Eip1559,
-            chain_id: Some(U256::from(1)),
-            nonce: U256::from(0),
-            max_priority_fee_per_gas: U256::zero(),
-            max_fee_per_gas: U256::from(1),
-            gas_limit: 21000,
-            to: Some(H160::zero()),
-            value: U256::zero(),
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        };
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(U256::from(1)),
+            U256::from(0),
+            U256::zero(),
+            U256::from(1),
+            21000,
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            None,
+        );
         let signed = transaction
             .sign_transaction(
                 "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"

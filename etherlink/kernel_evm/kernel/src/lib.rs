@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
@@ -369,19 +369,19 @@ mod tests {
         let gas_limit = 21000;
         let value = U256::from(1);
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
-        let tx = EthereumTransactionCommon {
-            type_: TransactionType::Legacy,
-            chain_id: Some(U256::one()),
+        let tx = EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(U256::one()),
             nonce,
-            max_fee_per_gas: gas_price,
-            max_priority_fee_per_gas: gas_price,
+            gas_price,
+            gas_price,
             gas_limit,
             to,
             value,
-            data: vec![],
-            access_list: vec![],
-            signature: None,
-        };
+            vec![],
+            vec![],
+            None,
+        );
 
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
         tx.sign_transaction(
