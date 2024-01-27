@@ -150,7 +150,7 @@ let fetch_delayed_transactions ~hashes ~level worker =
       in
       match bytes with
       | Ok (Some bytes) ->
-          return (Ethereum_types.Delayed_transaction.of_bytes bytes)
+          return (Ethereum_types.Delayed_transaction.of_bytes hash bytes)
       | _ ->
           let* () =
             Delayed_inbox_events.transaction_fetch_failed ~tx_hash:hash ~level
@@ -190,11 +190,6 @@ let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
           match delayed_transaction_hashes with
           | Error _err -> Delayed_inbox_events.fetch_failed ~level
           | Ok delayed_transaction_hashes ->
-              let* () =
-                Delayed_inbox_events.fetch_succeeded
-                  ~level
-                  ~nb_txs:(List.length delayed_transaction_hashes)
-              in
               (* Compute new hashes to avoid fetching transactions we already
                  know about. *)
               let new_transaction_hashes =
@@ -202,6 +197,11 @@ let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
                   (fun tx_hash ->
                     not (StringSet.mem tx_hash state.pending_transactions))
                   delayed_transaction_hashes
+              in
+              let* () =
+                Delayed_inbox_events.fetch_succeeded
+                  ~level
+                  ~nb_txs:(List.length new_transaction_hashes)
               in
               (* The new pending set is just the fetched delayed inbox.
                  It's important to drop the transactions from the pending

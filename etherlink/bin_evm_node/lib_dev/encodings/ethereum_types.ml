@@ -1146,15 +1146,17 @@ let filter_changes_encoding =
     ]
 
 module Delayed_transaction = struct
-  type transaction = {
-    hash : hash;
-    raw_tx : string;
-        (* Binary string, so that it integrates smoothly with the tx-pool. *)
-  }
+  type t =
+    | Transaction of {
+        hash : hash;
+        raw_tx : string;
+            (* Binary string, so that it integrates smoothly with the tx-pool. *)
+      }
+    | Deposit of {hash : hash; raw_deposit : string}
 
-  type t = Transaction of transaction
-
-  let hash = function Transaction {hash; _} -> hash
+  let hash = function
+    | Transaction {hash; _} -> hash
+    | Deposit {hash; _} -> hash
 
   let encoding =
     let open Data_encoding in
@@ -1164,11 +1166,20 @@ module Delayed_transaction = struct
           (Tag 0)
           ~title:"transaction"
           (obj2 (req "hash" hash_encoding) (req "raw_tx" string))
-          (function Transaction {hash; raw_tx} -> Some (hash, raw_tx))
+          (function
+            | Transaction {hash; raw_tx} -> Some (hash, raw_tx) | _ -> None)
           (function hash, raw_tx -> Transaction {hash; raw_tx});
+        case
+          (Tag 1)
+          ~title:"deposit"
+          (obj2 (req "hash" hash_encoding) (req "raw_deposit" string))
+          (function
+            | Deposit {hash; raw_deposit} -> Some (hash, raw_deposit)
+            | _ -> None)
+          (function hash, raw_deposit -> Deposit {hash; raw_deposit});
       ]
 
-  let of_bytes bytes =
+  let of_bytes hash bytes =
     match bytes |> Rlp.decode with
     | Ok (Rlp.List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
@@ -1178,6 +1189,9 @@ module Delayed_transaction = struct
               |> Hex.show |> hash_of_string
             in
             Some (Transaction {hash; raw_tx = Bytes.to_string raw_tx})
+        | "\x02", deposit ->
+            let raw_deposit = Rlp.encode deposit |> Bytes.to_string in
+            Some (Deposit {hash; raw_deposit})
         | _ -> None)
     | _ -> None
 
@@ -1185,8 +1199,11 @@ module Delayed_transaction = struct
     match transaction with
     | Transaction {raw_tx; _} ->
         Format.fprintf fmt "%a" Hex.pp (Hex.of_string raw_tx)
+    | Deposit {raw_deposit; _} ->
+        Format.fprintf fmt "%a" Hex.pp (Hex.of_string raw_deposit)
 
   let pp_short fmt transaction =
     match transaction with
     | Transaction {hash = Hash (Hex h); _} -> Format.pp_print_string fmt h
+    | Deposit {hash = Hash (Hex h); _} -> Format.pp_print_string fmt h
 end

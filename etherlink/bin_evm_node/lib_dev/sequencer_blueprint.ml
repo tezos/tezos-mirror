@@ -40,16 +40,29 @@ let max_chunk_size =
   - blueprint_tag_size - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
+let encode_transaction hash raw =
+  let open Rlp in
+  List
+    [
+      Value (Bytes.of_string hash);
+      List [Value (Bytes.of_string "\001"); Value (Bytes.of_string raw)];
+    ]
+
+let encode_delayed_transaction = function
+  | Delayed_transaction.Transaction {hash; raw_tx} ->
+      encode_transaction (hash_to_bytes hash) raw_tx
+  | Deposit {hash; raw_deposit} ->
+      let open Rlp in
+      let hash = hash_to_bytes hash in
+      let rlp = decode_exn (Bytes.of_string raw_deposit) in
+      List
+        [
+          Value (hash |> Bytes.of_string);
+          List [Value (Bytes.of_string "\002"); rlp];
+        ]
+
 let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
   let open Rlp in
-  let open Ethereum_types in
-  let encode_tx hash raw =
-    List
-      [
-        Value (Bytes.of_string hash);
-        List [Value (Bytes.of_string "\001"); Value (Bytes.of_string raw)];
-      ]
-  in
   let delayed_hashes =
     List
       (List.map
@@ -59,18 +72,14 @@ let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
          delayed_transactions)
   in
   let delayed_transactions =
-    List.map
-      (function
-        | Ethereum_types.Delayed_transaction.Transaction {hash; raw_tx} ->
-            encode_tx (hash_to_bytes hash) raw_tx)
-      delayed_transactions
+    List.map encode_delayed_transaction delayed_transactions
   in
   let messages, full_messages =
     let m =
       List.map
         (fun transaction ->
           let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-          encode_tx tx_hash_str transaction)
+          encode_transaction tx_hash_str transaction)
         transactions
     in
     (List m, List (delayed_transactions @ m))

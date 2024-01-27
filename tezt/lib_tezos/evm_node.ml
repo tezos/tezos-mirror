@@ -59,7 +59,7 @@ module Parameters = struct
 
   let base_default_name = "evm_node"
 
-  let default_colors = Log.Color.[|FG.magenta|]
+  let default_colors = Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
 end
 
 open Parameters
