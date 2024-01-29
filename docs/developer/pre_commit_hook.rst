@@ -1,25 +1,6 @@
 Pre-Commit Hook
 ===============
 
-The `pre-commit hook <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`__
-is a script located in :src:`scripts/pre_commit/pre_commit.py`, automatically
-executed before any Git commit.
-It executes modified :doc:`Tezt <tezt>` tests automatically. It looks for staged files
-(the default) or modified files (if ``--unstaged`` is passed) in
-``tezt/tests`` and calls ``tezt`` on those files. This avoids
-pushing commits that will break the CI. It is also handy to execute
-the relevant subset of tests by calling
-``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
-
-Using the pre-commit hook requires an installed Python environment, as
-described in :doc:`python_environment`.
-
-We refer to the header of ``pre_commit.py`` and its ``--help`` flag
-for additional instructions.
-
-Using pre-commit.com
-~~~~~~~~~~~~~~~~~~~~
-
 `Pre-commit <https://pre-commit.com/>`_ is a framework for managing and maintaining multi-language pre-commit Git hooks.
 
 Using this framework you can specify a list of hooks you want and pre-commit manages the installation and execution of any hooks before every commit. pre-commit is specifically designed to not require root access.

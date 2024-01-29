@@ -27,7 +27,6 @@ include:
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/check_precommit_hook.yml
   - .gitlab/ci/jobs/test/misc_checks.yml
   - .gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml

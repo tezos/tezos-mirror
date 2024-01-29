@@ -443,11 +443,7 @@ To ensure that your OCaml code is well formatted, set up correctly your editor:
 + no trailing whitespaces
 + indent correctly (e.g. use lisp-mode for dune files)
 
-Many of these checks can be run with ``make check-python-linting``.
-
 Some of these checks can be executed with a `pre-commit hook <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
-which is installed with
-``ln -sr scripts/pre_commit/pre_commit.py .git/hooks/pre-commit``
 (see :doc:`pre_commit_hook` for more details).
 
 Exposing internals
