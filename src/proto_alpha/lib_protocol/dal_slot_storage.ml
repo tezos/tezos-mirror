@@ -74,6 +74,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some level_attested ->
       let* seen_slots = find_slot_headers ctxt level_attested in
+      let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
       let* ctxt, attestation, confirmed_slot_headers =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
@@ -82,7 +83,6 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
               compute_attested_slot_headers ctxt seen_slots
             in
             let attested_slot_headers = List.rev rev_attested_slot_headers in
-            let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
             return (ctxt, attestation, attested_slot_headers)
       in
       let* ctxt =
