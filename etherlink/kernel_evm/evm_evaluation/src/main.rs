@@ -154,6 +154,8 @@ fn generate_final_report(
                     .or_insert_with(|| vec![insert_element]);
             } else if key == "stPreCompiledContracts"
                 || key == "stPreCompiledContracts2"
+                || key == "stZeroKnowledge"
+                || key == "stZeroKnowledge2"
                 || key == "stStaticFlagEnabled"
             {
                 final_report
@@ -213,15 +215,13 @@ fn generate_final_report(
                         section_elems.push(insert_element.clone())
                     })
                     .or_insert_with(|| vec![insert_element]);
-            } else if key == "stZeroKnowledge"
-                || key == "stZeroKnowledge2"
-                || key == "stHomesteadSpecific"
+            } else if key == "stHomesteadSpecific"
                 || key == "stCallDelegateCodesCallCodeHomestead"
                 || key == "stCallDelegateCodesHomestead"
                 || key == "stDelegatecallTestHomestead"
             {
                 final_report
-                    .entry("Investigation/Suspended")
+                    .entry("Homestead EIPs")
                     .and_modify(|section_elems| {
                         section_elems.push(insert_element.clone())
                     })
