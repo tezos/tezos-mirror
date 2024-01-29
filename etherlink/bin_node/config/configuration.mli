@@ -36,6 +36,8 @@ type sequencer = {
       (** The secret key used to sign the blueprints. *)
 }
 
+type observer = {evm_node_endpoint : Uri.t; preimages : string}
+
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
@@ -63,11 +65,18 @@ val save_proxy : force:bool -> data_dir:string -> proxy t -> unit tzresult Lwt.t
 val save_sequencer :
   force:bool -> data_dir:string -> sequencer t -> unit tzresult Lwt.t
 
+(** Same as {!save_proxy} but for the observer configuration. *)
+val save_observer :
+  force:bool -> data_dir:string -> observer t -> unit tzresult Lwt.t
+
 (** [load_proxy ~data_dir] loads a proxy configuration stored in [data_dir]. *)
 val load_proxy : data_dir:string -> proxy t tzresult Lwt.t
 
 (** Same as {!load_proxy} but for the sequencer configuration. *)
 val load_sequencer : data_dir:string -> sequencer t tzresult Lwt.t
+
+(** Same as {!load_proxy} but for the observer configuration. *)
+val load_observer : data_dir:string -> observer t tzresult Lwt.t
 
 module Cli : sig
   val create_proxy :
@@ -99,6 +108,19 @@ module Cli : sig
     unit ->
     sequencer t
 
+  val create_observer :
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?evm_node_endpoint:Uri.t ->
+    ?preimages:string ->
+    unit ->
+    observer t
+
   val create_or_read_proxy_config :
     data_dir:string ->
     devmode:bool ->
@@ -129,4 +151,18 @@ module Cli : sig
     sequencer:Signature.secret_key ->
     unit ->
     sequencer t tzresult Lwt.t
+
+  val create_or_read_observer_config :
+    data_dir:string ->
+    devmode:bool ->
+    ?rpc_addr:string ->
+    ?rpc_port:int ->
+    ?cors_origins:string trace ->
+    ?cors_headers:string trace ->
+    ?log_filter:log_filter_config ->
+    verbose:bool ->
+    ?evm_node_endpoint:Uri.t ->
+    ?preimages:string ->
+    unit ->
+    observer t tzresult Lwt.t
 end

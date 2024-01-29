@@ -184,11 +184,7 @@ let wait_for_application ~evm_node ~sc_rollup_node ~node ~client apply () =
   let rec loop () =
     let* () = Lwt_unix.sleep 5. in
     let* new_level =
-      match Evm_node.mode evm_node with
-      | Proxy _ -> next_evm_level ~evm_node ~sc_rollup_node ~node ~client
-      | Sequencer _ ->
-          let*@ head = Rpc.block_number evm_node in
-          return (Int32.to_int head)
+      Helpers.next_evm_level ~evm_node ~sc_rollup_node ~node ~client
     in
     if start_level + max_iteration < new_level then
       Test.fail

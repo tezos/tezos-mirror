@@ -66,3 +66,4 @@ let next_evm_level ~evm_node ~sc_rollup_node ~node ~client =
       let* _ = Rpc.produce_block evm_node in
       let*@ level = Rpc.block_number evm_node in
       return (Int32.to_int level)
+  | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
