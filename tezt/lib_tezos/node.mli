@@ -122,7 +122,7 @@ type t
     whose name is derived from [name]. It will be created
     as a named pipe so that node events can be received.
 
-    Default value for [net_addr] is either [127.0.0.1] if no [runner] is
+    Default value for [net_addr] is either [Constant.default_host] if no [runner] is
     provided, or a value allowing the local Tezt program to connect to it
     if it is.
 
@@ -179,8 +179,9 @@ val add_argument : t -> argument -> unit
 
     Usage: [add_peer node peer]
 
-    Same as [add_argument node (Peer "127.0.0.1:<PORT>")]
-    where [<PORT>] is the P2P port of [peer]. *)
+    Same as [add_argument node (Peer "<HOST>:<PORT>")]
+    where [<HOST>] is given by [Runner.address] and [<PORT>] is the P2P port of
+    [peer]. *)
 val add_peer : t -> t -> unit
 
 (** Returns the list of address of all [Peer <addr>] arguments. *)
@@ -190,8 +191,9 @@ val get_peers : t -> string list
 
     Usage: [add_peer node peer]
 
-    Same as [add_argument node (Peer "127.0.0.1:<PORT>#<ID>")]
-    where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
+    Same as [add_argument node (Peer "<HOST>:<PORT>#<ID>")]
+    where [<HOST>] is given by [Runner.address], [<PORT>] is the P2P port and
+    [<ID>] is the identity of [peer]. *)
 val add_peer_with_id : t -> t -> unit Lwt.t
 
 (** Removes the file peers.json that is at the root of data-dir.

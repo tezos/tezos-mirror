@@ -203,7 +203,7 @@ let test_forward =
     RPC.get_monitor_applied_blocks
     ~rpc_prefix:"/monitor/applied_blocks"
 
-let point_of_port port = "127.0.0.1:" ^ Int.to_string port
+let point_of_port port = sf "%s:%d" Constant.default_host port
 
 let wait_for_starting_rpc_server_event ~local ?fail node port =
   let filter =
@@ -220,7 +220,8 @@ let wait_for_starting_rpc_server_event ~local ?fail node port =
     filter
 
 let make_endpoint port =
-  Client.Foreign_endpoint Endpoint.{host = "127.0.0.1"; scheme = "http"; port}
+  Client.Foreign_endpoint
+    Endpoint.{host = Constant.default_host; scheme = "http"; port}
 
 let test_local_rpc_server =
   Test.register

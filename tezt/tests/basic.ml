@@ -40,7 +40,7 @@ let check_node_initialization (history_mode : Node.history_mode) :
       (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
     ~tags:["basic"; "node"; Node.show_history_mode history_mode]
   @@ fun protocol ->
-  let metrics_addr = "localhost" in
+  let metrics_addr = Constant.default_host in
   let metrics_port = Port.fresh () in
   let* node =
     Node.init [History_mode history_mode] ~metrics_addr ~metrics_port

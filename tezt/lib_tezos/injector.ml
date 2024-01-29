@@ -21,7 +21,7 @@ module Parameters = struct
   let base_default_name = "injector"
 
   let default_uri () =
-    Uri.make ~scheme:"http" ~host:"127.0.0.1" ~port:(Port.fresh ()) ()
+    Uri.make ~scheme:"http" ~host:Constant.default_host ~port:(Port.fresh ()) ()
 
   let default_colors =
     Log.Color.[|BG.green ++ FG.blue; BG.green ++ FG.gray; BG.green ++ FG.blue|]
@@ -45,7 +45,9 @@ let handle_readiness injector (event : event) =
   if event.name = "injector_listening.v0" then set_ready injector
 
 let rpc_host injector =
-  Uri.host_with_default ~default:"127.0.0.1" injector.persistent_state.uri
+  Uri.host_with_default
+    ~default:Constant.default_host
+    injector.persistent_state.uri
 
 let rpc_port injector = Option.get @@ Uri.port injector.persistent_state.uri
 

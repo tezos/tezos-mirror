@@ -45,7 +45,7 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; BG.gray|]
 end
 
-let rpc_host = "127.0.0.1"
+let rpc_host = Constant.default_host
 
 let rpc_scheme = "http"
 
@@ -75,7 +75,7 @@ let connection_arguments_and_port ?rpc_port node =
   in
   ( [
       "--endpoint";
-      "http://localhost:" ^ string_of_int (Node.rpc_port node);
+      sf "http://%s:%d" Constant.default_host (Node.rpc_port node);
       (* "-l"; <- to debug RPC delegations to the node
 
          Note that if you want to debug the proxy server's RPC server,

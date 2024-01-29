@@ -57,7 +57,7 @@ val mode : t -> mode
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
-    [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
+    [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port is
     chosen if [rpc_port] is not set.
 
     The server communicates with a rollup-node and sets its endpoint via

@@ -34,7 +34,9 @@ let node_tls () =
   let certificate_path = "tezt/tests/tls/tezos.crt" in
   let key_path = "tezt/tests/tls/tezos.key" in
   let rpc_tls = Node.{certificate_path; key_path} in
-  let* node = Node.init ~rpc_tls [] in
+  (* We set rpc_host to "localhost" instead of Constant.default_host
+     to conform to the DNS value stored in the tezos.crt. *)
+  let* node = Node.init ~rpc_host:"localhost" ~rpc_tls [] in
   Log.info "Check that a curl call to a node RPC fails without --cacert" ;
   let get_version_url =
     RPC_core.make_uri (Node.as_rpc_endpoint node) Node.RPC.get_version

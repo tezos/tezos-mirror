@@ -63,7 +63,7 @@ let input_config_files : JSON.t option list =
       @@ `O
            [
              ("confirmations", `Float 1.0);
-             ("endpoint", `String "http://127.0.0.1:8732");
+             ("endpoint", `String (sf "http://%s:8732" Constant.default_host));
              ("remote_signer", `String "http://127.0.0.2");
              ("web_port", `Float 8080.0);
              ("password_filename", `String "/tmp/doesnt_exist");
@@ -184,7 +184,7 @@ let test_config_show_roundtrip () =
     [
       [];
       [
-        ("--endpoint", "http://127.0.0.1:9732");
+        ("--endpoint", sf "http://%s:9732" Constant.default_host);
         ("--wait", "3");
         ("--remote-signer", "http://10.0.0.2");
         ("--password-filename", "/tmp/doesnt_exist_either");

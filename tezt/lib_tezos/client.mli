@@ -38,7 +38,7 @@ type endpoint =
 type ai_vote = On | Off | Pass
 
 (** A string representation of an endpoint suitable to be used as a CLI
-    argument (e.g., [http://localhost:5893]). *)
+    argument (e.g., [http://127.0.0.1:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
 
 (** Values that can be passed to the client's [--media-type] argument *)
