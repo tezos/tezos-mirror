@@ -73,7 +73,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   match Raw_level_repr.(sub raw_level dal.attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some level_attested ->
-      let* seen_slots = Storage.Dal.Slot.Headers.find ctxt level_attested in
+      let* seen_slots = find_slot_headers ctxt level_attested in
       let* ctxt, attestation, confirmed_slot_headers =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
