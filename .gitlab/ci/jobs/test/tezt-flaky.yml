@@ -1,7 +1,7 @@
 include: .gitlab/ci/jobs/test/common.yml
 
 # Runs flaky Tezts in the 'schedule_extended_test' pipeline.
-tezt_flaky:
+tezt-flaky:
   extends:
     - .tezt_tests
   variables:
@@ -12,6 +12,7 @@ tezt_flaky:
     # '--retry')
     TEZT_RETRY: 3
     TEZT_PARALLEL: 1
+    TEZT_VARIANT: "-flaky"
 
   # At the moment, there are few tests tagged as flaky, so this should
   # suffice.
