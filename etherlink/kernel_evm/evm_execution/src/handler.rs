@@ -89,6 +89,13 @@ pub struct ExecutionOutcome {
 /// and in what way). Second part tells Sputnik the return data if any.
 type CallOutcome = (ExitReason, Vec<u8>);
 
+// Will be used to check precondition before executing a call or a create
+pub enum Precondition {
+    PassPrecondition,
+    PreconditionErr(ExitReason),
+    EthereumErr(EthereumError),
+}
+
 /// The result of creating a contract as expected by the SputnikVM EVM implementation.
 /// First part of the triple is the execution outcome - same as for normal contract
 /// execution. Second part is the address of the newly created contract, if one was
@@ -750,13 +757,40 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         number_of_tx_layer.checked_sub(1).unwrap_or_default()
     }
 
+    fn has_enough_fund(&self, from: H160, value: &U256) -> Result<bool, EthereumError> {
+        if value.is_zero() {
+            Ok(true)
+        } else if let Some(from_account) = self.get_account(from) {
+            let balance = from_account
+                .balance(self.host)
+                .map_err(EthereumError::from)?;
+            let enough_balance = &balance >= value;
+            if !enough_balance {
+                log!(
+                    self.host,
+                    Debug,
+                    "Insufficient funds, balance of {:?} is {:?} but needs at least {:?}",
+                    from,
+                    balance,
+                    value
+                );
+            }
+            Ok(enough_balance)
+        } else {
+            log!(self.host, Debug, "'from' account {:?} is empty", from);
+            // Accounts of zero balance by default, so this must be
+            // an underflow.
+            Ok(false)
+        }
+    }
+
     fn end_create(
         &mut self,
         runtime: evm::Runtime,
-        sub_context_result: Result<ExitReason, EthereumError>,
+        creation_result: Result<ExitReason, EthereumError>,
         address: H160,
     ) -> Result<CreateOutcome, EthereumError> {
-        match sub_context_result {
+        match creation_result {
             Ok(sub_context_result @ ExitReason::Succeed(ExitSucceed::Suicided)) => {
                 Ok((sub_context_result, Some(address), vec![]))
             }
@@ -798,14 +832,64 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 // is available in the returndata buffer
                 Ok((sub_context_result, None, runtime.machine().return_value()))
             }
-            // Since the sub context failed, return address 0 (`None` in our case) (https://www.evm.codes/#f0?fork=shanghai)
-            Ok(sub_context_result @ ExitReason::Error(_)) => {
-                Ok((sub_context_result, None, vec![]))
-            }
-            Ok(sub_context_result @ ExitReason::Fatal(_)) => {
-                Ok((sub_context_result, None, vec![]))
-            }
+            // Since the creation fails, return address 0 (`None` in our case) (https://www.evm.codes/#f0?fork=shanghai)
+            Ok(create_err @ ExitReason::Error(_)) => Ok((create_err, None, vec![])),
+            Ok(create_err @ ExitReason::Fatal(_)) => Ok((create_err, None, vec![])),
             Err(err) => Err(err),
+        }
+    }
+
+    // Sub function to determine if the `caller` can create a new internal transaction.
+    // According to the Ethereum yellow paper (p.37) for `CALL`, `CREATE`, ... instructions that
+    // creates a new substate, it must always check that there are no `OutOfFund` or `CallTooDeep`
+    fn can_begin_inter_transaction(&self, caller: H160, value: &U256) -> Precondition {
+        // This check SHOULD be called outside of `begin_inter` and `end_inter`, this way
+        // we can reproduce the exact same check on the stack from the Ethereum yellow paper (p.37).
+        match (
+            self.has_enough_fund(caller, value),
+            self.stack_depth() < self.config.stack_limit,
+        ) {
+            (Ok(true), true) => Precondition::PassPrecondition,
+            (Ok(false), _) => {
+                Precondition::PreconditionErr(ExitReason::Error(ExitError::OutOfFund))
+            }
+            (Ok(_), false) => {
+                Precondition::PreconditionErr(ExitReason::Error(ExitError::CallTooDeep))
+            }
+            (Err(err), _) => Precondition::EthereumErr(err),
+        }
+    }
+
+    // Sub function to handle the collision part, we pinpoint two ways of colliding:
+    //   - the contract already exists
+    //   - it's been marked as `deleted` within the same transaction
+    fn contract_will_collide(&mut self, address: H160) -> Precondition {
+        if self.deleted(address) {
+            // The contract has been deleted, so the address is empty.
+            // We are trying to re-create the same contract that was deleted at
+            // the same transaction level: this is not allowed.
+            // TODO/NB: https://gitlab.com/tezos/tezos/-/issues/6783
+            // This behaviour is appropriate to <=Shanghai configuration.
+            // In the upcoming Cancun fork, the semantic of this behaviour will change.
+            Precondition::PreconditionErr(ExitReason::Error(ExitError::CreateCollision))
+        } else {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/6716
+            // Create collision and failed transfers should use up all the gas
+            match self.is_colliding(address) {
+                Ok(false) => Precondition::PassPrecondition,
+                Ok(true) => {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Failed to create contract at {:?}. Address is non-empty",
+                        address
+                    );
+                    Precondition::PreconditionErr(ExitReason::Error(
+                        ExitError::CreateCollision,
+                    ))
+                }
+                Err(collide_err) => Precondition::EthereumErr(collide_err),
+            }
         }
     }
 
@@ -826,6 +910,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         initial_code: Vec<u8>,
         create_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
+        log!(self.host, Debug, "Executing a contract create");
+
         let address = self.create_address(scheme);
 
         // TODO: Keep address as warm when creation fails
@@ -836,56 +922,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             )));
         }
 
-        if self.deleted(address) && create_opcode {
-            if let CreateScheme::Create2 { .. } = scheme {
-                // The contract has been deleted, so the address is empty.
-                // We are trying to re-create the same contract that was deleted at
-                // the same transaction level: this is not allowed.
-                // TODO/NB: https://gitlab.com/tezos/tezos/-/issues/6783
-                // This behaviour is appropriate to <=Shanghai configuration.
-                // In the upcoming Cancun fork, the semantic of this behaviour will change.
-                self.increment_nonce(caller)?;
-                return Ok((
-                    ExitReason::Succeed(ExitSucceed::Stopped),
-                    Some(H160::zero()), // see: https://www.evm.codes/#f5?fork=shanghai
-                    vec![],
-                ));
-            }
-        }
-
-        log!(self.host, Debug, "Executing a contract create");
-
-        if self.stack_depth() > self.config.stack_limit {
-            return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
-        }
+        if create_opcode {
+            self.increment_nonce(caller)?
+        };
 
         let context = Context {
             address,
             caller,
             apparent_value: value,
-        };
-
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6716
-        // Create collision and failed transfers should use up all the gas
-        if self.is_colliding(address)? {
-            log!(
-                self.host,
-                Debug,
-                "Failed to create contract at {:?}. Address is non-empty",
-                address
-            );
-            return Ok((ExitReason::Error(ExitError::CreateCollision), None, vec![]));
-        }
-
-        match self.execute_transfer(caller, address, value)? {
-            TransferExitReason::OutOfFund => {
-                return Ok((ExitReason::Error(ExitError::OutOfFund), None, vec![]))
-            }
-            TransferExitReason::Returned => (), // Otherwise result is ok and we do nothing and continue
-        }
-
-        if create_opcode {
-            self.increment_nonce(caller)?
         };
 
         let mut runtime = evm::Runtime::new(
@@ -896,9 +940,22 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.config.memory_limit,
         );
 
-        let result = self.execute(&mut runtime);
+        // Execute if there is no collision
+        let creation_result = match self.contract_will_collide(address) {
+            Precondition::PassPrecondition => {
+                match self.execute_transfer(caller, address, value) {
+                    Ok(TransferExitReason::Returned) => self.execute(&mut runtime),
+                    Ok(TransferExitReason::OutOfFund) => {
+                        Ok(ExitReason::Error(ExitError::OutOfFund))
+                    }
+                    Err(err) => Err(err),
+                }
+            }
+            Precondition::PreconditionErr(collision) => Ok(collision),
+            Precondition::EthereumErr(err) => Err(err),
+        };
 
-        self.end_create(runtime, result, address)
+        self.end_create(runtime, creation_result, address)
     }
 
     /// Call a contract
@@ -925,12 +982,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             address,
             stack_depth
         );
-
-        if stack_depth > self.config.stack_limit {
-            log!(self.host, Debug, "Execution beyond the call limit of 1024");
-
-            return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
-        }
 
         // TODO: check gas
         // issue: https://gitlab.com/tezos/tezos/-/issues/5120
@@ -1938,27 +1989,38 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         init_code: Vec<u8>,
         target_gas: Option<u64>,
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
-        let gas_limit = self.nested_call_gas_limit(target_gas);
+        match self.can_begin_inter_transaction(caller, &value) {
+            Precondition::PassPrecondition => {
+                let gas_limit = self.nested_call_gas_limit(target_gas);
 
-        if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
-            log!(
-                self.host,
-                Debug,
-                "Not enought gas for call. Required at least: {:?}",
-                gas_limit
-            );
+                if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Not enought gas for call. Required at least: {:?}",
+                        gas_limit
+                    );
 
-            Capture::Exit((
-                ExitReason::Fatal(ExitFatal::Other(Cow::from(
-                    "Out of gas before recursive create",
-                ))),
-                None,
-                vec![],
-            ))
-        } else {
-            let result = self.execute_create(caller, scheme, value, init_code, true);
+                    Capture::Exit((
+                        ExitReason::Fatal(ExitFatal::Other(Cow::from(
+                            "Out of gas before recursive create",
+                        ))),
+                        None,
+                        vec![],
+                    ))
+                } else {
+                    let result =
+                        self.execute_create(caller, scheme, value, init_code, true);
 
-            self.end_inter_transaction(result)
+                    self.end_inter_transaction(result)
+                }
+            }
+            Precondition::PreconditionErr(exit_reason) => {
+                Capture::Exit((exit_reason, None, vec![]))
+            }
+            Precondition::EthereumErr(err) => {
+                Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
+            }
         }
     }
 
@@ -1971,55 +2033,64 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         is_static: bool,
         context: Context,
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
-        let mut gas_limit = self.nested_call_gas_limit(target_gas);
+        let transaction_context = TransactionContext::from_context(context);
 
-        if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
-            log!(
-                self.host,
-                Debug,
-                "Not enought gas for call. Required at least: {:?}",
-                gas_limit
-            );
-
-            return Capture::Exit((
-                ExitReason::Fatal(ExitFatal::Other(Cow::from(
-                    "Out of gas before recursive call",
-                ))),
-                vec![],
-            ));
-        }
-
-        // For call with transfer value > 0, a stipend is added to the gaslimit.
-        // see yellowpaper, appendix H, opcode CALL (0xf1) and CALLCODE (Oxf2)
-        // Note that for other CALL* opcodes sputnik will not add a transfer at all.
-        if let Some(Transfer {
-            source,
-            target,
-            value,
-        }) = transfer
-        {
-            if value > U256::zero() {
-                gas_limit = gas_limit.map(|v| v.saturating_add(self.config.call_stipend));
-            }
+        // Retrieve value from `Transfer` struct to check if caller has enough balanace
+        let value = match transfer {
+            None => U256::zero(),
+            Some(Transfer { value, .. }) => value,
         };
 
-        if let Err(err) = self.begin_inter_transaction(is_static, gas_limit) {
-            return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
-        }
+        match self.can_begin_inter_transaction(transaction_context.context.caller, &value)
+        {
+            Precondition::PassPrecondition => {
+                let mut gas_limit = self.nested_call_gas_limit(target_gas);
 
-        let result = self.execute_call(
-            code_address,
-            transfer,
-            input,
-            TransactionContext::from_context(context),
-        );
+                if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Not enought gas for call. Required at least: {:?}",
+                        gas_limit
+                    );
 
-        match self.end_inter_transaction(result) {
-            Capture::Exit((reason, _, value)) => {
-                log!(self.host, Debug, "Call ended with reason: {:?}", reason);
-                Capture::Exit((reason, value))
+                    return Capture::Exit((
+                        ExitReason::Fatal(ExitFatal::Other(Cow::from(
+                            "Out of gas before recursive call",
+                        ))),
+                        vec![],
+                    ));
+                }
+
+                // For call with transfer value > 0, a stipend is added to the gaslimit.
+                // see yellowpaper, appendix H, opcode CALL (0xf1) and CALLCODE (Oxf2)
+                // Note that for other CALL* opcodes sputnik will not add a transfer at all.
+                if value > U256::zero() {
+                    gas_limit =
+                        gas_limit.map(|v| v.saturating_add(self.config.call_stipend));
+                }
+
+                if let Err(err) = self.begin_inter_transaction(is_static, gas_limit) {
+                    return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
+                }
+
+                let result =
+                    self.execute_call(code_address, transfer, input, transaction_context);
+
+                match self.end_inter_transaction(result) {
+                    Capture::Exit((reason, _, value)) => {
+                        log!(self.host, Debug, "Call ended with reason: {:?}", reason);
+                        Capture::Exit((reason, value))
+                    }
+                    Capture::Trap(x) => Capture::Trap(x),
+                }
             }
-            Capture::Trap(x) => Capture::Trap(x),
+            Precondition::PreconditionErr(exit_reason) => {
+                Capture::Exit((exit_reason, vec![]))
+            }
+            Precondition::EthereumErr(err) => {
+                Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]))
+            }
         }
     }
 
