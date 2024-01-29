@@ -519,6 +519,7 @@ let dispatch_private_request (_config : 'a Configuration.t)
           match input with
           | None -> return missing_parameter
           | Some payload ->
+              let*! () = Events.received_upgrade payload in
               let* () = Backend_rpc.inject_kernel_upgrade ~payload in
               return (Either.Left ())
         in
