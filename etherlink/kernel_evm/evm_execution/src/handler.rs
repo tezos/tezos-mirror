@@ -656,6 +656,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
     ) -> Result<CreateOutcome, EthereumError> {
         match sub_context_result {
+            Ok(sub_context_result @ ExitReason::Succeed(ExitSucceed::Suicided)) => {
+                Ok((sub_context_result, Some(address), vec![]))
+            }
             Ok(sub_context_result @ ExitReason::Succeed(_)) => {
                 let code_out = runtime.machine().return_value();
 
