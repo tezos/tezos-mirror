@@ -25,19 +25,27 @@ let default_branch =
 
 let records_directory = "tezt/records"
 
-let fetch_record (uri, index, kind) =
+let fetch_record (uri, index, variant) =
   let local_filename = index ^ ".json" in
-  let local_dir = records_directory // kind in
+  let local_dir =
+    match variant with
+    | None -> records_directory
+    | Some variant -> records_directory // variant
+  in
   let local = local_dir // local_filename in
   if not @@ Sys.file_exists local_dir then Sys.mkdir local_dir 0o755 ;
-  let* () = Gitlab.get_output uri ~output_path:local in
-  Log.info "Downloaded: %s" local ;
-  match JSON.parse_file local with
-  | exception (JSON.Error _ as exn) ->
+  Lwt.catch
+    (fun () ->
+      let* () = Gitlab.get_output uri ~output_path:local in
+      Log.info "Downloaded: %s" local ;
+      let (_ : JSON.t) = JSON.parse_file local in
+      return (Some local_filename))
+    (fun exn ->
       Log.error
-        "Failed to parse downloaded JSON file, maybe the artifact has expired?" ;
-      raise exn
-  | (_ : JSON.t) -> return local_filename
+        "Failed to fetch record: %s: %s"
+        (Uri.to_string uri)
+        (Printexc.to_string exn) ;
+      return None)
 
 let remove_existing_records new_records =
   let remove_if_looks_like_an_old_record filename =
@@ -49,21 +57,34 @@ let remove_existing_records new_records =
   in
   Array.iter remove_if_looks_like_an_old_record (Sys.readdir records_directory)
 
+let parse_tezt_job_name =
+  let with_no_variant = rex "^tezt (\\d+)/\\d+$" in
+  let with_variant = rex "^tezt-([a-zA-Z0-9-_]*) (\\d+)/\\d+$" in
+  fun name ->
+    match name =~* with_no_variant with
+    | Some index -> Some (None, index)
+    | None -> (
+        match name =~** with_variant with
+        | Some (variant, index) -> Some (Some variant, index)
+        | None -> None)
+
 let fetch_pipeline_records_from_jobs pipeline =
   Log.info "Fetching records from tezt executions in %d in %s" pipeline project ;
   let* jobs = Gitlab.(project_pipeline_jobs ~project ~pipeline () |> get_all) in
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let name = JSON.(job |-> "name" |> as_string) in
-    match name =~** rex "^tezt-?([^ ]*) (\\d+)/\\d+$" with
+    match parse_tezt_job_name name with
     | None -> None
     | Some (variant, index) ->
         let artifact_path =
           sf
             "tezt-results-%s%s.json"
             index
-            (if variant = "" then ""
-            else "-" ^ String.map (function '-' -> '_' | c -> c) variant)
+            (match variant with
+            | None -> ""
+            | Some variant ->
+                "-" ^ String.map (function '-' -> '_' | c -> c) variant)
         in
         Log.info "Will fetch %s from job #%d (%s)" artifact_path job_id name ;
         Some
@@ -126,6 +147,21 @@ let () =
             ()
     in
     let* new_records = fetch_pipeline_records_from_jobs pipeline_id in
-    remove_existing_records new_records ;
+    remove_existing_records (List.filter_map Fun.id new_records) ;
+    (* Now we can fail if we failed to download a record.
+       We did not want to fail earlier because in the CI we want to fetch
+       as many records as possible so that it can choose to continue anyway
+       (with a warning icon). *)
+    let failure_count =
+      List.filter (function None -> true | Some _ -> false) new_records
+      |> List.length
+    in
+    Log.info
+      "Successfully fetched %d record(s)."
+      (List.length new_records - failure_count) ;
+    if failure_count > 0 then
+      Test.fail
+        "%d record(s) could not be fetched; see errors above."
+        failure_count ;
     unit ) ;
   Test.run ()
