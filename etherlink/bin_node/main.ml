@@ -839,8 +839,23 @@ let observer_command =
       ~directory:Tezos_rpc_http_server.RPC_server.Directory.empty
   in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
-  (* Let’s pretend for a second we are doing something, before exiting. *)
-  let*! () = Lwt_unix.sleep 1. in
+
+  (* TODO: Should be resilient to errors from the EVM node endpoint *)
+  let*! blueprints_stream =
+    Evm_node_lib_dev.Evm_services.monitor_blueprints
+      ~evm_node_endpoint
+      (Qty Z.zero)
+  in
+  let*! () =
+    Lwt_stream.iter_s
+      (fun blueprint ->
+        let open Lwt_syntax in
+        let* res = Evm_node_lib_dev.Observer.on_new_blueprint blueprint in
+        match res with
+        | Ok () -> return_unit
+        | Error _ -> Stdlib.failwith "Something went wrong with the stream")
+      blueprints_stream
+  in
   return_unit
 
 let make_prod_messages ~smart_rollup_address s =

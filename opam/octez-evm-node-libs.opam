@@ -17,6 +17,7 @@ depends: [
   "lwt-exit"
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
+  "lwt-watcher" { = "0.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

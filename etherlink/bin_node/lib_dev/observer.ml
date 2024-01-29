@@ -5,20 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
+open Ethereum_types
 
-val get_smart_rollup_address :
-  evm_node_endpoint:Uri.t ->
-  Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
-
-val get_blueprint :
-  evm_node_endpoint:Uri.t ->
-  Ethereum_types.quantity ->
-  Blueprint_types.payload tzresult Lwt.t
-
-val register : Evm_context.t -> unit Directory.t -> unit Directory.t
-
-val monitor_blueprints :
-  evm_node_endpoint:Uri.t ->
-  Ethereum_types.quantity ->
-  Blueprint_types.t Lwt_stream.t Lwt.t
+let on_new_blueprint (blueprint : Blueprint_types.t) =
+  let open Lwt_result_syntax in
+  let (Qty level) = blueprint.number in
+  let*! () = Blueprint_event.blueprint_applied level in
+  return_unit

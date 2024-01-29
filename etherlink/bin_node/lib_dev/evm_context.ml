@@ -12,6 +12,7 @@ type t = {
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
+  blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
 }
 
 type metadata = {
@@ -120,6 +121,9 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       let*! () = Blueprint_event.blueprint_applied blueprint_number in
       let* ctxt = commit ctxt evm_state in
       let* () = Blueprints_publisher.publish next to_publish in
+      Lwt_watcher.notify
+        ctxt.blueprint_watcher
+        {number = Qty blueprint_number; payload = to_execute} ;
       return ctxt
   | Ok _ | Error (Evm_state.Cannot_apply_blueprint :: _) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
@@ -145,6 +149,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with ~data_dir
       preimages;
       smart_rollup_address = destination;
       next_blueprint_number;
+      blueprint_watcher = Lwt_watcher.create_input ();
     }
   in
   let* ctxt =
@@ -227,3 +232,13 @@ let execute_and_inspect ~input ctxt =
   let config = execution_config ctxt in
   let*! evm_state = evm_state ctxt in
   Evm_state.execute_and_inspect ~config ~input evm_state
+
+let last_produced_blueprint (ctxt : t) =
+  let open Lwt_syntax in
+  let (Qty next) = ctxt.next_blueprint_number in
+  let current = Ethereum_types.Qty Z.(pred next) in
+  let* blueprint = find_blueprint ctxt current in
+  match blueprint with
+  | Some blueprint ->
+      return_ok Blueprint_types.{number = current; payload = blueprint}
+  | None -> failwith "Could not fetch the last produced blueprint"

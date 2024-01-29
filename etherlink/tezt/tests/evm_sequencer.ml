@@ -727,8 +727,9 @@ let test_observer_applies_blueprint =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
+  let tbb = 1. in
   let* {evm_node = sequencer_node; sc_rollup_node; _} =
-    setup_sequencer protocol
+    setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
   let preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let observer_node =
@@ -742,7 +743,14 @@ let test_observer_applies_blueprint =
       (Evm_node.endpoint sequencer_node)
   in
   let* () = Evm_node.run observer_node in
-  Evm_node.wait_for_ready observer_node
+  let* () = Evm_node.wait_for_ready observer_node in
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      ~timeout:(tbb *. 3. *. 2.)
+      observer_node
+      3
+  in
+  unit
 
 let () =
   test_persistent_state [Alpha] ;

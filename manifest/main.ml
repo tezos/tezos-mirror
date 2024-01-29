@@ -8437,6 +8437,7 @@ let evm_node_lib_dev =
         octez_version_value;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
+        lwt_watcher;
         lwt_exit;
         evm_node_config |> open_;
         octez_context_sigs;
