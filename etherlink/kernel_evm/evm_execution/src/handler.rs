@@ -390,7 +390,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Check if an address has either a nonzero nonce, or a nonzero code length, i.e., if the address exists.
-    fn exists(&mut self, address: H160) -> Result<bool, EthereumError> {
+    fn is_colliding(&mut self, address: H160) -> Result<bool, EthereumError> {
         let Some(account) = self.get_account(address) else {
             return Ok(false);
         };
@@ -584,7 +584,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 H256::from_slice(hasher.finalize().as_slice()).into()
             }
             CreateScheme::Legacy { caller } => {
-                let nonce = self.get_nonce(caller).unwrap_or(U256::zero());
+                let nonce = self.get_nonce(caller);
                 let mut stream = rlp::RlpStream::new_list(2);
                 stream.append(&caller);
                 stream.append(&nonce);
@@ -762,7 +762,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6716
         // Create collision and failed transfers should use up all the gas
-        if self.exists(address)? {
+        if self.is_colliding(address)? {
             log!(
                 self.host,
                 Debug,
@@ -1043,10 +1043,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> Result<U256, EthereumError> {
+    fn get_nonce(&self, address: H160) -> U256 {
         self.get_account(address)
-            .map(|account| account.nonce(self.host).map_err(EthereumError::from))
-            .unwrap_or(Ok(U256::zero()))
+            .map(|account| account.nonce(self.host).unwrap_or_default())
+            .unwrap_or_default()
     }
 
     /// Completely delete an account including nonce, code, and data. This is for
@@ -1554,7 +1554,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or(U256::zero())
     }
 
+    // Hash of the chosen account's code, the empty hash (CODE_HASH_DEFAULT) if the account has no code,
+    // or 0 if the account does not exist or has been destroyed.
     fn code_hash(&self, address: H160) -> H256 {
+        if !self.exists(address) {
+            return H256::zero();
+        }
+
         self.get_account(address)
             .and_then(|a| a.code_hash(self.host).ok())
             .unwrap_or(CODE_HASH_DEFAULT)
@@ -1644,6 +1650,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn exists(&self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
+            || self.get_nonce(address) > U256::zero()
+            || self.balance(address) > U256::zero()
     }
 
     fn deleted(&self, address: H160) -> bool {
@@ -3129,5 +3137,32 @@ mod test {
             Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![1],)),
             result,
         )
+    }
+
+    #[test]
+    fn code_hash_of_zero_for_non_existing_address() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let gas_price = U256::from(21000);
+
+        let handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+        );
+
+        let hash = handler.code_hash(H160::from_low_u64_le(1));
+
+        assert_eq!(H256::zero(), hash)
     }
 }
