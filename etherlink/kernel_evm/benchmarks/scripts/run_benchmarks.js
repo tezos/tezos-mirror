@@ -22,12 +22,31 @@ const external = require("./lib/external")
 const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
+const commander = require('commander');
+const { mkdirSync } = require('node:fs')
+
+commander
+    .usage('[OPTIONS]')
+    .option('-i, --include <regex>', 'Only consider benchmark scripts matching <regex>')
+    .option('-e, --exclude <regex>', 'Exclude benchmark scripts matching <regex>')
+    .option('-o, --output-dir <path>', "Output directory")
+    .parse(process.argv);
+
+let INCLUDE_REGEX = commander.opts().include
+let EXCLUDE_REGEX = commander.opts().exclude
+function filter_name(name) {
+    return (INCLUDE_REGEX === undefined
+        || name.match(INCLUDE_REGEX))
+        && (EXCLUDE_REGEX === undefined
+            || !name.match(EXCLUDE_REGEX))
+}
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
 const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
-const OUTPUT_DIRECTORY = external.output()
-
+const OUTPUT_DIRECTORY = commander.opts().outputDir ? commander.opts().outputDir : external.output()
+mkdirSync(OUTPUT_DIRECTORY, { recursive: true })
+console.log(`Output directory ${OUTPUT_DIRECTORY}`)
 
 function sumArray(arr) {
     return arr.reduce((acc, curr) => acc + curr, 0);
@@ -426,9 +445,31 @@ function dump_opcodes(filename, opcodes) {
     fs.appendFileSync(filename, "}");
 }
 
+const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "/profiling"
+mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
+
+
+
+function move_profiler_output(src, bench_name, time) {
+    let dest = path.format({ dir: PROFILER_OUTPUT_DIRECTORY, base: `${bench_name.replaceAll('/', '_')}_${time}.out` })
+    fs.rename(path.resolve(src), dest, (err) => {
+        if (err && err.code === 'EXDEV') {
+            console.log(`WARNING: couldn't move profiler output with rename. Won't try more to avoid taking too long. File remains at ${src}`)
+            console.log(err)
+            return;
+        } else if (err) {
+            console.log(`WARNING: error while trying to move profiler output. Benchmarking while continue. File remains at ${src}`)
+            console.log(err)
+            return;
+        }
+        console.log(`Finished moving profiling output to ${dest}`)
+        return;
+    })
+}
+
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
-    console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
+    console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
     var benchmark_fields = [
         "benchmark_name",
         "status",
@@ -488,6 +529,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         opcodes[benchmark_name] = run_benchmark_result.opcodes;
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config));
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
+        move_profiler_output(run_benchmark_result.profiler_output_path, benchmark_script, time)
     }
     dump_opcodes(opcodes_dump, opcodes);
     console.log("Benchmarking complete");
@@ -496,4 +538,4 @@ async function run_all_benchmarks(benchmark_scripts) {
 }
 
 benchmark_scripts = require("./benchmarks_list.json")
-run_all_benchmarks(benchmark_scripts);
+run_all_benchmarks(benchmark_scripts.filter(filter_name));
