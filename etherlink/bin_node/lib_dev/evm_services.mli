@@ -7,13 +7,9 @@
 
 open Tezos_rpc
 
-val get_blueprint_service :
-  ( [`GET],
-    unit,
-    unit * int64,
-    unit,
-    unit,
-    Blueprint_types.payload )
-  Service.service
+val get_blueprint :
+  evm_node_endpoint:Uri.t ->
+  Ethereum_types.quantity ->
+  Blueprint_types.payload tzresult Lwt.t
 
 val register : Evm_context.t -> unit Directory.t -> unit Directory.t
