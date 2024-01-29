@@ -584,7 +584,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 H256::from_slice(hasher.finalize().as_slice()).into()
             }
             CreateScheme::Legacy { caller } => {
-                let nonce = self.get_nonce(caller).unwrap_or(U256::zero());
+                let nonce = self.get_nonce(caller);
                 let mut stream = rlp::RlpStream::new_list(2);
                 stream.append(&caller);
                 stream.append(&nonce);
@@ -1043,10 +1043,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> Result<U256, EthereumError> {
+    fn get_nonce(&self, address: H160) -> U256 {
         self.get_account(address)
-            .map(|account| account.nonce(self.host).map_err(EthereumError::from))
-            .unwrap_or(Ok(U256::zero()))
+            .map(|account| account.nonce(self.host).unwrap_or_default())
+            .unwrap_or_default()
     }
 
     /// Completely delete an account including nonce, code, and data. This is for
@@ -1650,7 +1650,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn exists(&self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
-            || self.get_nonce(address).unwrap_or_default() > U256::zero()
+            || self.get_nonce(address) > U256::zero()
             || self.balance(address) > U256::zero()
     }
 
