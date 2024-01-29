@@ -8,8 +8,9 @@
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator ?sequencer
-    ?delayed_bridge ?(flat_fee = Wei.zero) () =
+let make_config ?bootstrap_accounts ?ticketer ?administrator
+    ?sequencer_administrator ?sequencer ?delayed_bridge ?(flat_fee = Wei.zero)
+    () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -44,6 +45,15 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?sequencer
       ~none:[]
       administrator
   in
+  let sequencer_administrator =
+    Option.fold
+      ~some:(fun sequencer_administrator ->
+        let to_ = Durable_storage_path.sequencer_admin in
+        let value = Hex.(of_string sequencer_administrator |> show) in
+        [Set {value; to_}])
+      ~none:[]
+      sequencer_administrator
+  in
   let sequencer =
     match sequencer with
     | Some secret_key ->
@@ -67,8 +77,8 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?sequencer
     [Set {value; to_}]
   in
   match
-    ticketer @ bootstrap_accounts @ administrator @ sequencer @ delayed_bridge
-    @ flat_fee
+    ticketer @ bootstrap_accounts @ administrator @ sequencer_administrator
+    @ sequencer @ delayed_bridge @ flat_fee
   with
   | [] -> None
   | res -> Some (`Config res)

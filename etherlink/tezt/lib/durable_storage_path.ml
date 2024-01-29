@@ -47,6 +47,8 @@ let storage addr ?key () =
 
 let admin = evm "/admin"
 
+let sequencer_admin = evm "/sequencer_admin"
+
 let ticketer = evm "/ticketer"
 
 let sequencer = evm "/sequencer"
