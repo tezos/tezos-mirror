@@ -129,6 +129,7 @@ val init_config :
   ?peers:string list ->
   ?attester_profiles:string list ->
   ?producer_profiles:int list ->
+  ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   t ->
   unit Lwt.t
