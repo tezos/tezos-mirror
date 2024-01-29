@@ -7,6 +7,10 @@
 
 open Tezos_rpc
 
+val get_smart_rollup_address :
+  evm_node_endpoint:Uri.t ->
+  Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
+
 val get_blueprint :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
