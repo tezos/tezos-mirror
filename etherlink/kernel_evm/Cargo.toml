@@ -30,6 +30,7 @@ rlp = "0.5.2"
 
 # ethereum VM
 evm = { version = "0.39.1", default-features = false }
+aurora-engine-modexp = { version = "1.0", default-features = false }
 
 # crypto stuff
 sha2 = { version = "0.10.6", default-features = false }
