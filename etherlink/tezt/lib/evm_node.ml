@@ -47,8 +47,8 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     mutable last_injected_level : int;
     mutable pending_blueprint_injected : unit option Lwt.u list Per_level_map.t;
-    mutable last_produced_level : int;
-    mutable pending_blueprint_produced : unit option Lwt.u list Per_level_map.t;
+    mutable last_applied_level : int;
+    mutable pending_blueprint_applied : unit option Lwt.u list Per_level_map.t;
     mode : mode;
     data_dir : string;
     rpc_addr : string;
@@ -87,6 +87,11 @@ let initial_kernel t =
       Test.fail
         "Wrong argument: [initial_kernel] does not support the proxy node"
 
+let can_apply_blueprint t =
+  match t.persistent_state.mode with
+  | Sequencer _ | Observer _ -> true
+  | Proxy _ -> false
+
 let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =
@@ -111,11 +116,11 @@ let trigger_blueprint_injected evm_node level =
   List.iter (fun pending -> Lwt.wakeup_later pending (Some ()))
   @@ Option.value ~default:[] pending_for_level
 
-let trigger_blueprint_produced evm_node level =
-  let pending = evm_node.persistent_state.pending_blueprint_produced in
+let trigger_blueprint_applied evm_node level =
+  let pending = evm_node.persistent_state.pending_blueprint_applied in
   let pending_for_level = Per_level_map.find_opt level pending in
-  evm_node.persistent_state.last_produced_level <- level ;
-  evm_node.persistent_state.pending_blueprint_produced <-
+  evm_node.persistent_state.last_applied_level <- level ;
+  evm_node.persistent_state.pending_blueprint_applied <-
     Per_level_map.remove level pending ;
   List.iter (fun pending -> Lwt.wakeup_later pending (Some ()))
   @@ Option.value ~default:[] pending_for_level
@@ -133,8 +138,8 @@ let mode_prefix = function true -> "evm_node_dev" | false -> "evm_node_prod"
 let event_blueprint_injected_name devmode =
   mode_prefix devmode ^ "_blueprint_injection.v0"
 
-let event_blueprint_produced_name devmode =
-  mode_prefix devmode ^ "_blueprint_production.v0"
+let event_blueprint_applied_name devmode =
+  mode_prefix devmode ^ "_blueprint_application.v0"
 
 let handle_is_ready_event (evm_node : t) {name; value = _; timestamp = _} =
   if name = event_ready_name then set_ready evm_node else ()
@@ -147,10 +152,9 @@ let handle_blueprint_injected_event (evm_node : t) {name; value; timestamp = _}
       JSON.(value |> as_string |> int_of_string)
   else ()
 
-let handle_blueprint_produced_event (evm_node : t) {name; value; timestamp = _}
-    =
-  if name = event_blueprint_produced_name (devmode evm_node) then
-    trigger_blueprint_produced
+let handle_blueprint_applied_event (evm_node : t) {name; value; timestamp = _} =
+  if name = event_blueprint_applied_name (devmode evm_node) then
+    trigger_blueprint_applied
       evm_node
       JSON.(value |> as_string |> int_of_string)
   else ()
@@ -212,22 +216,23 @@ let wait_for_blueprint_injected ~timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
-let wait_for_blueprint_produced ~timeout evm_node level =
+let wait_for_blueprint_applied ~timeout evm_node level =
   match evm_node.status with
-  | Running {session_state = {ready = true; _}; _} when is_sequencer evm_node ->
-      let current_level = evm_node.persistent_state.last_produced_level in
+  | Running {session_state = {ready = true; _}; _}
+    when can_apply_blueprint evm_node ->
+      let current_level = evm_node.persistent_state.last_applied_level in
       if level <= current_level then unit
       else
         let promise, resolver = Lwt.task () in
-        evm_node.persistent_state.pending_blueprint_produced <-
+        evm_node.persistent_state.pending_blueprint_applied <-
           Per_level_map.update
             level
             (fun pending -> Some (resolver :: Option.value ~default:[] pending))
-            evm_node.persistent_state.pending_blueprint_produced ;
+            evm_node.persistent_state.pending_blueprint_applied ;
         check_event
           ~timeout
           evm_node
-          (event_blueprint_produced_name (devmode evm_node))
+          (event_blueprint_applied_name (devmode evm_node))
           promise
   | Running {session_state = {ready = true; _}; _} ->
       failwith "EVM node is not a sequencer"
@@ -252,8 +257,8 @@ let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
         pending_ready = [];
         last_injected_level = 0;
         pending_blueprint_injected = Per_level_map.empty;
-        last_produced_level = 0;
-        pending_blueprint_produced = Per_level_map.empty;
+        last_applied_level = 0;
+        pending_blueprint_applied = Per_level_map.empty;
         mode;
         data_dir;
         rpc_addr;
@@ -264,7 +269,7 @@ let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
   in
   on_event evm_node (handle_is_ready_event evm_node) ;
   on_event evm_node (handle_blueprint_injected_event evm_node) ;
-  on_event evm_node (handle_blueprint_produced_event evm_node) ;
+  on_event evm_node (handle_blueprint_applied_event evm_node) ;
   evm_node
 
 let create ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
