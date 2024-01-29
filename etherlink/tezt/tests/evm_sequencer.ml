@@ -551,8 +551,15 @@ let test_delayed_transfer_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; node; l1_contracts; sc_rollup_address; sc_rollup_node; evm_node}
-      =
+  let* {
+         client;
+         node;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         evm_node;
+         _;
+       } =
     setup_sequencer protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -604,8 +611,15 @@ let test_delayed_deposit_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; node; l1_contracts; sc_rollup_address; sc_rollup_node; evm_node}
-      =
+  let* {
+         client;
+         node;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         evm_node;
+         _;
+       } =
     setup_sequencer protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
@@ -705,6 +719,31 @@ let test_init_from_rollup_node_data_dir =
     ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
   unit
 
+let test_observer_applies_blueprint =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "observer"]
+    ~title:"Can start an Observer node"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {evm_node = sequencer_node; sc_rollup_node; _} =
+    setup_sequencer protocol
+  in
+  let preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let observer_node =
+    Evm_node.create
+      ~mode:
+        (Observer
+           {
+             initial_kernel = Evm_node.initial_kernel sequencer_node;
+             preimage_dir;
+           })
+      (Evm_node.endpoint sequencer_node)
+  in
+  let* () = Evm_node.run observer_node in
+  Evm_node.wait_for_ready observer_node
+
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
@@ -716,4 +755,5 @@ let () =
   test_rpc_produceBlock [Alpha] ;
   test_delayed_transfer_is_included [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
-  test_init_from_rollup_node_data_dir [Alpha]
+  test_init_from_rollup_node_data_dir [Alpha] ;
+  test_observer_applies_blueprint [Alpha]

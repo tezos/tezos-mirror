@@ -36,6 +36,7 @@ type time_between_blocks =
 
 (** EVM node mode. *)
 type mode =
+  | Observer of {initial_kernel : string; preimage_dir : string}
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)
@@ -73,6 +74,10 @@ val create :
   ?rpc_port:int ->
   string ->
   t
+
+(** [initial_kernel node] returns the path to the kernel used to initialize the
+    EVM state. Fails if [node] is a proxy node. *)
+val initial_kernel : t -> string
 
 (** [run ?wait ?extra_arguments evm_node] launches the EVM node server with
     the arguments given during {!create}, additional arguments can be

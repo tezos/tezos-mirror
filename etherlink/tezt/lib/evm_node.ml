@@ -28,6 +28,7 @@
 type time_between_blocks = Nothing | Time_between_blocks of float
 
 type mode =
+  | Observer of {initial_kernel : string; preimage_dir : string}
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string;
@@ -52,7 +53,7 @@ module Parameters = struct
     data_dir : string;
     rpc_addr : string;
     rpc_port : int;
-    rollup_node_endpoint : string;
+    endpoint : string;
     runner : Runner.t option;
   }
 
@@ -70,11 +71,21 @@ let mode t = t.persistent_state.mode
 
 let devmode t =
   match t.persistent_state.mode with
-  | Sequencer _ -> true
+  | Observer _ | Sequencer _ -> true
   | Proxy {devmode; _} -> devmode
 
 let is_sequencer t =
-  match t.persistent_state.mode with Sequencer _ -> true | Proxy _ -> false
+  match t.persistent_state.mode with
+  | Sequencer _ -> true
+  | Observer _ | Proxy _ -> false
+
+let initial_kernel t =
+  match t.persistent_state.mode with
+  | Sequencer {initial_kernel; _} | Observer {initial_kernel; _} ->
+      initial_kernel
+  | Proxy _ ->
+      Test.fail
+        "Wrong argument: [initial_kernel] does not support the proxy node"
 
 let connection_arguments ?rpc_addr ?rpc_port () =
   let open Cli_arg in
@@ -224,7 +235,7 @@ let wait_for_blueprint_produced ~timeout evm_node level =
       failwith "EVM node is not ready"
 
 let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
-    ?rpc_port rollup_node_endpoint =
+    ?rpc_port endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ()
   in
@@ -247,7 +258,7 @@ let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
         data_dir;
         rpc_addr;
         rpc_port;
-        rollup_node_endpoint;
+        endpoint;
         runner;
       }
   in
@@ -266,13 +277,7 @@ let run_args evm_node =
   let mode_args =
     match evm_node.persistent_state.mode with
     | Proxy {devmode} ->
-        [
-          "run";
-          "proxy";
-          "with";
-          "endpoint";
-          evm_node.persistent_state.rollup_node_endpoint;
-        ]
+        ["run"; "proxy"; "with"; "endpoint"; evm_node.persistent_state.endpoint]
         @ Cli_arg.optional_switch "devmode" devmode
     | Sequencer
         {
@@ -288,7 +293,7 @@ let run_args evm_node =
           "sequencer";
           "with";
           "endpoint";
-          evm_node.persistent_state.rollup_node_endpoint;
+          evm_node.persistent_state.endpoint;
           "signing";
           "with";
           sequencer;
@@ -310,6 +315,18 @@ let run_args evm_node =
             (fun timestamp ->
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
+    | Observer {preimage_dir; initial_kernel} ->
+        [
+          "run";
+          "observer";
+          "with";
+          "endpoint";
+          evm_node.persistent_state.endpoint;
+          "--preimage-dir";
+          preimage_dir;
+          "--initial-kernel";
+          initial_kernel;
+        ]
   in
   mode_args @ shared_args
 
@@ -340,6 +357,7 @@ let endpoint ?(private_ = false) (evm_node : t) =
       | Sequencer {private_rpc_port; _} ->
           (Constant.default_host, private_rpc_port, "/private")
       | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
+      | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
     else
       ( evm_node.persistent_state.rpc_addr,
         evm_node.persistent_state.rpc_port,

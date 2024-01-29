@@ -26,6 +26,8 @@ type sequencer = {
   sequencer : Signature.secret_key;
 }
 
+type observer = {evm_node_endpoint : Uri.t; preimages : string}
+
 type 'a t = {
   rpc_addr : string;
   rpc_port : int;
@@ -63,6 +65,8 @@ let default_kernel = "sequencer.wasm"
 let default_preimages = "_evm_installer_preimages"
 
 let default_rollup_node_endpoint = Uri.empty
+
+let default_evm_node_endpoint = Uri.empty
 
 let default_time_between_blocks = Time_between_blocks 5.
 
@@ -149,6 +153,20 @@ let encoding_sequencer =
           default_private_rpc_port)
        (req "sequencer" Signature.Secret_key.encoding))
 
+let encoding_observer =
+  let open Data_encoding in
+  conv
+    (fun {preimages; evm_node_endpoint} ->
+      (preimages, Uri.to_string evm_node_endpoint))
+    (fun (preimages, evm_node_endpoint) ->
+      {preimages; evm_node_endpoint = Uri.of_string evm_node_endpoint})
+    (obj2
+       (dft "preimages" string default_preimages)
+       (dft
+          "evm_node_endpoint"
+          string
+          (Uri.to_string default_evm_node_endpoint)))
+
 let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
  fun mode_encoding ->
   let open Data_encoding in
@@ -220,6 +238,10 @@ let save_sequencer ~force ~data_dir config =
   let encoding = encoding encoding_sequencer in
   save ~force ~data_dir encoding config
 
+let save_observer ~force ~data_dir config =
+  let encoding = encoding encoding_observer in
+  save ~force ~data_dir encoding config
+
 let load ~data_dir encoding =
   let open Lwt_result_syntax in
   let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
@@ -232,6 +254,10 @@ let load_proxy ~data_dir =
 
 let load_sequencer ~data_dir =
   let encoding = encoding encoding_sequencer in
+  load ~data_dir encoding
+
+let load_observer ~data_dir =
+  let encoding = encoding encoding_observer in
   load ~data_dir encoding
 
 module Cli = struct
@@ -276,6 +302,25 @@ module Cli = struct
         private_rpc_port =
           Option.value ~default:default_private_rpc_port private_rpc_port;
         sequencer;
+      }
+    in
+    create
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~mode
+
+  let create_observer ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+      ?log_filter ~verbose ?evm_node_endpoint ?preimages =
+    let mode =
+      {
+        evm_node_endpoint =
+          Option.value ~default:default_rollup_node_endpoint evm_node_endpoint;
+        preimages = Option.value ~default:default_preimages preimages;
       }
     in
     create
@@ -341,6 +386,29 @@ module Cli = struct
         private_rpc_port =
           Option.value ~default:default_private_rpc_port private_rpc_port;
         sequencer;
+      }
+    in
+    patch_configuration_from_args
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~mode
+      configuration
+
+  let patch_observer_configuration_from_args ~devmode ?rpc_addr ?rpc_port
+      ?cors_origins ?cors_headers ?log_filter ~verbose ?evm_node_endpoint
+      ?preimages configuration =
+    let mode =
+      {
+        evm_node_endpoint =
+          Option.value
+            ~default:configuration.mode.evm_node_endpoint
+            evm_node_endpoint;
+        preimages = Option.value ~default:configuration.mode.preimages preimages;
       }
     in
     patch_configuration_from_args
@@ -452,5 +520,24 @@ module Cli = struct
            ?preimages
            ?time_between_blocks
            ~sequencer)
+      ()
+
+  let create_or_read_observer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
+      ?cors_origins ?cors_headers ?log_filter ~verbose ?evm_node_endpoint
+      ?preimages () =
+    create_or_read_config
+      ~data_dir
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?log_filter
+      ~verbose
+      ~load:load_observer
+      ~patch_configuration_from_args:(fun ?private_rpc_port:_ ->
+        patch_observer_configuration_from_args ?evm_node_endpoint ?preimages)
+      ~create:(fun ?private_rpc_port:_ ->
+        create_observer ?evm_node_endpoint ?preimages)
       ()
 end

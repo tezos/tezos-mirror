@@ -154,6 +154,14 @@ let install_finalizer_seq server private_server =
   let* () = Evm_node_lib_dev.Delayed_inbox.shutdown () in
   Evm_node_lib_dev.Delayed_inbox_events.shutdown ()
 
+let install_finalizer_observer server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = Internal_event.Simple.emit Event.event_shutdown_node exit_status in
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
+  return_unit
+
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
@@ -308,13 +316,58 @@ let seq_start
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
+let observer_start
+    {
+      rpc_addr;
+      rpc_port;
+      cors_origins;
+      cors_headers;
+      verbose;
+      mode = (_ : observer);
+      _;
+    } ~directory =
+  let open Lwt_result_syntax in
+  let open Tezos_rpc_http_server in
+  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string p2p_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.allow_all in
+  let cors =
+    Resto_cohttp.Cors.
+      {allowed_headers = cors_headers; allowed_origins = cors_origins}
+  in
+  let server =
+    RPC_server.init_server
+      ~acl
+      ~cors
+      ~media_types:Media_type.all_media_types
+      directory
+  in
+  let*! () =
+    RPC_server.launch
+      ~host
+      server
+      ~callback:
+        (if verbose then callback_log server
+        else RPC_server.resto_callback server)
+      node
+  in
+  let*! () =
+    Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
+  in
+  return server
+
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
 
-  let rollup_node_endpoint =
+  let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
+
+  let rollup_node_endpoint = endpoint
+
+  let evm_node_endpoint = endpoint
 
   let secret_key : (Signature.secret_key, unit) Tezos_clic.parameter =
     Tezos_clic.parameter (fun _ sk ->
@@ -731,6 +784,65 @@ let sequencer_command =
       let* () = main_sequencer config in
       return_unit)
 
+let observer_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Start the EVM node in observer mode"
+    (args8
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg
+       verbose_arg
+       kernel_arg
+       preimages_arg)
+    (prefixes ["run"; "observer"; "with"; "endpoint"]
+    @@ param
+         ~name:"evm-node-endpoint"
+         ~desc:
+           "The EVM node endpoint address (as ADDR:PORT) the node will \
+            communicate with."
+         Params.evm_node_endpoint
+    @@ stop)
+  @@ fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           cors_origins,
+           cors_headers,
+           verbose,
+           kernel,
+           preimages )
+             evm_node_endpoint
+             () ->
+  ignore kernel ;
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
+  let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
+  let* config =
+    Cli.create_or_read_observer_config
+      ~data_dir
+      ~devmode:true
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ~evm_node_endpoint
+      ~verbose
+      ?preimages
+      ()
+  in
+  let* () = Configuration.save_observer ~force:true ~data_dir config in
+  let* server =
+    observer_start
+      config
+      ~directory:Tezos_rpc_http_server.RPC_server.Directory.empty
+  in
+  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
+  (* Let’s pretend for a second we are doing something, before exiting. *)
+  let*! () = Lwt_unix.sleep 1. in
+  return_unit
+
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
@@ -870,6 +982,7 @@ let commands =
   [
     proxy_command;
     sequencer_command;
+    observer_command;
     chunker_command;
     make_upgrade_command;
     init_from_rollup_node_command;
