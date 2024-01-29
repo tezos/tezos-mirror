@@ -4,13 +4,24 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    read_storage_version, store_storage_version, SEQUENCER_ADMIN, STORAGE_VERSION,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn store_sequencer_admin<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    // contract deployed in ghostnet with same pk as the admin
+    // contract
+    let contract_b58 = "KT1UwK4znfwrsqheq9EoBd4KFYtmbsf85eb2";
+    let bytes = contract_b58.as_bytes();
+    host.store_write_all(&SEQUENCER_ADMIN, bytes)
+        .map_err(Into::into)
 }
 
 // The workflow for migration is the following:
@@ -35,6 +46,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        store_sequencer_admin(host)?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

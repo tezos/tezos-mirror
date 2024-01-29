@@ -27,13 +27,14 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 3;
+pub const STORAGE_VERSION: u64 = 4;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
