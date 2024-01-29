@@ -42,14 +42,14 @@ val init_from_rollup_node :
 
 (** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
     to disk the changes, and update the checkpoint. *)
-val commit : t -> Sequencer_state.t -> t tzresult Lwt.t
+val commit : t -> Evm_state.t -> t tzresult Lwt.t
 
 (** [sync ctxt] synchronizes the [ctxt] based on on-disk information, loads the
     latest checkpoint. *)
 val sync : t -> t tzresult Lwt.t
 
 (** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
-val evm_state : t -> Sequencer_state.t Lwt.t
+val evm_state : t -> Evm_state.t Lwt.t
 
 (** [execute ?commit ctxt messages] executes [messages] on the freshest
     EVM state stored in [ctxt].
@@ -60,7 +60,7 @@ val execute :
   ?commit:bool ->
   t ->
   [< `Input of string] list ->
-  (t * Sequencer_state.t) tzresult Lwt.t
+  (t * Evm_state.t) tzresult Lwt.t
 
 (** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
     state, and returns [input.insights_requests]. *)

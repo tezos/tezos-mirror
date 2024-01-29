@@ -689,7 +689,7 @@ let sequencer_command =
       in
       let* () = Blueprints_publisher.start {rollup_node_endpoint} in
       let* ctxt =
-        Sequencer_context.init
+        Evm_context.init
           ?genesis_timestamp
           ~data_dir
           ~kernel:config.mode.kernel
@@ -718,7 +718,7 @@ let sequencer_command =
       let* directory =
         dev_directory config ((module Sequencer), smart_rollup_address)
       in
-      let directory = directory |> Sequencer_service.register ctxt in
+      let directory = directory |> Evm_services.register ctxt in
       let private_directory =
         dev_private_directory config ((module Sequencer), smart_rollup_address)
       in
@@ -861,7 +861,7 @@ let init_from_rollup_node_command =
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
     (fun data_dir rollup_node_data_dir () ->
-      Evm_node_lib_dev.Sequencer_context.init_from_rollup_node
+      Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~data_dir
         ~rollup_node_data_dir)
 

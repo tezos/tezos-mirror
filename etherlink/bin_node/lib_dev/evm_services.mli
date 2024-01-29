@@ -16,4 +16,4 @@ val get_blueprint_service :
     Blueprint_types.payload )
   Service.service
 
-val register : Sequencer_context.t -> unit Directory.t -> unit Directory.t
+val register : Evm_context.t -> unit Directory.t -> unit Directory.t
