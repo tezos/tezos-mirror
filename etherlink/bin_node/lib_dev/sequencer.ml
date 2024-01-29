@@ -74,6 +74,10 @@ end) : Services_backend_sig.Backend = struct
       | Some i -> return i
       | None -> Error_monad.failwith "Invalid insights format"
   end
+
+  let inject_kernel_upgrade ~payload:_ =
+    (* This is implemented in the next commit. *)
+    failwith "Stay tuned"
 end
 
 module Make (Ctxt : sig

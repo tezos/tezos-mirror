@@ -90,6 +90,8 @@ end) : Services_backend_sig.Backend = struct
       in
       return eval_result.insights
   end
+
+  let inject_kernel_upgrade ~payload:_ = Lwt_result_syntax.return_unit
 end
 
 module Make (Base : sig
