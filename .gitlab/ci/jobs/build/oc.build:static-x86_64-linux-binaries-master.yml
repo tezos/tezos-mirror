@@ -1,4 +1,4 @@
-include: .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries.yml
+include: .gitlab/ci/jobs/build/common.yml
 
 # this is the same as
 # oc.build:static-x86_64-linux-binaries-experimental.yml, but for the
