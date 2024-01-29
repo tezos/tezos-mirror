@@ -20,9 +20,9 @@ use primitive_types::U256;
 use storage::{
     read_admin, read_base_fee_per_gas, read_chain_id, read_delayed_transaction_bridge,
     read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, read_ticketer, sequencer,
-    store_base_fee_per_gas, store_chain_id, store_kernel_version, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_last_info_per_level_timestamp_stats, read_sequencer_admin, read_ticketer,
+    sequencer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
@@ -210,10 +210,15 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed to retrieve smart rollup address")?;
     let ticketer = read_ticketer(host);
     let admin = read_admin(host);
+    let sequencer_admin = read_sequencer_admin(host);
     let mut configuration = fetch_configuration(host)?;
     let block_fees = retrieve_block_fees(host)?;
 
-    let tezos_contracts = TezosContracts { ticketer, admin };
+    let tezos_contracts = TezosContracts {
+        ticketer,
+        admin,
+        sequencer_admin,
+    };
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the

@@ -671,6 +671,10 @@ pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN.into())
 }
 
+pub fn read_sequencer_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &SEQUENCER_ADMIN.into())
+}
+
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(
     host: &mut Host,
 ) -> Result<u32, Error> {
@@ -801,6 +805,14 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
     } else {
         Ok(None)
     }
+}
+pub fn store_sequencer<Host: Runtime>(
+    host: &mut Host,
+    public_key: PublicKey,
+) -> anyhow::Result<()> {
+    let pk_b58 = PublicKey::to_b58check(&public_key);
+    let bytes = String::as_bytes(&pk_b58);
+    host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
 }
 
 #[cfg(test)]
