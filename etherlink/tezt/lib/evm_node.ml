@@ -235,7 +235,7 @@ let wait_for_blueprint_applied ~timeout evm_node level =
           (event_blueprint_applied_name (devmode evm_node))
           promise
   | Running {session_state = {ready = true; _}; _} ->
-      failwith "EVM node is not a sequencer"
+      failwith "EVM node cannot produce blueprints"
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
