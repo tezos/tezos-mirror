@@ -15,6 +15,10 @@ val execute :
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
 val init : kernel:string -> t tzresult Lwt.t
 
+(** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
+    state. *)
+val modify : key:string -> value:string -> t -> t Lwt.t
+
 (** [inspect evm_state key] returns the value stored under [key] in
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t

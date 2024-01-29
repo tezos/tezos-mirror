@@ -75,9 +75,18 @@ end) : Services_backend_sig.Backend = struct
       | None -> Error_monad.failwith "Invalid insights format"
   end
 
-  let inject_kernel_upgrade ~payload:_ =
-    (* This is implemented in the next commit. *)
-    failwith "Stay tuned"
+  let inject_kernel_upgrade ~payload =
+    let open Lwt_result_syntax in
+    let* ctxt = Evm_context.sync Ctxt.ctxt in
+    let*! evm_state = Evm_context.evm_state ctxt in
+    let*! evm_state =
+      Evm_state.modify
+        ~key:Durable_storage_path.kernel_upgrade
+        ~value:payload
+        evm_state
+    in
+    let* _ctxt = Evm_context.commit ctxt evm_state in
+    return_unit
 end
 
 module Make (Ctxt : sig

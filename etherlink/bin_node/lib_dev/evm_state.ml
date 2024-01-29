@@ -49,6 +49,8 @@ let init ~kernel =
   in
   return evm_state
 
+let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
+
 let inspect evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in

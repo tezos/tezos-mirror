@@ -24,7 +24,7 @@ let base_fee_per_gas = EVM.make "/base_fee_per_gas"
 
 let kernel_version = EVM.make "/kernel_version"
 
-let upgrade_nonce = EVM.make "/upgrade_nonce"
+let kernel_upgrade = EVM.make "/kernel_upgrade"
 
 module Accounts = struct
   let accounts = EVM.make "/eth_accounts"
