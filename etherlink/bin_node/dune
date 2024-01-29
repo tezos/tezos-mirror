@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name evm_node)
+ (name main)
  (public_name octez-evm-node)
  (package octez-evm-node)
  (instrumentation (backend bisect_ppx))

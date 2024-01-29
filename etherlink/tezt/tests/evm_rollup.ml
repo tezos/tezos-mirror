@@ -2712,9 +2712,7 @@ let test_deposit_dailynet =
       ~address:rollup_address
       ~parameters_ty:evm_type
       ~installee:Constant.WASM.evm_kernel
-      ~config:
-        (`Path
-          Base.(project_root // "etherlink/kernel_evm/config/dailynet.yaml"))
+      ~config:(`Path Base.(project_root // "etherlink/config/dailynet.yaml"))
       ()
   in
 

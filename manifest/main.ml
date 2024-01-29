@@ -2812,15 +2812,15 @@ let _octez_p2p_tests =
         astring;
       ]
 
-let tezt_ethereum =
+let tezt_etherlink =
   private_lib
-    "tezt_ethereum"
-    ~path:"etherlink/tezt/lib_ethereum"
+    "tezt_etherlink"
+    ~path:"etherlink/tezt/lib"
     ~opam:"tezt-etherlink"
     ~bisect_ppx:No
     ~deps:
       [
-        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         octez_crypto;
         tezt_tezos |> open_;
@@ -4377,7 +4377,7 @@ let _tezt_testnet_scenarios =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_ethereum |> open_;
+        tezt_etherlink |> open_;
       ]
 
 let octogram =
@@ -8354,7 +8354,7 @@ let octez_evm_node_lib : Sub_lib.maker =
 let evm_node_config =
   octez_evm_node_lib
     "evm_node_config"
-    ~path:"etherlink/bin_evm_node/config"
+    ~path:"etherlink/bin_node/config"
     ~synopsis:"Configuration for the EVM node"
     ~deps:
       [
@@ -8366,7 +8366,7 @@ let evm_node_config =
 let evm_node_lib_prod_encoding =
   octez_evm_node_lib
     "evm_node_lib_prod_encoding"
-    ~path:"etherlink/bin_evm_node/lib_prod/encodings"
+    ~path:"etherlink/bin_node/lib_prod/encodings"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [prod \
        version]"
@@ -8379,7 +8379,7 @@ let _evm_node_sequencer_protobuf =
   in
   octez_evm_node_lib
     "evm_node_sequencer_protobuf"
-    ~path:"etherlink/bin_evm_node/lib_sequencer_protobuf"
+    ~path:"etherlink/bin_node/lib_sequencer_protobuf"
     ~synopsis:
       "gRPC libraries for interacting with a consensus node, generated from \
        protobuf definitions"
@@ -8389,7 +8389,7 @@ let _evm_node_sequencer_protobuf =
 let evm_node_lib_prod =
   octez_evm_node_lib
     "evm_node_lib_prod"
-    ~path:"etherlink/bin_evm_node/lib_prod"
+    ~path:"etherlink/bin_node/lib_prod"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [prod version]"
@@ -8414,7 +8414,7 @@ let evm_node_lib_prod =
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
     "evm_node_lib_dev_encoding"
-    ~path:"etherlink/bin_evm_node/lib_dev/encodings"
+    ~path:"etherlink/bin_node/lib_dev/encodings"
     ~synopsis:
       "EVM encodings for the EVM node and plugin for the WASM Debugger [dev \
        version]"
@@ -8424,7 +8424,7 @@ let evm_node_lib_dev_encoding =
 let evm_node_lib_dev =
   octez_evm_node_lib
     "evm_node_lib_dev"
-    ~path:"etherlink/bin_evm_node/lib_dev"
+    ~path:"etherlink/bin_node/lib_dev"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup [dev version]"
@@ -8452,7 +8452,7 @@ let evm_node_lib_dev =
 let _octez_evm_node_tests =
   tezt
     ["test_rlp"; "test_ethbloom"]
-    ~path:"etherlink/bin_evm_node/test"
+    ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
     ~with_macos_security_framework:true
@@ -8478,7 +8478,7 @@ let _tezt_etherlink =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_ethereum |> open_;
+        tezt_etherlink |> open_;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
@@ -8488,8 +8488,8 @@ let _tezt_etherlink =
 let _evm_node =
   public_exe
     (sf "octez-evm-node")
-    ~internal_name:(sf "evm_node")
-    ~path:"etherlink/bin_evm_node"
+    ~internal_name:(sf "main")
+    ~path:"etherlink/bin_node"
     ~opam:"octez-evm-node"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
@@ -8916,7 +8916,7 @@ let () =
 
 (* Generate documentation index for [octez-evm-node-libs] *)
 let () =
-  write "etherlink/bin_evm_node/index.mld" @@ fun fmt ->
+  write "etherlink/bin_node/index.mld" @@ fun fmt ->
   let header =
     "{0 Octez-evm-node-libs: octez EVM Node libraries}\n\n\
      This is a package containing some libraries used by the EVM Node of \

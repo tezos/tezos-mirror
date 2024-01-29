@@ -10,11 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "tezt" { >= "4.0.0" & < "5.0.0" }
-  "tezt-tezos"
   "octez-libs"
+  "tezt-tezos"
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
+  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "tezos-protocol-alpha" {with-test}
 ]
 build: [

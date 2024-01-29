@@ -6,18 +6,16 @@
 (*****************************************************************************)
 
 let exchanger_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/exchanger.tz")
+  Base.(project_root // "etherlink/tezos_contracts/exchanger.tz")
 
 let bridge_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/evm_bridge.tz")
+  Base.(project_root // "etherlink/tezos_contracts/evm_bridge.tz")
 
-let admin_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/admin.tz")
+let admin_path () = Base.(project_root // "etherlink/tezos_contracts/admin.tz")
 
 let withdrawal_abi_path () =
-  Base.(project_root // "etherlink/kernel_evm/l1_bridge/withdrawal.abi")
+  Base.(project_root // "etherlink/tezos_contracts/withdrawal.abi")
 
 let delayed_path () =
   Base.(
-    project_root
-    // "etherlink/kernel_evm/l1_bridge/delayed_transaction_bridge.tz")
+    project_root // "etherlink/tezos_contracts/delayed_transaction_bridge.tz")
