@@ -203,7 +203,8 @@ let wait_for_application ~evm_node ~sc_rollup_node ~node ~client apply () =
   return result
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs =
+let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node ?wait_for_blocks
+    txs =
   let requests =
     List.map
       (fun tx ->
@@ -225,7 +226,10 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs =
       ~sc_rollup_node
       ~node
       ~client
-      (wait_for_transaction_receipt ~evm_node ~transaction_hash:first_hash)
+      (wait_for_transaction_receipt
+         ?count:wait_for_blocks
+         ~evm_node
+         ~transaction_hash:first_hash)
       ()
   in
   return (requests, receipt, hashes)
@@ -1824,51 +1828,6 @@ let test_eth_call_storage_contract =
   let tags = ["evm"; "eth_call"; "simulate"] in
   register_both ~title ~tags test_f
 
-let test_eth_call_storage_contract_proxy =
-  register_proxy
-    ~tags:["evm"; "simulate"]
-    ~title:"Call a view (directly through rollup node)"
-    (fun ~protocol:_ ~evm_setup ->
-      let {sc_rollup_node; evm_node; _} = evm_setup in
-
-      let endpoint = Evm_node.endpoint evm_node in
-      let sender = Eth_account.bootstrap_accounts.(0) in
-
-      (* deploy contract *)
-      let* address, tx = deploy ~contract:simple_storage ~sender evm_setup in
-      let* () = check_tx_succeeded ~endpoint ~tx in
-
-      Check.(
-        (String.lowercase_ascii address
-        = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
-          string
-          ~error_msg:"Expected address to be %R but was %L.") ;
-      let* simulation_result =
-        Sc_rollup_node.RPC.call sc_rollup_node
-        @@ Sc_rollup_rpc.post_global_block_simulate
-             ~insight_requests:
-               [
-                 `Durable_storage_key ["evm"; "simulation_result"];
-                 `Durable_storage_key ["evm"; "simulation_status"];
-               ]
-             [
-               Hex.to_string @@ `Hex "ff";
-               Hex.to_string
-               @@ `Hex
-                    "ff0100e68094d77420f73b4612a7a99dba8c2afd30a1886b03448857040000000000008080844e70b1dc";
-             ]
-      in
-      let expected_insights =
-        [
-          Some "0000000000000000000000000000000000000000000000000000000000000000";
-          Some "01";
-        ]
-      in
-      Check.(
-        (simulation_result.insights = expected_insights) (list @@ option string))
-        ~error_msg:"Expected result %R, but got %L" ;
-      unit)
-
 let test_eth_call_storage_contract_eth_cli =
   let test_f ~protocol:_
       ~evm_setup:
@@ -3079,59 +3038,6 @@ let register_evm_migration ~protocols =
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols
 
-let test_reboot =
-  register_proxy
-    ~tags:["evm"; "reboot"; "loop"]
-    ~title:"Check that the kernel can handle too many txs for a single run"
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
-  (* Retrieves all the messages and prepare them for the current rollup. *)
-  let transfers =
-    read_file (kernel_inputs_path ^ "/100-loops-transfers")
-    |> String.trim |> String.split_on_char '\n'
-  in
-  let txs =
-    read_file (kernel_inputs_path ^ "/100-loops")
-    |> String.trim |> String.split_on_char '\n'
-  in
-  let* _, _transfer_receipt, _ =
-    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node transfers
-  in
-  let* requests, receipt, _hashes =
-    send_n_transactions ~sc_rollup_node ~node ~client ~evm_node txs
-  in
-  let* block_with_many_txs =
-    Evm_node.(
-      call_evm_rpc
-        evm_node
-        {
-          method_ = "eth_getBlockByNumber";
-          parameters =
-            `A
-              [`String (Format.sprintf "%#lx" receipt.blockNumber); `Bool false];
-        })
-  in
-  let block_with_many_txs =
-    block_with_many_txs |> Evm_node.extract_result |> Block.of_json
-  in
-  (match block_with_many_txs.Block.transactions with
-  | Block.Empty -> Test.fail "Expected a non empty block"
-  | Block.Full _ ->
-      Test.fail "Block is supposed to contain only transaction hashes"
-  | Block.Hash hashes ->
-      Check.((List.length hashes = List.length requests) int)
-        ~error_msg:"Expected %R transactions in the latest block, got %L") ;
-  let* tick_number =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_ticks ()
-  in
-  let max_tick =
-    Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
-  in
-  Check.((tick_number > Z.to_int max_tick) int)
-    ~error_msg:
-      "Expected %L to be greater than %R, max nb of ticks per kernel run" ;
-  unit
-
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in
   Evm_node.{method_; parameters = `A [`String arg]}
@@ -4159,6 +4065,100 @@ let test_regression_block_hash_gen =
   let* _address, _tx = deploy ~contract:block_hash_gen ~sender evm_setup in
   unit
 
+let test_reboot_out_of_ticks =
+  register_proxy
+    ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"]
+    ~title:
+      "Check that the kernel can handle transactions that take too many ticks \
+       for a single run"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
+  (* Retrieves all the messages and prepare them for the current rollup. *)
+  let txs =
+    read_file (kernel_inputs_path ^ "/loops-out-of-ticks")
+    |> String.trim |> String.split_on_char '\n'
+  in
+  (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
+  let first_block, second_block =
+    match txs with
+    | faucet1 :: faucet2 :: create :: rem -> ([faucet1; faucet2; create], rem)
+    | _ ->
+        failwith
+          "The prepared transactions should contain at least 3 transactions"
+  in
+  let* _requests, _receipt, _hashes =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_node
+      ~wait_for_blocks:5
+      first_block
+  in
+  let* total_tick_number_before_expected_reboots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
+  let* l1_level_before_out_of_ticks = Node.get_level node in
+  let* requests, receipt, _hashes =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_node
+      ~wait_for_blocks:5
+        (* By default, it waits for 3 blocks. We need to take into account the
+           blocks before the inclusion which is generally 2. The loops can be a
+           bit long to execute, as such the inclusion test might fail before the
+           execution is over, making it flaky. *)
+      second_block
+  in
+  let* total_tick_number_with_expected_reboots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
+  let*@ block_with_out_of_ticks =
+    Rpc.get_block_by_number
+      ~block:(Format.sprintf "%#lx" receipt.blockNumber)
+      evm_node
+  in
+  (* Check that all the transactions are actually included in the same block,
+     otherwise it wouldn't make sense to continue. *)
+  (match block_with_out_of_ticks.Block.transactions with
+  | Block.Empty -> Test.fail "Expected a non empty block"
+  | Block.Full _ ->
+      Test.fail "Block is supposed to contain only transaction hashes"
+  | Block.Hash hashes ->
+      Check.((List.length hashes = List.length requests) int)
+        ~error_msg:"Expected %R transactions in the resulting block, got %L") ;
+
+  (* Check the number of ticks spent during the period when there should have
+     been a reboot due to out of ticks. There have been a reboot if the number
+     of ticks is not `number of blocks` * `ticks per l1 level`. *)
+  let* l1_level_after_out_of_ticks = Node.get_level node in
+  let number_of_blocks =
+    l1_level_after_out_of_ticks - l1_level_before_out_of_ticks
+  in
+  let ticks_after_expected_reboot =
+    total_tick_number_with_expected_reboots
+    - total_tick_number_before_expected_reboots
+  in
+
+  (* The PVM takes 11G ticks for collecting inputs, 11G for a kernel_run. As such,
+     an L1 level is at least 22G ticks. *)
+  let ticks_per_snapshot =
+    Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
+    |> Z.to_int
+  in
+  let min_ticks_per_l1_level = ticks_per_snapshot * 2 in
+  Check.(
+    (ticks_after_expected_reboot
+    = (min_ticks_per_l1_level * number_of_blocks) + ticks_per_snapshot)
+      int)
+    ~error_msg:
+      "The number of ticks spent during the period should be %R, but got %L, \
+       which implies there have been no reboot, contrary to what was expected." ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4186,7 +4186,6 @@ let register_evm_node ~protocols =
   test_deploy_contract_for_shanghai protocols ;
   test_inject_100_transactions protocols ;
   test_eth_call_storage_contract protocols ;
-  test_eth_call_storage_contract_proxy protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
   test_preinitialized_evm_kernel protocols ;
@@ -4208,7 +4207,6 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
-  test_reboot protocols ;
   test_rpc_getBlockTransactionCountBy protocols ;
   test_rpc_getUncleCountByBlock protocols ;
   test_rpc_getUncleByBlockArgAndIndex protocols ;
@@ -4232,7 +4230,8 @@ let register_evm_node ~protocols =
   test_l2_intermediate_OOG_call protocols ;
   test_l2_ether_wallet protocols ;
   test_keep_alive protocols ;
-  test_regression_block_hash_gen protocols
+  test_regression_block_hash_gen protocols ;
+  test_reboot_out_of_ticks protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;

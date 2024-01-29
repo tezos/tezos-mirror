@@ -249,6 +249,13 @@ mod benchmarks {
     }
 }
 
+pub fn create_address_legacy(caller: &H160, nonce: &U256) -> H160 {
+    let mut stream = rlp::RlpStream::new_list(2);
+    stream.append(caller);
+    stream.append(nonce);
+    H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
+}
+
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
@@ -585,10 +592,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
             CreateScheme::Legacy { caller } => {
                 let nonce = self.get_nonce(caller);
-                let mut stream = rlp::RlpStream::new_list(2);
-                stream.append(&caller);
-                stream.append(&nonce);
-                H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
+                create_address_legacy(&caller, &nonce)
             }
             CreateScheme::Fixed(address) => address,
         }

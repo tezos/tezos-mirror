@@ -315,7 +315,11 @@ let run_args evm_node =
 
 let run ?(wait = true) ?(extra_arguments = []) evm_node =
   let* () =
-    run evm_node {ready = false} (run_args evm_node @ extra_arguments)
+    run
+      ~event_level:`Debug
+      evm_node
+      {ready = false}
+      (run_args evm_node @ extra_arguments)
   in
   let* () = if wait then wait_for_ready evm_node else unit in
   unit

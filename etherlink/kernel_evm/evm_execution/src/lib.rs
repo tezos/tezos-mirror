@@ -168,20 +168,33 @@ where
         || handler.pre_pay_transactions(caller, gas_limit, effective_gas_price)?
     {
         let result = if let Some(address) = address {
-            handler.call_contract(caller, address, value, call_data, gas_limit, false)?
+            handler.call_contract(caller, address, value, call_data, gas_limit, false)
         } else {
             // This is a create-contract transaction
-            handler.create_contract(caller, value, call_data, gas_limit)?
+            handler.create_contract(caller, value, call_data, gas_limit)
         };
 
-        handler.increment_nonce(caller)?;
+        match result {
+            Ok(result) => {
+                handler.increment_nonce(caller)?;
 
-        if do_refund(&result, pay_for_gas) {
-            let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-            handler.repay_gas(caller, unused_gas, effective_gas_price)?;
+                if do_refund(&result, pay_for_gas) {
+                    let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+                    handler.repay_gas(caller, unused_gas, effective_gas_price)?
+                }
+
+                Ok(Some(result))
+            }
+            // In case of `OutOfTicks` the gas is entirely refunded as it will
+            // be repaid in the next attempt
+            Err(EthereumError::OutOfTicks) => {
+                if pay_for_gas {
+                    handler.repay_gas(caller, gas_limit, effective_gas_price)?;
+                }
+                Err(EthereumError::OutOfTicks)
+            }
+            Err(e) => Err(e),
         }
-
-        Ok(Some(result))
     } else {
         // caller was unable to pay for the gas limit
         if pay_for_gas {
@@ -2711,5 +2724,71 @@ mod test {
         );
         assert_eq!(callee_nonce, U256::zero());
         assert_eq!(caller_nonce, U256::one());
+    }
+
+    #[test]
+    fn transactions_has_no_impact_if_retriable() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let callee = None;
+        let caller = H160::from_low_u64_be(117);
+        let transaction_value = U256::from(0);
+        let call_data: Vec<u8> = hex::decode(ERC20_CONTRACT_INITIALISATION).unwrap();
+
+        // gas_limit estimated using remix on shanghai network (1,631,430)
+        // plus a 50% margin for gas accounting discrepancies
+        let gas_limit = 2_400_000;
+        let gas_price = U256::from(21000);
+
+        // the test is not to check that account can prepay,
+        // so we can choose the balance depending on set gas limit
+        let initial_balance = gas_price
+            .saturating_mul(gas_limit.into())
+            .saturating_mul(U256::from(2));
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &caller,
+            initial_balance,
+        );
+
+        let path = account_path(&caller).unwrap();
+        let account = evm_account_storage.get_or_create(&host, &path).unwrap();
+        let initial_caller_nonce = account.nonce(&host).unwrap();
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            callee,
+            caller,
+            call_data,
+            Some(gas_limit),
+            gas_price,
+            Some(transaction_value),
+            true,
+            10_000,
+        );
+
+        let caller_balance = account.balance(&host).unwrap();
+        let caller_nonce = account.nonce(&host).unwrap();
+
+        assert_eq!(
+            Err(EthereumError::OutOfTicks),
+            result,
+            "Contract creation was expected to fail and run out of ticks: \n"
+        );
+        assert_eq!(
+            initial_balance, caller_balance,
+            "Balance shouldn't have changed as gas should have been repaid"
+        );
+        assert_eq!(
+            initial_caller_nonce, caller_nonce,
+            "Nonce shouldn't have changed"
+        )
     }
 }

@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{apply_transaction, ExecutionInfo};
+use crate::apply::{apply_transaction, ExecutionInfo, ExecutionResult};
 use crate::blueprint_storage::{drop_head_blueprint, read_next_blueprint};
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
@@ -58,6 +58,7 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
+    is_first_block_of_reboot: bool,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -65,14 +66,9 @@ fn compute<Host: Runtime>(
         "Queue length {}.",
         block_in_progress.queue_length()
     );
+    let mut is_first_transaction = true;
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
-        // is reboot necessary ?
-        if block_in_progress.would_overflow() {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
-            // there should be an upper bound on gasLimit
-            return Ok(ComputationResult::RebootNeeded);
-        }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 
@@ -93,7 +89,7 @@ fn compute<Host: Runtime>(
             accounts_index,
             allocated_ticks,
         )? {
-            Some(ExecutionInfo {
+            ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
                 object_info,
                 estimated_ticks_used,
@@ -112,7 +108,7 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks
                 );
             }
-            None => {
+            ExecutionResult::Invalid => {
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
@@ -121,7 +117,23 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks
                 );
             }
+            ExecutionResult::OutOfTicks => {
+                // Is is the first block processed in this reboot. Aditionnaly,
+                // it is the first transaction processed from this block in this
+                // reboot. The tick limit cannot be larger.
+                if is_first_transaction && is_first_block_of_reboot {
+                    log!(
+                        host,
+                        Debug,
+                        "Transaction is discarded as it uses too much ticks to be applied in a kernel run."
+                    );
+                } else {
+                    block_in_progress.repush_tx(transaction);
+                    return Ok(ComputationResult::RebootNeeded);
+                }
+            }
         };
+        is_first_transaction = false;
     }
     Ok(ComputationResult::Finished)
 }
@@ -169,6 +181,7 @@ fn compute_bip<Host: KernelRuntime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
+    first_block_of_reboot: &mut bool,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -177,6 +190,7 @@ fn compute_bip<Host: KernelRuntime>(
         precompiles,
         evm_account_storage,
         accounts_index,
+        *first_block_of_reboot,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -199,7 +213,9 @@ fn compute_bip<Host: KernelRuntime>(
             *current_constants = new_block
                 .constants(current_constants.chain_id, current_constants.block_fees);
             // Drop the processed blueprint from the storage
-            drop_head_blueprint(host)?
+            drop_head_blueprint(host)?;
+
+            *first_block_of_reboot = false;
         }
     }
     Ok(result)
@@ -235,6 +251,7 @@ pub fn produce<Host: KernelRuntime>(
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
     let mut tick_counter = TickCounter::new(0u64);
+    let mut first_block_of_reboot = true;
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(host)? {
@@ -249,8 +266,11 @@ pub fn produce<Host: KernelRuntime>(
             &mut evm_account_storage,
             &mut accounts_index,
             &mut tick_counter,
+            &mut first_block_of_reboot,
         )? {
-            ComputationResult::Finished => storage::delete_block_in_progress(host)?,
+            ComputationResult::Finished => {
+                storage::delete_block_in_progress(host)?;
+            }
             ComputationResult::RebootNeeded => {
                 return Ok(ComputationResult::RebootNeeded)
             }
@@ -277,6 +297,7 @@ pub fn produce<Host: KernelRuntime>(
             &mut evm_account_storage,
             &mut accounts_index,
             &mut tick_counter,
+            &mut first_block_of_reboot,
         )? {
             ComputationResult::Finished => (),
             ComputationResult::RebootNeeded => {
@@ -307,7 +328,6 @@ mod tests {
         account_path, init_account_storage, EthereumAccountStorage,
     };
     use primitive_types::{H160, H256, U256};
-    use std::ops::Rem;
     use std::str::FromStr;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
@@ -1064,13 +1084,16 @@ mod tests {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
         };
-        let transactions = vec![valid_tx].into();
+        let transactions = vec![valid_tx.clone()].into();
 
         // init block in progress
         let mut block_in_progress =
             BlockInProgress::new(U256::from(1), U256::from(1), transactions);
         // block is almost full wrt ticks
         block_in_progress.estimated_ticks = tick_model::constants::MAX_TICKS - 1000;
+
+        let data_length = valid_tx.data_size();
+        let ticks_for_invalid = tick_model::ticks_of_invalid_transaction(data_length);
 
         // act
         compute(
@@ -1080,6 +1103,7 @@ mod tests {
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
+            true,
         )
         .expect("Should have computed block");
 
@@ -1093,7 +1117,7 @@ mod tests {
         );
         assert_eq!(
             block_in_progress.estimated_ticks,
-            tick_model::constants::MAX_TICKS - 1000,
+            tick_model::constants::MAX_TICKS - 1000 + ticks_for_invalid,
             "should not have consumed any tick"
         );
 
@@ -1228,49 +1252,12 @@ mod tests {
         check_current_block_number(&mut host, 2);
     }
 
-    fn dummy_eth(nonce: u64) -> EthereumTransactionCommon {
-        let nonce = U256::from(nonce);
-        let gas_price = U256::from(40000000000u64);
-        let gas_limit = 21000;
-        let value = U256::from(1);
-        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
-        let tx = EthereumTransactionCommon::new(
-            TransactionType::Legacy,
-            Some(U256::one()),
-            nonce,
-            gas_price,
-            gas_price,
-            gas_limit,
-            to,
-            value,
-            vec![],
-            vec![],
-            None,
-        );
-
-        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        tx.sign_transaction(
-            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                .to_string(),
-        )
-        .unwrap()
-    }
-
     fn hash_from_nonce(nonce: u64) -> TransactionHash {
         let nonce = u64::to_le_bytes(nonce);
         let mut hash = [0; 32];
         hash[..8].copy_from_slice(&nonce);
         hash
     }
-
-    fn dummy_transaction(nonce: u64) -> Transaction {
-        Transaction {
-            tx_hash: hash_from_nonce(nonce),
-            content: TransactionContent::Ethereum(dummy_eth(nonce)),
-        }
-    }
-
-    const TOO_MANY_TRANSACTIONS: u64 = 500;
 
     fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
         const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
@@ -1282,6 +1269,51 @@ mod tests {
             is_marked_for_reboot(host),
             "The kernel should have been marked for reboot"
         );
+    }
+
+    const CREATE_LOOP_DATA: &str = "608060405234801561001057600080fd5b506101d0806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80630b7d796e14610030575b600080fd5b61004a600480360381019061004591906100c2565b61004c565b005b60005b81811015610083576001600080828254610069919061011e565b92505081905550808061007b90610152565b91505061004f565b5050565b600080fd5b6000819050919050565b61009f8161008c565b81146100aa57600080fd5b50565b6000813590506100bc81610096565b92915050565b6000602082840312156100d8576100d7610087565b5b60006100e6848285016100ad565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006101298261008c565b91506101348361008c565b925082820190508082111561014c5761014b6100ef565b5b92915050565b600061015d8261008c565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361018f5761018e6100ef565b5b60018201905091905056fea26469706673582212200cd6584173dbec22eba4ce6cc7cc4e702e00e018d340f84fc0ff197faf980ad264736f6c63430008150033";
+
+    const LOOP_1300: &str =
+        "0b7d796e0000000000000000000000000000000000000000000000000000000000000514";
+
+    const LOOP_4600: &str =
+        "0b7d796e00000000000000000000000000000000000000000000000000000000000011f8";
+
+    const TEST_SK: &str =
+        "84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502";
+
+    const TEST_ADDR: &str = "f0affc80a5f69f4a9a3ee01a640873b6ba53e539";
+
+    fn create_and_sign_transaction(
+        data: &str,
+        nonce: u64,
+        gas_limit: u64,
+        to: Option<H160>,
+        secret_key: &str,
+    ) -> EthereumTransactionCommon {
+        let unsigned_tx = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(DUMMY_CHAIN_ID),
+            U256::from(nonce),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            gas_limit,
+            to,
+            U256::zero(),
+            hex::decode(data).unwrap(),
+            vec![],
+            None,
+        );
+        unsigned_tx
+            .sign_transaction(String::from(secret_key))
+            .unwrap()
+    }
+
+    fn wrap_transaction(nonce: u64, tx: EthereumTransactionCommon) -> Transaction {
+        Transaction {
+            tx_hash: hash_from_nonce(nonce),
+            content: TransactionContent::Ethereum(tx),
+        }
     }
 
     #[test]
@@ -1301,7 +1333,7 @@ mod tests {
         );
 
         //provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
@@ -1311,12 +1343,31 @@ mod tests {
             sender_initial_balance,
         );
 
-        let mut transactions = vec![];
-        for n in 0..TOO_MANY_TRANSACTIONS {
-            transactions.push(dummy_transaction(n));
-        }
+        // These transactions are generated with the loop.sol contract, which are:
+        // - create the contract
+        // - call `loop(1200)`
+        // - call `loop(4600)`
+        let create_transaction =
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+        let loop_addr: H160 =
+            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_1200_tx =
+            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
+        let loop_4600_tx = create_and_sign_transaction(
+            LOOP_4600,
+            2,
+            2_600_000,
+            Some(loop_addr),
+            TEST_SK,
+        );
 
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        let proposals = vec![
+            wrap_transaction(0, create_transaction),
+            wrap_transaction(1, loop_1200_tx),
+            wrap_transaction(2, loop_4600_tx),
+        ];
+
+        store_blueprints(&mut host, vec![blueprint(proposals)]);
 
         host.reboot_left().expect("should be some reboot left");
 
@@ -1353,9 +1404,8 @@ mod tests {
             storage::read_current_block_number(&host).is_err(),
             "Should not have found current block number"
         );
-
         //provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
@@ -1365,15 +1415,31 @@ mod tests {
             sender_initial_balance,
         );
 
-        let mut transactions = vec![];
-        let mut proposals = vec![];
-        for n in 0..TOO_MANY_TRANSACTIONS {
-            transactions.push(dummy_transaction(n));
-            if n.rem(80) == 0 {
-                proposals.push(blueprint(transactions));
-                transactions = vec![];
-            }
-        }
+        // These transactions are generated with the loop.sol contract, which are:
+        // - create the contract
+        // - call `loop(1200)`
+        // - call `loop(4600)`
+        let create_transaction =
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+        let loop_addr: H160 =
+            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_1200_tx =
+            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
+        let loop_4600_tx = create_and_sign_transaction(
+            LOOP_4600,
+            2,
+            2_600_000,
+            Some(loop_addr),
+            TEST_SK,
+        );
+
+        let proposals = vec![
+            blueprint(vec![wrap_transaction(0, create_transaction)]),
+            blueprint(vec![
+                wrap_transaction(1, loop_1200_tx),
+                wrap_transaction(2, loop_4600_tx),
+            ]),
+        ];
 
         store_blueprints(&mut host, proposals);
 
@@ -1386,11 +1452,11 @@ mod tests {
         .expect("Should have produced");
 
         // test no new block
-        assert!(
+        assert_eq!(
             storage::read_current_block_number(&host)
-                .expect("should have found a block number")
-                > U256::zero(),
-            "There should have been multiple blocks registered"
+                .expect("should have found a block number"),
+            U256::zero(),
+            "There should have been one block registered"
         );
 
         // test reboot is set

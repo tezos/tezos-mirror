@@ -39,7 +39,7 @@ build-dev-deps: build-deps
 
 .PHONY: test
 test:
-	@cargo test --features testing
+	@cargo test --features testing ${TESTNAME}
 
 .PHONY: check
 check:

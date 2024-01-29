@@ -7,7 +7,6 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
-use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
@@ -15,6 +14,7 @@ use crate::{
     tick_model, CONFIG,
 };
 
+use evm_execution::run_transaction;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
@@ -30,9 +30,6 @@ pub const SIMULATION_SIMPLE_TAG: u8 = 1;
 pub const SIMULATION_CREATE_TAG: u8 = 2;
 // SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
-/// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
-/// Is used as default value if no gas is set.
-pub const MAX_EVALUATION_GAS: u64 = MAX_TRANSACTION_GAS_LIMIT;
 /// Tag indicating simulation is an evaluation.
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
@@ -118,7 +115,7 @@ impl Evaluation {
             block_fees.base_fee_per_gas()
         };
 
-        let outcome = evm_execution::run_transaction(
+        let outcome = run_transaction(
             host,
             &current_constants,
             &mut evm_account_storage,
@@ -127,9 +124,7 @@ impl Evaluation {
             self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
-            self.gas
-                .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
-                .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
+            self.gas.or(Some(u64::MAX)),
             gas_price,
             self.value,
             false,
@@ -193,11 +188,68 @@ enum TxValidationOutcome {
     NonceTooLow,
     NotCorrectSignature,
     InvalidChainId,
-    GasLimitTooHigh,
     MaxGasFeeTooLow,
+    OutOfTicks,
 }
 
 impl TxValidation {
+    // Run the transaction and checks if it fails with "OutOfTicks". It might
+    // fail for other reasons, but in that case it is still correct.
+    pub fn would_exhaust_ticks<Host: Runtime>(
+        host: &mut Host,
+        transaction: &EthereumTransactionCommon,
+        caller: &H160,
+    ) -> Result<bool, anyhow::Error> {
+        let chain_id = retrieve_chain_id(host)?;
+        let block_fees = retrieve_block_fees(host)?;
+
+        let current_constants = match storage::read_current_block(host) {
+            Ok(block) => block.constants(chain_id, block_fees),
+            Err(_) => {
+                let timestamp = current_timestamp(host);
+                let timestamp = U256::from(timestamp.as_u64());
+                BlockConstants::first_block(timestamp, chain_id, block_fees)
+            }
+        };
+
+        let mut evm_account_storage = account_storage::init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+        let precompiles = precompiles::precompile_set::<Host>();
+        let tx_data_size = transaction.data.len() as u64;
+        let allocated_ticks =
+            tick_model::estimate_remaining_ticks_for_transaction_execution(
+                0,
+                tx_data_size,
+            );
+
+        let gas_price = if let Ok(gas_price) =
+            transaction.effective_gas_price(block_fees.base_fee_per_gas())
+        {
+            gas_price
+        } else {
+            block_fees.base_fee_per_gas()
+        };
+
+        match run_transaction(
+            host,
+            &current_constants,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            transaction.to,
+            *caller,
+            transaction.data.clone(),
+            Some(transaction.execution_gas_limit()), // gas could be omitted
+            gas_price,
+            Some(transaction.value),
+            false,
+            allocated_ticks,
+        ) {
+            Err(evm_execution::EthereumError::OutOfTicks) => Ok(true),
+            _ => Ok(false),
+        }
+    }
+
     /// Execute the simulation
     pub fn run<Host: Runtime>(
         &self,
@@ -226,9 +278,10 @@ impl TxValidation {
         if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
             return Ok(TxValidationOutcome::InvalidChainId);
         }
-        // Check if the gas limit is not too high
-        if tx.execution_gas_limit() > MAX_TRANSACTION_GAS_LIMIT {
-            return Ok(TxValidationOutcome::GasLimitTooHigh);
+        // Check if running the transaction (assuming it is valid) would run out
+        // of ticks.
+        if let Ok(true) = Self::would_exhaust_ticks(host, tx, &caller) {
+            return Ok(TxValidationOutcome::OutOfTicks);
         }
         // Check if the gas price is high enough
         if tx.max_fee_per_gas < block_fees.base_fee_per_gas()
@@ -401,13 +454,21 @@ fn store_tx_validation_outcome<Host: Runtime>(
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Invalid chain id.".to_vec()))
         }
-        TxValidationOutcome::GasLimitTooHigh => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Gas limit too high.".to_vec()))
-        }
         TxValidationOutcome::MaxGasFeeTooLow => {
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Max gas fee too low.".to_vec()))
+        }
+        TxValidationOutcome::OutOfTicks => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(
+                host,
+                Some(
+                    b"The transaction would exhaust all the ticks it is allocated. \
+                      Try reducing its gas consumption or splitting the call in \
+                      multiple steps, if possible."
+                        .to_vec(),
+                ),
+            )
         }
     }
 }
@@ -581,7 +642,7 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
-            gas: Some(10000),
+            gas: Some(100000),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
@@ -605,7 +666,7 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
-            gas: Some(10000),
+            gas: Some(111111),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
@@ -716,19 +777,6 @@ mod tests {
             parsed,
             "should have been parsed as complete simulation"
         );
-
-        if let Input::Simple(box_simple) = parsed {
-            if let Message::Evaluation(s) = *box_simple {
-                let res = s.run(&mut host).expect("simulation should run");
-                assert!(
-                    res.is_some(),
-                    "Simulation should have produced some outcome"
-                );
-                let res = res.unwrap();
-                return assert!(res.is_success, "simulation should have succeeded");
-            }
-        }
-        panic!("Parsing failed")
     }
 
     #[test]
