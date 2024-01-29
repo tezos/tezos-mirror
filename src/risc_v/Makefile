@@ -37,6 +37,7 @@ test:
 check:
 	@cargo check --workspace --all-targets
 	@cargo clippy --workspace --all-targets -- --deny warnings
+	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
 	@make -C jstz check
 
