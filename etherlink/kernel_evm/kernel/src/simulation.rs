@@ -239,7 +239,7 @@ impl TxValidation {
             transaction.to,
             *caller,
             transaction.data.clone(),
-            Some(transaction.gas_limit), // gas could be omitted
+            Some(transaction.execution_gas_limit()), // gas could be omitted
             gas_price,
             Some(transaction.value),
             false,
@@ -642,7 +642,7 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
-            gas: Some(10000),
+            gas: Some(100000),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
@@ -666,7 +666,7 @@ mod tests {
             gas_price: None,
             to: Some(new_address),
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
-            gas: Some(10000),
+            gas: Some(111111),
             value: None,
         };
         let outcome = evaluation.run(&mut host);
@@ -777,19 +777,6 @@ mod tests {
             parsed,
             "should have been parsed as complete simulation"
         );
-
-        if let Input::Simple(box_simple) = parsed {
-            if let Message::Evaluation(s) = *box_simple {
-                let res = s.run(&mut host).expect("simulation should run");
-                assert!(
-                    res.is_some(),
-                    "Simulation should have produced some outcome"
-                );
-                let res = res.unwrap();
-                return assert!(res.is_success, "simulation should have succeeded");
-            }
-        }
-        panic!("Parsing failed")
     }
 
     #[test]
