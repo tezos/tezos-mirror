@@ -101,7 +101,7 @@ let execute =
     let open Lwt_result_syntax in
     let config = execution_config ctxt in
     let*! evm_state = evm_state ctxt in
-    let* evm_state = Sequencer_state.execute ~config evm_state inbox in
+    let* evm_state = Evm_state.execute ~config evm_state inbox in
     let* ctxt = if commit then perform_commit ctxt evm_state else return ctxt in
     return (ctxt, evm_state)
 
@@ -110,9 +110,7 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.next_blueprint_number in
-  let*! try_apply =
-    Sequencer_state.apply_blueprint ~config evm_state to_execute
-  in
+  let*! try_apply = Evm_state.apply_blueprint ~config evm_state to_execute in
 
   match try_apply with
   | Ok (evm_state, Block_height blueprint_number)
@@ -123,10 +121,10 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       let* ctxt = commit ctxt evm_state in
       let* () = Blueprints_publisher.publish next to_publish in
       return ctxt
-  | Ok _ | Error (Sequencer_state.Cannot_apply_blueprint :: _) ->
+  | Ok _ | Error (Evm_state.Cannot_apply_blueprint :: _) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
       let*! () = Blueprint_event.invalid_blueprint_produced next in
-      tzfail Sequencer_state.Cannot_apply_blueprint
+      tzfail Evm_state.Cannot_apply_blueprint
   | Error err -> fail err
 
 let init ?(genesis_timestamp = Helpers.now ()) ~data_dir ~kernel ~preimages
@@ -153,7 +151,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ~data_dir ~kernel ~preimages
     if loaded then return ctxt
     else
       (* Create the first empty block. *)
-      let* evm_state = Sequencer_state.init ~kernel in
+      let* evm_state = Evm_state.init ~kernel in
       let* ctxt = commit ctxt evm_state in
       let genesis =
         Sequencer_blueprint.create
@@ -210,9 +208,7 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
   let* current_blueprint_number =
     let*! current_blueprint_number_opt =
-      Sequencer_state.inspect
-        evm_state
-        Durable_storage_path.Block.current_number
+      Evm_state.inspect evm_state Durable_storage_path.Block.current_number
     in
     match current_blueprint_number_opt with
     | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
@@ -227,4 +223,4 @@ let execute_and_inspect ~input ctxt =
   let open Lwt_result_syntax in
   let config = execution_config ctxt in
   let*! evm_state = evm_state ctxt in
-  Sequencer_state.execute_and_inspect ~config ~input evm_state
+  Evm_state.execute_and_inspect ~config ~input evm_state

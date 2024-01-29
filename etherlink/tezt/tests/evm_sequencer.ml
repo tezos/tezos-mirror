@@ -22,7 +22,7 @@ module Sequencer_rpc = struct
     Runnable.run
     @@ Curl.get
          ~args:["--fail"]
-         (Evm_node.endpoint evm_node ^ "/sequencer/blueprint/"
+         (Evm_node.endpoint evm_node ^ "/evm/blueprint/"
         ^ Int64.to_string number)
 end
 
