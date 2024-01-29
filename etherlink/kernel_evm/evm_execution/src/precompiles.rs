@@ -13,9 +13,9 @@
 
 use std::{cmp::min, str::FromStr, vec};
 
-use crate::abi;
 use crate::handler::EvmHandler;
 use crate::EthereumError;
+use crate::{abi, modexp::modexp_precompile};
 use alloc::collections::btree_map::BTreeMap;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
@@ -229,7 +229,7 @@ fn ecrecover_precompile<Host: Runtime>(
     })
 }
 
-// implmenetation of 0x02 precompiled (identity)
+// implementation of 0x02 precompiled (identity)
 fn identity_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
@@ -437,6 +437,10 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
         (
             H160::from_low_u64_be(4u64),
             identity_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(5u64),
+            modexp_precompile as PrecompileFn<Host>,
         ),
         (
             // Prefixed by 'ff' to make sure we will not conflict with any
