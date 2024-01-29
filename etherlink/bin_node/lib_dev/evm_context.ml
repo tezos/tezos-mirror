@@ -117,7 +117,7 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
     when Z.equal blueprint_number next ->
       let* () = store_blueprint ctxt to_execute (Qty blueprint_number) in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
-      let*! () = Blueprint_event.blueprint_produced blueprint_number in
+      let*! () = Blueprint_event.blueprint_applied blueprint_number in
       let* ctxt = commit ctxt evm_state in
       let* () = Blueprints_publisher.publish next to_publish in
       return ctxt

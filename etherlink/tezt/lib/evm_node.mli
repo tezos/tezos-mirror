@@ -89,9 +89,9 @@ val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
 (** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
 val wait_for_ready : t -> unit Lwt.t
 
-(** [wait_for_blueprint_produced ~timeout evm_node level] waits until
-    [evm_node] has produced a blueprint for level [level]. *)
-val wait_for_blueprint_produced : timeout:float -> t -> int -> unit Lwt.t
+(** [wait_for_blueprint_applied ~timeout evm_node level] waits until
+    [evm_node] has applied a blueprint locally for level [level]. *)
+val wait_for_blueprint_applied : timeout:float -> t -> int -> unit Lwt.t
 
 (** [wait_for_blueprint_injected ~timeout evm_node level] waits until
     [evm_node] has injected a blueprint for level [level] to its rollup node. *)

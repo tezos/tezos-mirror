@@ -293,7 +293,7 @@ let test_resilient_to_rollup_node_disconnect =
         unit)
   in
 
-  let* () = Evm_node.wait_for_blueprint_produced evm_node ~timeout:5. 10 in
+  let* () = Evm_node.wait_for_blueprint_applied evm_node ~timeout:5. 10 in
 
   unit
 
