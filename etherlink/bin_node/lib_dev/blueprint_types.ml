@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = [`External of string] list
+type payload = [`External of string] list
 
-let encoding =
+let payload_encoding =
   let open Data_encoding in
   list
     (conv

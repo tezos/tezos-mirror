@@ -103,7 +103,10 @@ let encode_u16_le i =
   Bytes.set_uint16_le bytes 0 i ;
   bytes
 
-type t = {to_publish : Blueprint_types.t; to_execute : Blueprint_types.t}
+type t = {
+  to_publish : Blueprint_types.payload;
+  to_execute : Blueprint_types.payload;
+}
 
 let create ~secret_key ~timestamp ~smart_rollup_address ~number
     ~delayed_transactions ~transactions =

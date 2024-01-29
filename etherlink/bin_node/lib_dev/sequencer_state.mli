@@ -36,5 +36,5 @@ type error += Cannot_apply_blueprint
 val apply_blueprint :
   config:Config.config ->
   t ->
-  Blueprint_types.t ->
+  Blueprint_types.payload ->
   (t * Ethereum_types.block_height) tzresult Lwt.t

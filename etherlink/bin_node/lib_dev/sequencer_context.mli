@@ -67,7 +67,7 @@ val execute_and_inspect :
   bytes option list tzresult Lwt.t
 
 val find_blueprint :
-  t -> Ethereum_types.quantity -> Blueprint_types.t option Lwt.t
+  t -> Ethereum_types.quantity -> Blueprint_types.payload option Lwt.t
 
 (** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
     state stored under [ctxt]. It commits the result if the blueprint produces

@@ -91,7 +91,7 @@ let execute_and_inspect ~config
 
 type error += Cannot_apply_blueprint
 
-let apply_blueprint ~config evm_state (blueprint : Blueprint_types.t) =
+let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
     List.map
