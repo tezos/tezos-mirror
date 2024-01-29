@@ -16,7 +16,10 @@
     transactions are added in the blueprint, respecting the same order as
     their corresponding hashes.
 *)
-type t = {to_publish : Blueprint_types.t; to_execute : Blueprint_types.t}
+type t = {
+  to_publish : Blueprint_types.payload;
+  to_execute : Blueprint_types.payload;
+}
 
 (** [create ~secret_key ~timestamp ~smart_rollup_address ~number ~transactions]
     creates a sequencer blueprint at [timestamp] with a given [number]

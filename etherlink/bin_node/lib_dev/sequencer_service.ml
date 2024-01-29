@@ -13,7 +13,7 @@ let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
     ~query:Query.empty
-    ~output:Blueprint_types.encoding
+    ~output:Blueprint_types.payload_encoding
     Path.(sequencer_root / "blueprint" /: Arg.uint63)
 
 let register ctxt dir =

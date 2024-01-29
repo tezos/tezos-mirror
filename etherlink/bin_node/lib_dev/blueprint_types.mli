@@ -6,6 +6,6 @@
 (*****************************************************************************)
 
 (** A chunked blueprint, ready to be executed localy. *)
-type t = [`External of string] list
+type payload = [`External of string] list
 
-val encoding : t Data_encoding.t
+val payload_encoding : payload Data_encoding.t

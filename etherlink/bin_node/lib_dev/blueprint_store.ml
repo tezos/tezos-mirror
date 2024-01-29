@@ -37,7 +37,9 @@ let store store_path blueprint (Qty number) =
   let open Lwt_syntax in
   let number = Z.to_int number in
   let str =
-    Data_encoding.Binary.to_string_exn Blueprint_types.encoding blueprint
+    Data_encoding.Binary.to_string_exn
+      Blueprint_types.payload_encoding
+      blueprint
   in
 
   let blueprint_directory, file = blueprint_relative_path number in
@@ -66,5 +68,8 @@ let find store_path (Qty number) =
       in
 
       return
-      @@ Some (Data_encoding.Binary.of_string_exn Blueprint_types.encoding str))
+      @@ Some
+           (Data_encoding.Binary.of_string_exn
+              Blueprint_types.payload_encoding
+              str))
     (fun _exn -> return_none)
