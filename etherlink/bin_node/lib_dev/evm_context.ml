@@ -117,7 +117,7 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
     when Z.equal blueprint_number next ->
       let* () = store_blueprint ctxt to_execute (Qty blueprint_number) in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
-      let*! () = Blueprint_event.blueprint_applied blueprint_number in
+      let*! () = Blueprint_events.blueprint_applied blueprint_number in
       let* ctxt = commit ctxt evm_state in
       let* () = Blueprints_publisher.publish next to_publish in
       Lwt_watcher.notify
@@ -126,7 +126,7 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       return ctxt
   | Ok _ | Error (Evm_state.Cannot_apply_blueprint :: _) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
-      let*! () = Blueprint_event.invalid_blueprint_produced next in
+      let*! () = Blueprint_events.invalid_blueprint_produced next in
       tzfail Evm_state.Cannot_apply_blueprint
   | Error err -> fail err
 

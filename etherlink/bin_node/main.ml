@@ -150,7 +150,7 @@ let install_finalizer_seq server private_server =
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
   let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
   let* () = Evm_node_lib_dev.Blueprints_publisher.shutdown () in
-  let* () = Evm_node_lib_dev.Blueprint_event.publisher_shutdown () in
+  let* () = Evm_node_lib_dev.Blueprint_events.publisher_shutdown () in
   let* () = Evm_node_lib_dev.Delayed_inbox.shutdown () in
   Evm_node_lib_dev.Delayed_inbox_events.shutdown ()
 

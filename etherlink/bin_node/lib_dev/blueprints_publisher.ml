@@ -20,7 +20,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Blueprint_event.section
+  let base = Blueprint_events.section
 
   let pp _fmt () = ()
 
@@ -59,11 +59,11 @@ module Handlers = struct
         let* res = Rollup_node_services.publish ~rollup_node_endpoint payload in
         match res with
         | Ok () ->
-            let* () = Blueprint_event.blueprint_injected level in
+            let* () = Blueprint_events.blueprint_injected level in
             Lwt_result_syntax.return_unit
         | Error _ ->
             Worker.enters_degraded_mode self ;
-            let* () = Blueprint_event.entered_degraded_mode level in
+            let* () = Blueprint_events.entered_degraded_mode level in
             Lwt_result_syntax.return_unit)
     | Publish _ ->
         (* Degraded mode: nothing to do *)
@@ -92,7 +92,7 @@ let start node_ctxt =
   let* worker =
     Worker.launch table () {rollup_node_endpoint} (module Handlers)
   in
-  let*! () = Blueprint_event.publisher_is_ready () in
+  let*! () = Blueprint_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;
   return_unit
 

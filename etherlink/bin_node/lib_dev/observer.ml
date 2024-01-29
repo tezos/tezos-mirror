@@ -10,5 +10,5 @@ open Ethereum_types
 let on_new_blueprint (blueprint : Blueprint_types.t) =
   let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
-  let*! () = Blueprint_event.blueprint_applied level in
+  let*! () = Blueprint_events.blueprint_applied level in
   return_unit
