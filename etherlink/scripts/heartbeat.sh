@@ -45,7 +45,7 @@ report="Report:"
 
 add_report_msg() {
   report+="
-• $1"
+$1"
 }
 
 send_msg() {
@@ -61,19 +61,21 @@ add_timeout_msg() {
   network="$1"
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
-  add_report_msg "<!here> 🚨 *$2 timeouted with endpoint* <${network}|${network_name}>"
+  add_report_msg "• <!here> 🚨 *$2 timeouted with endpoint* <${network}|${network_name}>"
 }
 
 add_failed_tx_msg() {
   network="$1"
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
-  add_report_msg "<!here> 🚨 *$2 failed with endpoint* <${network}|${network_name}>"
+  add_report_msg "• <!here> 🚨 *$2 failed with endpoint* <${network}|${network_name}>"
 }
 
 add_not_included_tx_msg() {
   hash="${1}"
-  add_report_msg "<!here> 🚨 *$3* '${hash}' absent in explorer.* (rpc status_code: '$2')"
+  add_report_msg "• <!here> 🚨 *$3 absent in explorer*."
+  add_report_msg "  • hash: '${hash}'"
+  add_report_msg "  • rpc status_code: '$2'."
 }
 
 add_good_health_msg() {
@@ -84,17 +86,18 @@ add_good_health_msg() {
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
 
-  add_report_msg "✅ $3 transaction <https://explorer.etherlink.com/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
+  add_report_msg "• ✅ $3 transaction <https://explorer.etherlink.com/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
 }
 
 check_tx_applied() {
   op_hash=$(echo "$1" | tr -d '"')
+  op_type="$2"
   cmd=(-o /dev/null -s -w "%{http_code}\n" -X "GET" "https://explorer.etherlink.com/api/v2/transactions/${op_hash}" -H "accept: application/json")
   echo "> curl" "${cmd[@]}"
   status_code=$(curl "${cmd[@]}")
   echo "${status_code}"
   if [[ "${status_code}" -ne 200 ]]; then
-    add_not_included_tx_msg "${op_hash}" "${status_code}"
+    add_not_included_tx_msg "${op_type}" "${op_hash}" "${status_code}"
     return 1
   else
     return 0
@@ -150,10 +153,10 @@ erc20_tx() {
 
 allow_erc20_tx "${contract}" "${pk1}" "${addr1}" "${oregon}"
 erc20_tx "${contract}" "${pk1}" "${addr1}" "${addr2}" "${oregon}"
-add_report_msg "--------------"
+add_report_msg "------------------------"
 allow_erc20_tx "${contract}" "${pk2}" "${addr2}" "${dublin}"
 erc20_tx "${contract}" "${pk2}" "${addr2}" "${addr1}" "${dublin}"
-add_report_msg "--------------"
+add_report_msg "------------------------"
 tx "${pk1}" "${addr2}" "${node}"
 tx "${pk2}" "${addr1}" "${node}"
 tx "${pk1}" "${addr2}" "${oregon}"
