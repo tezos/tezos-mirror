@@ -213,7 +213,7 @@ impl BlockInProgress {
         BlockInProgress::new_with_ticks(
             current_block_number,
             parent_hash,
-            constants.base_fee_per_gas,
+            constants.base_fee_per_gas(),
             ring,
             tick_counter,
             blueprint.timestamp,

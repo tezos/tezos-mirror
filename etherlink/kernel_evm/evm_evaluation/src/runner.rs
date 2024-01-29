@@ -11,7 +11,7 @@ use evm_execution::handler::ExecutionOutcome;
 use evm_execution::precompiles::{precompile_set, PrecompileBTreeMap};
 use evm_execution::{run_transaction, Config, EthereumError};
 
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::block::{BlockConstants, BlockFees};
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
@@ -195,12 +195,14 @@ fn execute_transaction(
     env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
     env.tx.transact_to = unit.transaction.to;
 
+    let block_fees = BlockFees::new(env.block.basefee);
+
     let block_constants = BlockConstants {
         number: env.block.number,
         coinbase: env.block.coinbase.to_fixed_bytes().into(),
         timestamp: env.block.timestamp,
         gas_limit: env.block.gas_limit.as_u64(),
-        base_fee_per_gas: env.block.basefee,
+        block_fees,
         chain_id: U256::from(1337),
     };
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());

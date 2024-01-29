@@ -483,6 +483,7 @@ mod tests {
     use evm::Config;
     use primitive_types::{H160, U256};
     use tezos_ethereum::block::BlockConstants;
+    use tezos_ethereum::block::BlockFees;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -517,8 +518,8 @@ mod tests {
     ) -> Result<ExecutionOutcome, EthereumError> {
         let caller = H160::from_low_u64_be(118u64);
         let mut mock_runtime = MockHost::default();
-        let block =
-            BlockConstants::first_block(U256::zero(), U256::one(), U256::from(21000));
+        let block_fees = BlockFees::new(U256::from(21000));
+        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
         let config = Config::shanghai();
