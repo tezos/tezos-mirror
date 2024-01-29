@@ -8,7 +8,6 @@
 type t = {
   data_dir : string;
   context : Irmin_context.rw;
-  kernel : string;
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
@@ -131,8 +130,8 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       tzfail Evm_state.Cannot_apply_blueprint
   | Error err -> fail err
 
-let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with ~data_dir
-    ~kernel ~preimages ~smart_rollup_address () =
+let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
+    ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
   let open Lwt_result_syntax in
   let* index =
     Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
@@ -145,7 +144,6 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with ~data_dir
     {
       context;
       data_dir;
-      kernel;
       preimages;
       smart_rollup_address = destination;
       next_blueprint_number;
@@ -153,24 +151,32 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with ~data_dir
     }
   in
   let* ctxt =
-    if loaded then return ctxt
-    else
-      let* evm_state = Evm_state.init ~kernel in
-      let* ctxt = commit ctxt evm_state in
-      match produce_genesis_with with
-      | Some secret_key ->
-          (* Create the first empty block. *)
-          let genesis =
-            Sequencer_blueprint.create
-              ~secret_key
-              ~timestamp:genesis_timestamp
-              ~smart_rollup_address
-              ~transactions:[]
-              ~delayed_transactions:[]
-              ~number:Ethereum_types.(Qty Z.zero)
-          in
-          apply_blueprint ctxt genesis
-      | None -> return ctxt
+    match kernel_path with
+    | Some kernel -> (
+        if loaded then
+          let*! () = Events.ignored_kernel_arg () in
+          return ctxt
+        else
+          let* evm_state = Evm_state.init ~kernel in
+          let* ctxt = commit ctxt evm_state in
+          match produce_genesis_with with
+          | Some secret_key ->
+              (* Create the first empty block. *)
+              let genesis =
+                Sequencer_blueprint.create
+                  ~secret_key
+                  ~timestamp:genesis_timestamp
+                  ~smart_rollup_address
+                  ~transactions:[]
+                  ~delayed_transactions:[]
+                  ~number:Ethereum_types.(Qty Z.zero)
+              in
+              apply_blueprint ctxt genesis
+          | None -> return ctxt)
+    | None ->
+        failwith
+          "Cannot compute the initial EVM state without the path to the \
+           initial kernel"
   in
 
   return ctxt

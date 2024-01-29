@@ -8,7 +8,6 @@
 type t = {
   data_dir : string;  (** Data dir of the EVM node. *)
   context : Irmin_context.rw;  (** Irmin read and write context. *)
-  kernel : string;  (** Path to the kernel to execute. *)
   preimages : string;  (** Path to the preimages directory. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
@@ -16,18 +15,19 @@ type t = {
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
 }
 
-(** [init ~data_dir ~kernel ~preimages ~smart_rollup_address ()] creates
+(** [init ~data_dir ~preimages ~smart_rollup_address ()] creates
     a context where it initializes the {!type-index}, and use a
     checkpoint mechanism to load the latest {!type-store} if any.
 
-    If the context does not already exist and if [produce_genesis_with] is set,
-    this function also produces and publishes the genesis blueprint (optionally
-    set to [genesis_timestamp]). *)
+    If the context does not already exist, [kernel_path] is required.
+    Additionally,  if [produce_genesis_with] is set, this function also
+    produces and publishes the genesis blueprint (optionally set to
+    [genesis_timestamp]). *)
 val init :
   ?genesis_timestamp:Time.Protocol.t ->
   ?produce_genesis_with:Signature.secret_key ->
+  ?kernel_path:string ->
   data_dir:string ->
-  kernel:string ->
   preimages:string ->
   smart_rollup_address:string ->
   unit ->

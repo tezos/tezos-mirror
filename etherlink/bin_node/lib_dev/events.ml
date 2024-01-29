@@ -17,4 +17,16 @@ let received_upgrade =
     ~level:Notice
     ("payload", Data_encoding.string)
 
+let ignored_kernel_arg =
+  declare_0
+    ~section
+    ~name:"evm_node_dev_ignored_kernel_arg"
+    ~msg:
+      "Ignored the kernel command-line argument since the EVM state was \
+       already initialized"
+    ~level:Warning
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
+
+let ignored_kernel_arg () = emit ignored_kernel_arg ()
