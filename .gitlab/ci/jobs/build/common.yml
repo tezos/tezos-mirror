@@ -98,3 +98,10 @@
     - .needs__trigger
   variables:
     ARCH: "x86_64"
+
+.oc.build:static-arm64-linux-binaries:
+  extends:
+    - .oc.build_static_binaries_template
+    - .tags_template__build_arm64
+  variables:
+    ARCH: "arm64"
