@@ -626,11 +626,11 @@ module Get_logs = struct
 end
 
 module Produce_block = struct
-  type input = unit
+  type input = Time.Protocol.t
 
   type output = Ethereum_types.quantity
 
-  let input_encoding = Data_encoding.unit
+  let input_encoding = Time.Protocol.encoding
 
   let output_encoding = Ethereum_types.quantity_encoding
 

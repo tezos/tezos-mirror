@@ -26,5 +26,6 @@ module Syntax : sig
   val ( let*@? ) : ('a, error) result Lwt.t -> (error -> 'c Lwt.t) -> 'c Lwt.t
 end
 
-(** [produce_block evm_node] calls the private RPC [produceBlock]. *)
-val produce_block : Evm_node.t -> int32 Lwt.t
+(** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
+    provided the block will have timestamp [timestamp] (in RFC3339) format. *)
+val produce_block : ?timestamp:string -> Evm_node.t -> int32 Lwt.t

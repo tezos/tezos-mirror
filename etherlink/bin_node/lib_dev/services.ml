@@ -504,11 +504,10 @@ let dispatch_private_request (_config : 'a Configuration.t)
                  data = Some (`String method_);
                })
     | Method (Produce_block.Method, module_) ->
-        let f (_ : unit option) =
+        let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
-          let* nb_transactions =
-            Tx_pool.produce_block ~force:true ~timestamp:(Helpers.now ())
-          in
+          let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
+          let* nb_transactions = Tx_pool.produce_block ~force:true ~timestamp in
           return
             (Either.Left
                (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions))

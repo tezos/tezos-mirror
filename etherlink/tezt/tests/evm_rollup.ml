@@ -375,6 +375,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
                private_rpc_port;
                time_between_blocks;
                sequencer;
+               genesis_timestamp = None;
              })
   in
   let* evm_node =

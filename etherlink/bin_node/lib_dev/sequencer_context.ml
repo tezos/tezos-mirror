@@ -129,7 +129,8 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       tzfail Sequencer_state.Cannot_apply_blueprint
   | Error err -> fail err
 
-let init ~data_dir ~kernel ~preimages ~smart_rollup_address ~secret_key =
+let init ?(genesis_timestamp = Helpers.now ()) ~data_dir ~kernel ~preimages
+    ~smart_rollup_address ~secret_key () =
   let open Lwt_result_syntax in
   let* index =
     Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
@@ -157,7 +158,7 @@ let init ~data_dir ~kernel ~preimages ~smart_rollup_address ~secret_key =
       let genesis =
         Sequencer_blueprint.create
           ~secret_key
-          ~timestamp:(Helpers.now ())
+          ~timestamp:genesis_timestamp
           ~smart_rollup_address
           ~transactions:[]
           ~delayed_transactions:[]

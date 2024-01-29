@@ -46,6 +46,7 @@ type mode =
           (** See {!time_between_blocks}, if the value is not
               provided, the sequencer uses it default value. *)
       sequencer : string;  (** Secret key used to sign the blueprints. *)
+      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 
