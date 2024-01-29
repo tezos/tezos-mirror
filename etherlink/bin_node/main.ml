@@ -691,11 +691,11 @@ let sequencer_command =
       let* ctxt =
         Evm_context.init
           ?genesis_timestamp
+          ~produce_genesis_with:sequencer
           ~data_dir
           ~kernel:config.mode.kernel
           ~preimages:config.mode.preimages
           ~smart_rollup_address
-          ~secret_key:sequencer
           ()
       in
       let module Sequencer = Sequencer.Make (struct
