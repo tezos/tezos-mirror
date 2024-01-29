@@ -24,6 +24,15 @@ module Sequencer_rpc = struct
          ~args:["--fail"]
          (Evm_node.endpoint evm_node ^ "/evm/blueprint/"
         ^ Int64.to_string number)
+
+  let get_smart_rollup_address evm_node =
+    let* res =
+      Runnable.run
+      @@ Curl.get
+           ~args:["--fail"]
+           (Evm_node.endpoint evm_node ^ "/evm/smart_rollup_address")
+    in
+    return (JSON.as_string res)
 end
 
 let uses _protocol =
@@ -324,6 +333,23 @@ let test_can_fetch_blueprint =
     Test.fail
       ~__LOC__
       "At least two blueprints from a different level are equal."
+
+let test_can_fetch_smart_rollup_address =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "rpc"]
+    ~title:"Sequencer can return the smart rollup address on demand"
+    ~uses
+  @@ fun protocol ->
+  let* {evm_node; sc_rollup_address; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  let* claimed_address = Sequencer_rpc.get_smart_rollup_address evm_node in
+
+  Check.((sc_rollup_address = claimed_address) string)
+    ~error_msg:"Returned address is not the expected one" ;
+
+  unit
 
 let test_send_transaction_to_delayed_inbox =
   Protocol.register_test
@@ -683,6 +709,7 @@ let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
   test_resilient_to_rollup_node_disconnect [Alpha] ;
+  test_can_fetch_smart_rollup_address [Alpha] ;
   test_can_fetch_blueprint [Alpha] ;
   test_send_transaction_to_delayed_inbox [Alpha] ;
   test_send_deposit_to_delayed_inbox [Alpha] ;
