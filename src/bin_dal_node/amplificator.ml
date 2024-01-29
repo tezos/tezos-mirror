@@ -29,6 +29,7 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
         return_unit
       else
         (* We have enough shards to reconstruct the whole slot. *)
+        let*! () = Event.(emit reconstruct_started commitment) in
         let shards =
           Store.Shards.read_all shard_store commitment ~number_of_shards
           |> Seq_s.filter_map (function
@@ -55,4 +56,5 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             ~with_proof:true
           |> Errors.to_option_tzresult
         in
+        let*! () = Event.(emit reconstruct_finished commitment) in
         return_unit

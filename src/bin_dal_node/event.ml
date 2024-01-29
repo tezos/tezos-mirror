@@ -254,3 +254,21 @@ let saving_profiles_failed =
     ~msg:"saving profiles failed: {error}"
     ~level:Error
     ("error", Error_monad.trace_encoding)
+
+let reconstruct_started =
+  declare_1
+    ~section
+    ~name:"reconstruct_started"
+    ~msg:"slot reconstruction for commitment {commitment} started"
+    ~level:Notice
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
+
+let reconstruct_finished =
+  declare_1
+    ~section
+    ~name:"reconstruct_finished"
+    ~msg:"slot reconstruction for commitment {commitment} finished"
+    ~level:Notice
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
