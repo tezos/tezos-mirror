@@ -127,8 +127,8 @@ let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
       tzfail Evm_state.Cannot_apply_blueprint
   | Error err -> fail err
 
-let init ?(genesis_timestamp = Helpers.now ()) ~data_dir ~kernel ~preimages
-    ~smart_rollup_address ~secret_key () =
+let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with ~data_dir
+    ~kernel ~preimages ~smart_rollup_address () =
   let open Lwt_result_syntax in
   let* index =
     Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
@@ -150,19 +150,22 @@ let init ?(genesis_timestamp = Helpers.now ()) ~data_dir ~kernel ~preimages
   let* ctxt =
     if loaded then return ctxt
     else
-      (* Create the first empty block. *)
       let* evm_state = Evm_state.init ~kernel in
       let* ctxt = commit ctxt evm_state in
-      let genesis =
-        Sequencer_blueprint.create
-          ~secret_key
-          ~timestamp:genesis_timestamp
-          ~smart_rollup_address
-          ~transactions:[]
-          ~delayed_transactions:[]
-          ~number:Ethereum_types.(Qty Z.zero)
-      in
-      apply_blueprint ctxt genesis
+      match produce_genesis_with with
+      | Some secret_key ->
+          (* Create the first empty block. *)
+          let genesis =
+            Sequencer_blueprint.create
+              ~secret_key
+              ~timestamp:genesis_timestamp
+              ~smart_rollup_address
+              ~transactions:[]
+              ~delayed_transactions:[]
+              ~number:Ethereum_types.(Qty Z.zero)
+          in
+          apply_blueprint ctxt genesis
+      | None -> return ctxt
   in
 
   return ctxt
