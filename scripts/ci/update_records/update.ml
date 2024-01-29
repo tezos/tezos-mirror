@@ -25,9 +25,13 @@ let default_branch =
 
 let records_directory = "tezt/records"
 
-let fetch_record (uri, index, kind) =
+let fetch_record (uri, index, variant) =
   let local_filename = index ^ ".json" in
-  let local_dir = records_directory // kind in
+  let local_dir =
+    match variant with
+    | None -> records_directory
+    | Some variant -> records_directory // variant
+  in
   let local = local_dir // local_filename in
   if not @@ Sys.file_exists local_dir then Sys.mkdir local_dir 0o755 ;
   Lwt.catch
@@ -53,21 +57,34 @@ let remove_existing_records new_records =
   in
   Array.iter remove_if_looks_like_an_old_record (Sys.readdir records_directory)
 
+let parse_tezt_job_name =
+  let with_no_variant = rex "^tezt (\\d+)/\\d+$" in
+  let with_variant = rex "^tezt-([a-zA-Z0-9-_]*) (\\d+)/\\d+$" in
+  fun name ->
+    match name =~* with_no_variant with
+    | Some index -> Some (None, index)
+    | None -> (
+        match name =~** with_variant with
+        | Some (variant, index) -> Some (Some variant, index)
+        | None -> None)
+
 let fetch_pipeline_records_from_jobs pipeline =
   Log.info "Fetching records from tezt executions in %d in %s" pipeline project ;
   let* jobs = Gitlab.(project_pipeline_jobs ~project ~pipeline () |> get_all) in
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let name = JSON.(job |-> "name" |> as_string) in
-    match name =~** rex "^tezt-?([^ ]*) (\\d+)/\\d+$" with
+    match parse_tezt_job_name name with
     | None -> None
     | Some (variant, index) ->
         let artifact_path =
           sf
             "tezt-results-%s%s.json"
             index
-            (if variant = "" then ""
-            else "-" ^ String.map (function '-' -> '_' | c -> c) variant)
+            (match variant with
+            | None -> ""
+            | Some variant ->
+                "-" ^ String.map (function '-' -> '_' | c -> c) variant)
         in
         Log.info "Will fetch %s from job #%d (%s)" artifact_path job_id name ;
         Some
