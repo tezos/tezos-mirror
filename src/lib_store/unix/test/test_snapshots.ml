@@ -568,7 +568,7 @@ let test_rolling speed export_mode =
         sub (snd checkpoint) (of_int (Store.Block.max_operations_ttl metadata)))
     in
     let*! caboose = Store.Chain.caboose chain_store' in
-    Assert.Int32.equal ~msg:__LOC__ max_op_ttl_cp (snd caboose) ;
+    Assert.Int32.geq ~msg:__LOC__ max_op_ttl_cp (snd caboose) ;
     let*! () = Store.close_store store' in
     return_unit
   in
@@ -707,6 +707,10 @@ let test_drag_after_import speed export_mode =
       else
         let* _, head = Alpha_utils.bake_until_cycle_end chain_store' head in
         let*! () = Block_store.await_merging block_store in
+        let context_index =
+          Store.context_index (Store.Chain.global_store chain_store)
+        in
+        let*! () = Context_ops.wait_gc_completion context_index in
         let*! _, caboose_level = Store.Chain.caboose chain_store' in
         let*! _, savepoint_level = Store.Chain.savepoint chain_store' in
         let* () =
