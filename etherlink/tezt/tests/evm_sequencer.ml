@@ -49,6 +49,7 @@ type l1_contracts = {
   delayed_transaction_bridge : string;
   exchanger : string;
   bridge : string;
+  admin : string;
 }
 
 type sequencer_setup = {
@@ -60,7 +61,7 @@ type sequencer_setup = {
   l1_contracts : l1_contracts;
 }
 
-let setup_l1_contracts client =
+let setup_l1_contracts ?(admin = Constant.bootstrap1) client =
   (* Originates the delayed transaction bridge. *)
   let* delayed_transaction_bridge =
     Client.originate_contract
@@ -96,12 +97,24 @@ let setup_l1_contracts client =
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  return {delayed_transaction_bridge; exchanger; bridge}
+  (* Originates the administrator contract. *)
+  let* admin =
+    Client.originate_contract
+      ~alias:"evm-admin"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  return {delayed_transaction_bridge; exchanger; bridge; admin}
 
-let setup_sequencer ?time_between_blocks
+let setup_sequencer ?genesis_timestamp ?time_between_blocks
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) protocol =
-  let* node, client = setup_l1 protocol in
+  let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -117,6 +130,7 @@ let setup_sequencer ?time_between_blocks
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
+      ~administrator:l1_contracts.admin
       ()
   in
   let* {output; _} =
@@ -146,7 +160,7 @@ let setup_sequencer ?time_between_blocks
         private_rpc_port;
         time_between_blocks;
         sequencer;
-        genesis_timestamp = None;
+        genesis_timestamp;
       }
   in
   let* evm_node =
@@ -752,6 +766,101 @@ let test_observer_applies_blueprint =
   in
   unit
 
+(** This tests the situation where the kernel has an upgrade but the sequencer
+    does not upgrade as well, resulting in a different state in the sequencer
+    and rollup-node. *)
+let test_upgrade_kernel_unsync =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "upgrade"; "unsync"]
+    ~title:"Unsynchronised upgrade with rollup-node leads to a fork"
+    ~uses:(fun protocol -> Constant.WASM.debug_kernel :: uses protocol)
+  @@ fun protocol ->
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         evm_node;
+         node;
+         _;
+       } =
+    setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
+  in
+  (* Prepare upgrade to the debug kernel. *)
+  let upgrade_to = Constant.WASM.debug_kernel in
+  let preimages_dir =
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
+  in
+  let* {root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir upgrade_to
+  in
+  let* payload = Evm_node.upgrade_payload ~root_hash ~activation_timestamp in
+
+  (* Sends the upgrade to L1, but not to the sequencer. *)
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:l1_contracts.admin
+      ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  (* Per the activation timestamp, the state will remain synchronised until
+     the kernel is upgraded. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" evm_node in
+        unit)
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+
+  let* evm_proxy =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+    ~error_msg:"The head should be the same before the upgrade" ;
+
+  (* Produce a block after activation timestamp, the rollup node will upgrade
+     to debug kernel and therefore not produce the block. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" evm_node in
+        unit)
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  Check.((sequencer_head.hash <> rollup_node_head.hash) (option string))
+    ~error_msg:"The head shouldn't be the same after upgrade" ;
+  Check.((sequencer_head.number > rollup_node_head.number) int32)
+    ~error_msg:"The rollup node should be behind the sequencer" ;
+
+  unit
+
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
@@ -764,4 +873,5 @@ let () =
   test_delayed_transfer_is_included [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
   test_init_from_rollup_node_data_dir [Alpha] ;
-  test_observer_applies_blueprint [Alpha]
+  test_observer_applies_blueprint [Alpha] ;
+  test_upgrade_kernel_unsync [Alpha]
