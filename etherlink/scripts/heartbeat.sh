@@ -86,7 +86,7 @@ add_good_health_msg() {
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
 
-  add_report_msg "• ✅ $3 transaction <https://explorer.etherlink.com/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
+  add_report_msg "• ✅ $3 transaction <https://testnet-explorer.etherlink.com/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
 }
 
 check_tx_applied() {
