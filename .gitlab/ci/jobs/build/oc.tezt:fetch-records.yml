@@ -13,7 +13,7 @@ oc.tezt:fetch-records:
     - . ./scripts/version.sh
     - eval $(opam env)
   script:
-    - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --from last-merged-pipeline --info
+    - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log --from last-successful-schedule-extended-test --info
   after_script:
     - ./scripts/ci/filter_corrupted_records.sh
   # Allow failure of this job, since Tezt can use the records stored
