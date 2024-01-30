@@ -252,7 +252,12 @@ Client
 
 Octez client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
-For example, after starting your node you can check if it has finished
+
+.. note::
+
+  The rest of this page assumes that you have launched a local node, as explained in the previous section. But it is useful to know that the client can be configured to interact with a public node instead, either using :doc:`the configuration file <../user/client-configuration>` or by supplying option ``-E <node-url>`` with `a public RPC node <https://docs.tezos.com/architecture/rpc#public-and-private-rpc-nodes>`__.
+
+After starting your local node you can check if it has finished
 synchronizing (see :doc:`../shell/sync`) using::
 
    octez-client bootstrapped

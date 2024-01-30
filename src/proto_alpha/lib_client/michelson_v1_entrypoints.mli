@@ -25,7 +25,7 @@
 
 open Protocol
 
-(** Returns [Some type] if the contract has an entrypoint of type [type]. None if it does not exists.  *)
+(** Returns [Some type] if the contract has an entrypoint of type [type]. None if it does not exist.  *)
 val script_entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
@@ -34,7 +34,7 @@ val script_entrypoint_type :
   entrypoint:Alpha_context.Entrypoint.t ->
   Alpha_context.Script.expr option tzresult Lwt.t
 
-(** Returns [Some type] if the script has an entrypoint of type [type]. None if it does not exists.  *)
+(** Returns [Some type] if the script has an entrypoint of type [type]. None if it does not exist.  *)
 val contract_entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
