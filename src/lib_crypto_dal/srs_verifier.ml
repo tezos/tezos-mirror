@@ -47,3 +47,33 @@ let domain_length ~size =
 let slot_as_polynomial_length ~slot_size ~page_size =
   let page_length_domain = domain_length ~size:page_size in
   slot_size / page_size * page_length_domain
+
+let get_verifier_srs2 max_srs_size get_srs2 ~max_polynomial_length
+    ~page_length_domain ~shard_length =
+  let srs_g2_shards = get_srs2 shard_length in
+  let srs_g2_pages = get_srs2 page_length_domain in
+  let srs_g2_commitment = get_srs2 (max_srs_size - max_polynomial_length) in
+  (srs_g2_shards, srs_g2_pages, srs_g2_commitment)
+
+module Internal_for_tests = struct
+  let max_srs_size = 1 lsl 16
+
+  let max_verifier_srs_size = 1 lsl 8
+
+  let fake_srs_seed =
+    Scalar.of_string
+      "20812168509434597367146703229805575690060615791308155437936410982393987532344"
+
+  let fake_srs ?(size = max_srs_size) () =
+    Srs_g1.generate_insecure size fake_srs_seed
+
+  let get_srs1 i = G1.mul G1.one (Scalar.pow fake_srs_seed (Z.of_int i))
+
+  let get_srs2 i = G2.mul G2.one (Scalar.pow fake_srs_seed (Z.of_int i))
+
+  let get_verifier_srs2 = get_verifier_srs2 max_srs_size get_srs2
+
+  let get_verifier_srs1 = fake_srs ~size:max_verifier_srs_size
+
+  let is_in_srs2 _ = true
+end
