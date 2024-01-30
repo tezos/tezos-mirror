@@ -14,6 +14,7 @@
 use std::{cmp::min, str::FromStr, vec};
 
 use crate::handler::EvmHandler;
+use crate::zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 use crate::EthereumError;
 use crate::{abi, modexp::modexp_precompile};
 use alloc::collections::btree_map::BTreeMap;
@@ -466,6 +467,18 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
         (
             H160::from_low_u64_be(5u64),
             modexp_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(6u64),
+            ecadd_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(7u64),
+            ecmul_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(8u64),
+            ecpairing_precompile as PrecompileFn<Host>,
         ),
         (
             // Prefixed by 'ff' to make sure we will not conflict with any
