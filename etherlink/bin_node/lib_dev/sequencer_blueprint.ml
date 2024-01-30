@@ -48,13 +48,13 @@ let encode_transaction hash raw =
       List [Value (Bytes.of_string "\001"); Value (Bytes.of_string raw)];
     ]
 
-let encode_delayed_transaction = function
-  | Delayed_transaction.Transaction {hash; raw_tx} ->
-      encode_transaction (hash_to_bytes hash) raw_tx
-  | Deposit {hash; raw_deposit} ->
+let encode_delayed_transaction Delayed_transaction.{kind; hash; raw} =
+  match kind with
+  | Transaction -> encode_transaction (hash_to_bytes hash) raw
+  | Deposit ->
       let open Rlp in
       let hash = hash_to_bytes hash in
-      let rlp = decode_exn (Bytes.of_string raw_deposit) in
+      let rlp = decode_exn (Bytes.of_string raw) in
       List
         [
           Value (hash |> Bytes.of_string);
