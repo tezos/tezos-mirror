@@ -729,7 +729,6 @@ let sequencer_command =
           ?cors_headers
           ~rollup_node_endpoint
           ~verbose
-          ?kernel
           ?preimages
           ?time_between_blocks
           ~sequencer
@@ -746,7 +745,7 @@ let sequencer_command =
           ?genesis_timestamp
           ~produce_genesis_with:sequencer
           ~data_dir
-          ~kernel:config.mode.kernel
+          ?kernel_path:kernel
           ~preimages:config.mode.preimages
           ~smart_rollup_address
           ()
