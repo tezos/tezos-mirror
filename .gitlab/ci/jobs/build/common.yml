@@ -65,11 +65,15 @@
     CI_DOCKER_HUB: "false"
   script:
     - ./scripts/ci/docker_rust_toolchain_build.sh
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
 
 .oc.build_docker_release_template:
   extends:
     - .image_template__docker
     - .docker_auth_template
+  dependencies: [oc.docker:rust-toolchain]
   needs: [oc.docker:rust-toolchain]
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"

@@ -226,6 +226,7 @@
     - .oc.kernels_template
   stage: test
   needs: [oc.docker:rust-toolchain]
+  dependencies: [oc.docker:rust-toolchain]
   script:
     - make -f etherlink.mk check
     - make -f etherlink.mk test

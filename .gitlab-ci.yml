@@ -109,7 +109,10 @@ variables:
   image: ${build_deps_image_name}:client-libs-dependencies--${build_deps_image_version}
 
 .image_template__rust_toolchain:
-  image: ${rust_toolchain_image_name}:${CI_COMMIT_SHA}
+  # Warning: we are relying on ill-specified behavior from GitLab that
+  # allows the expansion of dotenv variables (here: # $rust_toolchain_image_tag)
+  # in the image field (https://gitlab.com/gitlab-org/gitlab-runner/-/issues/37361).
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
 
 # Match GitLab executors version and directly use the Docker socket
 # The Docker daemon is already configured, experimental features are enabled
