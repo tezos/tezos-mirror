@@ -549,7 +549,7 @@ type event = {name : string; value : JSON.t; timestamp : float}
 val on_event : t -> (event -> unit) -> unit
 
 (** See [Daemon.Make.log_events]. *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
 

@@ -262,8 +262,13 @@ module Make : functor (X : PARAMETERS) -> sig
   (** Register an event handler that logs all events.
 
       Use this when you need to debug or reverse engineer incoming events.
-      Usually you do not want to keep that in the final versions of your tests. *)
-  val log_events : t -> unit
+      Usually you do not want to keep that in the final versions of your tests.
+
+      The [max_length] optional parameter can be used to limit the
+      length of the output of each event; outputs longer than the
+      limit are truncated at the limit and "[...]" is appended to
+      them to mark the truncation. *)
+  val log_events : ?max_length:int -> t -> unit
 
   (** Values returned by {!memory_consumption}. *)
   type observe_memory_consumption = Observe of (unit -> int option Lwt.t)

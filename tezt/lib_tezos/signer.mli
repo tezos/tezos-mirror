@@ -74,7 +74,7 @@ val kill : t -> unit Lwt.t
 
     Use this when you need to debug or reverse engineer incoming events.
     Usually you do not want to keep that in the final versions of your tests. *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 (** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
 

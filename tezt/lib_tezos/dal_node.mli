@@ -107,7 +107,7 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 val kill : t -> unit Lwt.t
 
 (** Shows in stdout every events sent by the node *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
