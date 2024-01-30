@@ -1013,6 +1013,15 @@ let timestamp =
     bin = kernel_inputs_path ^ "/timestamp.bin";
   }
 
+(** The info for the "call_selfdestruct.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/call_selfdestruct.sol] *)
+let call_selfdestruct =
+  {
+    label = "call_selfdestruct";
+    abi = kernel_inputs_path ^ "/call_selfdestruct.abi";
+    bin = kernel_inputs_path ^ "/call_selfdestruct.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
@@ -4411,6 +4420,27 @@ let test_estimate_gas_out_of_ticks =
     ~error_msg:"The estimate gas should fail with out of ticks message." ;
   unit
 
+let test_l2_call_selfdetruct_contract_in_same_transaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_call"; "selfdestrcut"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Check destruct contract in same transaction can be called"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* _address, _tx = deploy ~contract:call_selfdestruct ~sender evm_setup in
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4487,7 +4517,8 @@ let register_evm_node ~protocols =
   test_l2_timestamp_opcode protocols ;
   test_migrate_proxy_to_sequencer protocols ;
   test_ghostnet_kernel protocols ;
-  test_estimate_gas_out_of_ticks protocols
+  test_estimate_gas_out_of_ticks protocols ;
+  test_l2_call_selfdetruct_contract_in_same_transaction protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
