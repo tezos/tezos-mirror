@@ -129,8 +129,8 @@ let build_transaction_operation ~amount ~parameters
 let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?(force = false) ?branch ?successor_level
     ~source ~src_pk ~src_sk ~destination ?(entrypoint = Entrypoint.default)
-    ~parameters ~amount ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter
-    ?replace_by_fees () =
+    ~parameters ~amount ?fee ?gas_limit ?safety_guard ?storage_limit ?counter
+    ~fee_parameter ?replace_by_fees () =
   let open Lwt_result_syntax in
   let contents =
     build_transaction_operation
@@ -153,6 +153,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ?verbose_signing
       ?simulation
       ~force
+      ?safety_guard
       ?branch
       ?successor_level
       ~source
@@ -174,7 +175,8 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?(force = false) ?branch ?successor_level
     ~source ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?fee
-    ?gas_limit ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
+    ?gas_limit ?safety_guard ?storage_limit ?counter ~fee_parameter
+    ?replace_by_fees () =
   let open Lwt_result_syntax in
   let* parameters = parse_arg_transfer arg in
   transfer_with_script
@@ -197,6 +199,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~amount
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ~fee_parameter
@@ -554,8 +557,9 @@ let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
        origination)
 
 let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
-    ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
+    ?verbose_signing ?branch ?fee ?gas_limit ?safety_guard ?storage_limit
+    ~delegate ~initial_storage ~balance ~source ~src_pk ~src_sk ~code
+    ~fee_parameter () =
   let open Lwt_result_syntax in
   let* origination =
     build_origination_operation
@@ -582,6 +586,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~gas_limit:(Limit.of_option gas_limit)
       ~storage_limit:(Limit.of_option storage_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -620,8 +625,9 @@ let build_register_global_constant ?fee ?gas_limit ?storage_limit value =
        op)
 
 let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~constant () =
+    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard
+    ?storage_limit ?counter ~source ~src_pk ~src_sk ~fee_parameter ~constant ()
+    =
   let open Lwt_result_syntax in
   let*? op =
     build_register_global_constant ?fee ?storage_limit ?gas_limit constant
@@ -641,6 +647,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1008,9 +1015,9 @@ let contract_cache_size_limit cctxt ~chain ~block =
   Alpha_services.Cache.contract_cache_size_limit cctxt cb
 
 let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter ~contents ~ty ~ticketer ~amount ~destination
-    ~entrypoint () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~contents ~ty ~ticketer
+    ~amount ~destination ~entrypoint () =
   let open Lwt_result_syntax in
   let* {expanded; _} = parse_expression contents in
   let contents = Script.lazy_expr expanded in
@@ -1041,6 +1048,7 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1051,9 +1059,9 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter
-    ?whitelist ~source ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk
-    ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ?whitelist ~source ~kind ~boot_sector ~parameters_ty ~src_pk
+    ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1077,6 +1085,7 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1087,8 +1096,8 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~messages ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~messages ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1112,6 +1121,7 @@ let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1122,8 +1132,8 @@ let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_cement (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~rollup ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1147,6 +1157,7 @@ let sc_rollup_cement (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1157,8 +1168,8 @@ let sc_rollup_cement (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~commitment ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~rollup ~commitment ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1182,6 +1193,7 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1193,8 +1205,8 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
-    ?storage_limit ?counter ~source ~rollup ~cemented_commitment ~output_proof
-    ~src_pk ~src_sk ~fee_parameter () =
+    ?safety_guard ?storage_limit ?counter ~source ~rollup ~cemented_commitment
+    ~output_proof ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1219,6 +1231,7 @@ let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1229,8 +1242,8 @@ let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
       return (oph, op, result)
 
 let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter ~sc_rollup ~staker () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~sc_rollup ~staker () =
   let open Lwt_result_syntax in
   let contents :
       Kind.sc_rollup_recover_bond Annotated_manager_operation.annotated_list =
@@ -1258,6 +1271,7 @@ let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1268,8 +1282,9 @@ let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_refute (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~refutation ~opponent ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~rollup ~refutation ~opponent ~src_pk ~src_sk
+    ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1293,6 +1308,7 @@ let sc_rollup_refute (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1303,8 +1319,8 @@ let sc_rollup_refute (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~alice ~bob ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~rollup ~alice ~bob ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup.Game.Index.make alice bob in
   let op =
@@ -1329,6 +1345,7 @@ let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1339,9 +1356,9 @@ let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let zk_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~public_parameters ~circuits_info ~init_state ~nb_ops ~src_pk ~src_sk
-    ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~public_parameters ~circuits_info ~init_state ~nb_ops
+    ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1366,6 +1383,7 @@ let zk_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1376,8 +1394,8 @@ let zk_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let zk_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~zk_rollup ~ops ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~zk_rollup ~ops ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1401,6 +1419,7 @@ let zk_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1411,8 +1430,8 @@ let zk_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let zk_rollup_update (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~zk_rollup ~update ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~zk_rollup ~update ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1436,6 +1455,7 @@ let zk_rollup_update (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ~fee:(Limit.of_option fee)
       ~storage_limit:(Limit.of_option storage_limit)
       ~gas_limit:(Limit.of_option gas_limit)
+      ?safety_guard
       ~src_pk
       ~src_sk
       ~fee_parameter
@@ -1446,8 +1466,8 @@ let zk_rollup_update (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let dal_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~slot_header ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
+    ?counter ~source ~slot_header ~src_pk ~src_sk ~fee_parameter () =
   let open Lwt_result_syntax in
   let* oph, _, op, result =
     Annotated_manager_operation.Single_manager
@@ -1469,6 +1489,7 @@ let dal_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~storage_limit:(Limit.of_option storage_limit)
          ~gas_limit:(Limit.of_option gas_limit)
+         ?safety_guard
          ~src_pk
          ~src_sk
          ~fee_parameter
