@@ -1,8 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
 ORIGIN=${ORIGIN:-origin}
+
+if [[ "$CI_MERGE_REQUEST_LABELS" =~ (^|,)ci--run-all-tezts($|,) ]]; then
+  echo "CI_MERGE_REQUEST_LABELS contains ci--run-all-tezts, test selection is disabled."
+  echo "true" > selected_tezts.tsl
+  exit 0
+fi
 
 if [ -z "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
   echo "CI_MERGE_REQUEST_DIFF_BASE_SHA is unspecified or empty, cannot continue."
