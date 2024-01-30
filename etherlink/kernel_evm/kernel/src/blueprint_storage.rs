@@ -290,3 +290,86 @@ pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
     let path = blueprint_path(number)?;
     host.store_delete(&path).map_err(Error::from)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::delayed_inbox::Hash;
+    use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
+    use crate::Timestamp;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_crypto_rs::hash::Signature;
+    use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_encoding::public_key::PublicKey;
+    use tezos_smart_rollup_mock::MockHost;
+
+    #[test]
+    fn test_invalid_sequencer_blueprint_is_removed() {
+        let mut host = MockHost::default();
+        let delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+        let delayed_bridge: ContractKt1Hash =
+            ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap();
+        let sequencer: PublicKey = PublicKey::from_b58check(
+            "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
+        )
+        .unwrap();
+        let mut config = Configuration::Sequencer {
+            delayed_bridge,
+            delayed_inbox: Box::new(delayed_inbox),
+            sequencer,
+        };
+
+        // Create empty blueprint with an invalid delayed hash
+        let empty_bluerpint = Blueprint {
+            timestamp: Timestamp::from(42),
+            transactions: vec![],
+        };
+        let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
+
+        let blueprint_with_invalid_hash: BlueprintWithDelayedHashes =
+            BlueprintWithDelayedHashes {
+                delayed_hashes: vec![dummy_tx_hash],
+                blueprint: empty_bluerpint,
+            };
+        let chunk = rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
+        let signature = Signature::from_base58_check(
+          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
+      ).expect("signature decoding should work");
+
+        let seq_blueprint = SequencerBlueprint {
+            blueprint: UnsignedSequencerBlueprint {
+                chunk: chunk.into(),
+                number: U256::from(0),
+                nb_chunks: 1u16,
+                chunk_index: 0u16,
+            },
+            signature,
+        };
+
+        // Store blueprint
+        store_sequencer_blueprint(&mut host, seq_blueprint)
+            .expect("Should be able to store sequencer blueprint");
+
+        // Blueprint 0 should be stored
+        let blueprint_path = blueprint_path(U256::zero()).unwrap();
+        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        assert!(exists);
+
+        // Reading the next blueprint should be None, as the delayed hash
+        // isn't in the delayed inbox
+        let blueprint = read_next_blueprint(&mut host, &mut config)
+            .expect("Reading next blueprint should work");
+        assert!(blueprint.is_none());
+
+        // Next number should be 0, as we didn't read one
+        let number = read_next_blueprint_number(&host)
+            .expect("Should be able to read next blueprint number");
+        assert!(number.is_zero());
+
+        // The blueprint 0 should have been removed
+        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        assert!(!exists)
+    }
+}

@@ -27,7 +27,7 @@ pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 ///
 /// It represents the key of the transaction in the delayed inbox.
 #[derive(Clone, Copy, Debug)]
-pub struct Hash([u8; TRANSACTION_HASH_SIZE]);
+pub struct Hash(pub [u8; TRANSACTION_HASH_SIZE]);
 
 impl Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
