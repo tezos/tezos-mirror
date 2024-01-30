@@ -8,7 +8,7 @@
 module Event = struct
   open Internal_event.Simple
 
-  let section = ["evm_node"; "dev"; "tx_pool"]
+  let section = Events.section
 
   let started =
     declare_0

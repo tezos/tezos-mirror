@@ -7,7 +7,7 @@
 
 include Internal_event.Simple
 
-let section = ["evm_node"; "dev"; "blueprint"]
+let section = Events.section
 
 let publisher_ready =
   declare_0

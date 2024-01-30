@@ -7,7 +7,7 @@
 
 include Internal_event.Simple
 
-let section = ["evm_node"; "dev"; "events"]
+let section = ["evm_node"; "dev"]
 
 let received_upgrade =
   declare_1
