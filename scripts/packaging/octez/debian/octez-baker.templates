@@ -1,0 +1,32 @@
+Template: octez-baker/liquidity-vote
+Type: string
+Default: on
+Description: Your choice for the liquidity vote
+ Vote to continue or end the liquidity baking subsidy. The possible values for
+ this option are: "off" to request ending the subsidy, "on" to request
+ continuing or restarting the subsidy, and "pass" to abstain.
+
+Template: octez-baker/baker-key
+Type: string
+Description: The baker key to associate to this baker
+ Name of the delegate to attest and bake for or the name of the consensus key
+ signing on the delegate's behalf. The key is required to run the baker, but it
+ can also be added later while configuring the baker.
+
+Template: octez-baker/baker-active-protocol
+Type: string
+Default: Proxford
+Description: The protocol associated to the baker
+ For production bakers this is the protocol of mainnet. Upon activation
+ both the baker for the active protocol and the next protocol must be running
+ at the same time.
+
+Template: octez-baker/baker-next-protocol
+Type: string
+Description: The protocol associated to the baker
+ For production bakers this is the adopted mainnet protocol. Upon activation
+ both the baker for the active protocol and the next protocol must be running
+ at the same time. You can leave this field empty.
+ .
+ After activation you can re-configure the package to stop the baker for the
+ old protocol and mark the freshly activated protocol as active.
