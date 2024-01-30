@@ -13,7 +13,7 @@ module Event = struct
   let started =
     declare_0
       ~section
-      ~name:"evm_node_dev_delayed_inbox_started"
+      ~name:"delayed_inbox_started"
       ~msg:"Delayed inbox has been started"
       ~level:Notice
       ()
@@ -21,7 +21,7 @@ module Event = struct
   let add_transaction =
     declare_1
       ~section
-      ~name:"evm_node_dev_delayed_inbox_add_transaction"
+      ~name:"delayed_inbox_add_transaction"
       ~msg:"Add delayed transaction {transaction} to the tx-pool"
       ~level:Notice
       ("transaction", Ethereum_types.Delayed_transaction.encoding)
@@ -32,7 +32,7 @@ module Event = struct
   let fetch_succeeded =
     declare_2
       ~section
-      ~name:"evm_node_dev_delayed_inbox_fetch_succeeded"
+      ~name:"delayed_inbox_fetch_succeeded"
       ~msg:
         "Fetching delayed inbox for level {level} succeeded, {nb} new \
          transactions fetched"
@@ -45,7 +45,7 @@ module Event = struct
   let fetch_failed =
     declare_1
       ~section
-      ~name:"evm_node_dev_delayed_inbox_fetch_failed"
+      ~name:"delayed_inbox_fetch_failed"
       ~msg:"Fetching delayed inbox for level {level} failed"
       ~level:Error
       ("level", Data_encoding.int32)
@@ -54,7 +54,7 @@ module Event = struct
   let transaction_fetch_failed =
     declare_2
       ~section
-      ~name:"evm_node_dev_delayed_inbox_transaction_fetch_failed"
+      ~name:"delayed_inbox_transaction_fetch_failed"
       ~msg:
         "Fetching transaction {tx_hash} from delayed inbox for level {level} \
          failed"
@@ -67,7 +67,7 @@ module Event = struct
   let connection_lost =
     declare_0
       ~section
-      ~name:"evm_node_dev_delayed_inbox_connection_lost"
+      ~name:"delayed_inbox_connection_lost"
       ~msg:"Connection with the rollup node has been lost"
       ~level:Error
       ()
@@ -75,7 +75,7 @@ module Event = struct
   let stopped =
     declare_0
       ~section
-      ~name:"evm_node_dev_delayed_inbox_stopped"
+      ~name:"delayed_inbox_stopped"
       ~msg:"Delayed inbox has been stopped"
       ~level:Notice
       ()
@@ -83,7 +83,7 @@ module Event = struct
   let shutdown =
     declare_0
       ~section
-      ~name:"evm_node_dev_shutting_down_delayed_inbox"
+      ~name:"shutting_down_delayed_inbox"
       ~msg:"Stopping the delayed inbox"
       ~level:Notice
       ()

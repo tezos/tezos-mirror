@@ -69,11 +69,6 @@ include Daemon.Make (Parameters)
 
 let mode t = t.persistent_state.mode
 
-let devmode t =
-  match t.persistent_state.mode with
-  | Observer _ | Sequencer _ -> true
-  | Proxy {devmode; _} -> devmode
-
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ -> true
@@ -131,29 +126,25 @@ let set_ready evm_node =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready evm_node (Some ())
 
-let event_ready_name = "evm_node_is_ready.v0"
+let event_ready_name = "is_ready.v0"
 
-let mode_prefix = function true -> "evm_node_dev" | false -> "evm_node_prod"
+let event_blueprint_injected_name = "blueprint_injection.v0"
 
-let event_blueprint_injected_name devmode =
-  mode_prefix devmode ^ "_blueprint_injection.v0"
-
-let event_blueprint_applied_name devmode =
-  mode_prefix devmode ^ "_blueprint_application.v0"
+let event_blueprint_applied_name = "blueprint_application.v0"
 
 let handle_is_ready_event (evm_node : t) {name; value = _; timestamp = _} =
   if name = event_ready_name then set_ready evm_node else ()
 
 let handle_blueprint_injected_event (evm_node : t) {name; value; timestamp = _}
     =
-  if name = event_blueprint_injected_name (devmode evm_node) then
+  if name = event_blueprint_injected_name then
     trigger_blueprint_injected
       evm_node
       JSON.(value |> as_string |> int_of_string)
   else ()
 
 let handle_blueprint_applied_event (evm_node : t) {name; value; timestamp = _} =
-  if name = event_blueprint_applied_name (devmode evm_node) then
+  if name = event_blueprint_applied_name then
     trigger_blueprint_applied
       evm_node
       JSON.(value |> as_string |> int_of_string)
@@ -206,11 +197,7 @@ let wait_for_blueprint_injected ~timeout evm_node level =
             level
             (fun pending -> Some (resolver :: Option.value ~default:[] pending))
             evm_node.persistent_state.pending_blueprint_injected ;
-        check_event
-          ~timeout
-          evm_node
-          (event_blueprint_injected_name (devmode evm_node))
-          promise
+        check_event ~timeout evm_node event_blueprint_injected_name promise
   | Running {session_state = {ready = true; _}; _} ->
       failwith "EVM node is not a sequencer"
   | Not_running | Running {session_state = {ready = false; _}; _} ->
@@ -229,11 +216,7 @@ let wait_for_blueprint_applied ~timeout evm_node level =
             level
             (fun pending -> Some (resolver :: Option.value ~default:[] pending))
             evm_node.persistent_state.pending_blueprint_applied ;
-        check_event
-          ~timeout
-          evm_node
-          (event_blueprint_applied_name (devmode evm_node))
-          promise
+        check_event ~timeout evm_node event_blueprint_applied_name promise
   | Running {session_state = {ready = true; _}; _} ->
       failwith "EVM node cannot produce blueprints"
   | Not_running | Running {session_state = {ready = false; _}; _} ->

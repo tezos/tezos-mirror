@@ -13,7 +13,7 @@ module Event = struct
   let started =
     declare_0
       ~section
-      ~name:"evm_node_dev_tx_pool_started"
+      ~name:"tx_pool_started"
       ~msg:"Tx-pool has been started"
       ~level:Notice
       ()
@@ -21,7 +21,7 @@ module Event = struct
   let add_transaction =
     declare_1
       ~section
-      ~name:"evm_node_dev_tx_pool_add_transaction"
+      ~name:"tx_pool_add_transaction"
       ~msg:"Add transaction {transaction} to the tx-pool"
       ~level:Info
       ("transaction", Data_encoding.string)
@@ -30,7 +30,7 @@ module Event = struct
   let invalid_transaction =
     declare_1
       ~section
-      ~name:"evm_node_dev_tx_pool_invalid_transaction"
+      ~name:"tx_pool_invalid_transaction"
       ~msg:"Transaction {transaction} is not valid"
       ~level:Info
       ("transaction", Data_encoding.string)
@@ -39,7 +39,7 @@ module Event = struct
   let transaction_injected =
     declare_1
       ~section
-      ~name:"evm_node_dev_tx_pool_transaction_injected"
+      ~name:"tx_pool_transaction_injected"
       ~msg:"Transaction {transaction} has been injected"
       ~level:Info
       ("transaction", Ethereum_types.hash_encoding)
@@ -48,7 +48,7 @@ module Event = struct
   let transaction_injection_failed =
     declare_0
       ~section
-      ~name:"evm_node_dev_tx_pool_transaction_injection_failed"
+      ~name:"tx_pool_transaction_injection_failed"
       ~msg:"Injection of transactions failed"
       ~level:Error
       ()
@@ -56,7 +56,7 @@ module Event = struct
   let connection_lost =
     declare_0
       ~section
-      ~name:"evm_node_dev_tx_pool_connection_lost"
+      ~name:"tx_pool_connection_lost"
       ~msg:"Connection with the rollup node has been lost, retrying..."
       ~level:Error
       ()
@@ -64,7 +64,7 @@ module Event = struct
   let stopped =
     declare_0
       ~section
-      ~name:"evm_node_dev_tx_pool_stopped"
+      ~name:"tx_pool_stopped"
       ~msg:"Tx-pool has been stopped"
       ~level:Notice
       ()
@@ -72,7 +72,7 @@ module Event = struct
   let shutdown =
     declare_0
       ~section
-      ~name:"evm_node_dev_shutting_down_tx_pool"
+      ~name:"shutting_down_tx_pool"
       ~msg:"Stopping the tx-pool"
       ~level:Notice
       ()
