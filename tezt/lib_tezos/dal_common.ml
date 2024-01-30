@@ -414,7 +414,7 @@ module Helpers = struct
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
       parameters =
     let initialisation_parameters =
-      Cryptobox.Internal_for_tests.parameters_initialisation parameters
+      Cryptobox.Internal_for_tests.parameters_initialisation ()
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match Cryptobox.make parameters with

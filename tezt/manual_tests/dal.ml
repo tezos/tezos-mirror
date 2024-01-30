@@ -63,7 +63,7 @@ let dal_parameters () =
   in
   match Internal_for_tests.ensure_validity_without_srs parameters with
   | Ok _ ->
-      Internal_for_tests.parameters_initialisation parameters
+      Internal_for_tests.parameters_initialisation ()
       |> Internal_for_tests.load_parameters ;
       let _ = make parameters in
       unit
