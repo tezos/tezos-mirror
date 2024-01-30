@@ -374,6 +374,7 @@ let test_reveal ~threshold ~inbox_level ~hash ~preimage_reveal_step
       metadata = Protocol.Raw_level_repr.root;
       dal_page = Protocol.Raw_level_repr.root;
       dal_parameters = Protocol.Raw_level_repr.root;
+      dal_attested_slots_validity_lag = 161_280;
     }
   in
   let is_reveal_enabled =

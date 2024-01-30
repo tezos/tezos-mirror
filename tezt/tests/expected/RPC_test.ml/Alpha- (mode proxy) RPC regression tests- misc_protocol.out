@@ -55,7 +55,9 @@
   "smart_rollup_max_number_of_parallel_games": 32,
   "smart_rollup_reveal_activation_level":
     { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 2147483646,
-      "dal_parameters": 2147483646 }, "smart_rollup_private_enable": true,
+      "dal_parameters": 2147483646,
+      "dal_attested_slots_validity_lag": 161280 },
+  "smart_rollup_private_enable": true,
   "smart_rollup_riscv_pvm_enable": false, "zk_rollup_enable": false,
   "zk_rollup_origination_size": 4000, "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,

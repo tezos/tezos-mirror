@@ -838,6 +838,7 @@ module Constants : sig
       metadata : Raw_level.t;
       dal_page : Raw_level.t;
       dal_parameters : Raw_level.t;
+      dal_attested_slots_validity_lag : int;
     }
 
     type sc_rollup = {

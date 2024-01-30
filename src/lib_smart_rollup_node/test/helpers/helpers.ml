@@ -52,7 +52,13 @@ let default_constants =
           commitment_period_in_blocks = 3;
           reveal_activation_level =
             Some
-              {blake2B = 0l; metadata = 0l; dal_page = 0l; dal_parameters = 0l};
+              {
+                blake2B = 0l;
+                metadata = 0l;
+                dal_page = 0l;
+                dal_parameters = 0l;
+                dal_attested_slots_validity_lag = Int32.max_int;
+              };
           max_number_of_stored_cemented_commitments = 5;
         };
       dal =

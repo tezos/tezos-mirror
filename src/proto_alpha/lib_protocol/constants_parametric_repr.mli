@@ -44,6 +44,7 @@ type sc_rollup_reveal_activation_level = {
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
   dal_parameters : Raw_level_repr.t;
+  dal_attested_slots_validity_lag : int;
 }
 
 type sc_rollup = {
