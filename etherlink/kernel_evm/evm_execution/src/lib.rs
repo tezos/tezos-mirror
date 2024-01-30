@@ -22,10 +22,12 @@ use thiserror::Error;
 pub mod abi;
 pub mod account_storage;
 pub mod handler;
+pub mod modexp;
 pub mod precompiles;
 pub mod storage;
 pub mod tick_model_opcodes;
 pub mod transaction;
+pub mod utilities;
 
 pub use evm::Config;
 

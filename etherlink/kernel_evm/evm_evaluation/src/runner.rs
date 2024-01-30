@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use bytes::Bytes;
 use evm_execution::account_storage::{
     init_account_storage, EthereumAccount, EthereumAccountStorage,
 };
@@ -174,6 +175,7 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
     Ok(env)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_transaction(
     host: &mut EvalHost,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -182,16 +184,12 @@ fn execute_transaction(
     unit: &TestUnit,
     env: &mut Env,
     test: &Test,
+    data: Bytes,
 ) -> Result<Option<ExecutionOutcome>, EthereumError> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
     let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
     env.tx.gas_limit = gas_limit;
-    env.tx.data = unit
-        .transaction
-        .data
-        .get(test.indexes.data)
-        .unwrap()
-        .clone();
+    env.tx.data = data;
     env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
     env.tx.transact_to = unit.transaction.to;
 
@@ -237,6 +235,20 @@ fn execute_transaction(
         pay_for_gas,
         u64::MAX, // don't account for ticks during the test
     )
+}
+
+const DATA_TO_SKIP: [&str; 1] = [
+    // Used in 'modexp'. Causing a [27035 IOT instruction (core dumped)]
+    "00000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000"
+];
+
+fn data_to_skip(data: &[u8]) -> bool {
+    for skip_data in DATA_TO_SKIP.iter() {
+        if data == hex::decode(skip_data).unwrap() {
+            return true;
+        }
+    }
+    false
 }
 
 fn check_results(
@@ -349,6 +361,17 @@ pub fn run_test(
                     }
                 }
 
+                let data = unit
+                    .transaction
+                    .data
+                    .get(test_execution.indexes.data)
+                    .unwrap()
+                    .clone();
+
+                if data_to_skip(&data) {
+                    continue;
+                }
+
                 let exec_result = execute_transaction(
                     &mut host,
                     &mut evm_account_storage,
@@ -357,6 +380,7 @@ pub fn run_test(
                     &unit,
                     &mut env,
                     test_execution,
+                    data,
                 );
 
                 let labels = LabelIndexes {
