@@ -75,6 +75,12 @@ let () =
     (function () -> Dal_initialisation_twice)
   [@@coverage off]
 
+let scalar_bytes_amount = Srs_verifier.scalar_bytes_amount
+
+let page_length = Srs_verifier.page_length
+
+let slot_as_polynomial_length = Srs_verifier.slot_as_polynomial_length
+
 (* This function is expected to be called once. *)
 let load_parameters parameters =
   let open Result_syntax in
@@ -260,10 +266,6 @@ module Inner = struct
       (function err -> Invalid_precomputation_hash err)
     [@@coverage off]
 
-  (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
-     r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
-  let scalar_bytes_amount = Scalar.size_in_bytes - 1
-
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domain.build n
 
@@ -301,19 +303,6 @@ module Inner = struct
   }
 
   let is_power_of_two = Kzg.Utils.is_power_of_two
-
-  (* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
-     hence the + 1 to account for the remainder of the division. *)
-  let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
-
-  (* [slot_as_polynomial_length ~slot_size ~page_size] returns the length of the
-     polynomial of maximal degree representing a slot of size [slot_size] with
-     [slot_size / page_size] pages. The returned length thus depends on the number
-     of pages. *)
-  let slot_as_polynomial_length ~slot_size ~page_size =
-    let page_length = page_length ~page_size in
-    let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-    slot_size / page_size * page_length_domain
 
   let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
       ~number_of_shards =
