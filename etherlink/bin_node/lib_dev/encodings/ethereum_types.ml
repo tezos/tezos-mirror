@@ -1146,38 +1146,44 @@ let filter_changes_encoding =
     ]
 
 module Delayed_transaction = struct
-  type t =
-    | Transaction of {
-        hash : hash;
-        raw_tx : string;
-            (* Binary string, so that it integrates smoothly with the tx-pool. *)
-      }
-    | Deposit of {hash : hash; raw_deposit : string}
+  type kind = Transaction | Deposit
 
-  let hash = function
-    | Transaction {hash; _} -> hash
-    | Deposit {hash; _} -> hash
+  type t = {
+    kind : kind;
+    hash : hash;
+    raw : string;
+        (* Binary string, so that it integrates smoothly with the tx-pool. *)
+  }
 
-  let encoding =
+  let hash t = t.hash
+
+  let encoding_kind =
     let open Data_encoding in
     union
       [
         case
           (Tag 0)
           ~title:"transaction"
-          (obj2 (req "hash" hash_encoding) (req "raw_tx" string))
-          (function
-            | Transaction {hash; raw_tx} -> Some (hash, raw_tx) | _ -> None)
-          (function hash, raw_tx -> Transaction {hash; raw_tx});
+          unit
+          (function Transaction -> Some () | _ -> None)
+          (function () -> Transaction);
         case
           (Tag 1)
           ~title:"deposit"
-          (obj2 (req "hash" hash_encoding) (req "raw_deposit" string))
-          (function
-            | Deposit {hash; raw_deposit} -> Some (hash, raw_deposit)
-            | _ -> None)
-          (function hash, raw_deposit -> Deposit {hash; raw_deposit});
+          unit
+          (function Deposit -> Some () | _ -> None)
+          (function () -> Deposit);
       ]
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {kind; hash; raw} -> (kind, hash, raw))
+      (fun (kind, hash, raw) -> {kind; hash; raw})
+      (obj3
+         (req "kind" encoding_kind)
+         (req "hash" hash_encoding)
+         (req "raw" string))
 
   let of_bytes hash bytes =
     match bytes |> Rlp.decode with
@@ -1188,22 +1194,19 @@ module Delayed_transaction = struct
               raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
               |> Hex.show |> hash_of_string
             in
-            Some (Transaction {hash; raw_tx = Bytes.to_string raw_tx})
+            Some {kind = Transaction; hash; raw = Bytes.to_string raw_tx}
         | "\x02", deposit ->
-            let raw_deposit = Rlp.encode deposit |> Bytes.to_string in
-            Some (Deposit {hash; raw_deposit})
+            let raw = Rlp.encode deposit |> Bytes.to_string in
+            Some {kind = Deposit; hash; raw}
         | _ -> None)
     | _ -> None
 
-  let pp fmt transaction =
-    match transaction with
-    | Transaction {raw_tx; _} ->
-        Format.fprintf fmt "%a" Hex.pp (Hex.of_string raw_tx)
-    | Deposit {raw_deposit; _} ->
-        Format.fprintf fmt "%a" Hex.pp (Hex.of_string raw_deposit)
+  let pp_kind fmt = function
+    | Transaction -> Format.pp_print_string fmt "Transaction"
+    | Deposit -> Format.pp_print_string fmt "Deposit"
 
-  let pp_short fmt transaction =
-    match transaction with
-    | Transaction {hash = Hash (Hex h); _} -> Format.pp_print_string fmt h
-    | Deposit {hash = Hash (Hex h); _} -> Format.pp_print_string fmt h
+  let pp fmt {raw; kind; _} =
+    Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
+
+  let pp_short fmt {hash = Hash (Hex h); _} = Format.pp_print_string fmt h
 end
