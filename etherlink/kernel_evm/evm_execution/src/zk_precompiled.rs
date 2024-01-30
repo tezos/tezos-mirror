@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::precompiles::call_precompile_with_gas_draining;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use alloc::vec::Vec;
 use bn::{FieldError, GroupError};
@@ -59,17 +60,23 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, EthereumError> {
     }
 }
 
-pub fn ecadd_precompile<Host: Runtime>(
+fn ecadd_precompile_without_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
     log!(handler.borrow_host(), Info, "Calling ecAdd precompile");
     // TODO: Make the actual tick estimation (remove the stub value).
     let estimated_ticks = 1_000_000;
+
+    if let Err(record_err) = handler.record_cost(150) {
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(record_err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
 
     let mut input = input.to_vec();
     input.resize(ADD_INPUT_LEN, 0);
@@ -97,17 +104,37 @@ pub fn ecadd_precompile<Host: Runtime>(
     })
 }
 
-pub fn ecmul_precompile<Host: Runtime>(
+pub fn ecadd_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
     _context: &Context,
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
+    call_precompile_with_gas_draining(
+        handler,
+        input,
+        ecadd_precompile_without_gas_draining,
+    )
+}
+
+fn ecmul_precompile_without_gas_draining<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
     log!(handler.borrow_host(), Info, "Calling ecMul precompile");
     // TODO: Make the actual tick estimation (remove the stub value).
     let estimated_ticks = 1_000_000;
+
+    if let Err(record_err) = handler.record_cost(6_000) {
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(record_err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
 
     let mut input = input.to_vec();
     input.resize(MUL_INPUT_LEN, 0);
@@ -133,16 +160,38 @@ pub fn ecmul_precompile<Host: Runtime>(
     })
 }
 
-pub fn ecpairing_precompile<Host: Runtime>(
+pub fn ecmul_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
     _context: &Context,
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
+    call_precompile_with_gas_draining(
+        handler,
+        input,
+        ecmul_precompile_without_gas_draining,
+    )
+}
+
+fn ecpairing_precompile_without_gas_draining<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling ecPairing precompile");
     // TODO: Make the actual tick estimation (remove the stub value).
     let estimated_ticks = 1_000_000;
+
+    let gas_cost = (input.len() / PAIR_ELEMENT_LEN) as u64 * 34_000 /* ISTANBUL_PAIR_PER_POINT */ + 45_000 /* ISTANBUL_PAIR_BASE */;
+
+    if let Err(record_err) = handler.record_cost(gas_cost) {
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(record_err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
 
     use bn::{AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
@@ -228,4 +277,18 @@ pub fn ecpairing_precompile<Host: Runtime>(
         withdrawals: vec![],
         estimated_ticks,
     })
+}
+
+pub fn ecpairing_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    call_precompile_with_gas_draining(
+        handler,
+        input,
+        ecpairing_precompile_without_gas_draining,
+    )
 }
