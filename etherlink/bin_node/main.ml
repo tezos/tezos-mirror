@@ -1053,5 +1053,12 @@ let () =
         (if Unix.isatty Unix.stdout then Ansi else Plain)
         Short)
   in
+  let _ =
+    Tezos_clic.(
+      setup_formatter
+        Format.err_formatter
+        (if Unix.isatty Unix.stderr then Ansi else Plain)
+        Short)
+  in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt_main.run (dispatch () (argv ())) |> handle_error
