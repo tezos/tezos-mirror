@@ -358,12 +358,29 @@ fn ripemd160_precompile<Host: Runtime>(
     })
 }
 
-fn blake2f_output_for_wrong_input() -> PrecompileOutcome {
-    PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: vec![],
-        withdrawals: vec![],
-        estimated_ticks: 0,
+fn blake2f_output_for_wrong_input<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+) -> PrecompileOutcome {
+    if let Err(err) = handler.record_cost(handler.gas_left().as_u64()) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Couldn't record the cost of blake2f {:?}",
+            err
+        );
+        PrecompileOutcome {
+            exit_status: ExitReason::Error(err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks: 0,
+        }
+    } else {
+        PrecompileOutcome {
+            exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks: 0,
+        }
     }
 }
 
@@ -392,7 +409,7 @@ fn blake2f_precompile<Host: Runtime>(
 
     // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
     if input.len() != 213 {
-        return Ok(blake2f_output_for_wrong_input());
+        return Ok(blake2f_output_for_wrong_input(handler));
     }
 
     // the number of rounds - 32-bit unsigned big-endian word
@@ -400,7 +417,7 @@ fn blake2f_precompile<Host: Runtime>(
     rounds_buf.copy_from_slice(&input[0..4]);
     let rounds: u32 = u32::from_be_bytes(rounds_buf);
 
-    // check that enough ressources to execute (gas / ticks) are available
+    // check that enough resources to execute (gas / ticks) are available
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_blake2f(rounds), handler);
     let cost = rounds as u64; // static_gas + dynamic_gas
@@ -442,7 +459,7 @@ fn blake2f_precompile<Host: Runtime>(
     let f = match input[212] {
         1 => true,
         0 => false,
-        _ => return Ok(blake2f_output_for_wrong_input()),
+        _ => return Ok(blake2f_output_for_wrong_input(handler)),
     };
 
     eip152::compress(&mut h, m, t, f, rounds as usize);
@@ -1154,33 +1171,38 @@ mod tests {
     fn test_blake2f_invalid_empty() {
         // act
         let input = [0; 0];
+        let gas_limit: u64 = 25000;
         let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(gas_limit));
 
         // assert
         // expected outcome is OK and empty output
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
+        println!("{}", outcome.gas_used);
         assert!(outcome.is_success);
+        assert!(outcome.gas_used == gas_limit); // all gas should be consumed
         assert_eq!(Some(vec![]), outcome.result);
     }
 
     #[test]
-    fn text_blake2f_invalid_flag() {
+    fn test_blake2f_invalid_flag() {
         let input = hex::decode(
             "0000000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
             d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000300000000000000000000000000000002"
         ).unwrap();
-
+        let gas_limit: u64 = 25000;
         let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(gas_limit));
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
+        println!("{}", outcome.gas_used);
         assert!(outcome.is_success);
+        assert!(outcome.gas_used == gas_limit); // all gas shoule be consumed
         assert_eq!(Some(vec![]), outcome.result);
     }
 
