@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    inbox::{Deposit, Transaction, TransactionContent},
+    inbox::{Deposit, TezosContracts, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
 };
@@ -325,8 +325,7 @@ impl InputResult {
         host: &mut Host,
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
-        ticketer: &Option<ContractKt1Hash>,
-        admin: &Option<ContractKt1Hash>,
+        tezos_contracts: &TezosContracts,
         delayed_bridge: &Option<ContractKt1Hash>,
     ) -> Self {
         if transfer.destination.hash().0 != smart_rollup_address {
@@ -343,7 +342,7 @@ impl InputResult {
         match transfer.payload {
             MichelsonOr::Left(left) => match left {
                 MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
-                    Self::parse_deposit(host, ticket, receiver, ticketer)
+                    Self::parse_deposit(host, ticket, receiver, &tezos_contracts.ticketer)
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
                     Self::parse_transaction_from_delayed_inbox(
@@ -354,7 +353,7 @@ impl InputResult {
                 }
             },
             MichelsonOr::Right(MichelsonBytes(upgrade)) => {
-                Self::parse_kernel_upgrade(source, admin, &upgrade)
+                Self::parse_kernel_upgrade(source, &tezos_contracts.admin, &upgrade)
             }
         }
     }
@@ -363,8 +362,7 @@ impl InputResult {
         host: &mut Host,
         message: InternalInboxMessage<RollupType>,
         smart_rollup_address: &[u8],
-        ticketer: &Option<ContractKt1Hash>,
-        admin: &Option<ContractKt1Hash>,
+        tezos_contracts: &TezosContracts,
         delayed_bridge: &Option<ContractKt1Hash>,
     ) -> Self {
         match message {
@@ -375,8 +373,7 @@ impl InputResult {
                 host,
                 transfer,
                 smart_rollup_address,
-                ticketer,
-                admin,
+                tezos_contracts,
                 delayed_bridge,
             ),
             _ => InputResult::Unparsable,
@@ -387,8 +384,7 @@ impl InputResult {
         host: &mut Host,
         input: Message,
         smart_rollup_address: [u8; 20],
-        ticketer: &Option<ContractKt1Hash>,
-        admin: &Option<ContractKt1Hash>,
+        tezos_contracts: &TezosContracts,
         delayed_bridge: &Option<ContractKt1Hash>,
         sequencer: &Option<PublicKey>,
     ) -> Self {
@@ -407,8 +403,7 @@ impl InputResult {
                     host,
                     message,
                     &smart_rollup_address,
-                    ticketer,
-                    admin,
+                    tezos_contracts,
                     delayed_bridge,
                 ),
             },
@@ -435,8 +430,10 @@ mod tests {
                 &mut host,
                 message,
                 ZERO_SMART_ROLLUP_ADDRESS,
-                &None,
-                &None,
+                &TezosContracts {
+                    ticketer: None,
+                    admin: None,
+                },
                 &None,
                 &None
             ),

@@ -7,6 +7,7 @@
 
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
+use crate::inbox::TezosContracts;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::{fetch, Configuration};
@@ -91,21 +92,14 @@ pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
+    tezos_contracts: TezosContracts,
     configuration: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage one.");
-    log!(
-        host,
-        Info,
-        "Ticketer is {:?}. Administrator is {:?}",
-        ticketer,
-        admin
-    );
+    log!(host, Info, "tezos_contracts: {}", tezos_contracts);
     log!(host, Info, "Configuration: {}", configuration);
 
-    fetch(host, smart_rollup_address, ticketer, admin, configuration)
+    fetch(host, smart_rollup_address, tezos_contracts, configuration)
 }
 
 fn retrieve_smart_rollup_address<Host: Runtime>(
@@ -219,6 +213,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let mut configuration = fetch_configuration(host)?;
     let block_fees = retrieve_block_fees(host)?;
 
+    let tezos_contracts = TezosContracts { ticketer, admin };
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
@@ -226,8 +221,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     stage_one(
         host,
         smart_rollup_address,
-        ticketer,
-        admin,
+        tezos_contracts,
         &mut configuration,
     )
     .context("Failed during stage 1")?;
