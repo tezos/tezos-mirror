@@ -1467,10 +1467,6 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                               in
                               return_unit)
                         in
-                        (* Don't call the finalizer in the critical
-                           section, in case it needs to access the block
-                           store. *)
-                        let* () = finalizer new_head_lpbl in
                         (* We can now trigger the context GC: if the
                            GC is performed, this call will block until
                            its end. *)
@@ -1481,6 +1477,10 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                             ~previous_savepoint
                             ~new_savepoint
                         in
+                        (* Don't call the finalizer in the critical
+                           section, in case it needs to access the block
+                           store. *)
+                        let* () = finalizer new_head_lpbl in
                         (* The merge operation succeeded, the store is now idle. *)
                         block_store.merging_thread <- None ;
                         let* () = write_status block_store Idle in
