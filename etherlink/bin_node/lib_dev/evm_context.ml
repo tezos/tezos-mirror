@@ -100,15 +100,38 @@ let execute =
     let* ctxt = if commit then perform_commit ctxt evm_state else return ctxt in
     return (ctxt, evm_state)
 
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cannot_apply_blueprint"
+    ~title:"Cannot apply a blueprint"
+    ~description:
+      "The EVM node could not apply apply a blueprint on top of its local EVM \
+       state."
+    ~pp:(fun ppf local_state_level ->
+      Format.fprintf
+        ppf
+        "The EVM node could not apply apply a blueprint on top of its local \
+         EVM state at level %a."
+        Z.pp_print
+        local_state_level)
+    Data_encoding.(obj1 (req "current_state_level" n))
+    (function
+      | Cannot_apply_blueprint {local_state_level} -> Some local_state_level
+      | _ -> None)
+    (fun local_state_level -> Cannot_apply_blueprint {local_state_level})
+
 let apply_blueprint ctxt payload =
   let open Lwt_result_syntax in
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.next_blueprint_number in
-  let*! try_apply = Evm_state.apply_blueprint ~config evm_state payload in
+  let* try_apply = Evm_state.apply_blueprint ~config evm_state payload in
 
   match try_apply with
-  | Ok (evm_state, Block_height blueprint_number)
+  | Apply_success (evm_state, Block_height blueprint_number)
     when Z.equal blueprint_number next ->
       let* () = store_blueprint ctxt payload (Qty blueprint_number) in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
@@ -118,11 +141,11 @@ let apply_blueprint ctxt payload =
         ctxt.blueprint_watcher
         {number = Qty blueprint_number; payload} ;
       return ctxt
-  | Ok _ | Error (Evm_state.Cannot_apply_blueprint :: _) ->
+  | Apply_success _ (* Produced a block, but not of the expected height *)
+  | Apply_failure (* Did not produce a block *) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
       let*! () = Blueprint_events.invalid_blueprint_produced next in
-      tzfail Evm_state.Cannot_apply_blueprint
-  | Error err -> fail err
+      tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
 let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
