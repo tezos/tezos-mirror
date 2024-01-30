@@ -6,8 +6,8 @@ use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
-use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
+use crate::inbox::{read_inbox, TezosContracts};
 use crate::upgrade::store_kernel_upgrade;
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -46,14 +46,13 @@ impl std::fmt::Display for Configuration {
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
+    tezos_contracts: TezosContracts,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         kernel_upgrade,
         transactions,
         sequencer_blueprints: _,
-    }) = read_inbox(host, smart_rollup_address, ticketer, admin, None, None)?
+    }) = read_inbox(host, smart_rollup_address, tezos_contracts, None, None)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -73,8 +72,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
 fn fetch_sequencer_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
+    tezos_contracts: TezosContracts,
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
@@ -86,8 +84,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     }) = read_inbox(
         host,
         smart_rollup_address,
-        ticketer,
-        admin,
+        tezos_contracts,
         Some(delayed_bridge),
         Some(sequencer),
     )? {
@@ -118,8 +115,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
 pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    ticketer: Option<ContractKt1Hash>,
-    admin: Option<ContractKt1Hash>,
+    tezos_contracts: TezosContracts,
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     match config {
@@ -130,14 +126,13 @@ pub fn fetch<Host: Runtime>(
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
-            ticketer,
-            admin,
+            tezos_contracts,
             delayed_bridge.clone(),
             delayed_inbox,
             sequencer.clone(),
         ),
         Configuration::Proxy => {
-            fetch_inbox_blueprints(host, smart_rollup_address, ticketer, admin)
+            fetch_inbox_blueprints(host, smart_rollup_address, tezos_contracts)
         }
     }
 }
