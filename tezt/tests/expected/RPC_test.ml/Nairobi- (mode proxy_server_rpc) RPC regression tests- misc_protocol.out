@@ -22,7 +22,7 @@
   "quorum_max": 7000, "min_proposal_quorum": 500,
   "liquidity_baking_subsidy": "83333",
   "liquidity_baking_toggle_ema_threshold": 1000000000,
-  "max_operations_time_to_live": 240, "minimal_block_delay": "1",
+  "max_operations_time_to_live": 8, "minimal_block_delay": "1",
   "delay_increment_per_round": "1", "consensus_committee_size": 256,
   "consensus_threshold": 0,
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
