@@ -6,6 +6,8 @@
 
 - Implement Call stipend for inner call with transfer. (!11587)
 - Support 'modexp' precompiled contract. (!11732)
+- Support 'ecAdd', 'ecMul' and 'ecPairing' precompiled contracts. (!11746)
+
 
 ### Bug fixes
 
