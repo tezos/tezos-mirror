@@ -72,3 +72,15 @@ let produce_block ?timestamp evm_node =
       (produce_block_request ?timestamp ())
   in
   return JSON.(json |-> "result" |> as_string |> Int32.of_string)
+
+let inject_upgrade_request payload =
+  Evm_node.{method_ = "injectUpgrade"; parameters = `String payload}
+
+let inject_upgrade ~payload evm_node =
+  let* _json =
+    Evm_node.call_evm_rpc
+      ~private_:true
+      evm_node
+      (inject_upgrade_request payload)
+  in
+  return ()

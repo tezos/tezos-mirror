@@ -472,4 +472,5 @@ let upgrade_payload ~root_hash ~activation_timestamp =
     ]
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
-  Process.check_and_read_stdout process
+  let* payload = Process.check_and_read_stdout process in
+  return (String.trim payload)

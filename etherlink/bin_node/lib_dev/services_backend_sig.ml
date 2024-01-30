@@ -102,6 +102,12 @@ module type S = sig
     Ethereum_types.address ->
     Ethereum_types.quantity ->
     Ethereum_types.hex tzresult Lwt.t
+
+  (**/**)
+
+  (** [inject_kernel_upgrade ~payload] injects the kernel upgrade
+      payload [payload] in the local state. *)
+  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -112,10 +118,14 @@ module type Backend = sig
   module Publisher : Publisher.Publisher with type messages = TxEncoder.messages
 
   module SimulatorBackend : Simulator.SimulationBackend
+
+  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : S = struct
   include Durable_storage.Make (Backend.READER)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
+
+  let inject_kernel_upgrade = Backend.inject_kernel_upgrade
 end

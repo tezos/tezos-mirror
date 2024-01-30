@@ -257,6 +257,8 @@ module Produce_block :
     with type input = Time.Protocol.t
      and type output = Ethereum_types.quantity
 
+module Inject_upgrade : METHOD with type input = string and type output = unit
+
 type map_result =
   | Method :
       ('input, 'output) method_

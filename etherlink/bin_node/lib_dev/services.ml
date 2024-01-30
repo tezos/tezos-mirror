@@ -513,6 +513,17 @@ let dispatch_private_request (_config : 'a Configuration.t)
                (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions))
         in
         build ~f module_ parameters
+    | Method (Inject_upgrade.Method, module_) ->
+        let f input =
+          let open Lwt_result_syntax in
+          match input with
+          | None -> return missing_parameter
+          | Some payload ->
+              let*! () = Events.received_upgrade payload in
+              let* () = Backend_rpc.inject_kernel_upgrade ~payload in
+              return (Either.Left ())
+        in
+        build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   return JSONRPC.{value; id}

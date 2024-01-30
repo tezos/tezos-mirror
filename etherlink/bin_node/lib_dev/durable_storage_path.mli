@@ -18,7 +18,7 @@ val base_fee_per_gas : path
 
 val kernel_version : path
 
-val upgrade_nonce : path
+val kernel_upgrade : path
 
 (** Paths related to accounts. *)
 module Accounts : sig
