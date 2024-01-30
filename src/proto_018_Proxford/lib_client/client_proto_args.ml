@@ -540,6 +540,16 @@ let default_gas_limit_arg =
        client decide based on a simulation"
     gas_limit_kind
 
+let safety_guard_arg =
+  Tezos_clic.arg
+    ~long:"safety-guard"
+    ~placeholder:"extra_gas"
+    ~doc:
+      "Amount of gas to add to value computed by simulation. The gas safety \
+       guard allows operations that consume a little more gas than expected to \
+       be successful"
+    gas_limit_kind
+
 let run_gas_limit_arg =
   Tezos_clic.arg
     ~long:"gas"
