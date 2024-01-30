@@ -63,6 +63,8 @@ fi
 
 echo "Build ${image_name}"
 
+./scripts/ci/docker_initialize.sh
+
 docker build images/rust-toolchain \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --cache-from="${image_base}:${CI_COMMIT_REF_SLUG}" \

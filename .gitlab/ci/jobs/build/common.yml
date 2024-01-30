@@ -63,6 +63,9 @@
   variables:
     # These image are not built for external use.
     CI_DOCKER_HUB: "false"
+  # Handle docker initialization, if necessary, in
+  # './scripts/ci/docker_rust_toolchain_build.sh'.
+  before_script: []
   script:
     - ./scripts/ci/docker_rust_toolchain_build.sh
   artifacts:
