@@ -716,7 +716,16 @@ let sequencer_command =
          rollup_node_endpoint
          sequencer
          () ->
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          make_with_defaults
+            ~enable_default_daily_logs_at:
+              Filename.Infix.(data_dir // "daily_logs")
+            ()
+        in
+        init ~config ()
+      in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       let* config =
         Cli.create_or_read_sequencer_config
