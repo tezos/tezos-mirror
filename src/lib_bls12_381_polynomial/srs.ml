@@ -100,6 +100,8 @@ module type S = sig
 
   (* TODO just for pack *)
   val to_array : ?len:int -> t -> elt array
+
+  val of_array : elt array -> t
 end
 
 module Make (Elt : GElt_sig) = struct
