@@ -390,9 +390,13 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
+    const DUMMY_FLAT_FEE: u64 = 0u64;
 
     fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(DUMMY_BASE_FEE_PER_GAS.into())
+        BlockFees::new(
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_FLAT_FEE),
+        )
     }
 
     fn dummy_eth_gen_transaction(

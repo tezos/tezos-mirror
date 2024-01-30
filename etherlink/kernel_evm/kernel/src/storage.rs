@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -54,6 +55,7 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
 const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
+const EVM_FLAT_FEE: RefPath = RefPath::assert_from(b"/flat_fee");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
@@ -553,6 +555,17 @@ pub fn store_base_fee_per_gas<Host: Runtime>(
 
 pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
+}
+
+pub fn store_flat_fee(
+    host: &mut impl Runtime,
+    base_fee_per_gas: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_FLAT_FEE.into(), base_fee_per_gas)
+}
+
+pub fn read_flat_fee(host: &impl Runtime) -> Result<U256, Error> {
+    read_u256(host, &EVM_FLAT_FEE.into())
 }
 
 pub fn store_timestamp_path<Host: Runtime>(
