@@ -71,7 +71,7 @@
     # because if the CI timeout is reached, there are no artefacts,
     # and thus no logs to investigate.
     # See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
-    - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/exit_code.sh _build/default/tezt/tests/main.exe
+    - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh
         ${TESTS}
         --color
         --log-buffer-size 5000
@@ -97,11 +97,13 @@
     - .tezt_template
     - .oc.template__retry_flaky
   dependencies:
+    - "select_tezts"
     - "oc.build_x86_64-released"
     - "oc.build_x86_64-exp-dev-extra"
     - "oc.build_kernels"
     - "oc.tezt:fetch-records"
   needs:
+    - "select_tezts"
     - "oc.build_x86_64-released"
     - "oc.build_x86_64-exp-dev-extra"
     - "oc.build_kernels"

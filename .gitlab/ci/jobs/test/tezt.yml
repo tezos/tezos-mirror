@@ -50,6 +50,7 @@ tezt:static-binaries:
     - .tezt_template
     - .rules__octez_changes
   dependencies:
+    - select_tezts
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
     # oc.build_x86_64-exp-dev-extra
     - oc.build_x86_64-exp-dev-extra
@@ -57,6 +58,7 @@ tezt:static-binaries:
     - oc.build:static-x86_64-linux-binaries
     - oc.tezt:fetch-records
   needs:
+    - select_tezts
     - oc.build_x86_64-exp-dev-extra
     - oc.build:static-x86_64-linux-binaries
     - oc.tezt:fetch-records
