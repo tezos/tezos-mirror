@@ -5,6 +5,7 @@
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -556,6 +557,7 @@ module Script : sig
     | D_Some
     | D_True
     | D_Unit
+    | D_Ticket
     | D_Lambda_rec
     | I_PACK
     | I_UNPACK

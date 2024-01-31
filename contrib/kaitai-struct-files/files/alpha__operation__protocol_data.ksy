@@ -1512,7 +1512,7 @@ enums:
       id: left
       doc: Left
     6:
-      id: none_0
+      id: none
       doc: None
     7:
       id: pair_1
@@ -1527,7 +1527,7 @@ enums:
       id: true
       doc: True
     11:
-      id: unit_0
+      id: unit_1
       doc: Unit
     12:
       id: pack
@@ -1680,7 +1680,7 @@ enums:
       id: nil
       doc: NIL
     62:
-      id: none
+      id: none_0
       doc: NONE
     63:
       id: not
@@ -1731,7 +1731,7 @@ enums:
       id: set_delegate
       doc: SET_DELEGATE
     79:
-      id: unit_1
+      id: unit_0
       doc: UNIT
     80:
       id: update
@@ -1878,10 +1878,10 @@ enums:
       id: emit
       doc: EMIT
     152:
-      id: lambda_rec
+      id: lambda_rec_0
       doc: Lambda_rec
     153:
-      id: lambda_rec_0
+      id: lambda_rec
       doc: LAMBDA_REC
     154:
       id: ticket_0
@@ -1892,6 +1892,9 @@ enums:
     156:
       id: nat_0
       doc: NAT
+    157:
+      id: ticket_1
+      doc: Ticket
   alpha__operation__alpha__contents_or_signature_prefix_tag:
     1: seed_nonce_revelation
     2: double_attestation_evidence
