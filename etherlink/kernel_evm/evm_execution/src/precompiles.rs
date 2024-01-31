@@ -17,7 +17,7 @@ use crate::handler::EvmHandler;
 use crate::EthereumError;
 use crate::{abi, modexp::modexp_precompile};
 use alloc::collections::btree_map::BTreeMap;
-use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
+use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
 use host::runtime::Runtime;
 use libsecp256k1::{curve::Scalar, recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, U256};
@@ -107,6 +107,31 @@ impl<Host: Runtime> PrecompileSet<Host> for PrecompileBTreeMap<Host> {
     /// `execute` already performs a check internally.
     fn is_precompile(&self, address: H160) -> bool {
         self.contains_key(&address)
+    }
+}
+
+type PrecompileWithoutGasDrainFn<Host> =
+    fn(_: &mut EvmHandler<Host>, _: &[u8]) -> Result<PrecompileOutcome, EthereumError>;
+
+pub fn call_precompile_with_gas_draining<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    precompile_contract_without_gas: PrecompileWithoutGasDrainFn<Host>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    match precompile_contract_without_gas(handler, input) {
+        Ok(precompile_outcome) => Ok(precompile_outcome),
+        Err(err) => {
+            if let Err(record_err) = handler.record_cost(handler.gas_left().as_u64()) {
+                Ok(PrecompileOutcome {
+                    exit_status: ExitReason::Error(record_err),
+                    output: vec![],
+                    withdrawals: vec![],
+                    estimated_ticks: 0,
+                })
+            } else {
+                Err(err)
+            }
+        }
     }
 }
 
