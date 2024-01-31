@@ -136,7 +136,7 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
 
-let apply_and_clear_current_cycle_denunciations ctxt =
+let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let previous_cycle =

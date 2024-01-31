@@ -89,7 +89,7 @@ val punish_double_signing :
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
-val apply_and_clear_current_cycle_denunciations :
+val apply_and_clear_denunciations :
   Raw_context.t ->
   (Raw_context.t
   * Int_percentage.t Signature.Public_key_hash.Map.t
