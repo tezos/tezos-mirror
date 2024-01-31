@@ -942,13 +942,6 @@ module History_v2 = struct
 
   [@@@ocaml.warning "-a"]
 
-  (* A leaf of the merkle tree is a slot. *)
-  module Leaf = struct
-    type t = Header.t
-
-    let to_bytes = Data_encoding.Binary.to_bytes_exn Header.encoding
-  end
-
   module Content_prefix = struct
     let (_prefix : string) = "dash1"
 
@@ -963,7 +956,6 @@ module History_v2 = struct
   end
 
   module Content_hash = Blake2B.Make (Base58) (Content_prefix)
-  module Merkle_list = Merkle_list.Make (Leaf) (Content_hash)
 
   (* Pointers of the skip lists are used to encode the content and the
      backpointers. *)
