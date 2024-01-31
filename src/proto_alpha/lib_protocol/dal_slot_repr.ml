@@ -1224,6 +1224,46 @@ module History_v2 = struct
         in
         return (new_head, cache)
 
+    (* Given a list [attested_slot_headers] of well-ordered (wrt slots indices)
+       (attested) slot headers, this function builds an extension [l] of
+       [attested_slot_headers] such that:
+
+       - all elements in [attested_slot_headers] are in [l],
+
+       - for every slot index i in [0, number_of_slots - 1] that doesn't appear
+       in [attested_slot_headers], an unattested slot id is inserted in [l],
+
+       - [l] is well sorted wrt. slots indices. *)
+    let fill_slot_headers ~number_of_slots ~published_level
+        attested_slot_headers =
+      let open Result_syntax in
+      let module I = Dal_slot_index_repr in
+      let* all_indices =
+        I.slots_range ~number_of_slots ~lower:0 ~upper:(number_of_slots - 1)
+      in
+      let mk_unattested index =
+        Content.Unattested Header.{published_level; index}
+      in
+      (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
+         indices. *)
+      let rec aux indices slots =
+        match (indices, slots) with
+        | _, [] -> List.map mk_unattested indices |> ok
+        | [], s :: _ ->
+            tzfail Add_element_in_slots_skip_list_violates_ordering_v2
+        | i :: indices', s :: slots' ->
+            if I.(i = s.Header.id.index) then
+              let* res = aux indices' slots' in
+              Content.Attested s :: res |> ok
+            else if I.(i < s.Header.id.index) then
+              let* res = aux indices' slots in
+              mk_unattested i :: res |> ok
+            else
+              (* i > s.Header.id.index *)
+              tzfail Add_element_in_slots_skip_list_violates_ordering_v2
+      in
+      aux all_indices attested_slot_headers
+
     (*  TODO: will be uncommented incrementally on the next MRs *)
 
     (*
