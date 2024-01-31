@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Representation for typed Michelson `key` values.
+
 use tezos_crypto_rs::{
     hash::{Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
     PublicKeyWithHash,
@@ -16,10 +18,11 @@ use super::{
 };
 
 macro_rules! key_type_and_impls {
-    ($($con:ident($ty:ident)),* $(,)*) => {
+    ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
+        /// Tezos public key. Corresponds to the `key` Michelson type.
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
         pub enum Key {
-            $($con($ty)),*
+            $($(#[$meta])* $con($ty)),*
         }
 
         $(impl From<$ty> for Key {
@@ -47,9 +50,13 @@ macro_rules! key_type_and_impls {
 }
 
 key_type_and_impls! {
+    /// Ed25519 public key.
     Ed25519(PublicKeyEd25519),
+    /// Secp256k1 public key.
     Secp256k1(PublicKeySecp256k1),
+    /// P256 public key.
     P256(PublicKeyP256),
+    /// BLS public key.
     Bls(PublicKeyBls),
 }
 
@@ -84,10 +91,12 @@ const TAG_P256: u8 = 2;
 const TAG_BLS: u8 = 3;
 
 impl Key {
-    /// Smallest key size
+    /// Smallest key byte size in base58-check encoding.
     pub const MIN_BASE58_SIZE: usize = 54;
+    /// Smallest key byte size when represented as raw bytes.
     pub const MIN_BYTE_SIZE: usize = 32;
 
+    /// Construct a [KeyHash] from the key. Essentially hashes the key.
     pub fn hash(&self) -> KeyHash {
         use Key::*;
         // unwrap because errors should be literally impossible, any bytestring

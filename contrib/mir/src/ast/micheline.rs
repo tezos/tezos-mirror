@@ -5,21 +5,30 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Definition of Micheline representation and utilities for working with it.
+
 use num_bigint::{BigInt, BigUint};
 use typed_arena::Arena;
 
 use super::annotations::{Annotations, NO_ANNS};
 use crate::lexer::Prim;
 
+/// Representation of a Micheline node. The representation is non-owning by
+/// design, so something has to own the child nodes. Generally used with an
+/// arena allocator, like, e.g. [typed_arena].
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Micheline<'a> {
+    /// Micheline integer literal.
     Int(BigInt),
+    /// Micheline string literal.
     String(String),
+    /// Micheline bytes literal.
     Bytes(Vec<u8>),
     /// Application of a Micheline primitive to some arguments with optional
     /// annotations. The primitive is the first field, arguments are the second
     /// field, annotations are the last field.
     App(Prim, &'a [Micheline<'a>], Annotations<'a>),
+    /// Micheline braced sequence.
     Seq(&'a [Micheline<'a>]),
 }
 
@@ -60,14 +69,19 @@ impl<'a> Micheline<'a> {
         buf
     }
 
+    /// Construct a primitive application with zero arguments.
     pub fn prim0(prim: Prim) -> Self {
         Micheline::App(prim, &[], NO_ANNS)
     }
 
+    /// Construct a primitive application with one argument, allocating the
+    /// argument in the [Arena].
     pub fn prim1(arena: &'a Arena<Micheline<'a>>, prim: Prim, arg: Micheline<'a>) -> Self {
         Micheline::App(prim, Self::alloc_seq(arena, [arg]), NO_ANNS)
     }
 
+    /// Construct a primitive application with two arguments, allocating the
+    /// arguments in the [Arena].
     pub fn prim2(
         arena: &'a Arena<Micheline<'a>>,
         prim: Prim,
@@ -77,6 +91,8 @@ impl<'a> Micheline<'a> {
         Micheline::App(prim, Self::alloc_seq(arena, [arg1, arg2]), NO_ANNS)
     }
 
+    /// Construct a primitive application with three arguments, allocating the
+    /// arguments in the [Arena].
     pub fn prim3(
         arena: &'a Arena<Micheline<'a>>,
         prim: Prim,
@@ -87,6 +103,7 @@ impl<'a> Micheline<'a> {
         Micheline::App(prim, Self::alloc_seq(arena, [arg1, arg2, arg3]), NO_ANNS)
     }
 
+    /// Construct a Micheline sequence, allocating the elements in the [Arena].
     pub fn seq<const N: usize>(arena: &'a Arena<Micheline<'a>>, args: [Micheline<'a>; N]) -> Self {
         Micheline::Seq(Self::alloc_seq(arena, args))
     }
@@ -140,6 +157,7 @@ impl<'a> From<&str> for Micheline<'a> {
     }
 }
 
+/// Trait for types that can be converted into [Micheline].
 pub trait IntoMicheline<'a> {
     /// Untypes a value using optimized representation in legacy mode.
     ///

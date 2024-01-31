@@ -5,24 +5,35 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Representation for typed Michelson `lambda 'a 'b` values.
+
 use std::rc::Rc;
 
 use crate::lexer::Prim;
 
 use super::{annotations::NO_ANNS, Instruction, IntoMicheline, Micheline, Type, TypedValue};
 
+/// Michelson lambda. Can be either non-recursive or recursive. Michelson
+/// lambdas carry their own raw [Micheline] representation to ensure consistent
+/// roundtripping through `PACK`/`UNPACK`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Lambda<'a> {
+    /// Non-recursive lambda.
     Lambda {
+        /// Raw [Micheline] representation.
         micheline_code: Micheline<'a>,
+        /// Typechecked code.
         code: Rc<[Instruction<'a>]>, // see Note: Rc in lambdas
     },
+    /// Recursive lambda.
     LambdaRec {
         /// Lambda argument type
         in_ty: Type,
         /// Lambda result type
         out_ty: Type,
+        /// Raw [Micheline] representation.
         micheline_code: Micheline<'a>,
+        /// Typechecked code.
         code: Rc<[Instruction<'a>]>, // see Note: Rc in lambdas
     },
 }
@@ -38,9 +49,13 @@ independent of the length of the code (there's a Lambda::clone call in the
 implementation)
 */
 
+/// Either a simple [Lambda], or a partially-applied one, the result of the
+/// `APPLY` instruction.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Closure<'a> {
+    /// Simple [Lambda].
     Lambda(Lambda<'a>),
+    /// Partially-applied [Lambda].
     Apply {
         /// Captured argument type
         arg_ty: Type,

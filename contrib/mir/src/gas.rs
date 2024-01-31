@@ -5,34 +5,47 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Gas accounting and costs.
+
 use num_bigint::{BigInt, BigUint};
 
+/// Structure carrying the remaining gas amount.
 #[derive(Debug)]
 pub struct Gas {
     milligas_amount: Option<u32>,
 }
 
+/// Out of gas error.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("out of gas")]
 pub struct OutOfGas;
 
-// Default gas limit per transaction, according to
-// https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost
-const DEFAULT_GAS_AMOUNT: u32 = 1_040_000;
+/// Default gas limit per transaction, according to
+/// <https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost>
+pub const DEFAULT_GAS_AMOUNT: u32 = 1_040_000;
 
 impl Default for Gas {
+    /// Constructs [Gas] with [DEFAULT_GAS_AMOUNT] gas remaining.
     fn default() -> Self {
         Gas::new(DEFAULT_GAS_AMOUNT * 1000)
     }
 }
 
 impl Gas {
+    /// Construct a new [Gas] with the specified `milligas_amount` milligas
+    /// remaining.
     pub fn new(milligas_amount: u32) -> Gas {
         Gas {
             milligas_amount: Some(milligas_amount),
         }
     }
 
+    /// Try to consume the specified milligas `cost`. If not enough gas left,
+    /// return [OutOfGas], and mark gas as exhausted.
+    ///
+    /// # Panics
+    ///
+    /// If gas was previously exhausted.
     pub fn consume(&mut self, cost: u32) -> Result<(), OutOfGas> {
         self.milligas_amount = self.milligas().checked_sub(cost);
         if self.milligas_amount.is_none() {
@@ -42,6 +55,11 @@ impl Gas {
         }
     }
 
+    /// Get the remaining milligas amount.
+    ///
+    /// # Panics
+    ///
+    /// If gas was previously exhausted.
     pub fn milligas(&self) -> u32 {
         self.milligas_amount
             .expect("Access to gas after exhaustion")
@@ -102,6 +120,8 @@ impl Log2i for u64 {
     }
 }
 
+/// Typechecking gas costs.
+#[allow(missing_docs)]
 pub mod tc_cost {
     use checked::Checked;
 
@@ -232,6 +252,7 @@ pub mod tc_cost {
     }
 }
 
+/// Get byte size of [BigInt] or [BigUint].
 pub trait BigIntByteSize {
     /// Minimal size in bytes a given bigint is representable in.
     fn byte_size(&self) -> u64;
@@ -254,6 +275,8 @@ impl BigIntByteSize for BigUint {
     }
 }
 
+/// Interpretation gas costs
+#[allow(missing_docs)]
 pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
@@ -730,7 +753,7 @@ pub mod interpret_cost {
                 }
                 for annot in annots {
                     // Annotations are accounted as simple string literals
-                    use crate::lexer::Annotation as Ann;
+                    use crate::ast::Annotation as Ann;
                     size.str_byte += match annot {
                         // Including annotation prefix into the size too
                         Ann::Field(a) => a.len() + 1,

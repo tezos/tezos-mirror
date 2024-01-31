@@ -5,17 +5,24 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Macro substitutions.
+
 use super::*;
 
 use crate::lexer::macros::*;
 use crate::lexer::Prim;
 
+/// Errors possible during macro expansion.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum MacroError {
+    /// Macro is applied to an unexpected (i.e. invalid) number of arguments,
+    /// e.g. `FAIL {}`, or `IF_SOME` without arguments.
     #[error("unexpected number of arguments for macro: {0}")]
     UnexpectedArgumentCount(Macro),
 }
 
+/// Expand a macro in raw [Micheline]. Requires access to an [Arena] in order to
+/// allocate the new instructions the macro was expanded to.
 pub fn expand_macro<'a>(
     arena: &'a Arena<Micheline<'a>>,
     m: &Macro,

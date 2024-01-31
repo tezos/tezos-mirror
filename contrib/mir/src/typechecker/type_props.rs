@@ -5,11 +5,16 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Ensure [TypeProperty] holds for a given [Type].
+
 use super::TcError;
 use crate::ast::Type;
 use crate::gas::{tc_cost, Gas};
 
+/// Type properties, as described in
+/// <https://tezos.gitlab.io/michelson-reference/#types>
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[allow(missing_docs)]
 pub enum TypeProperty {
     Comparable,
     Passable,
@@ -36,6 +41,12 @@ impl std::fmt::Display for TypeProperty {
 }
 
 impl Type {
+    /// Ensure a given property `prop` holds for `self`. This function consumes
+    /// gas, hence a mutable reference to [Gas] must be provided. The function
+    /// traverses the type, so worst-case complexity is O(n).
+    ///
+    /// If a property doesn't hold, returns [TcError::InvalidTypeProperty]. Can
+    /// run out of gas, in which case it will return [TcError::OutOfGas].
     pub fn ensure_prop(&self, gas: &mut Gas, prop: TypeProperty) -> Result<(), TcError> {
         use Type::*;
         gas.consume(tc_cost::TYPE_PROP_STEP)?;

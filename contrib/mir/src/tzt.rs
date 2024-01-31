@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Definitions for the TZT runner.
+
 mod expectation;
 
 use num_bigint::BigInt;
@@ -25,16 +27,23 @@ use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
 use crate::tzt::expectation::*;
 
+/// Test's input stack represented as a [Vec] of pairs of type and typechecked
+/// value. The top of the stack is the _leftmost_ element.
 pub type TestStack<'a> = Vec<(Type, TypedValue<'a>)>;
 
+/// The TZT execution didn't succeed, the expectation is not fulfilled.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TztTestError<'a> {
+    /// Expected and actual output stacks don't match.
     StackMismatch(
         (FailingTypeStack, IStack<'a>),
         (FailingTypeStack, IStack<'a>),
     ),
+    /// An error happened, when the test expected a success.
     UnexpectedError(TestError<'a>),
+    /// Execution completed succesfully, when the test expected an error.
     UnexpectedSuccess(ErrorExpectation<'a>, IStack<'a>),
+    /// Expected one error, but got another.
     ExpectedDifferentError(ErrorExpectation<'a>, TestError<'a>),
 }
 
@@ -69,14 +78,24 @@ impl fmt::Display for TztTestError<'_> {
 /// Represent one Tzt test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TztTest<'a> {
+    /// Test code, the content of the `code` field.
     pub code: Micheline<'a>,
+    /// Test input, as defined by the `input` field.
     pub input: TestStack<'a>,
+    /// Expected output, as defined by the `output` field.
     pub output: TestExpectation<'a>,
+    /// Transfer amount, as defined by the `amount` field.
     pub amount: Option<i64>,
+    /// Contract balance, as defined by the `balance` field.
     pub balance: Option<i64>,
+    /// Current chain identifier, as defined by the `chain_id` field.
     pub chain_id: Option<ChainId>,
+    /// Self parameter entrypoints, as defined by the type in the `parameter`
+    /// field.
     pub parameter: Option<Entrypoints>,
+    /// Self address, as defined by the `self` field.
     pub self_addr: Option<AddressHash>,
+    /// Other known contracts, as defined by `other_contracts` field.
     pub other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
 }
 
@@ -123,6 +142,7 @@ fn typecheck_stack<'a>(
 }
 
 impl<'a> Parser<'a> {
+    /// Parse top-level definition of a TZT test.
     pub fn parse_tzt_test(&'a self, src: &'a str) -> Result<TztTest, Box<dyn Error + '_>> {
         tztTestEntitiesParser::new()
             .parse(&self.arena, spanned_lexer(src))?
@@ -262,8 +282,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 /// the code in a test can fail.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum TestError<'a> {
+    /// Error happened during typechecking.
     #[error(transparent)]
     TypecheckerError(#[from] TcError),
+    /// Error happened during interpretation.
     #[error(transparent)]
     InterpreterError(InterpretError<'a>),
 }
@@ -278,13 +300,18 @@ impl<'a> From<InterpretError<'a>> for TestError<'a> {
 /// the code in a test.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TestExpectation<'a> {
-    ExpectSuccess(Vec<(Type, TypedValue<'a>)>),
+    /// Expecting the test code to finish with the given output stack.
+    ExpectSuccess(TestStack<'a>),
+    /// Expecting the test code to fail with the given error.
     ExpectError(ErrorExpectation<'a>),
 }
 
+/// Expected test error.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ErrorExpectation<'a> {
+    /// Typechecker error, with an optional string.
     TypecheckerError(Option<String>),
+    /// Interpreter error.
     InterpreterError(InterpreterErrorExpectation<'a>),
 }
 
@@ -299,10 +326,15 @@ impl fmt::Display for ErrorExpectation<'_> {
     }
 }
 
+/// Interpreter errors we can expect.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InterpreterErrorExpectation<'a> {
+    /// GeneralOverflow error, which can happen with bit-shift arithmetic.
     GeneralOverflow(BigInt, BigInt),
+    /// MutezOverflow error, which can happen with mutez arithmetic.
     MutezOverflow(i64, i64),
+    /// FailedWith error, which happens when execution reaches `FAILWITH`
+    /// instruction.
     FailedWith(Micheline<'a>),
 }
 
@@ -319,7 +351,7 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
 
 /// Helper type for use during parsing, represent a single
 /// line from the test file.
-pub enum TztEntity<'a> {
+pub(crate) enum TztEntity<'a> {
     Code(Micheline<'a>),
     Input(Vec<(Micheline<'a>, Micheline<'a>)>),
     Output(TztOutput<'a>),
@@ -331,9 +363,12 @@ pub enum TztEntity<'a> {
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
 }
 
-/// Possible values for the "output" expectation field in a Tzt test
-pub enum TztOutput<'a> {
+/// Possible values for the "output" expectation field in a Tzt test. This is a
+/// [Micheline] ("untyped") version of [TestExpectation].
+pub(crate) enum TztOutput<'a> {
+    /// Expecting the test code to finish with the given output stack.
     TztSuccess(Vec<(Micheline<'a>, Micheline<'a>)>),
+    /// Expecting the test code to fail with the given error.
     TztError(ErrorExpectation<'a>),
 }
 
@@ -364,6 +399,10 @@ fn execute_tzt_test_code<'a>(
     Ok((t_stack, i_stack))
 }
 
+/// Run a [TztTest]. If the test is succesful, the result is `Ok(())`.
+/// Otherwise, it returns [TztTestError]. An [Arena] must be supplied, it will
+/// be used for storing the results of `UNPACK`, which may end up as part of the
+/// error.
 pub fn run_tzt_test<'a>(
     test: TztTest<'a>,
     arena: &'a Arena<Micheline<'a>>,

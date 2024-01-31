@@ -18,25 +18,33 @@ use typed_arena::Arena;
 use crate::{
     ast::{
         annotations::{Annotations, NO_ANNS},
-        Micheline,
+        Annotation, Micheline,
     },
-    lexer::{try_ann_from_str, Annotation, Prim},
+    lexer::{try_ann_from_str, Prim},
 };
 
+/// Errors that can happen during deserialization.
 #[derive(PartialEq, Debug, Clone, Copy, thiserror::Error)]
 pub enum DecodeError {
+    /// Trailing bytes present after decoding a value.
     #[error("trailing bytes after decoding the value")]
     TrailingBytes,
+    /// Expected PACK format, but no leading 0x05 byte found.
     #[error("PACK tag 0x05 not found")]
     NoPackTag,
+    /// Expected more data, but found EOF.
     #[error("expected more data, but got EOF")]
     UnexpectedEOF,
+    /// Unknown data tag.
     #[error("unknown tag: {0}")]
     UnknownTag(u8),
+    /// Forbidden character found during string deserialization.
     #[error("forbidden character in string")]
     ForbiddenStringCharacter,
+    /// Expected a primitive, but could not interpret the byte as a primitive.
     #[error("unknown primitive tag: {0}")]
     UnknownPrim(u8),
+    /// Failed to deserialize an annotation.
     #[error("could not decode annotation")]
     BadAnnotation,
 }

@@ -1,3 +1,10 @@
+/******************************************************************************/
+/*                                                                            */
+/* SPDX-License-Identifier: MIT                                               */
+/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
+/*                                                                            */
+/******************************************************************************/
+
 use super::TypedValue;
 
 impl PartialOrd for TypedValue<'_> {

@@ -5,6 +5,9 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson interpreter definitions. Most functions are defined on
+//! [Instruction] and [ContractScript], see there for more.
+
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
@@ -22,23 +25,32 @@ use crate::irrefutable_match::irrefutable_match;
 use crate::stack::*;
 use crate::typechecker::{typecheck_contract_address, typecheck_value};
 
+/// Errors possible during interpretation.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError<'a> {
+    /// Interpreter ran out of gas.
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    /// When performing mutez arithmetic, an overflow occurred.
     #[error("mutez overflow")]
     MutezOverflow,
+    /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
+    /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
 }
 
+/// Errors possible when interpreting a full contract script.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ContractInterpretError<'a> {
+    /// Failed to typecheck the provided input as the type expected by the
+    /// script.
     #[error("failed typechecking input: {0}")]
     TcError(#[from] crate::typechecker::TcError),
-    #[error("runtime failure while running the contract: {0}")]
+    /// Failed during the interpretation of the script code.
+    #[error("runtime failure while running the script: {0}")]
     InterpretError(InterpretError<'a>),
 }
 

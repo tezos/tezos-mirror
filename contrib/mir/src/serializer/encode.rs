@@ -12,8 +12,8 @@ use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 
 use super::constants::*;
 use crate::{
-    ast::{annotations::Annotations, Micheline},
-    lexer::{Annotation, Prim},
+    ast::{Annotation, Annotations, Micheline},
+    lexer::Prim,
 };
 
 trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
@@ -73,6 +73,25 @@ impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
 }
 
 impl Annotation<'_> {
+    /// Serialize annotation to the output byte [Vec], using the `PACK` format.
+    /// Essentially this means write the annotation with the corresponding tag
+    /// character verbatim to the output, so, for example,
+    ///
+    /// ```
+    /// use mir::ast::Annotation;
+    /// let mut out = vec![];
+    /// Annotation::Field("field".into()).encode_bytes(&mut out);
+    /// assert_eq!(&out, b"%field");
+    /// ```
+    ///
+    /// Note that [Annotation::Special] are written to the output verbatim:
+    ///
+    /// ```
+    /// use mir::ast::Annotation;
+    /// let mut out = vec![];
+    /// Annotation::Special("@%".into()).encode_bytes(&mut out);
+    /// assert_eq!(&out, b"@%");
+    /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
         match self {
             Annotation::Special(s) => out.extend_from_slice(s.as_bytes()),
@@ -93,6 +112,21 @@ impl Annotation<'_> {
 }
 
 impl Annotations<'_> {
+    /// Serialize a collection of annotations to the output byte [Vec], using
+    /// the `PACK` format. Essentially this means write 4 bytes of length,
+    /// followed by annotations with the corresponding tag character verbatim to
+    /// the output, separated by a space character `0x20`. So, for example,
+    ///
+    /// ```
+    /// use mir::ast::{Annotations, Annotation};
+    /// let mut out = vec![];
+    /// Annotations::from([
+    ///     Annotation::Field("field".into()),
+    ///     Annotation::Variable("var".into()),
+    /// ])
+    /// .encode_bytes(&mut out);
+    /// assert_eq!(&out, b"\x00\x00\x00\x0B%field @var");
+    /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
         with_patchback_len(out, |out| {
             // Add them space-separated

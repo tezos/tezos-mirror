@@ -25,3 +25,18 @@ You can run the included tests by the following command.
 Some tests print gas consumption information (in addition to testing it), but `cargo test` omits output from successful tests by default. To see it, run
 
 `cargo test -- --show-output`
+
+#### Running examples
+
+The repository includes some simple examples in the `examples/` directory. To
+run them, you can use
+
+`cargo run --example example_name`
+
+Add the `--release` flag to build with optimization.
+
+For example:
+
+`cargo run --example lazy_parse --release`
+
+Note examples are automatically built (but not run) by `cargo test`.

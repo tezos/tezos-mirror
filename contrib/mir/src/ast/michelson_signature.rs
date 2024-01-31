@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Representation for typed Michelson `signature` values.
+
 use tezos_crypto_rs::{
     base58::*,
     blake2b,
@@ -37,12 +39,20 @@ needed.
 -- @lierdakil
 */
 
+/// Common behaviors for Tezos signatures.
 pub trait SignatureTrait: Sized + AsRef<[u8]> {
+    /// Raw size of the byte representation (_not_ base58-check encoded).
     const BYTE_SIZE: usize;
+    /// Magic prefix used for the base58-check representation.
     const BASE58_PREFIX: &'static [u8];
 
+    /// Construct signature from raw bytes. This function is potentially unsafe,
+    /// as in it can break invariants. Use [Self::try_from_bytes] instead.
     fn from_bytes(bs: &[u8]) -> Self;
 
+    /// Try to construct signature from raw bytes. Returns
+    /// [FromBytesError::InvalidSize] if the input slice length doesn't match
+    /// [Self::BYTE_SIZE].
     fn try_from_bytes(bs: &[u8]) -> Result<Self, FromBytesError> {
         if bs.len() == Self::BYTE_SIZE {
             Ok(Self::from_bytes(bs))
@@ -51,6 +61,7 @@ pub trait SignatureTrait: Sized + AsRef<[u8]> {
         }
     }
 
+    /// Construct base58-check representation of the signature.
     fn to_base58_check(&self) -> String {
         let data = self.as_ref();
         let mut hash = Vec::with_capacity(Self::BASE58_PREFIX.len() + data.len());
@@ -60,6 +71,11 @@ pub trait SignatureTrait: Sized + AsRef<[u8]> {
             .expect("should always be convertible to base58")
     }
 
+    /// Try to construct a signature from its base58-check representation.
+    /// Returns [FromBase58CheckError] on error, specifically if payload length
+    /// or prefix doesn't match [Self::BYTE_SIZE] and [Self::BASE58_PREFIX]
+    /// respectively. Naturally, also if base58 encoding is invalid or if
+    /// checksum doesn't match.
     fn from_b58check(s: &str) -> Result<Self, FromBase58CheckError> {
         let bytes = s.from_base58check()?;
         let expected_len = Self::BASE58_PREFIX.len() + Self::BYTE_SIZE;
@@ -78,7 +94,8 @@ pub trait SignatureTrait: Sized + AsRef<[u8]> {
 }
 
 macro_rules! defsignature {
-    ($name:ident, $size:literal, $prefix:expr) => {
+    ($(#[$meta:meta])* $name:ident, $size:literal, $prefix:expr) => {
+        $(#[$meta])*
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
         pub struct $name(hash::Signature);
 
@@ -98,16 +115,41 @@ macro_rules! defsignature {
     };
 }
 
-defsignature!(Ed25519Signature, 64, [9, 245, 205, 134, 18]); // edsig(99)
-defsignature!(Secp256k1Signature, 64, [13, 115, 101, 19, 63]); // spsig1(99)
-defsignature!(P256Signature, 64, [54, 240, 44, 52]); // p2sig(98)
-defsignature!(GenericSignature, 64, [4, 130, 43]); // sig(96)
+defsignature!(
+    /// Ed25519 signature, `edsig...`.
+    Ed25519Signature,
+    64,
+    [9, 245, 205, 134, 18]
+); // edsig(99)
+defsignature!(
+    /// Secp256k1 signature, `spsig...`
+    Secp256k1Signature,
+    64,
+    [13, 115, 101, 19, 63]
+); // spsig1(99)
+defsignature!(
+    /// P256 signature, `p2sig...`
+    P256Signature,
+    64,
+    [54, 240, 44, 52]
+); // p2sig(98)
+defsignature!(
+    /// Generic signature. Since raw byte representation of signatures are
+    /// untagged, and Ed25519, Secp256k1 and P256 signatures have the same
+    /// length, the type of the signature isn't known when constructing it from
+    /// raw bytes. This signature of yet unknown type is represented by the
+    /// generic signature, `sig...`.
+    GenericSignature,
+    64,
+    [4, 130, 43]
+); // sig(96)
 
 macro_rules! key_type_and_impls {
-    ($($con:ident($ty:path)),* $(,)*) => {
+    ($($(#[$meta:meta])* $con:ident($ty:path)),* $(,)*) => {
+        /// Enum representing arbitrary signature.
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
         pub enum Signature {
-            $($con($ty)),*
+            $($(#[$meta])* $con($ty)),*
         }
 
         $(impl From<$ty> for Signature {
@@ -135,10 +177,16 @@ macro_rules! key_type_and_impls {
 }
 
 key_type_and_impls! {
+    /// Ed25519 signature, `edsig...`.
     Ed25519(Ed25519Signature),
+    /// Secp256k1 signature, `spsig...`.
     Secp256k1(Secp256k1Signature),
+    /// P256 signature, `p2sig...`.
     P256(P256Signature),
+    /// BLS signature, `BLsig...`.
     Bls(BlsSignature),
+    /// Signature of yet-unknown type. Can be either Ed25519, Secp256k1 or P256,
+    /// but not BLS. See [GenericSignature] for more information.
     Generic(GenericSignature), // See Note: [Generic signatures]
 }
 
@@ -263,6 +311,8 @@ impl Signature {
     /// This is byte-length of `edsig`, `spsig1`, `p2sig` and `sig` variants.
     pub const GENERIC_BYTE_LENGTH: usize = 64;
 
+    /// Check the signature against a given message and public key. Returns
+    /// `true` if the signature is correct, `false` otherwise.
     pub fn check(&self, key: &super::michelson_key::Key, msg: &[u8]) -> bool {
         use super::michelson_key::Key;
         use Signature::*;

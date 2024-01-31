@@ -5,6 +5,8 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson parser.
+
 pub mod macros;
 
 use crate::ast::*;
@@ -15,17 +17,21 @@ use logos::Logos;
 use macros::MacroError;
 use typed_arena::Arena;
 
+/// Errors that can happen during parsing, aside from parser-specific ones.
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
-    #[error("expected a natural from 0 to 1023 inclusive, but got {0}")]
-    ExpectedU10(i128),
+    /// An error happened at the lexer stage.
     #[error(transparent)]
     LexerError(#[from] LexerError),
+    /// An error happened during macro expansion.
     #[error(transparent)]
     MacroError(#[from] MacroError),
 }
 
+/// A parser for Michelson. Carries an [Arena] for placing [Micheline] nodes
+/// into.
 pub struct Parser<'a> {
+    /// The [Arena] to place [Micheline] nodes into.
     pub arena: Arena<Micheline<'a>>,
 }
 
@@ -36,16 +42,21 @@ impl Default for Parser<'_> {
 }
 
 impl<'a> Parser<'a> {
+    /// Construct a new parser.
     pub fn new() -> Self {
         Parser {
             arena: Arena::new(),
         }
     }
 
+    /// Parse Michelson code or value into [Micheline].
     pub fn parse(&'a self, src: &'a str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
         syntax::MichelineNakedParser::new().parse(&self.arena, spanned_lexer(src))
     }
 
+    /// Parse Michelson script into [Micheline]. Top-level refers to a full
+    /// Michelson script, i.e. something that contains `parameter`, `storage`
+    /// and `code` fields.
     pub fn parse_top_level(
         &'a self,
         src: &'a str,
@@ -54,8 +65,10 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub fn spanned_lexer(
-    src: &'_ str,
+/// Given a Michelson string, create an iterator over lexemes in that string,
+/// with location information attached.
+pub(crate) fn spanned_lexer(
+    src: &str,
 ) -> impl Iterator<Item = Result<(usize, Tok, usize), ParserError>> + '_ {
     Tok::lexer(src)
         .spanned()
@@ -86,8 +99,8 @@ pub mod test_helpers {
 mod tests {
     use super::test_helpers::*;
     use crate::ast::micheline::test_helpers::{app, seq};
-    use crate::ast::Micheline;
-    use crate::lexer::{Annotation, Prim};
+    use crate::ast::{Annotation, Micheline};
+    use crate::lexer::Prim;
 
     #[test]
     fn instructions() {

@@ -5,6 +5,9 @@
 /*                                                                            */
 /******************************************************************************/
 
+//! Michelson typechecker definitions. Most functions defined as associated
+//! functions on [Micheline], see there for more.
+
 use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Entrypoints};
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
@@ -36,84 +39,137 @@ use crate::{ast::*, bls};
 /// Typechecker error type.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum TcError {
+    /// Two stacks didn't compare equal when they should have.
     #[error("type stacks not equal: {0:?} != {1:?}")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
+    /// Ran out of gas during typechecking.
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    /// The type didn't satisfy a given [TypeProperty].
     #[error("type is not {0}: {1:?}")]
     InvalidTypeProperty(TypeProperty, Type),
+    /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
+    /// Failed to interpret a number as a value of some type due to a numeric
+    /// conversion error.
     #[error("numeric conversion failed: {0}")]
     NumericConversion(#[from] TryFromBigIntError<()>),
+    /// Types are not equal when they should be.
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
+    /// Encountered the forbidden `DUP 0` instruction.
     #[error("DUP 0 is forbidden")]
     Dup0,
+    /// Encountered a forbidden `PAIR 0`, `PAIR 1`, `UNPAIR 0` or `UNPAIR 1`
+    /// instruction.
     #[error("{0} {1} is forbidden")]
     PairN01(Prim, u16),
+    /// Failed typechecking the value as the given type.
     #[error("value {0} is invalid for type {1:?}")]
     InvalidValueForType(String, Type),
+    /// When typechecking a `map` or `big_map`, encountered a non-`Elt` element
+    /// in a sequence.
     #[error("value {0:?} is invalid element for container type {1:?}")]
     InvalidEltForMap(String, Type),
+    /// Elements of a `map`, `set` or a `big_map` were not sorted in the
+    /// ascending order.
     #[error("sequence elements must be in strictly ascending order for type {0:?}")]
     ElementsNotSorted(Type),
+    /// Duplicate keys/elements when typechecking a `map`, `set` or a `big_map`.
     #[error("sequence elements must contain no duplicate keys for type {0:?}")]
     DuplicateElements(Type),
+    /// The given instruction can not be used with its input stack.
     #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
     NoMatchingOverload {
+        /// The instruction being typechecked.
         instr: Prim,
+        /// The offending input stack.
         stack: TypeStack,
+        /// Optional details.
         reason: Option<NoMatchingOverloadReason>,
     },
+    /// Encountered an error when typechecking a value represented as raw bytes
+    /// or a base58-check string.
     #[error("invalid value for type {0:?}: {1}")]
     ByteReprError(Type, ByteReprError),
+    /// Failed to typecheck an annotation as an entrypoint.
     #[error("invalid entrypoint: {0}")]
     EntrypointError(ByteReprError),
+    /// Failed to typecheck value of type `chain_id`.
     #[error("invalid value for chain_id: {0}")]
     ChainIdError(#[from] ChainIdError),
+    /// Encountered a SELF instruction in a forbidden context.
     #[error("SELF instruction is forbidden in this context")]
     SelfForbidden,
+    /// Entrypoint not found.
     #[error("no such entrypoint: {0}")]
     NoSuchEntrypoint(Entrypoint),
+    /// Contract with the given address not found.
     #[error("no such contract")]
     NoSuchContract,
+    /// Implicit account typechecked as a `contract 'ty` where `'ty` is neither
+    /// `unit` nor `ticket 'a`
     #[error("unexpected implicit account parameter type: {0:?}")]
     UnexpectedImplicitAccountType(Type),
-    #[error("Entrypoint specified from two different sources")]
+    /// In `CONTRACT` instruction, entrypoint was specified both in the address
+    /// and as an annotation to the instruction.
+    #[error("entrypoint specified from two different sources")]
     EntrypointAmbiguity,
+    /// Encountered unexpected Micheline syntax.
     #[error("unexpected syntax: {0}")]
     UnexpectedMicheline(String),
+    /// When typechecking a complete script, encountered duplicate top-level
+    /// field, viz. `code`, `parameter`, or `storage`.
     #[error("duplicate top-level element: {0}")]
     DuplicateTopLevelElt(Prim),
+    /// When typechecking a complete script, didn't find a required top-level
+    /// field, viz. `code`, `parameter`, or `storage`.
     #[error("missing top-level element: {0}")]
     MissingTopLevelElt(Prim),
+    /// Instructions like `DUP n` and `PAIR n` accept an argument that must be a
+    /// natural between 0 and 1023 inclusive. Found an integer outside this
+    /// bounds instead.
     #[error("expected a natural between 0 and 1023, but got {0}")]
     ExpectedU10(BigInt),
+    /// Encountered an error when working with annotations.
     #[error(transparent)]
     AnnotationError(#[from] AnnotationError),
+    /// Found a duplicate entrypoint when parsing a type.
     #[error("duplicate entrypoint: {0}")]
     DuplicateEntrypoint(Entrypoint),
+    /// Encountered an explicit default entrypoint annotation where it is
+    /// forbidden, e.g. with `CONTRACT` instruction.
     #[error("explicit default entrypoint is forbidden in: {0}")]
     ExplicitDefaultEntrypointError(Prim),
+    /// Instruction is not yet implemented.
     #[error("Unhandled instruction: {0}")]
     TodoInstr(Prim),
+    /// Type is not yet implemented.
     #[error("Unhandled type: {0}")]
     TodoType(Prim),
+    /// `big_map` with the supplied identifier not found in the storage.
     #[error("big map with ID {0} not found in the lazy storage")]
     BigMapNotFound(BigInt),
+    /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0:?}")]
     LazyStorageError(LazyStorageError),
+    /// Output stack after `MAP` instruction's code block is empty.
     #[error("MAP block returned an empty stack")]
     MapBlockEmptyStack,
+    /// All branches of a `MAP` instruction's code block are failing.
     #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
     MapBlockFail,
 }
 
+/// Errors happening when typechecking a value of type `chain_id`.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum ChainIdError {
+    /// Error happened when typechecking a (supposedly) base58-check encoded
+    /// string as `chain_id`.
     #[error("{0}")]
     FromBase58CheckError(String),
+    /// Error happened when typechecking raw bytes as `chain_id`.
     #[error("{0}")]
     FromBytesError(String),
 }
@@ -130,32 +186,48 @@ impl From<FromBytesError> for ChainIdError {
     }
 }
 
+/// More detailed, optional explanation for [TcError::NoMatchingOverload].
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum NoMatchingOverloadReason {
+    /// Input stack is too short.
     #[error("stack too short, expected at least {expected}")]
-    StackTooShort { expected: usize },
+    StackTooShort {
+        /// Expected minimal stack size
+        expected: usize,
+    },
+    /// Types don't match.
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
+    /// Expected a type `pair 'a 'b` in the input stack, but did not find it.
     #[error("expected pair 'a 'b, but got {0:?}")]
     ExpectedPair(Type),
+    /// Expected a type `option 'a` in the input stack, but did not find it.
     #[error("expected option 'a, but got {0:?}")]
     ExpectedOption(Type),
+    /// Expected a type `list 'a` in the input stack, but did not find it.
     #[error("expected list 'a, but got {0:?}")]
     ExpectedList(Type),
+    /// Expected a type `or 'a 'b` in the input stack, but did not find it.
     #[error("expected or 'a 'b, but got {0:?}")]
     ExpectedOr(Type),
+    /// Expected a comparable type in the input stack, but it was not
+    /// comparable.
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
 }
 
+/// More detailed explanation for [TcError::StacksNotEqual]
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum StacksNotEqualReason {
+    /// The given types in the stacks do not match.
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
+    /// Stack lengths differ.
     #[error("lengths are different: {0} != {1}")]
     LengthsDiffer(usize, usize),
 }
 
+/// Generic type mismatch error.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
@@ -206,6 +278,8 @@ impl<'a> Micheline<'a> {
         parse_ty(ctx, self)
     }
 
+    /// Interpreting `Micheline` as a contract parameter type, collect its
+    /// entrypoints into [Entrypoints].
     pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
         let (entrypoints, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)

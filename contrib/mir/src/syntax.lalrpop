@@ -13,7 +13,7 @@ use crate::ast::*;
 use crate::ast::annotations::*;
 use crate::parser::ParserError;
 use crate::parser::macros::expand_macro;
-use crate::lexer::{LexerError, Annotation, Prim, Noun, TztPrim as TzP, Tok};
+use crate::lexer::{LexerError, Prim, Noun, TztPrim as TzP, Tok};
 use crate::lexer::macros::{MacroArgs, Macro};
 use crate::typechecker as TC;
 use crate::tzt::*;
@@ -170,4 +170,4 @@ tztEntity : TztEntity<'a> = {
   "other_contracts" <otherContracts> => TztEntity::OtherContracts(<>),
 }
 
-pub tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
+pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
