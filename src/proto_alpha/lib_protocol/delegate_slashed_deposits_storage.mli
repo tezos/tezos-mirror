@@ -28,7 +28,7 @@
 (** This module maintains the storage related to slashing of delegates for
    double signing. In particular, it is responsible for maintaining the
    {!Storage.Slashed_deposits}, {!Storage.Contract.Slashed_deposits}, and
-   {!Storage.Current_cycle_denunciations} tables.
+   {!Storage.Pending_denunciations} tables.
 *)
 
 (** Returns true if the given delegate has already been slashed

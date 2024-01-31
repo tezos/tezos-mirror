@@ -465,9 +465,10 @@ module Pending_consensus_keys :
      and type key = Contract_repr.t
      and type value = Signature.public_key
 
-(** All denunciations of the current cycle that will have an effect (slashing,
-    reward), i.e. all below 100%, deferred to the cycle end. *)
-module Current_cycle_denunciations :
+(** All denunciations of the current and previous cycles that will have an effect
+    (slashing, reward), i.e. all below 100%, deferred to the end of their
+    slashing period. *)
+module Pending_denunciations :
   Indexed_data_storage
     with type t := Raw_context.t
      and type key = Signature.public_key_hash

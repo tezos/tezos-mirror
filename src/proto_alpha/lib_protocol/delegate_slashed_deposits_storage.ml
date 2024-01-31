@@ -113,7 +113,7 @@ let punish_double_signing ctxt ~operation_hash
       (* Do not store denunciations that have no effects .*) return ctxt
     else
       let* denunciations_opt =
-        Storage.Current_cycle_denunciations.find ctxt delegate
+        Storage.Pending_denunciations.find ctxt delegate
       in
       let denunciations = Option.value denunciations_opt ~default:[] in
       let denunciations =
@@ -124,7 +124,7 @@ let punish_double_signing ctxt ~operation_hash
           denunciations
       in
       let*! ctxt =
-        Storage.Current_cycle_denunciations.add ctxt delegate denunciations
+        Storage.Pending_denunciations.add ctxt delegate denunciations
       in
       return ctxt
   in
@@ -172,7 +172,7 @@ let apply_and_clear_denunciations ctxt =
     {reward; amount_to_burn}
   in
   let* ctxt, slashings, balance_updates, remaining_denunciations =
-    Storage.Current_cycle_denunciations.fold
+    Storage.Pending_denunciations.fold
       ctxt
       ~order:`Undefined
       ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, [], []))
@@ -340,14 +340,14 @@ let apply_and_clear_denunciations ctxt =
           balance_updates,
           (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
-  let*! ctxt = Storage.Current_cycle_denunciations.clear ctxt in
+  let*! ctxt = Storage.Pending_denunciations.clear ctxt in
   let*! ctxt =
     List.fold_left_s
       (fun ctxt (delegate, current_cycle_denunciations) ->
         match current_cycle_denunciations with
         | [] -> Lwt.return ctxt
         | _ ->
-            Storage.Current_cycle_denunciations.add
+            Storage.Pending_denunciations.add
               ctxt
               delegate
               current_cycle_denunciations)

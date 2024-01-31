@@ -184,7 +184,7 @@ module For_RPC = struct
            Another solution would be to add the slashing cycle in Storage.Contract.Slashed_deposits,
            but since it's only used for this specific RPC, let's not. *)
         let* denunciations_opt =
-          Storage.Current_cycle_denunciations.find ctxt delegate
+          Storage.Pending_denunciations.find ctxt delegate
         in
         let denunciations = Option.value denunciations_opt ~default:[] in
         let not_yet_slashed_pct =
