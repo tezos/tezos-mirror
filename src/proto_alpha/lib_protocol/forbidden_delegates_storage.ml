@@ -31,13 +31,6 @@ let should_forbid ~current_cycle slash_history =
   in
   Percentage.(Compare.(slashed_since >= p51))
 
-let may_forbid ctxt delegate ~current_cycle slash_history =
-  let open Lwt_syntax in
-  if should_forbid ~current_cycle slash_history then
-    let+ ctxt = forbid ctxt delegate in
-    (ctxt, true)
-  else return (ctxt, false)
-
 let load ctxt =
   let open Lwt_result_syntax in
   let* forbidden_delegates_opt =

@@ -101,13 +101,8 @@ let punish_double_signing ctxt ~operation_hash
   let*! ctxt =
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
-  let*! ctxt, did_forbid =
-    Forbidden_delegates_storage.may_forbid
-      ctxt
-      delegate
-      ~current_cycle
-      slash_history
-  in
+  let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
+  let did_forbid = true in
   let* ctxt =
     if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
       (* Do not store denunciations that have no effects .*) return ctxt
