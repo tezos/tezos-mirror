@@ -1264,28 +1264,38 @@ module History_v2 = struct
       in
       aux all_indices attested_slot_headers
 
-    (*  TODO: will be uncommented incrementally on the next MRs *)
-
-    (*
-    let add_confirmed_slot_header (t, cache) slot_header =
+    (* Assuming a [number_of_slots] per L1 level, we will ensure below that we
+       insert exactly [number_of_slots] cells in the skip list per level. This
+       will simplify the shape of proofs and help bounding the history cache
+       required for their generation. *)
+    let add_confirmed_slot_headers (t : t) cache published_level
+        ~number_of_slots attested_slot_headers =
       let open Result_syntax in
-      let prev_cell_ptr = hash t in
-      let* cache = History_cache.remember prev_cell_ptr t cache in
-      let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot_header in
-      return (new_cell, cache)
-
-    let add_confirmed_slot_headers (t : t) cache slot_headers =
-      List.fold_left_e add_confirmed_slot_header (t, cache) slot_headers
+      let* slot_headers =
+        fill_slot_headers
+          ~number_of_slots
+          ~published_level
+          attested_slot_headers
+      in
+      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
     let add_confirmed_slot_headers_no_cache =
-      let open Result_syntax in
-      let no_cache = History_cache.empty ~capacity:0L in
-      fun t slots ->
+      let empty_cache = History_cache.empty ~capacity:0L in
+      fun t published_level ~number_of_slots slots ->
+        let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
-          List.fold_left_e add_confirmed_slot_header (t, no_cache) slots
+          add_confirmed_slot_headers
+            t
+            empty_cache
+            published_level
+            ~number_of_slots
+            slots
         in
         cell
 
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
     (* Dal proofs section *)
 
     (** An inclusion proof, for a page ID, is a list of the slots' history
