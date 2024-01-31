@@ -241,32 +241,36 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         .expect("The kernel failed to create the temporary directory");
 
     let mut internal_storage = InternalStorage();
-    let mut host = SafeStorage {
+    let mut safe_host = SafeStorage {
         host,
         internal: &mut internal_storage,
     };
-    match main(&mut host) {
+    match main(&mut safe_host) {
         Ok(()) => {
-            promote_upgrade(&mut host)
+            promote_upgrade(&mut safe_host)
                 .expect("Potential kernel upgrade promotion failed");
-            host.promote(&EVM_PATH)
-                .expect("The kernel failed to promote the temporary directory")
+            safe_host
+                .promote(&EVM_PATH)
+                .expect("The kernel failed to promote the temporary directory");
         }
         Err(e) => {
             if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
                 // All the changes from the failed migration are reverted.
-                host.revert()
+                safe_host
+                    .revert()
                     .expect("The kernel failed to delete the temporary directory");
-                fallback_backup_kernel(&mut host).expect("Fallback mechanism failed");
+                fallback_backup_kernel(&mut safe_host)
+                    .expect("Fallback mechanism failed");
             } else {
-                log!(host, Error, "The kernel produced an error: {:?}", e);
+                log!(safe_host, Error, "The kernel produced an error: {:?}", e);
                 log!(
-                    host,
+                    safe_host,
                     Error,
                     "The temporarily modified durable storage is discarded"
                 );
 
-                host.revert()
+                safe_host
+                    .revert()
                     .expect("The kernel failed to delete the temporary directory")
             }
         }
