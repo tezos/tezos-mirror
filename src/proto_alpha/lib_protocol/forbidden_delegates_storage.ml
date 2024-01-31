@@ -24,9 +24,9 @@ let should_forbid ~current_cycle slash_history =
     List.fold_left
       (fun slashed_since (cycle, slashed) ->
         if Cycle_repr.(cycle >= since_cycle) then
-          Int_percentage.add_bounded slashed_since slashed
+          Percentage.add_bounded slashed_since slashed
         else slashed_since)
-      Int_percentage.p0
+      Percentage.p0
       slash_history
   in
   Compare.Int.((slashed_since :> int) >= 51)

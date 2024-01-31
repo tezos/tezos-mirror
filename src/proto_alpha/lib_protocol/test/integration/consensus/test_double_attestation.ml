@@ -710,7 +710,7 @@ let test_freeze_more_with_low_balance =
         preserved_cycles = 5;
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
-          Int_percentage.p50;
+          Percentage.p50;
         adaptive_issuance =
           {
             Default_parameters.constants_test.adaptive_issuance with

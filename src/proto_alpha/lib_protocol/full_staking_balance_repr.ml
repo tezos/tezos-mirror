@@ -84,7 +84,7 @@ let apply_slashing ~percentage
       min_delegated_in_cycle;
       cycle_of_min_delegated;
     } =
-  let remaining_percentage = Int_percentage.neg percentage in
+  let remaining_percentage = Percentage.neg percentage in
   let own_frozen =
     Tez_repr.mul_percentage ~rounding:`Down own_frozen remaining_percentage
   in

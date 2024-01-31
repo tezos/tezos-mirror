@@ -250,7 +250,7 @@ module Frozen_tez = struct
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
-  let slash base_amount (pct : Protocol.Int_percentage.t) a =
+  let slash base_amount (pct : Protocol.Percentage.t) a =
     let pct_times_100 = (pct :> int) in
     let slashed_amount =
       Tez.mul_q base_amount Q.(pct_times_100 // 100) |> Tez.of_q ~round_up:false

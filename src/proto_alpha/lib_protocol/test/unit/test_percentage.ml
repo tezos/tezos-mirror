@@ -16,9 +16,9 @@
 open Protocol
 
 let pct_of_int n =
-  Int_percentage.of_ratio_bounded Ratio_repr.{numerator = n; denominator = 100}
+  Percentage.of_ratio_bounded Ratio_repr.{numerator = n; denominator = 100}
 
-let assert_equal ~loc n (pct : Int_percentage.t) =
+let assert_equal ~loc n (pct : Percentage.t) =
   Assert.equal_int ~loc n (pct :> int)
 
 let assert_equal_tez ~loc t1 t2 =
@@ -28,13 +28,13 @@ let f = Tez_repr.mul_percentage
 
 let test_constant_values () =
   let open Lwt_result_syntax in
-  let* () = assert_equal ~loc:__LOC__ 5 Int_percentage.p5 in
-  let* () = assert_equal ~loc:__LOC__ 50 Int_percentage.p50 in
+  let* () = assert_equal ~loc:__LOC__ 5 Percentage.p5 in
+  let* () = assert_equal ~loc:__LOC__ 50 Percentage.p50 in
   return_unit
 
 let test_neg () =
   let open Lwt_result_syntax in
-  let open Int_percentage in
+  let open Percentage in
   let* () = assert_equal ~loc:__LOC__ 95 (neg p5) in
   let* () = assert_equal ~loc:__LOC__ 50 (neg p50) in
   let* () = assert_equal ~loc:__LOC__ 31 (neg (pct_of_int 69)) in
@@ -44,7 +44,7 @@ let test_neg () =
 
 let test_bounded () =
   let open Lwt_result_syntax in
-  let open Int_percentage in
+  let open Percentage in
   let* () = assert_equal ~loc:__LOC__ 100 (pct_of_int 200) in
   let* () = assert_equal ~loc:__LOC__ 0 (pct_of_int (-100)) in
   let* () = assert_equal ~loc:__LOC__ 100 (add_bounded p50 p50) in
@@ -59,27 +59,27 @@ let test_mul_percentage () =
     assert_equal_tez
       ~loc:__LOC__
       (of_mutez_exn 50L)
-      (mul_percentage ~rounding (of_mutez_exn 100L) Int_percentage.p50)
+      (mul_percentage ~rounding (of_mutez_exn 100L) Percentage.p50)
   in
   let* () =
     assert_equal_tez
       ~loc:__LOC__
       (of_mutez_exn 5L)
-      (mul_percentage ~rounding (of_mutez_exn 100L) Int_percentage.p5)
+      (mul_percentage ~rounding (of_mutez_exn 100L) Percentage.p5)
   in
   (* round down *)
   let* () =
     assert_equal_tez
       ~loc:__LOC__
       (of_mutez_exn 49L)
-      (mul_percentage ~rounding (of_mutez_exn 99L) Int_percentage.p50)
+      (mul_percentage ~rounding (of_mutez_exn 99L) Percentage.p50)
   in
   (* round up *)
   let* () =
     assert_equal_tez
       ~loc:__LOC__
       (of_mutez_exn 50L)
-      (mul_percentage ~rounding:`Up (of_mutez_exn 99L) Int_percentage.p50)
+      (mul_percentage ~rounding:`Up (of_mutez_exn 99L) Percentage.p50)
   in
   let tz = 123456L in
   let* () =

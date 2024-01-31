@@ -19,7 +19,7 @@ val encoding : t Data_encoding.t
 (** The weight of a delegate used for voting rights. *)
 val voting_weight : t -> Int64.t tzresult
 
-val apply_slashing : percentage:Int_percentage.t -> t -> t
+val apply_slashing : percentage:Percentage.t -> t -> t
 
 val own_frozen : t -> Tez_repr.t
 

@@ -90,10 +90,10 @@ val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 val limit_of_delegation_over_baking : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :
-  Raw_context.t -> Int_percentage.t
+  Raw_context.t -> Percentage.t
 
 val percentage_of_frozen_deposits_slashed_per_double_attestation :
-  Raw_context.t -> Int_percentage.t
+  Raw_context.t -> Percentage.t
 
 val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option
 
