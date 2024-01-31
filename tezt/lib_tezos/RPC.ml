@@ -799,10 +799,11 @@ let get_chain_block_context_contract_unstaked_frozen_balance ?(chain = "main")
     JSON.as_int
 
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
-    ?delegate ?level () =
+    ?delegate ?level ?cycle () =
   let query_string =
     Query_arg.opt "delegate" Fun.id delegate
     @ Query_arg.opt "level" Int.to_string level
+    @ Query_arg.opt "cycle" string_of_int cycle
   in
   make
     ~query_string
