@@ -722,6 +722,17 @@ let sequencer_command =
           make_with_defaults
             ~enable_default_daily_logs_at:
               Filename.Infix.(data_dir // "daily_logs")
+              (* Show only above Info rpc_server events, they are not
+                 relevant as we do not have a REST-API server. If not
+                 set, the daily logs are polluted with these
+                 uninformative logs. *)
+            ~daily_logs_section_prefixes:
+              [
+                ("rpc_server", Notice);
+                ("rpc_server", Warning);
+                ("rpc_server", Error);
+                ("rpc_server", Fatal);
+              ]
             ()
         in
         init ~config ()
