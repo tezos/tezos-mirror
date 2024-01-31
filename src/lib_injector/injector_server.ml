@@ -82,6 +82,8 @@ module Parameters :
      structures *)
   let fee_parameter {fee_parameters; _} _ = fee_parameters
 
+  let safety_guard _ = None
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
      {!Injector_common.Parameter.batch_must_succeed}. *)

@@ -158,6 +158,10 @@ module type PARAMETERS = sig
       caps of fee and burn for each operation. *)
   val fee_parameter : state -> Operation.t -> Injector_common.fee_parameter
 
+  (** Returns the gas safety guard for each operation if it should be different
+      from the client default (100). *)
+  val safety_guard : Operation.t -> int option
+
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
      succeed in the simulation of injection. If it returns [`At_least_one], at
@@ -214,6 +218,7 @@ module type PROTOCOL_CLIENT = sig
     src_pk:Signature.public_key ->
     successor_level:bool ->
     fee_parameter:Injector_common.fee_parameter ->
+    ?safety_guard:int ->
     operation list ->
     ( unsigned_operation simulation_result,
       [`Exceeds_quotas of tztrace | `TzError of tztrace] )

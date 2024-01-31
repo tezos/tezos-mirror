@@ -467,6 +467,20 @@ module Make (Parameters : PARAMETERS) = struct
       }
       ops
 
+  (** The safety guard parameter is global to the simulation function, so in the
+      case of a batch of L1 operations, we set this safety guard as the maximum
+      of safety guards decided by the injector instance for each operation. *)
+  let safety_guard_of_operations ops =
+    List.fold_left
+      (fun acc {Inj_operation.operation; _} ->
+        let op_safety = Parameters.safety_guard operation in
+        match (acc, op_safety) with
+        | None, _ -> op_safety
+        | Some _, None -> acc
+        | Some safety, Some op_safety -> Some (max safety op_safety))
+      None
+      ops
+
   (** Returns the first half of the list [ops] if there is more than two
       elements, or [None] otherwise.  *)
   let keep_half ops =
@@ -510,6 +524,7 @@ module Make (Parameters : PARAMETERS) = struct
     in
     let*! () = Event.(emit2 simulating_operations) state op_operations force in
     let fee_parameter = fee_parameter_of_operations state.state operations in
+    let safety_guard = safety_guard_of_operations operations in
     let module Proto_client = (val state.proto_client) in
     let*! simulation_result =
       Proto_client.simulate_operations
@@ -521,6 +536,7 @@ module Make (Parameters : PARAMETERS) = struct
           (* Operations are simulated in the next block, which is important for
              rollups and ok for other applications. *)
         ~fee_parameter
+        ?safety_guard
         op_operations
     in
     match simulation_result with
