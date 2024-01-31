@@ -52,7 +52,7 @@ type punishing_amounts = {
 
 let punish_double_signing ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
-    ~rewarded : (Raw_context.t * bool) tzresult Lwt.t =
+    ~rewarded =
   let open Lwt_result_syntax in
   let* slashed_opt =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -102,7 +102,6 @@ let punish_double_signing ctxt ~operation_hash
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
   let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
-  let did_forbid = true in
   let* ctxt =
     if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
       (* Do not store denunciations that have no effects .*) return ctxt
@@ -123,7 +122,7 @@ let punish_double_signing ctxt ~operation_hash
       in
       return ctxt
   in
-  return (ctxt, did_forbid)
+  return ctxt
 
 let clear_outdated_slashed_deposits ctxt ~new_cycle =
   let max_slashable_period = Constants_repr.max_slashing_period in

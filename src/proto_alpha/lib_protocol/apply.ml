@@ -2353,7 +2353,7 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
-  let+ ctxt, forbidden_delegate =
+  let+ ctxt =
     Delegate.punish_double_signing
       ctxt
       ~operation_hash
@@ -2362,9 +2362,7 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
       level
       ~rewarded
   in
-  ( ctxt,
-    Single_result
-      (mk_result (if forbidden_delegate then Some delegate else None) []) )
+  (ctxt, Single_result (mk_result (Some delegate) []))
 
 let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
