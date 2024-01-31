@@ -58,7 +58,7 @@ let check_is_in_range ~number_of_slots slot_index =
   error_unless
     Compare.Int.(slot_index >= zero && slot_index < number_of_slots)
     (Invalid_slot_index
-       {given = slot_index; min = zero; max = number_of_slots + 1})
+       {given = slot_index; min = zero; max = number_of_slots - 1})
 
 let of_int ~number_of_slots slot_index =
   let open Result_syntax in
@@ -84,3 +84,5 @@ let slots_range ~number_of_slots ~lower ~upper =
 
 let slots_range_opt ~number_of_slots ~lower ~upper =
   Option.of_result @@ slots_range ~number_of_slots ~lower ~upper
+
+let is_succ t ~succ = Compare.Int.(t + 1 = succ)
