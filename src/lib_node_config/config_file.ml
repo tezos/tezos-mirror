@@ -34,6 +34,8 @@ let default_data_dir = home // ".tezos-node"
 
 let default_rpc_port = 8732
 
+let default_max_active_rpc_connections = 100
+
 let default_metrics_port = 9932
 
 let default_p2p_port = 9732
@@ -361,6 +363,7 @@ and rpc = {
   tls : tls option;
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
+  max_active_rpc_connections : int;
 }
 
 and tls = {cert : string; key : string}
@@ -389,6 +392,7 @@ let default_rpc =
     tls = None;
     acl = RPC_server.Acl.empty_policy;
     media_type = Media_type.Command_line.Any;
+    max_active_rpc_connections = default_max_active_rpc_connections;
   }
 
 let default_disable_config_validation = false
@@ -559,6 +563,7 @@ let rpc : rpc Data_encoding.t =
            tls;
            acl;
            media_type;
+           max_active_rpc_connections;
          } ->
       let cert, key =
         match tls with
@@ -573,7 +578,8 @@ let rpc : rpc Data_encoding.t =
         cert,
         key,
         acl,
-        media_type ))
+        media_type,
+        max_active_rpc_connections ))
     (fun ( listen_addrs,
            local_listen_addrs,
            legacy_listen_addr,
@@ -582,7 +588,8 @@ let rpc : rpc Data_encoding.t =
            cert,
            key,
            acl,
-           media_type ) ->
+           media_type,
+           max_active_rpc_connections ) ->
       let tls =
         match (cert, key) with
         | None, _ | _, None -> None
@@ -609,8 +616,9 @@ let rpc : rpc Data_encoding.t =
         tls;
         acl;
         media_type;
+        max_active_rpc_connections;
       })
-    (obj9
+    (obj10
        (opt
           "listen-addrs"
           ~description:
@@ -652,7 +660,13 @@ let rpc : rpc Data_encoding.t =
           "media-type"
           ~description:"The media types supported by the server."
           Media_type.Command_line.encoding
-          default_rpc.media_type))
+          default_rpc.media_type)
+       (dft
+          "max_active_rpc_connections"
+          ~description:
+            "The maximum number of active connections per RPC endpoint."
+          int31
+          default_rpc.max_active_rpc_connections))
 
 let rpc_encoding = rpc
 
@@ -840,8 +854,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(local_rpc_listen_addrs = []) ?(allow_all_rpc = [])
-    ?(media_type = Media_type.Command_line.Any) ?(metrics_addr = [])
-    ?operation_metadata_size_limit ?(private_mode = default_p2p.private_mode)
+    ?(media_type = Media_type.Command_line.Any)
+    ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
+    ?(metrics_addr = []) ?operation_metadata_size_limit
+    ?(private_mode = default_p2p.private_mode)
     ?(disable_p2p_maintenance =
       Option.is_none default_p2p.limits.maintenance_idle_time)
     ?(disable_p2p_swap = Option.is_none default_p2p.limits.swap_linger)
@@ -928,6 +944,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       tls = Option.either rpc_tls cfg.rpc.tls;
       acl;
       media_type;
+      max_active_rpc_connections;
     }
   and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
   and log : Logs_simple_config.cfg =

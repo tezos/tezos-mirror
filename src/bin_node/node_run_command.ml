@@ -448,7 +448,14 @@ let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
   let mode = extract_mode rpc_server_kind in
   Lwt.catch
     (fun () ->
-      let*! () = RPC_server.launch ~host server ~callback mode in
+      let*! () =
+        RPC_server.launch
+          ~host
+          server
+          ~callback
+          ~max_active_connections:config.rpc.max_active_rpc_connections
+          mode
+      in
       return server)
     (function
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
