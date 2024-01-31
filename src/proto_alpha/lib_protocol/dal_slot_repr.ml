@@ -1110,14 +1110,8 @@ module History_v2 = struct
         Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
   end
 
-  (*  TODO: will be uncommented incrementally on the next MRs *)
-  (*
   module V1 = struct
-    (* The content of a cell is the hash of all the slot commitments
-       represented as a merkle list. *)
-    (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3765
-       Decide how to store attested slots in the skip list's content. *)
-    type content = Header.t
+    type content = Content.t
 
     (* A pointer to a cell is the hash of its content and all the back
        pointers. *)
@@ -1127,6 +1121,9 @@ module History_v2 = struct
 
     type t = history
 
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
     let history_encoding =
       Skip_list.encoding Pointer_hash.encoding Header.encoding
 
@@ -1715,8 +1712,8 @@ module History_v2 = struct
                 true
             | _ -> false)
     end
+  *)
   end
 
   include V1
-*)
 end
