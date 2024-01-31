@@ -1156,11 +1156,8 @@ module History_v2 = struct
             (fun ((), x) -> x);
         ]
 
-    (*  TODO: will be uncommented incrementally on the next MRs *)
-
-    (*
     let equal_history : history -> history -> bool =
-      Skip_list.equal Pointer_hash.equal Header.equal
+      Skip_list.equal Pointer_hash.equal Content.equal
 
     let encoding = history_encoding
 
@@ -1169,7 +1166,7 @@ module History_v2 = struct
     let hash cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Data_encoding.Binary.to_bytes_exn Header.encoding current_slot
+      Data_encoding.Binary.to_bytes_exn Content.encoding current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
@@ -1180,8 +1177,10 @@ module History_v2 = struct
         "@[hash : %a@;%a@]"
         Pointer_hash.pp
         history_hash
-        (Skip_list.pp ~pp_content:Header.pp ~pp_ptr:Pointer_hash.pp)
+        (Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp)
         history
+
+    let pp = pp_history
 
     module History_cache =
       Bounded_history_repr.Make
@@ -1199,6 +1198,9 @@ module History_v2 = struct
           let equal = equal_history
         end)
 
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
     let add_confirmed_slot_header (t, cache) slot_header =
       let open Result_syntax in
       let prev_cell_ptr = hash t in
