@@ -15,7 +15,13 @@ let preprocess_encoding : preprocess t =
   let open Data_encoding in
   tup2 Domain.encoding (array G1_carray.encoding)
 
-type shard_proof = G1.t
+(*Adding repr to inlcude the proof in the transcript*)
+type shard_proof = Commitment.t [@@deriving repr]
+
+type commitment = Commitment.t
+
+(*Adding repr to include evaluations_list in the transcript*)
+type eval_list = Scalar.t array list [@@deriving repr]
 
 let commit t = Commitment.commit t.srs_g1
 
@@ -361,3 +367,71 @@ let verify t ~commitment ~srs_point ~domain ~root ~evaluations ~proof =
             = e([r_i(τ)]_1-c, g_2) + e(π, [τ^l]_2 - [w^{i * l}]_2). *)
   Pairing.pairing_check
     [(diff_commits, G2.(copy one)); (proof, commit_srs_point_minus_root_pow)]
+
+(*Batched version of the verify functions, which verify the correctness of opening
+  of multiple multi reveals.
+  Inspired from page 13 of https://eprint.iacr.org/2019/953.pdf
+  With commmitment = c, remainder list = R_i
+  (IFFT of the evaluations, root_list = w_i
+  (indicating the shifts of the subgroup we are verifying evaluations agains, proof_list = pi_i,
+  we generate a pseudo random alpha and verify :
+  e(c, \sum_i w_i R_i,1)*e(sum_i aplha_i*w_i*pi_i,[X]) =? 1 *)
+let verify_multi t ~commitment ~srs_point ~domain ~root_list ~evaluations_list
+    ~proof_list =
+  let open Bls12_381 in
+  (* Compute r_i(x). *)
+  let remainder_list =
+    List.map2
+      (fun root evaluations -> interpolation_poly ~root ~domain ~evaluations)
+      root_list
+      evaluations_list
+  in
+  let transcript =
+    List.fold_left
+      (fun transcript proof ->
+        Utils.Transcript.expand shard_proof_t proof transcript)
+      Utils.Transcript.empty
+      proof_list
+  in
+  let transcript =
+    Utils.Transcript.expand eval_list_t evaluations_list transcript
+  in
+  (* We use Fiat-Shamir here to get some pseudo randomness.
+     Since alpha is only used on the verifier side we could
+     use real randomness as well. *)
+  let alpha, _ = Utils.Fr_generation.random_fr transcript in
+  (*TODO optimize*)
+  let alpha_list =
+    List.init (List.length proof_list) (fun i -> Scalar.pow alpha (Z.of_int i))
+  in
+  let batched_remainder =
+    List.fold_left2
+      (fun acc remainder_i alpha_i ->
+        Poly.(acc + mul_by_scalar alpha_i remainder_i))
+      Poly.zero
+      remainder_list
+      alpha_list
+  in
+  let commitment_remainder_batched = commit t batched_remainder in
+  let root_pow_list =
+    List.map
+      (fun root -> Scalar.pow root (Z.of_int (Domain.length domain)))
+      root_list
+  in
+  let sum_alpha_i = List.fold_left Scalar.add Scalar.zero alpha_list in
+  let batched_commitment = G1.mul commitment sum_alpha_i in
+  let alpha_i_root_pow_i = List.map2 Scalar.mul alpha_list root_pow_list in
+  let w_batched =
+    G1.pippenger (Array.of_list proof_list) (Array.of_list alpha_i_root_pow_i)
+  in
+  let left =
+    G1.(
+      add
+        batched_commitment
+        (add w_batched (negate commitment_remainder_batched)))
+  in
+  let w_batched_2 =
+    G1.(
+      negate @@ pippenger (Array.of_list proof_list) (Array.of_list alpha_list))
+  in
+  Pairing.pairing_check [(left, G2.one); (w_batched_2, srs_point)]

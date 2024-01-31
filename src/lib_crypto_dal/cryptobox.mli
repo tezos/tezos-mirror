@@ -194,7 +194,7 @@ val polynomial_to_slot : t -> polynomial -> slot
 
       Fails with [`Invalid_degree_strictly_less_than_expected _]
       if the degree of [p] exceeds the SRS size.
-      
+
       Fails with [`Prover_SRS_not_loaded] if the prover’s SRS is not loaded
       (ie: [init_dal_verifier] has been used to load the SRS). *)
 val commit :
@@ -314,6 +314,18 @@ val verify_shard :
   commitment ->
   shard ->
   shard_proof ->
+  ( unit,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Invalid_shard
+    | `Shard_length_mismatch
+    | `Shard_index_out_of_range of string ] )
+  Result.t
+
+val verify_shard_multi :
+  t ->
+  commitment ->
+  shard list ->
+  shard_proof list ->
   ( unit,
     [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
     | `Invalid_shard

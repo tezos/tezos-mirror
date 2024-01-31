@@ -17,6 +17,10 @@ module Test = struct
   let randrange ?(min = 0) max =
     QCheck2.Gen.(generate1 (int_range min (max - 1)))
 
+  (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
+  let randrange_list ?(min = 0) ~len max =
+    QCheck2.Gen.(generate ~n:len (int_range min (max - 1)))
+
   let out_of_range ~min ~max =
     let left = QCheck2.Gen.(Int.min_int -- (min - 1)) in
     let right = QCheck2.Gen.(max -- Int.max_int) in
@@ -463,6 +467,62 @@ module Test = struct
                commitment
                shard
                shard_proofs.(shard_index))
+        |> function
+        | Ok () -> true
+        | _ -> false)
+
+  (* Tests that a shard comes from the erasure-encoded slot. *)
+  let test_shard_proofs_multi =
+    let open QCheck2 in
+    let open Error_monad.Result_syntax in
+    Test.make
+      ~name:"shard proofs multi"
+      ~print:print_parameters
+      generate_parameters
+      (fun params ->
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
+        assert (ensure_validity params) ;
+        (let* t = make params in
+         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+         let* commitment = Cryptobox.commit t polynomial in
+         let shards = Cryptobox.shards_from_polynomial t polynomial in
+         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let shard_proofs =
+           Cryptobox.prove_shards t ~polynomial ~precomputation
+         in
+         let shard_index_list =
+           randrange_list ~len:params.number_of_shards params.number_of_shards
+         in
+
+         let shard_to_verify =
+           List.map
+             (fun shard_index ->
+               match
+                 Seq.find
+                   (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
+                   shards
+               with
+               | None ->
+                   (* The shard index was sampled within the bounds, so this case
+                      (the queried index is out of bounds) doesn't happen. *)
+                   assert false
+               | Some shard -> shard)
+             shard_index_list
+         in
+         (* Testing the initialisation logic, even if the prover’s would be
+            enough to verify *)
+         Cryptobox.Internal_for_tests.init_verifier_dal () ;
+         let* t = make params in
+         let shard_proof_list =
+           List.map
+             (fun shard_index -> shard_proofs.(shard_index))
+             shard_index_list
+         in
+         Cryptobox.verify_shard_multi
+           t
+           commitment
+           shard_to_verify
+           shard_proof_list)
         |> function
         | Ok () -> true
         | _ -> false)
@@ -1050,6 +1110,7 @@ let () =
               test_page_proofs;
               test_page_proofs_invalid;
               test_shard_proofs;
+              test_shard_proofs_multi;
               test_shard_proof_invalid;
               test_commitment_proof;
               test_commitment_proof_invalid;
