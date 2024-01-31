@@ -412,6 +412,26 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       (* Keep the worker alive. *)
       return_ok_unit
 
+(* This failsafe aims to look for an irmin error that is known to be
+   critical and, if found, stop the node gracefully. *)
+let check_and_quit_on_irmin_errors errors =
+  let open Lwt_syntax in
+  let is_inode_error error =
+    match error with
+    | Exn (Failure s) -> (
+        let rex = Str.regexp_string "unknown inode key" in
+        try
+          let _ = Str.search_forward rex s 0 in
+          true
+        with Not_found -> false)
+    | _ -> false
+  in
+  if List.exists (fun error -> is_inode_error error) errors then
+    let* () = Events.(emit stopping_node_missing_irmin_key ()) in
+    let* _ = Lwt_exit.exit_and_wait 1 in
+    return_unit
+  else return_unit
+
 let on_completion :
     type a b.
     t -> (a, b) Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
@@ -442,7 +462,10 @@ let on_completion :
           | [Canceled] ->
               (* Ignore requests cancellation *)
               Lwt.return_unit
-          | errs -> Events.(emit validation_failure) (v.block, st, errs))
+          | errs ->
+              let* () = Events.(emit validation_failure) (v.block, st, errs) in
+              let* () = check_and_quit_on_irmin_errors errs in
+              return_unit)
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
@@ -453,14 +476,20 @@ let on_completion :
       Prometheus.Counter.inc_one metrics.preapplication_errors_count ;
       match Request.view request with
       | Preapplication v ->
-          Events.(emit preapplication_failure) (v.level, st, errs)
+          let* () = Events.(emit preapplication_failure) (v.level, st, errs) in
+          let* () = check_and_quit_on_irmin_errors errs in
+          return_unit
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_error_after_precheck errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_after_precheck_count ;
       match Request.view request with
       | Validation v ->
-          Events.(emit validation_failure_after_precheck) (v.block, st, errs)
+          let* () =
+            Events.(emit validation_failure_after_precheck) (v.block, st, errs)
+          in
+          let* () = check_and_quit_on_irmin_errors errs in
+          return_unit
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Precheck_failed errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
@@ -471,7 +500,10 @@ let on_completion :
           | [Canceled] ->
               (* Ignore requests cancellation *)
               Lwt.return_unit
-          | errs -> Events.(emit precheck_failure) (v.block, st, errs))
+          | errs ->
+              let* () = Events.(emit precheck_failure) (v.block, st, errs) in
+              let* () = check_and_quit_on_irmin_errors errs in
+              return_unit)
       | _ -> (* assert false *) Lwt.return_unit)
   | _ -> (* assert false *) Lwt.return_unit
 
