@@ -150,7 +150,30 @@ module Schema = struct
                   |> List.map (fun p -> string p.name));
                 field_opt "additionalProperties" additional_properties to_json;
               ]
-          | One_of schemas -> [field "oneOf" (array (List.map to_json schemas))]
+          | One_of schemas ->
+              let schemas =
+                let rec deduplicate known acc = function
+                  | [] -> List.rev acc
+                  | schema :: tail -> (
+                      match schema with
+                      | Ref title | Other {title = Some title; _} ->
+                          if String_set.mem title known then (
+                            Printf.eprintf
+                              "Warning: Schema %s appears twice in the same \
+                               object; ignored duplicate occurrence\n\
+                               %!"
+                              title ;
+                            deduplicate known acc tail)
+                          else
+                            deduplicate
+                              (String_set.add title known)
+                              (schema :: acc)
+                              tail
+                      | _ -> deduplicate known (schema :: acc) tail)
+                in
+                deduplicate String_set.empty [] schemas
+              in
+              [field "oneOf" (array (List.map to_json schemas))]
           | Any -> []))
 
   let rec of_json json =
