@@ -106,6 +106,9 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** Send SIGKILL and wait for the process to terminate. *)
 val kill : t -> unit Lwt.t
 
+(** Send SIGSTOP to a daemon. Do not wait for the process to terminate. *)
+val stop : t -> unit Lwt.t
+
 (** Shows in stdout every events sent by the node *)
 val log_events : ?max_length:int -> t -> unit
 
