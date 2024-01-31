@@ -174,9 +174,11 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
               apply_blueprint ctxt genesis
           | None -> return ctxt)
     | None ->
-        failwith
-          "Cannot compute the initial EVM state without the path to the \
-           initial kernel"
+        if loaded then return ctxt
+        else
+          failwith
+            "Cannot compute the initial EVM state without the path to the \
+             initial kernel"
   in
 
   return ctxt
