@@ -60,6 +60,9 @@ const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
 const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
 
+/// Path to the last L1 level seen.
+const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
+
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/info_per_level/timestamp");
@@ -581,6 +584,19 @@ pub fn store_timestamp_path<Host: Runtime>(
     timestamp: &Timestamp,
 ) -> Result<(), Error> {
     host.store_write(path, &timestamp.i64().to_le_bytes(), 0)?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn read_l1_level<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+    let mut buffer = [0u8; 4];
+    store_read_slice(host, &EVM_L1_LEVEL, &mut buffer, 4)?;
+    let level = u32::from_le_bytes(buffer);
+    Ok(level)
+}
+
+pub fn store_l1_level<Host: Runtime>(host: &mut Host, level: u32) -> Result<(), Error> {
+    host.store_write(&EVM_L1_LEVEL, &level.to_le_bytes(), 0)?;
     Ok(())
 }
 

@@ -12,8 +12,8 @@ use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, clear_events, create_chunked_transaction,
     get_and_increment_deposit_nonce, read_last_info_per_level_timestamp,
-    remove_chunked_transaction, remove_sequencer, store_last_info_per_level_timestamp,
-    store_sequencer, store_transaction_chunk,
+    remove_chunked_transaction, remove_sequencer, store_l1_level,
+    store_last_info_per_level_timestamp, store_sequencer, store_transaction_chunk,
 };
 use crate::upgrade::*;
 use crate::Error;
@@ -307,7 +307,8 @@ pub fn handle_input(
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
             clear_events(host)?;
-            store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
+            store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
+            store_l1_level(host, info.level)?
         }
         Input::Deposit(deposit) => inbox_content
             .transactions
