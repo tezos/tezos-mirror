@@ -21,6 +21,10 @@
   variables:
     JUNIT: "tezt-junit.xml"
     TEZT_VARIANT: ""
+    # The variable TESTS controls test selection. It passed directly
+    # to tezt so can contain tags, their negation, or an arbitrary
+    # TSL expression.
+    TESTS: ""
   artifacts:
     reports:
       junit: $JUNIT
@@ -91,11 +95,6 @@
     - .oc.template__coverage_output_artifact
     - .tezt_template
     - .oc.template__retry_flaky
-  variables:
-    # Certain tests can be blacklisted by modifying the TESTS variable.
-    # Do not tests with the tag 'ci_disabled' and 'flaky'.
-    # See tezt/lib_tezos/tag.mli for more information.
-    TESTS: "/ci_disabled /flaky"
   dependencies:
     - "oc.build_x86_64-released"
     - "oc.build_x86_64-exp-dev-extra"
