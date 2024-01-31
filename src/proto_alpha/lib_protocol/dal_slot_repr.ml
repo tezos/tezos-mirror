@@ -1051,42 +1051,67 @@ module History_v2 = struct
   module Skip_list = struct
     include Skip_list.Make (Skip_list_parameters)
 
-    (** All confirmed DAL slots will be stored in a skip list, where only the
-        last cell is remembered in the L1 context. The skip list is used in
-        the proof phase of a refutation game to verify whether a given slot
-        exists (i.e., confirmed) or not in the skip list. The skip list is
-        supposed to be sorted, as its 'search' function explicitly uses a given
-        `compare` function during the list traversal to quickly (in log(size))
-        reach the target if any.
-
-        In our case, we will store one slot per cell in the skip list and
-        maintain that the list is well sorted (and without redundancy) w.r.t.
-        the [compare_slot_id] function.
+    (** All Dal slot indices for all levels will be stored in a skip list
+        (with or without a commitment depending on attestation status of each
+        slot), where only the last cell is needed to be remembered in the L1
+        context. The skip list is used in the proof phase of a refutation game
+        to verify whether a given slot is inserted as [Attested] or not in the
+        skip list. The skip list is supposed to be sorted, as its 'search'
+        function explicitly uses a given `compare` function during the list
+        traversal to quickly (in log(size)) reach the target slot header id.
+        Two cells compare in lexicographic ordering of their levels and slot indexes.
 
         Below, we redefine the [next] function (that allows adding elements
         on top of the list) to enforce that the constructed skip list is
-        well-sorted. We also define a wrapper around the search function to
+        well-sorted. We also define a wrapper around the [search] function to
         guarantee that it can only be called with the adequate compare function.
     *)
-
-    let next ~prev_cell ~prev_cell_ptr elt =
+    let next ~prev_cell ~prev_cell_ptr ~number_of_slots elt =
       let open Result_syntax in
+      let well_ordered =
+        (* For each cell we insert in the skip list, we ensure that it complies
+           with the following invariant:
+           - Either the published levels are successive (no gaps). In this case:
+             * The last inserted slot's index for the previous level is
+               [number_of_slots - 1];
+             * The first inserted slot's index for the current level is 0
+           - Or, levels are equal, but slot indices are successive. *)
+        let Header.{published_level = l1; index = i1} =
+          content prev_cell |> Content.content_id
+        in
+        let Header.{published_level = l2; index = i2} =
+          Content.content_id elt
+        in
+        (Raw_level_repr.equal l2 (Raw_level_repr.succ l1)
+        && Compare.Int.(Dal_slot_index_repr.to_int i1 = number_of_slots - 1)
+        && Compare.Int.(Dal_slot_index_repr.to_int i2 = 0))
+        || Raw_level_repr.equal l2 l1
+           && Dal_slot_index_repr.is_succ i1 ~succ:i2
+      in
       let* () =
-        error_when
-          (Compare.Int.( <= )
-             (Header.compare_slot_id
-                elt.Header.id
-                (content prev_cell).Header.id)
-             0)
+        error_unless
+          well_ordered
           Add_element_in_slots_skip_list_violates_ordering_v2
       in
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
-    let search ~deref ~cell ~target_id =
-      Lwt.search ~deref ~cell ~compare:(fun slot ->
-          Header.compare_slot_id slot.Header.id target_id)
+    let search =
+      let compare_with_slot_id (target_slot_id : Header.id)
+          (content : Content.t) =
+        let Header.{published_level = target_level; index = target_index} =
+          target_slot_id
+        in
+        let Header.{published_level; index} = Content.content_id content in
+        let c = Raw_level_repr.compare published_level target_level in
+        if Compare.Int.(c <> 0) then c
+        else Dal_slot_index_repr.compare index target_index
+      in
+      fun ~deref ~cell ~target_slot_id ->
+        Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
   end
 
+  (*  TODO: will be uncommented incrementally on the next MRs *)
+  (*
   module V1 = struct
     (* The content of a cell is the hash of all the slot commitments
        represented as a merkle list. *)
@@ -1693,4 +1718,5 @@ module History_v2 = struct
   end
 
   include V1
+*)
 end
