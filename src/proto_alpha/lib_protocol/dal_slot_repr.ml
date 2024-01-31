@@ -1121,6 +1121,9 @@ module History_v2 = struct
 
     type t = history
 
+    let genesis, genesis_level =
+      (Skip_list.genesis Content.zero, Content.zero_level)
+
     (*  TODO: will be uncommented incrementally on the next MRs *)
 
     (*
@@ -1133,8 +1136,6 @@ module History_v2 = struct
     let encoding = history_encoding
 
     let equal : t -> t -> bool = equal_history
-
-    let genesis : t = Skip_list.genesis Header.zero
 
     let hash cell =
       let current_slot = Skip_list.content cell in
