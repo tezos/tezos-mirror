@@ -47,9 +47,9 @@ val env_var_name : string
 (** Call [close] on all the sinks. *)
 val close : unit -> unit Lwt.t
 
-(** [make_defaults ?verbosity ?enable_default_daily_logs_at ?internal_events]
-    creates internal event configuration using default values depending on
-    parameters.
+(** [make_defaults ?verbosity ?enable_default_daily_logs_at
+    ?daily_logs_section_prefixes ?internal_events] creates internal
+    event configuration using default values depending on parameters.
 
     - [verbosity] overrides the default level on stdout. Usually provided
       through -v instead of configuration.
@@ -63,11 +63,12 @@ val close : unit -> unit Lwt.t
     ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"]
 
     This function handles [TEZOS_LOG] environment variables and rules
-    provided through it.
+    provided through it. It also optionally accepts [?daily_logs_section_prefixes].
 *)
 val make_with_defaults :
   ?verbosity:Internal_event.level ->
   ?enable_default_daily_logs_at:string ->
+  ?daily_logs_section_prefixes:(string * Internal_event.level) list ->
   ?log_cfg:Logs_simple_config.cfg ->
   unit ->
   Internal_event_config.t
