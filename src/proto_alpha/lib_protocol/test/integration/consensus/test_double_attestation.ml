@@ -166,11 +166,13 @@ let test_valid_double_attestation_evidence () =
     Context.Delegate.current_frozen_deposits (B blk_eoc) delegate
   in
   let frozen_deposits_after = Test_tez.(frozen_deposits_after -! autostaked) in
-  let p =
-    constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+  let one_minus_p =
+    Percentage.neg
+      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
+  let {Q.num; den} = Percentage.to_q one_minus_p in
   let expected_frozen_deposits_after =
-    Test_tez.(frozen_deposits_before *! Int64.of_int (100 - (p :> int)) /! 100L)
+    Test_tez.(frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
   in
   let* () =
     Assert.equal_tez
@@ -775,14 +777,13 @@ let test_freeze_more_with_low_balance =
     in
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
-    let slash_percentage =
-      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+    let one_minus_slash_percentage =
+      Percentage.neg
+        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
     in
+    let {Q.num; den} = Percentage.to_q one_minus_slash_percentage in
     let expected_frozen_deposits_after =
-      Test_tez.(
-        info2.frozen_deposits
-        *! Int64.of_int (100 - (slash_percentage :> int))
-        /! 100L)
+      Test_tez.(info2.frozen_deposits *! Z.to_int64 num /! Z.to_int64 den)
     in
     let* () =
       Assert.equal_tez

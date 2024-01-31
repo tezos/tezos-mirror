@@ -29,7 +29,7 @@ let should_forbid ~current_cycle slash_history =
       Percentage.p0
       slash_history
   in
-  Compare.Int.((slashed_since :> int) >= 51)
+  Percentage.(Compare.(slashed_since >= p51))
 
 let may_forbid ctxt delegate ~current_cycle slash_history =
   let open Lwt_syntax in

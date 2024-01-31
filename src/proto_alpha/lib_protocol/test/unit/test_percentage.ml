@@ -19,7 +19,8 @@ let pct_of_int n =
   Percentage.of_ratio_bounded Ratio_repr.{numerator = n; denominator = 100}
 
 let assert_equal ~loc n (pct : Percentage.t) =
-  Assert.equal_int ~loc n (pct :> int)
+  let pct_q = Percentage.to_q pct in
+  Assert.equal_q ~loc Q.(n // 100) pct_q
 
 let assert_equal_tez ~loc t1 t2 =
   Assert.equal ~loc Tez_repr.equal "Tez aren't equal" Tez_repr.pp t1 t2
@@ -28,8 +29,11 @@ let f = Tez_repr.mul_percentage
 
 let test_constant_values () =
   let open Lwt_result_syntax in
+  let* () = assert_equal ~loc:__LOC__ 0 Percentage.p0 in
   let* () = assert_equal ~loc:__LOC__ 5 Percentage.p5 in
   let* () = assert_equal ~loc:__LOC__ 50 Percentage.p50 in
+  let* () = assert_equal ~loc:__LOC__ 51 Percentage.p51 in
+  let* () = assert_equal ~loc:__LOC__ 100 Percentage.p100 in
   return_unit
 
 let test_neg () =

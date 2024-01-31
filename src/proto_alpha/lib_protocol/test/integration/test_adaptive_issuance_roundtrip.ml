@@ -1558,12 +1558,16 @@ let cycle_from_level blocks_per_cycle level =
 
 let pct_from_kind (block : Block.t) = function
   | Protocol.Misbehaviour_repr.Double_baking ->
-      (block.constants.percentage_of_frozen_deposits_slashed_per_double_baking
-        :> int)
+      Protocol.Percentage.to_q
+        block.constants.percentage_of_frozen_deposits_slashed_per_double_baking
+      |> Q.(mul (100 // 1))
+      |> Q.to_int
   | Double_attesting ->
-      (block.constants
-         .percentage_of_frozen_deposits_slashed_per_double_attestation
-        :> int)
+      Protocol.Percentage.to_q
+        block.constants
+          .percentage_of_frozen_deposits_slashed_per_double_attestation
+      |> Q.(mul (100 // 1))
+      |> Q.to_int
 
 let get_pending_slashed_pct_for_delegate (block, state) delegate =
   let rec aux r = function
