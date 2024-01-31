@@ -77,6 +77,8 @@ fn compute<Host: Runtime>(
             block_in_progress.estimated_ticks,
             data_size,
         );
+
+        let retriable = !is_first_transaction || !is_first_block_of_reboot;
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match apply_transaction(
@@ -88,6 +90,7 @@ fn compute<Host: Runtime>(
             evm_account_storage,
             accounts_index,
             allocated_ticks,
+            retriable,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -108,6 +111,20 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks
                 );
             }
+
+            ExecutionResult::Retriable(_) => {
+                // It is the first block processed in this reboot. Additionally,
+                // it is the first transaction processed from this block in this
+                // reboot. The tick limit cannot be larger.
+                log!(
+                    host,
+                    Debug,
+                    "The transaction exhausted the ticks of the \
+                         current reboot but will be retried."
+                );
+                block_in_progress.repush_tx(transaction);
+                return Ok(ComputationResult::RebootNeeded);
+            }
             ExecutionResult::Invalid => {
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
@@ -116,21 +133,6 @@ fn compute<Host: Runtime>(
                     "Estimated ticks after tx: {}",
                     block_in_progress.estimated_ticks
                 );
-            }
-            ExecutionResult::OutOfTicks => {
-                // Is is the first block processed in this reboot. Aditionnaly,
-                // it is the first transaction processed from this block in this
-                // reboot. The tick limit cannot be larger.
-                if is_first_transaction && is_first_block_of_reboot {
-                    log!(
-                        host,
-                        Debug,
-                        "Transaction is discarded as it uses too much ticks to be applied in a kernel run."
-                    );
-                } else {
-                    block_in_progress.repush_tx(transaction);
-                    return Ok(ComputationResult::RebootNeeded);
-                }
             }
         };
         is_first_transaction = false;

@@ -146,13 +146,15 @@ pub fn run_transaction<'a, Host>(
     value: Option<U256>,
     pay_for_gas: bool,
     allocated_ticks: u64,
+    retriable: bool,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
 {
     fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
         match outcome.reason {
-            ExtendedExitReason::Exit(ExitReason::Revert(_)) => pay_for_gas,
+            ExtendedExitReason::Exit(ExitReason::Revert(_))
+            | ExtendedExitReason::OutOfTicks => pay_for_gas,
             _ => pay_for_gas && outcome.is_success,
         }
     }
@@ -182,22 +184,29 @@ where
 
         match result {
             Ok(result) => {
-                handler.increment_nonce(caller)?;
+                if !(result.reason == ExtendedExitReason::OutOfTicks && retriable) {
+                    handler.increment_nonce(caller)?;
+                }
 
                 if do_refund(&result, pay_for_gas) {
-                    let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-                    handler.repay_gas(caller, unused_gas, effective_gas_price)?
+                    // In case of `OutOfTicks` and the transaction can be
+                    // retried, the gas is entirely refunded as it will be
+                    // repaid in the next attempt
+                    if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                        log!(
+                            handler.borrow_host(),
+                            Debug,
+                            "The transaction exhausted the ticks of the \
+                             current reboot and is retriable: refunding all the gas."
+                        );
+                        handler.repay_gas(caller, gas_limit, effective_gas_price)?;
+                    } else {
+                        let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+                        handler.repay_gas(caller, unused_gas, effective_gas_price)?;
+                    }
                 }
 
                 Ok(Some(result))
-            }
-            // In case of `OutOfTicks` the gas is entirely refunded as it will
-            // be repaid in the next attempt
-            Err(EthereumError::OutOfTicks) => {
-                if pay_for_gas {
-                    handler.repay_gas(caller, gas_limit, effective_gas_price)?;
-                }
-                Err(EthereumError::OutOfTicks)
             }
             Err(e) => Err(e),
         }
@@ -2743,8 +2752,15 @@ mod test {
         assert_eq!(caller_nonce, U256::one());
     }
 
-    #[test]
-    fn transactions_has_no_impact_if_retriable() {
+    fn out_of_tick_scenario(
+        retriable: bool,
+    ) -> (
+        MockHost,
+        Result<Option<ExecutionOutcome>, EthereumError>,
+        EthereumAccount,
+        U256,
+        U256,
+    ) {
         let mut host = MockHost::default();
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
@@ -2789,23 +2805,54 @@ mod test {
             Some(transaction_value),
             true,
             10_000,
+            retriable,
         );
 
-        let caller_balance = account.balance(&host).unwrap();
-        let caller_nonce = account.nonce(&host).unwrap();
+        (host, result, account, initial_balance, initial_caller_nonce)
+    }
+
+    #[test]
+    fn transaction_has_no_impact_if_retriable() {
+        let (host, result, caller, initial_caller_balance, initial_caller_nonce) =
+            out_of_tick_scenario(true);
+        let caller_balance = caller.balance(&host).unwrap();
+        let caller_nonce = caller.nonce(&host).unwrap();
 
         assert_eq!(
-            Err(EthereumError::OutOfTicks),
-            result,
+            ExtendedExitReason::OutOfTicks,
+            result.unwrap().unwrap().reason,
             "Contract creation was expected to fail and run out of ticks: \n"
         );
         assert_eq!(
-            initial_balance, caller_balance,
+            initial_caller_balance, caller_balance,
             "Balance shouldn't have changed as gas should have been repaid"
         );
         assert_eq!(
             initial_caller_nonce, caller_nonce,
             "Nonce shouldn't have changed"
+        )
+    }
+
+    #[test]
+    fn non_retriable_transaction_pays_for_exhausted_ticks() {
+        let (host, result, caller, initial_caller_balance, initial_caller_nonce) =
+            out_of_tick_scenario(false);
+        let caller_balance = caller.balance(&host).unwrap();
+        let caller_nonce = caller.nonce(&host).unwrap();
+
+        assert_eq!(
+            ExtendedExitReason::OutOfTicks,
+            result.unwrap().unwrap().reason,
+            "Contract creation was expected to fail and run out of ticks: \n"
+        );
+        assert_ne!(
+            initial_caller_balance, caller_balance,
+            "Gas was not deducted from the caller account"
+        );
+        assert_eq!(
+            initial_caller_nonce + 1,
+            caller_nonce,
+            "Nonce should have been incremented"
         )
     }
 
@@ -2842,6 +2889,7 @@ mod test {
             None,
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let internal_address_nonce =
@@ -2849,7 +2897,7 @@ mod test {
         let caller_nonce = get_nonce(&mut host, &mut evm_account_storage, &caller);
 
         assert_eq!(
-            ExitReason::Succeed(ExitSucceed::Stopped),
+            ExitReason::Succeed(ExitSucceed::Stopped).into(),
             result.unwrap().unwrap().reason,
         );
 

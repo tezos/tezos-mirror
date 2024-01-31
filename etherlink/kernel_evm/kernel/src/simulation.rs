@@ -15,6 +15,7 @@ use crate::{
     tick_model, CONFIG,
 };
 
+use evm_execution::handler::ExtendedExitReason;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
@@ -137,8 +138,13 @@ impl Evaluation {
             self.value,
             false,
             allocated_ticks,
+            false,
         ) {
-            Err(evm_execution::EthereumError::OutOfTicks) => {
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::OutOfTicks,
+                ..
+            }))
+            | Err(evm_execution::EthereumError::OutOfTicks) => {
                 Ok(EvaluationOutcome::OutOfTicks)
             }
             Err(err) => Ok(EvaluationOutcome::EvaluationError(err)),
@@ -147,7 +153,6 @@ impl Evaluation {
                 let outcome =
                     simulation_add_gas_for_fees(outcome, &block_fees, gas_price)
                         .map_err(Error::Simulation)?;
-
                 Ok(EvaluationOutcome::Outcome(Some(outcome)))
             }
         }
@@ -257,8 +262,9 @@ impl TxValidation {
             Some(transaction.value),
             false,
             allocated_ticks,
+            false,
         ) {
-            Err(evm_execution::EthereumError::OutOfTicks) => Ok(true),
+            Ok(Some(outcome)) => Ok(outcome.reason == ExtendedExitReason::OutOfTicks),
             _ => Ok(false),
         }
     }
