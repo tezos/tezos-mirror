@@ -370,7 +370,7 @@ fn apply_deposit<Host: Runtime>(
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
-        reason,
+        reason: reason.into(),
         new_address: None,
         logs: vec![],
         result: None,

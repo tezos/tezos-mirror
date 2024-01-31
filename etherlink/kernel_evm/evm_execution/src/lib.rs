@@ -39,6 +39,8 @@ extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
 
+use crate::handler::ExtendedExitReason;
+
 #[derive(Error, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DurableStorageError {
     /// Some runtime error happened while using durable storage
@@ -150,7 +152,7 @@ where
 {
     fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
         match outcome.reason {
-            ExitReason::Revert(_) => pay_for_gas,
+            ExtendedExitReason::Exit(ExitReason::Revert(_)) => pay_for_gas,
             _ => pay_for_gas && outcome.is_success,
         }
     }
