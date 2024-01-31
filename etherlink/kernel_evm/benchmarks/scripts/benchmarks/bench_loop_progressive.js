@@ -13,7 +13,9 @@ const addr = require('../lib/address');
 var faucet;
 
 var args = process.argv.slice(2);
-if (args.length == 1 && args[0] == "--for-reboot-limits-test") {
+if (args.length == 1 &&
+    (args[0] == "--for-reboot-limits-test" ||
+        args[0] == "--for-reboot-discard-test")) {
     // for tests
     faucet = require('./players/tezt_bootstraped.json');
 } else {
@@ -63,9 +65,8 @@ function test_reboot_limits(player1, player2, txs, create_addr) {
     txs.push(utils.send(player2, create_addr, 0, call_data(4600), { gasLimit: 2_800_000 }))
 }
 
-function test_reboot_discard(player1, player2, txs, create_addr) {
-    txs.push(utils.send(player1, create_addr, 0, call_data(1300), { gasLimit: 1_000_000 }))
-    txs.push(utils.send(player2, create_addr, 0, call_data(5800), { gasLimit: 4_000_000 }))
+function test_reboot_discard(player1, txs, create_addr) {
+    txs.push(utils.send(player1, create_addr, 0, call_data(5800), { gasLimit: 4_000_000 }))
 }
 
 
@@ -79,11 +80,11 @@ if (args.length == 1 && args[0] == "--for-reboot-limits-test") {
     utils.print_bench([txs])
 } else if (args.length == 1 && args[0] == "--for-reboot-discard-test") {
     let addr = init(txs, 9000);
-    test_reboot_discard(player1, player2, txs, addr);
+    test_reboot_discard(player1, txs, addr);
     utils.print_raw_txs(txs)
 } else if (args.length == 1 && args[0] == "--reboot-discard-debugger") {
     let addr = init(txs, 1000000);
-    test_reboot_discard(player1, player2, txs, addr);
+    test_reboot_discard(player1, txs, addr);
     utils.print_bench([txs])
 } else {
     txs.push(utils.transfer(faucet, player1, 1000000))

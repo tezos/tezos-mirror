@@ -4441,6 +4441,41 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
   let* _address, _tx = deploy ~contract:call_selfdestruct ~sender evm_setup in
   unit
 
+let test_transaction_exhausting_ticks_is_rejected =
+  register_both
+    ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
+    ~title:
+      "Check that the node will reject a transaction that wouldn't fit in a \
+       kernel run."
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
+  (* Retrieves all the messages and prepare them for the current rollup. *)
+  let txs =
+    read_file (kernel_inputs_path ^ "/loops-exhaust-ticks")
+    |> String.trim |> String.split_on_char '\n'
+  in
+  (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
+  let first_block, loop_out_of_ticks =
+    match txs with
+    | [faucet1; faucet2; create; loop_out_of_ticks] ->
+        ([faucet1; faucet2; create], loop_out_of_ticks)
+    | _ -> failwith "The prepared transactions should contain 4 transactions"
+  in
+  let* _requests, _receipt, _hashes =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_node
+      ~wait_for_blocks:5
+      first_block
+  in
+  let* result = Rpc.send_raw_transaction ~raw_tx:loop_out_of_ticks evm_node in
+
+  (match result with
+  | Ok _ -> Test.fail "The transaction should have been rejected by the node"
+  | Error _ -> ()) ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4518,7 +4553,8 @@ let register_evm_node ~protocols =
   test_migrate_proxy_to_sequencer protocols ;
   test_ghostnet_kernel protocols ;
   test_estimate_gas_out_of_ticks protocols ;
-  test_l2_call_selfdetruct_contract_in_same_transaction protocols
+  test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
+  test_transaction_exhausting_ticks_is_rejected protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
