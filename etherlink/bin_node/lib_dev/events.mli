@@ -7,6 +7,9 @@
 
 (** General purposes events. *)
 
+(** Default section for events. *)
+val section : string list
+
 (** [received_upgrade payload] advertises that the sequencer received an
     upgrade of payload [payload]. *)
 val received_upgrade : string -> unit Lwt.t

@@ -503,13 +503,13 @@ let wait_for_delayed_inbox_add_tx_and_injected ~evm_node ~sc_rollup_node ~node
     ~client =
   let event_watcher =
     let added =
-      Evm_node.wait_for evm_node "evm_node_dev_delayed_inbox_add_transaction.v0"
+      Evm_node.wait_for evm_node "delayed_inbox_add_transaction.v0"
       @@ fun json ->
       let hash = JSON.(json |-> "hash" |> as_string) in
       Some hash
     in
     let injected =
-      Evm_node.wait_for evm_node "evm_node_dev_tx_pool_transaction_injected.v0"
+      Evm_node.wait_for evm_node "tx_pool_transaction_injected.v0"
       @@ fun json ->
       let hash = JSON.(json |> as_string) in
       Some hash
@@ -531,8 +531,7 @@ let wait_for_delayed_inbox_add_tx_and_injected ~evm_node ~sc_rollup_node ~node
 
 let wait_for_delayed_inbox_fetch ~evm_node ~sc_rollup_node ~node ~client =
   let event_watcher =
-    Evm_node.wait_for evm_node "evm_node_dev_delayed_inbox_fetch_succeeded.v0"
-    @@ fun json ->
+    Evm_node.wait_for evm_node "delayed_inbox_fetch_succeeded.v0" @@ fun json ->
     let nb = JSON.(json |-> "nb" |> as_int) in
     Some nb
   in

@@ -7,12 +7,12 @@
 
 include Internal_event.Simple
 
-let section = ["evm_node"; "dev"; "events"]
+let section = ["evm_node"; "dev"]
 
 let received_upgrade =
   declare_1
     ~section
-    ~name:"evm_node_dev_received_upgrade"
+    ~name:"received_upgrade"
     ~msg:"Received an upgrade payload: {payload}"
     ~level:Notice
     ("payload", Data_encoding.string)
@@ -20,7 +20,7 @@ let received_upgrade =
 let ignored_kernel_arg =
   declare_0
     ~section
-    ~name:"evm_node_dev_ignored_kernel_arg"
+    ~name:"ignored_kernel_arg"
     ~msg:
       "Ignored the kernel command-line argument since the EVM state was \
        already initialized"

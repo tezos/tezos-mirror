@@ -4026,8 +4026,7 @@ let test_keep_alive =
         Evm_node.run ~wait:false ~extra_arguments:["--keep-alive"] evm_node
       in
       let* () =
-        Evm_node.wait_for evm_node "evm_node_retrying_connect.v0"
-        @@ fun _json -> Some ()
+        Evm_node.wait_for evm_node "retrying_connect.v0" @@ fun _json -> Some ()
       in
       (* Restart the rollup node to restore the connection. *)
       let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in

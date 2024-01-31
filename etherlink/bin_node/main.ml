@@ -32,7 +32,7 @@ module Event = struct
   let event_starting =
     Internal_event.Simple.declare_1
       ~section
-      ~name:"evm_node_start"
+      ~name:"start"
       ~msg:"starting the EVM node ({mode})"
       ~level:Notice
       ("mode", Data_encoding.string)
@@ -40,7 +40,7 @@ module Event = struct
   let event_is_ready =
     Internal_event.Simple.declare_2
       ~section
-      ~name:"evm_node_is_ready"
+      ~name:"is_ready"
       ~msg:"the EVM node is listening to {addr}:{port}"
       ~level:Notice
       ("addr", Data_encoding.string)
@@ -49,7 +49,7 @@ module Event = struct
   let event_retrying_connect =
     Internal_event.Simple.declare_2
       ~section
-      ~name:"evm_node_retrying_connect"
+      ~name:"retrying_connect"
       ~msg:"Cannot connect to {endpoint}, retrying in {delay} seconds.."
       ~level:Notice
       ("endpoint", Data_encoding.string)
@@ -58,7 +58,7 @@ module Event = struct
   let event_shutdown_node =
     Internal_event.Simple.declare_1
       ~section
-      ~name:"evm_node_shutting_down"
+      ~name:"shutting_down"
       ~msg:"Stopping the EVM node"
       ~level:Notice
       ("exit_status", Data_encoding.int8)
@@ -66,7 +66,7 @@ module Event = struct
   let event_shutdown_tx_pool =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"evm_node_shutting_down_tx_pool"
+      ~name:"shutting_down_tx_pool"
       ~msg:"Stopping the tx-pool"
       ~level:Notice
       ()
@@ -75,7 +75,7 @@ module Event = struct
     let server = if private_ then "private" else "public" in
     Internal_event.Simple.declare_0
       ~section
-      ~name:("evm_node_shutting_down_" ^ server ^ "_rpc_server")
+      ~name:("shutting_down_" ^ server ^ "_rpc_server")
       ~msg:("Stopping the" ^ server ^ " RPC server")
       ~level:Notice
       ()
@@ -83,7 +83,7 @@ module Event = struct
   let event_callback_log =
     Internal_event.Simple.declare_3
       ~section
-      ~name:"evm_node_callback_log"
+      ~name:"callback_log"
       ~msg:"Uri: {uri}\nMethod: {method}\nBody: {body}\n"
       ~level:Notice
       ("uri", Data_encoding.string)
@@ -716,7 +716,16 @@ let sequencer_command =
          rollup_node_endpoint
          sequencer
          () ->
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          make_with_defaults
+            ~enable_default_daily_logs_at:
+              Filename.Infix.(data_dir // "daily_logs")
+            ()
+        in
+        init ~config ()
+      in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       let* config =
         Cli.create_or_read_sequencer_config
