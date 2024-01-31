@@ -596,6 +596,51 @@ module Transfer = struct
     in
     unit
 
+  let safety_guard =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Gas safety guard for transfer"
+      ~tags:["client"; "transfer"; "safety_guard"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let Account.{public_key_hash = bootstrap1_pkh; _} = Constant.bootstrap1 in
+    let Account.{public_key_hash = bootstrap2_pkh; _} = Constant.bootstrap2 in
+    let Account.{public_key_hash = bootstrap5_pkh; _} = Constant.bootstrap5 in
+    let amount = Tez.of_int 100 in
+    let* () =
+      Client.transfer
+        client
+        ~amount
+        ~safety_guard:0
+        ~giver:bootstrap5_pkh
+        ~receiver:bootstrap1_pkh
+    in
+    let* () =
+      Client.transfer
+        client
+        ~amount
+        ~safety_guard:300
+        ~giver:bootstrap2_pkh
+        ~receiver:bootstrap1_pkh
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* operations =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
+    in
+    let ops =
+      JSON.as_list operations
+      |> List.map (fun op ->
+             let open JSON in
+             let op = op |-> "contents" |=> 0 in
+             (op |-> "source" |> as_string, op |-> "gas_limit" |> as_int))
+    in
+    let gas_limit0 = List.assoc bootstrap5_pkh ops in
+    let gas_limit300 = List.assoc bootstrap2_pkh ops in
+    Check.((gas_limit300 = gas_limit0 + 300) int)
+      ~error_msg:"Gas limit is %L but should be %R, i.e. 300 more" ;
+    unit
+
   let register protocols =
     alias_pkh_destination protocols ;
     alias_pkh_source protocols ;
@@ -603,7 +648,8 @@ module Transfer = struct
     batch_transfers_tz4 protocols ;
     forbidden_set_delegate_tz4 protocols ;
     balance_too_low protocols ;
-    transfers_bootstraps5_bootstrap1 protocols
+    transfers_bootstraps5_bootstrap1 protocols ;
+    safety_guard protocols
 end
 
 module Dry_run = struct

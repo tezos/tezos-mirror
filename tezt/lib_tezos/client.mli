@@ -819,6 +819,7 @@ val transfer :
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:int ->
+  ?safety_guard:int ->
   ?storage_limit:int ->
   ?counter:int ->
   ?entrypoint:string ->
@@ -841,6 +842,7 @@ val spawn_transfer :
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:int ->
+  ?safety_guard:int ->
   ?storage_limit:int ->
   ?counter:int ->
   ?entrypoint:string ->
@@ -860,6 +862,7 @@ val call :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?safety_guard:int ->
   ?entrypoint:string ->
   ?arg:string ->
   destination:string ->
@@ -874,6 +877,7 @@ val spawn_call :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?safety_guard:int ->
   ?entrypoint:string ->
   ?arg:string ->
   destination:string ->
