@@ -38,6 +38,29 @@ Follow [these instructions](https://github.com/trilitech/live-testing-protocols/
 
 ## Scenario 2: ERC-721 (NFT)
 
+Basic scenario for using the ERC-721 token: NFT (Non-Fungible Token).
+
+The code for the scenario can be found in [BasicNFT.sol](https://github.com/trilitech/live-testing-protocols/blob/main/contracts/ERC721/BasicNFT.sol).
+
+### Actions
+
+1. Owner can create a token
+    * The creation event is emitted
+    * The owner balance is increased
+2. Owner can transfer a token
+    * The transfer event is emitted
+    * The receiver balance is increased
+    * The sender balance is decreased
+
+The code for the actions can be found in [BasicNFT.ts](https://github.com/trilitech/live-testing-protocols/blob/main/test/ERC721/BasicNFT.ts).
+
+### Testing
+
+Follow [these instructions](https://github.com/trilitech/live-testing-protocols/tree/main#tests) specialized with the ERC-721 test.
+
+* Local: `npx hardhat test test/ERC721/BasicNFT.ts`.
+* Ghostnet: `npx hardhat test --network etherlink test/ERC721/BasicNFT.ts`.
+
 ## Scenario 3: ERC-1967 (transparent proxy pattern)
 
 ## Scenario 4: conventional NFT dApp
