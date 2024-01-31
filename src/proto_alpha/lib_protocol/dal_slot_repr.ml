@@ -994,6 +994,60 @@ module History_v2 = struct
         | _ -> None)
       (fun () -> Add_element_in_slots_skip_list_violates_ordering_v2)
 
+  module Content = struct
+    (** Each cell of the skip list is either a slot header that has been
+        attested, or a published level and a slot index for which no slot header
+        is attested (so, no associated commitment). *)
+    type t = Unattested of Header.id | Attested of Header.t
+
+    let content_id = function
+      | Unattested slot_id -> slot_id
+      | Attested {id; _} -> id
+
+    let encoding =
+      let open Data_encoding in
+      union
+        ~tag_size:`Uint8
+        [
+          case
+            ~title:"unattested"
+            (Tag 0)
+            (merge_objs
+               (obj1 (req "kind" (constant "unattested")))
+               Header.id_encoding)
+            (function
+              | Unattested slot_id -> Some ((), slot_id) | Attested _ -> None)
+            (fun ((), slot_id) -> Unattested slot_id);
+          case
+            ~title:"attested"
+            (Tag 1)
+            (merge_objs
+               (obj1 (req "kind" (constant "attested")))
+               Header.encoding)
+            (function
+              | Unattested _ -> None
+              | Attested slot_header -> Some ((), slot_header))
+            (fun ((), slot_header) -> Attested slot_header);
+        ]
+
+    let equal t1 t2 =
+      match (t1, t2) with
+      | Unattested sid1, Unattested sid2 -> Header.slot_id_equal sid1 sid2
+      | Attested sh1, Attested sh2 -> Header.equal sh1 sh2
+      | Unattested _, _ | Attested _, _ -> false
+
+    let zero, zero_level =
+      let zero_level = Raw_level_repr.root in
+      let zero_index = Dal_slot_index_repr.zero in
+      (Unattested {published_level = zero_level; index = zero_index}, zero_level)
+
+    let pp fmt = function
+      | Unattested slot_id ->
+          Format.fprintf fmt "Unattested (%a)" Header.pp_id slot_id
+      | Attested slot_header ->
+          Format.fprintf fmt "Attested (%a)" Header.pp slot_header
+  end
+
   module Skip_list = struct
     include Skip_list.Make (Skip_list_parameters)
 
