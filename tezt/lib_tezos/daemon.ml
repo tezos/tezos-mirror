@@ -459,6 +459,7 @@ module Make (X : PARAMETERS) = struct
     in
     on_event daemon @@ fun event ->
     Log.info
+      ~color:daemon.color
       "[%s] Received event: %s = %s"
       daemon.name
       event.name
