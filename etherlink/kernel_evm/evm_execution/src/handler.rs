@@ -3250,7 +3250,10 @@ mod test {
 
         let suicided_contract = result.new_address.unwrap();
 
-        assert_eq!(result.reason, ExitReason::Succeed(ExitSucceed::Suicided));
+        assert_eq!(
+            result.reason,
+            ExitReason::Succeed(ExitSucceed::Suicided).into()
+        );
         assert_eq!(get_balance(&mut handler, &withdrawal_contract), U256::one());
         assert_eq!(get_balance(&mut handler, &caller), U256::from(999999999));
         assert!(!handler.exists(suicided_contract));

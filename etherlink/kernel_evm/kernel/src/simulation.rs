@@ -660,6 +660,7 @@ mod tests {
             Some(transaction_value),
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();
