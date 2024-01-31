@@ -24,7 +24,12 @@ let pvm_kind = "wasm_2_0_0"
 
 let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
 
-type l1_contracts = {exchanger : string; bridge : string; admin : string}
+type l1_contracts = {
+  exchanger : string;
+  bridge : string;
+  admin : string;
+  sequencer_admin : string option;
+}
 
 type full_evm_setup = {
   node : Node.t;
@@ -41,6 +46,7 @@ type full_evm_setup = {
     | `Path of string
     | `Both of Installer_kernel_config.instr list * string ]
     option;
+  kernel : string;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -230,7 +236,7 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_node ?wait_for_blocks
   in
   return (requests, receipt, hashes)
 
-let setup_l1_contracts ~admin client =
+let setup_l1_contracts ~admin ?sequencer_admin client =
   (* Originates the exchanger. *)
   let* exchanger =
     Client.originate_contract
@@ -257,6 +263,25 @@ let setup_l1_contracts ~admin client =
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
 
+  (* Originates the sequencer administrator contract. *)
+  let* sequencer_admin =
+    match sequencer_admin with
+    | Some sequencer_admin ->
+        let* sequencer_admin =
+          Client.originate_contract
+            ~alias:"evm-sequencer-admin"
+            ~amount:Tez.zero
+            ~src:Constant.bootstrap1.public_key_hash
+            ~init:(sf "%S" sequencer_admin.Account.public_key_hash)
+            ~prg:(admin_path ())
+            ~burn_cap:Tez.one
+            client
+        in
+        let* () = Client.bake_for_and_wait ~keys:[] client in
+        return (Some sequencer_admin)
+    | None -> return None
+  in
+
   (* Originates the administrator contract. *)
   let* admin =
     Client.originate_contract
@@ -270,7 +295,7 @@ let setup_l1_contracts ~admin client =
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
 
-  return {exchanger; bridge; admin}
+  return {exchanger; bridge; admin; sequencer_admin}
 
 type setup_mode =
   | Setup_sequencer of {
@@ -283,16 +308,16 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ?flat_fee ~admin ?commitment_period
-    ?challenge_window ?timestamp ?(setup_mode = Setup_proxy {devmode = true})
-    protocol =
+    ?(with_administrator = true) ?flat_fee ~admin ?sequencer_admin
+    ?commitment_period ?challenge_window ?timestamp
+    ?(setup_mode = Setup_proxy {devmode = true}) protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
   let* l1_contracts =
     match admin with
     | Some admin ->
-        let* res = setup_l1_contracts ~admin client in
+        let* res = setup_l1_contracts ~admin ?sequencer_admin client in
         return (Some res)
     | None -> return None
   in
@@ -315,6 +340,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       ?ticketer
       ?administrator
       ?sequencer
+      ?sequencer_administrator:
+        (Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin))
       ()
   in
   let config =
@@ -394,6 +421,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       endpoint;
       l1_contracts;
       config;
+      kernel = output;
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
@@ -2073,7 +2101,7 @@ let test_deposit_and_withdraw =
                  evm_node;
                  _;
                } ->
-  let {bridge; admin = _; exchanger = _} =
+  let {bridge; admin = _; exchanger = _; sequencer_admin = _} =
     match l1_contracts with
     | Some x -> x
     | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
@@ -4227,6 +4255,139 @@ let test_l2_timestamp_opcode =
     ~title:"Check L2 opcode timestamp"
     test
 
+let test_migrate_proxy_to_sequencer =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rollup_node"; "init"; "migration"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"migrate from proxy to sequencer using a sequencer admin contract"
+  @@ fun protocol ->
+  let check_block_hash ~sequencer_node ~proxy_node =
+    let*@ expected_level = Rpc.block_number sequencer_node in
+    let*@ rollup_node_head =
+      Rpc.get_block_by_number ~block:"latest" proxy_node
+    in
+    let*@ sequencer_head =
+      Rpc.get_block_by_number ~block:"latest" sequencer_node
+    in
+    Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)" ;
+    Check.((sequencer_head.number = expected_level) int32)
+      ~error_msg:"block level is not equal (sequencer: %L; expected: %R)" ;
+    unit
+  in
+  let sequencer_admin = Constant.bootstrap5 in
+  let sequencer_key = Constant.bootstrap4 in
+  let* ({
+          evm_node = proxy_node;
+          sc_rollup_node;
+          client;
+          kernel;
+          sc_rollup_address;
+          l1_contracts;
+          node;
+          _;
+        } as full_evm_setup) =
+    setup_evm_kernel ~sequencer_admin ~admin:(Some Constant.bootstrap3) protocol
+  in
+  (* Send a transaction in proxy mode. *)
+  let* () =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let receiver = Eth_account.bootstrap_accounts.(1) in
+    let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
+    check_tx_succeeded ~endpoint:(Evm_node.endpoint proxy_node) ~tx
+  in
+  (* Send the internal message to add a sequencer on the rollup. *)
+  let sequencer_admin_contract =
+    match
+      Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin)
+    with
+    | Some contract -> contract
+    | None -> Test.fail "missing sequencer admin contract"
+  in
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:sequencer_admin.public_key_hash
+      ~receiver:sequencer_admin_contract
+      ~arg:
+        (sf
+           "Pair %S 0x%s"
+           sc_rollup_address
+           (Hex.of_string sequencer_key.public_key |> Hex.show))
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
+  let sequencer_node =
+    let mode =
+      let sequencer =
+        match sequencer_key.secret_key with
+        | Unencrypted sk -> sk
+        | Encrypted _ ->
+            Test.fail "Provide an unencrypted key for the sequencer"
+      in
+      Evm_node.Sequencer
+        {
+          initial_kernel = kernel;
+          preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0";
+          private_rpc_port = Port.fresh ();
+          time_between_blocks = Some Nothing;
+          sequencer;
+          genesis_timestamp = None;
+        }
+    in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  (* Run the sequencer from the rollup node state. *)
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir sequencer_node sc_rollup_node
+  in
+  let* () = Evm_node.run sequencer_node in
+  (* Same head after initialisation. *)
+  let* () = check_block_hash ~sequencer_node ~proxy_node in
+
+  (* Produce a block in sequencer. *)
+  let* _ = Rpc.produce_block sequencer_node in
+  (* Conservative way to make sure the produced block is published to L1. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ =
+          next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client
+        in
+        unit)
+  in
+  (* Same head after first sequencer produced block. *)
+  let* () = check_block_hash ~sequencer_node ~proxy_node in
+
+  (* Send a transaction to sequencer. *)
+  let* () =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let receiver = Eth_account.bootstrap_accounts.(1) in
+    let full_evm_setup = {full_evm_setup with evm_node = sequencer_node} in
+    let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
+    check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
+  in
+  (* Conservative way to make sure the produced block is published to L1. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ =
+          next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client
+        in
+        unit)
+  in
+  (* Same head after sequencer transaction. *)
+  let* () = check_block_hash ~sequencer_node ~proxy_node in
+
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4300,7 +4461,8 @@ let register_evm_node ~protocols =
   test_keep_alive protocols ;
   test_regression_block_hash_gen protocols ;
   test_reboot_out_of_ticks protocols ;
-  test_l2_timestamp_opcode protocols
+  test_l2_timestamp_opcode protocols ;
+  test_migrate_proxy_to_sequencer protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;

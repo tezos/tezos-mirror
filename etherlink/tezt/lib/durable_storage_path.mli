@@ -48,6 +48,10 @@ val storage : string -> ?key:string -> unit -> path
 (** [admin] is the path to the administrator contract. *)
 val admin : path
 
+(** [sequencer_admin] is the path to the contract administrating the
+    sequencer. *)
+val sequencer_admin : path
+
 (** [ticketer] is the path to the ticketer contract. *)
 val ticketer : path
 

@@ -80,6 +80,7 @@ pub enum Input {
     SimpleTransaction(Box<Transaction>),
     Deposit(Deposit),
     Upgrade(KernelUpgrade),
+    NewSequencer(PublicKey),
     NewChunkedTransaction {
         tx_hash: TransactionHash,
         num_chunks: u16,
@@ -182,18 +183,15 @@ impl InputResult {
         })
     }
 
-    fn parse_kernel_upgrade(
-        source: ContractKt1Hash,
-        admin: &Option<ContractKt1Hash>,
-        bytes: &[u8],
-    ) -> Self {
-        // Consider only upgrades from the bridge contract.
-        if admin.is_none() || &source != admin.as_ref().unwrap() {
-            return Self::Unparsable;
-        }
-
+    fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
         let kernel_upgrade = parsable!(KernelUpgrade::from_rlp_bytes(bytes).ok());
         Self::Input(Input::Upgrade(kernel_upgrade))
+    }
+
+    fn parse_sequencer_update(bytes: &[u8]) -> Self {
+        let pk_b58 = parsable!(String::from_utf8(bytes.to_vec()).ok());
+        let pk = parsable!(PublicKey::from_b58check(&pk_b58).ok());
+        Self::Input(Input::NewSequencer(pk))
     }
 
     fn parse_sequencer_blueprint_input(sequencer: &PublicKey, bytes: &[u8]) -> Self {
@@ -352,8 +350,14 @@ impl InputResult {
                     )
                 }
             },
-            MichelsonOr::Right(MichelsonBytes(upgrade)) => {
-                Self::parse_kernel_upgrade(source, &tezos_contracts.admin, &upgrade)
+            MichelsonOr::Right(MichelsonBytes(bytes)) => {
+                if tezos_contracts.is_admin(&source) {
+                    Self::parse_kernel_upgrade(&bytes)
+                } else if tezos_contracts.is_sequencer_admin(&source) {
+                    Self::parse_sequencer_update(&bytes)
+                } else {
+                    Self::Unparsable
+                }
             }
         }
     }
@@ -433,6 +437,7 @@ mod tests {
                 &TezosContracts {
                     ticketer: None,
                     admin: None,
+                    sequencer_admin: None
                 },
                 &None,
                 &None

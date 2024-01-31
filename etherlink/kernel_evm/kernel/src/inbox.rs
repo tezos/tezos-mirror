@@ -14,7 +14,7 @@ use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, create_chunked_transaction,
     get_and_increment_deposit_nonce, remove_chunked_transaction,
-    store_last_info_per_level_timestamp, store_transaction_chunk,
+    store_last_info_per_level_timestamp, store_sequencer, store_transaction_chunk,
 };
 use crate::upgrade::*;
 use crate::Error;
@@ -33,18 +33,33 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub struct TezosContracts {
     pub ticketer: Option<ContractKt1Hash>,
     pub admin: Option<ContractKt1Hash>,
+    pub sequencer_admin: Option<ContractKt1Hash>,
 }
 
 impl Display for TezosContracts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Ticketer is {:?}. Administrator is {:?}",
-            self.ticketer, self.admin,
+            "Ticketer is {:?}. Administrator is {:?}. Sequencer administrator is {:?}.",
+            self.ticketer, self.admin, self.sequencer_admin,
         )
     }
 }
+fn contains(contract: &Option<ContractKt1Hash>, expected: &ContractKt1Hash) -> bool {
+    contract.as_ref().map_or(false, |kt1| kt1 == expected)
+}
 
+impl TezosContracts {
+    pub fn is_admin(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.admin, contract)
+    }
+    pub fn is_sequencer_admin(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.sequencer_admin, contract)
+    }
+    pub fn is_ticketer(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.ticketer, contract)
+    }
+}
 #[derive(Debug, PartialEq, Clone)]
 pub struct Deposit {
     pub amount: U256,
@@ -339,6 +354,9 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
                 res.kernel_upgrade = Some(kernel_upgrade)
             }
+            InputResult::Input(Input::NewSequencer(sequencer)) => {
+                store_sequencer(host, sequencer)?
+            }
             InputResult::Input(Input::Simulation) => {
                 // kernel enters in simulation mode, reading will be done by the
                 // simulation and all the previous and next transactions are
@@ -574,6 +592,7 @@ mod tests {
             TezosContracts {
                 ticketer: None,
                 admin: Some(sender),
+                sequencer_admin: None,
             },
             None,
             None,

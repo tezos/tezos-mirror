@@ -27,13 +27,14 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 3;
+pub const STORAGE_VERSION: u64 = 4;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
@@ -670,6 +671,10 @@ pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN.into())
 }
 
+pub fn read_sequencer_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &SEQUENCER_ADMIN.into())
+}
+
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(
     host: &mut Host,
 ) -> Result<u32, Error> {
@@ -800,6 +805,14 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
     } else {
         Ok(None)
     }
+}
+pub fn store_sequencer<Host: Runtime>(
+    host: &mut Host,
+    public_key: PublicKey,
+) -> anyhow::Result<()> {
+    let pk_b58 = PublicKey::to_b58check(&public_key);
+    let bytes = String::as_bytes(&pk_b58);
+    host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
 }
 
 #[cfg(test)]
