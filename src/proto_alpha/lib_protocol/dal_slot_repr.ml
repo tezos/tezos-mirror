@@ -1198,6 +1198,32 @@ module History_v2 = struct
           let equal = equal_history
         end)
 
+    (* Insert a cell in the skip list [t] and the corresponding association [(hash(t),
+       t)] in the given [cache].
+
+       Note that if the given skip list contains the genesis cell, its content is
+       reset with the given content. This ensures the invariant that
+       there are no gaps in the successive cells of the list. *)
+    let add_cell (t, cache) next_cell_content ~number_of_slots =
+      let open Result_syntax in
+      let prev_cell_ptr = hash t in
+      let Header.{published_level; _} =
+        Skip_list.content t |> Content.content_id
+      in
+      if Raw_level_repr.equal published_level genesis_level then
+        (* If this is the first real cell of DAL, replace dummy genesis. *)
+        return (Skip_list.genesis next_cell_content, cache)
+      else
+        let* cache = History_cache.remember prev_cell_ptr t cache in
+        let* new_head =
+          Skip_list.next
+            ~prev_cell:t
+            ~prev_cell_ptr
+            next_cell_content
+            ~number_of_slots
+        in
+        return (new_head, cache)
+
     (*  TODO: will be uncommented incrementally on the next MRs *)
 
     (*
