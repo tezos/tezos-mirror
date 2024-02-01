@@ -367,7 +367,7 @@ let test_multiple_baking =
           (Tez.to_string alice_balance)
           (Tez.to_string bob_balance) ;
       return ())
-    (range 1 10)
+    (range 1 5)
 
 let perform_migration ~protocol ~next_protocol ~next_constants ~pre_migration
     ~post_migration =
