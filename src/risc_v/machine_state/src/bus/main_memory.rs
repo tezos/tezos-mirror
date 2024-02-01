@@ -19,21 +19,21 @@ macro_rules! gen_memory_layout {
         >;
     };
 
-    ($name:ident = $size_in_g:literal MiB) => {
+    ($name:ident = $size_in_m:literal MiB) => {
         pub type $name = crate::bus::main_memory::Sizes<
-            { $size_in_g * 1024 * 1024 },
-            { $size_in_g * 1024 * 512 },
-            { $size_in_g * 1024 * 256 },
-            { $size_in_g * 1024 * 128 },
+            { $size_in_m * 1024 * 1024 },
+            { $size_in_m * 1024 * 512 },
+            { $size_in_m * 1024 * 256 },
+            { $size_in_m * 1024 * 128 },
         >;
     };
 
-    ($name:ident = $size_in_g:literal KiB) => {
+    ($name:ident = $size_in_k:literal KiB) => {
         pub type $name = crate::bus::main_memory::Sizes<
-            { $size_in_g * 1024 },
-            { $size_in_g * 512 },
-            { $size_in_g * 256 },
-            { $size_in_g * 128 },
+            { $size_in_k * 1024 },
+            { $size_in_k * 512 },
+            { $size_in_k * 256 },
+            { $size_in_k * 128 },
         >;
     };
 }
