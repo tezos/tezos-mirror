@@ -2942,12 +2942,16 @@ let register_end_to_end_tests ~protocols =
            need to provide public key hashes. *)
         List.init num_extra_nodes (fun _index -> None)
       in
+      let tags =
+        ["e2e"; network]
+        @ match constants with Constants_mainnet -> [Tag.slow] | _ -> []
+      in
       scenario_with_all_nodes
         ~custom_constants:constants
         ~attestation_lag
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
-        ~tags:["e2e"; network]
+        ~tags
         ~uses:(fun protocol -> [Protocol.baker protocol])
         title
         (e2e_test_script
