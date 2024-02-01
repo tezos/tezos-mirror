@@ -51,7 +51,7 @@ let dal_parameters () =
   Test.register
     ~__FILE__
     ~title:"Check the validity of DAL parameters"
-    ~tags:["dal"; "parameters"]
+    ~tags:[Tag.tezos2; "dal"; "parameters"]
   @@ fun () ->
   let open Dal.Cryptobox in
   let number_of_shards = Cli.get_int "number_of_shards" in
@@ -419,7 +419,7 @@ let slots_injector_test ~network =
   Test.register
     ~__FILE__
     ~title:(sf "Join %s and inject slots" network)
-    ~tags:["dal"; "slot"; "producer"; network]
+    ~tags:[Tag.tezos2; "dal"; "slot"; "producer"; network]
   @@ fun () ->
   let slot_index = Cli.get_int "slot-index" in
   let publisher_sk = Cli.get_string_opt "publisher-sk" in
@@ -451,7 +451,7 @@ let baker_test ~network =
   Test.register
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
-    ~tags:["dal"; "baker"; network]
+    ~tags:[Tag.tezos2; "dal"; "baker"; network]
     ~uses:[Protocol.baker Alpha]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in

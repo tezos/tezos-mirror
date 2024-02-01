@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
   yes_wallet_lib)
@@ -12,6 +13,7 @@
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
+  -open Tezos_test_helpers
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos))

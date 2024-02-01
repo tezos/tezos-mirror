@@ -8660,6 +8660,7 @@ let _tezt_manual_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         yes_wallet_lib;
