@@ -202,6 +202,8 @@ type t = {
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
+  max_slashing_per_block : Percentage.t;
+  max_slashing_threshold : int;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -548,6 +550,8 @@ let encoding =
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_attestation,
+                c.max_slashing_per_block,
+                c.max_slashing_threshold,
                 c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
@@ -587,6 +591,8 @@ let encoding =
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_attestation,
+                   max_slashing_per_block,
+                   max_slashing_threshold,
                    testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
@@ -627,6 +633,8 @@ let encoding =
         limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
         percentage_of_frozen_deposits_slashed_per_double_attestation;
+        max_slashing_per_block;
+        max_slashing_threshold;
         testnet_dictator;
         initial_seed;
         cache_script_size;
@@ -677,7 +685,7 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj6
+                (obj8
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
@@ -686,6 +694,8 @@ let encoding =
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_attestation"
                       Percentage.encoding)
+                   (req "max_slashing_per_block" Percentage.encoding)
+                   (req "max_slashing_threshold" int31)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
