@@ -61,7 +61,7 @@ end) : Services_backend_sig.Backend = struct
           ~number:ctxt.next_blueprint_number
       in
       (* Apply the blueprint *)
-      let* _ctxt = Evm_context.apply_blueprint ctxt blueprint in
+      let* _ctxt = Evm_context.apply_and_publish_blueprint ctxt blueprint in
       return_unit
   end
 

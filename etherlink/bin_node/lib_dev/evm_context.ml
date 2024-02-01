@@ -105,30 +105,36 @@ let execute =
     let* ctxt = if commit then perform_commit ctxt evm_state else return ctxt in
     return (ctxt, evm_state)
 
-let apply_blueprint ctxt Sequencer_blueprint.{to_execute; to_publish} =
+let apply_blueprint ctxt payload =
   let open Lwt_result_syntax in
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.next_blueprint_number in
-  let*! try_apply = Evm_state.apply_blueprint ~config evm_state to_execute in
+  let*! try_apply = Evm_state.apply_blueprint ~config evm_state payload in
 
   match try_apply with
   | Ok (evm_state, Block_height blueprint_number)
     when Z.equal blueprint_number next ->
-      let* () = store_blueprint ctxt to_execute (Qty blueprint_number) in
+      let* () = store_blueprint ctxt payload (Qty blueprint_number) in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       let*! () = Blueprint_events.blueprint_applied blueprint_number in
       let* ctxt = commit ctxt evm_state in
-      let* () = Blueprints_publisher.publish next to_publish in
       Lwt_watcher.notify
         ctxt.blueprint_watcher
-        {number = Qty blueprint_number; payload = to_execute} ;
+        {number = Qty blueprint_number; payload} ;
       return ctxt
   | Ok _ | Error (Evm_state.Cannot_apply_blueprint :: _) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
       let*! () = Blueprint_events.invalid_blueprint_produced next in
       tzfail Evm_state.Cannot_apply_blueprint
   | Error err -> fail err
+
+let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
+  let open Lwt_result_syntax in
+  let (Qty level) = ctxt.next_blueprint_number in
+  let* ctxt = apply_blueprint ctxt blueprint.to_execute in
+  let* () = Blueprints_publisher.publish level blueprint.to_publish in
+  return ctxt
 
 let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
     ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
@@ -171,7 +177,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
                   ~delayed_transactions:[]
                   ~number:Ethereum_types.(Qty Z.zero)
               in
-              apply_blueprint ctxt genesis
+              apply_and_publish_blueprint ctxt genesis
           | None -> return ctxt)
     | None ->
         if loaded then return ctxt
