@@ -74,15 +74,11 @@ let punish_double_signing ctxt ~operation_hash
     | Double_baking ->
         ( for_double_baking,
           {denounced with for_double_baking = true},
-          Constants_storage
-          .percentage_of_frozen_deposits_slashed_per_double_baking
-            ctxt )
+          Slash_percentage.for_double_baking ctxt )
     | Double_attesting ->
         ( for_double_attesting,
           {denounced with for_double_attesting = true},
-          Constants_storage
-          .percentage_of_frozen_deposits_slashed_per_double_attestation
-            ctxt )
+          Slash_percentage.for_double_attestation ctxt )
   in
   assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
@@ -203,14 +199,9 @@ let apply_and_clear_denunciations ctxt =
                  Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
               let slashing_percentage =
                 match misbehaviour.kind with
-                | Double_baking ->
-                    Constants_storage
-                    .percentage_of_frozen_deposits_slashed_per_double_baking
-                      ctxt
+                | Double_baking -> Slash_percentage.for_double_baking ctxt
                 | Double_attesting ->
-                    Constants_storage
-                    .percentage_of_frozen_deposits_slashed_per_double_attestation
-                      ctxt
+                    Slash_percentage.for_double_attestation ctxt
               in
               let misbehaviour_cycle =
                 (Level_repr.level_from_raw

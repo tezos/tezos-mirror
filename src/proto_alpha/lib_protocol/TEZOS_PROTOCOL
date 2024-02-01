@@ -182,6 +182,7 @@
         "Delegate_rewards",
         "Delegate_missed_attestations_storage",
         "Forbidden_delegates_storage",
+	"Slash_percentage",
         "Delegate_slashed_deposits_storage",
         "Staking",
         "Delegate_cycles",
