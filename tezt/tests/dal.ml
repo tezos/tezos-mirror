@@ -3846,7 +3846,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     ~migration_level ~scenario ~description () =
   let tags =
-    Tag.tezos2 :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
   in
   Test.register
