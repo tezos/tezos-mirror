@@ -10,6 +10,9 @@ capability. This means that Tezos not only comes to consensus about the state of
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
+.. _tezos_community:
+
+Tezos is backed up by a vibrant `Tezos community <https://tezos.com/community>`__, which may also be contacted for technical support when needed.
 
 Octez includes a node, a client, a baker, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
 The source code is placed under the MIT Open Source License, and
@@ -20,9 +23,6 @@ This website contains technical documentation about both Octez and the Tezos pro
 The current release of Octez is :doc:`../releases/version-19`.
 
 For installing instructions, see :doc:`./howtoget`.
-
-Tezos is backed up by a vibrant :ref:`community <tezos_community>`.
-For technical support, check the :doc:`technical support page <../global/support>`.
 
 Mainnet & Test Networks
 ~~~~~~~~~~~~~~~~~~~~~~~
