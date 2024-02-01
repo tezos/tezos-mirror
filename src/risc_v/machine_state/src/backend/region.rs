@@ -178,16 +178,16 @@ pub(crate) mod tests {
         Array, Backend, Elem, Region,
     };
 
-    pub fn test_backend(factory: &mut impl TestBackendFactory) {
-        test_region_overlap(factory);
-        test_cell_overlap(factory);
-        test_region_stored_format(factory);
+    pub fn test_backend<F: TestBackendFactory>() {
+        test_region_overlap::<F>();
+        test_cell_overlap::<F>();
+        test_region_stored_format::<F>();
     }
 
-    fn test_region_overlap(factory: &mut impl TestBackendFactory) {
+    fn test_region_overlap<F: TestBackendFactory>() {
         const LEN: usize = 64;
         type OurLayout = (Array<u64, LEN>, Array<u64, LEN>);
-        let mut backend = factory.make::<OurLayout>();
+        let mut backend = F::new::<OurLayout>();
 
         let (mut array1, mut array2) = backend.allocate(OurLayout::placed().into_location());
 
@@ -229,9 +229,9 @@ pub(crate) mod tests {
         }
     }
 
-    fn test_cell_overlap(factory: &mut impl TestBackendFactory) {
+    fn test_cell_overlap<F: TestBackendFactory>() {
         type OurLayout = (Atom<[u64; 4]>, Atom<[u64; 4]>);
-        let mut backend = factory.make::<OurLayout>();
+        let mut backend = F::new::<OurLayout>();
         let (mut cell1, mut cell2) = backend.allocate(OurLayout::placed().into_location());
 
         // Cell should be zero-initialised.
@@ -255,7 +255,7 @@ pub(crate) mod tests {
         assert_eq!(cell1.read(), cell1_value);
     }
 
-    fn test_region_stored_format(factory: &mut impl TestBackendFactory) {
+    fn test_region_stored_format<F: TestBackendFactory>() {
         /// Dummy type that helps us implement custom normalisation via [Elem]
         #[repr(packed)]
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
@@ -287,7 +287,7 @@ pub(crate) mod tests {
         }
 
         type FlipperLayout = Array<Flipper, 4>;
-        let mut backend = factory.make::<FlipperLayout>();
+        let mut backend = F::new::<FlipperLayout>();
 
         // Writing to one item of the region must convert to stored format.
         {

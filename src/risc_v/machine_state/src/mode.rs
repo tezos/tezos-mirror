@@ -80,8 +80,8 @@ pub mod tests {
         mode::{Mode, ModeCell, ModeLayout},
     };
 
-    pub fn test_mode(factory: &mut impl TestBackendFactory) {
-        let mut backend = factory.make::<ModeLayout>();
+    pub fn test_mode<F: TestBackendFactory>() {
+        let mut backend = F::new::<ModeLayout>();
 
         let test_mode = |mode| {
             let first_value = mode;

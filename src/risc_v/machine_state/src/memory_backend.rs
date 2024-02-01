@@ -230,11 +230,11 @@ mod tests {
         impl backend::tests::TestBackendFactory for InMemoryBackendFactory {
             type Backend<L: Layout> = InMemoryBackend<L>;
 
-            fn make<L: Layout>(&mut self) -> Self::Backend<L> {
+            fn new<L: Layout>() -> Self::Backend<L> {
                 InMemoryBackend::<L>::new().0
             }
         }
 
-        backend::tests::test_backend(&mut InMemoryBackendFactory);
+        backend::tests::test_backend::<InMemoryBackendFactory>();
     }
 }
