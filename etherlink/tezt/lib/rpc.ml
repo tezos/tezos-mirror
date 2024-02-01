@@ -51,6 +51,14 @@ module Syntax = struct
     | Error err ->
         Test.fail "'let*@' expected a valid response but got %a" pp_error err
 
+  let ( let*@! ) x f =
+    let* r = x in
+    match r with
+    | Ok (Some x) -> f x
+    | Ok None -> Test.fail "'let*@!' expected a Some but got None"
+    | Error err ->
+        Test.fail "'let*@' expected a valid response but got %a" pp_error err
+
   let ( let*@? ) x f =
     let* r = x in
     match r with
@@ -84,3 +92,30 @@ let inject_upgrade ~payload evm_node =
       (inject_upgrade_request payload)
   in
   return ()
+
+let send_raw_transaction_request raw_tx =
+  Evm_node.
+    {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
+
+let send_raw_transaction ~raw_tx evm_node =
+  let* response =
+    Evm_node.call_evm_rpc evm_node (send_raw_transaction_request raw_tx)
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let get_transaction_receipt ~tx_hash evm_node =
+  let* response =
+    Evm_node.call_evm_rpc
+      evm_node
+      {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response
+         |> JSON.as_opt
+         |> Option.map Transaction.transaction_receipt_of_json)
+       response
