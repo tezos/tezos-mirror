@@ -28,7 +28,7 @@ to one provided by another node under the user’s control, or by
 relying on social cues to obtain a hash from a large number of trusted
 parties which are unlikely to be colluding.
 
-For instance, one may use one or more Tezos block explorers in the :ref:`Tezos community <tezos_community>` to check whether this block hash matches an existing block.
+For instance, one may use one or more :ref:`Tezos block explorers <block_explorers>` to check whether this block hash matches an existing block.
 
 After that careful selection and verification of the imported block
 hash, you can trust the node with the rest of the procedure. In

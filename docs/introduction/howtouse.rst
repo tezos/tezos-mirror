@@ -445,6 +445,12 @@ included anymore in a block.
 Furthermore each operation has a counter that prevents replays so it is usually safe to re-emit an
 operation that seems lost.
 
+.. _block_explorers:
+
+Block Explorers
+~~~~~~~~~~~~~~~
+
+Once your transaction is included in a block, you can retrieve it in one of the `public block explorers <https://docs.tezos.com/developing/information/block-explorers>`__, which list the whole history of the different Tezos networks (mainnet or test networks).
 
 .. _originated-accounts:
 

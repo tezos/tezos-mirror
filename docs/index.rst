@@ -258,6 +258,5 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    global/architecture
-   global/support.rst
    global/test_networks.rst
    global/timelock
