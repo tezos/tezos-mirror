@@ -12,6 +12,7 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
 use crate::read_last_info_per_level_timestamp;
+use crate::storage::read_l1_level;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -94,9 +95,15 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         Some(sequencer),
     )? {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+        let level = read_l1_level(host)?;
         // Store the transactions in the delayed inbox.
         for transaction in transactions {
-            delayed_inbox.save_transaction(host, transaction, previous_timestamp)?;
+            delayed_inbox.save_transaction(
+                host,
+                transaction,
+                previous_timestamp,
+                level,
+            )?;
         }
         // Check if there are timed-out transactions in the delayed inbox
         let timed_out = delayed_inbox.first_has_timed_out(host)?;

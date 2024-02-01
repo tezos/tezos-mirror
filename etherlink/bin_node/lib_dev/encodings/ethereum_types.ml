@@ -1191,7 +1191,7 @@ module Delayed_transaction = struct
 
   let of_bytes hash bytes =
     match bytes |> Rlp.decode with
-    | Ok Rlp.(List [List [Value tag; content]; _timestamp]) -> (
+    | Ok Rlp.(List [List [Value tag; content]; _timestamp; _level]) -> (
         match (Bytes.to_string tag, content) with
         | "\x01", Rlp.Value raw_tx ->
             let hash =

@@ -112,13 +112,21 @@ impl Decodable for DelayedTransaction {
 pub struct DelayedInboxItem {
     transaction: DelayedTransaction,
     timestamp: Timestamp,
+    level: u32,
+}
+
+impl DelayedInboxItem {
+    fn list_size() -> usize {
+        3
+    }
 }
 
 impl Encodable for DelayedInboxItem {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
+        stream.begin_list(Self::list_size());
         stream.append(&self.transaction);
         rlp_helpers::append_timestamp(stream, self.timestamp);
+        rlp_helpers::append_u32_le(stream, &self.level);
     }
 }
 
@@ -127,16 +135,19 @@ impl Decodable for DelayedInboxItem {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 2 {
+        if decoder.item_count()? != Self::list_size() {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let mut it = decoder.iter();
         let transaction =
             rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "transaction")?;
         let timestamp = rlp_helpers::decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+        let level =
+            rlp_helpers::decode_field_u32_le(&rlp_helpers::next(&mut it)?, "level")?;
         Ok(Self {
             transaction,
             timestamp,
+            level,
         })
     }
 }
@@ -152,6 +163,7 @@ impl DelayedInbox {
         host: &mut Host,
         tx: Transaction,
         timestamp: Timestamp,
+        level: u32,
     ) -> Result<()> {
         let Transaction { tx_hash, content } = tx;
         let transaction = match content {
@@ -161,6 +173,7 @@ impl DelayedInbox {
         let item = DelayedInboxItem {
             transaction,
             timestamp,
+            level,
         };
         self.0.push(host, &Hash(tx_hash), &item)?;
         log!(
@@ -203,6 +216,7 @@ impl DelayedInbox {
             |DelayedInboxItem {
                  transaction,
                  timestamp,
+                 level: _,
              }| {
                 (
                     Self::transaction_from_delayed(tx_hash, transaction),
@@ -228,6 +242,7 @@ impl DelayedInbox {
                 DelayedInboxItem {
                     transaction,
                     timestamp,
+                    level: _,
                 },
             )| {
                 if now.as_u64() - timestamp.as_u64() >= timeout {
@@ -357,7 +372,7 @@ mod tests {
         let tx: Transaction = dummy_transaction(0);
         let timestamp: Timestamp = current_timestamp(&mut host);
         delayed_inbox
-            .save_transaction(&mut host, tx.clone(), timestamp)
+            .save_transaction(&mut host, tx.clone(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
 
         let mut delayed_inbox =
