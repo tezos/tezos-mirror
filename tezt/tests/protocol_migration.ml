@@ -65,6 +65,35 @@ let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
   let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
   Lwt.return (client, node)
 
+(** [block_check ?level ~expected_block_type ~migrate_to ~migrate_from client]
+    is generic check that a block of type [expected_block_type] contains
+    (protocol) metatadata conforming to its type at [level]. **)
+let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
+  let block =
+    match level with Some level -> Some (string_of_int level) | None -> None
+  in
+  let* metadata =
+    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
+  in
+  let protocol = metadata.protocol in
+  let next_protocol = metadata.next_protocol in
+  (match expected_block_type with
+  | `Migration ->
+      Check.(
+        (next_protocol = Protocol.hash migrate_to)
+          string
+          ~error_msg:"expected next protocol to be %R, got %L") ;
+      Check.(
+        (protocol = Protocol.hash migrate_from)
+          string
+          ~error_msg:"expected (from) protocol to be %R, got %L")
+  | `Non_migration ->
+      Check.(
+        (next_protocol = protocol)
+          string
+          ~error_msg:"expected a non migration block ")) ;
+  Lwt.return_unit
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
@@ -88,36 +117,26 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
   in
   (* Ensure that the block before migration *)
-  let* pre_migration_block =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_metadata ~block:(Int.to_string migration_level) ()
-  in
   Log.info "Checking migration block consistency" ;
-  Check.(
-    (pre_migration_block.protocol = Protocol.hash migrate_from)
-      string
-      ~error_msg:"expected protocol = %R, got %L") ;
-  Check.(
-    (pre_migration_block.next_protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () =
+    block_check
+      ~expected_block_type:`Migration
+      client
+      ~migrate_from
+      ~migrate_to
+      ~level:migration_level
+  in
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
-  let* migration_block =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_metadata
-         ~block:(Int.to_string (migration_level + 1))
-         ()
-  in
   Log.info "Checking migration block consistency" ;
-  Check.(
-    (migration_block.protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected protocol = %R, got %L") ;
-  Check.(
-    (migration_block.next_protocol = Protocol.hash migrate_to)
-      string
-      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () =
+    block_check
+      ~expected_block_type:`Non_migration
+      client
+      ~migrate_from
+      ~migrate_to
+      ~level:(migration_level + 1)
+  in
   (* Test that we can still bake after migration *)
   let* () =
     repeat baked_blocks_after_migration (fun () ->
@@ -297,35 +316,6 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   let* () = connect (client3, node3) (client0, node0) in
   let* () = synchronize node1 [node0; node2; node3] in
   unit
-
-(** [block_check ~level ~expected_block_type ~migrate_to ~migrate_from client]
-    is generic check that a block of type [expected_block_type] contains
-    (protocol) metatadata conforming to its type at [level]. **)
-let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
-  let block =
-    match level with Some level -> Some (string_of_int level) | None -> None
-  in
-  let* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
-  in
-  let protocol = metadata.protocol in
-  let next_protocol = metadata.next_protocol in
-  (match expected_block_type with
-  | `Migration ->
-      Check.(
-        (next_protocol = Protocol.hash migrate_to)
-          string
-          ~error_msg:"expected next protocol to be %R, got %L") ;
-      Check.(
-        (protocol = Protocol.hash migrate_from)
-          string
-          ~error_msg:"expected (from) protocol to be %R, got %L")
-  | `Non_migration ->
-      Check.(
-        (next_protocol = protocol)
-          string
-          ~error_msg:"expected a non migration block ")) ;
-  Lwt.return_unit
 
 (** Number of elements in [l] that satisfy the predicate [p]. *)
 let list_count_p p l =
