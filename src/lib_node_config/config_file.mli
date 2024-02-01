@@ -80,6 +80,7 @@ and rpc = {
   tls : tls option;
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
+  max_active_rpc_connections : int;
 }
 
 and tls = {cert : string; key : string}
@@ -91,6 +92,8 @@ val default_data_dir : string
 val default_p2p_port : int
 
 val default_rpc_port : int
+
+val default_max_active_rpc_connections : int
 
 val default_p2p : p2p
 
@@ -118,6 +121,7 @@ val update :
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
+  ?max_active_rpc_connections:int ->
   ?metrics_addr:string list ->
   ?operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   ?private_mode:bool ->

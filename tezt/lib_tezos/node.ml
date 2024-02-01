@@ -58,6 +58,7 @@ type argument =
   | Version
   | RPC_additional_addr of string
   | RPC_additional_addr_local of string
+  | Max_active_rpc_connections of int
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -89,6 +90,8 @@ let make_argument = function
   | Version -> ["--version"]
   | RPC_additional_addr addr -> ["--rpc-addr"; addr]
   | RPC_additional_addr_local addr -> ["--local-rpc-addr"; addr]
+  | Max_active_rpc_connections n ->
+      ["--max-active-rpc-connections"; string_of_int n]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -110,7 +113,8 @@ let is_redundant = function
   | No_bootstrap_peers, No_bootstrap_peers
   | Media_type _, Media_type _
   | Metadata_size_limit _, Metadata_size_limit _
-  | Version, Version ->
+  | Version, Version
+  | Max_active_rpc_connections _, Max_active_rpc_connections _ ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -134,7 +138,8 @@ let is_redundant = function
   | Disable_mempool, _
   | RPC_additional_addr _, _
   | RPC_additional_addr_local _, _
-  | Version, _ ->
+  | Version, _
+  | Max_active_rpc_connections _, _ ->
       false
 
 type 'a known = Unknown | Known of 'a
@@ -152,6 +157,7 @@ module Parameters = struct
     rpc_port : int;
     rpc_tls : tls_config option;
     allow_all_rpc : bool;
+    max_active_rpc_connections : int;
     default_expected_pow : int;
     mutable default_arguments : argument list;
     mutable arguments : argument list;
@@ -696,7 +702,8 @@ let wait_for_disconnections node disconnections =
 let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
     ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
     ?metrics_port ?(rpc_local = false) ?(rpc_host = "localhost") ?rpc_port
-    ?rpc_tls ?(allow_all_rpc = true) arguments =
+    ?rpc_tls ?(allow_all_rpc = true) ?(max_active_rpc_connections = 500)
+    arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -733,6 +740,7 @@ let create ?runner ?(path = Constant.octez_node) ?name ?color ?data_dir
         rpc_tls;
         metrics_addr;
         metrics_port;
+        max_active_rpc_connections;
         allow_all_rpc;
         default_arguments = arguments;
         arguments;
@@ -837,6 +845,8 @@ let runlike_command_arguments node command arguments =
   :: (if node.persistent_state.rpc_local then "--local-rpc-addr"
      else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+  :: "--max-active-rpc-connections"
+  :: string_of_int node.persistent_state.max_active_rpc_connections
   :: command_args
 
 let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level

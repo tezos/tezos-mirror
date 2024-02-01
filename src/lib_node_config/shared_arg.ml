@@ -65,6 +65,7 @@ type t = {
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
   media_type : Media_type.Command_line.t;
+  max_active_rpc_connections : int option;
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
@@ -187,7 +188,8 @@ let wrap data_dir config_file network connections max_download_speed
     disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
     cors_origins cors_headers log_output log_coloring history_mode
     synchronisation_threshold latency disable_config_validation allow_all_rpc
-    media_type metrics_addr operation_metadata_size_limit =
+    media_type max_active_rpc_connections metrics_addr
+    operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -232,6 +234,7 @@ let wrap data_dir config_file network connections max_download_speed
     latency;
     allow_all_rpc;
     media_type;
+    max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
   }
@@ -709,6 +712,13 @@ module Term = struct
           Media_type.Command_line.Any
       & info ~docs ~doc ~docv:"MEDIATYPE" ["media-type"])
 
+  let max_active_rpc_connections =
+    let doc = "Sets the maximum number of active connections per RPC server." in
+    Arg.(
+      value
+      & opt (some int) (Some Config_file.default_max_active_rpc_connections)
+      & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
+
   (* Args. *)
 
   let args =
@@ -721,7 +731,8 @@ module Term = struct
     $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers $ log_output $ log_coloring $ history_mode
     $ synchronisation_threshold $ latency $ disable_config_validation
-    $ allow_all_rpc $ media_type $ metrics_addr $ operation_metadata_size_limit
+    $ allow_all_rpc $ media_type $ max_active_rpc_connections $ metrics_addr
+    $ operation_metadata_size_limit
 end
 
 let read_config_file args =
@@ -865,6 +876,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     latency;
     allow_all_rpc;
     media_type;
+    max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
   } =
@@ -1007,6 +1019,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~rpc_listen_addrs
     ~allow_all_rpc
     ~media_type
+    ?max_active_rpc_connections
     ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode
