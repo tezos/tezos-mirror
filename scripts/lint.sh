@@ -8,9 +8,10 @@ Where <action> can be:
 
 * --update-ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
+* --format-scripts: format shell scripts inplace using shfmt
 * --check-ocamlformat: check the above does nothing.
 * --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
-* --check-scripts: check the .sh files
+* --check-scripts: shellcheck and check formatting of the .sh files
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
@@ -77,8 +78,19 @@ function shellcheck_script() {
 }
 
 function shfmt_script() {
-  # following google style guide for sh formatting
   shfmt -i 2 -sr -d "$1"
+}
+
+function shfmt_script_write() {
+  shfmt -w -i 2 -sr -d "$1"
+}
+
+format_scripts() {
+  scripts=$(find "${source_directories[@]}" scripts docs -name "*.sh" -type f -print)
+
+  for script in ${scripts}; do
+    shfmt_script_write "$script"
+  done
 }
 
 check_scripts() {
@@ -269,6 +281,9 @@ case "$action" in
   ;;
 "--check-scripts")
   action=check_scripts
+  ;;
+"--format-scripts")
+  action=format_scripts
   ;;
 "--check-redirects")
   action=check_redirects

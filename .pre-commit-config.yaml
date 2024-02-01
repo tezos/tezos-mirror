@@ -1,8 +1,24 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.9.0
+    hooks:
+      - id: shellcheck
+        args: [ "--external-sources" ]
+  - repo: https://github.com/cisagov/pre-commit-shfmt
+    rev: v0.0.2
+    hooks:
+      - id: shfmt
+        # These settings must mirror the ones set in `scripts/lint.sh`. 
+        args: [ "-i", "2", "-sr", "-d" ]
+  - repo: https://github.com/arenadotio/pre-commit-ocamlformat
+    rev: 0439858
+    hooks:
+      - id: ocamlformat
+        args: [ "-i" ]
