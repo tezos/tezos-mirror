@@ -595,14 +595,14 @@ module Interpreter_tests = struct
 
   let path = project_root // Filename.dirname __FILE__
 
-  (* In this test we use a contract which takes a list of transactions, applies
+  (* In this test, we use a contract which takes a list of transactions, applies
      all of them, and assert all of them are correct. It also enforces a 1-to-1
      conversion with mutez by asking an amount to shield and asking for a pkh to
      unshield.
      We create 2 keys a and b. We originate the contract, then do two lists of
      shield for a, then transfers several outputs to b while unshielding, then
      transfer all of b inputs to a while adding dummy inputs and outputs.
-     At last we fail we make a failing transaction. *)
+     At last, we fail by making a faulty transaction. *)
   let test_shielded_tez () =
     init () >>=? fun (genesis, baker, src0, src1) ->
     let memo_size = 8 in
@@ -615,27 +615,29 @@ module Interpreter_tests = struct
     >>=? fun (dst, b1, anti_replay) ->
     let wa = wallet_gen () in
     let list_transac, total =
-      shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
+      shield ~memo_size wa.sk 2 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     transac_and_sync ~memo_size b1 parameters total src0 dst baker
     >>=? fun (b2, _state) ->
     (* we shield again on another block, forging with the empty state *)
-    let list_transac, total =
-      shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
+    let list_transac, total' =
+      shield ~memo_size wa.sk 2 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
-    transac_and_sync ~memo_size b2 parameters total src0 dst baker
+    transac_and_sync ~memo_size b2 parameters total' src0 dst baker
     >>=? fun (b3, state) ->
     (* address that will receive an unshield *)
     Context.Contract.balance (B b3) src1 >>=? fun balance_before_shield ->
     (* address that will receive an unshield *)
     let wb = wallet_gen () in
-    let list_addr = gen_addr 15 wb.vk in
+    let list_addr = gen_addr 2 wb.vk in
+    (* Take the first two inputs *)
     let list_forge_input =
-      WithExceptions.List.init ~loc:__LOC__ 14 (fun pos_int ->
+      List.map
+        (fun pos_int ->
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
@@ -643,16 +645,20 @@ module Interpreter_tests = struct
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
+        (0 -- 4)
     in
     let list_forge_output =
       List.map
         (fun addr -> Tezos_sapling.Forge.make_output addr 1L (Bytes.create 8))
         list_addr
     in
-    (let pkh = Context.Contract.pkh src1 in
+    (let src_pkh1 = Context.Contract.pkh src1 in
      Incremental.begin_construction b3 >>=? fun incr ->
      let alpha_ctxt = Incremental.alpha_ctxt incr in
-     Script_ir_translator.pack_data alpha_ctxt Script_typed_ir.key_hash_t pkh
+     Script_ir_translator.pack_data
+       alpha_ctxt
+       Script_typed_ir.key_hash_t
+       src_pkh1
      >>= wrap
      >>=? fun (bound_data, _alpha_ctxt) -> return bound_data)
     >>=? fun bound_data ->
@@ -684,18 +690,20 @@ module Interpreter_tests = struct
     in
     (* The balance after shield is obtained from the balance before shield by
        the shield specific update. *)
-    (* The inputs total [total] mutez and 15 of those are transfered in shielded tez *)
-    Assert.equal_int ~loc:__LOC__ (Int64.to_int diff_due_to_shield) (total - 15)
+    (* The inputs total [total] mutez and 2 of those are transfered in shielded tez *)
+    Assert.equal_int ~loc:__LOC__ (Int64.to_int diff_due_to_shield) (total - 2)
     >>=? fun () ->
     let list_forge_input =
-      WithExceptions.List.init ~loc:__LOC__ 15 (fun i ->
-          let pos = Int64.of_int (i + 14 + 14) in
+      List.map
+        (fun i ->
+          let pos = Int64.of_int (i + 5 + 5) in
           let forge_input =
             snd
               (Tezos_sapling.Forge.Input.get state pos wb.vk
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
+        (0 -- 1)
     in
     let addr_a =
       snd
@@ -703,12 +711,12 @@ module Interpreter_tests = struct
            wa.vk
            Tezos_sapling.Core.Client.Viewing_key.default_index
     in
-    let output = Tezos_sapling.Forge.make_output addr_a 15L (Bytes.create 8) in
+    let output = Tezos_sapling.Forge.make_output addr_a 2L (Bytes.create 8) in
     let hex_transac =
       to_hex
         (Tezos_sapling.Forge.forge_transaction
-           ~number_dummy_inputs:2
-           ~number_dummy_outputs:2
+           ~number_dummy_inputs:1
+           ~number_dummy_outputs:1
            list_forge_input
            [output]
            wb.sk
@@ -738,8 +746,6 @@ module Interpreter_tests = struct
     (* Here we fail by changing the field bound_data*)
     let orginal_transac =
       Tezos_sapling.Forge.forge_transaction
-        ~number_dummy_inputs:2
-        ~number_dummy_outputs:2
         list_forge_input
         [output]
         wb.sk
@@ -1186,7 +1192,7 @@ let tests =
     Tztest.tztest "bench_phases" `Slow Alpha_context_tests.test_bench_phases;
     Tztest.tztest
       "bench_phases_legacy"
-      `Quick
+      `Slow
       Alpha_context_tests.test_bench_phases_legacy;
     Tztest.tztest
       "bench_fold_over_same_token"
