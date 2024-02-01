@@ -6,12 +6,12 @@
 (*****************************************************************************)
 
 (** A value representing percentages, between 0% and 100%, inclusive.
-    Precision of the representation is 1% *)
+    Precision of the representation is 0.01% *)
 type t
 
 val encoding : t Data_encoding.t
 
-(** Rounds down to the nearest percent *)
+(** Rounds down to the nearest 0.01% *)
 val of_ratio_bounded : Ratio_repr.t -> t
 
 val to_q : t -> Q.t
@@ -43,3 +43,5 @@ val p100 : t
 module Compare : sig
   val ( >= ) : t -> t -> bool
 end
+
+val convert_from_o_to_p : t -> t

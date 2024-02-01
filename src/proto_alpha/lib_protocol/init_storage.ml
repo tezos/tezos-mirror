@@ -321,6 +321,10 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           cleanup_values_for_protocol_p ctxt previous_proto_constants level
         in
+        (* Update the percentage representation of the stored slashes *)
+        let*! ctxt =
+          Delegate_slashed_deposits_storage.update_slashing_storage_for_p ctxt
+        in
         return (ctxt, [])
   in
   let* ctxt =
