@@ -22,8 +22,6 @@ open Contract_path
 
 let pvm_kind = "wasm_2_0_0"
 
-let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
-
 type l1_contracts = {
   exchanger : string;
   bridge : string;
@@ -1560,14 +1558,6 @@ let test_simulate =
           (option int))
         ~error_msg:"The simulation should advance one L2 block" ;
       unit)
-
-let read_tx_from_file () =
-  read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
-  |> String.trim |> String.split_on_char '\n'
-  |> List.map (fun line ->
-         match String.split_on_char ' ' line with
-         | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
-         | _ -> failwith "Unexpected tx_raw and tx_hash.")
 
 let test_full_blocks =
   register_proxy

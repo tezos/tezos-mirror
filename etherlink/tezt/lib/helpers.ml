@@ -67,3 +67,13 @@ let next_evm_level ~evm_node ~sc_rollup_node ~node ~client =
       let*@ level = Rpc.block_number evm_node in
       return (Int32.to_int level)
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
+
+let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
+
+let read_tx_from_file () =
+  read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
+  |> String.trim |> String.split_on_char '\n'
+  |> List.map (fun line ->
+         match String.split_on_char ' ' line with
+         | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
+         | _ -> failwith "Unexpected tx_raw and tx_hash.")

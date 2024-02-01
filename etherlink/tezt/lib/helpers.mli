@@ -64,3 +64,11 @@ val next_evm_level :
   node:Node.t ->
   client:Client.t ->
   int Lwt.t
+
+(** Path to the directory containing sample inputs. *)
+val kernel_inputs_path : string
+
+(** [read_tx_from_file ()] reads a file containing 100 transactions.
+    The list returned contains pairs of the shape [(tx_raw, tx_hash)].
+*)
+val read_tx_from_file : unit -> (string * string) list
