@@ -227,6 +227,38 @@ pub mod tests {
         fn new<L: Layout>() -> Self::Backend<L>;
     }
 
+    /// Given a `StateLayout` and a [`TestBackendFactory`] type,
+    /// create the backend for that layout.
+    #[macro_export]
+    macro_rules! create_backend {
+        ($StateLayout:ty, $Factory:ty) => {
+            <$Factory>::new::<$StateLayout>()
+        };
+    }
+
+    /// Given a `State<M: Manager>`, optionally its `StateLayout`,
+    /// a [`TestBackendFactory`] type, a `backend` created with `create_backend!` macro,
+    /// create the location and return the created `State<M>`.
+    #[macro_export]
+    macro_rules! create_state {
+        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
+            {
+                use $crate::backend::{Backend, BackendManagement, Layout};
+                let loc = <$StateLayout>::placed().into_location();
+                let new_state =
+                    $State::<<<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::new_in(
+                        $backend.allocate(loc),
+                    );
+
+                new_state
+            }
+        };
+
+        ($State:tt, $Factory:ty, $backend:ident) => {
+            create_state!($State, paste::paste!([<$State Layout>]), $Factory, $backend)
+        };
+    }
+
     pub fn test_backend<F: TestBackendFactory>() {
         region::tests::test_backend::<F>();
         registers::tests::test_backend::<F>();
