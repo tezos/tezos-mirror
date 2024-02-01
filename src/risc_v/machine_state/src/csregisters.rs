@@ -6,6 +6,7 @@ mod xstatus;
 
 use crate::backend::{self, Region};
 use crate::mode::Mode;
+use strum::IntoEnumIterator;
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -23,7 +24,7 @@ pub const fn ones(n: u64) -> u64 {
 
 /// CSR index
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
 #[repr(usize)]
 pub enum CSRegister {
     // Unprivileged Floating-Point CSRs
@@ -659,6 +660,357 @@ impl CSRegister {
     const SATP_MODE_SV57: CSRValue = 10;
     /// We consider the default `SATP` value to be the `BARE` mode.
     const SATP_DEFAULT: CSRValue = CSRegister::SATP_MODE_BARE << CSRegister::SATP_MODE_OFFSET;
+
+    /// Get the default value for the register.
+    fn default_value(&self) -> u64 {
+        match self {
+            CSRegister::cycle
+            | CSRegister::time
+            | CSRegister::instret
+            | CSRegister::mcycle
+            | CSRegister::minstret => {
+                // Default is that the machine starts at 0
+                0
+            }
+
+            CSRegister::hpmcounter3
+            | CSRegister::hpmcounter4
+            | CSRegister::hpmcounter5
+            | CSRegister::hpmcounter6
+            | CSRegister::hpmcounter7
+            | CSRegister::hpmcounter8
+            | CSRegister::hpmcounter9
+            | CSRegister::hpmcounter10
+            | CSRegister::hpmcounter11
+            | CSRegister::hpmcounter12
+            | CSRegister::hpmcounter13
+            | CSRegister::hpmcounter14
+            | CSRegister::hpmcounter15
+            | CSRegister::hpmcounter16
+            | CSRegister::hpmcounter17
+            | CSRegister::hpmcounter18
+            | CSRegister::hpmcounter19
+            | CSRegister::hpmcounter20
+            | CSRegister::hpmcounter21
+            | CSRegister::hpmcounter22
+            | CSRegister::hpmcounter23
+            | CSRegister::hpmcounter24
+            | CSRegister::hpmcounter25
+            | CSRegister::hpmcounter26
+            | CSRegister::hpmcounter27
+            | CSRegister::hpmcounter28
+            | CSRegister::hpmcounter29
+            | CSRegister::hpmcounter30
+            | CSRegister::hpmcounter31
+            | CSRegister::mhpmcounter3
+            | CSRegister::mhpmcounter4
+            | CSRegister::mhpmcounter5
+            | CSRegister::mhpmcounter6
+            | CSRegister::mhpmcounter7
+            | CSRegister::mhpmcounter8
+            | CSRegister::mhpmcounter9
+            | CSRegister::mhpmcounter10
+            | CSRegister::mhpmcounter11
+            | CSRegister::mhpmcounter12
+            | CSRegister::mhpmcounter13
+            | CSRegister::mhpmcounter14
+            | CSRegister::mhpmcounter15
+            | CSRegister::mhpmcounter16
+            | CSRegister::mhpmcounter17
+            | CSRegister::mhpmcounter18
+            | CSRegister::mhpmcounter19
+            | CSRegister::mhpmcounter20
+            | CSRegister::mhpmcounter21
+            | CSRegister::mhpmcounter22
+            | CSRegister::mhpmcounter23
+            | CSRegister::mhpmcounter24
+            | CSRegister::mhpmcounter25
+            | CSRegister::mhpmcounter26
+            | CSRegister::mhpmcounter27
+            | CSRegister::mhpmcounter28
+            | CSRegister::mhpmcounter29
+            | CSRegister::mhpmcounter30
+            | CSRegister::mhpmcounter31 => {
+                // All counters shall start at 0 again
+                0
+            }
+
+            CSRegister::mhpmevent3
+            | CSRegister::mhpmevent4
+            | CSRegister::mhpmevent5
+            | CSRegister::mhpmevent6
+            | CSRegister::mhpmevent7
+            | CSRegister::mhpmevent8
+            | CSRegister::mhpmevent9
+            | CSRegister::mhpmevent10
+            | CSRegister::mhpmevent11
+            | CSRegister::mhpmevent12
+            | CSRegister::mhpmevent13
+            | CSRegister::mhpmevent14
+            | CSRegister::mhpmevent15
+            | CSRegister::mhpmevent16
+            | CSRegister::mhpmevent17
+            | CSRegister::mhpmevent18
+            | CSRegister::mhpmevent19
+            | CSRegister::mhpmevent20
+            | CSRegister::mhpmevent21
+            | CSRegister::mhpmevent22
+            | CSRegister::mhpmevent23
+            | CSRegister::mhpmevent24
+            | CSRegister::mhpmevent25
+            | CSRegister::mhpmevent26
+            | CSRegister::mhpmevent27
+            | CSRegister::mhpmevent28
+            | CSRegister::mhpmevent29
+            | CSRegister::mhpmevent30
+            | CSRegister::mhpmevent31 => {
+                // Zero means "no event"
+                0
+            }
+
+            CSRegister::mcountinhibit => {
+                // All counter are enabled
+                0
+            }
+
+            CSRegister::scounteren | CSRegister::mcounteren => {
+                // All counters are readable in all privilege levels
+                ones(32)
+            }
+
+            CSRegister::fflags => {
+                // Resets accrued floating-point exceptions
+                0b00000
+            }
+
+            CSRegister::frm => {
+                // 000 = RNE aka "round to nearest, ties to even"
+                0b000
+            }
+
+            CSRegister::fcsr => {
+                // fcsr is a combination of fflags and fcsr
+                CSRegister::fflags.default_value() & CSRegister::frm.default_value() << 5
+            }
+
+            CSRegister::pmpcfg0
+            | CSRegister::pmpcfg2
+            | CSRegister::pmpcfg4
+            | CSRegister::pmpcfg6
+            | CSRegister::pmpcfg8
+            | CSRegister::pmpcfg10
+            | CSRegister::pmpcfg12
+            | CSRegister::pmpcfg14 => {
+                // Physical-memory protection configuration is off initially
+                0
+            }
+
+            CSRegister::pmpaddr0
+            | CSRegister::pmpaddr1
+            | CSRegister::pmpaddr2
+            | CSRegister::pmpaddr3
+            | CSRegister::pmpaddr4
+            | CSRegister::pmpaddr5
+            | CSRegister::pmpaddr6
+            | CSRegister::pmpaddr7
+            | CSRegister::pmpaddr8
+            | CSRegister::pmpaddr9
+            | CSRegister::pmpaddr10
+            | CSRegister::pmpaddr11
+            | CSRegister::pmpaddr12
+            | CSRegister::pmpaddr13
+            | CSRegister::pmpaddr14
+            | CSRegister::pmpaddr15
+            | CSRegister::pmpaddr16
+            | CSRegister::pmpaddr17
+            | CSRegister::pmpaddr18
+            | CSRegister::pmpaddr19
+            | CSRegister::pmpaddr20
+            | CSRegister::pmpaddr21
+            | CSRegister::pmpaddr22
+            | CSRegister::pmpaddr23
+            | CSRegister::pmpaddr24
+            | CSRegister::pmpaddr25
+            | CSRegister::pmpaddr26
+            | CSRegister::pmpaddr27
+            | CSRegister::pmpaddr28
+            | CSRegister::pmpaddr29
+            | CSRegister::pmpaddr30
+            | CSRegister::pmpaddr31
+            | CSRegister::pmpaddr32
+            | CSRegister::pmpaddr33
+            | CSRegister::pmpaddr34
+            | CSRegister::pmpaddr35
+            | CSRegister::pmpaddr36
+            | CSRegister::pmpaddr37
+            | CSRegister::pmpaddr38
+            | CSRegister::pmpaddr39
+            | CSRegister::pmpaddr40
+            | CSRegister::pmpaddr41
+            | CSRegister::pmpaddr42
+            | CSRegister::pmpaddr43
+            | CSRegister::pmpaddr44
+            | CSRegister::pmpaddr45
+            | CSRegister::pmpaddr46
+            | CSRegister::pmpaddr47
+            | CSRegister::pmpaddr48
+            | CSRegister::pmpaddr49
+            | CSRegister::pmpaddr50
+            | CSRegister::pmpaddr51
+            | CSRegister::pmpaddr52
+            | CSRegister::pmpaddr53
+            | CSRegister::pmpaddr54
+            | CSRegister::pmpaddr55
+            | CSRegister::pmpaddr56
+            | CSRegister::pmpaddr57
+            | CSRegister::pmpaddr58
+            | CSRegister::pmpaddr59
+            | CSRegister::pmpaddr60
+            | CSRegister::pmpaddr61
+            | CSRegister::pmpaddr62
+            | CSRegister::pmpaddr63 => {
+                // Physical-memory protection configuration is off initially
+                0
+            }
+
+            // We're always on hart 0
+            CSRegister::mhartid => 0,
+
+            // Vendor ID is not implemented
+            CSRegister::mvendorid => 0,
+
+            // Arch ID is not implemented
+            CSRegister::marchid => 0,
+
+            // Implementation ID is not implemented
+            CSRegister::mimpid => 0,
+
+            // misa is pretty much fixed
+            CSRegister::misa => CSRegister::WARL_MISA_VALUE,
+
+            // Scratch registers are 0 by default
+            CSRegister::mscratch | CSRegister::sscratch => 0,
+
+            // Project view from mstatus
+            CSRegister::sstatus => {
+                xstatus::sstatus_from_mstatus(CSRegister::mstatus.default_value())
+            }
+
+            CSRegister::mstatus => {
+                let mstatus = 0;
+
+                // Interrupts are off
+                let mstatus = xstatus::set_SIE(mstatus, false);
+                let mstatus = xstatus::set_MIE(mstatus, false);
+
+                // Interrupts were off before
+                let mstatus = xstatus::set_SPIE(mstatus, false);
+                let mstatus = xstatus::set_MPIE(mstatus, false);
+
+                // Previous privilege mode was supervisor
+                let mstatus = xstatus::set_SPP(mstatus, xstatus::SPPValue::Supervisor);
+                let mstatus = xstatus::set_MPP(mstatus, xstatus::MPPValue::Supervisor);
+
+                // Endianness is little-endian
+                let mstatus = xstatus::set_UBE(mstatus, false);
+                let mstatus = xstatus::set_SBE(mstatus, false);
+                let mstatus = xstatus::set_MBE(mstatus, false);
+
+                // Set register dirtiness
+                let mstatus = xstatus::set_VS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_FS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_XS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_SD(mstatus, false);
+
+                // Registers are also 64-bit wide in user and supervisor mode
+                let mstatus = xstatus::set_UXL(mstatus, xstatus::XLenValue::MXL64);
+                let mstatus = xstatus::set_SXL(mstatus, xstatus::XLenValue::MXL64);
+
+                // Load and stores should use current effective privilege
+                let mstatus = xstatus::set_MPRV(mstatus, false);
+
+                // Supervisor mode shall have access to user page mappings
+                let mstatus = xstatus::set_SUM(mstatus, true);
+
+                // Make instruction loads from executable pages fail
+                let mstatus = xstatus::set_MXR(mstatus, false);
+
+                // Allow virtual-memory management configuration
+                let mstatus = xstatus::set_TVM(mstatus, false);
+
+                // WFI instruction works normally
+                let mstatus = xstatus::set_TW(mstatus, false);
+
+                // Allow SRET to work normally
+                xstatus::set_TSR(mstatus, false)
+            }
+
+            // Trap handling shall not be set up initially
+            CSRegister::stvec | CSRegister::mtvec => 0,
+
+            // No interrupts are enabled
+            CSRegister::sie | CSRegister::mie => 0,
+
+            // No address translation initially
+            CSRegister::satp => CSRegister::SATP_DEFAULT,
+
+            // No exception or trap inflight or pending
+            CSRegister::scause | CSRegister::mcause => 0,
+            CSRegister::sepc | CSRegister::mepc => 0,
+            CSRegister::stval | CSRegister::mtval | CSRegister::mtval2 => 0,
+            CSRegister::sip | CSRegister::mip => 0,
+            CSRegister::mtinst => 0,
+
+            // No specific environment configuration
+            CSRegister::senvcfg | CSRegister::menvcfg => 0,
+
+            // No hardware configuration supported
+            CSRegister::mconfigptr => 0,
+
+            // Delegate all exceptions and interrupts to S mode
+            CSRegister::medeleg => ones(CSRegister::MXLEN),
+            CSRegister::mideleg => ones(CSRegister::MXLEN),
+
+            // Security extensions are not enabled
+            CSRegister::mseccfg => 0,
+
+            // Unsupported debug, hypervisor and virtual supervisor extensions
+            CSRegister::scontext => 0,
+            CSRegister::hstatus => 0,
+            CSRegister::hedeleg => 0,
+            CSRegister::hideleg => 0,
+            CSRegister::hie => 0,
+            CSRegister::hcounteren => 0,
+            CSRegister::hgeie => 0,
+            CSRegister::htval => 0,
+            CSRegister::hip => 0,
+            CSRegister::hvip => 0,
+            CSRegister::htinst => 0,
+            CSRegister::hgeip => 0,
+            CSRegister::henvcfg => 0,
+            CSRegister::hgatp => 0,
+            CSRegister::hcontext => 0,
+            CSRegister::htimedelta => 0,
+            CSRegister::vsstatus => 0,
+            CSRegister::vsie => 0,
+            CSRegister::vstvec => 0,
+            CSRegister::vsscratch => 0,
+            CSRegister::vsepc => 0,
+            CSRegister::vscause => 0,
+            CSRegister::vstval => 0,
+            CSRegister::vsip => 0,
+            CSRegister::vsatp => 0,
+            CSRegister::tselect => 0,
+            CSRegister::tdata1 => 0,
+            CSRegister::tdata2 => 0,
+            CSRegister::tdata3 => 0,
+            CSRegister::mcontext => 0,
+            CSRegister::dcsr => 0,
+            CSRegister::dpc => 0,
+            CSRegister::dscratch0 => 0,
+            CSRegister::dscratch1 => 0,
+        }
+    }
 }
 
 /// Value in a CSR
@@ -811,16 +1163,32 @@ pub type CSRegistersLayout = backend::Array<CSRValue, 4096>;
 
 impl<M: backend::Manager> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.
-    pub fn new_in(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self { registers: space }
+    }
+
+    /// Reset the control and state registers.
+    pub fn reset(&mut self) {
+        // First we clear out all values unconditionally.
+        for i in 0..4096 {
+            self.registers.write(i, 0);
+        }
+
+        // Then we try to reset known CSRs to known default values.
+        for reg in CSRegister::iter() {
+            self.write(reg, reg.default_value());
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        backend::{tests::TestBackendFactory, Backend, Layout, Region},
-        csregisters::Exception,
+        backend::{
+            tests::{test_determinism, ManagerFor, TestBackendFactory},
+            Backend, BackendManagement, Layout, Region,
+        },
+        csregisters::{CSRegister, CSRegisters, CSRegistersLayout, Exception},
         mode::Mode,
     };
 
@@ -1005,17 +1373,19 @@ pub mod tests {
     }
 
     pub fn test_backend<F: TestBackendFactory>() {
-        #![allow(clippy::identity_op)]
+        test_write_read::<F>();
+        test_reset::<F>();
+    }
 
-        use super::{CSRegister, CSRegisters, CSRegistersLayout};
-        use crate::backend::BackendManagement;
+    fn test_write_read<F: TestBackendFactory>() {
+        #![allow(clippy::identity_op)]
 
         let mut backend = F::new::<CSRegistersLayout>();
         let placed = CSRegistersLayout::placed().into_location();
 
         let mut csrs: CSRegisters<
             <F::Backend<CSRegistersLayout> as BackendManagement>::Manager<'_>,
-        > = CSRegisters::new_in(backend.allocate(placed));
+        > = CSRegisters::bind(backend.allocate(placed));
 
         // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP (through mstatus)
         csrs.write(
@@ -1069,5 +1439,13 @@ pub mod tests {
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
         let read_sstatus = csrs.read(CSRegister::sstatus);
         assert_eq!(read_sstatus, 1 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8);
+    }
+
+    fn test_reset<F: TestBackendFactory>() {
+        test_determinism::<F, CSRegistersLayout, _>(|space| {
+            let mut csregs: CSRegisters<ManagerFor<'_, F, CSRegistersLayout>> =
+                CSRegisters::bind(space);
+            csregs.reset();
+        });
     }
 }

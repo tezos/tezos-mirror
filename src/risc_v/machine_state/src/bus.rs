@@ -63,11 +63,17 @@ pub struct Bus<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> Bus<ML, M> {
     /// Bind the Bus state to the allocated space.
-    pub fn new_in(space: backend::AllocatedOf<BusLayout<ML>, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<BusLayout<ML>, M>) -> Self {
         Self {
-            devices: devices::Devices::new_in(space.0),
-            memory: main_memory::MainMemory::new_in(space.1),
+            devices: devices::Devices::bind(space.0),
+            memory: main_memory::MainMemory::bind(space.1),
         }
+    }
+
+    /// Reset the bus state.
+    pub fn reset(&mut self) {
+        self.devices.reset();
+        self.memory.reset();
     }
 }
 
@@ -97,5 +103,24 @@ where
             AddressSpace::MainMemory => self.memory.write(local_address, value),
             AddressSpace::OutOfBounds => Err(OutOfBounds),
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::{main_memory::tests::T1K, Bus, BusLayout};
+    use crate::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
+
+    pub fn test_backend<F: TestBackendFactory>() {
+        super::main_memory::tests::test_backend::<F>();
+        super::devices::tests::test_backend::<F>();
+        test_reset::<F>();
+    }
+
+    fn test_reset<F: TestBackendFactory>() {
+        test_determinism::<F, BusLayout<T1K>, _>(|space| {
+            let mut bus: Bus<T1K, ManagerFor<'_, F, BusLayout<T1K>>> = Bus::bind(space);
+            bus.reset();
+        });
     }
 }

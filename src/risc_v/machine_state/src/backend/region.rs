@@ -162,7 +162,7 @@ impl<E: Elem, M: Manager + ?Sized> Cell<E, M> {
 }
 
 impl<E: Elem, M: Manager> Cell<E, M> {
-    pub fn new_in(space: AllocatedOf<Atom<E>, M>) -> Self {
+    pub fn bind(space: AllocatedOf<Atom<E>, M>) -> Self {
         Self {
             region: space.region,
         }

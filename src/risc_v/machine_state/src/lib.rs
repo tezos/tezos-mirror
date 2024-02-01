@@ -195,14 +195,23 @@ pub type HartStateLayout = (
 
 impl<M: backend::Manager> HartState<M> {
     /// Bind the hart state to the given allocated space.
-    pub fn new_in(space: backend::AllocatedOf<HartStateLayout, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<HartStateLayout, M>) -> Self {
         Self {
-            xregisters: registers::XRegisters::new_in(space.0),
-            fregisters: registers::FRegisters::new_in(space.1),
-            csregisters: csregisters::CSRegisters::new_in(space.2),
-            mode: mode::ModeCell::new_in(space.3),
-            pc: Cell::new_in(space.4),
+            xregisters: registers::XRegisters::bind(space.0),
+            fregisters: registers::FRegisters::bind(space.1),
+            csregisters: csregisters::CSRegisters::bind(space.2),
+            mode: mode::ModeCell::bind(space.3),
+            pc: Cell::bind(space.4),
         }
+    }
+
+    /// Reset the hart state.
+    pub fn reset(&mut self, mode: mode::Mode, pc: Address) {
+        self.xregisters.reset();
+        self.fregisters.reset();
+        self.csregisters.reset();
+        self.mode.reset(mode);
+        self.pc.write(pc);
     }
 }
 
@@ -217,13 +226,54 @@ pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> 
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
-    pub fn new_in(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
         Self {
-            hart: HartState::new_in(space.0),
-            bus: Bus::new_in(space.1),
+            hart: HartState::bind(space.0),
+            bus: Bus::bind(space.1),
         }
+    }
+
+    /// Reset the machine state.
+    pub fn reset(&mut self, mode: mode::Mode, pc: Address) {
+        self.hart.reset(mode, pc);
+        self.bus.reset();
     }
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::{
+        backend::tests::{test_determinism, ManagerFor, TestBackendFactory},
+        bus::main_memory::tests::T1K,
+        mode, HartState, HartStateLayout, MachineState, MachineStateLayout,
+    };
+    use strum::IntoEnumIterator;
+
+    pub fn test_backend<F: TestBackendFactory>() {
+        test_hart_state_reset::<F>();
+        test_machine_state_reset::<F>();
+    }
+
+    fn test_hart_state_reset<F: TestBackendFactory>() {
+        mode::Mode::iter().for_each(|mode: mode::Mode| {
+            proptest::proptest!(|(pc: u64)| {
+                test_determinism::<F, HartStateLayout, _>(|space| {
+                    let mut hart = HartState::bind(space);
+                    hart.reset(mode, pc);
+                });
+            });
+        });
+    }
+
+    fn test_machine_state_reset<F: TestBackendFactory>() {
+        mode::Mode::iter().for_each(|mode: mode::Mode| {
+            proptest::proptest!(|(pc: u64)| {
+                test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {
+                    let mut hart: MachineState<T1K, ManagerFor<'_, F, MachineStateLayout<T1K>>> =
+                        MachineState::bind(space);
+                    hart.reset(mode, pc);
+                });
+            });
+        });
+    }
+}

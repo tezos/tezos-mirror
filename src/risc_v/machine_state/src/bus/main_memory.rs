@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::backend;
+use crate::backend::{self, VolatileRegion};
 use std::mem;
 
 /// Configuration object for memory size
@@ -130,8 +130,15 @@ pub struct MainMemory<L: MainMemoryLayout + ?Sized, M: backend::Manager> {
 
 impl<L: MainMemoryLayout, M: backend::Manager> MainMemory<L, M> {
     /// Bind the main memory state to the given allocated space.
-    pub fn new_in(space: backend::AllocatedOf<L, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<L, M>) -> Self {
         L::refl(space)
+    }
+
+    /// Reset to the initial state.
+    pub fn reset(&mut self) {
+        for i in 0..L::LEN64 {
+            self.doublewords.write(i, 0u64);
+        }
     }
 }
 
@@ -179,13 +186,21 @@ impl_volatile_region!(doublewords, u64);
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        backend::{tests::TestBackendFactory, Backend, Layout},
+        backend::{
+            tests::{test_determinism, TestBackendFactory},
+            Backend, Layout,
+        },
         bus::Addressable,
     };
 
     gen_memory_layout!(T1K = 1 KiB);
 
     pub fn test_backend<F: TestBackendFactory>() {
+        test_endianess::<F>();
+        test_reset::<F>();
+    }
+
+    fn test_endianess<F: TestBackendFactory>() {
         let mut backend = F::new::<T1K>();
         let mut memory = backend.allocate(T1K::placed().into_location());
 
@@ -215,5 +230,11 @@ pub mod tests {
         check_address!(u8, 5, 0x33);
         check_address!(u8, 6, 0x22);
         check_address!(u8, 7, 0x11);
+    }
+
+    fn test_reset<F: TestBackendFactory>() {
+        test_determinism::<F, T1K, _>(|mut memory| {
+            memory.reset();
+        });
     }
 }
