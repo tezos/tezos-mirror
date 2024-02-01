@@ -57,7 +57,7 @@ module Syntax = struct
     | Ok (Some x) -> f x
     | Ok None -> Test.fail "'let*@!' expected a Some but got None"
     | Error err ->
-        Test.fail "'let*@' expected a valid response but got %a" pp_error err
+        Test.fail "'let*@!' expected a valid response but got %a" pp_error err
 
   let ( let*@? ) x f =
     let* r = x in
