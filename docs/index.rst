@@ -251,10 +251,3 @@ Platform developers are also provided reference materials for internal APIs of O
    developer/encodings
    developer/merkle-proof-encoding-formats
    api/api-inline
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Global doc
-   :hidden:
-
-   global/timelock
