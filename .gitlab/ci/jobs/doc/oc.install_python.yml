@@ -11,7 +11,7 @@
         - docs/developer/install-python-debian-ubuntu.sh
       when: on_success
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/'
       when: on_success
     - when: manual
       allow_failure: true

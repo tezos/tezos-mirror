@@ -1,0 +1,27 @@
+kaitai_e2e_checks:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_client_libs_dependencies
+  stage: test
+  needs: [kaitai_checks]
+  rules:
+    - changes:
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success
+  before_script:
+    - . ./scripts/version.sh
+    # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
+    #       As observed for the `unit:js_components` running `npm i`
+    #       everytime we run a job is inefficient.
+    #
+    #       The benefit of this approach is that we specify node version
+    #       and npm dependencies (package.json) in one place, and that the local
+    #       environment is then the same as CI environment.
+    - . ./scripts/install_build_deps.js.sh
+  script:
+    - ./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh
+      contrib/kaitai-struct-files/files
+      contrib/kaitai-struct-files/input

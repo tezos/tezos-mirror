@@ -1,0 +1,12 @@
+oc.script:test-gen-genesis:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies
+    - .rules__octez_changes
+    - .needs__trigger
+  stage: test
+  before_script:
+    - eval $(opam env)
+    - cd scripts/gen-genesis
+  script:
+    - dune build gen_genesis.exe

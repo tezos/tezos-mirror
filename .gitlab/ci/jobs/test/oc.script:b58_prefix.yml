@@ -1,0 +1,24 @@
+oc.script:b58_prefix:
+  # Can be changed to a python image, but using the build docker image to keep
+  # in sync with the python version used for the tests
+  extends:
+    - .default_settings_template
+    # Requires Python
+    - .image_template__runtime_build_test_dependencies
+    - .needs__trigger
+  rules:
+    - changes:
+        - scripts/b58_prefix/b58_prefix.py
+        - scripts/b58_prefix/test_b58_prefix.py
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success
+  stage: test
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+  script:
+    - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest scripts/b58_prefix/test_b58_prefix.py

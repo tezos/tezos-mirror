@@ -94,3 +94,15 @@ job_foo:
 ```
 
 Unless necessary, use the simple form.
+
+# Time intervals
+
+Time intervals appear in e.g. `artifacts:expire_in`, `job:start_in`
+and `job:timeout` fields. Use full units: `seconds`, `minutes`,
+`hours`, `days`, etc. Do not use short versions, e.g. `min`.
+
+Do:
+ - 1 minute
+
+Do not:
+ - 20 min

@@ -1,0 +1,8 @@
+oc.script:test_release_versions:
+  extends: .test_template
+  before_script:
+    - ./scripts/ci/take_ownership.sh
+    - . ./scripts/version.sh
+    - eval $(opam env)
+  script:
+    - ./scripts/test_release_version.sh

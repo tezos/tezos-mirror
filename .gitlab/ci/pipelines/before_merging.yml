@@ -19,7 +19,6 @@ include:
   - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
   - .gitlab/ci/jobs/build/oc.build_kernels.yml
-  - .gitlab/ci/jobs/build/build_get_contracts.yml
   - .gitlab/ci/jobs/doc/documentation:build_all.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-test_manual.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml
@@ -27,14 +26,19 @@ include:
   - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/misc_checks.yml
+  - .gitlab/ci/jobs/test/kaitai_checks.yml
+  - .gitlab/ci/jobs/test/kaitai_e2e_checks.yml
+  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml
   - .gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
   - .gitlab/ci/jobs/test/commit_titles.yml
   - .gitlab/ci/jobs/test/oc.semgrep.yml
   - .gitlab/ci/jobs/test/oc.unit.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
-  - .gitlab/ci/jobs/test/oc.script.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
+  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml
+  - .gitlab/ci/jobs/test/oc.script:test_release_versions.yml
+  - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml
@@ -45,7 +49,7 @@ include:
   # Only run on merge requests that do not have the label `ci--no-coverage`
   - local: .gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml
     rules:
-      - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
+      - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|,)ci--no-coverage(?:$|,)/'
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml

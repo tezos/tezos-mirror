@@ -6,9 +6,9 @@
     # Run on scheduled builds.
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: delayed
-      start_in: 1 minutes
+      start_in: 1 minute
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 1 minutes
     # Run on merge requests when opam changes are detected.
@@ -35,9 +35,9 @@
     # Run on scheduled builds.
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: delayed
-      start_in: 1 minutes
+      start_in: 1 minute
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 1 minutes
     # Run on merge requests when opam changes are detected.
@@ -66,7 +66,7 @@
       when: delayed
       start_in: 2 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 2 minutes
     # Run on merge requests when opam changes are detected.
@@ -95,7 +95,7 @@
       when: delayed
       start_in: 2 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 2 minutes
     # Run on merge requests when opam changes are detected.
@@ -124,7 +124,7 @@
       when: delayed
       start_in: 3 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 3 minutes
     # Run on merge requests when opam changes are detected.
@@ -153,7 +153,7 @@
       when: delayed
       start_in: 3 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 3 minutes
     # Run on merge requests when opam changes are detected.
@@ -182,7 +182,7 @@
       when: delayed
       start_in: 4 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 4 minutes
     # Run on merge requests when opam changes are detected.
@@ -211,7 +211,7 @@
       when: delayed
       start_in: 4 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 4 minutes
     # Run on merge requests when opam changes are detected.
@@ -240,7 +240,7 @@
       when: delayed
       start_in: 5 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 5 minutes
     # Run on merge requests when opam changes are detected.
@@ -269,7 +269,7 @@
       when: delayed
       start_in: 5 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 5 minutes
     # Run on merge requests when opam changes are detected.
@@ -298,7 +298,7 @@
       when: delayed
       start_in: 6 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 6 minutes
     # Run on merge requests when opam changes are detected.
@@ -327,7 +327,7 @@
       when: delayed
       start_in: 6 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 6 minutes
     # Run on merge requests when opam changes are detected.
@@ -356,7 +356,7 @@
       when: delayed
       start_in: 7 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 7 minutes
     # Run on merge requests when opam changes are detected.
@@ -385,7 +385,7 @@
       when: delayed
       start_in: 7 minutes
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: 7 minutes
     # Run on merge requests when opam changes are detected.

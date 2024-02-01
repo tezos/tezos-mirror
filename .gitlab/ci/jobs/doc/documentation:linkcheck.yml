@@ -8,7 +8,7 @@ documentation:linkcheck:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/'
       when: on_success
     - when: manual
   before_script:

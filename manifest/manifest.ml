@@ -3858,9 +3858,9 @@ let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
     # Run on scheduled builds.
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: delayed
-      start_in: %d minutes
+      start_in: %s
     # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
       when: delayed
       start_in: %d minutes
     # Run on merge requests when opam changes are detected.
@@ -3884,7 +3884,8 @@ let print_opam_job_rules fmt batch_index pipeline_type marge_restriction =
 |}
     pipeline_type
     batch_index
-    batch_index
+    (string_of_int batch_index ^ " "
+    ^ if batch_index = 1 then "minute" else "minutes")
     batch_index
     marge_restriction
     batch_index

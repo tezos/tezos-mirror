@@ -1,0 +1,18 @@
+oc.check_lift_limits_patch:
+  extends:
+    - .test_template
+    - .needs__trigger
+  rules:
+    - changes:
+        - src/bin_tps_evaluation/lift_limits.patch
+        - src/proto_alpha/lib_protocol/main.ml
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success
+  script:
+    # Check that the patch only modifies the
+    # src/proto_alpha/lib_protocol. If not, the rules above have to be
+    # updated.
+    - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) = "src/proto_alpha/lib_protocol/main.ml" ]'
+    - git apply src/bin_tps_evaluation/lift_limits.patch
+    - dune build @src/proto_alpha/lib_protocol/check

@@ -46,7 +46,7 @@
     # jobs per pipeline (60) and W the artifact size per tezt job
     # (2MB). This makes 35GB which is less than 0.5% than our total
     # artifact usage (https://gitlab.com/tezos/tezos/-/artifacts).
-    expire_in: 3 day
+    expire_in: 3 days
     when: always
   script:
     - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}" TEZT_PARALLEL: ${TEZT_PARALLEL} TEZT_VARIANT: ${TEZT_VARIANT}'
