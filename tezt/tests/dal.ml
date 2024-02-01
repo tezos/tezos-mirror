@@ -109,11 +109,11 @@ let make_string_parameter name = function
   | Some value -> [(name, `String value)]
 
 let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
-  let tags = "dal" :: tags in
+  let tags = Tag.tezos2 :: "dal" :: tags in
   Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
 let regression_test ~__FILE__ ?(tags = []) ?uses title f =
-  let tags = "dal" :: tags in
+  let tags = Tag.tezos2 :: "dal" :: tags in
   Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses f
 
 let dal_enable_param dal_enable =
@@ -1706,7 +1706,7 @@ let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
     ~title:"dal node startup"
-    ~tags:["dal"]
+    ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
@@ -3846,7 +3846,8 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     ~migration_level ~scenario ~description () =
   let tags =
-    Protocol.tag migrate_from :: Protocol.tag migrate_to :: "migration" :: tags
+    Tag.tezos2 :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    :: "migration" :: tags
   in
   Test.register
     ~__FILE__
