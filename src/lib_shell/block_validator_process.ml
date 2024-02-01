@@ -875,7 +875,6 @@ module External_validator_process = struct
       ~protocol_root ~process_path ~sandbox_parameters ~dal_config
       ~internal_events =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
@@ -900,6 +899,7 @@ module External_validator_process = struct
            * Lwt_io.input Lwt_io.channel) =
       start_process validator
     in
+    let*! () = Events.(emit init ()) in
     return validator
 
   let apply_block ~simulate ?(should_precheck = true) validator chain_store
