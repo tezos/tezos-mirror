@@ -36,7 +36,7 @@ The size of the node’s storage depends on its profile. A bootstrap node uses n
 L1 monitoring
 ^^^^^^^^^^^^^
 
-The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 chain via an RPC. Each time a block becomes final, it retrieves and stores the commitments published in that block, and if its storage contains shards for these commitments, it publishes them on the P2P network. The DAL node also retrieves the slot attestation status from the block’s metadata. Finally, based on this information it updates the status of the stored commitments, where the status of a commitment can be one of the following:
+The DAL node tracks the L1 chain, in particular it monitors the heads of the L1 chain via an RPC. Each time a block becomes :ref:`final<finality>`, it retrieves and stores the commitments published in that block, and if its storage contains shards for these commitments, it publishes them on the P2P network. The DAL node also retrieves the slot attestation status from the block’s metadata. Finally, based on this information it updates the status of the stored commitments, where the status of a commitment can be one of the following:
 
 - *waiting for attestation*: The commitment was included and applied in a finalized L1 block but the corresponding slot remains to be attested.
 - *attested*: The commitment was included in an L1 block and the corresponding slot is attested.
@@ -114,7 +114,7 @@ The life cycle of slots and shards is described by the following steps:
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>
 
-#. Once the operation is included in a final block (that is, there is another block on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
+#. Once the operation is included in a final block (that is, there are at least two blocks on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
 #. Attesters check, for all published slots, the availability of the shards they are assigned by interrogating their DAL node, via the RPC ``GET /profiles/<pkh>/attested_levels/<level>/attestable_slots``, where level is the level at which the slot was published plus ``attestation_lag``, and ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
 #. Attesters inject via their baker binary a DAL attestation operation containing the information received at step 6. (See also :doc:`dal_bakers`)
 #. The protocol aggregates the received DAL attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.

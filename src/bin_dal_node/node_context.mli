@@ -23,11 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type head_info = {
-  proto : int; (* the [proto_level] from the head's shell header *)
-  level : int32;
-}
-
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and the plugin
     for dal has been loaded.
@@ -41,8 +36,7 @@ type ready_ctxt = {
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
   plugin_proto : int;  (** Protocol level of the plugin. *)
-  last_seen_head : head_info option;
-      (** The level of the last seen head of the L1 node. *)
+  last_processed_level : int32 option;
 }
 
 (** The status of the dal node *)
@@ -87,10 +81,10 @@ val update_plugin_in_ready :
 
 type error += Node_not_ready
 
-(** Updates the [last_seen_head] field of the "ready context" with the given
-    info.  Assumes the node's status is ready. Otherwise it returns
+(** Updates the [last_processed_level] field of the "ready context" with the given
+    info. Assumes the node's status is ready. Otherwise it returns
     [Node_not_ready]. *)
-val update_last_seen_head : t -> head_info -> unit tzresult
+val update_last_processed_level : t -> level:int32 -> unit tzresult
 
 (** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
     propagates [Node_not_ready] if status is not ready yet. If called multiple

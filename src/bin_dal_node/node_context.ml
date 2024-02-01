@@ -25,18 +25,13 @@
 
 exception Status_already_ready
 
-type head_info = {
-  proto : int; (* the [proto_level] from the head's shell header *)
-  level : int32;
-}
-
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
   plugin_proto : int; (* the [proto_level] of the plugin *)
-  last_seen_head : head_info option;
+  last_processed_level : int32 option;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -102,7 +97,7 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
             proto_parameters;
             shards_proofs_precomputation;
             plugin_proto;
-            last_seen_head = None;
+            last_processed_level = None;
           } ;
       return_unit
   | Ready _ -> raise Status_already_ready
@@ -135,11 +130,11 @@ let get_ready ctxt =
   | Ready ctxt -> Ok ctxt
   | Starting -> fail [Node_not_ready]
 
-let update_last_seen_head ctxt head_info =
+let update_last_processed_level ctxt ~level =
   let open Result_syntax in
   match ctxt.status with
   | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with last_seen_head = Some head_info} ;
+      ctxt.status <- Ready {ready_ctxt with last_processed_level = Some level} ;
       return_unit
   | Starting -> fail [Node_not_ready]
 
