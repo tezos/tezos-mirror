@@ -9,7 +9,7 @@ and instructions to regenerate the protocol sources from the
 Gitlab branch.
 
 Test network Delphinet is available to test Delphi.
-See details in :ref:`Test Networks<test-networks>`
+See details in :ref:`Test Networks<test_networks>`
 and instructions to join in :ref:`How to get Tezos<howtoget>`.
 
 The source code of this proposal is available in `this tar archive

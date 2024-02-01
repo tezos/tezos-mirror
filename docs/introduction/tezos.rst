@@ -37,8 +37,8 @@ however we **strongly** encourage users to first try all the
 introduction tutorials on some test network to familiarize themselves without
 risks.
 
-There are several :ref:`test networks <test-networks>` for the Tezos blockchain with a
-faucet to obtain free tez (see :ref:`faucet`).
+There are several :ref:`test networks <test_networks>` for the Tezos blockchain with
+:ref:`faucets <faucet>` to obtain free tez.
 These networks are intended for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.

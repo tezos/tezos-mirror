@@ -234,7 +234,7 @@ Three kinds of economic protocols are included in the main Octez repository.
     switch to a new protocol chosen by the activator.
     The ``master`` branch contains additional variants of the genesis
     protocol, one for each of the existing :ref:`test
-    networks<test-networks>`.
+    networks<test_networks>`.
   - The active protocols. ``tezos-protocol-nnn-hhhhhhhh``
     (``tezos-embedded-protocol-nnn-hhhhhhhh``) is either the current
     protocol on Mainnet or a protocol that has been active on Mainnet

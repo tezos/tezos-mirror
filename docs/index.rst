@@ -257,5 +257,4 @@ Platform developers are also provided reference materials for internal APIs of O
    :caption: Global doc
    :hidden:
 
-   global/test_networks.rst
    global/timelock
