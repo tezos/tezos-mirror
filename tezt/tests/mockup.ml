@@ -38,7 +38,7 @@ let test_rpc_list =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) RPC list"
-    ~tags:["mockup"; "client"; "rpc"]
+    ~tags:["mockup"; "client"; "rpc"; "describe"; "slow"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
