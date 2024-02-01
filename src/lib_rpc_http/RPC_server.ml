@@ -95,9 +95,26 @@ module Acl = struct
           List.map
             parse
             [
-              "GET /chains/*/blocks";
+              (* Protocol RPCs *)
               "GET /chains/*/blocks/*";
-              "GET /chains/*/blocks/*/context/**";
+              "GET /chains/*/blocks/*/context/adaptive_issuance_launch_cycle";
+              "GET /chains/*/blocks/*/context/big_maps/*/*";
+              "GET /chains/*/blocks/*/context/cache/**";
+              "GET /chains/*/blocks/*/context/constants";
+              "GET /chains/*/blocks/*/context/contracts/**";
+              "GET /chains/*/blocks/*/context/delegates/**";
+              "GET /chains/*/blocks/*/context/denunciations";
+              "GET /chains/*/blocks/*/context/issuance";
+              "GET /chains/*/blocks/*/context/issuance/*";
+              "GET /chains/*/blocks/*/context/liquidity_baking/*";
+              "GET /chains/*/blocks/*/context/merkle_tree/**";
+              "GET /chains/*/blocks/*/context/merkle_tree_v2/**";
+              "GET /chains/*/blocks/*/context/nonces/*";
+              "GET /chains/*/blocks/*/context/sapling/**";
+              "GET /chains/*/blocks/*/context/seed_computation";
+              "GET /chains/*/blocks/*/context/selected_snapshot";
+              "GET /chains/*/blocks/*/context/total_frozen_stake";
+              "GET /chains/*/blocks/*/context/total_supply";
               "GET /chains/*/blocks/*/hash";
               "GET /chains/*/blocks/*/header";
               "GET /chains/*/blocks/*/header/**";
@@ -108,35 +125,32 @@ module Acl = struct
               "GET /chains/*/blocks/*/minimal_valid_time";
               "GET /chains/*/blocks/*/operation_hashes";
               "GET /chains/*/blocks/*/operation_hashes/**";
-              "GET /chains/*/blocks/*/operation_metadata_hash";
+              "GET /chains/*/blocks/*/operation_metadata_hashes";
               "GET /chains/*/blocks/*/operations";
               "GET /chains/*/blocks/*/operations/**";
               "GET /chains/*/blocks/*/operations_metadata_hash";
               "GET /chains/*/blocks/*/protocols";
+              "GET /chains/*/blocks/*/resulting_context_hash";
               "GET /chains/*/blocks/*/votes/**";
+              "GET /chains/*/mempool/filter";
+              "GET /chains/*/mempool/pending_operations";
+              "POST /chains/*/blocks/*/context/seed";
+              (* Shell RPCs *)
+              "GET /chains/*/blocks";
               "GET /chains/*/chain_id";
               "GET /chains/*/checkpoint";
               "GET /chains/*/invalid_blocks";
               "GET /chains/*/invalid_blocks/*";
               "GET /chains/*/is_bootstrapped";
-              "GET /chains/*/mempool/filter";
-              "GET /chains/*/mempool/monitor_operations";
-              "GET /chains/*/mempool/pending_operations";
+              "GET /chains/*/levels/*";
+              "GET /config/history_mode";
               "GET /config/network/user_activated_protocol_overrides";
               "GET /config/network/user_activated_upgrades";
               "GET /config/network/dal";
-              "GET /describe/**";
-              "GET /errors";
-              "GET /monitor/**";
-              "GET /network/greylist/ips";
-              "GET /network/greylist/peers";
-              "GET /network/self";
-              "GET /network/self";
               "GET /network/stat";
               "GET /network/version";
               "GET /network/versions";
               "GET /protocols";
-              "GET /protocols/*";
               "GET /protocols/*/environment";
               "GET /version";
               "POST /chains/*/blocks/*/context/contracts/*/big_map_get";
