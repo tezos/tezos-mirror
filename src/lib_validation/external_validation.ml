@@ -534,8 +534,50 @@ let create_socket_listen ~canceler ~max_requests ~socket_path =
   Lwt_unix.listen socket max_requests ;
   return socket
 
+type error += Cannot_connect_to_node_socket
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"cannot_connect_to_node_socket"
+    ~title:"Cannot connect to node socket"
+    ~description:"External validator failed to connect to the node's socket"
+    ~pp:(fun fmt () ->
+      Format.fprintf
+        fmt
+        "External validator failed to connect to the node's socket")
+    Data_encoding.unit
+    (function Cannot_connect_to_node_socket -> Some () | _ -> None)
+    (fun () -> Cannot_connect_to_node_socket)
+
+module Events = struct
+  open Internal_event.Simple
+
+  let section = ["external_validation"]
+
+  let cannot_connect_and_retry =
+    declare_0
+      ~section
+      ~level:Warning
+      ~name:"cannot_connect_and_retry"
+      ~msg:"validator cannot connect to node: retrying"
+      ()
+end
+
 let create_socket_connect ~canceler ~socket_path =
-  let open Lwt_syntax in
-  let* socket = create_socket ~canceler in
-  let* () = Lwt_unix.connect socket (make_socket socket_path) in
-  Lwt.return socket
+  let open Lwt_result_syntax in
+  protect @@ fun () ->
+  let*! socket = create_socket ~canceler in
+  let await_socket_to_be_ready () =
+    let log = function
+      | [Cannot_connect_to_node_socket] ->
+          Internal_event.Simple.emit Events.cannot_connect_and_retry ()
+      | _ -> Lwt.return_unit
+    in
+    Lwt_utils_unix.retry ~log ~n:20 ~sleep:1. @@ fun () ->
+    let*! b = Lwt_unix.file_exists socket_path in
+    if b then return_unit else tzfail Cannot_connect_to_node_socket
+  in
+  let* () = await_socket_to_be_ready () in
+  let*! () = Lwt_unix.connect socket (make_socket socket_path) in
+  return socket

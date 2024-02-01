@@ -428,6 +428,14 @@ module External_validator_process = struct
         ~msg:"external validation initialized"
         ()
 
+    let init_error =
+      declare_0
+        ~section
+        ~level:Error
+        ~name:"init_error"
+        ~msg:"failed to initialize the external block validator: shutting down"
+        ()
+
     let close =
       declare_0
         ~section
@@ -728,26 +736,37 @@ module External_validator_process = struct
           clean_process_fd socket_path)
     in
     let* process_socket =
-      Lwt.finalize
+      protect
+        ~on_error:(function
+          | [Exn Lwt_unix.Timeout] as err ->
+              let*! () = Events.(emit init_error ()) in
+              process#terminate ;
+              let*! _ = Lwt_exit.exit_and_wait 1 in
+              Lwt.return_error err
+          | err -> Lwt.return_error err)
         (fun () ->
-          let* process_socket =
-            External_validation.create_socket_listen
-              ~canceler
-              ~max_requests:1
-              ~socket_path
-          in
-          let*! v, _ = Lwt_unix.accept process_socket in
-          let*! () = Lwt_unix.close process_socket in
-          return v)
-        (fun () ->
-          (* As the external validation process is now started, we can
-              unlink the named socket. Indeed, the file descriptor will
-              remain valid as long as at least one process keeps it
-              open. This method mimics an anonymous file descriptor
-              without relying on Linux specific features. It also
-              trigger the clean up procedure if some sockets related
-              errors are thrown. *)
-          clean_process_fd socket_path)
+          Lwt.finalize
+            (fun () ->
+              let* process_socket =
+                External_validation.create_socket_listen
+                  ~canceler
+                  ~max_requests:1
+                  ~socket_path
+              in
+              let*! v, _ =
+                Lwt.pick [Lwt_unix.timeout 30.; Lwt_unix.accept process_socket]
+              in
+              let*! () = Lwt_unix.close process_socket in
+              return v)
+            (fun () ->
+              (* As the external validation process is now started, we can
+                  unlink the named socket. Indeed, the file descriptor will
+                  remain valid as long as at least one process keeps it
+                  open. This method mimics an anonymous file descriptor
+                  without relying on Linux specific features. It also
+                  trigger the clean up procedure if some sockets related
+                  errors are thrown. *)
+              clean_process_fd socket_path))
     in
     Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
     (* Register clean up callback to ensure that the validator process
@@ -875,7 +894,6 @@ module External_validator_process = struct
       ~protocol_root ~process_path ~sandbox_parameters ~dal_config
       ~internal_events =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
@@ -900,6 +918,7 @@ module External_validator_process = struct
            * Lwt_io.input Lwt_io.channel) =
       start_process validator
     in
+    let*! () = Events.(emit init ()) in
     return validator
 
   let apply_block ~simulate ?(should_precheck = true) validator chain_store
