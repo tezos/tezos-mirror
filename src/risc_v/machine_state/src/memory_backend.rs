@@ -102,7 +102,7 @@ impl<L: Layout> backend::Backend for InMemoryBackend<L> {
 /// Manager for in-memory backing storage
 pub struct SliceManager<'backend> {
     backing_storage: usize,
-    _lifetime: &'backend mut [u8],
+    _lifetime: PhantomData<&'backend mut [u8]>,
 }
 
 impl<'backend> SliceManager<'backend> {
@@ -110,7 +110,7 @@ impl<'backend> SliceManager<'backend> {
     pub fn new(backing_storage: &'backend mut [u8]) -> Self {
         Self {
             backing_storage: backing_storage.as_mut_ptr() as usize,
-            _lifetime: backing_storage,
+            _lifetime: PhantomData,
         }
     }
 }
