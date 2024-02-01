@@ -430,6 +430,8 @@ let sign_consensus_votes state operations kind =
                         emit
                           skipping_preendorsement
                           ( delegate,
+                            level,
+                            round,
                             [
                               Baking_highwatermarks.Block_previously_preendorsed
                                 {round; level};
@@ -439,6 +441,8 @@ let sign_consensus_votes state operations kind =
                         emit
                           skipping_endorsement
                           ( delegate,
+                            level,
+                            round,
                             [
                               Baking_highwatermarks.Block_previously_endorsed
                                 {round; level};
@@ -499,8 +503,10 @@ let sign_consensus_votes state operations kind =
         | Error err ->
             (match kind with
             | `Preendorsement ->
-                Events.(emit skipping_preendorsement (delegate, err))
-            | `Endorsement -> Events.(emit skipping_endorsement (delegate, err)))
+                Events.(
+                  emit skipping_preendorsement (delegate, level, round, err))
+            | `Endorsement ->
+                Events.(emit skipping_endorsement (delegate, level, round, err)))
             >>= fun () -> return_none
         | Ok signature ->
             let protocol_data =
@@ -568,7 +574,9 @@ let sign_dal_attestations state attestations =
   List.filter_map_es
     (fun (((consensus_key, _) as delegate), consensus_content) ->
       let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
-      let contents = Single (Dal_attestation consensus_content) in
+      let contents =
+        Single (Dal_attestation (consensus_content : Dal.Attestation.operation))
+      in
       let unsigned_operation = (shell, Contents_list contents) in
       let unsigned_operation_bytes =
         Data_encoding.Binary.to_bytes_exn
@@ -582,8 +590,10 @@ let sign_dal_attestations state attestations =
         unsigned_operation_bytes
       >>= function
       | Error err ->
-          Events.(emit skipping_attestation (delegate, err)) >>= fun () ->
-          return_none
+          let level = Raw_level.to_int32 consensus_content.level in
+          let round = state.round_state.current_round in
+          Events.(emit skipping_attestation (delegate, level, round, err))
+          >>= fun () -> return_none
       | Ok signature ->
           let protocol_data =
             Operation_data {contents; signature = Some signature}
