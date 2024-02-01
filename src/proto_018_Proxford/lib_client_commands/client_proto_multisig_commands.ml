@@ -74,11 +74,12 @@ let bytes_param ~name ~desc =
   Tezos_clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Tezos_clic.args10
+  Tezos_clic.args11
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
     Client_proto_args.gas_limit_arg
+    Client_proto_args.safety_guard_arg
     Client_proto_args.storage_limit_arg
     Client_proto_args.counter_arg
     Client_proto_args.arg_arg
@@ -87,11 +88,12 @@ let transfer_options =
     Client_proto_args.entrypoint_arg
 
 let non_transfer_options =
-  Tezos_clic.args8
+  Tezos_clic.args9
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
     Client_proto_args.gas_limit_arg
+    Client_proto_args.safety_guard_arg
     Client_proto_args.storage_limit_arg
     Client_proto_args.counter_arg
     Client_proto_args.no_print_source_flag
@@ -192,10 +194,11 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
       command
         ~group
         ~desc:"Originate a new multisig contract."
-        (args9
+        (args10
            Client_proto_args.fee_arg
            Client_proto_context_commands.dry_run_switch
            Client_proto_args.gas_limit_arg
+           Client_proto_args.safety_guard_arg
            Client_proto_args.storage_limit_arg
            Client_proto_args.delegate_arg
            (Client_keys.force_switch ())
@@ -221,6 +224,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun ( fee,
                dry_run,
                gas_limit,
+               safety_guard,
                storage_limit,
                delegate,
                force,
@@ -253,6 +257,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~dry_run
               ?fee
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ~verbose_signing
               ~delegate
@@ -488,6 +493,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                parameter,
@@ -533,6 +539,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()
@@ -565,6 +572,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                no_print_source,
@@ -598,6 +606,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()
@@ -632,6 +641,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                no_print_source,
@@ -661,6 +671,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()
@@ -691,6 +702,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                no_print_source,
@@ -719,6 +731,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()
@@ -751,6 +764,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                no_print_source,
@@ -787,6 +801,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()
@@ -828,6 +843,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                dry_run,
                verbose_signing,
                gas_limit,
+               safety_guard,
                storage_limit,
                counter,
                no_print_source,
@@ -857,6 +873,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
+              ?safety_guard
               ?storage_limit
               ?counter
               ()

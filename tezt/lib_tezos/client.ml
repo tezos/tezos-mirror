@@ -1091,8 +1091,8 @@ let bls_import_secret_key ?hooks ?force key sc_client =
   spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
-    ?gas_limit ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
-    ?(force = false) ~amount ~giver ~receiver client =
+    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
+    ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?log_output
     ?endpoint
@@ -1106,6 +1106,7 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
         fee
     @ optional_arg "burn-cap" Tez.to_string burn_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
+    @ optional_arg "safety-guard" string_of_int safety_guard
     @ optional_arg "storage-limit" string_of_int storage_limit
     @ optional_arg "counter" string_of_int counter
     @ optional_arg "entrypoint" Fun.id entrypoint
@@ -1114,8 +1115,8 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure
-    ~amount ~giver ~receiver client =
+    ?safety_guard ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force
+    ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?log_output
     ?endpoint
@@ -1124,6 +1125,7 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?burn_cap
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ?entrypoint
@@ -1137,22 +1139,24 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
   |> Process.check ?expect_failure
 
 let spawn_call ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?entrypoint ?arg ~destination ~source client =
+    ?safety_guard ?entrypoint ?arg ~destination ~source client =
   spawn_command ?log_output ?endpoint ?hooks client
   @@ ["--wait"; wait]
   @ ["call"; destination; "from"; source]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "safety-guard" string_of_int safety_guard
   @ optional_arg "entrypoint" Fun.id entrypoint
   @ optional_arg "arg" Fun.id arg
 
-let call ?hooks ?log_output ?endpoint ?wait ?burn_cap ?entrypoint ?arg
-    ~destination ~source client =
+let call ?hooks ?log_output ?endpoint ?wait ?burn_cap ?safety_guard ?entrypoint
+    ?arg ~destination ~source client =
   spawn_call
     ?hooks
     ?log_output
     ?endpoint
     ?wait
     ?burn_cap
+    ?safety_guard
     ?entrypoint
     ?arg
     ~destination

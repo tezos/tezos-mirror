@@ -855,6 +855,7 @@ let transfer_command amount (source : Contract.t) destination
       simulation,
       force,
       gas_limit,
+      safety_guard,
       storage_limit,
       counter,
       arg,
@@ -909,6 +910,7 @@ let transfer_command amount (source : Contract.t) destination
           ?arg
           ~amount
           ?gas_limit
+          ?safety_guard
           ?storage_limit
           ?counter
           ()
@@ -933,6 +935,7 @@ let transfer_command amount (source : Contract.t) destination
           ?arg
           ~amount
           ?gas_limit
+          ?safety_guard
           ?storage_limit
           ?counter
           ~replace_by_fees
@@ -1202,11 +1205,12 @@ let commands_rw () =
     command
       ~group
       ~desc:"Launch a smart contract on the blockchain."
-      (args10
+      (args11
          fee_arg
          dry_run_switch
          verbose_signing_switch
          gas_limit_arg
+         safety_guard_arg
          storage_limit_arg
          delegate_arg
          (Client_keys.force_switch ())
@@ -1234,6 +1238,7 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              gas_limit,
+             safety_guard,
              storage_limit,
              delegate,
              force,
@@ -1261,6 +1266,7 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ?gas_limit
+            ?safety_guard
             ?storage_limit
             ~delegate
             ~initial_storage
@@ -1289,13 +1295,14 @@ let commands_rw () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args13
+      (args14
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          force_switch
          default_gas_limit_arg
+         safety_guard_arg
          default_storage_limit_arg
          counter_arg
          default_arg_arg
@@ -1348,6 +1355,7 @@ let commands_rw () =
              simulation,
              force,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              arg,
@@ -1415,6 +1423,7 @@ let commands_rw () =
                 ~fee:(Limit.of_option fee)
                 ~gas_limit:(Limit.of_option gas_limit)
                 ~storage_limit:(Limit.of_option storage_limit)
+                ?safety_guard
                 ?counter
                 ~src_pk
                 ~src_sk
@@ -1438,13 +1447,14 @@ let commands_rw () =
     command
       ~group
       ~desc:"Execute an Epoxy origination operation.\n"
-      (args13
+      (args14
          force_switch
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          default_gas_limit_arg
+         safety_guard_arg
          default_storage_limit_arg
          counter_arg
          default_arg_arg
@@ -1484,6 +1494,7 @@ let commands_rw () =
              verbose_signing,
              simulation,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              _arg,
@@ -1509,6 +1520,7 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ?gas_limit
+            ?safety_guard
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations
@@ -1541,12 +1553,13 @@ let commands_rw () =
     command
       ~group
       ~desc:"Execute an Epoxy publish operation.\n"
-      (args12
+      (args13
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          default_gas_limit_arg
+         safety_guard_arg
          default_storage_limit_arg
          counter_arg
          default_arg_arg
@@ -1568,6 +1581,7 @@ let commands_rw () =
              verbose_signing,
              simulation,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              _arg,
@@ -1590,6 +1604,7 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ?gas_limit
+            ?safety_guard
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations
@@ -1606,12 +1621,13 @@ let commands_rw () =
     command
       ~group
       ~desc:"Execute an Epoxy update operation.\n"
-      (args12
+      (args13
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          default_gas_limit_arg
+         safety_guard_arg
          default_storage_limit_arg
          counter_arg
          default_arg_arg
@@ -1633,6 +1649,7 @@ let commands_rw () =
              verbose_signing,
              simulation,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              _arg,
@@ -1655,6 +1672,7 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ?gas_limit
+            ?safety_guard
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations
@@ -1671,13 +1689,14 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args14
+      (args15
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          force_switch
          gas_limit_arg
+         safety_guard_arg
          storage_limit_arg
          counter_arg
          arg_arg
@@ -1703,6 +1722,7 @@ let commands_rw () =
              simulation,
              force,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              arg,
@@ -1726,6 +1746,7 @@ let commands_rw () =
             simulation,
             force,
             gas_limit,
+            safety_guard,
             storage_limit,
             counter,
             arg,
@@ -1798,13 +1819,14 @@ let commands_rw () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args14
+      (args15
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          force_switch
          gas_limit_arg
+         safety_guard_arg
          storage_limit_arg
          counter_arg
          arg_arg
@@ -1828,6 +1850,7 @@ let commands_rw () =
              simulation,
              force,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter,
              arg,
@@ -1851,6 +1874,7 @@ let commands_rw () =
             simulation,
             force,
             gas_limit,
+            safety_guard,
             storage_limit,
             counter,
             arg,
@@ -2738,13 +2762,14 @@ let commands_rw () =
     command
       ~group
       ~desc:"Send one or more messages to a smart rollup."
-      (args8
+      (args9
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
          gas_limit_arg
+         safety_guard_arg
          storage_limit_arg
          counter_arg)
       (prefixes ["send"; "smart"; "rollup"; "message"]
@@ -2767,6 +2792,7 @@ let commands_rw () =
              simulation,
              fee_parameter,
              gas_limit,
+             safety_guard,
              storage_limit,
              counter )
            messages
@@ -2807,6 +2833,7 @@ let commands_rw () =
             ?verbose_signing:(Some verbose_signing)
             ?fee
             ?gas_limit
+            ?safety_guard
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations

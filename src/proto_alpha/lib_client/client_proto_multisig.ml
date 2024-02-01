@@ -960,7 +960,7 @@ let check_threshold ~threshold ~keys () =
   else return_unit
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit
+    ?confirmations ?dry_run ?branch ?fee ?gas_limit ?safety_guard ?storage_limit
     ?verbose_signing ~delegate ~threshold ~keys ~balance ~source ~src_pk ~src_sk
     ~fee_parameter () =
   let open Lwt_result_syntax in
@@ -977,6 +977,7 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?dry_run
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?verbose_signing
     ~delegate
@@ -1118,7 +1119,7 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
 
 let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
-    ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit
+    ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit ?safety_guard
     ?storage_limit ?counter ~fee_parameter () =
   let open Lwt_result_syntax in
   let* {bytes; threshold; keys; counter = stored_counter; entrypoint; generic} =
@@ -1157,6 +1158,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~amount
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ~fee_parameter
@@ -1243,8 +1245,8 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
 
 let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
-    ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () =
+    ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit ?safety_guard
+    ?storage_limit ?counter ~fee_parameter () =
   let open Lwt_result_syntax in
   let* info = multisig_get_information cctxt ~chain ~block multisig_contract in
   let* descr = check_multisig_contract cctxt ~chain ~block multisig_contract in
@@ -1273,6 +1275,7 @@ let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain ~block
     ~amount
     ?fee
     ?gas_limit
+    ?safety_guard
     ?storage_limit
     ?counter
     ~fee_parameter

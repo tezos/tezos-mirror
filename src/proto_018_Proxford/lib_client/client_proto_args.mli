@@ -40,6 +40,8 @@ val counter_arg : (Manager_counter.t option, full) Tezos_clic.arg
 
 val gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 
+val safety_guard_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
+
 val default_gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 
 val run_gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
