@@ -63,6 +63,44 @@ Follow [these instructions](https://github.com/trilitech/live-testing-protocols/
 
 ## Scenario 3: ERC-1967 (transparent proxy pattern)
 
+Basic scenario for using the [ERC-1967](https://eips.ethereum.org/EIPS/eip-1967): the transparent proxy pattern by Openzeppelin.
+
+The code for the scenario can be found in [Logic_positive.sol](https://github.com/trilitech/live-testing-protocols/blob/main/contracts/proxies/transparent/Logic_positive.sol) and [Logic_negative.sol](https://github.com/trilitech/live-testing-protocols/blob/main/contracts/proxies/transparent/Logic_negative.sol).
+
+This is almost the same code but with a small difference: one increase the storage, the other decrease it. The goal is to use them to test the proxy system and "upgrade" it by switching between these 2 versions.
+
+### Actions:
+1. Deployment of Transparent Proxy Pattern
+   * The proxy (storage) contract is deployed by the Openzeppelin's plugin
+   * The implementation (logic) contract is deployed by the Openzeppelin's plugin
+   * The admin (manage upgrade) contract is deployed by the Openzeppelin's plugin
+2. Delegate calls works
+   * The number in the proxy (storage) is modify
+   * The number in the implementation (logic) is not modify
+3. Upgrade version on Transparent Proxy
+   * The proxy contract address is the same after upgrade
+   * The proxy contract storage is the same after upgrade
+   * The implementation (logic) contract is the new version
+4. Delegate calls works after upgrade
+   * The number in the proxy (storage) is modify by the new version
+   * The number in the implementation (logic) is not modify
+
+The code for the actions can be found in [logicPositiveAndNegative.ts](https://github.com/trilitech/live-testing-protocols/blob/main/test/proxies/transparent/logicPositiveAndNegative.ts).
+
+The code for the deployment using Openzeppelin's plugin can be found in [01-deploy-proxyLogicPositive.ts](https://github.com/trilitech/live-testing-protocols/blob/main/deploy/proxies/transparent/01-deploy-proxyLogicPositive.ts).
+
+Important to know:
+- The objective here is to test a proxy system. These proxies rely on a logic contract (also known as implementation contract or master copy) that is called using delegatecall. This allows proxies to keep a persistent state (storage and balance) while the code is delegated to the logic contract.
+- The deployment process is also important here because the tool do not simply deploy the smart contract used for the test. Instead, the plugin deploy 3 different contracts: the Admin, the Proxy and the Logic. The Admin is responsible for the upgrade part. The Proxy is the contract storing all the modification and sending the request with delegatecall and the Logic is the contract containing the logic itself and will be called by the Proxy to modify directly it storage.
+
+### Testing
+
+Follow [these instructions](https://github.com/trilitech/live-testing-protocols/tree/main#tests) specialized with the ERC-1967 test.
+* Local: `npx hardhat test test/proxies/transparent/logicPositiveAndNegative.ts`.
+* Ghostnet: `npx hardhat test --network etherlink test/proxies/transparent/logicPositiveAndNegative.ts`.
+
+The test should go through, even if the interaction actually fails because of some issues in Etherlink, not the scenario. (Fixing Etherlink would be the purpose of the next task.)
+
 ## Scenario 4: conventional NFT dApp
 
 ## Scenario 5: the Uniswap v2 DeFi protocol
