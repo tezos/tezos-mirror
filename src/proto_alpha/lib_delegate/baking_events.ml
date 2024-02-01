@@ -580,25 +580,37 @@ module Actions = struct
   let section = section @ ["actions"]
 
   let skipping_preattestation =
-    declare_2
+    declare_4
       ~section
       ~name:"skipping_preattestation"
       ~level:Error
-      ~msg:"unable to sign preattestation for {delegate} -- {trace}"
+      ~msg:
+        "unable to sign preattestation for {delegate} at level {level}, round \
+         {round} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
+      ~pp4:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let skipping_attestation =
-    declare_2
+    declare_4
       ~section
       ~name:"skipping_attestation"
       ~level:Error
-      ~msg:"unable to sign attestation for {delegate} -- {trace}"
+      ~msg:
+        "unable to sign attestation for {delegate} at level {level}, round \
+         {round} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
+      ~pp4:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_get_dal_attestations =
