@@ -123,4 +123,6 @@ val create_socket_listen :
   Lwt_unix.file_descr tzresult Lwt.t
 
 val create_socket_connect :
-  canceler:Lwt_canceler.t -> socket_path:string -> Lwt_unix.file_descr Lwt.t
+  canceler:Lwt_canceler.t ->
+  socket_path:string ->
+  Lwt_unix.file_descr tzresult Lwt.t

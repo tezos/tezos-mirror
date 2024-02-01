@@ -586,18 +586,18 @@ let run ~readonly ~using_std_channel input output =
 let main ?socket_dir ~readonly () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  let*! in_channel, out_channel, using_std_channel =
+  let* in_channel, out_channel, using_std_channel =
     match socket_dir with
     | Some socket_dir ->
         let pid = Unix.getpid () in
         let socket_path = External_validation.socket_path ~socket_dir ~pid in
-        let*! socket_process =
+        let* socket_process =
           External_validation.create_socket_connect ~canceler ~socket_path
         in
         let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
         let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
-        Lwt.return (socket_in, socket_out, false)
-    | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout, true)
+        return (socket_in, socket_out, false)
+    | None -> return (Lwt_io.stdin, Lwt_io.stdout, true)
   in
   let*! () = Events.(emit initialized ()) in
   let*! r =
