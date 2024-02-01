@@ -8,6 +8,7 @@
 type t = {
   data_dir : string;  (** Data dir of the EVM node. *)
   context : Irmin_context.rw;  (** Irmin read and write context. *)
+  index : Irmin_context.rw_index;
   preimages : string;  (** Path to the preimages directory. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
