@@ -35,13 +35,23 @@
     "tags": [
       "dac",
       "dac_node",
+      "dal",
       "vdf",
       "tezos2"
     ],
     "path_patterns": [
+      "^src/bin_dal_node",
+      "^src/bin_testnet_scenarios/dal.ml$",
       "^src/lib_aplonk",
+      "^src/lib_crypto_dal",
+      "^src/lib_dal_node",
+      "^src/lib_dal_node_services",
       "^src/lib_distributed_plonk",
-      "^tezt/tests/injector_test.ml$"
+      "^src/lib_gossipsub",
+      "^src/lib_stdlib_unix/test/test_key_value_store_fuzzy.ml$",
+      "^tezt/tests/injector_test.ml$",
+      "^tezt/manual_tests/dal.ml$",      
+      "^tezt/tests/dal.ml$"
     ]
   },
   "etherlink": {
