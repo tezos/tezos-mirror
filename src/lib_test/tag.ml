@@ -40,3 +40,5 @@ let layer1 = "layer1"
 let tezos2 = "tezos2"
 
 let etherlink = "etherlink"
+
+let slow = "slow"

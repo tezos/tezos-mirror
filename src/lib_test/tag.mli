@@ -78,3 +78,7 @@ val tezos2 : string
 
 (** ["etherlink"]: tag for tests owned by the Etherlink product unit. *)
 val etherlink : string
+
+(** ["slow"]: tag for tests that are too slow for the CI's [before_merging]
+    pipelines and that will only be run on the scheduled pipeline. *)
+val slow : string
