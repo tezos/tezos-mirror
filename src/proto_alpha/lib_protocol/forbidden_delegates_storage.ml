@@ -16,21 +16,6 @@ let forbid ctxt delegate =
   in
   Storage.Tenderbake.Forbidden_delegates.add ctxt new_forbidden_delegates
 
-let should_forbid ~current_cycle slash_history =
-  let since_cycle =
-    Cycle_repr.pred current_cycle |> Option.value ~default:Cycle_repr.root
-  in
-  let slashed_since =
-    List.fold_left
-      (fun slashed_since (cycle, slashed) ->
-        if Cycle_repr.(cycle >= since_cycle) then
-          Percentage.add_bounded slashed_since slashed
-        else slashed_since)
-      Percentage.p0
-      slash_history
-  in
-  Percentage.(Compare.(slashed_since >= p51))
-
 let load ctxt =
   let open Lwt_result_syntax in
   let* forbidden_delegates_opt =
@@ -57,19 +42,37 @@ let set_forbidden_delegates ctxt forbidden_delegates =
   in
   return ctxt
 
-let should_unforbid ctxt delegate ~new_cycle ~selection_for_new_cycle =
+let has_pending_denunciations ctxt delegate =
   let open Lwt_result_syntax in
-  let* slash_history_opt =
-    Storage.Contract.Slashed_deposits.find ctxt (Implicit delegate)
+  let* pending_denunciations =
+    Storage.Pending_denunciations.find ctxt delegate
   in
-  let slash_history = Option.value slash_history_opt ~default:[] in
-  (* To be unforbidden in the new cycle, a delegate must not meet the
-     criterion used on denunciation anymore... *)
-  if should_forbid ~current_cycle:new_cycle slash_history then return_false
+  match pending_denunciations with
+  | None | Some [] -> return_false
+  | Some (_ :: _) -> return_true
+
+let should_unforbid ctxt delegate ~selection_for_new_cycle =
+  let open Lwt_result_syntax in
+  (* A delegate who has pending denunciations for which slashing has
+     not been applied yet should stay forbidden, because their frozen
+     deposits are going to decrease by a yet unknown amount. *)
+  let* has_pending_denunciations = has_pending_denunciations ctxt delegate in
+  if has_pending_denunciations then return_false
   else
-    (* ...and must have, either no rights (in which case there is no reason
-       to keep it forbidden), or have at least half the frozen deposits it
-       had when rights were computed (probably coming from autostaking). *)
+    (* To get unforbidden, a delegate's current frozen deposits must
+       be high enough to insure the next cycle's baking rights. More
+       precisely, their [current_frozen_deposits] must at least match
+       [frozen], where:
+
+       - [current_frozen_deposits] is the sum of the delegate's own
+       frozen funds and their stakers'; it doesn't necessarily observe
+       overstaking limits.
+
+       - [frozen] is the frozen stake that was used in the past to
+       compute the baking rights for the new cycle. It includes past
+       frozen balances from the delegate and their stakers, but
+       excludes any overstaked funds (as enforced by
+       {!Stake_context.apply_limits}). *)
     match
       Signature.Public_key_hash.Map.find delegate selection_for_new_cycle
     with
@@ -78,7 +81,7 @@ let should_unforbid ctxt delegate ~new_cycle ~selection_for_new_cycle =
         let* current_frozen_deposits =
           Delegate_storage.current_frozen_deposits ctxt delegate
         in
-        return Tez_repr.(current_frozen_deposits >= div2 frozen)
+        return Tez_repr.(current_frozen_deposits >= frozen)
 
 let update_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
@@ -92,7 +95,7 @@ let update_at_cycle_end ctxt ~new_cycle =
       Signature.Public_key_hash.Set.fold_es
         (fun delegate acc ->
           let* should_unforbid =
-            should_unforbid ctxt delegate ~new_cycle ~selection_for_new_cycle
+            should_unforbid ctxt delegate ~selection_for_new_cycle
           in
           if should_unforbid then
             let old_forbidden =
