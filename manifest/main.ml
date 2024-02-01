@@ -4375,6 +4375,7 @@ let _tezt_testnet_scenarios =
     ~static:false
     ~deps:
       [
+        octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;

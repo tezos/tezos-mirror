@@ -535,7 +535,7 @@ let run_scenario network kind scenario =
   Test.register
     ~__FILE__
     ~title:(sf "Produce slots on %s %s" net_name kind_str)
-    ~tags:["dal"; net_name; kind_tag]
+    ~tags:[Tag.tezos2; "dal"; net_name; kind_tag]
   @@ fun () ->
   let load = Cli.get ~default:None (fun _ -> Some (Some ())) "load" in
   let save = Cli.get ~default:None (fun _ -> Some (Some ())) "save" in
