@@ -755,11 +755,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
         if self.evm_account_storage.stack_depth() >= self.config.stack_limit {
-            return Ok((
-                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::CallTooDeep)),
-                None,
-                vec![],
-            ));
+            return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
         }
 
         let context = Context {
@@ -831,11 +827,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if self.evm_account_storage.stack_depth() > self.config.stack_limit {
             log!(self.host, Debug, "Execution beyond the call limit of 1024");
 
-            return Ok((
-                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::CallTooDeep)),
-                None,
-                vec![],
-            ));
+            return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
         }
 
         // TODO: check gas
@@ -2280,13 +2272,8 @@ mod test {
 
         match result {
             Ok(result) => {
-                let expected_result = (
-                    ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                        ExitError::CallTooDeep,
-                    )),
-                    None,
-                    vec![],
-                );
+                let expected_result =
+                    (ExitReason::Succeed(ExitSucceed::Returned), None, vec![]);
                 assert_eq!(result, expected_result);
             }
             Err(err) => {
