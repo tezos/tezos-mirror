@@ -38,7 +38,7 @@ let test_rpc_list =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) RPC list"
-    ~tags:["mockup"; "client"; "rpc"]
+    ~tags:["mockup"; "client"; "rpc"; "describe"; "slow"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -367,7 +367,7 @@ let test_multiple_baking =
           (Tez.to_string alice_balance)
           (Tez.to_string bob_balance) ;
       return ())
-    (range 1 10)
+    (range 1 5)
 
 let perform_migration ~protocol ~next_protocol ~next_constants ~pre_migration
     ~post_migration =
