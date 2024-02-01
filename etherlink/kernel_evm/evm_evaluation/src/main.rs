@@ -116,7 +116,7 @@ fn generate_final_report(
                 let entry = if report_value.skipped == 0 {
                     "Fully Successful Tests"
                 } else {
-                    "Fully Successful Unskipped Tests"
+                    "Fully Successful With Skipped Tests"
                 };
                 final_report
                     .entry(entry)
@@ -334,6 +334,16 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         // Reason: this test rely on hot/cold access and as of right now
         // this feature will not be part of Etherlink
         | "sloadGasCost.json"
+
+        // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
+        // access lists and we don't intend to implement them for now
+        | "addressOpcodes.json"
+        | "coinbaseT01.json"
+        | "coinbaseT2.json"
+        | "manualCreate.json"
+        | "storageCosts.json"
+        | "transactionCosts.json"
+        | "variedContext.json"
     )
 }
 
