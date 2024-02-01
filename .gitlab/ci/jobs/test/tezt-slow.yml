@@ -1,0 +1,13 @@
+include: .gitlab/ci/jobs/test/common.yml
+
+# Runs Tezts tagged as 'slow' in the 'schedule_extended_test'
+# pipeline.
+tezt-slow:
+  extends:
+    - .tezt_tests
+  variables:
+    # Run only slow tests
+    TESTS: "slow"
+    TEZT_PARALLEL: 3
+    TEZT_VARIANT: "-slow"
+  parallel: 10

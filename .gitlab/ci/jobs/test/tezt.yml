@@ -4,9 +4,10 @@ tezt:
   extends:
     - .tezt_tests
   variables:
-    # Exclude tests with tags 'ci_disabled', 'flaky' and `memory_{3,4}k`.
+    # Exclude tests with tags 'ci_disabled', 'flaky', 'memory_{3,4}k',
+    # 'time_sensitive' and 'slow'.
     # See tezt/lib_tezos/tag.mli for more information.
-    TESTS: "/ci_disabled /flaky /memory_3k /memory_4k /time_sensitive"
+    TESTS: "/ci_disabled /flaky /memory_3k /memory_4k /time_sensitive /slow"
     # the -j option of tezt
     TEZT_PARALLEL: 3
 

@@ -31,6 +31,8 @@ include:
   - .gitlab/ci/jobs/test/install_octez.yml
   # Flaky tezts
   - .gitlab/ci/jobs/test/tezt-flaky.yml
+  # Slow tezts
+  - .gitlab/ci/jobs/test/tezt-slow.yml
   # Tests that may not have been run in before_merging pipeline
   # because of absence of certain changes
   - .gitlab/ci/jobs/test/misc_checks.yml
