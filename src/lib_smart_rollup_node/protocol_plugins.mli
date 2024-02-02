@@ -71,12 +71,6 @@ val last_proto_plugin : _ Node_context.t -> proto_plugin tzresult Lwt.t
     depending on the context.
 *)
 
-(** Retrieve constants for a given protocol (values are cached). *)
-val get_constants_of_protocol :
-  _ Node_context.t ->
-  Protocol_hash.t ->
-  Rollup_constants.protocol_constants tzresult Lwt.t
-
 (** Retrieve constants for a given level (values are cached). *)
 val get_constants_of_level :
   _ Node_context.t ->
