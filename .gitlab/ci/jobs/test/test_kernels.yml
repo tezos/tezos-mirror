@@ -3,7 +3,6 @@ test_kernels:
     - .oc.kernels_template
   stage: test
   needs: [oc.docker:rust-toolchain]
-  dependencies: []
   script:
     - make -f kernels.mk check
     - make -f kernels.mk test
@@ -18,7 +17,8 @@ test_kernels:
         - etherlink/kernel_evm/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
+      when: on_success
   cache:
-    - key: kernels
-      paths:
-        - cargo/
+    key: kernels
+    paths:
+      - cargo/

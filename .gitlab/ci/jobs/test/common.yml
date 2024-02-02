@@ -49,7 +49,8 @@
     expire_in: 3 days
     when: always
   script:
-    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}" TEZT_PARALLEL: ${TEZT_PARALLEL} TEZT_VARIANT: ${TEZT_VARIANT}'
+    # Print variables in a shell-friendly format.
+    - 'echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""'
     # Store the list of tests that have been scheduled for execution for later debugging.
     # It is imperative this this first call to tezt receives any flags passed to the
     # second call that affect test selection.

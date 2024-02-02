@@ -42,6 +42,7 @@ tezt-time-sensitive:
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
+  stage: test
   extends:
     # Expansion of .integration_template but without coverage.
     - .default_settings_template
