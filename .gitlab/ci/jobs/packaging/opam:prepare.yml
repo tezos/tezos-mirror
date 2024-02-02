@@ -16,6 +16,10 @@
   before_script:
     - eval $(opam env)
     - mkdir -p $CI_PROJECT_DIR/opam_logs
+    # Start sccache. If sccache fails to start, it will set
+    # RUSTC_WRAPPER to "", inhibiting sccache in the rest of the
+    # script.
+    - . ./scripts/ci/sccache-start.sh
   script:
     - opam remote add dev-repo ./_opam-repo-for-release
     - opam install --yes ${package}.dev
@@ -24,6 +28,7 @@
     # Stores logs in opam_logs for artifacts and outputs an excerpt on
     # failure. [after_script] runs in a separate shell and so requires
     # a second opam environment initialization.
+    - sccache --stop-server || true
     - eval $(opam env)
     - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   artifacts:
@@ -40,6 +45,8 @@
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_LOG: debug
+    # Disable timeout
+    SCCACHE_IDLE_TIMEOUT: 0
     RUSTC_WRAPPER: "sccache"
   cache:
     key: opam-sccache
