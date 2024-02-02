@@ -1641,10 +1641,6 @@ module History_v2 = struct
       let*? serialized_proof = serialize_proof proof_repr in
       return (serialized_proof, page_data)
 
-    (*  TODO: will be uncommented incrementally on the next MRs *)
-
-    (*
-
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
        [snapshot] to [target]. *)
@@ -1669,96 +1665,76 @@ module History_v2 = struct
 
     let verify_proof_repr dal_params page_id snapshot proof =
       let open Result_syntax in
-      let Page.{slot_id; page_index = _} = page_id in
-      match proof with
-      | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
-          (* If the page is supposed to be confirmed, the last cell in
-             [inc_proof] should store the slot of the page. *)
-          let Header.{id; commitment} = Skip_list.content target_cell in
-          let* () =
-            error_when
-              Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
-              (dal_proof_error
-                 "verify_proof_repr: cannot construct a confirmation page \
-                  proof with 'zero' as target slot.")
-          in
-          let* () =
-            verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
-          in
-          (* We check that the page indeed belongs to the target slot at the
-             given page index. *)
-          let* () =
-            check_page_proof dal_params page_proof page_data page_id commitment
-          in
-          (* If all checks succeed, we return the data/content of the page. *)
+      let Page.{slot_id = Header.{published_level; index}; page_index = _} =
+        page_id
+      in
+      let* target_cell, inc_proof, page_proof_check =
+        match proof with
+        | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
+            let page_proof_check =
+              Some
+                (fun commitment ->
+                  (* We check that the page indeed belongs to the target slot at the
+                     given page index. *)
+                  let* () =
+                    check_page_proof
+                      dal_params
+                      page_proof
+                      page_data
+                      page_id
+                      commitment
+                  in
+                  (* If the check succeeds, we return the data/content of the
+                     page. *)
+                  return page_data)
+            in
+            return (target_cell, inc_proof, page_proof_check)
+        | Page_unconfirmed {target_cell; inc_proof} ->
+            return (target_cell, inc_proof, None)
+      in
+      let cell_content = Skip_list.content target_cell in
+      (* We check that the target cell has the same level and index than the
+         page we're about to prove. *)
+      let cell_id = Content.content_id cell_content in
+      let* () =
+        error_when
+          Raw_level_repr.(cell_id.published_level <> published_level)
+          (dal_proof_error "verify_proof_repr: published_level mismatch.")
+      in
+      let* () =
+        error_when
+          (not (Dal_slot_index_repr.equal cell_id.index index))
+          (dal_proof_error "verify_proof_repr: slot index mismatch.")
+      in
+      (* We check that the given inclusion proof indeed links our L1 snapshot to
+         the target cell. *)
+      let* () =
+        verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
+      in
+      match (page_proof_check, cell_content) with
+      | None, Unattested _ -> return_none
+      | Some page_proof_check, Attested {commitment; _} ->
+          let* page_data = page_proof_check commitment in
           return_some page_data
-      | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
-          (* The page's slot is supposed to be unconfirmed. *)
-          let ( < ) a b = Compare.Int.(Header.compare_slot_id a b < 0) in
-          (* We retrieve the last cell of the inclusion proof to be able to
-             call {!verify_inclusion_proof}. We also do some well-formedness on
-             the shape of the inclusion proof (see the case [Page_unconfirmed]
-             of type {!proof}). *)
-          let* () =
-            match next_cell_opt with
-            | None ->
-                let* () =
-                  error_unless
-                    (List.is_empty next_inc_proof)
-                    (dal_proof_error
-                       "verify_proof_repr: invalid next_inc_proof")
-                in
-                (* In case the inclusion proof has no elements, we check that:
-                   - the prev_cell slot's id is smaller than the unconfirmed slot's ID
-                   - the snapshot is equal to the [prev_cell] skip list.
-
-                   This way, and since the skip list is sorted wrt.
-                   {!compare_slot_id}, we are sure that the skip list whose head
-                   is [snapshot] = [prev_cell] cannot contain a slot whose ID is
-                   [slot_id]. *)
-                error_unless
-                  ((Skip_list.content prev_cell).id < slot_id
-                  && equal_history snapshot prev_cell)
-                  (dal_proof_error "verify_proof_repr: invalid next_inc_proof")
-            | Some next_cell ->
-                (* In case the inclusion proof has at least one element,
-                   we check that:
-                   - the [prev_cell] slot's id is smaller than [slot_id]
-                   - the [next_cell] slot's id is greater than [slot_id]
-                   - the [next_cell] cell is a direct successor of the
-                     [prev_cell] cell.
-                   - the [next_cell] cell is a predecessor of [snapshot]
-
-                   Since the skip list is sorted wrt. {!compare_slot_id}, and
-                   if the call to {!verify_inclusion_proof} succeeds, we are
-                   sure that the skip list whose head is [snapshot] cannot
-                   contain a slot whose ID is [slot_id]. *)
-                let* () =
-                  error_unless
-                    ((Skip_list.content prev_cell).id < slot_id
-                    && slot_id < (Skip_list.content next_cell).id
-                    &&
-                    let prev_cell_pointer =
-                      Skip_list.back_pointer next_cell 0
-                    in
-                    match prev_cell_pointer with
-                    | None -> false
-                    | Some prev_ptr ->
-                        Pointer_hash.equal prev_ptr (hash prev_cell))
-                    (dal_proof_error
-                       "verify_proof_repr: invalid next_inc_proof")
-                in
-                verify_inclusion_proof
-                  next_inc_proof
-                  ~src:snapshot
-                  ~dest:next_cell
-          in
-          return_none
+      | Some _, Unattested _ ->
+          error
+          @@ dal_proof_error
+               "verify_proof_repr: the unconfirmation proof contains the \
+                target slot."
+      | None, Attested _ ->
+          error
+          @@ dal_proof_error
+               "verify_proof_repr: the confirmation proof doesn't contain the \
+                attested slot."
 
     let verify_proof dal_params page_id snapshot serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
+
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
 
     module Internal_for_tests = struct
       let content = Skip_list.content
