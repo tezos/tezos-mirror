@@ -14,8 +14,8 @@ use crate::{
     tick_model, CONFIG,
 };
 
-use evm_execution::run_transaction;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
+use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::block::BlockConstants;
@@ -74,6 +74,13 @@ pub struct Evaluation {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum EvaluationOutcome {
+    EvaluationError(EthereumError),
+    Outcome(Option<ExecutionOutcome>),
+    OutOfTicks,
+}
+
 impl Evaluation {
     /// Unserialize bytes as RLP encoded data.
     pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
@@ -85,7 +92,7 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<Option<ExecutionOutcome>, Error> {
+    ) -> Result<EvaluationOutcome, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
 
@@ -115,7 +122,7 @@ impl Evaluation {
             block_fees.base_fee_per_gas()
         };
 
-        let outcome = run_transaction(
+        match run_transaction(
             host,
             &current_constants,
             &mut evm_account_storage,
@@ -129,9 +136,13 @@ impl Evaluation {
             self.value,
             false,
             allocated_ticks,
-        )
-        .map_err(Error::Simulation)?;
-        Ok(outcome)
+        ) {
+            Err(evm_execution::EthereumError::OutOfTicks) => {
+                Ok(EvaluationOutcome::OutOfTicks)
+            }
+            Err(err) => Ok(EvaluationOutcome::EvaluationError(err)),
+            Ok(outcome) => Ok(EvaluationOutcome::Outcome(outcome)),
+        }
     }
 }
 
@@ -417,16 +428,39 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
 
 fn store_simulation_outcome<Host: Runtime>(
     host: &mut Host,
-    outcome: Option<ExecutionOutcome>,
+    outcome: EvaluationOutcome,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "outcome={:?} ", outcome);
     match outcome {
-        Some(outcome) => {
+        EvaluationOutcome::Outcome(Some(outcome)) => {
             storage::store_simulation_status(host, outcome.is_success)?;
             storage::store_evaluation_gas(host, outcome.gas_used)?;
             storage::store_simulation_result(host, outcome.result)
         }
-        None => Ok(()),
+        EvaluationOutcome::Outcome(None) => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(
+                host,
+                Some(b"No outcome was produced when the transaction was ran".to_vec()),
+            )
+        }
+        EvaluationOutcome::OutOfTicks => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(
+                host,
+                Some(
+                    b"The transaction would exhaust all the ticks it is allocated. \
+                      Try reducing its gas consumption or splitting the call in \
+                      multiple steps, if possible."
+                        .to_vec(),
+                ),
+            )
+        }
+        EvaluationOutcome::EvaluationError(err) => {
+            storage::store_simulation_status(host, false)?;
+            let msg = format!("The transaction failed: {:?}.", err);
+            storage::store_simulation_result(host, Some(msg.as_bytes().to_vec()))
+        }
     }
 }
 
@@ -646,16 +680,21 @@ mod tests {
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "simulation result should be 0"
-        );
+
+        if let EvaluationOutcome::Outcome(outcome) = outcome {
+            assert!(
+                outcome.is_some(),
+                "simulation should have produced some outcome"
+            );
+            let outcome = outcome.unwrap();
+            assert_eq!(
+                Some(vec![0u8; 32]),
+                outcome.result,
+                "simulation result should be 0"
+            );
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
 
         // run simulation get
         let evaluation = Evaluation {
@@ -670,16 +709,20 @@ mod tests {
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "evaluation result should be 0"
-        );
+        if let EvaluationOutcome::Outcome(outcome) = outcome {
+            assert!(
+                outcome.is_some(),
+                "simulation should have produced some outcome"
+            );
+            let outcome = outcome.unwrap();
+            assert_eq!(
+                Some(vec![0u8; 32]),
+                outcome.result,
+                "evaluation result should be 0"
+            );
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
     }
 
     #[test]
@@ -701,16 +744,20 @@ mod tests {
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
-        assert!(
-            outcome.is_some(),
-            "simulation should have produced some outcome"
-        );
-        let outcome = outcome.unwrap();
-        assert_eq!(
-            Some(vec![0u8; 32]),
-            outcome.result,
-            "evaluation result should be 0"
-        );
+        if let EvaluationOutcome::Outcome(outcome) = outcome {
+            assert!(
+                outcome.is_some(),
+                "simulation should have produced some outcome"
+            );
+            let outcome = outcome.unwrap();
+            assert_eq!(
+                Some(vec![0u8; 32]),
+                outcome.result,
+                "evaluation result should be 0"
+            );
+        } else {
+            panic!("evaluation should have reached outcome");
+        }
     }
 
     #[test]
