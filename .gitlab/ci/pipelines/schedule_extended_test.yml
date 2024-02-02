@@ -50,6 +50,7 @@ include:
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
+  - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml

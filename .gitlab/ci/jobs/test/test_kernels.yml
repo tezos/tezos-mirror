@@ -14,7 +14,6 @@ test_kernels:
         - kernels.mk
         - src/kernel_*/**/*
         - src/risc_v/**/*
-        - etherlink/kernel_evm/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
       when: on_success

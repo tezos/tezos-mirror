@@ -538,24 +538,30 @@ clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 
 .PHONY: build-kernels-deps
 build-kernels-deps:
-	make -f kernels.mk build-deps
+	$(MAKE) -f kernels.mk build-deps
+	$(MAKE) -f etherlink.mk build-deps
 
 .PHONY: build-kernels-dev-deps
 build-kernels-dev-deps:
-	make -f kernels.mk build-dev-deps
+	$(MAKE) -f kernels.mk build-dev-deps
+	$(MAKE) -f etherlink.mk build-dev-deps
 
 .PHONY: build-kernels
 build-kernels:
-	make -f kernels.mk build
+	$(MAKE) -f kernels.mk build
+	$(MAKE) -f etherlink.mk build
 
 .PHONY: check-kernels
 check-kernels:
-	make -f kernels.mk check
+	$(MAKE) -f kernels.mk check
+	$(MAKE) -f etherlink.mk check
 
 .PHONY: test-kernels
 test-kernels:
-	make -f kernels.mk test
+	$(MAKE) -f kernels.mk test
+	$(MAKE) -f etherlink.mk test
 
 .PHONY: clean-kernels
 clean-kernels:
-	make -f kernels.mk clean
+	$(MAKE) -f kernels.mk clean
+	$(MAKE) -f etherlink.mk clean

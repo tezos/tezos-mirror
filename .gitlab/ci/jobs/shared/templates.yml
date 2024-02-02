@@ -219,3 +219,16 @@
       - etherlink/**/*
       - .gitlab-ci.yml
       - .gitlab/**/*
+
+.test_etherlink_kernel:
+  extends:
+    - .oc.kernels_template
+  stage: test
+  needs: [oc.docker:rust-toolchain]
+  script:
+    - make -f etherlink.mk check
+    - make -f etherlink.mk test
+  cache:
+    key: kernels
+    paths:
+      - cargo/
