@@ -54,10 +54,6 @@ val to_int : t -> int
 
 val to_int_list : t list -> int list
 
-val compare : t -> t -> int
-
-val equal : t -> t -> bool
-
 (** [slots_range ~number_of_slots ~lower ~upper] returns the list of slots indexes between
       [lower] and [upper].
 
@@ -73,3 +69,5 @@ val slots_range_opt :
 
 (** [is_succ elt ~succ] returns true if and only if elt + 1 = succ. *)
 val is_succ : t -> succ:t -> bool
+
+include Compare.S with type t := t
