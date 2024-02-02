@@ -15,6 +15,7 @@ depends: [
   "safepass"
   "tls-lwt"
   "aches"
+  "prometheus-app"
   ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"
@@ -34,6 +35,7 @@ depopts: [
   "octez-protocol-015-PtLimaPt-libs"
   "octez-protocol-016-PtMumbai-libs"
   "octez-protocol-017-PtNairob-libs"
+  "octez-protocol-018-Proxford-libs"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

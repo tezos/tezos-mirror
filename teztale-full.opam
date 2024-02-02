@@ -28,10 +28,12 @@ depends: [
   "octez-protocol-015-PtLimaPt-libs"
   "octez-protocol-016-PtMumbai-libs"
   "octez-protocol-017-PtNairob-libs"
+  "octez-protocol-018-Proxford-libs"
   "octez-shell-libs"
   "safepass"
   "tls-lwt"
   "aches"
+  "prometheus-app"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
