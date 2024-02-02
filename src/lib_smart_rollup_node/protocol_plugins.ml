@@ -100,7 +100,8 @@ let constants_cache =
   let cache_size = 3 in
   Constants_cache.create cache_size
 
-let get_constants_of_protocol (node_ctxt : _ Node_context.t) protocol_hash =
+let get_constants_of_protocol ?level (node_ctxt : _ Node_context.t)
+    protocol_hash =
   let open Lwt_result_syntax in
   if Protocol_hash.(protocol_hash = node_ctxt.current_protocol.hash) then
     return node_ctxt.current_protocol.constants
@@ -108,10 +109,18 @@ let get_constants_of_protocol (node_ctxt : _ Node_context.t) protocol_hash =
     let retrieve protocol_hash =
       let*? plugin = proto_plugin_for_protocol protocol_hash in
       let module Plugin = (val plugin) in
-      let* (First_known l | Activation_level l) =
-        Node_context.protocol_activation_level node_ctxt protocol_hash
+      let* level =
+        match level with
+        | None ->
+            let+ (First_known l | Activation_level l) =
+              Node_context.protocol_activation_level node_ctxt protocol_hash
+            in
+            l
+        | Some l -> return l
       in
-      Plugin.Layer1_helpers.retrieve_constants ~block:(`Level l) node_ctxt.cctxt
+      Plugin.Layer1_helpers.retrieve_constants
+        ~block:(`Level level)
+        node_ctxt.cctxt
     in
     Constants_cache.bind_or_put
       constants_cache
@@ -122,7 +131,7 @@ let get_constants_of_protocol (node_ctxt : _ Node_context.t) protocol_hash =
 let get_constants_of_level node_ctxt level =
   let open Lwt_result_syntax in
   let* {protocol; _} = Node_context.protocol_of_level node_ctxt level in
-  get_constants_of_protocol node_ctxt protocol
+  get_constants_of_protocol ~level node_ctxt protocol
 
 let get_constants_of_block_hash node_ctxt block_hash =
   let open Lwt_result_syntax in
