@@ -122,7 +122,11 @@ let encode_tx tx =
 module Encodings = struct
   open Data_encoding
 
-  type insights = {result : bytes option; success : bool option}
+  type insights = {
+    success : bool option;
+    result : bytes option;
+    gas : bytes option;
+  }
 
   type eval_result = {
     state_hash : string;
@@ -210,21 +214,22 @@ module Encodings = struct
 
   let insights =
     conv
-      (fun {result; success} -> (result, success))
-      (fun (result, success) -> {result; success})
-      (tup2 (option bytes) bool_as_bytes)
+      (fun {success; result; gas} -> (gas, result, success))
+      (fun (gas, result, success) -> {gas; result; success})
+      (tup3 (option bytes) (option bytes) bool_as_bytes)
 
   let insights_from_list l =
     match l with
-    | [result; success] ->
+    | [gas; result; success] ->
         Some
           {
-            result;
             success =
               Option.bind success (fun s ->
                   s
                   |> Data_encoding.Binary.of_bytes Data_encoding.bool
                   |> Result.to_option);
+            result;
+            gas;
           }
     | _ -> None
 
@@ -260,36 +265,38 @@ module Encodings = struct
             ~description:"PVM state values requested after the simulation")
 end
 
-let call_result {Encodings.result; success} =
+let call_result Encodings.{success; result; gas = _} =
   let open Lwt_result_syntax in
-  match (result, success) with
-  | Some b, _ ->
-      let v = b |> Hex.of_bytes |> Hex.show in
+  match (success, result) with
+  | Some true, Some result ->
+      let v = result |> Hex.of_bytes |> Hex.show in
       return (Ok (Hash (Hex v)))
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6752
-     better propagate errors and reverts messages from kernel to help the
-     user debug their call *)
-  | None, Some false -> return (Error ())
+  | Some false, Some result ->
+      let error_msg = Bytes.to_string result in
+      return (Error error_msg)
   | _ -> failwith "Insights of 'call_result' cannot be parsed"
 
-let gas_estimation {Encodings.result; _} =
+let gas_estimation Encodings.{success; result; gas} =
   let open Lwt_result_syntax in
-  let* simulated_amount =
-    match result with
-    | Some b -> b |> Bytes.to_string |> Z.of_bits |> return
-    | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
-  in
-  (* See EIP2200 for reference. But the tl;dr is: we cannot do the
-     opcode SSTORE if we have less than 2300 gas available, even if we don't
-     consume it. The simulated amount then gives an amount of gas insufficient
-     to execute the transaction.
+  match (success, result, gas) with
+  | Some true, _, Some simulated_amount ->
+      let simulated_amount = Bytes.to_string simulated_amount |> Z.of_bits in
+      (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+         opcode SSTORE if we have less than 2300 gas available, even
+         if we don't consume it. The simulated amount then gives an
+         amount of gas insufficient to execute the transaction.
 
-     The extra gas units, i.e. 2300, will be refunded.
-  *)
-  let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
-  return (quantity_of_z simulated_amount)
+         The extra gas units, i.e. 2300, will be refunded.
+      *)
+      let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
 
-let is_tx_valid {Encodings.result; success} =
+      return (Ok (quantity_of_z simulated_amount))
+  | Some false, Some result, _ ->
+      let error_msg = Bytes.to_string result in
+      return (Error error_msg)
+  | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
+
+let is_tx_valid Encodings.{success; result; gas = _} =
   let open Lwt_result_syntax in
   match (result, success) with
   | Some payload, Some success ->
