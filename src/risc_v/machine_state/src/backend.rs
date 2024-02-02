@@ -224,18 +224,18 @@ pub mod tests {
         type Backend<L: Layout>: Backend<Layout = L>;
 
         /// Construct a backend for the given layout `L`.
-        fn make<L: Layout>(&mut self) -> Self::Backend<L>;
+        fn new<L: Layout>() -> Self::Backend<L>;
     }
 
-    pub fn test_backend(factory: &mut impl TestBackendFactory) {
-        region::tests::test_backend(factory);
-        registers::tests::test_backend(factory);
-        bus::main_memory::tests::test_backend(factory);
-        mode::tests::test_mode(factory);
-        test_example(factory);
+    pub fn test_backend<F: TestBackendFactory>() {
+        region::tests::test_backend::<F>();
+        registers::tests::test_backend::<F>();
+        bus::main_memory::tests::test_backend::<F>();
+        mode::tests::test_mode::<F>();
+        test_example::<F>();
     }
 
-    fn test_example(factory: &mut impl TestBackendFactory) {
+    fn test_example<F: TestBackendFactory>() {
         struct Example<M: Manager> {
             first: Cell<u64, M>,
             second: M::Region<u32, 4>,
@@ -252,7 +252,7 @@ pub mod tests {
             }
         }
 
-        let mut backend = factory.make::<ExampleLayout>();
+        let mut backend = F::new::<ExampleLayout>();
         let placed = ExampleLayout::placed().into_location();
 
         let first_offset = placed.0.offset();

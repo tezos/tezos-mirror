@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod xstatus;
+
 use crate::backend::{self, Region};
 use crate::mode::Mode;
 
@@ -15,7 +17,7 @@ pub enum Privilege {
 }
 
 /// Get the bitmask formed of `n` ones.
-const fn ones(n: u64) -> u64 {
+pub const fn ones(n: u64) -> u64 {
     !0 >> (64 - n)
 }
 
@@ -311,6 +313,7 @@ impl CSRegister {
     // Since read-only misa.MXL = 0b10, we have MXLEN = 64 from table 3.1
     const MXLEN: u64 = 64;
     const SXLEN: u64 = CSRegister::MXLEN;
+    const MXL_ENCODING: CSRValue = 0b10;
 
     /// Determine the priviledge level required to access this CSR.
     #[inline(always)]
@@ -367,6 +370,20 @@ impl CSRegister {
     pub fn is_read_only(self) -> bool {
         // Rules & Table of read-write / read-only ranges are in section 2.1 & table 2.1
         (self as usize >> 10) & 0b11 == 0b11
+    }
+
+    /// Enforce the WPRI and WLRL field specifications.
+    ///
+    /// Either return the value to be written, or None to signify that no write is necessary,
+    /// leaving the existing value in its place.
+    #[inline(always)]
+    pub fn make_value_writable(self, value: CSRValue) -> Option<CSRValue> {
+        // respect the reserved WPRI fields, setting them to 0
+        let value = self.clear_wpri_fields(value);
+        // apply WARL rules
+        let value = self.transform_warl_fields(value)?;
+        // check if value is legal w.r.t. WLRL fields
+        self.is_legal(value).then_some(value)
     }
 
     const WPRI_MASK_EMPTY: CSRValue = CSRValue::MAX;
@@ -492,7 +509,7 @@ impl CSRegister {
     ///
     /// Section 2.3 - privileged spec
     #[inline(always)]
-    fn is_legal(self, new_value: CSRValue) -> bool {
+    pub fn is_legal(self, new_value: CSRValue) -> bool {
         let legal_values = self.legal_values();
         // if no legal values are defined, then the register is not WLRL
         legal_values.is_empty() || legal_values.contains(&new_value)
@@ -501,7 +518,7 @@ impl CSRegister {
     /// Value for CSR `misa`, see section 3.1.1 & tables 3.1 (MXL) & 3.2 (Extensions)
     const WARL_MISA_VALUE: CSRValue = {
         /* MXLEN encoding of 64 bits */
-        const MXL_ENCODING: u64 = 0b10 << 62;
+        const MXL_MASK: u64 = CSRegister::MXL_ENCODING << 62;
         /* Extensions (A + C + D + F + I + M + S + U) */
         const ATOMIC_EXT: u64 = 1 << 0;
         const COMPRESSED_EXT: u64 = 1 << 2;
@@ -512,7 +529,7 @@ impl CSRegister {
         const SUPERVISOR_EXT: u64 = 1 << 18;
         const USER_EXT: u64 = 1 << 20;
         /* MXL */
-        MXL_ENCODING |
+        MXL_MASK |
         /* Extensions */
         ATOMIC_EXT |
         COMPRESSED_EXT |
@@ -555,6 +572,8 @@ impl CSRegister {
                     _ => return None,
                 }
             }
+            CSRegister::mstatus => xstatus::apply_warl_mstatus(new_value),
+            CSRegister::sstatus => xstatus::apply_warl_sstatus(new_value),
             _ => new_value,
         };
         Some(write_value)
@@ -643,7 +662,7 @@ impl CSRegister {
 }
 
 /// Value in a CSR
-type CSRValue = u64;
+pub type CSRValue = u64;
 
 /// RISC-V exceptions
 #[derive(PartialEq, Eq)]
@@ -686,13 +705,52 @@ pub struct CSRegisters<M: backend::Manager> {
 }
 
 impl<M: backend::Manager> CSRegisters<M> {
+    /// Transform the write operation to account for shadow registers.
+    /// (e.g. `sstatus` register)
+    ///
+    /// Sections 3.1.6 & 4.1.1
+    #[inline(always)]
+    fn transform_write(&self, reg: CSRegister, value: CSRValue) -> (CSRegister, CSRValue) {
+        match reg {
+            CSRegister::sstatus => {
+                let mstatus = self.registers.read(CSRegister::mstatus as usize);
+                let sstatus_only = xstatus::sstatus_from_mstatus(value);
+                let mstatus_only = mstatus & !xstatus::SSTATUS_FIELDS_MASK;
+                (CSRegister::mstatus, sstatus_only | mstatus_only)
+            }
+            _ => (reg, value),
+        }
+    }
+
+    /// Transform a read operation to account for shadow registers.
+    /// (e.g. `sstatus` register)
+    ///
+    /// `mstatus_value` holds the value of `mstatus` if known, `None` otherwise.
+    /// `mstatus` is read only if `sstatus` is requested and `mstatus` is not known already
+    ///
+    /// Sections 3.1.6 & 4.1.1
+    #[inline(always)]
+    fn transform_read(&self, reg: CSRegister, mstatus_value: Option<CSRValue>) -> CSRValue {
+        let read_mstatus = || self.registers.read(CSRegister::mstatus as usize);
+
+        match reg {
+            CSRegister::sstatus => {
+                let mstatus = mstatus_value.unwrap_or_else(read_mstatus);
+                xstatus::sstatus_from_mstatus(mstatus)
+            }
+            CSRegister::mstatus => mstatus_value.unwrap_or_else(read_mstatus),
+            _ => self.registers.read(reg as usize),
+        }
+    }
+
     /// Write to a CSR.
     #[inline(always)]
     pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-
-        if let Some(value) = self.make_value_writable(reg, value) {
+        // extra function to read mstatus if needed
+        if let Some(value) = reg.make_value_writable(value) {
+            let (reg, value) = self.transform_write(reg, value);
             self.registers.write(reg as usize, value);
         }
     }
@@ -702,7 +760,11 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn read(&mut self, reg: CSRegister) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        self.registers.read(reg as usize)
+
+        // sstatus is just a restricted view of mstatus.
+        // to maintain consistency, when reading sstatus
+        // just return mstatus with only the sstatus fields, making the other fields 0
+        self.transform_read(reg, None)
     }
 
     /// Replace the CSR value, returning the previous value.
@@ -711,10 +773,13 @@ impl<M: backend::Manager> CSRegisters<M> {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
-        if let Some(value) = self.make_value_writable(reg, value) {
-            self.registers.replace(reg as usize, value)
+        if let Some(value) = reg.make_value_writable(value) {
+            let (upd_reg, value) = self.transform_write(reg, value);
+            let old_value = self.registers.replace(upd_reg as usize, value);
+
+            self.transform_read(reg, Some(old_value))
         } else {
-            self.registers.read(reg as usize)
+            self.read(reg)
         }
     }
 
@@ -739,20 +804,6 @@ impl<M: backend::Manager> CSRegisters<M> {
         self.write(reg, new_value);
         old_value
     }
-
-    /// Enforce the WPRI and WLRL field specifications.
-    ///
-    /// Either return the value to be written, or None to signify that no write is necessary,
-    /// to leave existing value in its place.
-    #[inline(always)]
-    fn make_value_writable(&self, reg: CSRegister, value: CSRValue) -> Option<CSRValue> {
-        // respect the reserved WPRI fields, setting them 0
-        let value = reg.clear_wpri_fields(value);
-        // apply WARL rules
-        let value = reg.transform_warl_fields(value)?;
-        // check if value is legal w.r.t. WLRL fields
-        reg.is_legal(value).then_some(value)
-    }
 }
 
 /// Layout for [CSRegisters]
@@ -768,7 +819,8 @@ impl<M: backend::Manager> CSRegisters<M> {
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        csregisters::{CSRValue, Exception},
+        backend::{tests::TestBackendFactory, Backend, Layout, Region},
+        csregisters::Exception,
         mode::Mode,
     };
 
@@ -844,11 +896,12 @@ pub mod tests {
     fn test_wlrl() {
         use crate::csregisters::CSRegister as csreg;
 
-        let check = |reg: csreg, value| reg.is_legal(value);
+        // Additionally check if value remains legal after using `make_value_writable`
+        let check =
+            |reg: csreg, value| reg.is_legal(value) && reg.make_value_writable(value).is_some();
 
         // Registers that are not xcause should always be ok
-        const ALL_BITS: CSRValue = 0xFFFF_FFFF_FFFF_FFFF;
-        assert!(check(csreg::mstatus, ALL_BITS));
+        assert!(check(csreg::mstatus, 0xFFFF_FFFF_FFFF_FFFF));
         assert!(check(csreg::sstatus, 0x0));
         assert!(check(csreg::time, 0x0));
 
@@ -870,11 +923,11 @@ pub mod tests {
     }
 
     #[test]
-    fn test_warl() {
+    fn test_writable_warl() {
         use crate::csregisters::CSRegister as csreg;
 
-        let check_wrapped = |reg: csreg, value| reg.transform_warl_fields(value);
-        let check = |reg: csreg, value| reg.transform_warl_fields(value).unwrap();
+        let check_wrapped = |reg: csreg, value| reg.make_value_writable(value);
+        let check = |reg: csreg, value| reg.make_value_writable(value).unwrap();
 
         // misa field
         assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
@@ -919,7 +972,102 @@ pub mod tests {
             Some(0x90F0_0000_FFFF_0000)
         );
 
+        // mstatus
+        // uxl & sxl fields are set
+        assert_eq!(check(csreg::mstatus, 0x0), 0x0000_000A_0000_0000);
+        // besides uxl & sxl changing, wpri fields get set to 0
+        assert_eq!(
+            check(csreg::mstatus, 0xFFFF_FFFF_FFFF_FFFF),
+            0x8000_003A_007F_FFEA
+        );
+        // check sd bit set from XS=00, FS=10, VS=11, and MPP gets changed to 0b00 from 0b01
+        assert_eq!(
+            check(csreg::mstatus, 0x0FFF_0000_0000_57FF),
+            0x8000_000A_0000_47EA
+        );
+
+        // sstatus
+        // uxl & sxl fields are set
+        assert_eq!(check(csreg::sstatus, 0x0), 0x0000_0002_0000_0000);
+        // besides uxl changing, wpri fields get set to 0
+        assert_eq!(
+            check(csreg::sstatus, 0xFFFF_FFFF_FFFF_FFFF),
+            0x8000_0002_000D_E762
+        );
+        // check sd bit set from XS=00, FS=10, VS=11
+        assert_eq!(
+            check(csreg::sstatus, 0x0FFF_0000_0000_57FF),
+            0x8000_0002_0000_4762
+        );
+
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
+    }
+
+    pub fn test_backend<F: TestBackendFactory>() {
+        #![allow(clippy::identity_op)]
+
+        use super::{CSRegister, CSRegisters, CSRegistersLayout};
+        use crate::backend::BackendManagement;
+
+        let mut backend = F::new::<CSRegistersLayout>();
+        let placed = CSRegistersLayout::placed().into_location();
+
+        let mut csrs: CSRegisters<
+            <F::Backend<CSRegistersLayout> as BackendManagement>::Manager<'_>,
+        > = CSRegisters::new_in(backend.allocate(placed));
+
+        // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP (through mstatus)
+        csrs.write(
+            CSRegister::mstatus,
+            1 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7,
+        );
+        // SXL, UXL should be set to MXL (WARL), SD bit should be 1
+        let read_mstatus = csrs.read(CSRegister::mstatus);
+        assert_eq!(
+            read_mstatus,
+            1 << 63 | 1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7
+        );
+        // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
+        let read_sstatus = csrs.read(CSRegister::sstatus);
+        assert_eq!(read_sstatus, 1 << 63 | 0b10 << 32 | 0b11 << 9 | 1 << 8);
+
+        // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP, (through sstatus, M-fields should be ignored, being WPRI)
+        csrs.write(
+            CSRegister::sstatus,
+            0 << 37 | 0b11 << 34 | 0b01 << 32 | 0b11 << 11 | 0 << 9 | 0 << 7 | 1 << 8,
+        );
+        // setting VS to 0, SD bit becomes 0. Otherwise, only UXL and SPP fields are non-zero.
+        let second_read_sstatus = csrs.read(CSRegister::sstatus);
+        assert_eq!(second_read_sstatus, 0b10 << 32 | 1 << 8);
+        // MBE remained 1, SXL, UXL are constant, MPP remained 0b11, VS is 0 due to the sstatus change, SPP and MPIE remained 1,
+        let read_mstatus = csrs.read(CSRegister::mstatus);
+        assert_eq!(
+            read_mstatus,
+            1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+        );
+
+        assert_eq!(csrs.registers.read(CSRegister::sstatus as usize), 0);
+        assert_eq!(
+            csrs.registers.read(CSRegister::mstatus as usize),
+            1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+        );
+
+        // write to MBE, SXL, UXL, MPP, VS, SPP, MPIE (through sstatus)
+        let old_sstatus = csrs.replace(
+            CSRegister::sstatus,
+            1 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 0 << 7,
+        );
+        assert_eq!(old_sstatus, second_read_sstatus);
+        assert_eq!(csrs.registers.read(CSRegister::sstatus as usize), 0x0);
+        // SXL, UXL should be set to MXL (WARL), SD bit should be 1
+        let read_mstatus = csrs.read(CSRegister::mstatus);
+        assert_eq!(
+            read_mstatus,
+            1 << 63 | 1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 1 << 7
+        );
+        // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
+        let read_sstatus = csrs.read(CSRegister::sstatus);
+        assert_eq!(read_sstatus, 1 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8);
     }
 }

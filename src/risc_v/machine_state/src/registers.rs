@@ -271,13 +271,13 @@ pub mod tests {
     use super::*;
     use crate::backend::{tests::TestBackendFactory, Backend, BackendManagement, Layout};
 
-    pub fn test_backend(factory: &mut impl TestBackendFactory) {
-        test_zero(factory);
-        test_arbitrary_register(factory);
+    pub fn test_backend<F: TestBackendFactory>() {
+        test_zero::<F>();
+        test_arbitrary_register::<F>();
     }
 
-    fn test_zero<F: TestBackendFactory>(factory: &mut F) {
-        let mut backend = factory.make::<XRegistersLayout>();
+    fn test_zero<F: TestBackendFactory>() {
+        let mut backend = F::new::<XRegistersLayout>();
         let mut registers: XRegisters<
             <F::Backend<XRegistersLayout> as BackendManagement>::Manager<'_>,
         > = XRegisters::new_in(backend.allocate(XRegistersLayout::placed().into_location()));
@@ -295,8 +295,8 @@ pub mod tests {
         x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31,
     ];
 
-    fn test_arbitrary_register<F: TestBackendFactory>(factory: &mut F) {
-        let mut backend = factory.make::<XRegistersLayout>();
+    fn test_arbitrary_register<F: TestBackendFactory>() {
+        let mut backend = F::new::<XRegistersLayout>();
         let mut registers: XRegisters<
             <F::Backend<XRegistersLayout> as BackendManagement>::Manager<'_>,
         > = XRegisters::new_in(backend.allocate(XRegistersLayout::placed().into_location()));
