@@ -162,7 +162,7 @@ find . -name '*.old' -exec rm {} \;
 # automatically add the new protocol tag to alcotezt
 
 temp_file=$(mktemp)
-head -n -1 tezt/lib_alcotezt/alcotezt_utils.ml > "$temp_file"
+tac tezt/lib_alcotezt/alcotezt_utils.ml | tail +2 | tac > "$temp_file"
 echo "  | Some \"${version}_${short_hash}\" -> [\"${label}\"]" >> "$temp_file"
 echo "  | Some _ -> assert false" >> "$temp_file"
 mv "$temp_file" tezt/lib_alcotezt/alcotezt_utils.ml
