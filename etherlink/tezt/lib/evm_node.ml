@@ -36,6 +36,9 @@ type mode =
       time_between_blocks : time_between_blocks option;
       sequencer : string;
       genesis_timestamp : Client.timestamp option;
+      max_blueprints_lag : int option;
+      max_blueprints_catchup : int option;
+      catchup_cooldown : int option;
     }
   | Proxy of {devmode : bool}
 
@@ -275,6 +278,9 @@ let run_args evm_node =
           time_between_blocks;
           sequencer;
           genesis_timestamp;
+          max_blueprints_lag;
+          max_blueprints_catchup;
+          catchup_cooldown;
         } ->
         [
           "run";
@@ -292,6 +298,18 @@ let run_args evm_node =
           "--private-rpc-port";
           string_of_int private_rpc_port;
         ]
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-lag"
+            string_of_int
+            max_blueprints_lag
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-catch-up"
+            string_of_int
+            max_blueprints_catchup
+        @ Cli_arg.optional_arg
+            "catch-up-cooldown"
+            string_of_int
+            catchup_cooldown
         @ Cli_arg.optional_arg
             "time-between-blocks"
             (function

@@ -5,9 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type config = {rollup_node_endpoint : Uri.t}
-
-val start : config -> unit tzresult Lwt.t
+val start :
+  rollup_node_endpoint:Uri.t ->
+  max_blueprints_lag:int ->
+  max_blueprints_catchup:int ->
+  catchup_cooldown:int ->
+  Blueprint_store.t ->
+  unit tzresult Lwt.t
 
 val shutdown : unit -> unit Lwt.t
 
@@ -15,3 +19,7 @@ val shutdown : unit -> unit Lwt.t
     forward the chunked blueprint [payload] for level [level] to the
     rollup node. *)
 val publish : Z.t -> [`External of string] list -> unit tzresult Lwt.t
+
+(** [new_l2_head rollup_head] tells the worker that a new L2 head has been
+    published and that the rollup head is now [rollup_head]. *)
+val new_l2_head : Z.t -> unit tzresult Lwt.t

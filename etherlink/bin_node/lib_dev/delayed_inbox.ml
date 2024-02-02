@@ -164,6 +164,22 @@ let include_delayed_transaction delayed_transaction =
   let* _sent = Tx_pool.add_delayed delayed_transaction in
   return_unit
 
+let advertizes_current_number ~rollup_node_endpoint level =
+  let open Lwt_syntax in
+  let* current_number =
+    read_from_rollup_node
+      Durable_storage_path.Block.current_number
+      level
+      rollup_node_endpoint
+  in
+
+  match current_number with
+  | Ok (Some bytes) ->
+      let (Qty current_number) = Ethereum_types.decode_number bytes in
+      let* _ = Blueprints_publisher.new_l2_head current_number in
+      return_unit
+  | _ -> return_unit
+
 let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
   let open Lwt_syntax in
   let open Sc_rollup_block in
@@ -182,6 +198,11 @@ let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
            to make sure the block is final. *)
         let final_level = Int32.(sub level 2l) in
         let state = Worker.state worker in
+        let* () =
+          advertizes_current_number
+            ~rollup_node_endpoint:state.rollup_node_endpoint
+            final_level
+        in
         (* Hashes in the delayed inbox *)
         let* delayed_transaction_hashes =
           fetch_delayed_inbox_hashes ~level:final_level worker
