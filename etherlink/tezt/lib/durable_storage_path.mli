@@ -66,3 +66,6 @@ val delayed_bridge_path : path
 
 (** [flat_fee_path] is the path to the flat fee, charged on every transaction. *)
 val flat_fee_path : path
+
+(** [da_fee_per_byte_path] is the path to the da fee per byte, charged on every transaction. *)
+val da_fee_per_byte_path : path

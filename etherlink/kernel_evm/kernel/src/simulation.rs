@@ -150,9 +150,14 @@ impl Evaluation {
             Err(err) => Ok(EvaluationOutcome::EvaluationError(err)),
             Ok(None) => Ok(EvaluationOutcome::Outcome(None)),
             Ok(Some(outcome)) => {
-                let outcome =
-                    simulation_add_gas_for_fees(outcome, &block_fees, gas_price)
-                        .map_err(Error::Simulation)?;
+                let outcome = simulation_add_gas_for_fees(
+                    outcome,
+                    &block_fees,
+                    gas_price,
+                    &self.data,
+                )
+                .map_err(Error::Simulation)?;
+
                 Ok(EvaluationOutcome::Outcome(Some(outcome)))
             }
         }

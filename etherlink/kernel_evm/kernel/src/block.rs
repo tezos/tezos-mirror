@@ -394,11 +394,13 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
     const DUMMY_FLAT_FEE: u64 = 0u64;
+    const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
             U256::from(DUMMY_BASE_FEE_PER_GAS),
             U256::from(DUMMY_FLAT_FEE),
+            U256::from(DUMMY_DA_FEE),
         )
     }
 
@@ -411,6 +413,17 @@ mod tests {
         let chain_id = Some(DUMMY_CHAIN_ID);
         let gas_price = U256::from(40000000u64);
         let gas_limit = 21000u64;
+
+        let gas_for_fees = crate::fees::gas_for_fees(
+            DUMMY_FLAT_FEE.into(),
+            DUMMY_DA_FEE.into(),
+            gas_price,
+            &[],
+            &[],
+        )
+        .unwrap();
+        let gas_limit = gas_limit + gas_for_fees;
+
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
         let value = U256::from(500000000u64);
         let data: Vec<u8> = vec![];
@@ -429,6 +442,8 @@ mod tests {
         )
     }
 
+    // When updating the dummy txs, you can use the `resign` function to get the updated
+    // signatures (see bottom of test module)
     fn dummy_eth_caller() -> H160 {
         H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap()
     }
@@ -439,10 +454,10 @@ mod tests {
         let nonce = U256::zero();
         let v = U256::from(37);
         let r = string_to_h256_unsafe(
-            "451d603fc1e73bb8c7afda6d4a0ce635657c812262f8d35aa0400504cec5af03",
+            "4b0afbd9e1d9e8f9eb89dc0c97d9ef94a04ceea1fee1e96d5684bca317d4626b",
         );
         let s = string_to_h256_unsafe(
-            "562c20b430d8d137ef6ce0dc46a21f3ed4f810b7d27394af70684900be1a2e07",
+            "49179e495aba03c815bacfb9e07b3abd69b752160fb85cb95ff1d7deda35bbe8",
         );
         dummy_eth_gen_transaction(nonce, v, r, s)
     }
@@ -451,12 +466,12 @@ mod tests {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
         let nonce = U256::one();
-        let v = U256::from(37);
+        let v = U256::from(38);
         let r = string_to_h256_unsafe(
-            "624ebca1a42237859de4f0f90e4d6a6e8f73ed014656929abfe5664a039d1fc5",
+            "d9642333535b12060e81d94903cf9d73551e69723be1539ba558b06eaf0849cd",
         );
         let s = string_to_h256_unsafe(
-            "4a08c518537102edd0c3c8c2125ef9ca45d32341a5b829a94b2f2f66e4f43eb0",
+            "0c49afec0df5b4fe557624508369e6db825cab6fbebc0920ef6500b9f9aef849",
         );
         dummy_eth_gen_transaction(nonce, v, r, s)
     }
@@ -473,6 +488,16 @@ mod tests {
         let value = U256::zero();
         // corresponding contract is kernel_benchmark/scripts/benchmarks/contracts/storage.sol
         let data: Vec<u8> = hex::decode("608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033").unwrap();
+
+        let gas_for_fees = crate::fees::gas_for_fees(
+            DUMMY_FLAT_FEE.into(),
+            DUMMY_DA_FEE.into(),
+            gas_price,
+            &data,
+            &[],
+        )
+        .unwrap();
+        let gas_limit = gas_limit + gas_for_fees;
 
         let tx = EthereumTransactionCommon::new(
             tezos_ethereum::transaction::TransactionType::Legacy,
@@ -772,6 +797,7 @@ mod tests {
             internal: &mut internal,
         };
         let base_gas = U256::from(21000);
+        let gas_for_fees = U256::from(7479012);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -810,10 +836,10 @@ mod tests {
         let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
             .expect("should have found receipt");
 
-        assert_eq!(receipt0.cumulative_gas_used, base_gas);
+        assert_eq!(receipt0.cumulative_gas_used, base_gas + gas_for_fees);
         assert_eq!(
             receipt1.cumulative_gas_used,
-            receipt0.cumulative_gas_used + base_gas
+            receipt0.cumulative_gas_used + base_gas + gas_for_fees
         );
     }
 
@@ -882,12 +908,16 @@ mod tests {
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
-        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas;
+        let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[]);
+        let rounding_amount = 39000000;
+        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas
+            + da_fee
+            + rounding_amount;
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
 
         assert_eq!(dest_balance, expected_dest_balance);
-        assert_eq!(sender_balance, expected_sender_balance);
+        assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
     #[test]
@@ -1308,16 +1338,27 @@ mod tests {
         to: Option<H160>,
         secret_key: &str,
     ) -> EthereumTransactionCommon {
+        let data = hex::decode(data).unwrap();
+
+        let gas_for_fees = crate::fees::gas_for_fees(
+            DUMMY_FLAT_FEE.into(),
+            DUMMY_DA_FEE.into(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &data,
+            &[],
+        )
+        .unwrap();
+
         let unsigned_tx = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(DUMMY_CHAIN_ID),
             U256::from(nonce),
             U256::from(DUMMY_BASE_FEE_PER_GAS),
             U256::from(DUMMY_BASE_FEE_PER_GAS),
-            gas_limit,
+            gas_limit + gas_for_fees,
             to,
             U256::zero(),
-            hex::decode(data).unwrap(),
+            data,
             vec![],
             None,
         );
@@ -1655,5 +1696,24 @@ mod tests {
             TransactionStatus::Failure,
             "The transaction should have failed"
         )
+    }
+
+    // Comment out `ignore` when resigning the dummy transactions
+    #[test]
+    #[ignore = "Only run when re-signing required"]
+    fn resign() {
+        println!("Dummy eth transactions");
+        // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
+        let private_key =
+            "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158";
+
+        let zero = dummy_eth_transaction_zero();
+        let one = dummy_eth_transaction_one();
+
+        let zero_resigned = zero.sign_transaction(private_key.to_string()).unwrap();
+        let one_resigned = one.sign_transaction(private_key.to_string()).unwrap();
+
+        assert_eq!(zero, zero_resigned);
+        assert_eq!(one, one_resigned);
     }
 }
