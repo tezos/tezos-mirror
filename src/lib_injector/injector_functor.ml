@@ -1342,7 +1342,7 @@ module Make (Parameters : PARAMETERS) = struct
   let rec monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
     let open Lwt_result_syntax in
     let*! res =
-      Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
+      Layer_1.iter_heads ~only_new:true l1_ctxt @@ fun (head_hash, header) ->
       let head = {block_hash = head_hash; level = header.shell.level} in
       let* next_protocol =
         next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)

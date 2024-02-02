@@ -151,8 +151,9 @@ let cache_shell_header {headers_cache; _} hash header =
 
 let client_context {cctxt; _} = cctxt
 
-let iter_heads l1_ctxt f =
-  iter_heads l1_ctxt.l1 @@ fun (hash, {shell = {level; _} as header; _}) ->
+let iter_heads ?only_new l1_ctxt f =
+  iter_heads ?only_new l1_ctxt.l1
+  @@ fun (hash, {shell = {level; _} as header; _}) ->
   cache_shell_header l1_ctxt hash header ;
   f {hash; level; header}
 

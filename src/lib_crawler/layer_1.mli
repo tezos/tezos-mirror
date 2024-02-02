@@ -64,11 +64,12 @@ val create :
     exit. *)
 val shutdown : t -> unit Lwt.t
 
-(** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
+(** [iter_heads ?only_new t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection),
     [iter_heads] terminates and returns the error.  *)
 val iter_heads :
+  ?only_new:bool ->
   t ->
   (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t

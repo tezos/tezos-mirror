@@ -274,9 +274,13 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
   in
   loop init_timeout
 
-let iter_heads l1_ctxt f =
+let iter_heads ?(only_new = false) l1_ctxt f =
   let open Lwt_result_syntax in
   let rec loop {heads; stopper} =
+    let heads = Lwt_stream.clone heads in
+    let*! () =
+      if only_new then Lwt_stream.junk_old heads else Lwt.return_unit
+    in
     let* stopping_reason =
       lwt_stream_iter_with_timeout ~min_timeout:10. ~init_timeout:300. f heads
     in
