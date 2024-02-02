@@ -8,6 +8,7 @@
 type t = {
   data_dir : string;
   context : Irmin_context.rw;
+  index : Irmin_context.rw_index;
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
@@ -66,14 +67,8 @@ let commit (ctxt : t) evm_state =
 
 let sync ctxt =
   let open Lwt_result_syntax in
-  let* index =
-    Irmin_context.load
-      ~cache_size:100_000
-      Read_write
-      (store_path ~data_dir:ctxt.data_dir)
-  in
   let* context, next_blueprint_number, _loaded =
-    load_metadata ~data_dir:ctxt.data_dir index
+    load_metadata ~data_dir:ctxt.data_dir ctxt.index
   in
   return {ctxt with context; next_blueprint_number}
 
@@ -148,6 +143,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
   let* context, next_blueprint_number, loaded = load_metadata ~data_dir index in
   let ctxt =
     {
+      index;
       context;
       data_dir;
       preimages;
