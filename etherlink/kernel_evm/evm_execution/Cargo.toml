@@ -34,6 +34,7 @@ libsecp256k1.workspace = true
 
 evm.workspace = true
 aurora-engine-modexp.workspace = true
+bn.workspace = true
 
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true
