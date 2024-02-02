@@ -149,6 +149,8 @@ let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
+let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
+
 let empty_hash = Hash (Hex "")
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
@@ -963,6 +965,8 @@ module Address = struct
   let to_string = address_to_string
 
   let of_string = address_of_string
+
+  let encoding = address_encoding
 end
 
 module AddressMap = MapMake (Address)
@@ -1140,3 +1144,69 @@ let filter_changes_encoding =
         (function Log f -> Some f | _ -> None)
         (fun f -> Log f);
     ]
+
+module Delayed_transaction = struct
+  type kind = Transaction | Deposit
+
+  type t = {
+    kind : kind;
+    hash : hash;
+    raw : string;
+        (* Binary string, so that it integrates smoothly with the tx-pool. *)
+  }
+
+  let hash t = t.hash
+
+  let encoding_kind =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"transaction"
+          unit
+          (function Transaction -> Some () | _ -> None)
+          (function () -> Transaction);
+        case
+          (Tag 1)
+          ~title:"deposit"
+          unit
+          (function Deposit -> Some () | _ -> None)
+          (function () -> Deposit);
+      ]
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {kind; hash; raw} -> (kind, hash, raw))
+      (fun (kind, hash, raw) -> {kind; hash; raw})
+      (obj3
+         (req "kind" encoding_kind)
+         (req "hash" hash_encoding)
+         (req "raw" string))
+
+  let of_bytes hash bytes =
+    match bytes |> Rlp.decode with
+    | Ok (Rlp.List [Value tag; content]) -> (
+        match (Bytes.to_string tag, content) with
+        | "\x01", Rlp.Value raw_tx ->
+            let hash =
+              raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
+              |> Hex.show |> hash_of_string
+            in
+            Some {kind = Transaction; hash; raw = Bytes.to_string raw_tx}
+        | "\x02", deposit ->
+            let raw = Rlp.encode deposit |> Bytes.to_string in
+            Some {kind = Deposit; hash; raw}
+        | _ -> None)
+    | _ -> None
+
+  let pp_kind fmt = function
+    | Transaction -> Format.pp_print_string fmt "Transaction"
+    | Deposit -> Format.pp_print_string fmt "Deposit"
+
+  let pp fmt {raw; kind; _} =
+    Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
+
+  let pp_short fmt {hash = Hash (Hex h); _} = Format.pp_print_string fmt h
+end

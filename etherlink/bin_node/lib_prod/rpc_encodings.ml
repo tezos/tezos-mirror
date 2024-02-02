@@ -626,15 +626,29 @@ module Get_logs = struct
 end
 
 module Produce_block = struct
-  type input = unit
+  type input = Time.Protocol.t
 
   type output = Ethereum_types.quantity
 
-  let input_encoding = Data_encoding.unit
+  let input_encoding = Time.Protocol.encoding
 
   let output_encoding = Ethereum_types.quantity_encoding
 
   let method_ = "produceBlock"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Inject_upgrade = struct
+  type input = string
+
+  type output = unit
+
+  let input_encoding = Data_encoding.(string' Hex)
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "injectUpgrade"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -680,6 +694,7 @@ let supported_methods : (module METHOD) list =
     (module Web3_clientVersion);
     (module Web3_sha3);
     (module Produce_block);
+    (module Inject_upgrade);
   ]
 
 let unsupported_methods : string list =
