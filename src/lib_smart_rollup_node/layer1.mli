@@ -61,6 +61,9 @@ type fetch_block_rpc =
   unit ->
   block tzresult Lwt.t
 
+(** Returns the raw L1 connection to allow for monitoring by others. *)
+val raw_l1_connection : t -> Layer_1.t
+
 (** [start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols cctxt]
     connects to a Tezos node and starts monitoring new heads. One can iterate on
     the heads by calling {!iter_heads} on its result. [reconnection_delay] gives

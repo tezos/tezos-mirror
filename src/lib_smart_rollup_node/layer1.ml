@@ -112,6 +112,8 @@ type nonrec t = {
   prefetch_blocks : int;  (** Number of blocks to prefetch by default. *)
 }
 
+let raw_l1_connection {l1; _} = l1
+
 let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
     ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
   let open Lwt_result_syntax in

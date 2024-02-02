@@ -480,6 +480,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       unless (signers = []) @@ fun () ->
       Injector.init
         node_ctxt.cctxt
+        (Layer1.raw_l1_connection node_ctxt.l1_ctxt)
         {
           cctxt = (node_ctxt.cctxt :> Client_context.full);
           fee_parameters = configuration.fee_parameters;
