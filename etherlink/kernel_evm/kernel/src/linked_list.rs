@@ -618,7 +618,8 @@ mod tests {
     fn test_delete() {
         let mut host = MockHost::default();
         let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut list: LinkedList<Hash, u8> =
+            LinkedList::new(&path, &host).expect("list should be created");
         let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
         let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
         list.push(&mut host, &id_1, &0x32_u8)
