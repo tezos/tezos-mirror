@@ -17,6 +17,8 @@ We first cover the operation of the rollup node and the corresponding workflow,
 using some predefined rollup logic (called kernel), and then we explain how the
 logic of a rollup can be defined by developing a custom rollup kernel.
 
+.. _smart_rollup_node_prerequisites:
+
 Prerequisites
 -------------
 
