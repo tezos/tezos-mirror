@@ -35,10 +35,6 @@ Node
 - Introduced a new ``--local-rpc-addr`` that starts the RPC server
   locally, not using the dedicated RPC-process.
 
-- Added ``--max-active-rpc-connections <NUM>`` that limits the number
-  of active RPC connections per server to the provided argument. The
-  default limit is set to 100.
-
 Client
 ------
 
@@ -93,18 +89,15 @@ Smart Rollup node
 - Introduced a new command ``generate openapi``, to generate the OpenAPI JSON
   specification and output it to stdout. (MR :gl:`!10118`)
 
-- Register in ``octez-codec`` some of the protocol smart rollup
+- Registered in ``octez-codec`` some of the protocol smart rollup
   related encodings. (MRs :gl:`!10174`, :gl:`!11200`)
 
-- Fix a critical bug that could lead to data loss when chain
-  reorganizations happen while a GC is running. (MR :gl:`!11358`)
+- Added Snapshot inspection command. (MR :gl:`!11456`)
 
-- Snapshot inspection command. (MR :gl:`!11456`)
-
-- Snapshot export options. (MRs :gl:`!10812`, :gl:`!11078`, :gl:`!11256`,
+- Added Snapshot export options. (MRs :gl:`!10812`, :gl:`!11078`, :gl:`!11256`,
   :gl:`!11454`)
 
-- Snapshot import. (MR :gl:`!10803`)
+- Added Snapshot import. (MR :gl:`!10803`)
 
 - Pre-images endpoint (configurable on the CLI of the config file) to allow the
   rollup node to fetch missing pre-images from a remote server. (MR
@@ -112,8 +105,6 @@ Smart Rollup node
 
 - Higher gas limit for publish commitment operations to avoid their failing due
   to gas variations. (MR :gl:`!11761`)
-
-- Fix issue with constants fetching during protocol migration. (MR :gl:`!11804`)
 
 Smart Rollup WASM Debugger
 --------------------------

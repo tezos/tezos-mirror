@@ -92,5 +92,6 @@ It is now also possible to download experimental Debian and Redhat packages on t
 Changelog
 ---------
 
+- `Version 19.1 <../CHANGES.html#version-19-1>`_
 - `Version 19.0 <../CHANGES.html#version-19-0>`_
 - `Version 19.0~rc1 <../CHANGES.html#version-19-0-rc1>`_
