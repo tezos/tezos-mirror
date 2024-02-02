@@ -1,9 +1,5 @@
-The economic protocol
-=====================
-
-The economic protocol provides the rules for checking the validity of the blocks and operations, and for updating the blockchain state accordingly, by applying new valid blocks and operations on the current blockchain state. These rules can be changed through voting.
-Thus, the
-economic protocol represents the amendable part of Tezos.
+Economic protocol features
+==========================
 
 This page groups the documentation helping developers and users in
 understanding the basic concepts of the economic protocol
