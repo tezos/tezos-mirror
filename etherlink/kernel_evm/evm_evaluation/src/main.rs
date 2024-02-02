@@ -344,6 +344,17 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "storageCosts.json"
         | "transactionCosts.json"
         | "variedContext.json"
+
+        // Reason: those test the refund mechanism
+        // see https://gitlab.com/tezos/tezos/-/merge_requests/11835
+        | "refund_getEtherBack.json"
+        | "refund50_2.json"
+        | "refundSSTORE.json"
+        | "refund50_1.json"
+        | "refund_NoOOG_1.json"
+        | "refund_CallA.json"
+        | "refund50percentCap.json"
+        | "refund600.json"
     )
 }
 
