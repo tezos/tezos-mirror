@@ -86,6 +86,8 @@ Smart Rollup Node
 
 The smart rollup node exposes different RPCs depending on the underlying L1
 protocol in use. Their specification is given in the sections below.
+(The exact versions of the rollup node for which these files are produced can be
+seen in the field ``.info.version`` within each file.)
 
 Nairobi RPCs
 ------------
@@ -95,19 +97,15 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Nairobi
 
 - `nairobi-smart-rollup-node-openapi.json (version from master branch)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-smart-rollup-node-openapi.json>`_
-  (The exact version of the rollup node for which this file is produced can be
-  seen in the field ``.info.version`` of the file.)
 
 Oxford RPCs
 -----------
 
-The OpenAPI specifications for the RPCs of the smart rollup node for the Nairobi
+The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
 (``Proxford``) protocol can be found at:
 
-- `oxford-smart-rollup-node-openapi.json (version from master branch)
+- `oxford-smart-rollup-node-openapi.json (version 19.0)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
-  (The exact version of the rollup node for which this file is produced can be
-  seen in the field ``.info.version`` of the file.)
 
 .. _openapi_generate:
 
