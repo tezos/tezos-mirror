@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023-2024 Marigold <contact@marigold.dev>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -16,6 +16,8 @@
 
 open Protocol
 open Alpha_context
+
+type constructor = Pair | Ticket
 
 let originate_contract ~code ~storage originator block =
   let open Lwt_result_syntax in
@@ -97,7 +99,7 @@ code
                      resulting in an updated balance in the ticket table.
        - If disabled: The transfer attempt should fail,
                       triggering a [Bad_contract_parameter] error. *)
-let test_spending ~direct_ticket_spending_enable () =
+let test_spending ~direct_ticket_spending_enable ~constructor () =
   let open Lwt_result_syntax in
   let constants =
     let default_constants =
@@ -145,7 +147,11 @@ let test_spending ~direct_ticket_spending_enable () =
       (Destination.Contract implicit)
       block
   in
-  let arg = sf "Pair %S Unit 1" boomerang_str in
+  let arg =
+    match constructor with
+    | Pair -> sf "Pair %S Unit 1" boomerang_str
+    | Ticket -> sf "Ticket %S unit Unit 1" boomerang_str
+  in
   if direct_ticket_spending_enable then
     let* block = call_contract ~source:implicit ~contract:consumer ~arg block in
     assert_ticket_balance
@@ -163,13 +169,25 @@ let test_spending ~direct_ticket_spending_enable () =
 let tests =
   [
     Tztest.tztest
-      "Test ticket spending from implicit accounts (feature enabled)"
+      "Test ticket spending from implicit accounts (feature enabled) with Pair \
+       ticket constructor"
       `Quick
-      (test_spending ~direct_ticket_spending_enable:true);
+      (test_spending ~direct_ticket_spending_enable:true ~constructor:Pair);
     Tztest.tztest
-      "Test ticket spending from implicit accounts (feature disabled)"
+      "Test ticket spending from implicit accounts (feature disabled) with \
+       Pair ticket constructor"
       `Quick
-      (test_spending ~direct_ticket_spending_enable:false);
+      (test_spending ~direct_ticket_spending_enable:false ~constructor:Pair);
+    Tztest.tztest
+      "Test ticket spending from implicit accounts (feature enabled) with \
+       Ticket constructor"
+      `Quick
+      (test_spending ~direct_ticket_spending_enable:true ~constructor:Ticket);
+    Tztest.tztest
+      "Test ticket spending from implicit accounts (feature disabled) with \
+       Ticket constructor"
+      `Quick
+      (test_spending ~direct_ticket_spending_enable:false ~constructor:Ticket);
   ]
 
 let () =

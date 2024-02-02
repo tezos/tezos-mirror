@@ -6,6 +6,7 @@
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
 (* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -2331,10 +2332,48 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Tickets *)
   | Ticket_t (t, _ty_name), expr ->
+      (* This local function handles the case of parsing the `Ticket` data constructor. *)
+      let parse_ticket loc ticketer contents_type contents amount =
+        (* Ensure that the content type provided in the ticket constructor
+           matches the ticket type expected by the entrypoint. *)
+        let*? Ex_ty expected, ctxt =
+          parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy contents_type
+        in
+        let*? eq, ctxt =
+          Gas_monad.run ctxt
+          @@
+          let error_details = Informative loc in
+          ty_eq ~error_details t expected
+        in
+        let*? Eq = eq in
+        let* {destination; entrypoint = _}, ctxt =
+          non_terminal_recursion ctxt address_t ticketer
+        in
+        let* contents, ctxt = non_terminal_recursion ctxt t contents in
+        let+ amount, ctxt = non_terminal_recursion ctxt nat_t amount in
+        ((destination, contents, amount), ctxt)
+      in
       if allow_forged then
-        let*? ty = opened_ticket_type (location expr) t in
-        let* ({destination; entrypoint = _}, (contents, amount)), ctxt =
-          non_terminal_recursion ctxt ty expr
+        let* (destination, contents, amount), ctxt =
+          match expr with
+          | Prim
+              ( loc,
+                D_Ticket,
+                [ticketer; contents_type; contents; amount],
+                _annot ) ->
+              parse_ticket loc ticketer contents_type contents amount
+          | Prim (_, D_Pair, _, _) ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6833
+
+                 In the future, this [D_Pair] constructor must
+                 be allowed only when the legacy flag is set to true. *)
+              let*? ty = opened_ticket_type (location expr) t in
+              let+ ({destination; entrypoint = _}, (contents, amount)), ctxt =
+                non_terminal_recursion ctxt ty expr
+              in
+              ((destination, contents, amount), ctxt)
+          | _ ->
+              tzfail @@ unexpected expr [] Constant_namespace [D_Ticket; D_Pair]
         in
         match Ticket_amount.of_n amount with
         | Some amount -> (
