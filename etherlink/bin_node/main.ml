@@ -835,12 +835,6 @@ let observer_command =
       ()
   in
   let* () = Configuration.save_observer ~force:true ~data_dir config in
-  let* server =
-    observer_start
-      config
-      ~directory:Tezos_rpc_http_server.RPC_server.Directory.empty
-  in
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
 
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
@@ -856,6 +850,22 @@ let observer_command =
            smart_rollup_address)
       ()
   in
+
+  let observer_backend =
+    (module Observer.Make (struct
+      let ctxt = ctxt
+    end) : Services_backend_sig.S)
+  in
+
+  let* directory =
+    dev_directory config (observer_backend, smart_rollup_address)
+  in
+  let directory = directory |> Evm_services.register ctxt in
+
+  let* server = observer_start config ~directory in
+
+  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
+
   Observer.main ctxt ~evm_node_endpoint
 
 let make_prod_messages ~smart_rollup_address s =
