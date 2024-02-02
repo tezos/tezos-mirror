@@ -91,7 +91,7 @@ let execute_and_inspect ~config
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
-type error += Cannot_apply_blueprint
+type apply_result = Apply_success of t * block_height | Apply_failure
 
 let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
@@ -104,5 +104,5 @@ let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
   let* evm_state = execute ~config evm_state exec_inputs in
   let*! (Block_height after_height) = current_block_height evm_state in
   if Z.(equal (succ before_height) after_height) then
-    return (evm_state, Block_height after_height)
-  else tzfail Cannot_apply_blueprint
+    return (Apply_success (evm_state, Block_height after_height))
+  else return Apply_failure

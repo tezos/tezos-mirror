@@ -35,10 +35,15 @@ val execute_and_inspect :
     produced by the kernel. *)
 val current_block_height : t -> Ethereum_types.block_height Lwt.t
 
-type error += Cannot_apply_blueprint
+type apply_result =
+  | Apply_success of t * Ethereum_types.block_height
+  | Apply_failure
 
+(** [apply_blueprint ~config state payload] applies the blueprint [payload] on
+    top of [evm_state]. If the payload produces a block, the new updated EVM
+    state is returned along with the new block’s height. *)
 val apply_blueprint :
   config:Config.config ->
   t ->
   Blueprint_types.payload ->
-  (t * Ethereum_types.block_height) tzresult Lwt.t
+  apply_result tzresult Lwt.t
