@@ -157,7 +157,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
     #[inline(always)]
     fn read(&self, index: usize) -> E {
         // Make sure the access is within bounds.
-        debug_assert!(index * mem::size_of::<E>() <= LEN - mem::size_of::<E>());
+        debug_assert!(index < LEN);
 
         // The backing storage needs to be aligend properly for the resulting memory access to be
         // properly aligned as well.
@@ -171,7 +171,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
     #[inline(always)]
     fn write(&mut self, index: usize, mut value: E) {
         // Make sure the access is within bounds.
-        debug_assert!(index * mem::size_of::<E>() <= LEN - mem::size_of::<E>());
+        debug_assert!(index < LEN);
 
         // The backing storage needs to be aligend properly for the resulting memory access to be
         // properly aligned as well.
