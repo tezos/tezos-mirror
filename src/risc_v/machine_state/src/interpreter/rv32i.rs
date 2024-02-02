@@ -36,6 +36,13 @@ impl<M> HartState<M>
 where
     M: backend::Manager,
 {
+    /// `AUIPC` U-type instruction
+    pub fn run_auipc(&mut self, imm: i64, rd: XRegister) {
+        // U-type immediates have bits [31:12] set and the lower 12 bits zeroed.
+        let rval = self.pc.read().wrapping_add(imm as u64);
+        self.xregisters.write(rd, rval);
+    }
+
     /// Generic `JALR` w.r.t instruction width
     fn run_jalr_impl<const INSTR_WIDTH: u64>(
         &mut self,
