@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022-2024 Marigold <contact@marigold.dev>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,8 +31,6 @@
    Subject:      Regression tests for tickets
 *)
 
-open Tezos_protocol_alpha.Protocol
-
 let hooks = Tezos_regression.hooks
 
 let setup_node protocol ~direct_ticket_spending_enable =
@@ -51,17 +49,11 @@ let setup_node protocol ~direct_ticket_spending_enable =
   return (node, client)
 
 (* Return micheline encoding of ticket. *)
-let encode_ticket ~ticketer ~content ~amount =
-  let ticketer_contract =
-    Result.get_ok (Alpha_context.Contract.of_b58check ticketer)
-  in
-  let ticketer_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Contract.encoding
-      ticketer_contract
-  in
-  let encoded_ticketer = Hex.show (Hex.of_bytes ticketer_bytes) in
-  sf {|Pair 0x%s (Pair %S %d)|} encoded_ticketer content amount
+let encode_pair_ticket ~ticketer ~content ~amount =
+  sf {|Pair %S (Pair %S %d)|} ticketer content amount
+
+let encode_string_ticket ~ticketer ~content ~amount =
+  sf {|Ticket %S string %S %d|} ticketer content amount
 
 let test_create_and_remove_tickets =
   Protocol.register_regression_test
@@ -243,13 +235,8 @@ let test_send_tickets_to_implicit_account =
 
 (* Tests that an implicit account can send a single ticket to originated
    using the [Transfer] manager operation. *)
-let test_direct_transfer_tickets_from_implicit_account_to_originated =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~title:"Send tickets from implicit account to originated directly"
-    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 19)
-  @@ fun protocol ->
+let test_direct_transfer_tickets_from_implicit_account_to_originated
+    ~encode_ticket protocol =
   let* _node, client =
     setup_node protocol ~direct_ticket_spending_enable:true
   in
@@ -330,19 +317,38 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated =
   in
   unit
 
+let test_direct_transfer_tickets_from_implicit_account_to_originated_with_pair_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Send Pair tickets from implicit account to originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated
+    protocol
+    ~encode_ticket:encode_pair_ticket
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_with_ticket_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send tickets with Ticket constructor from implicit account to \
+       originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated
+    protocol
+    ~encode_ticket:encode_string_ticket
+
 (* Tests that an implicit account can send a tickets to originated
    using the [Transfer] manager operation. The parameter of the
    transfer is made complex to check that the [Transfer] properly
    scans the parameter and transfers all included tickets. *)
-let test_direct_transfer_tickets_from_implicit_account_to_originated_complex =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~title:
-      "Send tickets from implicit account to originated directly (with complex \
-       parameters)"
-    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 19)
-  @@ fun protocol ->
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    ~encode_ticket protocol =
   let* _node, client =
     setup_node protocol ~direct_ticket_spending_enable:true
   in
@@ -479,6 +485,34 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated_complex =
       client
   in
   unit
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_ticket_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send tickets with Ticket constructor (with complex parameters) from \
+       implicit account to originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    protocol
+    ~encode_ticket:encode_pair_ticket
+
+let test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_pair_constructor
+    =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Send Pair tickets (with complex parameters) from implicit account to \
+       originated directly"
+    ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
+    ~supports:(Protocol.From_protocol 19)
+  @@ fun protocol ->
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+    protocol
+    ~encode_ticket:encode_string_ticket
 
 (* This test originates one contract which mints and sends tickets to the address
    passed in the parameter. In this test, the receiver of the ticket is an
@@ -1327,6 +1361,11 @@ let register ~protocols =
   test_originated_implicit_can_be_equipotent protocols ;
   test_send_tickets_to_sc_rollup protocols ;
   test_send_tickets_from_storage_to_sc_rollup protocols ;
-  test_direct_transfer_tickets_from_implicit_account_to_originated protocols ;
-  test_direct_transfer_tickets_from_implicit_account_to_originated_complex
+  test_direct_transfer_tickets_from_implicit_account_to_originated_with_pair_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_with_ticket_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_pair_constructor
+    protocols ;
+  test_direct_transfer_tickets_from_implicit_account_to_originated_complex_with_ticket_constructor
     protocols

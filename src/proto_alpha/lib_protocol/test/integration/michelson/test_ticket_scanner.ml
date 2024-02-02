@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -285,7 +286,9 @@ let test_tickets_in_unit_ticket () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = new_ctxt () in
   let type_exp = "ticket(unit)" in
-  let value_exp = {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" Unit 10|} in
+  let value_exp =
+    {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" unit Unit 10|}
+  in
   let* ex_ticket, ctxt =
     make_ex_ticket
       ctxt
@@ -317,10 +320,10 @@ let test_tickets_in_list_with_zero_amount () =
     ~value_exp:
       {|
         {
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1;
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2;
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3;
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "orange" 0;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 3;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "orange" 0;
         }
       |}
 
@@ -333,9 +336,9 @@ let test_tickets_in_list () =
     ~value_exp:
       {|
         {
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1;
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2;
-          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2;
+          Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 3;
         }
       |}
     ~expected:
@@ -353,9 +356,9 @@ let test_tickets_in_pair_with_zero_amount () =
     ~value_exp:
       {|
         Pair
-          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1)
-          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2)
-          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 0)
+          (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1)
+          (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2)
+          (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 0)
       |}
 
 (** Test that all tickets can be extracted from a pair of tickets *)
@@ -367,8 +370,8 @@ let test_tickets_in_pair () =
     ~value_exp:
       {|
         Pair
-          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1)
-          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2)
+          (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1)
+          (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2)
       |}
     ~expected:
       [
@@ -384,9 +387,9 @@ let test_tickets_in_map_with_zero_amount () =
     ~value_exp:
       {|
         {
-          Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
-          Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
-          Elt 3 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 0);
+          Elt 1 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1);
+          Elt 2 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2);
+          Elt 3 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 0);
         }
     |}
 
@@ -399,8 +402,8 @@ let test_tickets_in_map () =
     ~value_exp:
       {|
         {
-          Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
-          Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
+          Elt 1 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1);
+          Elt 2 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2);
         }
     |}
     ~expected:
@@ -424,8 +427,8 @@ let test_tickets_in_big_map () =
     ~value_exp:
       {|
         {
-          Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
-          Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
+          Elt 1 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1);
+          Elt 2 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2);
         }
       |}
 
@@ -439,9 +442,9 @@ let test_tickets_in_big_map_strict_only () =
     ~value_exp:
       {|
         {
-          Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
-          Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
-          Elt 3 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3);
+          Elt 1 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1);
+          Elt 2 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 2);
+          Elt 3 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 3);
         }
       |}
     ~expected:[]
@@ -462,12 +465,12 @@ let test_tickets_in_list_in_big_map () =
       {|
         {
           Elt 1 {
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 ;
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1;
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 1
           };
           Elt 2 {
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1 ;
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "orange" 1
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 1;
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "orange" 1
           }
         }
       |}
@@ -483,12 +486,12 @@ let test_tickets_in_pair_big_map_and_list_strict_only () =
       {|
         Pair
           {
-            Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
-            Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1)
+            Elt 1 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1);
+            Elt 2 (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 1)
           }
           {
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1;
-            Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "orange" 1
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 1;
+            Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "orange" 1
           }
       |}
     ~expected:
@@ -503,7 +506,8 @@ let test_tickets_in_or_left () =
     ~loc:__LOC__
     ~include_lazy:false
     ~type_exp:"or (ticket string) int"
-    ~value_exp:{| Left (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1) |}
+    ~value_exp:
+      {| Left (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1) |}
     ~expected:[("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1)]
 
 (** Test that tickets from the left side of an or-expression with zero amount
@@ -513,7 +517,8 @@ let test_tickets_in_or_left_with_zero_amount () =
     ~loc:__LOC__
     ~include_lazy:false
     ~type_exp:"or (ticket string) int"
-    ~value_exp:{| Left (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 0) |}
+    ~value_exp:
+      {| Left (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 0) |}
 
 (** Test that tickets can be extracted from the right side of an or-expression. *)
 let test_tickets_in_or_right () =
@@ -521,7 +526,8 @@ let test_tickets_in_or_right () =
     ~loc:__LOC__
     ~include_lazy:false
     ~type_exp:"or int (ticket string)"
-    ~value_exp:{| Right (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1) |}
+    ~value_exp:
+      {| Right (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1) |}
     ~expected:[("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1)]
 
 (*
@@ -549,9 +555,9 @@ let test_tickets_in_non_empty_big_map_ref () =
     ~loc:__LOC__
     ~pre_populated:
       [
-        (1, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1|});
-        (2, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
-        (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1|});
+        (1, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1|});
+        (2, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 1|});
+        (3, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 1|});
       ]
     ~big_map_exp:(Printf.sprintf "%s")
     [
@@ -573,7 +579,7 @@ let test_tickets_overlay_in_empty_big_map_ref () =
     ~pre_populated:[]
     ~big_map_exp:
       (Printf.sprintf
-         {|Pair %s { Elt 1 (Some (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1))}|})
+         {|Pair %s { Elt 1 (Some (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1))}|})
 
 (** Test tickets from non-empty big-map when passed as a pair of identifier
     and overrides. The scanned tickets are contained in the context as well as
@@ -588,15 +594,15 @@ let test_tickets_overlay_in_non_empty_in_big_map_ref () =
     ~loc:__LOC__
     ~pre_populated:
       [
-        (1, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1|});
-        (2, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
-        (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1|});
+        (1, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1|});
+        (2, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 1|});
+        (3, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "blue" 1|});
       ]
     ~big_map_exp:
       (Printf.sprintf
          {| Pair
             %s
-            { Elt 4 (Some (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "orange" 1))}
+            { Elt 4 (Some (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "orange" 1))}
        |})
 
 (** Test tickets from non-empty big-map when passed as a pair of identifier
@@ -610,12 +616,12 @@ let test_tickets_replace_overlay_in_non_empty_in_big_map_ref () =
   assert_fail_non_empty_overlay_with_big_map_ref
     ~loc:__LOC__
     ~pre_populated:
-      [(1, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1|})]
+      [(1, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1|})]
     ~big_map_exp:
       (Printf.sprintf
          {| Pair
             %s
-            { Elt 1 (Some (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1))}
+            { Elt 1 (Some (Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "green" 1))}
        |})
 
 (** Test tickets from non-empty big-map when passed as a pair of identifier
@@ -629,7 +635,7 @@ let test_tickets_remove_overlay_in_non_empty_in_big_map_ref () =
   assert_fail_non_empty_overlay_with_big_map_ref
     ~loc:__LOC__
     ~pre_populated:
-      [(1, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1|})]
+      [(1, {|Ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" string "red" 1|})]
     ~big_map_exp:(Printf.sprintf {| Pair %s { Elt 1 None} |})
 
 let tests =
