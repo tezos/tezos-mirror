@@ -835,7 +835,7 @@ let observer_command =
            preimages )
              evm_node_endpoint
              () ->
-  ignore kernel ;
+  let open Evm_node_lib_dev in
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   let* config =
@@ -859,23 +859,21 @@ let observer_command =
   in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
 
-  (* TODO: Should be resilient to errors from the EVM node endpoint *)
-  let*! blueprints_stream =
-    Evm_node_lib_dev.Evm_services.monitor_blueprints
-      ~evm_node_endpoint
-      (Qty Z.zero)
+  let* smart_rollup_address =
+    Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
-  let*! () =
-    Lwt_stream.iter_s
-      (fun blueprint ->
-        let open Lwt_syntax in
-        let* res = Evm_node_lib_dev.Observer.on_new_blueprint blueprint in
-        match res with
-        | Ok () -> return_unit
-        | Error _ -> Stdlib.failwith "Something went wrong with the stream")
-      blueprints_stream
+
+  let* ctxt =
+    Evm_context.init
+      ~data_dir
+      ?kernel_path:kernel
+      ~preimages:config.mode.preimages
+      ~smart_rollup_address:
+        (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+           smart_rollup_address)
+      ()
   in
-  return_unit
+  Observer.main ctxt ~evm_node_endpoint
 
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
