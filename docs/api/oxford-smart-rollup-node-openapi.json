@@ -3,7 +3,7 @@
     { "title": "Smart Rollup Node RPCs",
       "description":
         "Smart Rollup Node RPC API for protocol ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH",
-      "version": "19.0 (10b119feab)" },
+      "version": "19.1 (dd3a30f891)" },
   "paths":
     { "/describe":
         { "get":
