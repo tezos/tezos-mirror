@@ -49,14 +49,20 @@ fn fetch_timed_out_transactions<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let timeout = crate::storage::delayed_inbox_timeout(host)?;
     let timestamp = current_timestamp(host);
+    let current_level = crate::storage::read_l1_level(host)?;
+    let min_levels = crate::storage::delayed_inbox_min_levels(host)?;
     // Number for the first forced blueprint
     let base = crate::blueprint_storage::read_next_blueprint_number(host)?;
     // Accumulator of how many blueprints we fetched
     let mut offset: u32 = 0;
 
-    while let Some(timed_out) =
-        delayed_inbox.next_delayed_inbox_blueprint(host, timestamp, timeout)?
-    {
+    while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(
+        host,
+        timestamp,
+        timeout,
+        current_level,
+        min_levels,
+    )? {
         log!(
             host,
             Info,
