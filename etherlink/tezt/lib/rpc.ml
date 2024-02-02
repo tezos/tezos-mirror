@@ -119,3 +119,18 @@ let get_transaction_receipt ~tx_hash evm_node =
          |> JSON.as_opt
          |> Option.map Transaction.transaction_receipt_of_json)
        response
+
+let estimate_gas eth_call evm_node =
+  let* response =
+    Evm_node.(
+      call_evm_rpc
+        evm_node
+        {
+          method_ = "eth_estimateGas";
+          parameters = `A [`O eth_call; `String "latest"];
+        })
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_int)
+       response

@@ -1704,17 +1704,8 @@ let test_inject_100_transactions =
 
 let check_estimate_gas {evm_node; _} eth_call expected_gas =
   (* Make the call to the EVM node. *)
-  let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        evm_node
-        {
-          method_ = "eth_estimateGas";
-          parameters = `A [`O eth_call; `String "latest"];
-        })
-  in
+  let*@ r = Rpc.estimate_gas eth_call evm_node in
   (* Check the RPC result. *)
-  let r = call_result |> Evm_node.extract_result |> JSON.as_int in
   Check.((r >= expected_gas) int)
     ~error_msg:"Expected result greater than %R, but got %L" ;
   unit
