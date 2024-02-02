@@ -3,10 +3,8 @@ include: .gitlab/ci/jobs/build/common.yml
 # See comments in oc.build:static-x86_64-linux-binaries-experimental.yml.
 oc.build:static-arm64-linux-binaries:
   extends:
-    - .oc.build_static_binaries_template
-    - .tags_template__build_arm64
+    - .oc.build:static-arm64-linux-binaries
   variables:
-    ARCH: "arm64"
     EXECUTABLE_FILES: "script-inputs/released-executables"
   # Extend the lifespan to prevent failure for external tools using artifacts.
   artifacts:

@@ -87,3 +87,21 @@
     - .needs__trigger
   variables:
     ARCH: "x86_64"
+
+.oc.build:static-x86_64-linux-binaries:
+  extends:
+    - .tags_template__build
+    - .oc.build_static_binaries_template
+  # Even though not many tests depend on static executables, some of those that do
+  # are limiting factors in the total duration of pipelines.
+  # So we start this job as early as possible, without waiting for sanity_ci.
+    - .needs__trigger
+  variables:
+    ARCH: "x86_64"
+
+.oc.build:static-arm64-linux-binaries:
+  extends:
+    - .oc.build_static_binaries_template
+    - .tags_template__build_arm64
+  variables:
+    ARCH: "arm64"

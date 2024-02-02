@@ -6,3 +6,5 @@ oc.build:static-arm64-linux-binaries:
     - .oc.build:static-arm64-linux-binaries
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+  rules:
+    - when: always
