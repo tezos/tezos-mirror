@@ -99,7 +99,7 @@
 .rules__octez_docker_changes_or_master:
   rules:
       - if: '$CI_COMMIT_BRANCH == "master"'
-        when: on_success
+        when: always
       - changes:
           - scripts/**/*
           - script-inputs/**/*

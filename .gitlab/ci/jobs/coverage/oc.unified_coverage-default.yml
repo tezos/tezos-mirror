@@ -26,3 +26,4 @@ oc.unified_coverage:
   # This job will fail if coverage is not found, but that is not
   # reason to stop the pipeline.
   allow_failure: true
+  when: always
