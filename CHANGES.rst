@@ -109,6 +109,8 @@ Smart Rollup node
 - Pre-images endpoint (configurable on the CLI of the config file) to allow the rollup
   node to fetch missing pre-images from a remote server. (MR :gl:`!11600`)
 
+- Fix issue with constants fetching during protocol migration. (MR :gl:`!11804`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
