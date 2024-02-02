@@ -2164,10 +2164,10 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0")
-    ?(from_ghostnet = false) ?evm_setup ?rollup_address ?(should_fail = false)
-    ~installee ?with_administrator ?expect_l1_failure
-    ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
+let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0") ?evm_setup
+    ?rollup_address ?(should_fail = false) ~installee ?with_administrator
+    ?expect_l1_failure ?(admin = Constant.bootstrap1) ?(upgrador = admin)
+    protocol =
   let* {
          node;
          client;
@@ -2199,8 +2199,7 @@ let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0")
     let* {root_hash; _} =
       Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
     in
-    if from_ghostnet then return root_hash
-    else Evm_node.upgrade_payload ~root_hash ~activation_timestamp
+    Evm_node.upgrade_payload ~root_hash ~activation_timestamp
   in
   let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
@@ -2550,7 +2549,6 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   (* Upgrade the kernel. *)
   let* _ =
     gen_test_kernel_upgrade
-      ~from_ghostnet:true
       ~evm_setup
       ~installee:Constant.WASM.evm_kernel
       ~admin
