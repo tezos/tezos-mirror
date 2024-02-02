@@ -291,6 +291,10 @@ module History : sig
       should be provided, as they are not needed to construct a non-confirmation
       proof.
 
+      The function returns an error in case the slot is not confirmed but the
+      page's content and proof are given. It also fails if the slot is confirmed
+      but no or bad information about the page are provided.
+
       [dal_parameters] is used when verifying that/if the page is part of
       the candidate slot (if any).
   *)
