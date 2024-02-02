@@ -421,13 +421,6 @@ let verbose_arg =
     ~doc:"Sets logging level to debug. Beware, it is highly verbose."
     ()
 
-let super_verbose_arg =
-  Tezos_clic.switch
-    ~short:'v'
-    ~long:"verbose"
-    ~doc:"If verbose is set, the node will display the responses to RPCs."
-    ()
-
 let data_dir_arg =
   let default = Configuration.default_data_dir in
   Tezos_clic.default_arg
@@ -588,7 +581,6 @@ let proxy_command =
           ?cors_origins
           ?cors_headers
           ~rollup_node_endpoint
-          ~verbose
           ()
       in
       let* () = Configuration.save_proxy ~force:true ~data_dir config in
@@ -735,7 +727,6 @@ let sequencer_command =
           ?cors_origins
           ?cors_headers
           ~rollup_node_endpoint
-          ~verbose
           ?preimages
           ?time_between_blocks
           ~sequencer
@@ -840,7 +831,6 @@ let observer_command =
       ?cors_origins
       ?cors_headers
       ~evm_node_endpoint
-      ~verbose
       ?preimages
       ()
   in

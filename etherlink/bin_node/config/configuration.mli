@@ -43,7 +43,6 @@ type 'a t = {
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
-  verbose : bool;
   log_filter : log_filter_config;
   mode : 'a;
 }
@@ -85,7 +84,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     rollup_node_endpoint:Uri.t ->
     unit ->
     proxy t
@@ -98,7 +96,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
@@ -113,7 +110,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     ?evm_node_endpoint:Uri.t ->
     ?preimages:string ->
     unit ->
@@ -127,7 +123,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     rollup_node_endpoint:Uri.t ->
     unit ->
     proxy t tzresult Lwt.t
@@ -141,7 +136,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
@@ -157,7 +151,6 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    verbose:bool ->
     ?evm_node_endpoint:Uri.t ->
     ?preimages:string ->
     unit ->
