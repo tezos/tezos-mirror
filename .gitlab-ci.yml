@@ -105,8 +105,8 @@ variables:
 .image_template__runtime_prebuild_dependencies:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
-.image_template__runtime_client_libs_dependencies:
-  image: ${build_deps_image_name}:runtime-client-libs-dependencies--${build_deps_image_version}
+.image_template__client_libs_dependencies:
+  image: ${build_deps_image_name}:client-libs-dependencies--${build_deps_image_version}
 
 .image_template__rust_toolchain:
   image: ${rust_toolchain_image_name}:${CI_COMMIT_SHA}

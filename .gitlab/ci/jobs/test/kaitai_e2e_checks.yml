@@ -1,7 +1,7 @@
 kaitai_e2e_checks:
   extends:
     - .default_settings_template
-    - .image_template__runtime_client_libs_dependencies
+    - .image_template__client_libs_dependencies
   stage: test
   needs: [kaitai_checks]
   rules:
