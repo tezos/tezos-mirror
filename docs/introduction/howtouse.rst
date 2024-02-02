@@ -145,7 +145,7 @@ Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
 If you wish to run your node on a test network, now is also a good time
-to configure your node (see :ref:`builtin_networks`).
+to configure your node for it (see :doc:`../user/multinetwork`).
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
@@ -215,7 +215,7 @@ Many options of the node can be configured when running the node:
 
 - RPC parameters (e.g. the port number for listening to RPC requests using option ``--rpc-addr``)
 - The directory where the node stores local data (using option ``--data-dir``)
-- Network parameters (e.g. the number of connections to peers, using option ``--connections``)
+- Network parameters (e.g. the network to connect to, using option ``--network``, the number of connections to peers, using option ``--connections``)
 - Validator and mempool parameters
 - :ref:`Logging options <configure_node_logging>`.
 
@@ -327,7 +327,7 @@ Get Free Test Tokens
 ~~~~~~~~~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the system, on
-:doc:`test networks<../global/test_networks>` you can obtain free tokens from
+:ref:`test networks <test_networks>` you can obtain free tokens from
 :ref:`a faucet <faucet>`. Transfer some to Alice's address.
 
 Transfers and Receipts
@@ -445,6 +445,12 @@ included anymore in a block.
 Furthermore each operation has a counter that prevents replays so it is usually safe to re-emit an
 operation that seems lost.
 
+.. _block_explorers:
+
+Block Explorers
+~~~~~~~~~~~~~~~
+
+Once your transaction is included in a block, you can retrieve it in one of the `public block explorers <https://docs.tezos.com/developing/information/block-explorers>`__, which list the whole history of the different Tezos networks (mainnet or test networks).
 
 .. _originated-accounts:
 
@@ -605,7 +611,7 @@ have to resort to RPCs.
 
 For example to check the value of important
 :ref:`constants <protocol_constants>` in Tezos, which may differ between Mainnet and other
-:ref:`test networks<test-networks>`, you can use::
+:ref:`test networks<test_networks>`, you can use::
 
    octez-client rpc get /chains/main/blocks/head/context/constants | jq
    {

@@ -1,21 +1,26 @@
 Octez Software Architecture
 ===========================
 
-This page presents the software architecture of the most important tool in a Tezos network: the Tezos node, implemented in our case as the Octez node executable (``octez-node``).
-The Octez software architecture faithfully implements the :doc:`Tezos software architecture <../global/architecture>` principles.
+This page presents the software architecture of the Octez suite, focusing on the most important tool in a Tezos network: the Tezos node, implemented in our case as the Octez node executable (``octez-node``).
+The Octez node software architecture faithfully implements the `Tezos software architecture <https://docs.tezos.com/architecture>`__ principles:
+
+- It is separated into a shell and a protocol, to support protocol evolution.
+- It implements a client/server architecture, to allow composition with many other tools in a safe way.
 
 This page contains two sections. The first section, which should be
-readable by anyone, describes the main elements of Tezos from a
+readable by anyone, describes the main elements of a Tezos node from a
 distance. It abstracts from all plumbing and both internal and system
 dependencies to give a simple view of the main components, their
 responsibilities, and interactions. The second part is written for
 developers and is at the level of OPAM packages.
 
+Although the description is focused on the Octez node, some of these components are reused to generate other tools in the Octez suite, see :ref:`final_executables`.
+
 .. _the_big_picture:
 
 The Big Picture
 ---------------
-The diagram below shows a very coarse-grained architecture of Tezos.
+The diagram below shows a very coarse-grained architecture of the Tezos node.
 
 |Tezos architecture diagram|
 
@@ -229,7 +234,7 @@ Three kinds of economic protocols are included in the main Octez repository.
     switch to a new protocol chosen by the activator.
     The ``master`` branch contains additional variants of the genesis
     protocol, one for each of the existing :ref:`test
-    networks<test-networks>`.
+    networks<test_networks>`.
   - The active protocols. ``tezos-protocol-nnn-hhhhhhhh``
     (``tezos-embedded-protocol-nnn-hhhhhhhh``) is either the current
     protocol on Mainnet or a protocol that has been active on Mainnet
@@ -306,6 +311,8 @@ run them.
  - :package-api:`tezos-crypto <octez-libs/Tezos_crypto/index.html>`
    (in directory :src:`src/lib_crypto/test/`):
    tests for the in-house merkle trees.
+
+.. _final_executables:
 
 The Final Executables
 ~~~~~~~~~~~~~~~~~~~~~

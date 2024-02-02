@@ -71,7 +71,7 @@ For instance:
 
 We now have the possibility to send transactions to the sandboxed network.
 As the genesis block used to initialize the sandboxed network differs from the
-one used in :ref:`test networks<test-networks>`, it is not possible to activate
+one used in :ref:`test networks<test_networks>`, it is not possible to activate
 accounts obtained from the faucet. However, we can use the
 preconfigured accounts which can be listed with:
 

@@ -16,7 +16,7 @@ Reporting issues
 The simplest way to contribute to Octez is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
-consult the :doc:`technical support sources <../global/support>`
+consult the :ref:`Tezos community <tezos_community>`
 first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
@@ -43,7 +43,7 @@ Alternatively, you may of course create your own MRs for submitting your changes
 Other non-code contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you acquired a good expertise level in using, configuring, or overcoming problems with the various Octez executables, you may bring useful contributions by providing assistance to others via the different channels (Slack,  StackExchange, etc.) listed in the :doc:`technical support page <../global/support>`.
+If you acquired a good expertise level in using, configuring, or overcoming problems with the various Octez executables, you may bring useful contributions by providing assistance to others via the different channels (Slack,  StackExchange, etc.) in the :ref:`Tezos community <tezos_community>`.
 
 If you want to shape the future of Octez, you may consider contributing to Tezos Improvement Proposals (TZIPs), that specify new features or define standards. These are located in the `TZIP repo <https://gitlab.com/tezos/tzip/>`__.
 
@@ -52,7 +52,7 @@ Going further
 
 To directly contribute to the *code* itself, expertise in a few areas is necessary.
 
-First, make sure that you are proficient enough in OCaml. The community
+First, make sure that you are proficient enough in OCaml. The OCaml community
 website https://ocaml.org gives a few useful pointers for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
