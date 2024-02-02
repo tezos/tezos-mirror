@@ -257,10 +257,17 @@ impl InputResult {
         };
 
         let (transaction_tag, remaining) = parsable!(remaining.split_first());
+        // External transactions are only allowed in proxy mode
         match *transaction_tag {
-            SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
-            NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
-            TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
+            SIMPLE_TRANSACTION_TAG if sequencer.is_none() => {
+                Self::parse_simple_transaction(remaining)
+            }
+            NEW_CHUNKED_TRANSACTION_TAG if sequencer.is_none() => {
+                Self::parse_new_chunked_transaction(remaining)
+            }
+            TRANSACTION_CHUNK_TAG if sequencer.is_none() => {
+                Self::parse_transaction_chunk(remaining)
+            }
             SEQUENCER_BLUEPRINT_TAG if sequencer.is_some() => {
                 Self::parse_sequencer_blueprint_input(
                     sequencer.as_ref().unwrap(),

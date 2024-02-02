@@ -111,7 +111,7 @@ let setup_l1_contracts ?(admin = Constant.bootstrap1) client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   return {delayed_transaction_bridge; exchanger; bridge; admin}
 
-let setup_sequencer ?genesis_timestamp ?time_between_blocks
+let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
@@ -124,7 +124,7 @@ let setup_sequencer ?genesis_timestamp ?time_between_blocks
       ~base_dir:(Client.base_dir client)
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let config =
+  let base_config =
     Configuration.make_config
       ~bootstrap_accounts
       ~sequencer:sequencer.public_key
@@ -132,6 +132,15 @@ let setup_sequencer ?genesis_timestamp ?time_between_blocks
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
       ()
+  in
+  let config =
+    match (config, base_config) with
+    | Some (`Config config), Some (`Config base) ->
+        Some (`Config (base @ config))
+    | Some (`Path path), Some (`Config base) -> Some (`Both (base, path))
+    | None, _ -> base_config
+    | Some (`Config config), None -> Some (`Config config)
+    | Some (`Path path), None -> Some (`Path path)
   in
   let* {output; _} =
     prepare_installer_kernel ~preimages_dir ?config Constant.WASM.evm_kernel
@@ -956,6 +965,45 @@ let test_upgrade_kernel_sync =
 
   unit
 
+let test_external_transaction_to_delayed_inbox_fails =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "external"]
+    ~title:"Sending an external transaction to the delayed inbox fails"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {client; node; evm_node; sc_rollup_node; _} =
+    setup_sequencer
+      protocol
+      ~time_between_blocks:Nothing
+      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+  in
+  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. evm_node 0 in
+  (* Bake a couple more levels for the blueprint to be final *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let proxy_mode = Evm_node.Proxy {devmode = true} in
+  let* proxy_evm =
+    Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let raw_tx, _ = read_tx_from_file () |> List.hd in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy_evm in
+  (* Bake enough levels to make sure the transaction would be processed
+     if added *)
+  let* () =
+    repeat 10 (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Response should be none *)
+  let*@ response = Rpc.get_transaction_receipt ~tx_hash proxy_evm in
+  assert (Option.is_none response) ;
+  let*@ response = Rpc.get_transaction_receipt ~tx_hash evm_node in
+  assert (Option.is_none response) ;
+  unit
+
 let () =
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
@@ -970,4 +1018,5 @@ let () =
   test_init_from_rollup_node_data_dir [Alpha] ;
   test_observer_applies_blueprint [Alpha] ;
   test_upgrade_kernel_unsync [Alpha] ;
-  test_upgrade_kernel_sync [Alpha]
+  test_upgrade_kernel_sync [Alpha] ;
+  test_external_transaction_to_delayed_inbox_fails [Alpha]

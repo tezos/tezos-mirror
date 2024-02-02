@@ -22,8 +22,6 @@ open Contract_path
 
 let pvm_kind = "wasm_2_0_0"
 
-let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
-
 type l1_contracts = {
   exchanger : string;
   bridge : string;
@@ -1364,14 +1362,6 @@ let get_tx_object ~endpoint ~tx_hash =
   | Some tx_object -> return tx_object
   | None -> Test.fail "The transaction object of %s should be available" tx_hash
 
-let get_transaction_receipt ~full_evm_setup ~tx_hash =
-  let* json =
-    Evm_node.call_evm_rpc
-      full_evm_setup.evm_node
-      {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
-  in
-  return JSON.(json |-> "result" |> Transaction.transaction_receipt_of_json)
-
 let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
     full_evm_setup =
   let endpoint = Evm_node.endpoint full_evm_setup.evm_node in
@@ -1386,8 +1376,10 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
   assert (sender_nonce = transfer_result.sender_nonce_after) ;
   let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
   assert (tx_object = transfer_result.tx_object) ;
-  let* tx_receipt =
-    get_transaction_receipt ~full_evm_setup ~tx_hash:transfer_result.tx_hash
+  let*@! tx_receipt =
+    Rpc.get_transaction_receipt
+      ~tx_hash:transfer_result.tx_hash
+      full_evm_setup.evm_node
   in
   assert (tx_receipt = transfer_result.tx_receipt) ;
   unit
@@ -1408,7 +1400,9 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
     get_transaction_count full_evm_setup.evm_node sender.address
   in
   let* tx_object = get_tx_object ~endpoint ~tx_hash in
-  let* tx_receipt = get_transaction_receipt ~full_evm_setup ~tx_hash in
+  let*@! tx_receipt =
+    Rpc.get_transaction_receipt ~tx_hash full_evm_setup.evm_node
+  in
   return
     {
       sender_balance_before;
@@ -1564,14 +1558,6 @@ let test_simulate =
           (option int))
         ~error_msg:"The simulation should advance one L2 block" ;
       unit)
-
-let read_tx_from_file () =
-  read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
-  |> String.trim |> String.split_on_char '\n'
-  |> List.map (fun line ->
-         match String.split_on_char ' ' line with
-         | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
-         | _ -> failwith "Unexpected tx_raw and tx_hash.")
 
 let test_full_blocks =
   register_proxy
@@ -2386,23 +2372,6 @@ let test_kernel_upgrade_failing_migration =
     ~endpoint
     ~expected_block_level:3
 
-let send_raw_transaction_request raw_tx =
-  Evm_node.
-    {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
-
-let send_raw_transaction evm_node raw_tx =
-  let* response =
-    Evm_node.call_evm_rpc evm_node (send_raw_transaction_request raw_tx)
-  in
-  let hash = response |> Evm_node.extract_result |> JSON.as_string_opt in
-  let error_message =
-    response |> Evm_node.extract_error_message |> JSON.as_string_opt
-  in
-  match (hash, error_message) with
-  | Some hash, _ -> return (Ok hash)
-  | _, Some error_code -> return (Error error_code)
-  | _ -> failwith "invalid response from eth_sendRawTransaction"
-
 let test_rpc_sendRawTransaction =
   register_both
     ~tags:["evm"; "tx_hash"]
@@ -2412,9 +2381,8 @@ let test_rpc_sendRawTransaction =
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* hashes =
     Lwt_list.map_p
-      (fun (tx_raw, _) ->
-        let* hash = send_raw_transaction evm_node tx_raw in
-        let hash = Result.get_ok hash in
+      (fun (raw_tx, _) ->
+        let*@ hash = Rpc.send_raw_transaction ~raw_tx evm_node in
         return hash)
       txs
   in
@@ -2767,8 +2735,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
   let raw_tx =
     "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
   in
-  let* result = send_raw_transaction evm_node raw_tx in
-  let transaction_hash = Result.get_ok result in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
   let* _ =
     wait_for_application
       ~evm_node
@@ -2778,10 +2745,9 @@ let test_rpc_sendRawTransaction_nonce_too_low =
       (wait_for_transaction_receipt ~evm_node ~transaction_hash)
       ()
   in
-  let* result = send_raw_transaction evm_node raw_tx in
-  let error_message = Result.get_error result in
+  let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
-    ((error_message = "Nonce too low.") string)
+    ((error.message = "Nonce too low.") string)
       ~error_msg:"The transaction should fail") ;
   unit
 
@@ -2794,7 +2760,7 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   let raw_tx =
     "0xf86c01825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a95a0a349864bedc9b84aea88cda197e96538c62c242286ead58eb7180a611f850237a01206525ff16ae5b708ee02b362f9b4d7565e0d7e9b4c536d7ef7dec81cda3ac7"
   in
-  let* result = send_raw_transaction evm_node raw_tx in
+  let* result = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
     ((Result.is_ok result = true) bool) ~error_msg:"The transaction should fail") ;
   unit
@@ -2927,10 +2893,9 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
   let raw_tx =
     "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
   in
-  let* result = send_raw_transaction evm_node raw_tx in
-  let error_message = Result.get_error result in
+  let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
-    ((error_message = "Invalid chain id.") string)
+    ((error.message = "Invalid chain id.") string)
       ~error_msg:"The transaction should fail") ;
   unit
 
@@ -3055,8 +3020,8 @@ let test_transaction_storage_before_and_after_migration =
   in
   let scenario_after ~evm_setup ~sanity_check:() =
     let check_one tx_hash =
-      let* _receipt =
-        get_transaction_receipt ~full_evm_setup:evm_setup ~tx_hash
+      let*@ _receipt =
+        Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node
       in
       let* _tx_object = get_tx_object ~endpoint:evm_setup.endpoint ~tx_hash in
       unit
@@ -3249,7 +3214,7 @@ let test_cover_fees =
     "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
   in
   (* This should fail when the tx-pool check this. *)
-  let* hash_result = send_raw_transaction evm_node raw_transfer in
+  let* hash_result = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
   let hash =
     match hash_result with
     | Ok hash -> hash
@@ -3276,15 +3241,13 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
   let tx_1 =
     "0xf86480825208831e84809400000000000000000000000000000000000000008080820a96a0718d24970c6d2fc794e972f4319caf24a939ff3d822959c7e6b022813d16c8c4a04535ad83a67307759569b1e2087b0b79f80d4502027b6d1d52e3c072634b3f8b"
   in
-  let* result = send_raw_transaction evm_node tx_1 in
-  let hash_1 = Result.get_ok result in
+  let*@ hash_1 = Rpc.send_raw_transaction ~raw_tx:tx_1 evm_node in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 1*)
   let tx_2 =
     "0xf86401825208831e84809400000000000000000000000000000000000000008080820a95a01f47f2ec950d998bd99f7ff656a7f13a385603373f0e96130290ba2869f56515a018bd20697ab1f3cd82891663c62f514de7b2deeee2ed569e85b3aa351e1b1c3b"
   in
-  let* result = send_raw_transaction evm_node tx_2 in
-  let hash_2 = Result.get_ok result in
+  let*@ hash_2 = Rpc.send_raw_transaction ~raw_tx:tx_2 evm_node in
   let* _ =
     wait_for_application
       ~evm_node
@@ -3317,16 +3280,15 @@ let test_rpc_sendRawTransaction_not_included =
   let tx =
     "0xf86401825208831e84809400000000000000000000000000000000000000008080820a96a05709a6fbce9cf391d0530f4b4d4c9fd57fa160dd20fead5bd5c49c3ec78efcc9a06e4fcb1d5596e00bc34fa5d97ccafce8fa1f44534b36920d7db0a3ad29ca03f8"
   in
-  let* result =
+  let*@ tx_hash =
     wait_for_application
       ~evm_node
       ~sc_rollup_node
       ~node
       ~client
-      (fun () -> send_raw_transaction evm_node tx)
+      (fun () -> Rpc.send_raw_transaction ~raw_tx:tx evm_node)
       ()
   in
-  let tx_hash = Result.get_ok result in
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   (* Check if txs is not included *)
   let* receipt = Eth_cli.get_receipt ~endpoint ~tx:tx_hash in
@@ -3723,9 +3685,7 @@ let test_rpc_getLogs =
       (list (tuple3 string (list string) string)))
     ~error_msg:"Expected logs %R, got %L" ;
   (* Check that a specific block has a log *)
-  let* tx1_receipt =
-    get_transaction_receipt ~full_evm_setup:evm_setup ~tx_hash:tx1
-  in
+  let*@! tx1_receipt = Rpc.get_transaction_receipt ~tx_hash:tx1 evm_node in
   let* tx1_block_logs =
     get_logs
       ~from_block:(Int32.to_string tx1_receipt.blockNumber)
@@ -3756,10 +3716,8 @@ let test_tx_pool_replacing_transactions =
     "0xf86b80827530825208940000000000000000000000000000000000000000884563918244f4000080820a96a008410806e7a3c6b403bbfa99d82886e5460921a664410eaea5fe99050c4dc63da031c3eb45ac8a42600b27029d1c910b4c0006f1f435a29f91626964a8cf25da3f"
   in
   (* Send the transactions to the proxy*)
-  let* result = send_raw_transaction evm_node tx_a in
-  let _tx_a_hash = Result.get_ok result in
-  let* result = send_raw_transaction evm_node tx_b in
-  let tx_b_hash = Result.get_ok result in
+  let*@ _tx_a_hash = Rpc.send_raw_transaction ~raw_tx:tx_a evm_node in
+  let*@ tx_b_hash = Rpc.send_raw_transaction ~raw_tx:tx_b evm_node in
   let* receipt =
     wait_for_application
       ~evm_node
@@ -3872,8 +3830,7 @@ let test_l2_revert_returns_unused_gas =
     "0xf8690183010000830186a094d77420f73b4612a7a99dba8c2afd30a1886b03448084c0406226820a96a0869b3a97d2c87d41c22eaeafba2644c276e74267998dff3504d1d2b35fae0e2ba058f0661adcff7d2abd3c6eb4d663e4731c838f6ef15ebb797b88db87c4fee39b"
   in
   let* balance_before = Eth_cli.balance ~account:sender.address ~endpoint in
-  let* result = send_raw_transaction evm_node tx in
-  let transaction_hash = Result.get_ok result in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx:tx evm_node in
   let* transaction_receipt =
     wait_for_application
       ~evm_node

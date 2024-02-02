@@ -24,6 +24,9 @@ module Syntax : sig
   val ( let*@ ) : ('a, error) result Lwt.t -> ('a -> 'c Lwt.t) -> 'c Lwt.t
 
   val ( let*@? ) : ('a, error) result Lwt.t -> (error -> 'c Lwt.t) -> 'c Lwt.t
+
+  val ( let*@! ) :
+    ('a option, error) result Lwt.t -> ('a -> 'c Lwt.t) -> 'c Lwt.t
 end
 
 (** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
@@ -33,3 +36,15 @@ val produce_block : ?timestamp:string -> Evm_node.t -> int32 Lwt.t
 (** [inject_upgrade ~payload evm_node] calls the private RPC [injectUpgrade].
     It will store the [payload] under the kernel upgrade path. *)
 val inject_upgrade : payload:string -> Evm_node.t -> unit Lwt.t
+
+(** [send_raw_transaction ~raw_tx evm_node] calls [eth_sendRawTransaction]
+    with [raw_tx] as argument. *)
+val send_raw_transaction :
+  raw_tx:string -> Evm_node.t -> (string, error) result Lwt.t
+
+(** [get_transaction_receipt ~tx_hash evm_node] calls
+    [eth_getTransactionReceipt] with [tx_hash] as argument. *)
+val get_transaction_receipt :
+  tx_hash:string ->
+  Evm_node.t ->
+  (Transaction.transaction_receipt option, error) result Lwt.t
