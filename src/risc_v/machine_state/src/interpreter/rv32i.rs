@@ -91,6 +91,58 @@ where
     pub fn run_jal(&mut self, imm: i64, rd: XRegister) -> Address {
         self.run_jal_impl::<4>(imm, rd)
     }
+
+    /// Generic `BEQ` w.r.t. instruction width
+    fn run_beq_impl<const INSTR_WIDTH: u64>(
+        &mut self,
+        imm: i64,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Address {
+        let current_pc = self.pc.read();
+
+        // Branch if `val(rs1) == val(rs2)`, jumping `imm` bytes ahead.
+        // Otherwise, jump the width of current instruction
+        if self.xregisters.read(rs1) == self.xregisters.read(rs2) {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(INSTR_WIDTH)
+        }
+    }
+
+    /// `BEQ` B-type instruction
+    ///
+    /// Returns the target address if registers contain the same value,
+    /// otherwise the next instruction address
+    pub fn run_beq(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        self.run_beq_impl::<4>(imm, rs1, rs2)
+    }
+
+    /// Generic `BNE` w.r.t. instruction width
+    fn run_bne_impl<const INSTR_WIDTH: u64>(
+        &mut self,
+        imm: i64,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Address {
+        let current_pc = self.pc.read();
+
+        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
+        // Otherwise, jump the width of current instruction
+        if self.xregisters.read(rs1) != self.xregisters.read(rs2) {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(INSTR_WIDTH)
+        }
+    }
+
+    /// `BNE` B-type instruction
+    ///
+    /// Returns the target address if registers contain different values,
+    /// otherwise the next instruction address
+    pub fn run_bne(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        self.run_bne_impl::<4>(imm, rs1, rs2)
+    }
 }
 
 #[cfg(test)]
@@ -101,11 +153,12 @@ pub mod tests {
         registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
         HartState, HartStateLayout,
     };
-    use proptest::{prelude::any, prop_assert_eq, proptest};
+    use proptest::{prelude::any, prop_assert_eq, prop_assume, proptest};
 
     pub fn test<F: TestBackendFactory>() {
         test_addi::<F>();
         test_auipc::<F>();
+        test_beq_bne::<F>();
         test_jal::<F>();
         test_jalr::<F>();
         test_lui::<F>();
@@ -165,6 +218,70 @@ pub mod tests {
 
             assert_eq!(read_pc, res);
         }
+    }
+
+    macro_rules! test_branch_instr {
+        ($state:ident, $branch_fn:tt, $imm:expr,
+         $rs1:ident, $r1_val:expr,
+         $rs2:ident, $r2_val:expr,
+         $init_pc:ident, $expected_pc:expr
+        ) => {
+            $state.pc.write($init_pc);
+            $state.xregisters.write($rs1, $r1_val);
+            $state.xregisters.write($rs2, $r2_val);
+
+            let new_pc = $state.$branch_fn($imm, $rs1, $rs2);
+            prop_assert_eq!(new_pc, $expected_pc);
+        };
+    }
+
+    fn test_beq_bne<F: TestBackendFactory>() {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+            r1_val in any::<u64>(),
+            r2_val in any::<u64>(),
+        )| {
+            // to ensure different behaviour for tests
+            prop_assume!(r1_val != r2_val);
+            // to ensure branch_pc, init_pc, next_pc are different
+            prop_assume!(imm > 10);
+            let branch_pc = init_pc.wrapping_add(imm as u64);
+            let next_pc = init_pc.wrapping_add(4);
+
+            let mut backend = create_backend!(HartStateLayout, F);
+            let mut state = create_state!(HartState, F, backend);
+
+            // BEQ - different
+            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, init_pc, next_pc);
+            // BEQ - equal
+            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, init_pc, branch_pc);
+
+            // BNE - different
+            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, init_pc, branch_pc);
+            // BNE - equal
+            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, init_pc, next_pc);
+
+            // BEQ - different - imm = 0
+            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, init_pc, next_pc);
+            // BEQ - equal - imm = 0
+            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, init_pc, init_pc);
+
+            // BNE - different - imm = 0
+            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, init_pc, init_pc);
+            // BNE - equal - imm = 0
+            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, init_pc, next_pc);
+
+            // BEQ - same register - imm = 0
+            test_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, init_pc, init_pc);
+            // BEQ - same register
+            test_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, init_pc, branch_pc);
+
+            // BNE - same register - imm = 0
+            test_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, init_pc, next_pc);
+            // BNE - same register
+            test_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, init_pc, next_pc);
+        });
     }
 
     fn test_jalr<F: TestBackendFactory>() {

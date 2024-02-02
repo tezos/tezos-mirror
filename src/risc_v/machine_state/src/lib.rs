@@ -12,6 +12,9 @@ pub mod memory_backend;
 mod mode;
 pub mod registers;
 
+#[cfg(test)]
+extern crate proptest;
+
 use backend::{Atom, Cell};
 use bus::{main_memory, Address, Bus};
 
