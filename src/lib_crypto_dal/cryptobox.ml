@@ -47,15 +47,7 @@ let () =
     (fun parameter -> Failed_to_load_trusted_setup parameter)
   [@@coverage off]
 
-type srs_user = Prover | Verifier
-
-type prover_raw_srs = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
-
-type verifier_raw_srs = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
-
-type initialisation_parameters =
-  | Prover_init_param of prover_raw_srs
-  | Verifier_init_param of verifier_raw_srs
+type initialisation_parameters = Srs_g1.t
 
 (* Initialisation parameters are supposed to be instantiated once. *)
 let initialisation_parameters = ref None
@@ -75,6 +67,12 @@ let () =
     (function () -> Dal_initialisation_twice)
   [@@coverage off]
 
+let scalar_bytes_amount = Srs_verifier.scalar_bytes_amount
+
+let page_length = Srs_verifier.page_length
+
+let slot_as_polynomial_length = Srs_verifier.slot_as_polynomial_length
+
 (* This function is expected to be called once. *)
 let load_parameters parameters =
   let open Result_syntax in
@@ -88,8 +86,7 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 
-let initialisation_parameters_from_files ~srs_user ~srs_g1_path ~srs_g2_path
-    ~srs_size_log2 =
+let initialisation_parameters_from_files ~srs_g1_path ~srs_size_log2 =
   let open Lwt_result_syntax in
   let len = 1 lsl srs_size_log2 in
   let to_bigstring ~path =
@@ -119,22 +116,17 @@ let initialisation_parameters_from_files ~srs_user ~srs_g1_path ~srs_g2_path
       (fun () -> Lwt_unix.close fd)
   in
   let* srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
-  let* srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
   match
     let open Result_syntax in
     let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ~len in
-    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring ~len in
-    return (srs_g1, srs_g2)
+    return srs_g1
   with
   | Error (`End_of_file s) ->
       tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
   | Error (`Invalid_point p) ->
       tzfail
         (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
-  | Ok (srs_g1, srs_g2) -> (
-      match srs_user with
-      | Prover -> return (Prover_init_param {srs_g1; srs_g2})
-      | Verifier -> return (Verifier_init_param {srs_g1; srs_g2}))
+  | Ok srs_g1 -> return srs_g1
 
 module Inner = struct
   module Commitment = struct
@@ -260,10 +252,6 @@ module Inner = struct
       (function err -> Invalid_precomputation_hash err)
     [@@coverage off]
 
-  (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
-     r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
-  let scalar_bytes_amount = Scalar.size_in_bytes - 1
-
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domain.build n
 
@@ -278,41 +266,29 @@ module Inner = struct
     (* Length of the erasure-encoded polynomial representation of a slot,
        also called [erasure_encoded_polynomial_length] in the comments. *)
     erasure_encoded_polynomial_length : int;
-    domain_polynomial_length : Domain.t;
     (* Domain for the FFT on slots as polynomials to be erasure encoded. *)
+    domain_polynomial_length : Domain.t;
     domain_2_times_polynomial_length : Domain.t;
-    domain_erasure_encoded_polynomial_length : Domain.t;
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
-    shard_length : int;
+    domain_erasure_encoded_polynomial_length : Domain.t;
     (* Length of a shard in terms of scalar elements. *)
-    pages_per_slot : int;
+    shard_length : int;
     (* Number of slot pages. *)
+    pages_per_slot : int;
     page_length : int;
     page_length_domain : int;
-    remaining_bytes : int;
     (* Log of the number of evaluations that constitute an erasure encoded
        polynomial. *)
-    kate_amortized_srs_g2_shards : G2.t;
-    kate_amortized_srs_g2_pages : G2.t;
-    kate_amortized_srs_g2_commitment : G2.t;
+    remaining_bytes : int;
+    (* These srs_g2_* parameters are used by the verifier to check the proofs *)
+    srs_g2_shards : G2.t;
+    srs_g2_pages : G2.t;
+    srs_g2_commitment : G2.t;
     mode : [`Verifier | `Prover];
     kate_amortized : Kate_amortized.public_parameters;
   }
 
   let is_power_of_two = Kzg.Utils.is_power_of_two
-
-  (* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
-     hence the + 1 to account for the remainder of the division. *)
-  let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
-
-  (* [slot_as_polynomial_length ~slot_size ~page_size] returns the length of the
-     polynomial of maximal degree representing a slot of size [slot_size] with
-     [slot_size / page_size] pages. The returned length thus depends on the number
-     of pages. *)
-  let slot_as_polynomial_length ~slot_size ~page_size =
-    let page_length = page_length ~page_size in
-    let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-    slot_size / page_size * page_length_domain
 
   let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
       ~number_of_shards =
@@ -462,8 +438,8 @@ module Inner = struct
           max_polynomial_length
           shard_length)
 
-  let ensure_validity ~slot_size ~page_size ~redundancy_factor ~number_of_shards
-      ~srs_g1_length =
+  let ensure_validity ~mode ~slot_size ~page_size ~redundancy_factor
+      ~number_of_shards ~srs_g1_length =
     let open Result_syntax in
     let assert_result condition error_message =
       if not condition then fail (`Fail (error_message ())) else return_unit
@@ -478,32 +454,45 @@ module Inner = struct
     let max_polynomial_length =
       slot_as_polynomial_length ~slot_size ~page_size
     in
+    let shard_length =
+      let erasure_encoded_polynomial_length =
+        redundancy_factor * max_polynomial_length
+      in
+      erasure_encoded_polynomial_length / number_of_shards
+    in
+    let min_g1 =
+      match mode with
+      | `Prover -> max_polynomial_length
+      | `Verifier -> shard_length
+    in
+    let* () =
+      assert_result
+        (min_g1 <= srs_g1_length)
+        (* The committed polynomials have degree t.max_polynomial_length - 1 at most,
+           so t.max_polynomial_length coefficients. *)
+        (fun () ->
+          Format.asprintf
+            "SRS on G1 size is too small. Expected more than %d. Got %d. Hint: \
+             you can reduce the size of a slot."
+            min_g1
+            srs_g1_length)
+    in
+    let page_length_domain = Srs_verifier.domain_length ~size:page_size in
+    let offset_monomial_degree =
+      Srs_verifier.Internal_for_tests.max_srs_size - max_polynomial_length
+    in
     assert_result
-      (max_polynomial_length <= srs_g1_length)
-      (* The committed polynomials have degree t.max_polynomial_length - 1 at most,
-         so t.max_polynomial_length coefficients. *)
+      Srs_verifier.(
+        Internal_for_tests.is_in_srs2 shard_length
+        && Internal_for_tests.is_in_srs2 page_length_domain
+        && Internal_for_tests.is_in_srs2 offset_monomial_degree)
       (fun () ->
         Format.asprintf
-          "SRS on G1 size is too small. Expected more than %d. Got %d. Hint: \
-           you can reduce the size of a slot."
-          max_polynomial_length
-          srs_g1_length)
-  (* TODO: Put this verification somewhere. *)
-  (* let erasure_encoded_polynomial_length = *)
-  (*   redundancy_factor * max_polynomial_length *)
-  (* in *)
-  (* let shard_length = erasure_encoded_polynomial_length / number_of_shards in   *)
-  (* assert_result *)
-  (*   (let srs_g2_expected_length = *)
-  (*      max max_polynomial_length shard_length + 1 *)
-  (*    in *)
-  (*    srs_g2_expected_length <= srs_g2_length) *)
-  (*   (fun () -> *)
-  (*     Format.asprintf *)
-  (* "SRS on G2 size is too small. Expected more than %d. Got %d. Hint: \ *)
-     (*        you can increase the number of shards/number of pages." *)
-  (*       max_polynomial_length *)
-  (*       srs_g2_length) *)
+          "SRS on shourd contain points of indices shard_length = %d, \
+           page_length_domain = %d & offset_monomial_degree = %d."
+          shard_length
+          page_length_domain
+          offset_monomial_degree)
 
   type parameters = Dal_config.parameters = {
     redundancy_factor : int;
@@ -549,75 +538,32 @@ module Inner = struct
         redundancy_factor * max_polynomial_length
       in
       let shard_length = erasure_encoded_polynomial_length / number_of_shards in
-      let* raw =
-        match !initialisation_parameters with
-        | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialised.")
-        | Some srs -> return srs
-      in
       let page_length = page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-      let ( mode,
-            kate_amortized_srs_g2_shards,
-            kate_amortized_srs_g2_pages,
-            kate_amortized_srs_g2_commitment,
-            kate_amortized ) =
-        match raw with
-        | Prover_init_param {srs_g1; srs_g2} ->
-            let kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length in
-            let kate_amortized_srs_g2_pages =
-              Srs_g2.get srs_g2 page_length_domain
-            in
-            let kate_amortized_srs_g2_commitment =
-              let max_allowed_committed_poly_degree =
-                max_polynomial_length - 1
-              in
-              let max_committable_degree = Srs_g1.size srs_g1 - 1 in
-              let offset_monomial_degree =
-                max_committable_degree - max_allowed_committed_poly_degree
-              in
-              Srs_g2.get srs_g2 offset_monomial_degree
-            in
-            let kate_amortized =
-              Kate_amortized.
-                {max_polynomial_length; shard_length; srs_g1; number_of_shards}
-            in
-            ( `Prover,
-              kate_amortized_srs_g2_shards,
-              kate_amortized_srs_g2_pages,
-              kate_amortized_srs_g2_commitment,
-              kate_amortized )
-        | Verifier_init_param {srs_g1; srs_g2} ->
-            let kate_amortized_srs_g2_shards = Srs_g2.get srs_g2 shard_length in
-            let kate_amortized_srs_g2_pages =
-              Srs_g2.get srs_g2 page_length_domain
-            in
-            let kate_amortized_srs_g2_commitment =
-              let max_allowed_committed_poly_degree =
-                max_polynomial_length - 1
-              in
-              let max_committable_degree = Srs_g1.size srs_g1 - 1 in
-              let offset_monomial_degree =
-                max_committable_degree - max_allowed_committed_poly_degree
-              in
-              Srs_g2.get srs_g2 offset_monomial_degree
-            in
-            let kate_amortized =
-              Kate_amortized.
-                {max_polynomial_length; shard_length; srs_g1; number_of_shards}
-            in
-            ( `Verifier,
-              kate_amortized_srs_g2_shards,
-              kate_amortized_srs_g2_pages,
-              kate_amortized_srs_g2_commitment,
-              kate_amortized )
+      let srs_g2_shards, srs_g2_pages, srs_g2_commitment =
+        Srs_verifier.Internal_for_tests.get_verifier_srs2
+          ~max_polynomial_length
+          ~page_length_domain
+          ~shard_length
+      in
+      let mode, srs_g1 =
+        match !initialisation_parameters with
+        | Some srs_g1 -> (`Prover, srs_g1)
+        | None ->
+            (`Verifier, Srs_verifier.Internal_for_tests.get_verifier_srs1 ())
       in
       let* () =
         ensure_validity
+          ~mode
           ~slot_size
           ~page_size
           ~redundancy_factor
           ~number_of_shards
-          ~srs_g1_length:(Srs_g1.size kate_amortized.srs_g1)
+          ~srs_g1_length:(Srs_g1.size srs_g1)
+      in
+      let kate_amortized =
+        Kate_amortized.
+          {max_polynomial_length; shard_length; srs_g1; number_of_shards}
       in
       return
         {
@@ -637,9 +583,9 @@ module Inner = struct
           page_length;
           page_length_domain;
           remaining_bytes = page_size mod scalar_bytes_amount;
-          kate_amortized_srs_g2_shards;
-          kate_amortized_srs_g2_pages;
-          kate_amortized_srs_g2_commitment;
+          srs_g2_shards;
+          srs_g2_pages;
+          srs_g2_commitment;
           mode;
           kate_amortized;
         }
@@ -1148,7 +1094,7 @@ module Inner = struct
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
     let srs_0 = G2.one in
-    let srs_n_d = t.kate_amortized_srs_g2_commitment in
+    let srs_n_d = t.srs_g2_commitment in
     Degree_check.verify {srs_0; srs_n_d} cm proof
 
   let save_precompute_shards_proofs precomputation ~filename =
@@ -1235,7 +1181,7 @@ module Inner = struct
           Domain.get t.domain_erasure_encoded_polynomial_length shard_index
         in
         let domain = Domain.build t.shard_length in
-        let srs_point = t.kate_amortized_srs_g2_shards in
+        let srs_point = t.srs_g2_shards in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1301,7 +1247,7 @@ module Inner = struct
               | _ -> Scalar.(copy zero))
         in
         let root = Domain.get t.domain_polynomial_length page_index in
-        let srs_point = t.kate_amortized_srs_g2_pages in
+        let srs_point = t.srs_g2_pages in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1319,53 +1265,7 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let parameters_initialisation
-      {slot_size; page_size; number_of_shards; redundancy_factor; _} =
-    let length = slot_as_polynomial_length ~slot_size ~page_size in
-    let secret =
-      Scalar.of_string
-        "20812168509434597367146703229805575690060615791308155437936410982393987532344"
-    in
-    let srs_g1 = Srs_g1.generate_insecure length secret in
-    (* The error is caught during the instantiation through [make]. *)
-    let erasure_encoded_polynomial_length = redundancy_factor * length in
-    let evaluations_per_proof =
-      match erasure_encoded_polynomial_length / number_of_shards with
-      | exception Invalid_argument _ -> 0
-      | x -> x
-    in
-    (* The cryptobox will read at indices `size`, `1 lsl evaluations_per_proof_log`
-       and `page_length` so we take the max + 1. Since `page_length < size`, we
-       can remove the `page_length from the max. *)
-    let srs_g2 =
-      Srs_g2.generate_insecure (max length evaluations_per_proof + 1) secret
-    in
-    Prover_init_param {srs_g1; srs_g2}
-
-  (* This function is duplicated from parameters_initialisation for now.
-     At some point the two functions will differ *)
-  let parameters_initialisation_verifier
-      {slot_size; page_size; number_of_shards; redundancy_factor; _} =
-    let length = slot_as_polynomial_length ~slot_size ~page_size in
-    let secret =
-      Scalar.of_string
-        "20812168509434597367146703229805575690060615791308155437936410982393987532344"
-    in
-    let srs_g1 = Srs_g1.generate_insecure length secret in
-    (* The error is caught during the instantiation through [make]. *)
-    let erasure_encoded_polynomial_length = redundancy_factor * length in
-    let evaluations_per_proof =
-      match erasure_encoded_polynomial_length / number_of_shards with
-      | exception Invalid_argument _ -> 0
-      | x -> x
-    in
-    (* The cryptobox will read at indices `size`, `1 lsl evaluations_per_proof_log`
-       and `page_length` so we take the max + 1. Since `page_length < size`, we
-       can remove the `page_length from the max. *)
-    let srs_g2 =
-      Srs_g2.generate_insecure (max length evaluations_per_proof + 1) secret
-    in
-    Verifier_init_param {srs_g1; srs_g2}
+  let parameters_initialisation () = Srs_verifier.Internal_for_tests.fake_srs ()
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 
@@ -1439,23 +1339,19 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let open Result_syntax in
-    let* raw =
+    let mode, srs_g1_length =
       match !initialisation_parameters with
-      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
-      | Some srs -> return srs
-    in
-    let srs_g1 =
-      match raw with
-      | Prover_init_param {srs_g1; _} -> srs_g1
-      | Verifier_init_param {srs_g1; _} -> srs_g1
+      | Some srs -> (`Prover, Srs_g1.size srs)
+      | None ->
+          (`Verifier, Srs_verifier.Internal_for_tests.max_verifier_srs_size)
     in
     ensure_validity
+      ~mode
       ~slot_size
       ~page_size
       ~redundancy_factor
       ~number_of_shards
-      ~srs_g1_length:(Srs_g1.size srs_g1)
+      ~srs_g1_length
 
   let ensure_validity parameters =
     match ensure_validity parameters with Ok _ -> true | _ -> false
@@ -1479,34 +1375,11 @@ module Config = struct
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
-        | Some parameters ->
-            return (Internal_for_tests.parameters_initialisation parameters)
+        | Some _parameters ->
+            return (Internal_for_tests.parameters_initialisation ())
         | None ->
-            let*? srs_g1_path, srs_g2_path = find_srs_files () in
-            initialisation_parameters_from_files
-              ~srs_user:Prover
-              ~srs_g1_path
-              ~srs_g2_path
-              ~srs_size_log2
-      in
-      Lwt.return (load_parameters initialisation_parameters)
-    else return_unit
-
-  let init_dal_verifier ~find_srs_files ?(srs_size_log2 = 21) dal_config =
-    let open Lwt_result_syntax in
-    if dal_config.activated then
-      let* initialisation_parameters =
-        match dal_config.use_mock_srs_for_testing with
-        | Some parameters ->
-            return
-              (Internal_for_tests.parameters_initialisation_verifier parameters)
-        | None ->
-            let*? srs_g1_path, srs_g2_path = find_srs_files () in
-            initialisation_parameters_from_files
-              ~srs_user:Verifier
-              ~srs_g1_path
-              ~srs_g2_path
-              ~srs_size_log2
+            let*? srs_g1_path, _ = find_srs_files () in
+            initialisation_parameters_from_files ~srs_g1_path ~srs_size_log2
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

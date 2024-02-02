@@ -435,15 +435,8 @@ val prove_shards :
 module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
      purposes. This function creates an unsafe initialisation
-     parameters using [parameters]. The running time of this function
-     is linear with respect to [parameters.slot_size]. Order of magnitude can
-     be around 1 minute for a size of 1MiB. *)
-  val parameters_initialisation : parameters -> initialisation_parameters
-
-  (** Same as [parameters_initialisation] but the resulting
-      initialisation_parameters will be tagged for the verifier *)
-  val parameters_initialisation_verifier :
-    parameters -> initialisation_parameters
+     parameters using default parameters designed to handle test cases. *)
+  val parameters_initialisation : unit -> initialisation_parameters
 
   (** Same as {!val:load_parameters} except it erase parameters if
      they were already loaded. This is used to circumvent limitation
@@ -562,14 +555,6 @@ module Config : sig
      check is run.) In this case, [init_dal] can take several seconds
      to run. *)
   val init_dal :
-    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
-    ?srs_size_log2:int ->
-    t ->
-    unit Error_monad.tzresult Lwt.t
-
-  (** For now, it’s a duplicate of [init_dal]. In the future it will initialize
-      the DAL verification, loading only the SRS part needed for verification *)
-  val init_dal_verifier :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
     ?srs_size_log2:int ->
     t ->
