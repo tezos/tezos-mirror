@@ -54,7 +54,7 @@
     # Store the list of tests that have been scheduled for execution for later debugging.
     # It is imperative this this first call to tezt receives any flags passed to the
     # second call that affect test selection.
-    - _build/default/tezt/tests/main.exe
+    - ./scripts/ci/tezt.sh
         ${TESTS}
         --from-record tezt/records
         --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
@@ -71,7 +71,7 @@
     # because if the CI timeout is reached, there are no artefacts,
     # and thus no logs to investigate.
     # See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
-    - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/exit_code.sh _build/default/tezt/tests/main.exe
+    - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh
         ${TESTS}
         --color
         --log-buffer-size 5000
@@ -97,11 +97,13 @@
     - .tezt_template
     - .oc.template__retry_flaky
   dependencies:
+    - "select_tezts"
     - "oc.build_x86_64-released"
     - "oc.build_x86_64-exp-dev-extra"
     - "oc.build_kernels"
     - "oc.tezt:fetch-records"
   needs:
+    - "select_tezts"
     - "oc.build_x86_64-released"
     - "oc.build_x86_64-exp-dev-extra"
     - "oc.build_kernels"
@@ -115,6 +117,7 @@
   # Add [BISECT_FILE] to the set of artifacts defined in [.tezt_template]
   artifacts:
     paths:
+      - selected_tezts.tsv
       - tezt.log
       - tezt-*.log
       - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json

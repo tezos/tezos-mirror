@@ -1,0 +1,18 @@
+select_tezts:
+  extends:
+    - .default_settings_template
+    # We need:
+    # - Git (to run git diff)
+    # - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest)
+    - .image_template__runtime_prebuild_dependencies
+  stage: build
+  before_script:
+    - ./scripts/ci/take_ownership.sh
+    - eval $(opam env)
+  script:
+    - scripts/ci/select_tezts.sh
+  artifacts:
+    when: always
+    paths:
+      - selected_tezts.tsl
+    expire_in: 3 days
