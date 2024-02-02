@@ -95,6 +95,11 @@ const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
     RefPath::assert_from(b"/delayed_inbox_timeout");
 
+// Path to the number of l1 levels that need to pass for a
+// delayed tx to be timed out.
+const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
+    RefPath::assert_from(b"/delayed_inbox_min_levels");
+
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
@@ -896,6 +901,30 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
             default_timeout / 3600
         );
         Ok(default_timeout)
+    }
+}
+
+pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u32> {
+    let default_min_levels = 720;
+    if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
+        let mut buffer = [0u8; 4];
+        store_read_slice(host, &EVM_DELAYED_INBOX_MIN_LEVELS, &mut buffer, 4)?;
+        let min_levels = u32::from_le_bytes(buffer);
+        log!(
+            host,
+            Info,
+            "Using delayed inbox minimum levels: {}",
+            min_levels
+        );
+        Ok(min_levels)
+    } else {
+        log!(
+            host,
+            Info,
+            "Using default delayed inbox minimum levels: {}",
+            default_min_levels
+        );
+        Ok(default_min_levels)
     }
 }
 
