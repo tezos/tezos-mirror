@@ -4363,6 +4363,31 @@ let test_ghostnet_kernel =
   Regression.capture version ;
   unit
 
+let test_estimate_gas_out_of_ticks =
+  register_both
+    ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"]
+    ~title:"estimateGas works with out of ticks"
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* loop_address, _tx = deploy ~contract:loop ~sender evm_setup in
+  (* Call estimateGas with an out of ticks transaction. *)
+  let estimateGas =
+    [
+      ("from", `String sender.address);
+      (* The data payload was retrieved by calling `loop(100000)` and reversed
+         engineer the data field. *)
+      ( "data",
+        `String
+          "0x0b7d796e00000000000000000000000000000000000000000000000000000000000186a0"
+      );
+      ("to", `String loop_address);
+    ]
+  in
+  let*@? {message; code = _} = Rpc.estimate_gas estimateGas evm_node in
+  Check.(message =~ rex "The transaction would exhaust all the ticks")
+    ~error_msg:"The estimate gas should fail with out of ticks message." ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4438,7 +4463,8 @@ let register_evm_node ~protocols =
   test_reboot_out_of_ticks protocols ;
   test_l2_timestamp_opcode protocols ;
   test_migrate_proxy_to_sequencer protocols ;
-  test_ghostnet_kernel protocols
+  test_ghostnet_kernel protocols ;
+  test_estimate_gas_out_of_ticks protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
