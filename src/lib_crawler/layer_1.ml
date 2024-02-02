@@ -274,8 +274,9 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
   in
   loop init_timeout
 
-let iter_heads ?(only_new = false) l1_ctxt f =
+let iter_heads ?name ?(only_new = false) l1_ctxt f =
   let open Lwt_result_syntax in
+  let name = Option.value name ~default:l1_ctxt.name in
   let rec loop {heads; stopper} =
     let heads = Lwt_stream.clone heads in
     let*! () =
@@ -288,9 +289,8 @@ let iter_heads ?(only_new = false) l1_ctxt f =
     stopper () ;
     let*! () =
       match stopping_reason with
-      | Closed -> Layer1_event.connection_lost ~name:l1_ctxt.name
-      | Timeout timeout ->
-          Layer1_event.connection_timeout ~name:l1_ctxt.name ~timeout
+      | Closed -> Layer1_event.connection_lost ~name
+      | Timeout timeout -> Layer1_event.connection_timeout ~name ~timeout
       | Connection_error trace ->
           Format.eprintf "@[<v 2>Connection error:@ %a@]@." pp_print_trace trace ;
           Lwt.return_unit

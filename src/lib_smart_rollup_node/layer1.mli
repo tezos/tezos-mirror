@@ -99,7 +99,11 @@ val shutdown : t -> unit Lwt.t
     [iter_heads] terminates and returns the error. If [only_new] is [true], [f]
     will be called only on heads that are produced after the call is made. *)
 val iter_heads :
-  ?only_new:bool -> t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+  ?name:string ->
+  ?only_new:bool ->
+  t ->
+  (header -> unit tzresult Lwt.t) ->
+  unit tzresult Lwt.t
 
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)
