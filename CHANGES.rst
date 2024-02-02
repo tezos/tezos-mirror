@@ -189,6 +189,8 @@ Smart Rollup client
 - Fix a critical bug that could lead to data loss when chain
   reorganizations happen while a GC is running. (MR :gl:`!11358`)
 
+- Fix issue with constants fetching during protocol migration. (MR :gl:`!11804`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
