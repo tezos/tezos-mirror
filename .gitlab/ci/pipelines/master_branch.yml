@@ -1,6 +1,6 @@
 include:
   # Stage: build
-  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
+  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-master.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-master.yml
   - .gitlab/ci/jobs/build/oc.build:static-arm64-linux-binaries-master.yml
   - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml
