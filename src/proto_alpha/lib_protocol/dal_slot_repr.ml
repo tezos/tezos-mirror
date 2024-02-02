@@ -942,13 +942,6 @@ module History_v2 = struct
 
   [@@@ocaml.warning "-a"]
 
-  (* A leaf of the merkle tree is a slot. *)
-  module Leaf = struct
-    type t = Header.t
-
-    let to_bytes = Data_encoding.Binary.to_bytes_exn Header.encoding
-  end
-
   module Content_prefix = struct
     let (_prefix : string) = "dash1"
 
@@ -963,7 +956,6 @@ module History_v2 = struct
   end
 
   module Content_hash = Blake2B.Make (Base58) (Content_prefix)
-  module Merkle_list = Merkle_list.Make (Leaf) (Content_hash)
 
   (* Pointers of the skip lists are used to encode the content and the
      backpointers. *)
@@ -1002,45 +994,124 @@ module History_v2 = struct
         | _ -> None)
       (fun () -> Add_element_in_slots_skip_list_violates_ordering_v2)
 
+  module Content = struct
+    (** Each cell of the skip list is either a slot header that has been
+        attested, or a published level and a slot index for which no slot header
+        is attested (so, no associated commitment). *)
+    type t = Unattested of Header.id | Attested of Header.t
+
+    let content_id = function
+      | Unattested slot_id -> slot_id
+      | Attested {id; _} -> id
+
+    let encoding =
+      let open Data_encoding in
+      union
+        ~tag_size:`Uint8
+        [
+          case
+            ~title:"unattested"
+            (Tag 0)
+            (merge_objs
+               (obj1 (req "kind" (constant "unattested")))
+               Header.id_encoding)
+            (function
+              | Unattested slot_id -> Some ((), slot_id) | Attested _ -> None)
+            (fun ((), slot_id) -> Unattested slot_id);
+          case
+            ~title:"attested"
+            (Tag 1)
+            (merge_objs
+               (obj1 (req "kind" (constant "attested")))
+               Header.encoding)
+            (function
+              | Unattested _ -> None
+              | Attested slot_header -> Some ((), slot_header))
+            (fun ((), slot_header) -> Attested slot_header);
+        ]
+
+    let equal t1 t2 =
+      match (t1, t2) with
+      | Unattested sid1, Unattested sid2 -> Header.slot_id_equal sid1 sid2
+      | Attested sh1, Attested sh2 -> Header.equal sh1 sh2
+      | Unattested _, _ | Attested _, _ -> false
+
+    let zero, zero_level =
+      let zero_level = Raw_level_repr.root in
+      let zero_index = Dal_slot_index_repr.zero in
+      (Unattested {published_level = zero_level; index = zero_index}, zero_level)
+
+    let pp fmt = function
+      | Unattested slot_id ->
+          Format.fprintf fmt "Unattested (%a)" Header.pp_id slot_id
+      | Attested slot_header ->
+          Format.fprintf fmt "Attested (%a)" Header.pp slot_header
+  end
+
   module Skip_list = struct
     include Skip_list.Make (Skip_list_parameters)
 
-    (** All confirmed DAL slots will be stored in a skip list, where only the
-        last cell is remembered in the L1 context. The skip list is used in
-        the proof phase of a refutation game to verify whether a given slot
-        exists (i.e., confirmed) or not in the skip list. The skip list is
-        supposed to be sorted, as its 'search' function explicitly uses a given
-        `compare` function during the list traversal to quickly (in log(size))
-        reach the target if any.
-
-        In our case, we will store one slot per cell in the skip list and
-        maintain that the list is well sorted (and without redundancy) w.r.t.
-        the [compare_slot_id] function.
+    (** All Dal slot indices for all levels will be stored in a skip list
+        (with or without a commitment depending on attestation status of each
+        slot), where only the last cell is needed to be remembered in the L1
+        context. The skip list is used in the proof phase of a refutation game
+        to verify whether a given slot is inserted as [Attested] or not in the
+        skip list. The skip list is supposed to be sorted, as its 'search'
+        function explicitly uses a given `compare` function during the list
+        traversal to quickly (in log(size)) reach the target slot header id.
+        Two cells compare in lexicographic ordering of their levels and slot indexes.
 
         Below, we redefine the [next] function (that allows adding elements
         on top of the list) to enforce that the constructed skip list is
-        well-sorted. We also define a wrapper around the search function to
+        well-sorted. We also define a wrapper around the [search] function to
         guarantee that it can only be called with the adequate compare function.
     *)
-
-    let next ~prev_cell ~prev_cell_ptr elt =
+    let next ~prev_cell ~prev_cell_ptr ~number_of_slots elt =
       let open Result_syntax in
+      let well_ordered =
+        (* For each cell we insert in the skip list, we ensure that it complies
+           with the following invariant:
+           - Either the published levels are successive (no gaps). In this case:
+             * The last inserted slot's index for the previous level is
+               [number_of_slots - 1];
+             * The first inserted slot's index for the current level is 0
+           - Or, levels are equal, but slot indices are successive. *)
+        let Header.{published_level = l1; index = i1} =
+          content prev_cell |> Content.content_id
+        in
+        let Header.{published_level = l2; index = i2} =
+          Content.content_id elt
+        in
+        (Raw_level_repr.equal l2 (Raw_level_repr.succ l1)
+        && Compare.Int.(Dal_slot_index_repr.to_int i1 = number_of_slots - 1)
+        && Compare.Int.(Dal_slot_index_repr.to_int i2 = 0))
+        || Raw_level_repr.equal l2 l1
+           && Dal_slot_index_repr.is_succ i1 ~succ:i2
+      in
       let* () =
-        error_when
-          (Compare.Int.( <= )
-             (Header.compare_slot_id
-                elt.Header.id
-                (content prev_cell).Header.id)
-             0)
+        error_unless
+          well_ordered
           Add_element_in_slots_skip_list_violates_ordering_v2
       in
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
-    let search ~deref ~cell ~target_id =
-      Lwt.search ~deref ~cell ~compare:(fun slot ->
-          Header.compare_slot_id slot.Header.id target_id)
+    let search =
+      let compare_with_slot_id (target_slot_id : Header.id)
+          (content : Content.t) =
+        let Header.{published_level = target_level; index = target_index} =
+          target_slot_id
+        in
+        let Header.{published_level; index} = Content.content_id content in
+        let c = Raw_level_repr.compare published_level target_level in
+        if Compare.Int.(c <> 0) then c
+        else Dal_slot_index_repr.compare index target_index
+      in
+      fun ~deref ~cell ~target_slot_id ->
+        Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
   end
 
+  (*  TODO: will be uncommented incrementally on the next MRs *)
+  (*
   module V1 = struct
     (* The content of a cell is the hash of all the slot commitments
        represented as a merkle list. *)
@@ -1647,4 +1718,5 @@ module History_v2 = struct
   end
 
   include V1
+*)
 end
