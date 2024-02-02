@@ -17,7 +17,7 @@ build:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v18.1", "master"]
+        OCTEZ_BRANCH: ["v19.0", "v18.1", "master"]
   tags:
     - ${ARCH}
   variables:
@@ -118,6 +118,14 @@ docker:amd64:v18.1:
     ARCH: "amd64"
     OCTEZ_BRANCH: "v18.1"
 
+docker:amd64:v19.0:
+  extends: .docker-push
+  dependencies: ["build: [amd64, v19.0]"]
+  variables:
+    ARCH: "amd64"
+    OCTEZ_BRANCH: "v19.0"
+
+
 docker:amd64:master:
   extends: .docker-push
   dependencies: ["build: [amd64, master]"]
@@ -131,6 +139,14 @@ docker:arm64:v18.1:
   variables:
     ARCH: "arm64"
     OCTEZ_BRANCH: "v18.1"
+
+docker:arm64:v19.0:
+  extends: .docker-push
+  dependencies: ["build: [arm64, v19.0]"]
+  variables:
+    ARCH: "arm64"
+    OCTEZ_BRANCH: "v19.0"
+
 
 docker:arm64:master:
   extends: .docker-push
@@ -169,6 +185,16 @@ manifest:v18.1:
       artifacts: false
   variables:
     OCTEZ_BRANCH: "v18.1"
+
+manifest:v19.0:
+  extends: .manifest
+  needs:
+    - job: "docker:amd64:v19.0"
+      artifacts: false
+    - job: "docker:arm64:v19.0"
+      artifacts: false
+  variables:
+    OCTEZ_BRANCH: "v19.0"
 
 manifest:master:
   extends: .manifest
