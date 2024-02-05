@@ -298,6 +298,17 @@ mod test {
         account.increment_nonce(host).unwrap();
     }
 
+    fn get_nonce(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+    ) -> U256 {
+        let account = evm_account_storage
+            .get_or_create(host, &account_path(address).unwrap())
+            .unwrap();
+        account.nonce(host).unwrap()
+    }
+
     fn dummy_first_block() -> BlockConstants {
         let block_fees = BlockFees::new(U256::from(12345));
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
@@ -2793,5 +2804,53 @@ mod test {
             initial_caller_nonce, caller_nonce,
             "Nonce shouldn't have changed"
         )
+    }
+
+    // This test will fail because it blows the stack with the Rust default
+    // stack size.
+    // use RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
+    // with <value> set to 104857600 or something similar in size
+    #[ignore]
+    #[test]
+    fn call_too_deep_not_revert() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let internal_address =
+            H160::from_str("7335dfb20cdcd40881235a54d61cb1152d771f4d").unwrap();
+
+        let code = hex::decode("3060025560206000600039602060006000f000").unwrap(); // Creates an infinity of contract
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            code,
+            None,
+            U256::one(),
+            None,
+            false,
+            DUMMY_ALLOCATED_TICKS,
+        );
+
+        let internal_address_nonce =
+            get_nonce(&mut host, &mut evm_account_storage, &internal_address);
+        let caller_nonce = get_nonce(&mut host, &mut evm_account_storage, &caller);
+
+        assert_eq!(
+            ExitReason::Succeed(ExitSucceed::Stopped),
+            result.unwrap().unwrap().reason,
+        );
+
+        assert_eq!(caller_nonce, U256::one());
+        assert_eq!(internal_address_nonce, U256::from(2));
     }
 }
