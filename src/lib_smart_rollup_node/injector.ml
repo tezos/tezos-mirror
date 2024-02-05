@@ -100,19 +100,12 @@ module Parameters :
     | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
         None
 
-  let retry_unsuccessful_operation _state (_op : Operation.t) status =
+  let retry_unsuccessful_operation _state (op : Operation.t) status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
         (* Always retry backtracked or skipped operations, or operations that
            are on another branch because of a reorg:
-
-           - Commitments are always produced on finalized blocks. They don't
-             need to be recomputed, and as such are valid in another branch.
-
-           - The cementation operations should be re-injected because the node
-             only keeps track of the last cemented level and the last published
-             commitment, without rollbacks.
 
            - Messages posted to an inbox should be re-emitted (i.e. re-queued)
              in case of a fork.
@@ -128,9 +121,16 @@ module Parameters :
     | Failed error -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
-        match classify_trace error with
-        | Permanent | Outdated -> return Forget
-        | Branch | Temporary -> return Retry)
+        match op with
+        | Cement _ | Publish _ ->
+            (* Cement and Publish commitments can be forgotten to free up the
+               injector as they are requeued by the node automatically. *)
+            return Forget
+        | Refute _ | Timeout _ | Add_messages _ | Recover_bond _
+        | Execute_outbox_message _ -> (
+            match classify_trace error with
+            | Permanent | Outdated -> return Forget
+            | Branch | Temporary -> return Retry))
     | Never_included ->
         (* Forget operations that are never included *)
         return Forget
