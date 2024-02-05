@@ -1146,6 +1146,39 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
   in
   return commitment
 
+(* Similar to [publish_and_store_slot] but additionally bakes [1 +
+   number_of_extra_blocks] blocks to trigger the publication of the
+   shards of the published slot. Moreover, the [wait_slot] argument
+   can be used to wait for the shards to be received by one or several
+   other DAL nodes. Returns the level at which the slot was
+   published. *)
+let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) client
+    slot_producer_dal_node source ~index ~wait_slot
+    ~number_of_extra_blocks_to_bake content =
+  let* commitment, proof =
+    Helpers.store_slot ~with_proof:true slot_producer_dal_node content
+  in
+  let p = wait_slot commitment in
+  let* _ =
+    publish_commitment
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      client
+  in
+  (* Bake a first block to include the operation. *)
+  let* () = bake_for client in
+  let* level = Client.level client in
+  (* Bake some more blocks to finalize the block containing the publication. *)
+  let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
+  (* Wait for the shards to be received *)
+  let* () = p in
+  return level
+
 let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client node
     dal_node source ~index ~content ~attestation_lag ~number_of_slots =
   let* _commitment =
