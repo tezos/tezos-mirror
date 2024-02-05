@@ -13,7 +13,6 @@ use crate::account_storage::{
     CODE_HASH_DEFAULT,
 };
 use crate::transaction::TransactionContext;
-use crate::ArithmeticErrorKind::FeeOverflow;
 use crate::EthereumError;
 use crate::PrecompileSet;
 use crate::{storage, tick_model_opcodes};
@@ -479,7 +478,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let amount = U256::from(gas_limit)
             .checked_mul(effective_gas_price)
-            .ok_or(EthereumError::ArithmeticError(FeeOverflow))?;
+            .ok_or(EthereumError::GasPaymentOverflow)?;
 
         log!(
             self.host,
@@ -503,7 +502,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let amount = U256::from(unused_gas)
             .checked_mul(effective_gas_price)
-            .ok_or(EthereumError::ArithmeticError(FeeOverflow))?;
+            .ok_or(EthereumError::GasPaymentOverflow)?;
 
         log!(
             self.host,

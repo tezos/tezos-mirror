@@ -50,11 +50,6 @@ pub enum DurableStorageError {
     PathError(#[from] host::path::PathError),
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum ArithmeticErrorKind {
-    FeeOverflow,
-}
-
 /// Errors when processing Ethereum transactions
 ///
 /// What could possibly go wrong? Some of these are place holders for now.
@@ -109,13 +104,13 @@ pub enum EthereumError {
     /// result of a bug in the EvmHandler.
     #[error("Inconsistent EvmHandler state: {0}")]
     InconsistentState(Cow<'static, str>),
-    /// The execution failed because there was an arithmetic overflow or underflow.
-    #[error("A computation provoked an arithmetic error: {0:?}")]
-    ArithmeticError(ArithmeticErrorKind),
     /// The execution failed because it spent more ticks than the one currently
     /// available for the current run.
     #[error("The transaction took more ticks than expected")]
     OutOfTicks,
+    /// gas_limit * gas_price > u64::max
+    #[error("Gas payment overflowed u64::max")]
+    GasPaymentOverflow,
 }
 
 /// Execute an Ethereum Transaction
