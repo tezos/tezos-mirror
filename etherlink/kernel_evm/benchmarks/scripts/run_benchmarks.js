@@ -30,6 +30,7 @@ commander
     .option('-i, --include <regex>', 'Only consider benchmark scripts matching <regex>')
     .option('-e, --exclude <regex>', 'Exclude benchmark scripts matching <regex>')
     .option('-o, --output-dir <path>', "Output directory")
+    .option('--keep-temp', "Keep temporary files", false)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -41,6 +42,7 @@ function filter_name(name) {
             || !name.match(EXCLUDE_REGEX))
 }
 
+let KEEP_TEMP = commander.opts().keepTemp;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
 const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
@@ -143,7 +145,7 @@ function run_profiler(path, logs) {
                 : null;
             if (profiler_output_path_result !== null) {
                 profiler_output_path = profiler_output_path_result;
-                console.log(`Flamechart: ${profiler_output_path}`)
+                if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path}`)
             }
             push_match(output, gas_used, /\bgas_used:\s*(\d+)/g)
             push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
@@ -274,6 +276,15 @@ async function run_benchmark(path, logs) {
     var inbox_size = fs.statSync(path).size
     run_profiler_result = await run_profiler(path, logs);
     profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
+    if (!KEEP_TEMP) {
+        fs.unlink(run_profiler_result.profiler_output_path, (err) => {
+            if (err) {
+                console.error(err);
+            } else {
+                console.log(`Profiler output ${run_profiler_result.profiler_output_path} removed.`);
+            }
+        });
+    }
     return {
         inbox_size,
         ...profiler_output_analysis_result,
@@ -451,6 +462,7 @@ mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
 
 
 function move_profiler_output(src, bench_name, time) {
+    if (!KEEP_TEMP) return;
     let dest = path.format({ dir: PROFILER_OUTPUT_DIRECTORY, base: `${bench_name.replaceAll('/', '_')}_${time}.out` })
     fs.rename(path.resolve(src), dest, (err) => {
         if (err && err.code === 'EXDEV') {
