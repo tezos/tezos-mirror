@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type kind = Double_baking | Double_attesting
+type kind = Double_baking | Double_attesting | Double_preattesting
 
 let kind_encoding =
   let open Data_encoding in
@@ -24,6 +24,12 @@ let kind_encoding =
         (constant "double attesting")
         (function Double_attesting -> Some () | _ -> None)
         (fun () -> Double_attesting);
+      case
+        (Tag 2)
+        ~title:"Double preattesting"
+        (constant "double preattesting")
+        (function Double_preattesting -> Some () | _ -> None)
+        (fun () -> Double_preattesting);
     ]
 
 type t = {
@@ -32,6 +38,19 @@ type t = {
   round : Round_repr.t;
   slot : Slot_repr.t;
 }
+
+let compare_kind a b =
+  let to_int = function
+    | Double_baking -> 0
+    | Double_attesting -> 1
+    | Double_preattesting -> 2
+  in
+  Compare.Int.compare (to_int a) (to_int b)
+
+let compare a b =
+  Compare.or_else (Raw_level_repr.compare a.level b.level) @@ fun () ->
+  Compare.or_else (Round_repr.compare a.round b.round) @@ fun () ->
+  compare_kind a.kind b.kind
 
 let encoding =
   let open Data_encoding in

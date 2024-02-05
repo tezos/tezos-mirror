@@ -94,7 +94,7 @@ let punish_double_signing ctxt ~operation_hash
         ( for_double_baking,
           {denounced with for_double_baking = true},
           Slash_percentage.for_double_baking ctxt )
-    | Double_attesting ->
+    | Double_attesting | Double_preattesting ->
         ( for_double_attesting,
           {denounced with for_double_attesting = true},
           Slash_percentage.for_double_attestation ctxt )
@@ -219,7 +219,7 @@ let apply_and_clear_denunciations ctxt =
               let slashing_percentage =
                 match misbehaviour.kind with
                 | Double_baking -> Slash_percentage.for_double_baking ctxt
-                | Double_attesting ->
+                | Double_attesting | Double_preattesting ->
                     Slash_percentage.for_double_attestation ctxt
               in
               let misbehaviour_cycle =

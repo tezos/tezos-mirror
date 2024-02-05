@@ -214,7 +214,7 @@ module For_RPC = struct
                         (Constants_storage
                          .percentage_of_frozen_deposits_slashed_per_double_baking
                            ctxt)
-                  | Double_attesting ->
+                  | Double_attesting | Double_preattesting ->
                       Percentage.add_bounded
                         acc
                         (Constants_storage

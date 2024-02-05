@@ -1422,7 +1422,8 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
       rewarded
       (match misbehaviour.kind with
       | Double_baking -> "double baking"
-      | Double_attesting -> "double attesting")
+      | Double_attesting -> "double attesting"
+      | Double_preattesting -> "double preattesting")
   in
   let denunciations_pp = Format.pp_print_list denunciations_obj_pp in
   let* () =
@@ -1575,7 +1576,7 @@ let pct_from_kind (block : Block.t) = function
         block.constants.percentage_of_frozen_deposits_slashed_per_double_baking
       |> Q.(mul (100 // 1))
       |> Q.to_int
-  | Double_attesting ->
+  | Double_attesting | Double_preattesting ->
       Protocol.Percentage.to_q
         block.constants
           .percentage_of_frozen_deposits_slashed_per_double_attestation
