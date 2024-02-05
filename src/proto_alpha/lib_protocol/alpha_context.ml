@@ -524,7 +524,6 @@ module Misbehaviour = Misbehaviour_repr
 module Delegate = struct
   include Delegate_storage
   include Delegate_missed_attestations_storage
-  include Already_denounced_storage
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
@@ -540,6 +539,8 @@ module Delegate = struct
   let deactivated = Delegate_activation_storage.is_inactive
 
   let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden
+
+  let already_denounced = Already_denounced_storage.already_denounced
 
   module Consensus_key = Delegate_consensus_key
 

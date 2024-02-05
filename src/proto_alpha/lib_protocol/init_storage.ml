@@ -117,11 +117,16 @@ let migrate_already_denounced_from_Oxford ctxt =
         (ctxt, cycle)
         ~order:`Undefined
         ~init:ctxt
-        ~f:(fun (level, delegate) denounced ctxt ->
+        ~f:(fun (level, delegate) {for_double_attesting; for_double_baking} ctxt
+           ->
           Storage.Already_denounced.add
             (ctxt, cycle)
             ((level, Round_repr.zero), delegate)
-            denounced)
+            {
+              for_double_preattesting = for_double_attesting;
+              for_double_attesting;
+              for_double_baking;
+            })
     in
     Storage.Already_denounced__Oxford.clear (ctxt, cycle)
   in

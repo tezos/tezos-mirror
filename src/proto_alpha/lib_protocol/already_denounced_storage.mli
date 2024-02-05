@@ -12,29 +12,25 @@
     {!Storage.Already_denounced} table, which tracks which
     denunciations have already been seen in blocks.
 
+    A denunciation is uniquely characterized by the delegate (the
+    culprit), the level and round of the duplicate block or
+    (pre)attestation, and the {!type-Misbehaviour_repr.kind} (double
+    baking/attesting/preattesting).
+
     Invariant: {!Storage.Already_denounced} is empty for cycles equal
     to [current_cycle - max_slashing_period] or older. Indeed, such
     denunciations are no longer allowed (see
     [Anonymous.check_denunciation_age] in {!Validate}) so there is no
     need to track them anymore. *)
 
-(** Returns true if the given delegate has already been denounced for
-    double baking for the given level and round. *)
-val already_denounced_for_double_baking :
+(** Returns true if the given delegate has already been denounced
+    for the given misbehaviour kind at the given level and round. *)
+val already_denounced :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
   Round_repr.t ->
-  bool tzresult Lwt.t
-
-(** Returns true if the given delegate has already been denounced for
-    double preattesting or double attesting for the given level and
-    round. *)
-val already_denounced_for_double_attesting :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  Round_repr.t ->
+  Misbehaviour_repr.kind ->
   bool tzresult Lwt.t
 
 (** Records a denunciation in {!Storage.Already_denounced}.

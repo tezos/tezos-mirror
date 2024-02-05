@@ -1358,11 +1358,13 @@ module Anonymous = struct
         in
         let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
         let* already_slashed =
-          Delegate.already_denounced_for_double_attesting
-            ctxt
-            delegate
-            level
-            e1.round
+          let kind =
+            match denunciation_kind with
+            | Preattestation -> Misbehaviour.Double_preattesting
+            | Attestation -> Double_attesting
+            | Block -> Double_baking
+          in
+          Delegate.already_denounced ctxt delegate level e1.round kind
         in
         let*? () =
           error_unless
@@ -1528,7 +1530,7 @@ module Anonymous = struct
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
-      Delegate.already_denounced_for_double_baking ctxt delegate level round1
+      Delegate.already_denounced ctxt delegate level round1 Double_baking
     in
     let*? () =
       error_unless

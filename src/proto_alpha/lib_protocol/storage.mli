@@ -485,9 +485,16 @@ module Pending_denunciations :
      and type key = Signature.public_key_hash
      and type value = Denunciations_repr.t
 
+(** Needed for the stitching from Oxford to P. Remove this in Q. *)
+type denounced__Oxford = {for_double_attesting : bool; for_double_baking : bool}
+
 (** This type is used to track which denunciations have already been
     recorded, to avoid slashing multiple times the same event. *)
-type denounced = {for_double_attesting : bool; for_double_baking : bool}
+type denounced = {
+  for_double_preattesting : bool;
+  for_double_attesting : bool;
+  for_double_baking : bool;
+}
 
 (** {!denounced} with all fields set to [false]. *)
 val default_denounced : denounced
@@ -505,7 +512,7 @@ module Already_denounced__Oxford :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
      and type key = Raw_level_repr.t * Signature.Public_key_hash.t
-     and type value = denounced
+     and type value = denounced__Oxford
 
 module Pending_staking_parameters :
   Indexed_data_storage

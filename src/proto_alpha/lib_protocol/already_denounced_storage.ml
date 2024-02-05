@@ -7,29 +7,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
-    round =
+let already_denounced ctxt delegate (level : Level_repr.t) round kind =
   let open Lwt_result_syntax in
   let* denounced_opt =
     Storage.Already_denounced.find
       (ctxt, level.cycle)
       ((level.level, round), delegate)
   in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_attesting
-
-let already_denounced_for_double_baking ctxt delegate (level : Level_repr.t)
-    round =
-  let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, round), delegate)
-  in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_baking
+  match (denounced_opt, (kind : Misbehaviour_repr.kind)) with
+  | None, _ -> return_false
+  | Some denounced, Double_preattesting ->
+      return denounced.for_double_preattesting
+  | Some denounced, Double_attesting -> return denounced.for_double_attesting
+  | Some denounced, Double_baking -> return denounced.for_double_baking
 
 let add_denunciation ctxt delegate (level : Level_repr.t) round kind =
   let open Lwt_result_syntax in
@@ -42,12 +32,15 @@ let add_denunciation ctxt delegate (level : Level_repr.t) round kind =
     Option.value denounced_opt ~default:Storage.default_denounced
   in
   let already_denounced, updated_denounced =
-    let Storage.{for_double_baking; for_double_attesting} = denounced in
     match kind with
     | Misbehaviour_repr.Double_baking ->
-        (for_double_baking, {denounced with for_double_baking = true})
-    | Double_attesting | Double_preattesting ->
-        (for_double_attesting, {denounced with for_double_attesting = true})
+        (denounced.for_double_baking, {denounced with for_double_baking = true})
+    | Double_attesting ->
+        ( denounced.for_double_attesting,
+          {denounced with for_double_attesting = true} )
+    | Double_preattesting ->
+        ( denounced.for_double_preattesting,
+          {denounced with for_double_preattesting = true} )
   in
   assert (Compare.Bool.(already_denounced = false)) ;
   let*! ctxt =
