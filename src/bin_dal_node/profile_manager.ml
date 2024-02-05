@@ -153,25 +153,23 @@ let get_profiles t =
   match t with
   | Bootstrap -> Types.Bootstrap
   | Operator {producers; attesters; observers} ->
-      let producer_profiles =
+      let producer_profiles acc =
         Slot_set.fold
           (fun slot_index acc -> Types.Producer {slot_index} :: acc)
           producers
-          []
+          acc
       in
-      let observer_profiles =
+      let observer_profiles acc =
         Slot_set.fold
           (fun slot_index acc -> Types.Observer {slot_index} :: acc)
           observers
-          []
+          acc
       in
-      let attester_profiles =
-        Pkh_set.fold
-          (fun pkh acc -> Types.Attester pkh :: acc)
-          attesters
-          producer_profiles
+      let attester_profiles acc =
+        Pkh_set.fold (fun pkh acc -> Types.Attester pkh :: acc) attesters acc
       in
-      Types.Operator (attester_profiles @ producer_profiles @ observer_profiles)
+      Types.Operator
+        (attester_profiles @@ producer_profiles @@ observer_profiles @@ [])
 
 let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
