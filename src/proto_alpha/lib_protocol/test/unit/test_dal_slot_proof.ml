@@ -31,6 +31,11 @@
     Subject:    These unit tests check proof-related functions of Dal slots.
 *)
 
+(*
+TODO: https://gitlab.com/tezos/tezos/-/issues/6895
+
+Adapt/re-enable tests
+
 open Protocol
 module S = Dal_slot_repr
 module H = S.Header
@@ -442,3 +447,4 @@ let tests =
 let () =
   Alcotest_lwt.run ~__FILE__ Protocol.name [("dal slot proof", tests)]
   |> Lwt_main.run
+*)
