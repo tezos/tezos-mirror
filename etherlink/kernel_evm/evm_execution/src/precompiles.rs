@@ -407,7 +407,7 @@ fn withdrawal_precompile<Host: Runtime>(
             log!(
                 handler.borrow_host(),
                 Info,
-                "Withdrawal to {:?}\n",
+                "Withdrawal to {:?}",
                 address_str
             );
 
