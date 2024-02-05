@@ -4,6 +4,8 @@
 
 ### Features
 
+- Implement EIP-3860. (!11831)
+
 ### Bug fixes
 
 - EVM call stack is now the number of internal transaction layers. (!11719)
