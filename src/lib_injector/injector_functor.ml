@@ -1464,7 +1464,7 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 100) ?(injection_ttl = 120)
+      ?(allowed_attempts = 10) ?(injection_ttl = 120)
       ?(reconnection_delay = 2.0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
