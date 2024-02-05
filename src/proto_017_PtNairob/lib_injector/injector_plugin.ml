@@ -235,7 +235,7 @@ module Proto_client = struct
          "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr"
 
   let simulate_operations cctxt ~force ~source ~src_pk ~successor_level
-      ~fee_parameter operations =
+      ~fee_parameter ?safety_guard operations =
     let open Lwt_result_syntax in
     let fee_parameter : Injection.fee_parameter =
       {
@@ -267,6 +267,7 @@ module Proto_client = struct
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
     in
+    let safety_guard = Option.map Gas.Arith.integral_of_int_exn safety_guard in
     let*! simulation_result =
       Injection.inject_manager_operation
         cctxt
@@ -282,6 +283,7 @@ module Proto_client = struct
         ~fee:Limit.unknown
         ~gas_limit:Limit.unknown
         ~storage_limit:Limit.unknown
+        ?safety_guard
         ~fee_parameter
         annot_op
     in

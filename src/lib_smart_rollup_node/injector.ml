@@ -86,6 +86,20 @@ module Parameters :
     |> Option.value
          ~default:(Configuration.default_fee_parameter operation_kind)
 
+  let safety_guard = function
+    | Operation.Publish _ ->
+        (* Gas consumption of commitment publication can increase if there are
+           already commitments for the same level in the context. The value 300
+           was inferred empirically by looking at gas consumption on a running
+           rollup, and is sufficient to cover the difference in the case where a
+           commitment for the same level already exists. *)
+        Some 300
+    | Timeout _ | Refute _ ->
+        (* We increase safety of refutation game operations by precaution. *)
+        Some 300
+    | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
+        None
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Decide if some batches must have all the operations succeed. See
      {!Injector_sigs.Parameter.batch_must_succeed}. *)

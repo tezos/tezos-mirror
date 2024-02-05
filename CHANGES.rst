@@ -106,8 +106,12 @@ Smart Rollup node
 
 - Snapshot import. (MR :gl:`!10803`)
 
-- Pre-images endpoint (configurable on the CLI of the config file) to allow the rollup
-  node to fetch missing pre-images from a remote server. (MR :gl:`!11600`)
+- Pre-images endpoint (configurable on the CLI of the config file) to allow the
+  rollup node to fetch missing pre-images from a remote server. (MR
+  :gl:`!11600`)
+
+- Higher gas limit for publish commitment operations to avoid their failing due
+  to gas variations. (MR :gl:`!11761`)
 
 - Fix issue with constants fetching during protocol migration. (MR :gl:`!11804`)
 
