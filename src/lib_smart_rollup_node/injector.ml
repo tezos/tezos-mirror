@@ -100,11 +100,6 @@ module Parameters :
     | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
         None
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Decide if some batches must have all the operations succeed. See
-     {!Injector_sigs.Parameter.batch_must_succeed}. *)
-  let batch_must_succeed _ = `At_least_one
-
   let retry_unsuccessful_operation _state (_op : Operation.t) status =
     let open Lwt_syntax in
     match status with
