@@ -269,7 +269,7 @@ init_rollup)
   echo "You can now start the docker with \"./init.sh run\""
   ;;
 reset_rollup)
-  docker compose stop smart-rollup-node sequencer blockscout blockscout-db blockscout-redis-db
+  docker compose stop smart-rollup-node sequencer
 
   rm -r "${HOST_TEZOS_DATA_DIR}/.tezos-smart-rollup-node" "${HOST_TEZOS_DATA_DIR}/.octez-evm-node" "${HOST_TEZOS_DATA_DIR}/kernel"
 
