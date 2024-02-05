@@ -47,10 +47,12 @@ let () =
     (fun parameter -> Failed_to_load_trusted_setup parameter)
   [@@coverage off]
 
-type initialisation_parameters = Srs_g1.t
+type initialisation_parameters =
+  | Verifier of {test : bool}
+  | Prover of {test : bool; srs : Srs_g1.t}
 
 (* Initialisation parameters are supposed to be instantiated once. *)
-let initialisation_parameters = ref None
+let initialisation_parameters = ref @@ Verifier {test = false}
 
 type error += Dal_initialisation_twice
 
@@ -76,11 +78,8 @@ let slot_as_polynomial_length = Srs_verifier.slot_as_polynomial_length
 (* This function is expected to be called once. *)
 let load_parameters parameters =
   let open Result_syntax in
-  match !initialisation_parameters with
-  | None ->
-      initialisation_parameters := Some parameters ;
-      return_unit
-  | Some _ -> fail [Dal_initialisation_twice]
+  initialisation_parameters := parameters ;
+  return_unit
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
 
@@ -540,16 +539,21 @@ module Inner = struct
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
       let* mode, srs_g1, srs_verifier =
         match !initialisation_parameters with
-        | Some srs_g1 ->
-            Ok
-              ( `Prover,
-                srs_g1,
-                (module Srs_verifier.Internal_for_tests : Srs_verifier.S) )
-        | None ->
-            Ok
-              ( `Verifier,
-                Srs_verifier.get_verifier_srs1 (),
-                (module Srs_verifier : Srs_verifier.S) )
+        | Verifier {test} ->
+            if test then
+              Ok
+                ( `Verifier,
+                  Srs_verifier.Internal_for_tests.get_verifier_srs1 (),
+                  (module Srs_verifier.Internal_for_tests : Srs_verifier.S) )
+            else
+              Ok
+                ( `Verifier,
+                  Srs_verifier.get_verifier_srs1 (),
+                  (module Srs_verifier : Srs_verifier.S) )
+        | Prover {test; srs} ->
+            if test then
+              Ok (`Prover, srs, (module Srs_verifier.Internal_for_tests))
+            else Ok (`Prover, srs, (module Srs_verifier))
       in
       let* () =
         ensure_validity
@@ -563,16 +567,17 @@ module Inner = struct
       in
       let srs_g2 =
         match !initialisation_parameters with
-        | Some _ ->
-            Srs_verifier.Internal_for_tests.get_verifier_srs2
-              ~max_polynomial_length
-              ~page_length_domain
-              ~shard_length
-        | None ->
-            Srs_verifier.get_verifier_srs2
-              ~max_polynomial_length
-              ~page_length_domain
-              ~shard_length
+        | Verifier {test} | Prover {test; _} ->
+            if test then
+              Srs_verifier.Internal_for_tests.get_verifier_srs2
+                ~max_polynomial_length
+                ~page_length_domain
+                ~shard_length
+            else
+              Srs_verifier.get_verifier_srs2
+                ~max_polynomial_length
+                ~page_length_domain
+                ~shard_length
       in
       let kate_amortized =
         Kate_amortized.
@@ -1276,9 +1281,10 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let parameters_initialisation () = Srs_verifier.Internal_for_tests.fake_srs ()
+  let parameters_initialisation () =
+    Prover {test = true; srs = Srs_verifier.Internal_for_tests.fake_srs ()}
 
-  let load_parameters parameters = initialisation_parameters := Some parameters
+  let load_parameters parameters = initialisation_parameters := parameters
 
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
@@ -1313,7 +1319,8 @@ module Internal_for_tests = struct
 
   let precomputation_equal = Kate_amortized.preprocess_equal
 
-  let reset_initialisation_parameters () = initialisation_parameters := None
+  let reset_initialisation_parameters () =
+    initialisation_parameters := Verifier {test = false}
 
   let dummy_commitment ~state () = Commitment_proof.random ~state ()
 
@@ -1352,8 +1359,9 @@ module Internal_for_tests = struct
       {redundancy_factor; slot_size; page_size; number_of_shards} =
     let mode, srs_g1_length =
       match !initialisation_parameters with
-      | Some srs -> (`Prover, Srs_g1.size srs)
-      | None -> (`Verifier, Srs_verifier.max_verifier_srs_size)
+      | Verifier {test = _} ->
+          (`Verifier, Srs_g1.size (Srs_verifier.get_verifier_srs1 ()))
+      | Prover {test = _; srs} -> (`Prover, Srs_g1.size srs)
     in
     match
       ensure_validity
@@ -1382,18 +1390,37 @@ module Config = struct
 
   let default = Dal_config.default
 
-  let init_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
+  let init_verifier_dal dal_config =
+    let open Lwt_result_syntax in
+    if dal_config.activated then
+      let* initialisation_parameters =
+        match dal_config.use_mock_srs_for_testing with
+        | Some _parameters -> return (Verifier {test = true})
+        | None -> return (Verifier {test = false})
+      in
+      Lwt.return (load_parameters initialisation_parameters)
+    else return_unit
+
+  let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
         | Some _parameters ->
-            return (Internal_for_tests.parameters_initialisation ())
+            return
+              (Prover
+                 {
+                   test = true;
+                   srs = Srs_verifier.Internal_for_tests.fake_srs ();
+                 })
         | None ->
             let*? srs_g1_path, _ = find_srs_files () in
-            initialisation_parameters_from_files
-              ~srs_g1_path
-              ~srs_size:(1 lsl srs_size_log2)
+            let* srs =
+              initialisation_parameters_from_files
+                ~srs_g1_path
+                ~srs_size:(1 lsl srs_size_log2)
+            in
+            return (Prover {test = false; srs})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

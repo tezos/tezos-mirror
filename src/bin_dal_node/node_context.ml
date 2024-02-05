@@ -73,17 +73,11 @@ let init config store gs_worker transport_layer cctxt metrics_server =
     metrics_server;
   }
 
-let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
+let set_ready ctxt plugin cryptobox shards_proofs_precomputation
+    proto_parameters plugin_proto =
   let open Result_syntax in
   match ctxt.status with
   | Starting ->
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-
-         Instead of recompute those parameters, they could be stored
-         (for a given cryptobox). *)
-      let shards_proofs_precomputation =
-        Cryptobox.precompute_shards_proofs cryptobox
-      in
       let* () =
         Profile_manager.validate_slot_indexes
           ctxt.profile_ctxt
