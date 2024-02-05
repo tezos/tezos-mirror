@@ -165,14 +165,14 @@ val adaptive_issuance_ns_enable : Raw_context.t -> bool
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
-(** The following accessor are not actual parameters, but constants that
-    derives from the protocol parameter. *)
+(** The following accessors are not actual parameters, but constants that
+    derive from the protocol parameter. *)
 
-(** Delay in cycle before the current state of the stake impacts the
+(** Delay, in cycles, before the current state of the stake impacts the
     issuance rate.*)
 val issuance_modification_delay : Raw_context.t -> int
 
-(** Time in cycle before activation of AI after the voting EMA threshold is
+(** Delay, in cycles, before activation of AI after the voting EMA threshold is
    reached *)
 val adaptive_issuance_activation_delay : Raw_context.t -> int
 
@@ -183,6 +183,7 @@ val tolerated_inactivity_period : Raw_context.t -> int
 (** Delay before the activation of a consensus key, in cycles *)
 val consensus_key_activation_delay : Raw_context.t -> int
 
-(** Period, in cycles, during which frozen tokens remain slashable after the
-    cycle of their deposit *)
+(** Number of cycles during which a misbehavior of a delegate will induce a
+    slashing of the funds that are currently in its frozen deposit. *)
+
 val slashable_deposits_period : Raw_context.t -> int
