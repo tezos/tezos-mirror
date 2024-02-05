@@ -1440,6 +1440,25 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
+    fn rollback_inter_transaction_side_effect<T>(
+        handler: &mut EvmHandler<'_, Host>,
+        execution_result: CreateOutcome,
+        refund_gas: bool,
+    ) -> Capture<CreateOutcome, T> {
+        if let Err(err) = handler.rollback_inter_transaction(refund_gas) {
+            log!(
+                handler.host,
+                Debug,
+                "Rolling back reverted transaction caused an error: {:?}",
+                err
+            );
+
+            Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
+        } else {
+            Capture::Exit(execution_result)
+        }
+    }
+
     /// End a transaction based on an execution result from a call to
     /// [execute]. This can be either a rollback or a commit depending
     /// on whether the execution was successful or not.
@@ -1450,78 +1469,89 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Capture<CreateOutcome, T> {
-        if let Ok((ref _r @ ExitReason::Succeed(_), _, _)) = execution_result {
-            log!(
-                self.host,
-                Debug,
-                "Intermediate transaction ended with: {:?}",
-                _r
-            );
-
-            if let Err(err) = self.commit_inter_transaction() {
-                log!(
-                    self.host,
-                    Debug,
-                    "Committing intermediate transaction caused an error: {:?}",
-                    err
-                );
-
-                return Capture::Exit((
-                    ethereum_error_to_exit_reason(&err),
-                    None,
-                    vec![],
-                ));
-            }
-        } else if let Ok((ExitReason::Revert(_), _, _)) = execution_result {
-            log!(self.host, Debug, "Intermediate transaction reverted");
-
-            if let Err(err) = self.rollback_inter_transaction(true) {
-                log!(
-                    self.host,
-                    Debug,
-                    "Rolling back reverted transaction caused an error: {:?}",
-                    err
-                );
-
-                return Capture::Exit((
-                    ethereum_error_to_exit_reason(&err),
-                    None,
-                    vec![],
-                ));
-            }
-        } else if let Ok((ExitReason::Error(_), _, _)) = execution_result {
-            // Internal call failed. [rollback_inter_transaction] will consume
-            // the gas with [refund_gas = false] and revert all sub-context
-            // side-effect and continue the execution.
-
-            if let Err(err) = self.rollback_inter_transaction(false) {
-                log!(
-                    self.host,
-                    Debug,
-                    "Rolling back intermediate transaction caused an error: {:?}",
-                    err
-                );
-
-                return Capture::Exit((
-                    ethereum_error_to_exit_reason(&err),
-                    None,
-                    vec![],
-                ));
-            }
-        } else if let Err(err) = self.rollback_inter_transaction(false) {
-            log!(
-                self.host,
-                Debug,
-                "Intermediate transaction ended in error: {:?}",
-                err
-            );
-
-            return Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]));
-        }
-
         match execution_result {
-            Ok(res) => Capture::Exit(res),
+            Ok((ref exit_reason, _, _)) => match exit_reason {
+                ExitReason::Succeed(_) => {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction ended with: {:?}",
+                        exit_reason
+                    );
+
+                    if let Err(err) = self.commit_inter_transaction() {
+                        log!(
+                            self.host,
+                            Debug,
+                            "Committing intermediate transaction caused an error: {:?}",
+                            err
+                        );
+
+                        Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
+                    } else {
+                        Capture::Exit(execution_result.unwrap()) // safe unwrap
+                    }
+                }
+                ExitReason::Revert(_) => {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction reverted with: {:?}",
+                        exit_reason
+                    );
+
+                    Self::rollback_inter_transaction_side_effect(
+                        self,
+                        execution_result.unwrap(), // safe unwrap
+                        true,
+                    )
+                }
+                ExitReason::Error(_) => {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction produced the following error: {:?}",
+                        exit_reason
+                    );
+
+                    Self::rollback_inter_transaction_side_effect(
+                        self,
+                        execution_result.unwrap(), // safe unwrap
+                        false,
+                    )
+                }
+                ExitReason::Fatal(_) => {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction produced the following fatal error: {:?}",
+                        exit_reason
+                    );
+
+                    Self::rollback_inter_transaction_side_effect(
+                        self,
+                        execution_result.unwrap(), // safe unwrap
+                        false,
+                    )
+                }
+            },
             Err(err) => {
+                log!(
+                    self.host,
+                    Debug,
+                    "Intermediate transaction ended in error: {:?}",
+                    err
+                );
+
+                if let Err(err) = self.rollback_inter_transaction(false) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Rolling back reverted transaction caused an error: {:?}",
+                        err
+                    );
+                }
+
                 Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
             }
         }
