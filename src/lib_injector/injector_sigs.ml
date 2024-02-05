@@ -161,6 +161,10 @@ module type PARAMETERS = sig
   (** Returns the gas safety guard for each operation if it should be different
       from the client default (100). *)
   val safety_guard : Operation.t -> int option
+
+  (** Indicate which operations should be persisted on disk to be reinjected
+      upon restart.  *)
+  val persist_operation : Operation.t -> bool
 end
 
 module type PROTOCOL_CLIENT = sig

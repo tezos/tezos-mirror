@@ -127,6 +127,8 @@ end)
 (K : Tezos_crypto.Intfs.HASH) (V : sig
   type t
 
+  val persist : t -> bool
+
   val encoding : t Data_encoding.t
 end) : sig
   type t

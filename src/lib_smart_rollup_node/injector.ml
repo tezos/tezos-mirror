@@ -100,6 +100,18 @@ module Parameters :
     | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
         None
 
+  let persist_operation (op : Operation.t) =
+    match op with
+    | Cement _ | Publish _
+    (* Cement and Publish commitments don't need to be persisted as they are
+       requeued by the node automatically. *)
+    | Refute _ | Timeout _
+    (* Refutation game operations don't need to be persisted as they are
+       requeued by the node automatically depending on the state of the game on
+       L1 on startup. *) ->
+        false
+    | Add_messages _ | Recover_bond _ | Execute_outbox_message _ -> true
+
   let retry_unsuccessful_operation _state (op : Operation.t) status =
     let open Lwt_syntax in
     match status with

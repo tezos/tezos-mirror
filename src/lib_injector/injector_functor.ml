@@ -119,7 +119,11 @@ module Make (Parameters : PARAMETERS) = struct
         let name = "operations_queue"
       end)
       (Inj_operation.Hash)
-      (Inj_operation)
+      (struct
+        include Inj_operation
+
+        let persist o = Parameters.persist_operation o.operation
+      end)
 
   module Injected_operations = Inj_operation.Hash.Table
   module Injected_ophs = Operation_hash.Table

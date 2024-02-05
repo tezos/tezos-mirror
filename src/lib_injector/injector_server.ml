@@ -84,6 +84,8 @@ module Parameters :
 
   let safety_guard _ = None
 
+  let persist_operation _ = true
+
   let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
     let open Lwt_syntax in
     match status with
