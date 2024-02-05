@@ -874,7 +874,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
                 Err(err) => Err(err),
             }
-        } else if !self.deleted(address) {
+        } else {
             let code = self.code(address);
 
             let mut runtime = evm::Runtime::new(
@@ -888,10 +888,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             let result = self.execute(&mut runtime);
 
             return Ok((result?, None, runtime.machine().return_value()));
-        } else {
-            // Contract must be empty since it was deleted, so there are no
-            // instructions to run.
-            return Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![]));
         }
     }
 
