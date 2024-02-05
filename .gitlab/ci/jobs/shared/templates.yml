@@ -120,6 +120,16 @@
           - .gitlab-ci.yml
         when: on_success
 
+.rules__octez_kaitai_e2e_changes:
+  rules:
+    - changes:
+        - images/**/*
+        - src/**/*
+        - contrib/*kaitai*/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success
+
 # Add variable for bisect_ppx instrumentation.
 #
 # This template should be extended by jobs that build OCaml targets

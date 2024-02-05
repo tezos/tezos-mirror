@@ -13,6 +13,7 @@ include:
 
   # Stage: build
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-before_merging.yml
+  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-before_merging.yml
   - .gitlab/ci/jobs/build/ocaml-check.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
   - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml

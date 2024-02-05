@@ -2,15 +2,10 @@ kaitai_e2e_checks:
   extends:
     - .default_settings_template
     - .image_template__client_libs_dependencies
+    - .rules__octez_kaitai_e2e_changes
   stage: test
-  needs: [kaitai_checks]
-  rules:
-    - changes:
-        - src/**/*
-        - contrib/*kaitai*/**/*
-        - .gitlab/**/*
-        - .gitlab-ci.yml
-      when: on_success
+  needs: [oc.docker:client-libs-dependencies, kaitai_checks]
+  dependencies: [oc.docker:client-libs-dependencies]
   before_script:
     - . ./scripts/version.sh
     # TODO: https://gitlab.com/tezos/tezos/-/issues/5026

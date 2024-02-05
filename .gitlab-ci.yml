@@ -67,6 +67,7 @@ variables:
   # This image is not automatically mirrored to AWS ECR and should be
   # fetch from the GitLab registry, so do not use CI_REGISTRY here.
   rust_toolchain_image_name: "registry.gitlab.com/${CI_PROJECT_PATH}/rust-toolchain"
+  client_libs_dependencies_image_name: "registry.gitlab.com/${CI_PROJECT_PATH}/client-libs-dependencies"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
@@ -106,7 +107,7 @@ variables:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
 .image_template__client_libs_dependencies:
-  image: ${build_deps_image_name}:client-libs-dependencies--${build_deps_image_version}
+  image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
 
 .image_template__rust_toolchain:
   # Warning: we are relying on ill-specified behavior from GitLab that
