@@ -1079,7 +1079,7 @@ module Consensus_keys =
        end))
        (Public_key_hash_index)
 
-module Current_cycle_denunciations =
+module Pending_denunciations =
   Make_indexed_data_storage
     (Make_subcontext (Registered) (Raw_context)
        (struct

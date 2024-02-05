@@ -2470,7 +2470,7 @@ module Delegate : sig
 
     val staking_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
-    val current_cycle_denunciations_list :
+    val pending_denunciations_list :
       context -> (public_key_hash * Denunciations_repr.item) list Lwt.t
   end
 end

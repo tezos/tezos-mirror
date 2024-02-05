@@ -113,29 +113,18 @@ let punish_double_signing ctxt ~operation_hash
       (* Do not store denunciations that have no effects .*) return ctxt
     else
       let* denunciations_opt =
-        Storage.Current_cycle_denunciations.find ctxt delegate
+        Storage.Pending_denunciations.find ctxt delegate
       in
       let denunciations = Option.value denunciations_opt ~default:[] in
-      let cycle =
-        if Cycle_repr.(level.cycle = current_cycle) then
-          Denunciations_repr.Current
-        else if Cycle_repr.(succ level.cycle = current_cycle) then
-          Denunciations_repr.Previous
-        else
-          (* [max_slashing_period = 2] according to
-             {!Constants_repr.check_constants}. *)
-          assert false
-      in
       let denunciations =
         Denunciations_repr.add
           operation_hash
           rewarded
           misbehaviour
-          cycle
           denunciations
       in
       let*! ctxt =
-        Storage.Current_cycle_denunciations.add ctxt delegate denunciations
+        Storage.Pending_denunciations.add ctxt delegate denunciations
       in
       return ctxt
   in
@@ -147,7 +136,7 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
 
-let apply_and_clear_current_cycle_denunciations ctxt =
+let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let previous_cycle =
@@ -182,18 +171,41 @@ let apply_and_clear_current_cycle_denunciations ctxt =
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     {reward; amount_to_burn}
   in
-  let* ctxt, slashings, balance_updates =
-    Storage.Current_cycle_denunciations.fold
+  let* ctxt, slashings, balance_updates, remaining_denunciations =
+    Storage.Pending_denunciations.fold
       ctxt
       ~order:`Undefined
-      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, []))
+      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, [], []))
       ~f:(fun delegate denunciations acc ->
-        let*? ctxt, slashings, balance_updates = acc in
+        let*? ctxt, slashings, balance_updates, remaining_denunciations = acc in
+        (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
+           end of this period, we "delay" the current cycle's misbehaviour's denunciations,
+           while we apply the older denunciations.
+           Indeed, we apply denunciations in the cycle following the misbehaviour, so that
+           the time between the misbehaviour and the slashing is at most
+           [max_slashing_period = 2] cycles. *)
+        let denunciations_to_apply, denunciations_to_delay =
+          if not (Constants_storage.adaptive_issuance_ns_enable ctxt) then
+            (denunciations, [])
+          else
+            List.partition
+              (fun denunciation ->
+                let level =
+                  denunciation.Denunciations_repr.misbehaviour.level
+                in
+                let misb_cycle =
+                  (Level_repr.level_from_raw
+                     ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                     level)
+                    .cycle
+                in
+                Cycle_repr.(misb_cycle < current_cycle))
+              denunciations
+        in
         let+ ctxt, percentage, balance_updates =
           List.fold_left_es
             (fun (ctxt, percentage, balance_updates)
-                 Denunciations_repr.
-                   {operation_hash; rewarded; misbehaviour; misbehaviour_cycle} ->
+                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
               let slashing_percentage =
                 match misbehaviour.kind with
                 | Double_baking ->
@@ -205,15 +217,22 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                     .percentage_of_frozen_deposits_slashed_per_double_attestation
                       ctxt
               in
-              let ( misbehaviour_cycle,
-                    get_initial_frozen_deposits_of_misbehaviour_cycle ) =
-                match misbehaviour_cycle with
-                | Current ->
-                    (current_cycle, Delegate_storage.initial_frozen_deposits)
-                | Previous ->
-                    ( previous_cycle,
-                      Delegate_storage.initial_frozen_deposits_of_previous_cycle
-                    )
+              let misbehaviour_cycle =
+                (Level_repr.level_from_raw
+                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                   misbehaviour.level)
+                  .cycle
+              in
+              let get_initial_frozen_deposits_of_misbehaviour_cycle =
+                if Cycle_repr.equal current_cycle misbehaviour_cycle then
+                  Delegate_storage.initial_frozen_deposits
+                else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
+                  Delegate_storage.initial_frozen_deposits_of_previous_cycle
+                else fun (_ : Raw_context.t) (_ : Signature.public_key_hash) ->
+                  return Tez_repr.zero
+                (* (denunciation applied too late)
+                   We could assert false, but we can also be permissive
+                   while keeping the same invariants *)
               in
               let* frozen_deposits =
                 let* initial_amount =
@@ -311,12 +330,28 @@ let apply_and_clear_current_cycle_denunciations ctxt =
                 punish_balance_updates @ reward_balance_updates
                 @ balance_updates ))
             (ctxt, Int_percentage.p0, balance_updates)
-            denunciations
+            denunciations_to_apply
         in
         let slashings =
           Signature.Public_key_hash.Map.add delegate percentage slashings
         in
-        (ctxt, slashings, balance_updates))
+        ( ctxt,
+          slashings,
+          balance_updates,
+          (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
-  let*! ctxt = Storage.Current_cycle_denunciations.clear ctxt in
+  let*! ctxt = Storage.Pending_denunciations.clear ctxt in
+  let*! ctxt =
+    List.fold_left_s
+      (fun ctxt (delegate, current_cycle_denunciations) ->
+        match current_cycle_denunciations with
+        | [] -> Lwt.return ctxt
+        | _ ->
+            Storage.Pending_denunciations.add
+              ctxt
+              delegate
+              current_cycle_denunciations)
+      ctxt
+      remaining_denunciations
+  in
   return (ctxt, slashings, balance_updates)

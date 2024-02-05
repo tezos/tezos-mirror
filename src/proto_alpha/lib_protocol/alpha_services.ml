@@ -328,7 +328,7 @@ module Denunciations = struct
     let open Lwt_result_syntax in
     register0 ~chunked:false S.denunciations (fun ctxt () () ->
         let*! r =
-          Alpha_context.Delegate.For_RPC.current_cycle_denunciations_list ctxt
+          Alpha_context.Delegate.For_RPC.pending_denunciations_list ctxt
         in
         return r)
 

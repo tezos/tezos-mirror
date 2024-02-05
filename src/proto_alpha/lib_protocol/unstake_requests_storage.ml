@@ -169,51 +169,71 @@ module For_RPC = struct
         (Contract_repr.Implicit delegate)
     in
     let slashing_history = Option.value slashing_history_opt ~default:[] in
-    (* Remove slashes that haven't been applied yet *)
-    let slashing_history =
-      if not is_last_of_cycle then
-        List.filter
-          (fun (cycle, _) -> Cycle_repr.(cycle < current_level.cycle))
-          slashing_history
-      else slashing_history
-    in
-    (* We get the current cycle's denunciations for events in the previous cycle,
-       and remove them from the slashing events (since they haven't been applied yet).
-       Another solution would be to add the slashing cycle in Storage.Contract.Slashed_deposits,
-       but since it's only used for this specific RPC, let's not. *)
-    let* denunciations_opt =
-      Storage.Current_cycle_denunciations.find ctxt delegate
-    in
-    let denunciations = Option.value denunciations_opt ~default:[] in
-    let not_yet_slashed_pct =
-      if is_last_of_cycle then Int_percentage.p0
+    let* slashing_history =
+      if not (Constants_storage.adaptive_issuance_ns_enable ctxt) then
+        (* Remove slashes that haven't been applied yet *)
+        let slashing_history =
+          if not is_last_of_cycle then
+            List.filter
+              (fun (cycle, _) -> Cycle_repr.(cycle < current_level.cycle))
+              slashing_history
+          else slashing_history
+        in
+        (* We get the current cycle's denunciations for events in the previous cycle,
+           and remove them from the slashing events (since they haven't been applied yet).
+           Another solution would be to add the slashing cycle in Storage.Contract.Slashed_deposits,
+           but since it's only used for this specific RPC, let's not. *)
+        let* denunciations_opt =
+          Storage.Pending_denunciations.find ctxt delegate
+        in
+        let denunciations = Option.value denunciations_opt ~default:[] in
+        let not_yet_slashed_pct =
+          if is_last_of_cycle then Int_percentage.p0
+          else
+            List.fold_left
+              (fun acc Denunciations_repr.{misbehaviour; _} ->
+                let misbehaviour_cycle =
+                  (Level_repr.level_from_raw
+                     ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                     misbehaviour.level)
+                    .cycle
+                in
+                if Cycle_repr.(misbehaviour_cycle = current_level.cycle) then
+                  acc
+                else
+                  match misbehaviour.kind with
+                  | Double_baking ->
+                      Int_percentage.add_bounded
+                        acc
+                        (Constants_storage
+                         .percentage_of_frozen_deposits_slashed_per_double_baking
+                           ctxt)
+                  | Double_attesting ->
+                      Int_percentage.add_bounded
+                        acc
+                        (Constants_storage
+                         .percentage_of_frozen_deposits_slashed_per_double_attestation
+                           ctxt))
+              Int_percentage.p0
+              denunciations
+        in
+        return
+        @@ List.map
+             (fun (cycle, pct) ->
+               if Cycle_repr.(succ cycle = current_level.cycle) then
+                 (cycle, Int_percentage.(sub_bounded pct not_yet_slashed_pct))
+               else (cycle, pct))
+             slashing_history
+      else if not is_last_of_cycle then
+        return
+        @@ List.filter
+             (fun (cycle, _) -> Cycle_repr.(succ cycle < current_level.cycle))
+             slashing_history
       else
-        List.fold_left
-          (fun acc Denunciations_repr.{misbehaviour; misbehaviour_cycle; _} ->
-            match (misbehaviour_cycle, misbehaviour.kind) with
-            | Current, _ -> acc
-            | Previous, Double_baking ->
-                Int_percentage.add_bounded
-                  acc
-                  (Constants_storage
-                   .percentage_of_frozen_deposits_slashed_per_double_baking
-                     ctxt)
-            | Previous, Double_attesting ->
-                Int_percentage.add_bounded
-                  acc
-                  (Constants_storage
-                   .percentage_of_frozen_deposits_slashed_per_double_attestation
-                     ctxt))
-          Int_percentage.p0
-          denunciations
-    in
-    let slashing_history =
-      List.map
-        (fun (cycle, pct) ->
-          if Cycle_repr.(succ cycle = current_level.cycle) then
-            (cycle, Int_percentage.(sub_bounded pct not_yet_slashed_pct))
-          else (cycle, pct))
-        slashing_history
+        return
+        @@ List.filter
+             (fun (cycle, _) -> Cycle_repr.(cycle < current_level.cycle))
+             slashing_history
     in
     List.map_es
       (fun (request_cycle, request_amount) ->
