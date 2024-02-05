@@ -184,8 +184,6 @@ enums:
     2: p256
     3: bls
 seq:
-- id: preserved_cycles
-  type: u1
 - id: consensus_rights_delay
   type: u1
 - id: blocks_preservation_cycles
