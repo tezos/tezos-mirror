@@ -8,6 +8,7 @@ include:
   - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
   # Check that binary packages build
   - .gitlab/ci/jobs/build/bin_packages.yml
+  - .gitlab/ci/jobs/build/select_tezts.yml
 
   # These jobs are necessary to run flaky tezts
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
