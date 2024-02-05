@@ -401,6 +401,9 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
                time_between_blocks;
                sequencer;
                genesis_timestamp = None;
+               max_blueprints_lag = None;
+               max_blueprints_catchup = None;
+               catchup_cooldown = None;
              })
   in
   let* evm_node =
@@ -4296,6 +4299,9 @@ let test_migrate_proxy_to_sequencer =
           time_between_blocks = Some Nothing;
           sequencer;
           genesis_timestamp = None;
+          max_blueprints_lag = None;
+          max_blueprints_catchup = None;
+          catchup_cooldown = None;
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)

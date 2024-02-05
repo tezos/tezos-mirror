@@ -397,6 +397,34 @@ let private_rpc_port_arg =
     ~doc:"The EVM node private server rpc port."
     Params.int
 
+let maximum_blueprints_lag_arg =
+  Tezos_clic.default_arg
+    ~long:"maximum-blueprints-lag"
+    ~placeholder:"LAG"
+    ~default:"500"
+    ~doc:
+      "The maximum advance (in blueprints) the Sequencer accepts to have \
+       before trying to send its backlog again."
+    Params.int
+
+let maximum_blueprints_catchup_arg =
+  Tezos_clic.default_arg
+    ~long:"maximum-blueprints-catch-up"
+    ~placeholder:"CATCH_UP"
+    ~default:"1_000"
+    ~doc:"The maximum number of blueprints the Sequencer resends at once."
+    Params.int
+
+let catchup_cooldown_arg =
+  Tezos_clic.default_arg
+    ~long:"catch-up-cooldown"
+    ~placeholder:"COOLDOWN"
+    ~default:"10"
+    ~doc:
+      "The maximum number of Layer 1 blocks the Sequencer waits after \
+       resending its blueprints before trying to catch-up again."
+    Params.int
+
 let cors_allowed_headers_arg =
   Tezos_clic.arg
     ~long:"cors-headers"
@@ -653,7 +681,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args11
+    (args14
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -664,7 +692,10 @@ let sequencer_command =
        kernel_arg
        preimages_arg
        time_between_blocks_arg
-       genesis_timestamp_arg)
+       genesis_timestamp_arg
+       maximum_blueprints_lag_arg
+       maximum_blueprints_catchup_arg
+       catchup_cooldown_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -689,7 +720,10 @@ let sequencer_command =
            kernel,
            preimages,
            time_between_blocks,
-           genesis_timestamp )
+           genesis_timestamp,
+           max_blueprints_lag,
+           max_blueprints_catchup,
+           catchup_cooldown )
          rollup_node_endpoint
          sequencer
          () ->
@@ -737,7 +771,14 @@ let sequencer_command =
       let* smart_rollup_address =
         Rollup_node_services.smart_rollup_address rollup_node_endpoint
       in
-      let* () = Blueprints_publisher.start {rollup_node_endpoint} in
+      let* () =
+        Blueprints_publisher.start
+          ~rollup_node_endpoint
+          ~max_blueprints_lag
+          ~max_blueprints_catchup
+          ~catchup_cooldown
+          (Blueprint_store.make ~data_dir)
+      in
       let* ctxt =
         Evm_context.init
           ?genesis_timestamp

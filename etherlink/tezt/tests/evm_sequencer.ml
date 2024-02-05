@@ -112,6 +112,7 @@ let setup_l1_contracts ?(admin = Constant.bootstrap1) client =
   return {delayed_transaction_bridge; exchanger; bridge; admin}
 
 let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_catchup ?catchup_cooldown
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
@@ -170,6 +171,9 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
         time_between_blocks;
         sequencer;
         genesis_timestamp;
+        max_blueprints_lag;
+        max_blueprints_catchup;
+        catchup_cooldown;
       }
   in
   let* evm_node =
@@ -295,28 +299,131 @@ let test_resilient_to_rollup_node_disconnect =
     ~title:"Sequencer is resilient to rollup node disconnection"
     ~uses
   @@ fun protocol ->
-  let* {evm_node; sc_rollup_node; _} =
-    setup_sequencer ~time_between_blocks:Nothing protocol
+  (* The objective of this test is to show that the sequencer can deal with
+     rollup node outage. The logic of the sequencer at the moment is to
+     wait for its advance on the rollup node to be more than [max_blueprints_lag]
+     before sending at most [max_blueprints_catchup] blueprints. The sequencer
+     waits for [catchup_cooldown] L1 blocks before checking if it needs to push
+     new blueprints again. This scenario checks this logic. *)
+  let max_blueprints_lag = 10 in
+  let max_blueprints_catchup = max_blueprints_lag - 3 in
+  let catchup_cooldown = 10 in
+  let first_batch_blueprints_count = 5 in
+  let ensure_rollup_node_publish = 5 in
+
+  let* {evm_node; sc_rollup_node; sc_rollup_address; node; client; _} =
+    setup_sequencer
+      ~max_blueprints_lag
+      ~max_blueprints_catchup
+      ~catchup_cooldown
+      ~time_between_blocks:Nothing
+      protocol
   in
+
+  (* Start a proxy node to see the state of the rollup node *)
+  let* evm_proxy =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  (* Produce blueprints *)
   let* _ =
-    repeat 5 (fun () ->
+    repeat first_batch_blueprints_count (fun () ->
         let* _ = Rpc.produce_block evm_node in
         unit)
   in
+  let* () =
+    Evm_node.wait_for_blueprint_injected
+      ~timeout:(float_of_int first_batch_blueprints_count)
+      evm_node
+      first_batch_blueprints_count
+  in
 
-  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. evm_node 5 in
+  (* Produce some L1 blocks so that the rollup node publishes the blueprints. *)
+  let* _ =
+    repeat ensure_rollup_node_publish (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  (* Check sequencer and rollup consistency *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+    ~error_msg:"The head should be the same before the outage" ;
 
   (* Kill the rollup node *)
   let* () = Sc_rollup_node.kill sc_rollup_node in
 
-  (* The sequencer node should keep producing blocks. *)
+  (* The sequencer node should keep producing blocks, enough so that
+     it cannot catchup in one go. *)
   let* _ =
-    repeat 5 (fun () ->
+    repeat (2 * max_blueprints_lag) (fun () ->
         let* _ = Rpc.produce_block evm_node in
         unit)
   in
 
-  let* () = Evm_node.wait_for_blueprint_applied evm_node ~timeout:5. 10 in
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      evm_node
+      ~timeout:5.
+      (first_batch_blueprints_count + (2 * max_blueprints_lag))
+  in
+
+  (* Kill the sequencer node, restart the rollup node, restart the sequencer to
+     reestablish the connection *)
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
+
+  let* () = Evm_node.terminate evm_node in
+  let* () = Evm_node.run evm_node in
+  let* () = Evm_node.wait_for_ready evm_node in
+
+  (* Produce enough blocks in advance to ensure the sequencer node will catch
+     up at the end. *)
+  let* _ =
+    repeat max_blueprints_lag (fun () ->
+        let* _ = Rpc.produce_block evm_node in
+        unit)
+  in
+
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      evm_node
+      ~timeout:5.
+      (first_batch_blueprints_count + (2 * max_blueprints_catchup) + 1)
+  in
+
+  (* Give some time for the sequencer node to inject the first round of
+     blueprints *)
+  let* _ =
+    repeat ensure_rollup_node_publish (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  Check.(
+    (rollup_node_head.number
+    = Int32.(of_int (first_batch_blueprints_count + max_blueprints_catchup)))
+      int32)
+    ~error_msg:
+      "The rollup node should have received the first round of lost blueprints" ;
+
+  (* Go through several cooldown periods to let the sequencer sends the rest of
+     the blueprints. *)
+  let* _ =
+    repeat (2 * catchup_cooldown) (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  (* Check the consistency again *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+    ~error_msg:"The head should be the same after the outage" ;
 
   unit
 

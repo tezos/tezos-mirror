@@ -48,6 +48,9 @@ type mode =
               provided, the sequencer uses it default value. *)
       sequencer : string;  (** Secret key used to sign the blueprints. *)
       genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
+      max_blueprints_lag : int option;
+      max_blueprints_catchup : int option;
+      catchup_cooldown : int option;
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 
