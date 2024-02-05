@@ -909,6 +909,39 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
 
+        // We check that the maximum allowed init code size as specified by EIP-3860
+        // can not be reached.
+        if let Some(max_initcode_size) = self.config.max_initcode_size {
+            if initial_code.len() > max_initcode_size {
+                return Ok((
+                    ExitReason::Error(ExitError::CreateContractLimit),
+                    None,
+                    vec![],
+                ));
+            }
+        }
+
+        // Charge of 2 gas for every 32-byte chunk of initcode to represent
+        // the cost of jumpdest-analysis.
+        // See: https://eips.ethereum.org/EIPS/eip-3860
+        // * We target wasm32-unknown-unknown, so this conversion should be safe.
+        // * The division behave as an unsafe div_floor which we can't use since
+        //   it's nightly-only.
+        // * The `unwrap_or` is there in case there's an unexpected behaviour
+        //   that we missed.
+        let extra_cost: u64 = (initial_code.len() / 32).try_into().unwrap_or(0) * 2;
+
+        if self.record_cost(extra_cost).is_err() {
+            log!(
+                self.host,
+                Debug,
+                "Not enought gas for call. Required at least: {:?} for the init code size extra cost.",
+                extra_cost
+            );
+
+            return Ok((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
+        }
+
         let context = Context {
             address,
             caller,
@@ -1983,6 +2016,18 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
         match self.can_begin_inter_transaction(caller, &value) {
             Precondition::PassPrecondition => {
+                // We check that the maximum allowed init code size as specified by EIP-3860
+                // can not be reached.
+                if let Some(max_initcode_size) = self.config.max_initcode_size {
+                    if init_code.len() > max_initcode_size {
+                        return Capture::Exit((
+                            ExitReason::Error(ExitError::CreateContractLimit),
+                            None,
+                            vec![],
+                        ));
+                    }
+                }
+
                 let gas_limit = self.nested_call_gas_limit(target_gas);
 
                 if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
