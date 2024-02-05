@@ -35,6 +35,7 @@ addr2=$7
 oregon=https://node-ore.ghostnet.etherlink.com
 dublin=https://node-dub.ghostnet.etherlink.com
 node=https://node.ghostnet.etherlink.com
+explorer=https://testnet-explorer.etherlink.com
 
 # 3 mn
 timeout_time=180
@@ -66,16 +67,19 @@ add_timeout_msg() {
 
 add_failed_tx_msg() {
   network="$1"
+  op_type="${2}"
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
-  add_report_msg "• <!here> 🚨 *$2 failed with endpoint* <${network}|${network_name}>"
+  add_report_msg "• <!here> 🚨 *${op_type} failed with endpoint* <${network}|${network_name}>"
 }
 
 add_not_included_tx_msg() {
-  hash="${1}"
-  add_report_msg "• <!here> 🚨 *$3 absent in explorer*."
+  op_type="${1}"
+  hash="${2}"
+  rpc="${3}"
+  add_report_msg "• <!here> 🚨 *${op_type} absent in explorer*."
   add_report_msg "  • hash: '${hash}'"
-  add_report_msg "  • rpc status_code: '$2'."
+  add_report_msg "  • rpc status_code: '${rpc}'."
 }
 
 add_good_health_msg() {
@@ -86,13 +90,13 @@ add_good_health_msg() {
   network_name="${network#https://}"
   network_name="${network_name%.ghostnet.etherlink.com}"
 
-  add_report_msg "• ✅ $3 transaction <https://testnet-explorer.etherlink.com/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
+  add_report_msg "• ✅ $3 transaction <${explorer}/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
 }
 
 check_tx_applied() {
   op_hash=$(echo "$1" | tr -d '"')
   op_type="$2"
-  cmd=(-o /dev/null -s -w "%{http_code}\n" -X "GET" "https://explorer.etherlink.com/api/v2/transactions/${op_hash}" -H "accept: application/json")
+  cmd=(-o /dev/null -s -w "%{http_code}\n" -X "GET" "${explorer}/api/v2/transactions/${op_hash}" -H "accept: application/json")
   echo "> curl" "${cmd[@]}"
   status_code=$(curl "${cmd[@]}")
   echo "${status_code}"
