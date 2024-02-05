@@ -85,7 +85,7 @@ module Event = struct
       ~section
       ~name:"callback_log"
       ~msg:"Uri: {uri}\nMethod: {method}\nBody: {body}\n"
-      ~level:Notice
+      ~level:Debug
       ("uri", Data_encoding.string)
       ("method", Data_encoding.string)
       ("body", Data_encoding.string)
@@ -241,13 +241,7 @@ let start {rpc_addr; rpc_port; cors_origins; cors_headers; verbose; _}
   Lwt.catch
     (fun () ->
       let*! () =
-        RPC_server.launch
-          ~host
-          server
-          ~callback:
-            (if verbose then callback_log server
-            else RPC_server.resto_callback server)
-          node
+        RPC_server.launch ~host server ~callback:(callback_log server) node
       in
       let*! () =
         Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
@@ -293,21 +287,13 @@ let seq_start
   Lwt.catch
     (fun () ->
       let*! () =
-        RPC_server.launch
-          ~host
-          server
-          ~callback:
-            (if verbose then callback_log server
-            else RPC_server.resto_callback server)
-          node
+        RPC_server.launch ~host server ~callback:(callback_log server) node
       in
       let*! () =
         RPC_server.launch
           ~host:Ipaddr.V4.(to_string localhost)
           private_server
-          ~callback:
-            (if verbose then callback_log private_server
-            else RPC_server.resto_callback private_server)
+          ~callback:(callback_log private_server)
           private_node
       in
       let*! () =
@@ -344,13 +330,7 @@ let observer_start
       directory
   in
   let*! () =
-    RPC_server.launch
-      ~host
-      server
-      ~callback:
-        (if verbose then callback_log server
-        else RPC_server.resto_callback server)
-      node
+    RPC_server.launch ~host server ~callback:(callback_log server) node
   in
   let*! () =
     Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
