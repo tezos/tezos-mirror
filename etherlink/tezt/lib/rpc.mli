@@ -74,7 +74,7 @@ val get_transaction_receipt :
 (** [estimate_gas eth_call evm_node] calls [eth_estimateGas] with [eth_call]
     as payload. *)
 val estimate_gas :
-  (string * Ezjsonm.value) list -> Evm_node.t -> (int, error) result Lwt.t
+  (string * Ezjsonm.value) list -> Evm_node.t -> (int64, error) result Lwt.t
 
 (** [get_transaction_count ~address evm_node] calls [eth_getTransactionCount]
     with [address] as argument (on block ["latest"]). *)

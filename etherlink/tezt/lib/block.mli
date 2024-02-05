@@ -47,8 +47,8 @@ type t = {
   totalDifficulty : int64;
   extraData : string;
   size : int32;
-  gasLimit : int32;
-  gasUsed : int32;
+  gasLimit : int64;
+  gasUsed : int64;
   timestamp : int32;
   transactions : transactions;
   uncles : string list;

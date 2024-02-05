@@ -59,8 +59,8 @@ let hex_256_of_address acc =
 
 let expected_gas_fees ~gas_price ~gas_used =
   let open Wei in
-  let gas_price = gas_price |> Z.of_int32 |> Wei.to_wei_z in
-  let gas_used = gas_used |> Z.of_int32 in
+  let gas_price = gas_price |> Z.of_int64 |> Wei.to_wei_z in
+  let gas_used = gas_used |> Z.of_int64 in
   gas_price * gas_used
 
 let evm_node_version evm_node =
@@ -116,7 +116,7 @@ let check_tx_gas_for_flat_fee ~flat_fee ~expected_execution_gas ~gas_price
     Z.add (Wei.of_wei_z flat_fee) execution_gas_fee |> Z.to_int64
   in
   let total_fee_receipt =
-    Z.(mul (of_int32 gas_price) (of_int32 gas_used)) |> Z.to_int64
+    Z.(mul (of_int64 gas_price) (of_int64 gas_used)) |> Z.to_int64
   in
   Check.((total_fee_receipt > expected_total_fee) int64)
     ~error_msg:"total fee in receipt %L did not cover expected fees of %R"
@@ -1745,7 +1745,7 @@ let check_estimate_gas {evm_node; _} eth_call expected_gas =
   (* Make the call to the EVM node. *)
   let*@ r = Rpc.estimate_gas eth_call evm_node in
   (* Check the RPC result. *)
-  Check.((r >= expected_gas) int)
+  Check.((r >= expected_gas) int64)
     ~error_msg:"Expected result greater than %R, but got %L" ;
   unit
 
@@ -1786,7 +1786,7 @@ let test_estimate_gas =
     let data = read_file simple_storage.bin in
     let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
 
-    check_estimate_gas evm_setup eth_call 23423
+    check_estimate_gas evm_setup eth_call 23423L
   in
 
   let title = "eth_estimateGas for contract creation" in
@@ -1809,7 +1809,7 @@ let test_estimate_gas_additionnal_field =
       ]
     in
 
-    check_estimate_gas evm_setup eth_call 23423
+    check_estimate_gas evm_setup eth_call 23423L
   in
   let title = "eth_estimateGas allows additional fields" in
   let tags = ["evm"; "eth_estimategas"; "simulate"; "remix"] in
@@ -3877,7 +3877,7 @@ let test_l2_revert_returns_unused_gas =
   let gas_used = transaction_receipt.gasUsed in
   Format.printf "TXHASH: %s\n%!" transaction_hash ;
   let* () = check_tx_failed ~endpoint ~tx:transaction_hash in
-  Check.((gas_used < 100000l) int32)
+  Check.((gas_used < 100000L) int64)
     ~error_msg:"Expected gas usage less than %R logs, got %L" ;
   let* balance_after = Eth_cli.balance ~account:sender.address ~endpoint in
   let gas_fee_paid = Wei.(balance_before - balance_after) in
