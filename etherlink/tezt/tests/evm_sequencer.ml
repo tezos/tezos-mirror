@@ -766,12 +766,29 @@ let test_observer_applies_blueprint =
   in
   let* () = Evm_node.run observer_node in
   let* () = Evm_node.wait_for_ready observer_node in
-  let* () =
-    Evm_node.wait_for_blueprint_applied
-      ~timeout:(tbb *. 3. *. 2.)
-      observer_node
-      3
+  let levels_to_wait = 3 in
+  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
+
+  let* _ =
+    Lwt.both
+      (Evm_node.wait_for_blueprint_applied
+         ~timeout
+         observer_node
+         levels_to_wait)
+      (Evm_node.wait_for_blueprint_applied
+         ~timeout
+         sequencer_node
+         levels_to_wait)
   in
+
+  let*@ sequencer_head =
+    Rpc.get_block_by_number ~block:"latest" sequencer_node
+  in
+  let*@ observer_head = Rpc.get_block_by_number ~block:"latest" observer_node in
+
+  Check.((sequencer_head.hash = observer_head.hash) (option string))
+    ~error_msg:"head hash is not equal (sequencer: %L; rollup: %R)" ;
+
   unit
 
 (** This tests the situation where the kernel has an upgrade but the sequencer
