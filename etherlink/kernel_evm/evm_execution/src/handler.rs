@@ -1748,17 +1748,18 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
-        target_gas.map(|gas| {
-            // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
-            let gas_remaining = self.gas_remaining();
-            let max_gas_limit = if self.config.call_l64_after_gas {
-                gas_remaining - gas_remaining / 64
-            } else {
-                gas_remaining
-            };
-
-            min(gas, max_gas_limit)
-        })
+        // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
+        let gas_remaining = self.gas_remaining();
+        let max_gas_limit = if self.config.call_l64_after_gas {
+            gas_remaining - gas_remaining / 64
+        } else {
+            gas_remaining
+        };
+        if let Some(gas) = target_gas {
+            Some(min(gas, max_gas_limit))
+        } else {
+            Some(max_gas_limit)
+        }
     }
 }
 
@@ -1983,6 +1984,21 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Precondition::PassPrecondition => {
                 let gas_limit = self.nested_call_gas_limit(target_gas);
 
+                if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Not enough gas for create. Required at least: {:?}",
+                        gas_limit
+                    );
+
+                    return Capture::Exit((
+                        ExitReason::Error(ExitError::OutOfGas),
+                        None,
+                        vec![],
+                    ));
+                }
+
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
                 let contract_address = self.create_address(scheme);
@@ -2073,14 +2089,12 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     log!(
                         self.host,
                         Debug,
-                        "Not enought gas for call. Required at least: {:?}",
+                        "Not enough gas for call. Required at least: {:?}",
                         gas_limit
                     );
 
                     return Capture::Exit((
-                        ExitReason::Fatal(ExitFatal::Other(Cow::from(
-                            "Out of gas before recursive call",
-                        ))),
+                        ExitReason::Error(ExitError::OutOfGas),
                         vec![],
                     ));
                 }
@@ -2149,6 +2163,7 @@ mod test {
     use primitive_types::{H160, H256};
     use std::cmp::Ordering;
     use std::str::FromStr;
+    use std::vec;
     use tezos_ethereum::block::BlockFees;
     use tezos_smart_rollup_mock::MockHost;
 
@@ -3822,5 +3837,92 @@ mod test {
             },
             Capture::Trap(_) => panic!("The internal result shouldn't be a trap case."),
         }
+    }
+
+    #[test]
+    fn inner_create_costs_gas() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 1000,
+            gas_price,
+            false,
+        );
+
+        let address = H160::from_low_u64_be(210_u64);
+
+        // Create an account with 0 wei and 4 FF as code
+        // PUSH13 0x63FFFFFFFF6000526004601CF3
+        // PUSH1 0
+        // MSTORE
+        // PUSH1 13
+        // PUSH1 19
+        // PUSH1 0
+        // CREATE
+        // STOP
+
+        let code: Vec<u8> = vec![
+            Opcode::PUSH13.as_u8(), // 3 gas
+            0x63,
+            0xff,
+            0xff,
+            0xff,
+            0xff,
+            0x60,
+            0x00,
+            0x52,
+            0x60,
+            0x04,
+            0x60,
+            0x1c,
+            0xf3,
+            Opcode::PUSH1.as_u8(), // 3 gas
+            0,
+            Opcode::MSTORE.as_u8(), // 6 gas
+            Opcode::PUSH1.as_u8(),  // 3 gas
+            13,
+            Opcode::PUSH1.as_u8(), // 3 gas
+            19,
+            Opcode::PUSH1.as_u8(), // 3 gas
+            0,
+            Opcode::CREATE.as_u8(), // 32000 gas + init_code
+            Opcode::STOP.as_u8(),
+        ];
+
+        set_code(&mut handler, &address, code);
+        set_balance(&mut handler, &caller, U256::from(99_u32));
+
+        let result =
+            handler.call_contract(caller, address, None, vec![], Some(1000000), false);
+
+        // Top layers costs 21000 + 3 + 6 + 3 + 3 + 3 + 32000 = 53021 < 53839
+        assert_eq!(
+            Ok(ExecutionOutcome {
+                gas_used: 53839, // costs 53841 on ethereum
+                is_success: true,
+                reason: ExtendedExitReason::Exit(ExitReason::Succeed(
+                    ExitSucceed::Stopped
+                )),
+                new_address: None,
+                logs: vec![],
+                result: Some(vec![]),
+                withdrawals: vec![],
+                estimated_ticks_used: 1484809
+            }),
+            result,
+        )
     }
 }

@@ -3462,11 +3462,11 @@ mod test {
             None,
             caller,
             code,
-            None,
+            Some(u64::MAX),
             U256::one(),
             None,
             false,
-            DUMMY_ALLOCATED_TICKS,
+            u64::MAX,
             false,
             false,
         );

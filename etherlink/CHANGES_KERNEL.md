@@ -12,6 +12,7 @@
 - Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 - Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
 - Fix a bug where validation would succeed, for a transaction that failed to pay da-fee. (!11992)
+- Gas is now charged for inner create. (!11814)
 
 ### Breaking changes
 
