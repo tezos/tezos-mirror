@@ -638,7 +638,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 log!(
                     self.host,
                     Debug,
-                    "Failed transfer for create due to insufficient funds, value: {:?}, from: {:?}, to: {:?}",
+                    "Failed transfer due to insufficient funds, value: {:?}, from: {:?}, to: {:?}",
                     value,
                     from_account,
                     to
