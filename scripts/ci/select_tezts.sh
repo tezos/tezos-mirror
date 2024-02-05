@@ -11,8 +11,9 @@ if [[ "$CI_MERGE_REQUEST_LABELS" =~ (^|,)ci--run-all-tezts($|,) ]]; then
 fi
 
 if [ -z "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
-  echo "CI_MERGE_REQUEST_DIFF_BASE_SHA is unspecified or empty, cannot continue."
-  exit 1
+  echo "CI_MERGE_REQUEST_DIFF_BASE_SHA is unspecified or empty, test selection is disabled."
+  echo "true" > selected_tezts.tsl
+  exit 0
 fi
 
 echo "---- Fetching HEAD and $CI_MERGE_REQUEST_DIFF_BASE_SHA..."
