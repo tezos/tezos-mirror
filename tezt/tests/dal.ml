@@ -3919,6 +3919,18 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     ~description
     ()
 
+let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
+    dal_node =
+  let index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Producer index])) in
+  let* () =
+    check_profiles
+      ~__LOC__
+      dal_node
+      ~expected:Dal_RPC.(Operator [Producer index])
+  in
+  unit
+
 module Tx_kernel_e2e = struct
   open Tezos_protocol_alpha.Protocol
   open Tezt_tx_kernel
@@ -4379,6 +4391,11 @@ let register ~protocols =
     ~bootstrap_profile:true
     "trusted peers reconnection"
     test_peers_reconnection
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["producer"; "profile"]
+    "producer profile"
+    test_producer_profile
     protocols ;
 
   (* Tests with all nodes *)
