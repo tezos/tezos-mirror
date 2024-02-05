@@ -409,6 +409,25 @@ module Helpers = struct
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
 
+  let pp_cryptobox_error fmt = function
+    | `Fail message -> Format.fprintf fmt "Fail: %s" message
+    | `Not_enough_shards message ->
+        Format.fprintf fmt "Not enough shards: %s" message
+    | `Shard_index_out_of_range message ->
+        Format.fprintf fmt "Shard index out of range: %s" message
+    | `Invalid_shard_length message ->
+        Format.fprintf fmt "Invalid shard length: %s" message
+    | `Invalid_page -> Format.fprintf fmt "Invalid page"
+    | `Page_index_out_of_range -> Format.fprintf fmt "Page index out of range"
+    | `Invalid_degree_strictly_less_than_expected _ ->
+        Format.fprintf fmt "Invalid degree strictly less than expected"
+    | `Page_length_mismatch -> Format.fprintf fmt "Page length mismatch"
+    | `Slot_wrong_size message ->
+        Format.fprintf fmt "Slot wrong size: %s" message
+    | `Prover_SRS_not_loaded -> Format.fprintf fmt "Prover SRS not loaded"
+    | `Shard_length_mismatch -> Format.fprintf fmt "Shard length mismatch"
+    | `Invalid_shard -> Format.fprintf fmt "Invalid shard"
+
   let make_cryptobox
       ?(on_error =
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)

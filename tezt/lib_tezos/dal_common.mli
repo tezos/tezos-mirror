@@ -84,6 +84,22 @@ module Helpers : sig
     ?with_proof:bool ->
     slot ->
     (string * string) Lwt.t
+
+  val pp_cryptobox_error :
+    Format.formatter ->
+    [ `Fail of string
+    | `Invalid_degree_strictly_less_than_expected of 'a
+    | `Invalid_page
+    | `Invalid_shard_length of string
+    | `Not_enough_shards of string
+    | `Page_index_out_of_range
+    | `Page_length_mismatch
+    | `Shard_index_out_of_range of string
+    | `Slot_wrong_size of string
+    | `Shard_length_mismatch
+    | `Prover_SRS_not_loaded
+    | `Invalid_shard ] ->
+    unit
 end
 
 module RPC_legacy : sig
