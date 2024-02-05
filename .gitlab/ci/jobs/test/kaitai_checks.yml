@@ -1,3 +1,5 @@
+include: .gitlab/ci/jobs/test/common.yml
+
 # check that ksy files are still up-to-date with octez
 kaitai_checks:
   extends:
