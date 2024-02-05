@@ -65,6 +65,8 @@ const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
 
+const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/fees/burned");
+
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/info_per_level/timestamp");
@@ -591,6 +593,22 @@ pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
     read_u256(host, &EVM_DA_FEE.into())
 }
 
+pub fn update_burned_fees(
+    host: &mut impl Runtime,
+    burned_fee: U256,
+) -> Result<(), Error> {
+    let path = &EVM_BURNED_FEES.into();
+    let current = read_u256(host, path).unwrap_or_else(|_| U256::zero());
+    let new = current.saturating_add(burned_fee);
+    write_u256(host, path, new)
+}
+
+#[cfg(test)]
+pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
+    let path = &EVM_BURNED_FEES.into();
+    read_u256(host, path).unwrap_or_else(|_| U256::zero())
+}
+
 pub fn store_timestamp_path<Host: Runtime>(
     host: &mut Host,
     path: &OwnedPath,
@@ -974,4 +992,29 @@ pub fn read_delayed_transaction_bridge<Host: Runtime>(
     host: &Host,
 ) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &DELAYED_BRIDGE.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use tezos_smart_rollup_mock::MockHost;
+
+    #[test]
+    fn update_burned_fees() {
+        // Arrange
+        let mut host = MockHost::default();
+
+        let fst = 17.into();
+        let snd = 19.into();
+
+        // Act
+        let result_fst = super::update_burned_fees(&mut host, fst);
+        let result_snd = super::update_burned_fees(&mut host, snd);
+
+        // Assert
+        assert!(result_fst.is_ok());
+        assert!(result_snd.is_ok());
+
+        let burned = super::read_burned_fees(&mut host);
+        assert_eq!(fst + snd, burned);
+    }
 }

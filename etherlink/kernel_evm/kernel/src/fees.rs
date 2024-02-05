@@ -144,6 +144,8 @@ impl FeeUpdates {
             ));
         }
 
+        crate::storage::update_burned_fees(host, self.burn_amount)?;
+
         Ok(())
     }
 }
@@ -288,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_deducts_balance_from_user() {
+    fn apply_deducts_balance_from_user_and_burns() {
         // Arrange
         let mut host = MockHost::default();
         let mut evm_account_storage =
@@ -298,10 +300,12 @@ mod tests {
         let balance = U256::from(1000);
         set_balance(&mut host, &mut evm_account_storage, address, balance);
 
+        let burn_amount = balance / 3;
+
         let fee_updates = FeeUpdates {
             overall_gas_used: U256::zero(),
             overall_gas_price: U256::zero(),
-            burn_amount: U256::zero(),
+            burn_amount: balance / 3,
             charge_user_amount: balance / 2,
             compensate_sequencer_amount: U256::zero(),
         };
@@ -313,6 +317,9 @@ mod tests {
         assert!(result.is_ok());
         let new_balance = get_balance(&mut host, &mut evm_account_storage, address);
         assert_eq!(balance / 2, new_balance);
+
+        let burned = crate::storage::read_burned_fees(&mut host);
+        assert_eq!(burn_amount, burned);
     }
 
     #[test]
