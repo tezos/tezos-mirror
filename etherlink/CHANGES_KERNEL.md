@@ -4,6 +4,16 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version a41f30ddb8787e5ff5c461d949a9ae3f71e4eea9
+
+### Features
+
 - Implement Call stipend for inner call with transfer. (!11587)
 - Support 'modexp' precompiled contract. (!11732)
 - Support 'ecAdd', 'ecMul' and 'ecPairing' precompiled contracts. (!11746)

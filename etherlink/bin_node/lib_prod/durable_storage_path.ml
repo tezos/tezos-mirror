@@ -24,7 +24,7 @@ let base_fee_per_gas = EVM.make "/base_fee_per_gas"
 
 let kernel_version = EVM.make "/kernel_version"
 
-let upgrade_nonce = EVM.make "/upgrade_nonce"
+let kernel_upgrade = EVM.make "/kernel_upgrade"
 
 module Accounts = struct
   let accounts = EVM.make "/eth_accounts"
@@ -84,4 +84,10 @@ module Transaction_object = struct
   let objects = EVM.make "/transactions_objects"
 
   let object_ (Hash (Hex tx_hash)) = objects ^ "/" ^ tx_hash
+end
+
+module Delayed_transaction = struct
+  let hashes = EVM.make "/delayed-inbox"
+
+  let transaction (Hash (Hex tx_hash)) = hashes ^ "/" ^ tx_hash ^ "/data"
 end

@@ -8403,13 +8403,17 @@ let evm_node_lib_prod =
         octez_version_value;
         octez_stdlib_unix |> open_;
         evm_node_lib_prod_encoding |> open_;
+        lwt_watcher;
         lwt_exit;
         evm_node_config |> open_;
+        octez_context_sigs;
         octez_context_disk;
         octez_context_encoding;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_debugger_lib |> open_;
+        octez_layer2_store |> open_;
+        octez_smart_rollup_lib |> open_;
       ]
 
 let evm_node_lib_dev_encoding =

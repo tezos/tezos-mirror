@@ -14,10 +14,10 @@ depends: [
   "octez-smart-rollup-wasm-debugger-plugin"
   "ocaml-protoc-plugin" { >= "4.5.0" }
   "octez-version"
+  "lwt-watcher" { = "0.2" }
   "lwt-exit"
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
-  "lwt-watcher" { = "0.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
