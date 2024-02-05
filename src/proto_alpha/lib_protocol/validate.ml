@@ -1464,7 +1464,11 @@ module Anonymous = struct
         in
         let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
         let* already_slashed =
-          Delegate.already_denounced_for_double_attesting ctxt delegate level
+          Delegate.already_denounced_for_double_attesting
+            ctxt
+            delegate
+            level
+            e1.round
         in
         let*? () =
           error_unless
@@ -1630,7 +1634,7 @@ module Anonymous = struct
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
-      Delegate.already_denounced_for_double_baking ctxt delegate level
+      Delegate.already_denounced_for_double_baking ctxt delegate level round1
     in
     let*? () =
       error_unless

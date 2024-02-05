@@ -120,7 +120,7 @@ let migrate_already_denounced_from_Oxford ctxt =
         ~f:(fun (level, delegate) denounced ctxt ->
           Storage.Already_denounced.add
             (ctxt, cycle)
-            (level, delegate)
+            ((level, Round_repr.zero), delegate)
             denounced)
     in
     Storage.Already_denounced__Oxford.clear (ctxt, cycle)

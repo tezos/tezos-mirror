@@ -37,6 +37,7 @@ val already_denounced_for_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
+  Round_repr.t ->
   bool tzresult Lwt.t
 
 (** Returns true if the given delegate has already been denounced
@@ -45,6 +46,7 @@ val already_denounced_for_double_attesting :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
+  Round_repr.t ->
   bool tzresult Lwt.t
 
 (** The [reward_and_burn] type embeds amounts involved when slashing a

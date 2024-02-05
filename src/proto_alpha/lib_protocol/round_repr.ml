@@ -495,6 +495,32 @@ let level_offset_of_round round_durations ~round =
   let* offset = raw_level_offset_of_round round_durations ~round in
   return (Period_repr.of_seconds_exn offset)
 
+module Index = struct
+  type t = round
+
+  let path_length = 1
+
+  let to_path round l = Int32.to_string round :: l
+
+  let of_path = function [s] -> Int32.of_string_opt s | _ -> None
+
+  let rpc_arg =
+    let construct round = Int32.to_string round in
+    let destruct str =
+      Int32.of_string_opt str |> Option.to_result ~none:"Cannot parse round"
+    in
+    RPC_arg.make
+      ~descr:"A round integer"
+      ~name:"block_round"
+      ~construct
+      ~destruct
+      ()
+
+  let encoding = encoding
+
+  let compare = compare
+end
+
 module Internals_for_test = struct
   type round_and_offset_raw = {round : round; offset : Period_repr.t}
 

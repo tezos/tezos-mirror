@@ -485,7 +485,8 @@ val default_denounced : denounced
 module Already_denounced :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
-     and type key = Raw_level_repr.t * Signature.Public_key_hash.t
+     and type key =
+      (Raw_level_repr.t * Round_repr.t) * Signature.Public_key_hash.t
      and type value = denounced
 
 (** Needed for the stitching from Oxford to P. Remove this in Q. *)

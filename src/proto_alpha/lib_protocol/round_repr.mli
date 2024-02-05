@@ -221,6 +221,8 @@ val round_of_timestamp :
   timestamp:Time_repr.t ->
   t tzresult
 
+module Index : Storage_description.INDEX with type t = round
+
 module Internals_for_test : sig
   type round_and_offset_raw = {round : round; offset : Period_repr.t}
 

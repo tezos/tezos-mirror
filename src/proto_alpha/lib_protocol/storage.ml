@@ -1123,7 +1123,12 @@ module Cycle = struct
          (struct
            let name = ["already_denounced"]
          end))
-         (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
+         (Pair
+            (Pair
+               (Make_index
+                  (Raw_level_repr.Index))
+                  (Make_index (Round_repr.Index)))
+               (Public_key_hash_index))
       (Denounced)
 
   module Already_denounced__Oxford =
