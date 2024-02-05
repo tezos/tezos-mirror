@@ -78,5 +78,7 @@ echo "Build ${image_name}"
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
   -t "${image_base}:${CI_COMMIT_REF_SLUG}"
 
+./images/client-libs-dependencies/check_versions.sh "${image_base}" "${image_tag}"
+
 # Push image
 docker push --all-tags "${image_base}"
