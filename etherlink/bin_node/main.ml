@@ -219,8 +219,7 @@ let dev_private_directory config rollup_node_config =
   let open Evm_node_lib_dev in
   Services.private_directory config rollup_node_config
 
-let start {rpc_addr; rpc_port; cors_origins; cors_headers; verbose; _}
-    ~directory =
+let start {rpc_addr; rpc_port; cors_origins; cors_headers; _} ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -255,7 +254,6 @@ let seq_start
       rpc_port;
       cors_origins;
       cors_headers;
-      verbose;
       mode = {private_rpc_port; _};
       _;
     } ~directory ~private_directory =
@@ -303,15 +301,8 @@ let seq_start
     (fun _ -> return (server, private_server))
 
 let observer_start
-    {
-      rpc_addr;
-      rpc_port;
-      cors_origins;
-      cors_headers;
-      verbose;
-      mode = (_ : observer);
-      _;
-    } ~directory =
+    {rpc_addr; rpc_port; cors_origins; cors_headers; mode = (_ : observer); _}
+    ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -424,6 +415,13 @@ let devmode_arg =
   Tezos_clic.switch ~long:"devmode" ~doc:"The EVM node in development mode." ()
 
 let verbose_arg =
+  Tezos_clic.switch
+    ~short:'v'
+    ~long:"verbose"
+    ~doc:"Sets logging level to debug. Beware, it is highly verbose."
+    ()
+
+let super_verbose_arg =
   Tezos_clic.switch
     ~short:'v'
     ~long:"verbose"
@@ -572,7 +570,14 @@ let proxy_command =
            keep_alive )
          rollup_node_endpoint
          () ->
-      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          if verbose then Some (make_with_defaults ~verbosity:Debug ())
+          else None
+        in
+        init ?config ()
+      in
       let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* config =
         Cli.create_or_read_proxy_config
@@ -698,8 +703,10 @@ let sequencer_command =
          () ->
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
+        let verbosity = if verbose then Some Internal_event.Debug else None in
         let config =
           make_with_defaults
+            ?verbosity
             ~enable_default_daily_logs_at:
               Filename.Infix.(data_dir // "daily_logs")
               (* Show only above Info rpc_server events, they are not
@@ -816,7 +823,13 @@ let observer_command =
              evm_node_endpoint
              () ->
   let open Evm_node_lib_dev in
-  let*! () = Tezos_base_unix.Internal_event_unix.init () in
+  let*! () =
+    let open Tezos_base_unix.Internal_event_unix in
+    let config =
+      if verbose then Some (make_with_defaults ~verbosity:Debug ()) else None
+    in
+    init ?config ()
+  in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   let* config =
     Cli.create_or_read_observer_config
