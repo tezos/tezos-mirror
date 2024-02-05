@@ -4827,6 +4827,29 @@ let dal_crypto_benchmark () =
                  let*? () = verify_shard dal commitment shard shard_proof in
                  ())
         in
+        let bench_i_shard_verif i =
+          Seq.zip shards shard_proofs |> Seq.take i |> List.of_seq |> List.split
+          |> fun (shard_list, shard_proof_list) ->
+          let message =
+            Format.asprintf
+              "verify shard multi (size: %d) (number_of_shards:%d)"
+              (Bytes.length
+                 (Data_encoding.Binary.to_bytes_exn
+                    share_encoding
+                    (List.hd shard_list).share))
+              (List.length shard_list)
+          in
+          Profiler.record_f Profiler.main message @@ fun () ->
+          let*? () =
+            verify_shard_multi dal commitment shard_list shard_proof_list
+          in
+          ()
+        in
+        bench_i_shard_verif 1 ;
+        bench_i_shard_verif 5 ;
+        bench_i_shard_verif 20 ;
+        bench_i_shard_verif 100 ;
+        bench_i_shard_verif 2048 ;
         let pages =
           Seq.ints 0 |> Seq.take nb_pages
           |> Seq.map (fun i -> Bytes.sub slot (i * page_size) page_size)
