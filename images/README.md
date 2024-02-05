@@ -8,6 +8,7 @@ The images, their content and indented usage, are:
 | Image                             | Contents                           | Usage                             |
 |-----------------------------------|------------------------------------|-----------------------------------|
 | `rust-toolchain`                  | cargo                              | CI: kernel build, test and SDK    |
+| `client-libs-dependencies`        | kaitai-struct-compiler, xxd, java  | CI: Kaitai e2e tests              |
 
 For more details on the contents and usage of each image, see below
 and in the header comment of each corresponding Dockerfile.
@@ -40,3 +41,18 @@ The `rust-toolchain` image is used in the CI to build and test
 kernels, and to build the kernel SDK. It is also used to build the
 `evm_kernel` included in the Octez Docker distribution. To build this
 image for local use, run `create_rust_toolchain_image.sh`.
+
+# `client-libs-dependencies` image
+
+The `client-libs-depencies` image is used in the CI to run end-to-end
+tests of client-libs. To build this image for local use, run
+`create_client_libs_dependencies_image.sh`.
+
+# Common files in `common`
+
+Files that are shared between image built contexts are stored in
+`common` and are symlinked into the build contexts for images that
+require them. `docker build` does not resolve symlinks, but we work
+around this by tarring the image's build context directory, having tar
+resolve symlinks and piping the result to `docker build`. See
+`create_client_libs_dependencies_image.sh` for an example.
