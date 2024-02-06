@@ -17,7 +17,7 @@ build:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v19.0", "v18.1", "master"]
+        OCTEZ_BRANCH: ["v19.1", "v19.0", "v18.1", "master"]
   tags:
     - ${ARCH}
   variables:
@@ -53,6 +53,13 @@ build:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
 
+release:amd64:v19.1:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [amd64, v19.1]"]
+  variables:
+    ARCHIVE: "binaries-amd64-v19.1.zip"
+
 release:amd64:v19.0:
   stage: deploy
   extends: .release
@@ -81,6 +88,13 @@ release:arm64:v18.1:
   variables:
     ARCHIVE: "binaries-arm64-v18.1.zip"
 
+release:arm64:v19.1:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [arm64, v19.1]"]
+  variables:
+    ARCHIVE: "binaries-arm64-v19.1.zip"
+    
 release:arm64:v19.0:
   stage: deploy
   extends: .release
@@ -123,12 +137,12 @@ release:arm64:master:
       when: manual
       allow_failure: true
 
-docker:amd64:v18.1:
+docker:amd64:v19.1:
   extends: .docker-push
-  dependencies: ["build: [amd64, v18.1]"]
+  dependencies: ["build: [amd64, v19.1]"]
   variables:
     ARCH: "amd64"
-    OCTEZ_BRANCH: "v18.1"
+    OCTEZ_BRANCH: "v19.1"
 
 docker:amd64:v19.0:
   extends: .docker-push
@@ -137,6 +151,12 @@ docker:amd64:v19.0:
     ARCH: "amd64"
     OCTEZ_BRANCH: "v19.0"
 
+docker:amd64:v18.1:
+  extends: .docker-push
+  dependencies: ["build: [amd64, v18.1]"]
+  variables:
+    ARCH: "amd64"
+    OCTEZ_BRANCH: "v18.1"
 
 docker:amd64:master:
   extends: .docker-push
@@ -151,6 +171,13 @@ docker:arm64:v18.1:
   variables:
     ARCH: "arm64"
     OCTEZ_BRANCH: "v18.1"
+
+docker:arm64:v19.1:
+  extends: .docker-push
+  dependencies: ["build: [arm64, v19.1]"]
+  variables:
+    ARCH: "arm64"
+    OCTEZ_BRANCH: "v19.1"
 
 docker:arm64:v19.0:
   extends: .docker-push
@@ -188,15 +215,15 @@ docker:arm64:master:
       when: manual
       allow_failure: true
 
-manifest:v18.1:
+manifest:v19.1:
   extends: .manifest
   needs:
-    - job: "docker:amd64:v18.1"
+    - job: "docker:amd64:v19.1"
       artifacts: false
-    - job: "docker:arm64:v18.1"
+    - job: "docker:arm64:v19.1"
       artifacts: false
   variables:
-    OCTEZ_BRANCH: "v18.1"
+    OCTEZ_BRANCH: "v19.1"
 
 manifest:v19.0:
   extends: .manifest
@@ -207,6 +234,16 @@ manifest:v19.0:
       artifacts: false
   variables:
     OCTEZ_BRANCH: "v19.0"
+
+manifest:v18.1:
+  extends: .manifest
+  needs:
+    - job: "docker:amd64:v18.1"
+      artifacts: false
+    - job: "docker:arm64:v18.1"
+      artifacts: false
+  variables:
+    OCTEZ_BRANCH: "v18.1"
 
 manifest:master:
   extends: .manifest
