@@ -31,8 +31,36 @@ docker images or can be compiled from sources. Please refer to the
 `Dailynet <https://teztnets.com/dailynet-about>`_ website
 for installation details.
 
-An Octez rollup node needs an Octez node to run. We assume that
-an Octez node has been launched locally, typically by issuing:
+An Octez rollup node needs an Octez node to run. It is recommended that the two
+nodes run on the same machine. If this is the case, there is no additional
+configuration required of the Octez node. If they are on different network
+interfaces, the Octez node needs to allow the rollup node to make specific
+RPCs. To achieve this, one can add the following to the :doc:`Octez node
+configuration file <../user/node-configuration>`, where ``<ip.address:port>`` is
+the address at which the rollup node can contact the Octez node.
+
+.. code:: json
+
+   {
+      "rpc": {
+        "acl": [
+          {
+            "address": "<ip.address:port>",
+            "blacklist": []
+          }
+        ]
+      }
+   }
+
+.. warning::
+
+   Configuring a public facing Octez node this way exposes it to DoS
+   attacks. However one can allow all RPCs on the Octez node to be accessed
+   locally while still keeping sane defaults for outside accesses by specifying
+   an additional RPC server with, *e.g.*, ``--rpc-addr 127.0.0.1 --rpc-addr
+   0.0.0.0``.
+
+We assume that an Octez node has been launched locally, typically by issuing:
 
 .. code:: sh
 
