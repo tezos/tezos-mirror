@@ -23,6 +23,8 @@ module Request : sig
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
   val eth_estimateGas : (string * Ezjsonm.value) list -> Evm_node.request
+
+  val eth_getTransactionCount : address:string -> Evm_node.request
 end
 
 (** [block_number evm_node] calls [eth_blockNumber]. *)
@@ -73,3 +75,8 @@ val get_transaction_receipt :
     as payload. *)
 val estimate_gas :
   (string * Ezjsonm.value) list -> Evm_node.t -> (int, error) result Lwt.t
+
+(** [get_transaction_count ~address evm_node] calls [eth_getTransactionCount]
+    with [address] as argument (on block ["latest"]). *)
+val get_transaction_count :
+  address:string -> Evm_node.t -> (int64, error) result Lwt.t

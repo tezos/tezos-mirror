@@ -50,6 +50,12 @@ module Request = struct
       method_ = "eth_estimateGas";
       parameters = `A [`O eth_call; `String "latest"];
     }
+
+  let eth_getTransactionCount ~address =
+    {
+      method_ = "eth_getTransactionCount";
+      parameters = `A [`String address; `String "latest"];
+    }
 end
 
 let block_number evm_node =
@@ -147,4 +153,13 @@ let estimate_gas eth_call evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_int)
+       response
+
+let get_transaction_count ~address evm_node =
+  let* response =
+    Evm_node.call_evm_rpc evm_node (Request.eth_getTransactionCount ~address)
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
