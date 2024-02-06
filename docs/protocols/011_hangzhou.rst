@@ -92,7 +92,7 @@ Timelock
 Michelson On-Chain Views
 ------------------------
 
-:ref:`Views <MichelsonViews>` are a new mechanism for contract calls that:
+:doc:`Views <../active/views>` are a new mechanism for contract calls that:
 
 - are read-only: they may depend on the contract storage but cannot
   modify it nor emit operations (but they can call other views);
