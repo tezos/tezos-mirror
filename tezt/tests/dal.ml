@@ -4620,8 +4620,12 @@ let register ~protocols =
     protocols ;
 
   (* Register end-to-end tests *)
-  register_end_to_end_tests ~protocols ;
-  dal_crypto_benchmark ()
+  register_end_to_end_tests ~protocols
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/6905
+
+   Wait for the SRS to be split before reactivating this test.
+*)
+(* dal_crypto_benchmark () *)
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to
