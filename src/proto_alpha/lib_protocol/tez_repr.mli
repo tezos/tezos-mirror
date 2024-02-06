@@ -85,7 +85,7 @@ val mul_q : rounding:[`Down | `Up] -> t -> Q.t -> t tzresult
 
 (** [mul_percentage tez percentage] returns [tez * percentage / 100].
     No errors can happen. *)
-val mul_percentage : rounding:[`Down | `Up] -> t -> Int_percentage.t -> t
+val mul_percentage : rounding:[`Down | `Up] -> t -> Percentage.t -> t
 
 val to_mutez : t -> int64
 

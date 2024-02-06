@@ -250,10 +250,10 @@ module Frozen_tez = struct
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
-  let slash base_amount (pct : Protocol.Int_percentage.t) a =
-    let pct_times_100 = (pct :> int) in
+  let slash base_amount (pct : Protocol.Percentage.t) a =
+    let pct_q = Protocol.Percentage.to_q pct in
     let slashed_amount =
-      Tez.mul_q base_amount Q.(pct_times_100 // 100) |> Tez.of_q ~round_up:false
+      Tez.mul_q base_amount pct_q |> Tez.of_q ~round_up:false
     in
     let total_current = total_current a in
     let slashed_amount_final = Tez.min slashed_amount total_current in
@@ -1084,11 +1084,13 @@ let apply_slashing
     let frozen_deposits, slashed_frozen =
       Frozen_tez.slash base_rights slashed_pct frozen_deposits
     in
+    let slashed_pct_q = Protocol.Percentage.to_q slashed_pct in
+    let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in
     let unstaked_frozen, slashed_unstaked =
       Unstaked_frozen.slash
         ~preserved_cycles:constants.preserved_cycles
         slashed_cycle
-        (slashed_pct :> int)
+        slashed_pct
         unstaked_frozen
     in
     ( {acc with frozen_deposits; unstaked_frozen},

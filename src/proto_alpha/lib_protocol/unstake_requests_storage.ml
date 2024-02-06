@@ -188,7 +188,7 @@ module For_RPC = struct
         in
         let denunciations = Option.value denunciations_opt ~default:[] in
         let not_yet_slashed_pct =
-          if is_last_of_cycle then Int_percentage.p0
+          if is_last_of_cycle then Percentage.p0
           else
             List.fold_left
               (fun acc Denunciations_repr.{misbehaviour; _} ->
@@ -203,25 +203,25 @@ module For_RPC = struct
                 else
                   match misbehaviour.kind with
                   | Double_baking ->
-                      Int_percentage.add_bounded
+                      Percentage.add_bounded
                         acc
                         (Constants_storage
                          .percentage_of_frozen_deposits_slashed_per_double_baking
                            ctxt)
                   | Double_attesting ->
-                      Int_percentage.add_bounded
+                      Percentage.add_bounded
                         acc
                         (Constants_storage
                          .percentage_of_frozen_deposits_slashed_per_double_attestation
                            ctxt))
-              Int_percentage.p0
+              Percentage.p0
               denunciations
         in
         return
         @@ List.map
              (fun (cycle, pct) ->
                if Cycle_repr.(succ cycle = current_level.cycle) then
-                 (cycle, Int_percentage.(sub_bounded pct not_yet_slashed_pct))
+                 (cycle, Percentage.(sub_bounded pct not_yet_slashed_pct))
                else (cycle, pct))
              slashing_history
       else if not is_last_of_cycle then

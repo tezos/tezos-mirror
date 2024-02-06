@@ -19,7 +19,7 @@
         "Bounded_history_repr",
         "Context_binary_proof",
         "Ratio_repr",
-        "Int_percentage",
+        "Percentage",
 
 
         "Michelson_v1_primitives",

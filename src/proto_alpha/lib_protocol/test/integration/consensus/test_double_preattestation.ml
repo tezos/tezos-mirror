@@ -154,8 +154,9 @@ end = struct
     (* the diff of the two balances in normal and in denunciation cases *)
     let diff_end_bal = Test_tez.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
+    let Q.{num; den} = Percentage.to_q p in
     let lost_deposit =
-      Test_tez.(frozen_deposit *! Int64.of_int (p :> int) /! 100L)
+      Test_tez.(frozen_deposit *! Z.to_int64 num /! Z.to_int64 den)
     in
     (* some of the lost deposits (depending on staking constants) will be earned by the baker *)
     let divider =

@@ -144,6 +144,9 @@ let leq_int64 ~loc (a : int64) (b : int64) =
 let equal_z ~loc (a : Z.t) (b : Z.t) =
   equal ~loc Compare.Z.( = ) "Z are not equal" Z.pp_print a b
 
+let equal_q ~loc (a : Q.t) (b : Q.t) =
+  equal ~loc Compare.Q.( = ) "Q are not equal" Q.pp_print a b
+
 (* bool *)
 let equal_bool ~loc (a : bool) (b : bool) =
   equal ~loc Bool.equal "Booleans aren't equal" Format.pp_print_bool a b

@@ -109,7 +109,7 @@ let punish_double_signing ctxt ~operation_hash
       slash_history
   in
   let* ctxt =
-    if Compare.Int.((previously_slashed_this_cycle :> int) >= 100) then
+    if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
       (* Do not store denunciations that have no effects .*) return ctxt
     else
       let* denunciations_opt =

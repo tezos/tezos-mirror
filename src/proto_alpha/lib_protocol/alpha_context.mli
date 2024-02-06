@@ -921,10 +921,9 @@ module Constants : sig
       consensus_committee_size : int;
       consensus_threshold : int;
       limit_of_delegation_over_baking : int;
-      percentage_of_frozen_deposits_slashed_per_double_baking :
-        Int_percentage.t;
+      percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
       percentage_of_frozen_deposits_slashed_per_double_attestation :
-        Int_percentage.t;
+        Percentage.t;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -1021,10 +1020,10 @@ module Constants : sig
   val limit_of_delegation_over_baking : context -> int
 
   val percentage_of_frozen_deposits_slashed_per_double_baking :
-    context -> Int_percentage.t
+    context -> Percentage.t
 
   val percentage_of_frozen_deposits_slashed_per_double_attestation :
-    context -> Int_percentage.t
+    context -> Percentage.t
 
   val testnet_dictator : context -> public_key_hash option
 

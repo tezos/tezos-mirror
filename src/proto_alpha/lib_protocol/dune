@@ -49,7 +49,7 @@
   Bounded_history_repr
   Context_binary_proof
   Ratio_repr
-  Int_percentage
+  Percentage
   Michelson_v1_primitives
   Slot_repr
   Cycle_repr
@@ -342,7 +342,7 @@
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -640,7 +640,7 @@
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli
@@ -922,7 +922,7 @@
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
-  int_percentage.ml int_percentage.mli
+  percentage.ml percentage.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   cycle_repr.ml cycle_repr.mli

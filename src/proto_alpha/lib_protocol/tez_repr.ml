@@ -182,13 +182,11 @@ let mul_ratio ~rounding tez ~num ~den =
 
 let mul_q ~rounding tez {Q.num; den} = mul_ratio_z ~rounding tez ~num ~den
 
-let mul_percentage ~rounding =
-  let z100 = Z.of_int 100 in
-  fun (Tez_tag t) (percentage : Int_percentage.t) ->
-    (* Guaranteed to produce no errors by the invariants on {!Int_percentage.t}. *)
-    let div' = match rounding with `Down -> Z.div | `Up -> Z.cdiv in
-    Tez_tag
-      Z.(to_int64 (div' (mul (of_int64 t) (of_int (percentage :> int))) z100))
+let mul_percentage ~rounding (Tez_tag t) (percentage : Percentage.t) =
+  let {Q.num; den} = Percentage.to_q percentage in
+  (* Guaranteed to produce no errors by the invariants on {!Percentage.t}. *)
+  let div' = match rounding with `Down -> Z.div | `Up -> Z.cdiv in
+  Tez_tag Z.(to_int64 (div' (mul (of_int64 t) num) den))
 
 let of_mutez t = if t < 0L then None else Some (Tez_tag t)
 
