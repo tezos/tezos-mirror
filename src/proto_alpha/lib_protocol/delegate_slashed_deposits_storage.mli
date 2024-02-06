@@ -27,21 +27,21 @@
 
 (** This module maintains the storage related to slashing of delegates for
    double signing. In particular, it is responsible for maintaining the
-   {!Storage.Slashed_deposits}, {!Storage.Contract.Slashed_deposits}, and
+   {!Storage.Already_denounced}, {!Storage.Contract.Slashed_deposits}, and
    {!Storage.Pending_denunciations} tables.
 *)
 
-(** Returns true if the given delegate has already been slashed
+(** Returns true if the given delegate has already been denounced
     for double baking for the given level. *)
-val already_slashed_for_double_baking :
+val already_denounced_for_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
   bool tzresult Lwt.t
 
-(** Returns true if the given delegate has already been slashed
+(** Returns true if the given delegate has already been denounced
     for double preattesting or double attesting for the given level. *)
-val already_slashed_for_double_attesting :
+val already_denounced_for_double_attesting :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
@@ -80,7 +80,10 @@ val punish_double_signing :
   rewarded:Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
 
-val clear_outdated_slashed_deposits :
+(** Clear the part of {!Storage.Already_denounced} about the cycle
+    [new_cycle - max_slashable_period]. Indeed, denunciations on
+    events which happened during this cycle are no longer allowed. *)
+val clear_outdated_already_denounced :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
 val apply_and_clear_denunciations :

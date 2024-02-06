@@ -25,23 +25,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let already_slashed_for_double_attesting ctxt delegate (level : Level_repr.t) =
+let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
+    =
   let open Lwt_result_syntax in
-  let* slashed_opt =
-    Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
+  let* denounced_opt =
+    Storage.Already_denounced.find (ctxt, level.cycle) (level.level, delegate)
   in
-  match slashed_opt with
+  match denounced_opt with
   | None -> return_false
-  | Some slashed -> return slashed.for_double_attesting
+  | Some denounced -> return denounced.for_double_attesting
 
-let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
+let already_denounced_for_double_baking ctxt delegate (level : Level_repr.t) =
   let open Lwt_result_syntax in
-  let* slashed_opt =
-    Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
+  let* denounced_opt =
+    Storage.Already_denounced.find (ctxt, level.cycle) (level.level, delegate)
   in
-  match slashed_opt with
+  match denounced_opt with
   | None -> return_false
-  | Some slashed -> return slashed.for_double_baking
+  | Some denounced -> return denounced.for_double_baking
 
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
@@ -54,36 +55,36 @@ let punish_double_signing ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  let* slashed_opt =
-    Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
+  let* denounced_opt =
+    Storage.Already_denounced.find (ctxt, level.cycle) (level.level, delegate)
   in
-  let slashed =
-    Option.value slashed_opt ~default:Storage.default_slashed_level
+  let denounced =
+    Option.value denounced_opt ~default:Storage.default_denounced
   in
-  let already_slashed, updated_slashed, slashing_percentage =
-    let Storage.{for_double_baking; for_double_attesting} = slashed in
+  let already_denounced, updated_denounced, slashing_percentage =
+    let Storage.{for_double_baking; for_double_attesting} = denounced in
     match misbehaviour.kind with
     | Double_baking ->
         ( for_double_baking,
-          {slashed with for_double_baking = true},
+          {denounced with for_double_baking = true},
           Constants_storage
           .percentage_of_frozen_deposits_slashed_per_double_baking
             ctxt )
     | Double_attesting ->
         ( for_double_attesting,
-          {slashed with for_double_attesting = true},
+          {denounced with for_double_attesting = true},
           Constants_storage
           .percentage_of_frozen_deposits_slashed_per_double_attestation
             ctxt )
   in
-  assert (Compare.Bool.(already_slashed = false)) ;
+  assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let*! ctxt =
-    Storage.Slashed_deposits.add
+    Storage.Already_denounced.add
       (ctxt, level.cycle)
       (level.level, delegate)
-      updated_slashed
+      updated_denounced
   in
   let* slash_history_opt =
     Storage.Contract.Slashed_deposits.find ctxt delegate_contract
@@ -124,11 +125,11 @@ let punish_double_signing ctxt ~operation_hash
   in
   return ctxt
 
-let clear_outdated_slashed_deposits ctxt ~new_cycle =
+let clear_outdated_already_denounced ctxt ~new_cycle =
   let max_slashable_period = Constants_repr.max_slashing_period in
   match Cycle_repr.(sub new_cycle max_slashable_period) with
   | None -> Lwt.return ctxt
-  | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
+  | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
 
 let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in

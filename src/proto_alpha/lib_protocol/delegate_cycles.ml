@@ -199,7 +199,7 @@ let cycle_end ctxt last_cycle =
   in
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
   let*! ctxt =
-    Delegate_slashed_deposits_storage.clear_outdated_slashed_deposits
+    Delegate_slashed_deposits_storage.clear_outdated_already_denounced
       ctxt
       ~new_cycle
   in
