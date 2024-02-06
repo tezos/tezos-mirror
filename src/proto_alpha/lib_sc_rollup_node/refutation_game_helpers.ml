@@ -71,6 +71,7 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
     ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
+  let dal_number_of_slots = constants.Rollup_constants.dal.number_of_slots in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->
@@ -94,6 +95,7 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
       let* pages =
         Dal_pages_request.slot_pages
           ~dal_attestation_lag
+          ~dal_number_of_slots
           ~inbox_level
           node_ctxt
           slot_id

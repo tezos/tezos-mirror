@@ -281,11 +281,12 @@ module Dal_helpers : sig
       [commit_inbox_level] (aka inbox_level in that module) is the level
       (included) up to which the PVM consumed all messages and DAL/DAC inputs
       before producing the related commitment. *)
-  val valid_published_level :
+  val valid_slot_id :
+    dal_number_of_slots:int ->
     dal_attestation_lag:int ->
     origination_level:Raw_level_repr.t ->
     commit_inbox_level:Raw_level_repr.t ->
-    published_level:Raw_level_repr.t ->
+    Dal_slot_repr.Header.id ->
     bool
 end
 
