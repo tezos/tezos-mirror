@@ -1132,6 +1132,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "risc-v-parser"
+version = "0.1.0"
+dependencies = [
+ "goblin",
+]
+
+[[package]]
 name = "risc-v-sandbox"
 version = "0.0.0"
 dependencies = [

@@ -6,6 +6,7 @@ members = [
   "machine_state",
   "interpreter",
   "pvm",
+  "parser",
   # Executables
   "sandbox",
 ]
