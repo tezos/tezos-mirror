@@ -92,7 +92,10 @@ let store_blueprint ctxt number blueprint =
     blueprint
 
 let find_blueprint ctxt number =
-  Blueprint_store.find (Blueprint_store.make ~data_dir:ctxt.data_dir) number
+  Blueprint_store.find
+    ~kind:`Execute
+    (Blueprint_store.make ~data_dir:ctxt.data_dir)
+    number
 
 let execution_config ctxt =
   Config.config
@@ -144,7 +147,9 @@ let apply_blueprint ctxt payload =
   match try_apply with
   | Apply_success (evm_state, Block_height blueprint_number, current_block_hash)
     when Z.equal blueprint_number next ->
-      let* () = store_blueprint ctxt payload (Qty blueprint_number) in
+      let* () =
+        store_blueprint ~kind:`Execute ctxt payload (Qty blueprint_number)
+      in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       ctxt.current_block_hash <- current_block_hash ;
       let*! () = Blueprint_events.blueprint_applied blueprint_number in
@@ -163,6 +168,9 @@ let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
   let (Qty level) = ctxt.next_blueprint_number in
   let* ctxt = apply_blueprint ctxt blueprint.to_execute in
+  let* () =
+    store_blueprint ~kind:`Publish ctxt blueprint.to_publish (Qty level)
+  in
   let* () = Blueprints_publisher.publish level blueprint.to_publish in
   return ctxt
 

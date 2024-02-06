@@ -128,7 +128,10 @@ module Worker = struct
       Lwt_seq.iter_s
         (fun level ->
           let* payload =
-            Blueprint_store.find (blueprint_store worker) (Qty level)
+            Blueprint_store.find
+              ~kind:`Publish
+              (blueprint_store worker)
+              (Qty level)
           in
           match payload with
           | Some payload -> publish worker payload level
