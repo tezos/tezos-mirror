@@ -8,7 +8,6 @@ use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::InboxContent;
 use crate::inbox::{read_inbox, TezosContracts};
-use crate::upgrade::store_kernel_upgrade;
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -49,7 +48,6 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     tezos_contracts: TezosContracts,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
-        kernel_upgrade,
         transactions,
         sequencer_blueprints: _,
     }) = read_inbox(host, smart_rollup_address, tezos_contracts, None, None)?
@@ -61,10 +59,6 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
         };
         // Store the blueprint.
         store_inbox_blueprint(host, blueprint)?;
-        // Store kernel upgrade.
-        if let Some(kernel_upgrade) = kernel_upgrade {
-            store_kernel_upgrade(host, &kernel_upgrade)?;
-        };
     }
     Ok(())
 }
@@ -78,7 +72,6 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     sequencer: PublicKey,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
-        kernel_upgrade,
         transactions,
         sequencer_blueprints,
     }) = read_inbox(
@@ -104,10 +97,6 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
             );
             store_sequencer_blueprint(host, seq_blueprint)?
         }
-        // Store kernel upgrade.
-        if let Some(kernel_upgrade) = kernel_upgrade {
-            store_kernel_upgrade(host, &kernel_upgrade)?;
-        };
     }
     Ok(())
 }

@@ -182,7 +182,6 @@ impl Decodable for Transaction {
 
 #[derive(Debug, PartialEq)]
 pub struct InboxContent {
-    pub kernel_upgrade: Option<KernelUpgrade>,
     pub transactions: Vec<Transaction>,
     pub sequencer_blueprints: Vec<SequencerBlueprint>,
 }
@@ -300,7 +299,6 @@ pub fn read_inbox<Host: Runtime>(
     sequencer: Option<PublicKey>,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
     let mut res = InboxContent {
-        kernel_upgrade: None,
         transactions: vec![],
         sequencer_blueprints: vec![],
     };
@@ -353,7 +351,7 @@ pub fn read_inbox<Host: Runtime>(
                     }
                 }
                 Input::Upgrade(kernel_upgrade) => {
-                    res.kernel_upgrade = Some(kernel_upgrade)
+                    store_kernel_upgrade(host, &kernel_upgrade)?
                 }
                 Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
                 Input::Simulation => {
@@ -589,7 +587,7 @@ mod tests {
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         host.add_transfer(payload, &transfer_metadata);
-        let inbox_content = read_inbox(
+        let _inbox_content = read_inbox(
             &mut host,
             [0; 20],
             TezosContracts {
@@ -607,7 +605,8 @@ mod tests {
             activation_timestamp,
         });
 
-        assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
+        let stored_kernel_upgrade = crate::upgrade::read_kernel_upgrade(&host).unwrap();
+        assert_eq!(stored_kernel_upgrade, expected_upgrade);
     }
 
     #[test]
@@ -791,7 +790,6 @@ mod tests {
         assert_eq!(
             inbox_content,
             InboxContent {
-                kernel_upgrade: None,
                 transactions: vec![],
                 sequencer_blueprints: vec![]
             }
