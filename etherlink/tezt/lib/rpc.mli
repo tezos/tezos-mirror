@@ -8,6 +8,23 @@
 
 type error = {code : int; message : string}
 
+module Request : sig
+  val eth_blockNumber : Evm_node.request
+
+  val eth_getBlockByNumber :
+    block:string -> full_tx_objects:bool -> Evm_node.request
+
+  val produceBlock : ?timestamp:string -> unit -> Evm_node.request
+
+  val injectUpgrade : string -> Evm_node.request
+
+  val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
+
+  val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
+
+  val eth_estimateGas : (string * Ezjsonm.value) list -> Evm_node.request
+end
+
 (** [block_number evm_node] calls [eth_blockNumber]. *)
 val block_number : Evm_node.t -> (int32, error) result Lwt.t
 
