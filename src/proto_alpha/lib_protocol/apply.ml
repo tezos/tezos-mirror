@@ -2406,29 +2406,24 @@ let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
     | Single (Attestation _) ->
         Double_attestation_evidence_result {forbidden_delegate; balance_updates}
   in
-  match op1.protocol_data.contents with
-  | Single (Preattestation e1)
-  | Single (Attestation {consensus_content = e1; dal_content = _}) ->
-      let level = Level.from_raw ctxt e1.level in
-      let* ctxt, consensus_pk1 =
-        Stake_distribution.slot_owner ctxt level e1.slot
-      in
-      let misbehaviour =
-        {
-          Misbehaviour.kind = Double_attesting;
-          level = e1.level;
-          round = e1.round;
-          slot = e1.slot;
-        }
-      in
-      punish_delegate
-        ctxt
-        ~operation_hash
-        consensus_pk1.delegate
-        level
-        misbehaviour
-        mk_result
-        ~payload_producer
+  let {slot; level = raw_level; round; block_payload_hash = _}, kind =
+    match op1.protocol_data.contents with
+    | Single (Preattestation consensus_content) ->
+        (consensus_content, Misbehaviour.Double_preattesting)
+    | Single (Attestation {consensus_content; dal_content = _}) ->
+        (consensus_content, Misbehaviour.Double_attesting)
+  in
+  let level = Level.from_raw ctxt raw_level in
+  let* ctxt, consensus_pk1 = Stake_distribution.slot_owner ctxt level slot in
+  let misbehaviour = {Misbehaviour.kind; level = raw_level; round; slot} in
+  punish_delegate
+    ctxt
+    ~operation_hash
+    consensus_pk1.delegate
+    level
+    misbehaviour
+    mk_result
+    ~payload_producer
 
 let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     ~payload_producer =
