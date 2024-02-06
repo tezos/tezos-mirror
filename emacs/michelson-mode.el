@@ -57,7 +57,7 @@
   :group 'michelson)
 
 (defcustom michelson-client-command "tezos-client"
-  "Path to the `tezos-client' binary."
+  "Path to the `octez-client' binary."
   :type 'string
   :group 'michelson-options)
 
@@ -89,7 +89,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   :group 'michelson-options)
 
 (defcustom michelson-extra-flags nil
-  "Additional flags to pass to tezos-client when type checking."
+  "Additional flags to pass to octez-client when type checking."
   :type '(list string)
   :group 'michelson-options)
 
