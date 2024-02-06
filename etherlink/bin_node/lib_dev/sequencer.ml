@@ -49,7 +49,6 @@ end) : Services_backend_sig.Backend = struct
 
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
       (* Create the blueprint with the messages. *)
       let blueprint =
         Sequencer_blueprint.create
@@ -58,19 +57,20 @@ end) : Services_backend_sig.Backend = struct
           ~smart_rollup_address
           ~transactions:messages.TxEncoder.raw
           ~delayed_transactions:messages.TxEncoder.delayed
-          ~parent_hash:ctxt.current_block_hash
-          ~number:ctxt.next_blueprint_number
+          ~parent_hash:Ctxt.ctxt.current_block_hash
+          ~number:Ctxt.ctxt.next_blueprint_number
       in
       (* Apply the blueprint *)
-      let* _ctxt = Evm_context.apply_and_publish_blueprint ctxt blueprint in
+      let* _ctxt =
+        Evm_context.apply_and_publish_blueprint Ctxt.ctxt blueprint
+      in
       return_unit
   end
 
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
-      let* raw_insights = Evm_context.execute_and_inspect ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
       match Simulation.Encodings.insights_from_list raw_insights with
       | Some i -> return i
       | None -> Error_monad.failwith "Invalid insights format"
@@ -78,15 +78,14 @@ end) : Services_backend_sig.Backend = struct
 
   let inject_kernel_upgrade ~payload =
     let open Lwt_result_syntax in
-    let* ctxt = Evm_context.sync Ctxt.ctxt in
-    let*! evm_state = Evm_context.evm_state ctxt in
+    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
     let*! evm_state =
       Evm_state.modify
         ~key:Durable_storage_path.kernel_upgrade
         ~value:payload
         evm_state
     in
-    let* _ctxt = Evm_context.commit ctxt evm_state in
+    let* _ctxt = Evm_context.commit Ctxt.ctxt evm_state in
     return_unit
 end
 

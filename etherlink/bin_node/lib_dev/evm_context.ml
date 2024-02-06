@@ -7,7 +7,7 @@
 
 type t = {
   data_dir : string;
-  context : Irmin_context.rw;
+  mutable context : Irmin_context.rw;
   index : Irmin_context.rw_index;
   preimages : string;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -74,7 +74,8 @@ let commit (ctxt : t) evm_state =
         current_block_hash = ctxt.current_block_hash;
       }
   in
-  return {ctxt with context}
+  ctxt.context <- context ;
+  return_unit
 
 let sync ctxt =
   let open Lwt_result_syntax in
@@ -111,7 +112,7 @@ let execute =
     let config = execution_config ctxt in
     let*! evm_state = evm_state ctxt in
     let* evm_state = Evm_state.execute ~config evm_state inbox in
-    let* ctxt = if commit then perform_commit ctxt evm_state else return ctxt in
+    let* () = when_ commit (fun () -> perform_commit ctxt evm_state) in
     return (ctxt, evm_state)
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -153,7 +154,7 @@ let apply_blueprint ctxt payload =
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       ctxt.current_block_hash <- current_block_hash ;
       let*! () = Blueprint_events.blueprint_applied blueprint_number in
-      let* ctxt = commit ctxt evm_state in
+      let* () = commit ctxt evm_state in
       Lwt_watcher.notify
         ctxt.blueprint_watcher
         {number = Qty blueprint_number; payload} ;
@@ -206,7 +207,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
           return ctxt
         else
           let* evm_state = Evm_state.init ~kernel in
-          let* ctxt = commit ctxt evm_state in
+          let* () = commit ctxt evm_state in
           match produce_genesis_with with
           | Some secret_key ->
               (* Create the first empty block. *)
