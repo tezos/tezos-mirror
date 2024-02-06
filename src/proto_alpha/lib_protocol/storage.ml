@@ -1121,6 +1121,15 @@ module Cycle = struct
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
+           let name = ["already_denounced"]
+         end))
+         (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
+      (Denounced)
+
+  module Already_denounced__Oxford =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
+         (struct
            let name = ["slashed_deposits"]
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
@@ -1267,6 +1276,7 @@ module Cycle = struct
 end
 
 module Already_denounced = Cycle.Already_denounced
+module Already_denounced__Oxford = Cycle.Already_denounced__Oxford
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
