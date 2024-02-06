@@ -4,8 +4,8 @@
 
 pub mod instruction;
 
-use crate::instruction::Instr;
 use core::ops::Range;
+use instruction::Instr;
 
 fn parse_uncompressed_instruction(bytes: u32) -> Instr {
     // TODO parse an uncompressed instruction

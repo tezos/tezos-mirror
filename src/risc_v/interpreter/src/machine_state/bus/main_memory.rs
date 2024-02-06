@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::backend::{self, VolatileRegion};
+use crate::machine_state::backend::{self, VolatileRegion};
 use std::mem;
 
 /// Configuration object for memory size
@@ -11,7 +11,7 @@ pub enum Sizes<const LEN8: usize, const LEN16: usize, const LEN32: usize, const 
 /// Generates a variant of [Sizes] with all length parameters instantiated.
 macro_rules! gen_memory_layout {
     ($name:ident = $size_in_g:literal GiB) => {
-        pub type $name = crate::bus::main_memory::Sizes<
+        pub type $name = crate::machine_state::bus::main_memory::Sizes<
             { $size_in_g * 1024 * 1024 * 1024 },
             { $size_in_g * 1024 * 1024 * 512 },
             { $size_in_g * 1024 * 1024 * 256 },
@@ -20,7 +20,7 @@ macro_rules! gen_memory_layout {
     };
 
     ($name:ident = $size_in_m:literal MiB) => {
-        pub type $name = crate::bus::main_memory::Sizes<
+        pub type $name = crate::machine_state::bus::main_memory::Sizes<
             { $size_in_m * 1024 * 1024 },
             { $size_in_m * 1024 * 512 },
             { $size_in_m * 1024 * 256 },
@@ -29,7 +29,7 @@ macro_rules! gen_memory_layout {
     };
 
     ($name:ident = $size_in_k:literal KiB) => {
-        pub type $name = crate::bus::main_memory::Sizes<
+        pub type $name = crate::machine_state::bus::main_memory::Sizes<
             { $size_in_k * 1024 },
             { $size_in_k * 512 },
             { $size_in_k * 256 },
@@ -185,7 +185,7 @@ impl_volatile_region!(doublewords, u64);
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
+    use crate::machine_state::{
         backend::{
             tests::{test_determinism, TestBackendFactory},
             Backend, Layout,

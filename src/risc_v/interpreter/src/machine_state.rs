@@ -242,7 +242,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use super::{
         backend::tests::{test_determinism, ManagerFor, TestBackendFactory},
         bus::main_memory::tests::T1K,
         mode, HartState, HartStateLayout, MachineState, MachineStateLayout,

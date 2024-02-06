@@ -180,7 +180,7 @@ pub trait VolatileRegion<E: Elem> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::backend::{
+    use crate::machine_state::backend::{
         layout::{Atom, Layout},
         tests::TestBackendFactory,
         Array, Backend, Elem, Region,

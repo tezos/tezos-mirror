@@ -26,7 +26,7 @@
 //! We can describe the layout of this state using the following type.
 //!
 //! ```
-//! use risc_v_machine_state::backend::{Atom, Array};
+//! use risc_v_interpreter::machine_state::backend::{Atom, Array};
 //!
 //! type MyStateLayout = (
 //!     Atom<u64>,
@@ -217,7 +217,7 @@ pub trait Backend: BackendManagement + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{bus, interpreter, mode, registers};
+    use crate::machine_state::{bus, interpreter, mode, registers};
     use rand::{Fill, Rng};
     use std::collections::VecDeque;
 
@@ -412,7 +412,7 @@ pub mod tests {
     macro_rules! create_state {
         ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
             {
-                use $crate::backend::{Backend, BackendManagement, Layout};
+                use $crate::machine_state::backend::{Backend, BackendManagement, Layout};
                 let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<<<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
@@ -435,7 +435,7 @@ pub mod tests {
         mode::tests::test_mode::<F>();
         interpreter::tests::test::<F>();
         test_example::<F>();
-        crate::tests::test_backend::<F>();
+        crate::machine_state::tests::test_backend::<F>();
     }
 
     fn test_example<F: TestBackendFactory>() {

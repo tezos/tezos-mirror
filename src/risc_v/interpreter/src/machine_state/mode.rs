@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
+use crate::machine_state::{
     backend::{self, Cell},
     csregisters::Privilege,
 };
@@ -80,7 +80,7 @@ impl<M: backend::Manager> ModeCell<M> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
+    use crate::machine_state::{
         backend::{
             tests::{test_determinism, TestBackendFactory},
             Backend, Layout,

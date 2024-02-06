@@ -8,7 +8,7 @@
 // Allow non snake case for setters & getters
 #![allow(non_snake_case)]
 
-use crate::csregisters::{ones, CSRValue};
+use crate::machine_state::csregisters::{ones, CSRValue};
 use paste::paste;
 
 /// Common trait for fields in `mstatus` register
@@ -243,7 +243,9 @@ pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::csregisters::xstatus::{ExtensionValue, FieldValue, MPPValue, SPPValue, XLenValue};
+    use crate::machine_state::csregisters::xstatus::{
+        ExtensionValue, FieldValue, MPPValue, SPPValue, XLenValue,
+    };
 
     #[test]
     fn test_status_fields() {

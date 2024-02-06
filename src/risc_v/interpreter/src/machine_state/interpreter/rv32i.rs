@@ -2,7 +2,7 @@
 //!
 //! Chapter 2 - Unprivileged spec
 
-use crate::{
+use crate::machine_state::{
     backend,
     bus::Address,
     registers::{XRegister, XRegisters},
@@ -147,12 +147,12 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
+    use crate::machine_state::{
         backend::tests::TestBackendFactory,
-        create_backend, create_state,
         registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
         HartState, HartStateLayout,
     };
+    use crate::{create_backend, create_state};
     use proptest::{prelude::any, prop_assert_eq, prop_assume, proptest};
 
     pub fn test<F: TestBackendFactory>() {

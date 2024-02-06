@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_choreographer_align() {
-        use crate::backend::{Atom, Layout};
+        use crate::machine_state::backend::{Atom, Layout};
 
         type TestLayout = (Atom<[u8; 5]>, Atom<u64>);
 

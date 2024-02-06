@@ -4,8 +4,8 @@
 
 mod xstatus;
 
-use crate::backend::{self, Region};
-use crate::mode::Mode;
+use crate::machine_state::backend::{self, Region};
+use crate::machine_state::mode::Mode;
 use strum::IntoEnumIterator;
 
 /// Privilege required to access a CSR
@@ -1183,7 +1183,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
+    use crate::machine_state::{
         backend::{
             tests::{test_determinism, ManagerFor, TestBackendFactory},
             Backend, BackendManagement, Layout, Region,
@@ -1194,8 +1194,8 @@ pub mod tests {
 
     #[test]
     pub fn test_privilege_access() {
-        use crate::csregisters::check_privilege as check;
-        use crate::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::check_privilege as check;
+        use crate::machine_state::csregisters::CSRegister as csreg;
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1220,8 +1220,8 @@ pub mod tests {
 
     #[test]
     fn test_read_write_access() {
-        use crate::csregisters::check_write as check;
-        use crate::csregisters::{CSRegister as csreg, Exception};
+        use crate::machine_state::csregisters::check_write as check;
+        use crate::machine_state::csregisters::{CSRegister as csreg, Exception};
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1244,7 +1244,7 @@ pub mod tests {
 
     #[test]
     fn test_wpri() {
-        use crate::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::CSRegister as csreg;
 
         let check = |reg: csreg, value| reg.clear_wpri_fields(value);
 
@@ -1262,7 +1262,7 @@ pub mod tests {
 
     #[test]
     fn test_wlrl() {
-        use crate::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::CSRegister as csreg;
 
         // Additionally check if value remains legal after using `make_value_writable`
         let check =
@@ -1292,7 +1292,7 @@ pub mod tests {
 
     #[test]
     fn test_writable_warl() {
-        use crate::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::CSRegister as csreg;
 
         let check_wrapped = |reg: csreg, value| reg.make_value_writable(value);
         let check = |reg: csreg, value| reg.make_value_writable(value).unwrap();

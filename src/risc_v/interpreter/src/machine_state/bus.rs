@@ -5,7 +5,7 @@
 pub mod devices;
 pub mod main_memory;
 
-use crate::{backend, registers};
+use crate::machine_state::{backend, registers};
 
 /// Bus address
 pub type Address = registers::XValue;
@@ -109,7 +109,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use super::{main_memory::tests::T1K, Bus, BusLayout};
-    use crate::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
+    use crate::machine_state::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
 
     pub fn test_backend<F: TestBackendFactory>() {
         super::main_memory::tests::test_backend::<F>();
