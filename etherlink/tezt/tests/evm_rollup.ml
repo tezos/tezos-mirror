@@ -726,26 +726,15 @@ let test_l2_block_size_non_zero =
     ~error_msg:"Unexpected block size, should be > 0, but got %%L" ;
   unit
 
-let transaction_count_request address =
-  Evm_node.
-    {
-      method_ = "eth_getTransactionCount";
-      parameters = `A [`String address; `String "latest"];
-    }
-
-let get_transaction_count evm_node address =
-  let* transaction_count =
-    Evm_node.call_evm_rpc evm_node (transaction_count_request address)
-  in
-  return JSON.(transaction_count |-> "result" |> as_int64)
-
 let test_rpc_getTransactionCount =
   register_both
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let* transaction_count =
-    get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
+  let*@ transaction_count =
+    Rpc.get_transaction_count
+      evm_node
+      ~address:Eth_account.bootstrap_accounts.(0).address
   in
   Check.((transaction_count = 0L) int64)
     ~error_msg:"Expected a nonce of %R, but got %L" ;
@@ -756,14 +745,19 @@ let test_rpc_getTransactionCountBatch =
     ~tags:["evm"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let* transaction_count =
-    get_transaction_count evm_node Eth_account.bootstrap_accounts.(0).address
+  let*@ transaction_count =
+    Rpc.get_transaction_count
+      evm_node
+      ~address:Eth_account.bootstrap_accounts.(0).address
   in
   let* transaction_count_batch =
     let* transaction_count =
       Evm_node.batch_evm_rpc
         evm_node
-        [transaction_count_request Eth_account.bootstrap_accounts.(0).address]
+        [
+          Rpc.Request.eth_getTransactionCount
+            ~address:Eth_account.bootstrap_accounts.(0).address;
+        ]
     in
     match JSON.as_list transaction_count with
     | [transaction_count] ->
@@ -779,7 +773,8 @@ let test_rpc_batch =
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* transaction_count, chain_id =
     let transaction_count =
-      transaction_count_request Eth_account.bootstrap_accounts.(0).address
+      Rpc.Request.eth_getTransactionCount
+        ~address:Eth_account.bootstrap_accounts.(0).address
     in
     let chain_id = Evm_node.{method_ = "eth_chainId"; parameters = `Null} in
     let* results =
@@ -1384,8 +1379,8 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
   assert (sender_balance = transfer_result.sender_balance_after) ;
   let* receiver_balance = balance receiver.Eth_account.address in
   assert (receiver_balance = transfer_result.receiver_balance_after) ;
-  let* sender_nonce =
-    get_transaction_count full_evm_setup.evm_node sender.address
+  let*@ sender_nonce =
+    Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
   in
   assert (sender_nonce = transfer_result.sender_nonce_after) ;
   let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
@@ -1403,15 +1398,15 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
   let balance account = Eth_cli.balance ~account ~endpoint in
   let* sender_balance_before = balance sender.Eth_account.address in
   let* receiver_balance_before = balance receiver.Eth_account.address in
-  let* sender_nonce_before =
-    get_transaction_count full_evm_setup.evm_node sender.address
+  let*@ sender_nonce_before =
+    Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
   in
   let* tx_hash = send ~sender ~receiver ~value ?data full_evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx:tx_hash in
   let* sender_balance_after = balance sender.address in
   let* receiver_balance_after = balance receiver.address in
-  let* sender_nonce_after =
-    get_transaction_count full_evm_setup.evm_node sender.address
+  let*@ sender_nonce_after =
+    Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
   in
   let* tx_object = get_tx_object ~endpoint ~tx_hash in
   let*@! tx_receipt =
@@ -3724,7 +3719,7 @@ let test_tx_pool_replacing_transactions =
   register_both ~tags:["evm"; "tx_pool"] ~title:"Transactions can be replaced"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   let bob = Eth_account.bootstrap_accounts.(0) in
-  let* bob_nonce = get_transaction_count evm_node bob.address in
+  let*@ bob_nonce = Rpc.get_transaction_count evm_node ~address:bob.address in
   (* nonce: 0, private_key: bootstrappe_account(0), amount: 10; max_fees: 21000*)
   let tx_a =
     "0xf86b80825208825208940000000000000000000000000000000000000000888ac7230489e8000080820a95a05fc733145b2066166e074bc42239a7312b2358f5cbf9ce17bab404abd1dfaff0a0493e763aa933d3eb724d75f9ad6fb4bbffdf3d54568d44d6f70cfcf0a07dc4f8"
@@ -3745,7 +3740,9 @@ let test_tx_pool_replacing_transactions =
       (wait_for_transaction_receipt ~evm_node ~transaction_hash:tx_b_hash)
       ()
   in
-  let* new_bob_nonce = get_transaction_count evm_node bob.address in
+  let*@ new_bob_nonce =
+    Rpc.get_transaction_count evm_node ~address:bob.address
+  in
   Check.((receipt.status = true) bool) ~error_msg:"Transaction has failed" ;
   Check.((new_bob_nonce = Int64.(add bob_nonce one)) int64)
     ~error_msg:"Bob has sent more than one transaction" ;
