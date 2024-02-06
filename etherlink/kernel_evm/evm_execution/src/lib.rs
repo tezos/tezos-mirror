@@ -50,11 +50,6 @@ pub enum DurableStorageError {
     PathError(#[from] host::path::PathError),
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum ArithmeticErrorKind {
-    FeeOverflow,
-}
-
 /// Errors when processing Ethereum transactions
 ///
 /// What could possibly go wrong? Some of these are place holders for now.
@@ -109,13 +104,19 @@ pub enum EthereumError {
     /// result of a bug in the EvmHandler.
     #[error("Inconsistent EvmHandler state: {0}")]
     InconsistentState(Cow<'static, str>),
-    /// The execution failed because there was an arithmetic overflow or underflow.
-    #[error("A computation provoked an arithmetic error: {0:?}")]
-    ArithmeticError(ArithmeticErrorKind),
     /// The execution failed because it spent more ticks than the one currently
     /// available for the current run.
     #[error("The transaction took more ticks than expected")]
     OutOfTicks,
+    /// gas_limit * gas_price > u64::max
+    #[error("Gas payment overflowed u64::max")]
+    GasPaymentOverflow,
+    /// Converting non-execution fees to gas overflowed u64::max
+    #[error("Gas for fees overflowed u64::max in conversion")]
+    FeesToGasOverflow,
+    /// Underflow of gas limit when subtracting gas for fees
+    #[error("Insufficient gas to cover the non-execution fees")]
+    GasToFeesUnderflow,
 }
 
 /// Execute an Ethereum Transaction
@@ -310,7 +311,7 @@ mod test {
     }
 
     fn dummy_first_block() -> BlockConstants {
-        let block_fees = BlockFees::new(U256::from(12345));
+        let block_fees = BlockFees::new(U256::from(12345), U256::from(500_000));
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 
@@ -1998,7 +1999,7 @@ mod test {
         let chain_id = U256::from(42);
         let mut chain_id_bytes = [0u8; 32];
         chain_id.to_big_endian(&mut chain_id_bytes);
-        let block_fees = BlockFees::new(U256::from(54321));
+        let block_fees = BlockFees::new(U256::from(54321), U256::from(1000));
         let block = BlockConstants::first_block(U256::zero(), chain_id, block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
@@ -2070,7 +2071,7 @@ mod test {
         let base_fee_per_gas = U256::from(23000);
         let mut base_fee_per_gas_bytes = [0u8; 32];
         base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
-        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas, U256::zero());
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
@@ -2314,7 +2315,7 @@ mod test {
         // Arrange
         let mut mock_runtime = MockHost::default();
         let base_fee_per_gas = U256::from(23000);
-        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas, U256::zero());
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
@@ -2371,7 +2372,7 @@ mod test {
         // Arrange
         let mut mock_runtime = MockHost::default();
         let base_fee_per_gas = U256::from(23000);
-        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas, U256::zero());
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_evm_account_storage().unwrap();
@@ -2425,7 +2426,7 @@ mod test {
 
     fn first_block() -> BlockConstants {
         let base_fee_per_gas = U256::from(23000);
-        let block_fees = BlockFees::new(base_fee_per_gas);
+        let block_fees = BlockFees::new(base_fee_per_gas, U256::zero());
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 

@@ -19,10 +19,10 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
     read_admin, read_base_fee_per_gas, read_chain_id, read_delayed_transaction_bridge,
-    read_kernel_version, read_last_info_per_level_timestamp,
+    read_flat_fee, read_kernel_version, read_last_info_per_level_timestamp,
     read_last_info_per_level_timestamp_stats, read_sequencer_admin, read_ticketer,
-    sequencer, store_base_fee_per_gas, store_chain_id, store_kernel_version,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    sequencer, store_base_fee_per_gas, store_chain_id, store_flat_fee,
+    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
@@ -39,6 +39,7 @@ mod blueprint;
 mod blueprint_storage;
 mod delayed_inbox;
 mod error;
+mod fees;
 mod inbox;
 mod indexable_storage;
 mod linked_list;
@@ -63,6 +64,9 @@ pub const CHAIN_ID: u32 = 1337;
 ///
 /// Distinct from 'intrinsic base fee' of a simple Eth transfer: which costs 21_000 gas.
 pub const BASE_FEE_PER_GAS: u32 = 21_000;
+
+/// Default base fee (flat), applied to every transaction. Set to 0.005 tez.
+pub const FLAT_FEE: u64 = 5 * 10_u64.pow(15);
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::shanghai();
@@ -148,7 +152,16 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
         }
     };
 
-    let block_fees = BlockFees::new(base_fee_per_gas);
+    let flat_fee = match read_flat_fee(host) {
+        Ok(flat_fee) => flat_fee,
+        Err(_) => {
+            let flat_fee = U256::from(FLAT_FEE);
+            store_flat_fee(host, flat_fee)?;
+            flat_fee
+        }
+    };
+
+    let block_fees = BlockFees::new(base_fee_per_gas, flat_fee);
 
     Ok(block_fees)
 }
@@ -342,6 +355,14 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
+    const DUMMY_FLAT_FEE: u64 = 21_100_000u64;
+
+    fn dummy_block_fees() -> BlockFees {
+        BlockFees::new(
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_FLAT_FEE),
+        )
+    }
 
     fn set_balance<Host: KernelRuntime>(
         host: &mut Host,
@@ -500,7 +521,7 @@ mod tests {
         crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
             .expect("Should be able to store kernel upgrade");
 
-        let block_fees = BlockFees::new(DUMMY_BASE_FEE_PER_GAS.into());
+        let block_fees = dummy_block_fees();
 
         // If the upgrade is started, it should raise an error
         crate::block::produce(

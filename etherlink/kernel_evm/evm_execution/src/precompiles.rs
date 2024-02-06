@@ -560,7 +560,7 @@ mod tests {
     ) -> Result<ExecutionOutcome, EthereumError> {
         let caller = H160::from_low_u64_be(118u64);
         let mut mock_runtime = MockHost::default();
-        let block_fees = BlockFees::new(U256::from(21000));
+        let block_fees = BlockFees::new(U256::from(21000), U256::from(1_000_000));
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
