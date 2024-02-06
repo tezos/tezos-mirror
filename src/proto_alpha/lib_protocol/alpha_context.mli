@@ -2508,6 +2508,10 @@ module Staking : sig
 
   (** Staking can be either automated or manual. If Adaptive Issuance is
       enabled, staking must be manual. *)
+  type staking_automation = Auto_staking | Manual_staking
+
+  val staking_automation : context -> staking_automation
+
   val check_manual_staking_allowed : context -> unit tzresult
 end
 
