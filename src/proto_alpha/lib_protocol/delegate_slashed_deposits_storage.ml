@@ -171,13 +171,13 @@ let apply_and_clear_denunciations ctxt =
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     {reward; amount_to_burn}
   in
-  let* ctxt, slashings, balance_updates, remaining_denunciations =
+  let* ctxt, balance_updates, remaining_denunciations =
     Storage.Pending_denunciations.fold
       ctxt
       ~order:`Undefined
-      ~init:(Ok (ctxt, Signature.Public_key_hash.Map.empty, [], []))
+      ~init:(Ok (ctxt, [], []))
       ~f:(fun delegate denunciations acc ->
-        let*? ctxt, slashings, balance_updates, remaining_denunciations = acc in
+        let*? ctxt, balance_updates, remaining_denunciations = acc in
         (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
            end of this period, we "delay" the current cycle's misbehaviour's denunciations,
            while we apply the older denunciations.
@@ -202,9 +202,9 @@ let apply_and_clear_denunciations ctxt =
                 Cycle_repr.(misb_cycle < current_cycle))
               denunciations
         in
-        let+ ctxt, percentage, balance_updates =
+        let+ ctxt, balance_updates =
           List.fold_left_es
-            (fun (ctxt, percentage, balance_updates)
+            (fun (ctxt, balance_updates)
                  Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
               let slashing_percentage =
                 match misbehaviour.kind with
@@ -322,21 +322,13 @@ let apply_and_clear_denunciations ctxt =
                   to_reward
                   (`Contract (Contract_repr.Implicit rewarded))
               in
-              let percentage =
-                Int_percentage.add_bounded percentage slashing_percentage
-              in
               ( ctxt,
-                percentage,
                 punish_balance_updates @ reward_balance_updates
                 @ balance_updates ))
-            (ctxt, Int_percentage.p0, balance_updates)
+            (ctxt, balance_updates)
             denunciations_to_apply
         in
-        let slashings =
-          Signature.Public_key_hash.Map.add delegate percentage slashings
-        in
         ( ctxt,
-          slashings,
           balance_updates,
           (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
@@ -354,4 +346,4 @@ let apply_and_clear_denunciations ctxt =
       ctxt
       remaining_denunciations
   in
-  return (ctxt, slashings, balance_updates)
+  return (ctxt, balance_updates)

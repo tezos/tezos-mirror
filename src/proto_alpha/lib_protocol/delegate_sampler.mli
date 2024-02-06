@@ -26,9 +26,8 @@
 (*****************************************************************************)
 
 (** This module draws random values for a cycle based on the {!Seed_repr.seed}
-   associated that cycle. These random values are:
-    - delegates associated with slots
-    - snapshot indexes.
+   associated that cycle. These random values are only delegates associated with
+   slots.
    The selection of delegates is done by {i sampling} from a particular
    distribution of the stake among the active delegates.
 
@@ -70,19 +69,13 @@ val compute_snapshot_index :
   Raw_context.t -> Cycle_repr.t -> max_snapshot_index:int -> int tzresult Lwt.t
 
 val select_new_distribution_at_cycle_end :
-  Raw_context.t ->
-  slashings:Int_percentage.t Signature.Public_key_hash.Map.t ->
-  new_cycle:Cycle_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 val clear_outdated_sampling_data :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 val select_distribution_for_cycle :
-  Raw_context.t ->
-  slashings:Int_percentage.t Signature.Public_key_hash.Map.t ->
-  Cycle_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
