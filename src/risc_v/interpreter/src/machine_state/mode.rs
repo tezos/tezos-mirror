@@ -79,31 +79,26 @@ impl<M: backend::Manager> ModeCell<M> {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use crate::machine_state::{
-        backend::{
-            tests::{test_determinism, TestBackendFactory},
-            Backend, Layout,
+mod tests {
+    use crate::{
+        backend_test,
+        machine_state::{
+            backend::{tests::test_determinism, Backend, Layout},
+            mode::{Mode, ModeCell, ModeLayout},
         },
-        mode::{Mode, ModeCell, ModeLayout},
     };
     use strum::IntoEnumIterator;
 
-    pub fn test_mode<F: TestBackendFactory>() {
-        test_mode_read_write::<F>();
-        test_mode_reset::<F>();
-    }
-
-    fn test_mode_reset<F: TestBackendFactory>() {
+    backend_test!(test_mode_reset, F, {
         Mode::iter().for_each(|mode| {
             test_determinism::<F, ModeLayout, _>(|space| {
                 let mut mode1 = ModeCell::bind(space);
                 mode1.reset(mode);
             });
         });
-    }
+    });
 
-    fn test_mode_read_write<F: TestBackendFactory>() {
+    backend_test!(test_mode_read_write, F, {
         let mut backend = F::new::<ModeLayout>();
 
         Mode::iter().for_each(|mode| {
@@ -126,5 +121,5 @@ pub mod tests {
         });
 
         assert!(Mode::try_from(42).is_err());
-    }
+    });
 }

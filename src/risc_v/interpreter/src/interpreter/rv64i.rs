@@ -29,20 +29,18 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
-    use crate::machine_state::{
-        backend::tests::TestBackendFactory,
-        registers::{a0, a1},
-        HartState, HartStateLayout,
+mod tests {
+    use crate::{
+        backend_test,
+        machine_state::{
+            registers::{a0, a1},
+            HartState, HartStateLayout,
+        },
     };
     use crate::{create_backend, create_state};
     use proptest::{arbitrary::any, prop_assert_eq, proptest};
 
-    pub fn test<F: TestBackendFactory>() {
-        test_addiw::<F>();
-    }
-
-    fn test_addiw<F: TestBackendFactory>() {
+    backend_test!(test_addiw, F, {
         proptest!(|(
             imm in any::<i64>(),
             reg_val in any::<i64>())|
@@ -60,5 +58,5 @@ pub mod tests {
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
             )
         });
-    }
+    });
 }
