@@ -83,7 +83,7 @@ let should_unforbid ctxt delegate ~selection_for_new_cycle =
         in
         return Tez_repr.(current_frozen_deposits >= frozen)
 
-let update_at_cycle_end ctxt ~new_cycle =
+let update_at_cycle_end_after_slashing ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
   if Signature.Public_key_hash.Set.is_empty forbidden_delegates then return ctxt

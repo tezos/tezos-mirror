@@ -33,7 +33,7 @@ val load : Raw_context.t -> Raw_context.t tzresult Lwt.t
     This function should be called at the end of each cycle, after
     having applied any slashings that were scheduled for the same
     cycle end. *)
-val update_at_cycle_end :
+val update_at_cycle_end_after_slashing :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 val init_for_genesis : Raw_context.t -> Raw_context.t tzresult Lwt.t
