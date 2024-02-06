@@ -54,21 +54,6 @@ type initialisation_parameters =
 (* Initialisation parameters are supposed to be instantiated once. *)
 let initialisation_parameters = ref @@ Verifier {test = false}
 
-type error += Dal_initialisation_twice
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.initialisation_twice"
-    ~title:"Initialisation_twice"
-    ~description:"DAL parameters were initialised twice"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "DAL parameters were initialised twice")
-    Data_encoding.empty
-    (function Dal_initialisation_twice -> Some () | _ -> None)
-    (function () -> Dal_initialisation_twice)
-  [@@coverage off]
-
 let scalar_bytes_amount = Srs_verifier.scalar_bytes_amount
 
 let page_length = Srs_verifier.page_length

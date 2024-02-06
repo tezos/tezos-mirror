@@ -105,9 +105,6 @@ type ('a, 'b) error_container = {given : 'a; expected : 'b}
 
 open Error_monad
 
-(** [Dal_initialisation_twice], thrown by {!Config.init_dal}. *)
-type error += Dal_initialisation_twice
-
 (** [Failed_to_load_trusted_setup], thrown by {!Config.init_dal}. *)
 type error += Failed_to_load_trusted_setup of string
 
