@@ -3061,11 +3061,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     if Level.may_compute_randao ctxt then Seed.compute_randao ctxt
     else return ctxt
   in
-  let* ctxt =
-    if Level.may_snapshot_stake_distribution ctxt then
-      Stake_distribution.snapshot ctxt
-    else return ctxt
-  in
   let* ctxt, cycle_end_balance_updates, deactivated =
     may_start_new_cycle ctxt
   in

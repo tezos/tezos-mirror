@@ -198,13 +198,6 @@ let set_active ctxt delegate =
       return ctxt
     else return ctxt
 
-let snapshot ctxt =
-  let open Lwt_result_syntax in
-  let* index = Storage.Stake.Last_snapshot.get ctxt in
-  let* ctxt = Storage.Stake.Last_snapshot.update ctxt (index + 1) in
-  let* ctxt = Storage.Stake.Staking_balance.snapshot ctxt index in
-  Storage.Stake.Active_delegates_with_minimal_stake.snapshot ctxt index
-
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
 
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
@@ -212,12 +205,7 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   let stakes = List.sort (fun (_, x) (_, y) -> Stake_repr.compare y x) stakes in
   let* ctxt = Selected_distribution_for_cycle.init ctxt cycle stakes in
   let*! ctxt = Storage.Stake.Total_active_stake.add ctxt cycle total_stake in
-  (* cleanup snapshots *)
-  let*! ctxt = Storage.Stake.Staking_balance.Snapshot.clear ctxt in
-  let*! ctxt =
-    Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
-  in
-  Storage.Stake.Last_snapshot.update ctxt 0
+  return ctxt
 
 let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
   let open Lwt_result_syntax in
@@ -228,19 +216,6 @@ let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
     ~f:(fun delegate () acc ->
       let*? acc in
       f delegate acc)
-
-let fold_snapshot ctxt ~index ~f ~init =
-  let open Lwt_result_syntax in
-  Storage.Stake.Active_delegates_with_minimal_stake.fold_snapshot
-    ctxt
-    index
-    ~order:`Sorted
-    ~init
-    ~f:(fun delegate () acc ->
-      let* stake =
-        Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
-      in
-      f (delegate, stake) acc)
 
 let clear_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in

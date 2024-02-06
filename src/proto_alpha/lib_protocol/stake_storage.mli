@@ -30,7 +30,6 @@
     - {!Storage.Stake.Selected_distribution_for_cycle}
     - {!Storage.Stake.Staking_balance}
     - {!Storage.Stake.Active_delegates_with_minimal_stake}
-    - {!Storage.Stake.Last_snapshot}
     - {!Storage.Stake.Total_active_stake}
 *)
 
@@ -75,8 +74,6 @@ val set_inactive :
 val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
     minimal required stake. The folding process starts with [init]. Each element of the
     list is the public key hash of a delegate. *)
@@ -84,21 +81,6 @@ val fold_on_active_delegates_with_minimal_stake_es :
   Raw_context.t ->
   f:(Signature.Public_key_hash.t -> 'a -> 'a tzresult Lwt.t) ->
   order:[`Sorted | `Undefined] ->
-  init:'a ->
-  'a tzresult Lwt.t
-
-(** [fold_snapshot ctxt ~index ~f ~init] folds [f] on the list of active
-    delegates having the minimal required stake for the given snapshot [index]. The folding
-    process starts with [init]. Each element of the list is a pair [pkh, stake],
-    where [pkh] is the public key hash of the delegate and [stake] is the staking
-    balance of the delegate for the given snapshot [index]. *)
-val fold_snapshot :
-  Raw_context.t ->
-  index:int ->
-  f:
-    (Signature.Public_key_hash.t * Full_staking_balance_repr.t ->
-    'a ->
-    'a tzresult Lwt.t) ->
   init:'a ->
   'a tzresult Lwt.t
 
