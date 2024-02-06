@@ -69,10 +69,11 @@ val deploy :
   (string * string) Lwt.t
 
 (** [contract_send ~source_private_key ~endpoint ~abi_label ~address
-    ~method_call ?value ()] makes a call to a contract found at
+    ~method_call ?value ?gas ()] makes a call to a contract found at
     [address], with interface registered as [abi_labbel] in the
     client, signed with a user's [source_private_key].  [method_call]
-    is the call data, as a solidity expression.
+    is the call data, as a solidity expression. If [gas] is specified,
+    it will not try to estimate it.
 
     This is a transaction to be included in a block.
 
@@ -92,6 +93,7 @@ val contract_send :
   address:string ->
   method_call:string ->
   ?value:Wei.t ->
+  ?gas:int ->
   unit ->
   string Lwt.t
 

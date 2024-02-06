@@ -1957,6 +1957,7 @@ let withdraw protocol ~commitment_period ~challenge_window ~amount_wei ~sender
       ~address:"0xff00000000000000000000000000000000000001"
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
       ~value:amount_wei
+      ~gas:50_000
   in
   let* _tx =
     wait_for_application
