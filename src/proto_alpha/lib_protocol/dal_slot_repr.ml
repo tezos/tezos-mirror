@@ -1293,28 +1293,18 @@ module History_v2 = struct
         in
         cell
 
-    (*  TODO: will be uncommented incrementally on the next MRs *)
-
-    (*
     (* Dal proofs section *)
 
-    (** An inclusion proof, for a page ID, is a list of the slots' history
-        skip list's cells that encodes a minimal path:
-        - from a starting cell, which serves as a reference. It is usually called
-        'snapshot' below,
-        - to a final cell, that is either the exact target cell in case the slot
-         of the page is confirmed, or a cell whose slot ID is the smallest
-         that directly follows the page's slot id, in case the target slot
-         is not confirmed.
-
-         Using the starting cell as a trustable starting point (i.e. maintained
-         and provided by L1), and combined with the extra information stored in
-         the {!proof} type below, one can verify if a slot (and then a page of
-         that slot) is confirmed on L1 or not. *)
+    (** An inclusion proof is a sequence (list) of cells from the Dal skip list,
+        represented as [c1; c2; ...; cn], that encodes a minimal path from the
+        head [c1] (referred to as the "reference" or "snapshot" cell below) to a
+        target cell [cn]. Thanks to the back-pointers, it can be demonstrated
+        that the successive elements of the sequence are indeed cells of the
+        skip list. *)
     type inclusion_proof = history list
 
     (** (See the documentation in the mli file to understand what we want to
-        prove in game refutation involving Dal and why.)
+        prove in a refutation game involving Dal and why.)
 
         A Dal proof is an algebraic datatype with two cases, where we basically
         prove that a Dal page is confirmed on L1 or not. Being 'not confirmed'
@@ -1322,37 +1312,34 @@ module History_v2 = struct
         case where the slot's header is published, but the attesters didn't
         confirm the availability of its data.
 
-        To produce a proof representation for a page (see function {!produce_proof_repr}
-        below), we assume given:
+        To produce a proof representation for a page (see function
+        {!produce_proof_repr} below), we assume given:
 
         - [page_id], identifies the page;
 
         - [slots_history], a current/recent cell of the slots history skip list.
-          Typically, it should be the skip list cell snapshotted when starting the
-          refutation game;
+        Typically, it should be the skip list cell snapshotted when starting the
+        refutation game;
 
-       - [history_cache], a sufficiently large slots history cache, to navigate
-          back through the successive cells of the skip list. Typically,
-          the cache should at least contain the cell whose slot ID is [page_id.slot_id]
-          in case the page is confirmed, or the cell whose slot ID is immediately
-          after [page_id.slot_id] in case of an unconfirmed page. Indeed,
-          inclusion proofs encode paths through skip lists' cells where the head
-          is the reference/snapshot cell and the last element is the target slot
-          in or the nearest upper slot (w.r.t [page_id]'s slot id and to
-          skip list elements ordering) ;
+       - [get_history], a sufficiently large slots history cache, encoded as a
+       function from pointer hashes to their corresponding skip lists cells, to
+       navigate back through the successive cells of the skip list. The cache
+       should at least contain the cells starting from the published level of
+       the page ID for which we want to generate a proof. Indeed, inclusion
+       proofs encode paths through skip lists' cells where the head is the
+       reference/snapshot cell and the last element is the target cell inserted
+       at the level corresponding to the page's published level). Note that, the
+       case where the level of the page is far in the past (i.e. the skip list
+       was not populated yet) should be handled by the caller ;
 
-        - [page_info], that provides the page's information (the content and
-          the slot membership proof) for page_id. In case the page is supposed
-          to be confirmed, this argument should contain the page's content and
-          the proof that the page is part of the (confirmed) slot whose ID is
-          given in [page_id]. In case we want to show that the page is not confirmed,
-          the value [page_info] should be [None].
+        - [page_info], provides information for [page_id]. In case the page is
+        supposed to be confirmed, this argument should contain the page's
+        content and the proof that the page is part of the (confirmed) slot
+        whose ID is given in [page_id]. In case we want to show that the page is
+        not confirmed, the value [page_info] should be [None].
 
       [dal_parameters] is used when verifying that/if the page is part of
-      the candidate slot (if any).
-
-
-*)
+      the candidate slot (if any). *)
     type proof_repr =
       | Page_confirmed of {
           target_cell : history;
@@ -1370,50 +1357,18 @@ module History_v2 = struct
               (** [page_proof] is the proof that the page whose content is
                   [page_data] is actually the [page_id.page_index]th page of
                   the slot stored in [target_cell] and identified by
-                  page_id.slot_id. *)
+                  [page_id.slot_id]. *)
         }  (** The case where the slot's page is confirmed/attested on L1. *)
-      | Page_unconfirmed of {
-          prev_cell : history;
-              (** [prev_cell] is the cell of the skip list containing a
-                  (confirmed) slot, and whose ID is the biggest (w.r.t. to skip
-                  list elements ordering), but smaller than [page_id.slot_id]. *)
-          next_cell_opt : history option;
-              (** [next_cell_opt] is the cell that immediately follows [prev_cell]
-                  in the skip list, if [prev_cell] is not the latest element in
-                  the list. Otherwise, it's set to [None]. *)
-          next_inc_proof : inclusion_proof;
-              (** [inc_proof] is a (minimal) path in the skip list that proves
-                  cells inclusion. In case, [next_cell_opt] contains some cell
-                  'next_cell', the head of the list is the [slots_history]
-                  provided to produce the proof, and the last cell is
-                  'next_cell'. In case [next_cell_opt] is [None], the list is
-                  empty.
+      | Page_unconfirmed of {target_cell : history; inc_proof : inclusion_proof}
+          (** The case where the slot's page doesn't exist or is not confirmed
+              on L1. The fields are similar to {!Page_confirmed} case except
+              that we don't have a page data or proof to check.
 
-                  We maintain the following invariant in case the inclusion
-                  proof is not empty:
-                  ```
-                   (content next_cell).id > page_id.slot_id > (content prev_cell).id AND
-                   hash prev_cell = back_pointer next_cell 0 AND
-                   Some next_cell = next_cell_opt AND
-                   head next_inc_proof = slots_history
-                  ```
-
-                  Said differently, `next_cell` and `prev_cell` are two consecutive
-                  cells of the skip list whose contents' IDs surround the page's
-                  slot ID. Moreover, the head of the list should be equal to
-                  the initial (snapshotted) slots_history skip list.
-
-                  The case of an empty inclusion proof happens when the inputs
-                  are such that: `page_id.slot_id > (content slots_history).id`.
-                  The returned proof statement implies the following property in this case:
-
-                  ```
-                  next_cell_opt = None AND prev_cell = slots_history
-                  ```
-              *)
-        }
-          (** The case where the slot's page doesn't exist or is not
-              confirmed on L1. *)
+              As said above, in case the level of the page is far in the past
+              (for instance, the skip list was not populated yet or the slots of
+              that level are not valid to be imported by the DAL anymore) should
+              be handled by the caller. In fact, the [proof_repr] type here only
+              covers levels where a new cell has been added to the skip list. *)
 
     let proof_repr_encoding =
       let open Data_encoding in
@@ -1437,17 +1392,16 @@ module History_v2 = struct
         case
           ~title:"unconfirmed dal page proof representation"
           (Tag 1)
-          (obj4
+          (obj3
              (req "kind" (constant "unconfirmed"))
-             (req "prev_cell" history_encoding)
-             (req "next_cell_opt" (option history_encoding))
-             (req "next_inc_proof" (list history_encoding)))
+             (req "target_cell" history_encoding)
+             (req "inc_proof" (list history_encoding)))
           (function
-            | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
-                Some ((), prev_cell, next_cell_opt, next_inc_proof)
+            | Page_unconfirmed {target_cell; inc_proof} ->
+                Some ((), target_cell, inc_proof)
             | _ -> None)
-          (fun ((), prev_cell, next_cell_opt, next_inc_proof) ->
-            Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof})
+          (fun ((), target_cell, inc_proof) ->
+            Page_unconfirmed {target_cell; inc_proof})
       in
 
       union [case_page_confirmed; case_page_unconfirmed]
@@ -1501,8 +1455,6 @@ module History_v2 = struct
 
     let pp_inclusion_proof = Format.pp_print_list pp_history
 
-    let pp_history_opt = Format.pp_print_option pp_history
-
     let pp_proof ~serialized fmt p =
       if serialized then Format.pp_print_string fmt (Bytes.to_string p)
       else
@@ -1523,19 +1475,20 @@ module History_v2 = struct
                   inc_proof
                   Page.pp_proof
                   page_proof
-            | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
+            | Page_unconfirmed {target_cell; inc_proof} ->
                 Format.fprintf
                   fmt
-                  "Page_unconfirmed (prev_cell = %a | next_cell = %a | \
-                   prev_inc_proof:[size=%d@ | path=%a])"
+                  "Page_unconfirmed (target_cell = %a | inc_proof:[size=%d@ | \
+                   path=%a])"
                   pp_history
-                  prev_cell
-                  pp_history_opt
-                  next_cell_opt
-                  (List.length next_inc_proof)
+                  target_cell
+                  (List.length inc_proof)
                   pp_inclusion_proof
-                  next_inc_proof)
+                  inc_proof)
 
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
     type error +=
       | Dal_proof_error_v2 of string
       | Unexpected_page_size_v2 of {expected_size : int; page_size : int}
