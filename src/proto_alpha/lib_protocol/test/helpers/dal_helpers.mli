@@ -38,6 +38,11 @@ val derive_dal_parameters :
   constants_divider:int ->
   Cryptobox.parameters
 
+(** Returns the slot id of the given cell's content . *)
+val content_slot_id :
+  Dal_slot_repr.History.Internal_for_tests.cell_content ->
+  Dal_slot_repr.Header.id
+
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
