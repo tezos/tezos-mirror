@@ -164,6 +164,48 @@ where
     }
 }
 
+impl<A, B, C, D, E> Layout for (A, B, C, D, E)
+where
+    A: Layout,
+    B: Layout,
+    C: Layout,
+    D: Layout,
+    E: Layout,
+{
+    type Placed = (A::Placed, B::Placed, C::Placed, D::Placed, E::Placed);
+
+    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+        (
+            A::place_with(alloc),
+            B::place_with(alloc),
+            C::place_with(alloc),
+            D::place_with(alloc),
+            E::place_with(alloc),
+        )
+    }
+
+    type Allocated<Back: super::Manager> = (
+        A::Allocated<Back>,
+        B::Allocated<Back>,
+        C::Allocated<Back>,
+        D::Allocated<Back>,
+        E::Allocated<Back>,
+    );
+
+    fn allocate<Back: super::Manager>(
+        backend: &mut Back,
+        placed: Self::Placed,
+    ) -> Self::Allocated<Back> {
+        (
+            A::allocate(backend, placed.0),
+            B::allocate(backend, placed.1),
+            C::allocate(backend, placed.2),
+            D::allocate(backend, placed.3),
+            E::allocate(backend, placed.4),
+        )
+    }
+}
+
 impl<T, const LEN: usize> Layout for [T; LEN]
 where
     T: Layout,
