@@ -18,5 +18,5 @@ val get :
   Raw_context.t ->
   kind:Misbehaviour_repr.kind ->
   level:Level_repr.t ->
-  (Signature.public_key_hash * Denunciations_repr.item) list ->
+  Signature.public_key_hash list ->
   (Raw_context.t * Percentage.t) tzresult Lwt.t

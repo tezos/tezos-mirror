@@ -40,6 +40,14 @@ let encoding =
 let of_ratio_bounded Ratio_repr.{numerator; denominator} =
   of_int_bounded (one_hundred_percent * numerator / denominator)
 
+let of_q_bounded ~round (Q.{num; den} as q) =
+  if Compare.Q.(q >= Q.one) then one_hundred_percent
+  else
+    (* Ensures that [to_int] doesn't overflow *)
+    let div = match round with `Down -> Z.div | `Up -> Z.cdiv in
+    of_int_bounded
+      (Z.to_int (div (Z.mul (Z.of_int one_hundred_percent) num) den))
+
 let to_q x = Q.of_ints x one_hundred_percent
 
 let neg p = one_hundred_percent - p
@@ -47,6 +55,10 @@ let neg p = one_hundred_percent - p
 let add_bounded p1 p2 = Compare.Int.min one_hundred_percent (p1 + p2)
 
 let sub_bounded p1 p2 = Compare.Int.max 0 (p1 - p2)
+
+let mul ~round a b = Q.mul (to_q a) (to_q b) |> of_q_bounded ~round
+
+let mul_q_bounded ~round a q = Q.mul (to_q a) q |> of_q_bounded ~round
 
 let p0 = 0
 

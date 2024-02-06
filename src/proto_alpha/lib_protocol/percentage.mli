@@ -17,6 +17,8 @@ val encoding : t Data_encoding.t
 (** Rounds down to the nearest 0.01% *)
 val of_ratio_bounded : Ratio_repr.t -> t
 
+val of_q_bounded : round:[`Down | `Up] -> Q.t -> t
+
 val to_q : t -> Q.t
 
 (** [neg p] is [100% - p]. *)
@@ -25,6 +27,10 @@ val neg : t -> t
 val add_bounded : t -> t -> t
 
 val sub_bounded : t -> t -> t
+
+val mul : round:[`Down | `Up] -> t -> t -> t
+
+val mul_q_bounded : round:[`Down | `Up] -> t -> Q.t -> t
 
 (** Constants *)
 

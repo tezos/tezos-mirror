@@ -89,11 +89,7 @@ let punish_double_signing ctxt ~operation_hash
   in
   (* Placeholder value *)
   let* ctxt, slashing_percentage =
-    Slash_percentage.get
-      ctxt
-      ~kind:misbehaviour.kind
-      ~level
-      [(delegate, {operation_hash; rewarded; misbehaviour})]
+    Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
   in
   let already_denounced, updated_denounced =
     let Storage.{for_double_baking; for_double_attesting} = denounced in
@@ -252,8 +248,9 @@ let apply_and_clear_denunciations ctxt =
             raw_level
         in
         let misbehaviour_cycle = level.cycle in
+        let denounced = List.map fst denunciations in
         let* ctxt, slashing_percentage =
-          Slash_percentage.get ctxt ~kind ~level denunciations
+          Slash_percentage.get ctxt ~kind ~level denounced
         in
         let+ ctxt, balance_updates =
           List.fold_left_es

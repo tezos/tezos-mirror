@@ -34,5 +34,7 @@ val encoding : t Data_encoding.t
 
 val compare_kind : kind -> kind -> int
 
+val equal_kind : kind -> kind -> bool
+
 (** Note: the field [slot] is not taken into account in this comparison *)
 val compare : t -> t -> int

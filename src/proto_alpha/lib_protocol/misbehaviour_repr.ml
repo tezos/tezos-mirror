@@ -47,6 +47,8 @@ let compare_kind a b =
   in
   Compare.Int.compare (to_int a) (to_int b)
 
+let equal_kind a b = Compare.Int.equal 0 (compare_kind a b)
+
 let compare a b =
   Compare.or_else (Raw_level_repr.compare a.level b.level) @@ fun () ->
   Compare.or_else (Round_repr.compare a.round b.round) @@ fun () ->
