@@ -103,6 +103,7 @@ end) : sig
   val mk_page_info :
     ?default_char:char ->
     ?level:Raw_level_repr.t ->
+    ?slot_index:Dal_slot_index_repr.t ->
     ?page_index:int ->
     ?custom_data:(default_char:char -> int -> bytes option) option ->
     Dal_slot_repr.Header.t ->
