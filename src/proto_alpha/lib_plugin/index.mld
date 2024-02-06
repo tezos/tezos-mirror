@@ -7,7 +7,7 @@ It contains the following libraries:
 - {{!module-Tezos_alpha_test_helpers}Tezos_alpha_test_helpers}: Protocol testing framework
 - {{!module-Tezos_baking_alpha}Tezos_baking_alpha}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_alpha_commands}Tezos_baking_alpha_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `octez-client`
 - {{!module-Tezos_dac_alpha}Tezos_dac_alpha}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_alpha}Tezos_dal_alpha}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_alpha}Tezos_layer2_utils_alpha}: Protocol specific library for Layer 2 utils

@@ -4,7 +4,7 @@ This is a package containing some libraries related to the Tezos 016-PtMumbai pr
 
 It contains the following libraries:
 
-- {{!module-Tezos_client_016_PtMumbai}Tezos_client_016_PtMumbai}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_016_PtMumbai}Tezos_client_016_PtMumbai}: Protocol specific library for `octez-client`
 - {{!module-Tezos_layer2_utils_016_PtMumbai}Tezos_layer2_utils_016_PtMumbai}: Protocol specific library for Layer 2 utils
 - {{!module-Tezos_protocol_plugin_016_PtMumbai}Tezos_protocol_plugin_016_PtMumbai}: Protocol plugin
 - {{!module-Tezos_protocol_plugin_016_PtMumbai_registerer}Tezos_protocol_plugin_016_PtMumbai_registerer}: Protocol plugin registerer

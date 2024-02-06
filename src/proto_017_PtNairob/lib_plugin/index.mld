@@ -7,7 +7,7 @@ It contains the following libraries:
 - {{!module-Tezos_017_PtNairob_test_helpers}Tezos_017_PtNairob_test_helpers}: Protocol testing framework
 - {{!module-Tezos_baking_017_PtNairob}Tezos_baking_017_PtNairob}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_017_PtNairob_commands}Tezos_baking_017_PtNairob_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_017_PtNairob}Tezos_client_017_PtNairob}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_017_PtNairob}Tezos_client_017_PtNairob}: Protocol specific library for `octez-client`
 - {{!module-Tezos_dac_017_PtNairob}Tezos_dac_017_PtNairob}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_017_PtNairob}Tezos_dal_017_PtNairob}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_017_PtNairob}Tezos_layer2_utils_017_PtNairob}: Protocol specific library for Layer 2 utils
