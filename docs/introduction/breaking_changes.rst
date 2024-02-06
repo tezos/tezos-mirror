@@ -109,7 +109,7 @@ Specifically, all the sub-libraries prefixed with ``tezos-`` or ``octez-`` are n
 For instance, ``tezos-base``, which is now a sub-library of ``octez-libs``, is now ``octez-libs.base``.
 
 The protocol name suffixes of the protocol libraries have also been removed.
-For instance, ``Tezos-client-018-PtNairob`` is now the sub-library ``Client`` of the package ``Octez-018-PtNairob-libs``.
+For instance, ``Tezos-client-017-PtNairob`` is now the sub-library ``Client`` of the package ``Octez-017-PtNairob-libs``.
 
 
 Backward compatibility

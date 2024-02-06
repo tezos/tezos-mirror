@@ -41,6 +41,7 @@ sequence:
 * 015 Lima
 * 016 Mumbai
 * 017 Nairobi
+* 018 Oxford
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
