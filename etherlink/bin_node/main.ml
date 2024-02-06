@@ -24,6 +24,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Configuration
 
 module Event = struct
@@ -219,7 +220,9 @@ let dev_private_directory config rollup_node_config =
   let open Evm_node_lib_dev in
   Services.private_directory config rollup_node_config
 
-let start {rpc_addr; rpc_port; cors_origins; cors_headers; _} ~directory =
+let start
+    {rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _}
+    ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -240,7 +243,12 @@ let start {rpc_addr; rpc_port; cors_origins; cors_headers; _} ~directory =
   Lwt.catch
     (fun () ->
       let*! () =
-        RPC_server.launch ~host server ~callback:(callback_log server) node
+        RPC_server.launch
+          ~max_active_connections
+          ~host
+          server
+          ~callback:(callback_log server)
+          node
       in
       let*! () =
         Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
@@ -255,6 +263,7 @@ let seq_start
       cors_origins;
       cors_headers;
       mode = {private_rpc_port; _};
+      max_active_connections;
       _;
     } ~directory ~private_directory =
   let open Lwt_result_syntax in
@@ -285,10 +294,16 @@ let seq_start
   Lwt.catch
     (fun () ->
       let*! () =
-        RPC_server.launch ~host server ~callback:(callback_log server) node
+        RPC_server.launch
+          ~max_active_connections
+          ~host
+          server
+          ~callback:(callback_log server)
+          node
       in
       let*! () =
         RPC_server.launch
+          ~max_active_connections
           ~host:Ipaddr.V4.(to_string localhost)
           private_server
           ~callback:(callback_log private_server)
@@ -301,8 +316,15 @@ let seq_start
     (fun _ -> return (server, private_server))
 
 let observer_start
-    {rpc_addr; rpc_port; cors_origins; cors_headers; mode = (_ : observer); _}
-    ~directory =
+    {
+      rpc_addr;
+      rpc_port;
+      cors_origins;
+      cors_headers;
+      mode = (_ : observer);
+      max_active_connections;
+      _;
+    } ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -321,7 +343,12 @@ let observer_start
       directory
   in
   let*! () =
-    RPC_server.launch ~host server ~callback:(callback_log server) node
+    RPC_server.launch
+      ~max_active_connections
+      ~host
+      server
+      ~callback:(callback_log server)
+      node
   in
   let*! () =
     Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
