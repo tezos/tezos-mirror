@@ -18,8 +18,9 @@ use crate::handler::EvmHandler;
 use crate::zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 use crate::EthereumError;
 use crate::{abi, modexp::modexp_precompile};
+use alloc::borrow::Cow;
 use alloc::collections::btree_map::BTreeMap;
-use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
+use evm::{Context, ExitError, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, U256};
@@ -376,7 +377,9 @@ fn blake2f_output_for_wrong_input<Host: Runtime>(
         }
     } else {
         PrecompileOutcome {
-            exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+            exit_status: ExitReason::Error(ExitError::Other(Cow::from(
+                "Wrong input for blake2f precompile",
+            ))),
             output: vec![],
             withdrawals: vec![],
             estimated_ticks: 0,
@@ -1181,9 +1184,9 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         println!("{}", outcome.gas_used);
-        assert!(outcome.is_success);
-        assert!(outcome.gas_used == gas_limit); // all gas should be consumed
-        assert_eq!(Some(vec![]), outcome.result);
+        assert!(!outcome.is_success);
+        assert_eq!(gas_limit, outcome.gas_used); // all gas should be consumed
+        assert_eq!(None, outcome.result);
     }
 
     #[test]
@@ -1201,9 +1204,9 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         println!("{}", outcome.gas_used);
-        assert!(outcome.is_success);
-        assert!(outcome.gas_used == gas_limit); // all gas shoule be consumed
-        assert_eq!(Some(vec![]), outcome.result);
+        assert!(!outcome.is_success);
+        assert_eq!(gas_limit, outcome.gas_used); // all gas shoule be consumed
+        assert_eq!(None, outcome.result);
     }
 
     struct Blake2fTest {
