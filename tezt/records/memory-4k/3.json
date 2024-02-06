@@ -1,0 +1,61 @@
+[
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Nairobi: storage snapshot export and import",
+    "tags": [
+      "admin_client",
+      "client",
+      "export",
+      "import",
+      "layer1",
+      "memory_4k",
+      "nairobi",
+      "node",
+      "snapshot",
+      "storage"
+    ],
+    "successful_runs": {
+      "total_time": "53146105",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Oxford: storage snapshot export and import",
+    "tags": [
+      "admin_client",
+      "client",
+      "export",
+      "import",
+      "layer1",
+      "memory_4k",
+      "node",
+      "oxford",
+      "snapshot",
+      "storage"
+    ],
+    "successful_runs": {
+      "total_time": "54044748",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: bootstrap: many nodes bootstrap",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "bootstrap",
+      "client",
+      "memory_4k",
+      "node",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "39398760",
+      "count": "1"
+    }
+  }
+]

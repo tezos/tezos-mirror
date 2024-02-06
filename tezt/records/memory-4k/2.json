@@ -1,0 +1,18 @@
+[
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p-maintenance-init-expected_connections",
+    "tags": [
+      "admin_client",
+      "client",
+      "maintenance",
+      "memory_4k",
+      "node",
+      "p2p"
+    ],
+    "successful_runs": {
+      "total_time": "4330698",
+      "count": "1"
+    }
+  }
+]

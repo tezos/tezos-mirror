@@ -1,0 +1,250 @@
+[
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "Test [octez-admin-client p2p stat]",
+    "tags": [
+      "admin_client",
+      "client",
+      "connections",
+      "memory_3k",
+      "node",
+      "p2p",
+      "p2p_stat"
+    ],
+    "successful_runs": {
+      "total_time": "7003319",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/nonce_seed_revelation.ml",
+    "title": "Nairobi: Nonce seed revelation",
+    "tags": [
+      "admin_client",
+      "baker_ptnairob",
+      "client",
+      "memory_3k",
+      "nairobi",
+      "node",
+      "nonce",
+      "revelation",
+      "seed"
+    ],
+    "successful_runs": {
+      "total_time": "17009006",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/nonce_seed_revelation.ml",
+    "title": "Oxford: Nonce seed revelation",
+    "tags": [
+      "admin_client",
+      "baker_proxford",
+      "client",
+      "memory_3k",
+      "node",
+      "nonce",
+      "oxford",
+      "revelation",
+      "seed"
+    ],
+    "successful_runs": {
+      "total_time": "17961208",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/nonce_seed_revelation.ml",
+    "title": "Alpha: Nonce seed revelation",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "client",
+      "memory_3k",
+      "node",
+      "nonce",
+      "revelation",
+      "seed"
+    ],
+    "successful_runs": {
+      "total_time": "17231936",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Nairobi: forge fake block",
+    "tags": [
+      "admin_client",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "nairobi",
+      "node",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "8836864",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Oxford: forge fake block",
+    "tags": [
+      "admin_client",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "node",
+      "oxford",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "8796853",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Alpha: forge fake block",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "node",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "8899300",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Nairobi: forge block with wrong payload",
+    "tags": [
+      "admin_client",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "nairobi",
+      "node",
+      "payload",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "14007325",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Oxford: forge block with wrong payload",
+    "tags": [
+      "admin_client",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "node",
+      "oxford",
+      "payload",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "13943994",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/precheck.ml",
+    "title": "Alpha: forge block with wrong payload",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "codec",
+      "fake_block",
+      "memory_3k",
+      "node",
+      "payload",
+      "precheck",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "14188608",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Nairobi: check synchronization state",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "nairobi",
+      "node",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "11791966",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Oxford: check synchronization state",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "node",
+      "oxford",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "11180624",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: check synchronization state",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "memory_3k",
+      "node",
+      "sync",
+      "synchronisation_threshold"
+    ],
+    "successful_runs": {
+      "total_time": "11163671",
+      "count": "1"
+    }
+  }
+]
