@@ -108,7 +108,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none timeout dispute on smart rollup '[SMART_ROLLUP_HASH]' with '[PUBLIC_KEY_HASH]' against '[PUBLIC_KEY_HASH]' from bootstrap1
 Node is bootstrapped.
-Estimated gas: 3715.525 units (will add 100 for safety)
+Estimated gas: 3715.433 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -131,7 +131,7 @@ This sequence of operations was run:
       First staker (Alice): [PUBLIC_KEY_HASH]
       Second staker (Bob): [PUBLIC_KEY_HASH]
       This smart rollup refutation timeout was successfully applied
-      Consumed gas: 3715.459
+      Consumed gas: 3715.367
       Refutation game status: Game ended: [PUBLIC_KEY_HASH] lost because: timeout
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... -ꜩ10000
