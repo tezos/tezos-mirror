@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +25,10 @@
 
 open Runnable.Syntax
 
-type consensus_kind = Attestation | Preattestation | Dal_attestation
+type consensus_kind =
+  | Attestation of {with_dal : bool}
+  | Preattestation
+  | Dal_attestation
 
 type kind =
   | Consensus of {kind : consensus_kind; chain_id : string}
@@ -103,7 +106,7 @@ let sign ?protocol ({kind; signer; _} as t) client =
             let prefix =
               match kind with
               | Preattestation -> "\x12"
-              | Attestation -> "\x13"
+              | Attestation _ -> "\x13"
               | Dal_attestation -> "\x14"
             in
             Tezos_crypto.Signature.Custom
@@ -245,14 +248,21 @@ let make_preapply_operation_input ~protocol ~signature t =
     ]
 
 module Consensus = struct
+  type consensus_content = {
+    slot : int;
+    level : int;
+    round : int;
+    block_payload_hash : string;
+  }
+
+  type dal_content = {attestation : bool array}
+
   type t =
-    | Consensus of {
-        kind : consensus_kind;
+    | CPreattestation of {use_legacy_name : bool; consensus : consensus_content}
+    | CAttestation of {
         use_legacy_name : bool;
-        slot : int;
-        level : int;
-        round : int;
-        block_payload_hash : string;
+        consensus : consensus_content;
+        dal : dal_content option;
       }
     | Dal_attestation of {
         attestation : bool array;
@@ -262,41 +272,78 @@ module Consensus = struct
       }
 
   let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
-    Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
+    let consensus = {slot; level; round; block_payload_hash} in
+    match kind with
+    | Preattestation -> CPreattestation {use_legacy_name; consensus}
+    | Attestation {with_dal} ->
+        assert (with_dal = false) ;
+        CAttestation {use_legacy_name; consensus; dal = None}
+    | Dal_attestation -> assert false
 
-  let attestation = consensus ~kind:Attestation
+  let attestation ~use_legacy_name ~slot ~level ~round ~block_payload_hash
+      ?dal_attestation () =
+    let consensus = {slot; level; round; block_payload_hash} in
+    CAttestation
+      {
+        use_legacy_name;
+        consensus;
+        dal = Option.map (fun attestation -> {attestation}) dal_attestation;
+      }
 
-  let preattestation = consensus ~kind:Preattestation
+  let preattestation ~use_legacy_name ~slot ~level ~round ~block_payload_hash =
+    let consensus = {slot; level; round; block_payload_hash} in
+    CPreattestation {use_legacy_name; consensus}
 
   let dal_attestation ~attestation ~level ~round ~slot =
     Dal_attestation {attestation; level; round; slot}
 
-  let kind_to_string kind use_legacy_name =
+  let string_of_bool_vector dal_attestation =
+    let aux (acc, n) b =
+      let bit = if b then 1 else 0 in
+      (acc lor (bit lsl n), n + 1)
+    in
+    Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
+
+  let kind_to_string kind ~use_legacy_name =
     let name = function true -> "endorsement" | false -> "attestation" in
     match kind with
-    | Attestation -> name use_legacy_name
+    | Attestation {with_dal} ->
+        name use_legacy_name ^ if with_dal then "_with_dal" else ""
     | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
     | Dal_attestation -> "dal_attestation"
 
   let json = function
-    | Consensus {kind; use_legacy_name; slot; level; round; block_payload_hash}
-      ->
+    | CAttestation {use_legacy_name; consensus; dal} ->
+        let with_dal = Option.is_some dal in
+        `O
+          ([
+             ( "kind",
+               Ezjsonm.string
+                 (kind_to_string (Attestation {with_dal}) ~use_legacy_name) );
+             ("slot", Ezjsonm.int consensus.slot);
+             ("level", Ezjsonm.int consensus.level);
+             ("round", Ezjsonm.int consensus.round);
+             ("block_payload_hash", Ezjsonm.string consensus.block_payload_hash);
+           ]
+          @
+          match dal with
+          | None -> []
+          | Some {attestation} ->
+              [
+                ( "dal_attestation",
+                  Ezjsonm.string (string_of_bool_vector attestation) );
+              ])
+    | CPreattestation {use_legacy_name; consensus} ->
         `O
           [
-            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
-            ("slot", Ezjsonm.int slot);
-            ("level", Ezjsonm.int level);
-            ("round", Ezjsonm.int round);
-            ("block_payload_hash", Ezjsonm.string block_payload_hash);
+            ( "kind",
+              Ezjsonm.string (kind_to_string Preattestation ~use_legacy_name) );
+            ("slot", Ezjsonm.int consensus.slot);
+            ("level", Ezjsonm.int consensus.level);
+            ("round", Ezjsonm.int consensus.round);
+            ("block_payload_hash", Ezjsonm.string consensus.block_payload_hash);
           ]
     | Dal_attestation {attestation; level; round; slot} ->
-        let string_of_bool_vector attestation =
-          let aux (acc, n) b =
-            let bit = if b then 1 else 0 in
-            (acc lor (bit lsl n), n + 1)
-          in
-          Array.fold_left aux (0, 0) attestation |> fst |> string_of_int
-        in
         `O
           [
             ("kind", Ezjsonm.string "dal_attestation");
@@ -320,7 +367,8 @@ module Consensus = struct
     in
     let kind =
       match consensus_operation with
-      | Consensus {kind; _} -> kind
+      | CPreattestation _ -> Preattestation
+      | CAttestation _ -> Attestation {with_dal = false}
       | Dal_attestation _ -> Dal_attestation
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
@@ -373,8 +421,8 @@ module Anonymous = struct
       (({kind = op1_kind; _}, _) as op1) (({kind = op2_kind; _}, _) as op2) =
     match (kind, op1_kind, op2_kind) with
     | ( Double_attestation_evidence,
-        Consensus {kind = Attestation; _},
-        Consensus {kind = Attestation; _} ) ->
+        Consensus {kind = Attestation {with_dal = false}; _},
+        Consensus {kind = Attestation {with_dal = false}; _} ) ->
         Double_consensus_evidence {kind; use_legacy_name; op1; op2}
     | ( Double_preattestation_evidence,
         Consensus {kind = Preattestation; _},
@@ -389,14 +437,14 @@ module Anonymous = struct
   let double_preattestation_evidence =
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
-  let kind_to_string kind use_legacy_name =
+  let kind_to_string kind ~use_legacy_name =
     sf
       "double_%s_evidence"
       (Consensus.kind_to_string
          (match kind with
-         | Double_attestation_evidence -> Attestation
+         | Double_attestation_evidence -> Attestation {with_dal = false}
          | Double_preattestation_evidence -> Preattestation)
-         use_legacy_name)
+         ~use_legacy_name)
 
   let denunced_op_json (op, signature) =
     `O
@@ -412,7 +460,7 @@ module Anonymous = struct
         let op2 = denunced_op_json op2 in
         `O
           [
-            ("kind", Ezjsonm.string (kind_to_string kind use_legacy_name));
+            ("kind", Ezjsonm.string (kind_to_string kind ~use_legacy_name));
             ("op1", op1);
             ("op2", op2);
           ]

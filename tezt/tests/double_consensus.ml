@@ -149,7 +149,14 @@ let double_consensus_wrong_slot
 
 let attest_utils =
   ( Client.attest_for,
-    Operation.Consensus.attestation ~use_legacy_name:true,
+    (fun ~slot ~level ~round ~block_payload_hash ->
+      Operation.Consensus.attestation
+        ~use_legacy_name:true
+        ~slot
+        ~level
+        ~round
+        ~block_payload_hash
+        ()),
     double_attestation_waiter,
     get_consensus_operation_name )
 
@@ -377,6 +384,7 @@ let operation_too_old =
       ~level
       ~round:3
       ~block_payload_hash
+      ()
   in
   let waiter = consensus_operation_too_old_waiter accuser in
   let* _ =
@@ -455,6 +463,7 @@ let operation_too_far_in_future =
       ~level
       ~round:0
       ~block_payload_hash
+      ()
   in
   let waiter = consensus_operation_too_far_in_future_waiter accuser in
   let* _ =
