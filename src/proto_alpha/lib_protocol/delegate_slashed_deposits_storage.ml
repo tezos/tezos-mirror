@@ -87,17 +87,21 @@ let punish_double_signing ctxt ~operation_hash
   let denounced =
     Option.value denounced_opt ~default:Storage.default_denounced
   in
-  let already_denounced, updated_denounced, slashing_percentage =
+  (* Placeholder value *)
+  let* ctxt, slashing_percentage =
+    Slash_percentage.get
+      ctxt
+      ~kind:misbehaviour.kind
+      ~level
+      [(delegate, {operation_hash; rewarded; misbehaviour})]
+  in
+  let already_denounced, updated_denounced =
     let Storage.{for_double_baking; for_double_attesting} = denounced in
     match misbehaviour.kind with
     | Double_baking ->
-        ( for_double_baking,
-          {denounced with for_double_baking = true},
-          Slash_percentage.for_double_baking ctxt )
+        (for_double_baking, {denounced with for_double_baking = true})
     | Double_attesting | Double_preattesting ->
-        ( for_double_attesting,
-          {denounced with for_double_attesting = true},
-          Slash_percentage.for_double_attestation ctxt )
+        (for_double_attesting, {denounced with for_double_attesting = true})
   in
   assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
@@ -238,28 +242,31 @@ let apply_and_clear_denunciations ctxt =
   (* Processes the applicable denunciations *)
   let* ctxt, balance_updates =
     MisMap.fold_es
-      (fun {Misbehaviour_repr.level = _; round = _; kind = _; _}
+      (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
            denunciations
            acc ->
         let ctxt, balance_updates = acc in
+        let level =
+          Level_repr.level_from_raw
+            ~cycle_eras:(Raw_context.cycle_eras ctxt)
+            raw_level
+        in
+        let misbehaviour_cycle = level.cycle in
+        let* ctxt, slashing_percentage =
+          Slash_percentage.get ctxt ~kind ~level denunciations
+        in
         let+ ctxt, balance_updates =
           List.fold_left_es
             (fun (ctxt, balance_updates)
                  ( delegate,
                    Denunciations_repr.{operation_hash; rewarded; misbehaviour}
                  ) ->
-              let slashing_percentage =
-                match misbehaviour.kind with
-                | Double_baking -> Slash_percentage.for_double_baking ctxt
-                | Double_attesting | Double_preattesting ->
-                    Slash_percentage.for_double_attestation ctxt
-              in
-              let misbehaviour_cycle =
-                (Level_repr.level_from_raw
-                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
-                   misbehaviour.level)
-                  .cycle
-              in
+              assert (
+                Compare.Int.equal
+                  (* This compare ignores the slot *)
+                  (Misbehaviour_repr.compare miskey misbehaviour)
+                  0) ;
+              (* Validate ensures that [denunciations] contains [delegate] at most once *)
               let get_initial_frozen_deposits_of_misbehaviour_cycle =
                 if Cycle_repr.equal current_cycle misbehaviour_cycle then
                   Delegate_storage.initial_frozen_deposits
