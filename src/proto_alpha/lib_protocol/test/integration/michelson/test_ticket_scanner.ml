@@ -137,7 +137,8 @@ let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
     Script_ir_translator.parse_data
       ctxt
       ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-      ~allow_forged:true
+      ~allow_forged_tickets:true
+      ~allow_forged_lazy_storage_id:true
       ty
       node
   in

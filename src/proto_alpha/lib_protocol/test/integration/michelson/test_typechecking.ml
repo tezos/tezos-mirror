@@ -77,7 +77,8 @@ let test_unparse_view () =
     Script_ir_translator.parse_and_unparse_script_unaccounted
       ctx
       ~legacy:true
-      ~allow_forged_in_storage:false
+      ~allow_forged_tickets_in_storage:false
+      ~allow_forged_lazy_storage_id_in_storage:false
       Readable
       ~normalize_types:true
       script
@@ -395,9 +396,16 @@ let test_unparse_comb_comparable_type () =
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let open Lwt_result_wrap_syntax in
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
-  let allow_forged = true in
+  let allow_forged_tickets = true in
+  let allow_forged_lazy_storage_id = true in
   let*@ actual, ctxt =
-    Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf
+      ~allow_forged_tickets
+      ~allow_forged_lazy_storage_id
+      ty
+      node
   in
   if equal actual expected then return ctxt
   else Alcotest.failf "Unexpected error: %s" loc
@@ -405,9 +413,16 @@ let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
 let test_parse_data_fails loc ctxt ty node =
   let open Lwt_result_wrap_syntax in
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
-  let allow_forged = false in
+  let allow_forged_tickets = false in
+  let allow_forged_lazy_storage_id = false in
   let*! result =
-    Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
+    Script_ir_translator.parse_data
+      ctxt
+      ~elab_conf
+      ~allow_forged_tickets
+      ~allow_forged_lazy_storage_id
+      ty
+      node
   in
   match result with
   | Ok _ -> Alcotest.failf "Unexpected typechecking success: %s" loc

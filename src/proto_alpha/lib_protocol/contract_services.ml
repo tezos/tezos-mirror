@@ -321,7 +321,8 @@ module S = struct
             Script_ir_translator.parse_script
               ctxt
               ~elab_conf:legacy
-              ~allow_forged_in_storage:true
+              ~allow_forged_tickets_in_storage:true
+              ~allow_forged_lazy_storage_id_in_storage:true
               script
           in
           let*? Ex_script (Script script), ctxt = tzresult in
@@ -430,7 +431,8 @@ let register () =
               parse_data
                 ctxt
                 ~elab_conf:legacy
-                ~allow_forged:true
+                ~allow_forged_tickets:true
+                ~allow_forged_lazy_storage_id:true
                 value_type
                 (Micheline.root value)
             in
@@ -458,7 +460,8 @@ let register () =
                 parse_data
                   ctxt
                   ~elab_conf:legacy
-                  ~allow_forged:true
+                  ~allow_forged_tickets:true
+                  ~allow_forged_lazy_storage_id:true
                   value_type
                   (Micheline.root value)
               in
@@ -533,7 +536,8 @@ let register () =
             parse_script
               ctxt
               ~elab_conf:legacy
-              ~allow_forged_in_storage:true
+              ~allow_forged_tickets_in_storage:true
+              ~allow_forged_lazy_storage_id_in_storage:true
               script
           in
           let+ storage, _ctxt =
@@ -664,7 +668,8 @@ let register () =
                 parse_script
                   ctxt
                   ~elab_conf:legacy
-                  ~allow_forged_in_storage:true
+                  ~allow_forged_tickets_in_storage:true
+                  ~allow_forged_lazy_storage_id_in_storage:true
                   script
               in
               let*? ids, _ctxt =
@@ -702,7 +707,8 @@ let register () =
                 Script_ir_translator.parse_and_unparse_script_unaccounted
                   ctxt
                   ~legacy:true
-                  ~allow_forged_in_storage:true
+                  ~allow_forged_tickets_in_storage:true
+                  ~allow_forged_lazy_storage_id_in_storage:true
                   Readable
                   ~normalize_types
                   script

@@ -192,7 +192,8 @@ module type MICHELSON_PARSER = sig
     elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
-    allow_forged:bool ->
+    allow_forged_tickets:bool ->
+    allow_forged_lazy_storage_id:bool ->
     ('a, 'ac) ty ->
     Script.node ->
     ('a * t) tzresult Lwt.t

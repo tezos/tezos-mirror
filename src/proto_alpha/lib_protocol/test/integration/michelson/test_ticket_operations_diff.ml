@@ -280,7 +280,8 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
     Script_ir_translator.parse_script
       ctxt
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
-      ~allow_forged_in_storage:true
+      ~allow_forged_tickets_in_storage:true
+      ~allow_forged_lazy_storage_id_in_storage:true
       script
   in
   let operation =

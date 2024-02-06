@@ -180,7 +180,8 @@ val parse_comparable_data :
 val parse_data :
   elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  allow_forged:bool ->
+  allow_forged_tickets:bool ->
+  allow_forged_lazy_storage_id:bool ->
   ('a, _) Script_typed_ir.ty ->
   Script.node ->
   ('a * context) tzresult Lwt.t
@@ -320,7 +321,8 @@ val parse_code :
 val parse_storage :
   elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  allow_forged:bool ->
+  allow_forged_tickets:bool ->
+  allow_forged_lazy_storage_id:bool ->
   ('storage, _) Script_typed_ir.ty ->
   storage:Script.lazy_expr ->
   ('storage * context) tzresult Lwt.t
@@ -329,7 +331,8 @@ val parse_storage :
 val parse_script :
   elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  allow_forged_in_storage:bool ->
+  allow_forged_tickets_in_storage:bool ->
+  allow_forged_lazy_storage_id_in_storage:bool ->
   Script.t ->
   (ex_script * context) tzresult Lwt.t
 
@@ -337,7 +340,8 @@ val parse_script :
 val parse_and_unparse_script_unaccounted :
   context ->
   legacy:bool ->
-  allow_forged_in_storage:bool ->
+  allow_forged_tickets_in_storage:bool ->
+  allow_forged_lazy_storage_id_in_storage:bool ->
   Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
   Script.t ->

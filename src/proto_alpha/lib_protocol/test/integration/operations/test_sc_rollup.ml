@@ -362,7 +362,8 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
       Script_ir_translator.parse_data
         ctxt
         ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-        ~allow_forged:true
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id:true
         parameters_ty
         (Environment.Micheline.root unparsed_parameters)
     in

@@ -2066,14 +2066,16 @@ let normalized_lam_rec ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
 (*
              Some values, such as operations, tickets, or big map ids, are used only
              internally and are not allowed to be forged by users.
-             In [parse_data], [allow_forged] should be [false] for:
+             In [parse_data], both [allow_forged_tickets] and [allow_forged_lazy_storage_id] should be [false] for:
              - PUSH
              - UNPACK
-             - user-provided script parameters
              - storage on origination
              And [true] for:
              - internal calls parameters
-             - storage after origination
+             - storage after origination.
+             For
+             - user-provided script parameters 
+             [allow_forged_lazy_storage_id] should be [false] but [allow_forged_tickets] should be [true] as users are allowed to transfer tickets. Checking ticket ownership is handled by the ticket table.
            *)
 
 let rec parse_data :
@@ -2082,11 +2084,19 @@ let rec parse_data :
     elab_conf:elab_conf ->
     stack_depth:int ->
     context ->
-    allow_forged:bool ->
+    allow_forged_tickets:bool ->
+    allow_forged_lazy_storage_id:bool ->
     (a, ac) ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ~unparse_code_rec ~elab_conf ~stack_depth ctxt ~allow_forged ty script_data ->
+ fun ~unparse_code_rec
+     ~elab_conf
+     ~stack_depth
+     ctxt
+     ~allow_forged_tickets
+     ~allow_forged_lazy_storage_id
+     ty
+     script_data ->
   let open Lwt_result_syntax in
   let*? ctxt = Gas.consume ctxt Typecheck_costs.parse_data_cycle in
   let non_terminal_recursion ctxt ty script_data =
@@ -2098,7 +2108,8 @@ let rec parse_data :
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
-        ~allow_forged
+        ~allow_forged_tickets
+        ~allow_forged_lazy_storage_id
         ty
         script_data
   in
@@ -2353,7 +2364,7 @@ let rec parse_data :
         let+ amount, ctxt = non_terminal_recursion ctxt nat_t amount in
         ((destination, contents, amount), ctxt)
       in
-      if allow_forged then
+      if allow_forged_tickets then
         let* (destination, contents, amount), ctxt =
           match expr with
           | Prim
@@ -2462,7 +2473,7 @@ let rec parse_data :
         match id_opt with
         | None -> return (None, ctxt)
         | Some (id, loc) ->
-            if allow_forged then
+            if allow_forged_lazy_storage_id then
               let id = Big_map.Id.parse_z id in
               let* ctxt, tys_opt = Big_map.exists ctxt id in
               match tys_opt with
@@ -2504,7 +2515,7 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_bls12_381_fr ctxt expr
   (*
                    /!\ When adding new lazy storage kinds, you may want to guard the parsing
-                   of identifiers with [allow_forged].
+                   of identifiers with [allow_forged_lazy_storage_id].
                *)
   (* Sapling *)
   | Sapling_transaction_t memo_size, expr ->
@@ -2514,7 +2525,7 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt
       @@ parse_sapling_transaction_deprecated ctxt ~memo_size expr
   | Sapling_state_t memo_size, Int (loc, id) ->
-      if allow_forged then
+      if allow_forged_lazy_storage_id then
         let id = Sapling.Id.parse_z id in
         let* state, ctxt = Sapling.state_from_id ctxt id in
         let*? () =
@@ -2975,7 +2986,8 @@ and parse_instr :
           ~elab_conf
           ~stack_depth:(stack_depth + 1)
           ctxt
-          ~allow_forged:false
+          ~allow_forged_tickets:false
+          ~allow_forged_lazy_storage_id:false
           t
           d
       in
@@ -5159,12 +5171,19 @@ let parse_storage :
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
-    allow_forged:bool ->
+    allow_forged_tickets:bool ->
+    allow_forged_lazy_storage_id:bool ->
     ('storage, _) ty ->
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  fun ~unparse_code_rec ~elab_conf ctxt ~allow_forged storage_type ~storage ->
+  fun ~unparse_code_rec
+      ~elab_conf
+      ctxt
+      ~allow_forged_tickets
+      ~allow_forged_lazy_storage_id
+      storage_type
+      ~storage ->
     let*? storage, ctxt =
       Script.force_decode_in_context
         ~consume_deserialization_gas:When_needed
@@ -5180,7 +5199,8 @@ let parse_storage :
          ~elab_conf
          ~stack_depth:0
          ctxt
-         ~allow_forged
+         ~allow_forged_tickets
+         ~allow_forged_lazy_storage_id
          storage_type
          (root storage))
 
@@ -5188,11 +5208,17 @@ let parse_script :
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
-    allow_forged_in_storage:bool ->
+    allow_forged_tickets_in_storage:bool ->
+    allow_forged_lazy_storage_id_in_storage:bool ->
     Script.t ->
     (ex_script * context) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  fun ~unparse_code_rec ~elab_conf ctxt ~allow_forged_in_storage {code; storage} ->
+  fun ~unparse_code_rec
+      ~elab_conf
+      ctxt
+      ~allow_forged_tickets_in_storage
+      ~allow_forged_lazy_storage_id_in_storage
+      {code; storage} ->
     let* ( Ex_code
              (Code
                {code; arg_type; storage_type; views; entrypoints; code_size}),
@@ -5204,7 +5230,8 @@ let parse_script :
         ~unparse_code_rec
         ~elab_conf
         ctxt
-        ~allow_forged:allow_forged_in_storage
+        ~allow_forged_tickets:allow_forged_tickets_in_storage
+        ~allow_forged_lazy_storage_id:allow_forged_lazy_storage_id_in_storage
         storage_type
         ~storage
     in
@@ -5366,7 +5393,8 @@ let unparse_code_rec : unparse_code_rec =
     let* code, ctxt = unparse_code ctxt ~stack_depth mode node in
     return (Micheline.root code, ctxt)
 
-let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
+let parse_and_unparse_script_unaccounted ctxt ~legacy
+    ~allow_forged_tickets_in_storage ~allow_forged_lazy_storage_id_in_storage
     mode ~normalize_types {code; storage} =
   let open Lwt_result_syntax in
   let*? code, ctxt =
@@ -5398,7 +5426,8 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
       ~unparse_code_rec
       ~elab_conf:(Script_ir_translator_config.make ~legacy ())
       ctxt
-      ~allow_forged:allow_forged_in_storage
+      ~allow_forged_tickets:allow_forged_tickets_in_storage
+      ~allow_forged_lazy_storage_id:allow_forged_lazy_storage_id_in_storage
       storage_type
       ~storage
   in
@@ -5902,8 +5931,17 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v
 let list_of_big_map_ids ids =
   Lazy_storage.IdSet.fold Big_map (fun id acc -> id :: acc) ids []
 
-let parse_data ~elab_conf ctxt ~allow_forged ty t =
-  parse_data ~unparse_code_rec ~elab_conf ~allow_forged ~stack_depth:0 ctxt ty t
+let parse_data ~elab_conf ctxt ~allow_forged_tickets
+    ~allow_forged_lazy_storage_id ty t =
+  parse_data
+    ~unparse_code_rec
+    ~elab_conf
+    ~allow_forged_tickets
+    ~allow_forged_lazy_storage_id
+    ~stack_depth:0
+    ctxt
+    ty
+    t
 
 let parse_view ~elab_conf ctxt ty view =
   parse_view ~unparse_code_rec ~elab_conf ctxt ty view
@@ -5914,16 +5952,32 @@ let parse_views ~elab_conf ctxt ty views =
 let parse_code ~elab_conf ctxt ~code =
   parse_code ~unparse_code_rec ~elab_conf ctxt ~code
 
-let parse_storage ~elab_conf ctxt ~allow_forged ty ~storage =
-  parse_storage ~unparse_code_rec ~elab_conf ctxt ~allow_forged ty ~storage
+let parse_storage ~elab_conf ctxt ~allow_forged_tickets
+    ~allow_forged_lazy_storage_id ty ~storage =
+  parse_storage
+    ~unparse_code_rec
+    ~elab_conf
+    ctxt
+    ~allow_forged_tickets
+    ~allow_forged_lazy_storage_id
+    ty
+    ~storage
 
-let parse_script ~elab_conf ctxt ~allow_forged_in_storage script =
-  parse_script ~unparse_code_rec ~elab_conf ctxt ~allow_forged_in_storage script
+let parse_script ~elab_conf ctxt ~allow_forged_tickets_in_storage
+    ~allow_forged_lazy_storage_id_in_storage script =
+  parse_script
+    ~unparse_code_rec
+    ~elab_conf
+    ctxt
+    ~allow_forged_tickets_in_storage
+    ~allow_forged_lazy_storage_id_in_storage
+    script
 
 let parse_comparable_data ?type_logger ctxt ty t =
   parse_data
     ~elab_conf:Script_ir_translator_config.(make ~legacy:false ?type_logger ())
-    ~allow_forged:false
+    ~allow_forged_tickets:false
+    ~allow_forged_lazy_storage_id:false
     ctxt
     ty
     t

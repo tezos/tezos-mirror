@@ -233,7 +233,8 @@ module Typechecking_data : Benchmark.S = struct
                  (Script_ir_translator.parse_data
                     ctxt
                     ~elab_conf:strict
-                    ~allow_forged:false
+                    ~allow_forged_tickets:false
+                    ~allow_forged_lazy_storage_id:false
                     ty
                     (Micheline.root node))
              with
@@ -312,7 +313,8 @@ module Unparsing_data : Benchmark.S = struct
                Script_ir_translator.parse_data
                  ctxt
                  ~elab_conf:strict
-                 ~allow_forged:false
+                 ~allow_forged_tickets:false
+                 ~allow_forged_lazy_storage_id:false
                  ty
                  (Micheline.root node)
              in

@@ -168,13 +168,15 @@ let roundtrip (ty : ('a, 'ac) ty) (x : 'a) lazy_storage_diff ctxt =
   let* ctxt, script = Contract.get_script ctxt dummy_address in
   let script = assert_some script in
   let elab_conf = Script_ir_translator_config.make ~legacy:true () in
-  let allow_forged_in_storage = true in
+  let allow_forged_tickets_in_storage = true in
+  let allow_forged_lazy_storage_id_in_storage = true in
   let* Ex_script (Script {storage_type; storage; _}), ctxt =
     Script_ir_translator.parse_script
       ctxt
       script
       ~elab_conf
-      ~allow_forged_in_storage
+      ~allow_forged_tickets_in_storage
+      ~allow_forged_lazy_storage_id_in_storage
   in
   let*? eq, _ctxt =
     Gas_monad.run ctxt

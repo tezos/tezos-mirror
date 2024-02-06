@@ -49,7 +49,8 @@ let load_and_elaborate ctxt addr =
             ctxt
             script
             ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-            ~allow_forged_in_storage:true
+            ~allow_forged_tickets_in_storage:true
+            ~allow_forged_lazy_storage_id_in_storage:true
         in
         (* We consume gas after the fact in order to not have to instrument
            [script_size] (for efficiency).
