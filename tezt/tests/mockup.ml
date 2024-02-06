@@ -709,7 +709,7 @@ let test_create_mockup_already_initialized =
   in
   unit
 
-(* Tests [tezos-client create mockup]s [--protocols-constants]
+(* Tests [octez-client create mockup]s [--protocols-constants]
    argument. The call must succeed. *)
 let test_create_mockup_custom_constants =
   Protocol.register_test
@@ -800,7 +800,7 @@ let mockup_bootstrap_account_of_json json : mockup_bootstrap_account =
 let mockup_bootstrap_accounts_of_json json =
   List.map mockup_bootstrap_account_of_json (JSON.as_list json)
 
-(* Tests [tezos-client create mockup --bootstrap-accounts]
+(* Tests [octez-client create mockup --bootstrap-accounts]
    argument. The call must succeed. *)
 let test_create_mockup_custom_bootstrap_accounts =
   Protocol.register_test
@@ -830,7 +830,7 @@ let test_create_mockup_custom_bootstrap_accounts =
 
 let rmdir dir = Process.spawn "rm" ["-rf"; dir] |> Process.check
 
-(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+(* Executes [octez-client --base-dir /tmp/mdir create mockup] when
    [/tmp/mdir] looks like a dubious base directory. Checks that a warning
    is printed. *)
 let test_transfer_bad_base_dir =
@@ -867,7 +867,7 @@ let test_transfer_bad_base_dir =
   in
   unit
 
-(* Executes [tezos-client --mode mockup config show] in a state where
+(* Executes [octez-client --mode mockup config show] in a state where
    it should succeed. *)
 let test_config_show_mockup =
   Protocol.register_test
@@ -880,7 +880,7 @@ let test_config_show_mockup =
   let* _ = Client.config_show ~protocol client in
   unit
 
-(* Executes [tezos-client --mode mockup config show] when base dir is
+(* Executes [octez-client --mode mockup config show] when base dir is
    NOT a mockup. It should fail as this is dangerous (the default base
    directory could contain sensitive data, such as private keys) *)
 let test_config_show_mockup_fail =
@@ -895,7 +895,7 @@ let test_config_show_mockup_fail =
   let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
   unit
 
-(* Executes [tezos-client config init mockup] in a state where it
+(* Executes [octez-client config init mockup] in a state where it
    should succeed *)
 let test_config_init_mockup =
   Protocol.register_test
@@ -914,7 +914,7 @@ let test_config_init_mockup =
   let (_ : JSON.t) = JSON.parse_file bootstrap_accounts in
   unit
 
-(* Executes [tezos-client config init mockup] when base dir is NOT a
+(* Executes [octez-client config init mockup] when base dir is NOT a
    mockup. It should fail as this is dangerous (the default base
    directory could contain sensitive data, such as private keys) *)
 let test_config_init_mockup_fail =
