@@ -25,6 +25,10 @@ let assert_equal ~loc n (pct : Percentage.t) =
 let assert_equal_tez ~loc t1 t2 =
   Assert.equal ~loc Tez_repr.equal "Tez aren't equal" Tez_repr.pp t1 t2
 
+let assert_equal_q ~loc q (pct : Percentage.t) =
+  let pct_q = Percentage.to_q pct in
+  Assert.equal_q ~loc q pct_q
+
 let f = Tez_repr.mul_percentage
 
 let test_constant_values () =
@@ -101,6 +105,58 @@ let test_mul_percentage () =
   in
   return_unit
 
+let test_mul () =
+  let open Lwt_result_syntax in
+  let mul = Percentage.mul ~round:`Down in
+  let* () =
+    assert_equal_q
+      ~loc:__LOC__
+      Q.(25 // 100)
+      (mul Percentage.p50 Percentage.p50)
+  in
+  let* () =
+    assert_equal_q
+      ~loc:__LOC__
+      Q.(25 // 10000)
+      (mul Percentage.p5 Percentage.p5)
+  in
+  return_unit
+
+let test_of_q () =
+  let open Lwt_result_syntax in
+  let round = `Down in
+  let of_q = Percentage.of_q_bounded in
+  let* () =
+    assert_equal_q ~loc:__LOC__ Q.(11 // 100) (of_q ~round Q.(11 // 100))
+  in
+  let* () = assert_equal_q ~loc:__LOC__ Q.one (of_q ~round Q.(199 // 100)) in
+  (* round down *)
+  let* () =
+    assert_equal_q ~loc:__LOC__ Q.(777 // 10000) (of_q ~round Q.(777 // 9999))
+  in
+  (* round up *)
+  let* () =
+    assert_equal_q
+      ~loc:__LOC__
+      Q.(778 // 10000)
+      (of_q ~round:`Up Q.(777 // 9999))
+  in
+
+  (* precision *)
+  let* () = assert_equal_q ~loc:__LOC__ Q.zero (of_q ~round Q.(1 // 10001)) in
+  let* () =
+    assert_equal_q ~loc:__LOC__ Q.(1 // 10000) (of_q ~round Q.(1 // 10000))
+  in
+  let* () =
+    assert_equal_q ~loc:__LOC__ Q.(1 // 10000) (of_q ~round:`Up Q.(1 // 10001))
+  in
+  (* no overflow *)
+  let big_z = Z.of_int64 9131138316486228048L in
+  let* () =
+    assert_equal_q ~loc:__LOC__ Q.one (of_q ~round Q.(big_z /// Z.one))
+  in
+  return_unit
+
 let tests =
   Tztest.
     [
@@ -108,6 +164,8 @@ let tests =
       tztest "Test neg" `Quick test_neg;
       tztest "Test bounded" `Quick test_bounded;
       tztest "Test mul_percentage" `Quick test_mul_percentage;
+      tztest "Test mul" `Quick test_mul;
+      tztest "Test of_q" `Quick test_of_q;
     ]
 
 let () =
