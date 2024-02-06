@@ -96,11 +96,16 @@ let test_update_consensus_key =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    [
-      (["blocks_per_cycle"], `Int blocks_per_cycle);
-      (["nonce_revelation_threshold"], `Int 2);
-      (["preserved_cycles"], `Int preserved_cycles);
-    ]
+    let p =
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["nonce_revelation_threshold"], `Int 2);
+        (["preserved_cycles"], `Int preserved_cycles);
+      ]
+    in
+    if Protocol.number protocol > Protocol.number Protocol.Oxford then
+      (["consensus_rights_delay"], `Int preserved_cycles) :: p
+    else p
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -625,11 +630,16 @@ let register ?(regression = true) title test =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    [
-      (["blocks_per_cycle"], `Int blocks_per_cycle);
-      (["nonce_revelation_threshold"], `Int 2);
-      (["preserved_cycles"], `Int preserved_cycles);
-    ]
+    let p =
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["nonce_revelation_threshold"], `Int 2);
+        (["preserved_cycles"], `Int preserved_cycles);
+      ]
+    in
+    if Protocol.number protocol > Protocol.number Protocol.Oxford then
+      (["consensus_rights_delay"], `Int preserved_cycles) :: p
+    else p
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
