@@ -17,7 +17,7 @@ run_in_docker() {
 docker_update_images() {
   # pull latest version
   docker pull tezos/tezos-bare:"${OCTEZ_TAG}"
-  docker build -t tezos_with_curl:"${OCTEZ_TAG}" tezos_with_curl/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}"
+  docker build -t tezos_with_curl:"${OCTEZ_TAG}" "${script_dir}"/tezos_with_curl/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}"
 }
 
 create_chain_id() {
@@ -89,7 +89,7 @@ build_kernel() {
   cp "${SEQUENCER_CONFIG}" evm_kernel_builder/evm_config.yaml
   create_kernel_config evm_kernel_builder/evm_config.yaml
   # build kernel in an image (e.g. tezos/tezos-bare:master) with new chain id
-  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" evm_kernel_builder/
+  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" "${script_dir}"/evm_kernel_builder/
   container_name=$(docker create etherlink_kernel:"${OCTEZ_TAG}")
   docker cp "${container_name}":/kernel/ "${HOST_TEZOS_DATA_DIR}/"
 }
@@ -204,7 +204,7 @@ originate_contract() {
   contract_alias=$2
   storage=$3
   mkdir -p "${HOST_TEZOS_DATA_DIR}"/contracts
-  cp "../../tezos_contracts/${filename}" "${HOST_TEZOS_DATA_DIR}/contracts"
+  cp "${script_dir}/../../tezos_contracts/${filename}" "${HOST_TEZOS_DATA_DIR}/contracts"
   echo "originate ${filename} contract (alias: ${contract_alias})"
   run_in_docker octez-client --endpoint "${ENDPOINT}" originate contract "${contract_alias}" transferring 0 from "${ORIGINATOR_ALIAS}" running "contracts/${filename}" --init "$storage" --burn-cap 0.5
 }
