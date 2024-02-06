@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
+use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
@@ -45,6 +46,8 @@ const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
+
+const EVENTS: RefPath = RefPath::assert_from(b"/events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/transactions_receipts");
@@ -843,6 +846,23 @@ pub fn store_sequencer<Host: Runtime>(
     let pk_b58 = PublicKey::to_b58check(&public_key);
     let bytes = String::as_bytes(&pk_b58);
     host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
+}
+
+pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    if host.store_has(&EVENTS)?.is_some() {
+        host.store_delete(&EVENTS)
+            .context("Failed to delete old events")
+    } else {
+        Ok(())
+
+    }
+}
+
+pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Result<()> {
+    let index = IndexableStorage::new(&EVENTS)?;
+    index
+        .push_value(host, &event.rlp_bytes())
+        .map_err(Into::into)
 }
 
 #[cfg(test)]
