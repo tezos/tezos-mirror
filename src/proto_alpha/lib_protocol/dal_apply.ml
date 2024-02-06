@@ -53,7 +53,7 @@ let slot_of_int_e ~number_of_slots n =
 let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
   consensus_key.delegate
 
-let validate_attestation ctxt level consensus_key attestation =
+let validate_block_attestation ctxt level consensus_key attestation =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
   let number_of_slots = Dal.number_of_slots ctxt in
@@ -69,6 +69,17 @@ let validate_attestation ctxt level consensus_key attestation =
   fail_when
     (Option.is_none @@ Dal.Attestation.shards_of_attester ctxt ~attester)
     (Dal_data_availibility_attester_not_in_committee {attester; level})
+
+let validate_mempool_attestation ctxt attestation =
+  let open Lwt_result_syntax in
+  let*? () = assert_dal_feature_enabled ctxt in
+  let number_of_slots = Dal.number_of_slots ctxt in
+  let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
+  let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
+  let size = Dal.Attestation.occupied_size_in_bits attestation in
+  fail_unless
+    Compare.Int.(size <= maximum_size)
+    (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
 
 let validate_dal_attestation ctxt get_consensus_key_and_round_opt op =
   let open Lwt_result_syntax in
