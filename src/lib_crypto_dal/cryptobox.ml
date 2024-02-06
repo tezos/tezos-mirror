@@ -280,9 +280,7 @@ module Inner = struct
        polynomial. *)
     remaining_bytes : int;
     (* These srs_g2_* parameters are used by the verifier to check the proofs *)
-    srs_g2_shards : G2.t;
-    srs_g2_pages : G2.t;
-    srs_g2_commitment : G2.t;
+    srs_g2 : Srs_verifier.srs_verifier;
     mode : [`Verifier | `Prover];
     kate_amortized : Kate_amortized.public_parameters;
   }
@@ -563,7 +561,7 @@ module Inner = struct
           ~number_of_shards
           ~srs_g1_length:(Srs_g1.size srs_g1)
       in
-      let srs_g2_shards, srs_g2_pages, srs_g2_commitment =
+      let srs_g2 =
         match !initialisation_parameters with
         | Some _ ->
             Srs_verifier.Internal_for_tests.get_verifier_srs2
@@ -598,9 +596,7 @@ module Inner = struct
           page_length;
           page_length_domain;
           remaining_bytes = page_size mod scalar_bytes_amount;
-          srs_g2_shards;
-          srs_g2_pages;
-          srs_g2_commitment;
+          srs_g2;
           mode;
           kate_amortized;
         }
@@ -1109,7 +1105,7 @@ module Inner = struct
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
     let srs_0 = G2.one in
-    let srs_n_d = t.srs_g2_commitment in
+    let srs_n_d = t.srs_g2.commitment in
     Degree_check.verify {srs_0; srs_n_d} cm proof
 
   let save_precompute_shards_proofs precomputation ~filename =
@@ -1196,7 +1192,7 @@ module Inner = struct
           Domain.get t.domain_erasure_encoded_polynomial_length shard_index
         in
         let domain = Domain.build t.shard_length in
-        let srs_point = t.srs_g2_shards in
+        let srs_point = t.srs_g2.shards in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1262,7 +1258,7 @@ module Inner = struct
               | _ -> Scalar.(copy zero))
         in
         let root = Domain.get t.domain_polynomial_length page_index in
-        let srs_point = t.srs_g2_pages in
+        let srs_point = t.srs_g2.pages in
         if
           Kate_amortized.verify
             t.kate_amortized

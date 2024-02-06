@@ -27,6 +27,8 @@ open Error_monad
 open Kzg.Bls
 open Zcash_srs
 
+type srs_verifier = {shards : G2.t; pages : G2.t; commitment : G2.t}
+
 let max_verifier_srs_size = Srs_g1.size srs_g1
 
 (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
@@ -54,10 +56,10 @@ let slot_as_polynomial_length ~slot_size ~page_size =
 
 let get_verifier_srs2 max_srs_size get_srs2 ~max_polynomial_length
     ~page_length_domain ~shard_length =
-  let srs_g2_shards = get_srs2 shard_length in
-  let srs_g2_pages = get_srs2 page_length_domain in
-  let srs_g2_commitment = get_srs2 (max_srs_size - max_polynomial_length) in
-  (srs_g2_shards, srs_g2_pages, srs_g2_commitment)
+  let shards = get_srs2 shard_length in
+  let pages = get_srs2 page_length_domain in
+  let commitment = get_srs2 (max_srs_size - max_polynomial_length) in
+  {shards; pages; commitment}
 
 module Internal_for_tests = struct
   let max_srs_size = 1 lsl 16
@@ -103,7 +105,7 @@ module type S = sig
     max_polynomial_length:int ->
     page_length_domain:int ->
     shard_length:int ->
-    G2.t * G2.t * G2.t
+    srs_verifier
 
   val get_srs1 : int -> G1.t
 end
