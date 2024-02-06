@@ -328,7 +328,7 @@ module Consensus : sig
 
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)
-  val get_block_payload_hash : Client.t -> string Lwt.t
+  val get_block_payload_hash : ?block:string -> Client.t -> string Lwt.t
 end
 
 module Anonymous : sig

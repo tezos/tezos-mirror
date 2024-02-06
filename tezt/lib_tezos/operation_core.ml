@@ -397,9 +397,9 @@ module Consensus = struct
           delegate.public_key_hash
           (JSON.encode slots_json)
 
-  let get_block_payload_hash client =
+  let get_block_payload_hash ?block client =
     let* block_header =
-      Client.RPC.call client @@ RPC.get_chain_block_header ()
+      Client.RPC.call client @@ RPC.get_chain_block_header ?block ()
     in
     return JSON.(block_header |-> "payload_hash" |> as_string)
 end
