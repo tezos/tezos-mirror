@@ -874,7 +874,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
                 Err(err) => Err(err),
             }
-        } else if !self.deleted(address) {
+        } else {
             let code = self.code(address);
 
             let mut runtime = evm::Runtime::new(
@@ -888,10 +888,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             let result = self.execute(&mut runtime);
 
             return Ok((result?, None, runtime.machine().return_value()));
-        } else {
-            // Contract must be empty since it was deleted, so there are no
-            // instructions to run.
-            return Ok((ExitReason::Succeed(ExitSucceed::Stopped), None, vec![]));
         }
     }
 
@@ -3311,6 +3307,104 @@ mod test {
 
         assert_eq!(
             Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![3],)),
+            result,
+        )
+    }
+
+    #[test]
+    fn contract_that_selfdestruct_can_be_called_again_in_same_transaction() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+        );
+
+        let address_1 = H160::from_low_u64_be(210_u64);
+        let address_2 = H160::from_low_u64_be(211_u64);
+        let input = vec![0_u8];
+        let transaction_context =
+            TransactionContext::new(caller, address_1, U256::zero());
+        let transfer: Option<Transfer> = None;
+
+        let code_1: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0, // return size
+            Opcode::PUSH1.as_u8(),
+            0, // return offset
+            Opcode::PUSH1.as_u8(),
+            0, // arg size
+            Opcode::PUSH1.as_u8(),
+            0, // arg offset
+            Opcode::PUSH1.as_u8(),
+            0, // value
+            Opcode::PUSH1.as_u8(),
+            211, // address
+            Opcode::PUSH2.as_u8(),
+            100,
+            0,                    // gas
+            Opcode::CALL.as_u8(), // call should cause address 2 to selfdestruct
+            Opcode::POP.as_u8(),  // pop return value off the stack
+            Opcode::PUSH1.as_u8(),
+            0, // return size
+            Opcode::PUSH1.as_u8(),
+            0, // return offset
+            Opcode::PUSH1.as_u8(),
+            0, // arg size
+            Opcode::PUSH1.as_u8(),
+            0, // arg offset
+            Opcode::PUSH1.as_u8(),
+            0, // value
+            Opcode::PUSH1.as_u8(),
+            211, // address
+            Opcode::PUSH2.as_u8(),
+            100,
+            0,                    // gas
+            Opcode::CALL.as_u8(), // call should cause address 2 to selfdestruct
+            Opcode::PUSH1.as_u8(),
+            0,
+            Opcode::MSTORE.as_u8(), // store result to Memory[0:1]
+            Opcode::PUSH1.as_u8(),
+            1,
+            Opcode::PUSH1.as_u8(),
+            31,
+            Opcode::RETURN.as_u8(), // return result of second call
+        ];
+
+        let code_2: Vec<u8> = vec![Opcode::PUSH1.as_u8(), 0, Opcode::SUICIDE.as_u8()];
+
+        set_code(&mut handler, &address_1, code_1);
+        set_code(&mut handler, &address_2, code_2);
+
+        set_balance(&mut handler, &caller, U256::from(1000_u32));
+        set_balance(&mut handler, &address_1, U256::from(1000_u32));
+
+        handler
+            .begin_initial_transaction(false, Some(1000000))
+            .unwrap();
+
+        let result =
+            handler.execute_call(address_1, transfer, input, transaction_context);
+
+        // The transaction should consume more than twice the cost of a selfdestruct
+        assert!(handler.gas_used() > 10000);
+
+        // The second call succeeded
+        assert_eq!(
+            Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![1],)),
             result,
         )
     }
