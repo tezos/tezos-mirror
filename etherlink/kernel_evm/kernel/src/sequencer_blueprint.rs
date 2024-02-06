@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_crypto_rs::hash::Signature;
 use tezos_ethereum::rlp_helpers::{
@@ -15,6 +15,7 @@ use crate::{blueprint::Blueprint, delayed_inbox::Hash};
 
 #[derive(Debug, Clone)]
 pub struct BlueprintWithDelayedHashes {
+    pub parent_hash: H256,
     pub delayed_hashes: Vec<Hash>,
     pub blueprint: Blueprint,
 }
@@ -22,6 +23,7 @@ pub struct BlueprintWithDelayedHashes {
 impl Encodable for BlueprintWithDelayedHashes {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let BlueprintWithDelayedHashes {
+            parent_hash,
             delayed_hashes,
             blueprint:
                 Blueprint {
@@ -29,7 +31,8 @@ impl Encodable for BlueprintWithDelayedHashes {
                     timestamp,
                 },
         } = self;
-        stream.begin_list(3);
+        stream.begin_list(4);
+        rlp_helpers::append_h256(stream, *parent_hash);
         stream.append_list(delayed_hashes);
         stream.append_list(transactions);
         append_timestamp(stream, *timestamp);
@@ -41,11 +44,13 @@ impl Decodable for BlueprintWithDelayedHashes {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 3 {
+        if decoder.item_count()? != 4 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         let mut it = decoder.iter();
+        let parent_hash =
+            rlp_helpers::decode_field_h256(&rlp_helpers::next(&mut it)?, "parent_hash")?;
         let delayed_hashes =
             rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "delayed_hashes")?;
         let transactions =
@@ -54,6 +59,7 @@ impl Decodable for BlueprintWithDelayedHashes {
 
         Ok(Self {
             delayed_hashes,
+            parent_hash,
             blueprint: Blueprint {
                 transactions,
                 timestamp,

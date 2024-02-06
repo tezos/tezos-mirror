@@ -58,6 +58,8 @@ module Block = struct
   let by_hash (Block_hash (Hex hash)) = blocks ^ "/" ^ hash
 
   let current_number = blocks ^ "/current" ^ number
+
+  let current_hash = blocks ^ "/current/hash"
 end
 
 module Indexes = struct

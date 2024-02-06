@@ -132,6 +132,10 @@ let block_hash_encoding =
   Data_encoding.(
     conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
 
+let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
+
+let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
+
 (** Ethereum hash, that would encoded with a 0x prefix. *)
 type hash = Hash of hex [@@ocaml.unboxed]
 
