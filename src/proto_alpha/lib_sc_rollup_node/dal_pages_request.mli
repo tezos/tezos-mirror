@@ -54,6 +54,7 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
     [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val slot_pages :
+  dal_activation_level:Raw_level.t option ->
   dal_attestation_lag:int ->
   dal_number_of_slots:int ->
   inbox_level:int32 ->
@@ -72,6 +73,7 @@ val slot_pages :
     [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val page_content :
+  dal_activation_level:Raw_level.t option ->
   dal_attestation_lag:int ->
   dal_number_of_slots:int ->
   inbox_level:int32 ->

@@ -3838,6 +3838,8 @@ module Sc_rollup : sig
         val dal_attestation_lag : int
 
         val dal_number_of_slots : int
+
+        val dal_activation_level : Raw_level.t option
       end
     end
 
@@ -3850,6 +3852,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       Dal.Slots_history.t ->
       Dal.parameters ->
+      dal_activation_level:Raw_level.t option ->
       dal_attestation_lag:int ->
       dal_number_of_slots:int ->
       is_reveal_enabled:is_reveal_enabled ->
@@ -3866,6 +3869,7 @@ module Sc_rollup : sig
     module Dal_helpers : sig
       val valid_slot_id :
         dal_number_of_slots:int ->
+        dal_activation_level:Raw_level.t option ->
         dal_attestation_lag:int ->
         origination_level:Raw_level.t ->
         commit_inbox_level:Raw_level.t ->
@@ -3969,6 +3973,7 @@ module Sc_rollup : sig
     val play :
       Kind.t ->
       Dal.parameters ->
+      dal_activation_level:Raw_level.t option ->
       dal_attestation_lag:int ->
       dal_number_of_slots:int ->
       stakers:Index.t ->

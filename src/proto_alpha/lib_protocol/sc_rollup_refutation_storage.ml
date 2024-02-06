@@ -446,7 +446,13 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
       Sc_rollup_wrong_turn
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
-  let dal = (Constants_storage.parametric ctxt).dal in
+  let constants = Constants_storage.parametric ctxt in
+  let dal = constants.dal in
+  let dal_activation_level =
+    if dal.feature_enable then
+      Some constants.sc_rollup.reveal_activation_level.dal_parameters
+    else None
+  in
   let* check_result, ctxt = check_stakes ctxt rollup stakers in
   match check_result with
   | Some game_result -> return (Some game_result, ctxt)
@@ -457,6 +463,7 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
         Sc_rollup_game_repr.play
           kind
           dal.cryptobox_parameters
+          ~dal_activation_level
           ~dal_attestation_lag:dal.attestation_lag
           ~dal_number_of_slots:dal.number_of_slots
           ~stakers

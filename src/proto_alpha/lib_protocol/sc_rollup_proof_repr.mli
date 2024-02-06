@@ -153,12 +153,13 @@ val stop_of_pvm_step :
         output from the [input] proof is too recent to be allowed into
         the PVM proof ;
 
-      - DAL related parameters, to be able to check the page content membership to a slot
-        or check the revealed parameters if needed ;
+      - DAL related parameters, to be able to check the page content membership
+        to a slot or check the revealed parameters if needed ;
 
       - the [pvm_name], used to check that the proof given has the right
         PVM kind.
 
+      - The level at which DAL is activated (None if the DAL is not enabled).
     It also returns the optional input executed during the proof and the
     input_request for the state at the beginning of the proof.
 *)
@@ -169,6 +170,7 @@ val valid :
   Raw_level_repr.t ->
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
+  dal_activation_level:Raw_level_repr.t option ->
   dal_attestation_lag:int ->
   dal_number_of_slots:int ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
@@ -234,6 +236,9 @@ module type PVM_with_context_and_state = sig
 
     (** The number of DAL slots provided by the L1. *)
     val dal_number_of_slots : int
+
+    (** The level at which the DAL got activated, [None] if the DAL has not yet been activated. *)
+    val dal_activation_level : Raw_level_repr.t option
   end
 end
 
@@ -270,6 +275,7 @@ module Dal_helpers : sig
       is valid, and produce or verify a proof for it if, and only if, the level
       is in the following boundaries:
 
+      - DAL is activated and [published_level] >= [dal_activation_level]
       - [published_level] > [origination_level]: this means that the slot of the
       page was published after the rollup origination ;
 
@@ -280,9 +286,12 @@ module Dal_helpers : sig
       According to the definition in {!Sc_rollup_commitment_repr},
       [commit_inbox_level] (aka inbox_level in that module) is the level
       (included) up to which the PVM consumed all messages and DAL/DAC inputs
-      before producing the related commitment. *)
+      before producing the related commitment.
+      We also check that the given slot ID's index is within the range of
+      allowed slots thanks to [dal_number_of_slots].  *)
   val valid_slot_id :
     dal_number_of_slots:int ->
+    dal_activation_level:Raw_level_repr.t option ->
     dal_attestation_lag:int ->
     origination_level:Raw_level_repr.t ->
     commit_inbox_level:Raw_level_repr.t ->

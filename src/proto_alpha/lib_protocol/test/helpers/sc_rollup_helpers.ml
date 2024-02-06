@@ -1006,5 +1006,11 @@ let make_pvm_with_context_and_state (type context state)
 
       let dal_number_of_slots =
         Default_parameters.constants_test.dal.number_of_slots
+
+      let dal_activation_level =
+        let constants = Default_parameters.constants_test in
+        if constants.dal.feature_enable then
+          Some constants.sc_rollup.reveal_activation_level.dal_parameters
+        else None
     end
   end)

@@ -391,6 +391,7 @@ val status_encoding : status Data_encoding.t
 val play :
   Sc_rollups.Kind.t ->
   Dal_slot_repr.parameters ->
+  dal_activation_level:Raw_level_repr.t option ->
   dal_attestation_lag:int ->
   dal_number_of_slots:int ->
   stakers:Index.t ->
