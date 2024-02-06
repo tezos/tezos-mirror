@@ -34,6 +34,7 @@ This document describes Adaptive Issuance and Staking, two new experimental feat
 
   For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/the-aleph/a-walkthrough-of-tezos-new-staking-mechanism-4ff0c50a57a8>`__.
 
+.. _adaptive_issuance:
 .. _adaptive_issuance_oxford:
 
 Adaptive Issuance
@@ -100,6 +101,7 @@ nominal issuance rate as a function of the staked funds ratio for a
 given cycle. Its value decreases as the staked funds ratio increases,
 and *vice versa*.
 
+.. _static_rate:
 .. _static_rate_oxford:
 
 \ **STATIC RATE**\     Let :math:`\IL{f}` be the staked funds ratio at
@@ -124,6 +126,7 @@ increasing when :math:`\IL{f}` < 48% and decreasing when :math:`\IL{f}`
 > 52%, provided the total issuance rate is not hitting its lower or
 upper limit.
 
+.. _dynamic_rate:
 .. _dynamic_rate_oxford:
 
 \ **DYNAMIC RATE**\     The **dynamic rate** :math:`\IL{\dyn{c}}` is
@@ -182,6 +185,7 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_
 for a cycle :math:`\IL{c + 5}` is defined as the sum of the static rate
 and the dynamic rate, clipped to stay within 0.05% – 5% range.
 
+.. _adaptive_rate:
 .. _adaptive_rate_oxford:
 
 \ **ADAPTIVE ISSUANCE RATE**\     Let :math:`\F{f}{c}` be the staked
@@ -192,6 +196,7 @@ rate** for cycle :math:`\IL{c+5}` is defined as:
 
   \adr{c + 5} = \clip{\dyn{c} + \static{\F{f}{c}}}{\minR}{\maxR}
 
+.. _adaptive_rewards:
 .. _adaptive_rewards_oxford:
 
 Adaptive rewards
@@ -217,6 +222,7 @@ Where 2102400 =
 number of blocks produced in a year, given a minimal block time of 15
 seconds.
 
+.. _reward_weights:
 .. _reward_weights_oxford:
 
 \ **REWARD WEIGHTS**\     The Adaptive-Issuance/Staking proposal defines the weights for
@@ -297,6 +303,7 @@ endpoint <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-context-issuance-e
 all participation rewards and the LB subsidy, for the cycle
 corresponding to the queried block level, and the next 4 cycles.
 
+.. _new_staking:
 .. _new_staking_oxford:
 
 New Staking mechanism
@@ -369,6 +376,7 @@ delegated funds remains unchanged. In the current implementation, only
 *implicit accounts* can become stakers. In other words, smart contracts
 cannot stake funds (they can of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_oxford:
 
 Staking policy configuration
@@ -412,6 +420,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_oxford:
 
 Staked funds management
@@ -485,6 +494,7 @@ balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
 
+.. _feature_activation:
 .. _feature_activation_oxford:
 
 Feature activation vs protocol activation

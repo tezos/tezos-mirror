@@ -16,6 +16,7 @@ or available only on test networks, is given in the
 :package-api:`OCaml Documentation
 <tezos-protocol-018-Proxford/Tezos_raw_protocol_018_Proxford/Operation_repr/index.html>`.
 
+.. _validation_passes:
 .. _validation_passes_oxford:
 
 Validation Passes
@@ -37,6 +38,7 @@ Each kind of operation belongs to exactly one validation pass, except for the :r
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
 
+.. _consensus_operations:
 .. _consensus_operations_oxford:
 
 Consensus Operations
@@ -57,6 +59,7 @@ phases required to agree on the next block.
   for which a preattestation quorum certificate (PQC) has been
   observed.
 
+.. _voting_operations:
 .. _voting_operations_oxford:
 
 Voting Operations
@@ -79,6 +82,7 @@ Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :ref:`on-chain
 governance<voting_operations_oxford>`.
 
+.. _anonymous_operations:
 .. _anonymous_operations_oxford:
 
 Anonymous Operations
@@ -142,6 +146,7 @@ account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
 
+.. _manager_operations:
 .. _manager_operations_oxford:
 
 Manager Operations
@@ -232,6 +237,7 @@ handled with dedicated manager operations.
   determine if it is called by a smart rollup using the ``SENDER``
   Michelson instruction.
 
+.. _manager_operations_batches:
 .. _manager_operations_batches_oxford:
 
 Manager Operation Batches

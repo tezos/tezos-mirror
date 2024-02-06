@@ -29,6 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
+.. _address_prefixes:
 .. _address_prefixes_oxford:
 
 Semantics of smart contracts and transactions
@@ -307,6 +308,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
+.. _michelson_type_system:
 .. _michelson_type_system_oxford:
 
 Introduction to the type system and notations
@@ -728,6 +730,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
+.. _ConcreteSyntax:
 .. _ConcreteSyntax_oxford:
 
 The concrete language is very close to the formal notation of the
@@ -796,6 +799,7 @@ parameters require sequences in the concrete syntax.
     IF { instr1_true ; instr2_true ; ... }
        { instr1_false ; instr2_false ; ... }
 
+.. _syntax_of_scripts:
 .. _syntax_of_scripts_oxford:
 
 Main program structure
@@ -1283,6 +1287,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 .. _SpecialAnnotations_oxford:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
@@ -2183,6 +2188,7 @@ instruction return a chosen timestamp:
    code NOW;
    output { Stack_elt timestamp "2020-01-08T07:13:51Z" }
 
+.. _syntax_of_concrete_stacks:
 .. _syntax_of_concrete_stacks_oxford:
 
 Syntax of concrete stacks
@@ -2195,6 +2201,7 @@ Stack_elt nat 42 }`` is a concrete stack of length 2 whose top element
 is the boolean ``True`` and the bottom element is the natural number
 ``42``.
 
+.. _omitting_parts_of_the_output:
 .. _omitting_parts_of_the_output_oxford:
 
 Omitting parts of the output
@@ -2265,6 +2272,7 @@ cryptographic nonces in values of type ``operation`` (see the
 parts of error outputs (see the :ref:`syntax of errors
 <syntax_of_errors_oxford>`).
 
+.. _output_normalization:
 .. _output_normalization_oxford:
 
 Output normalization
@@ -2311,6 +2319,7 @@ but the following test does pass:
    code {};
    output {Stack_elt _ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
 
+.. _syntax_of_errors:
 .. _syntax_of_errors_oxford:
 
 Syntax of errors
@@ -2376,6 +2385,7 @@ instruction.
    code { DUP "foo" };
    output (StaticError _)
 
+.. _syntax_of_concrete_operations:
 .. _syntax_of_concrete_operations_oxford:
 
 Syntax of concrete operations
@@ -2420,6 +2430,7 @@ to set the delegate of the current contract to the account at address
   code SET_DELEGATE ;
   output { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }
 
+.. _syntax_of_other_contracts:
 .. _syntax_of_other_contracts_oxford:
 
 Syntax of other contracts specifications
@@ -2439,6 +2450,7 @@ Micheline sequence whose elements have the form ``Contract "KT1..."
 ``<ty>`` is the type of its parameter. Each address should appear at
 most once and the order is irrelevant.
 
+.. _syntax_of_extra_big_maps:
 .. _syntax_of_extra_big_maps_oxford:
 
 Syntax of extra big maps specifications

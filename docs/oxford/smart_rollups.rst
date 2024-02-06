@@ -137,6 +137,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, these internal messages does not
 come with any payload.
 
+.. _reveal_data_channel_smart_rollups:
 .. _reveal_data_channel_smart_rollups_oxford:
 
 Reveal data channel
@@ -313,6 +314,7 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent stakers to avoid the rollup getting stuck.
 
+.. _private_rollups:
 .. _private_rollups_oxford:
 
 Private rollups

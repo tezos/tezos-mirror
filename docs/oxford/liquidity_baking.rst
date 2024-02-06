@@ -37,6 +37,7 @@ the subsidy would be adjusted by the adaptive issuance coefficient.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
+.. _toggle:
 .. _toggle_oxford:
 
 Toggle vote
