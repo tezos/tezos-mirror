@@ -150,73 +150,6 @@ module Nonce = struct
   let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
 
-type error += No_available_snapshots of {min_cycle : int32}
-
-let () =
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"no_available_snapshots"
-    ~title:"No available snapshots"
-    ~description:"No available snapshots"
-    ~pp:(fun ppf min_cycle ->
-      Format.fprintf ppf "No available snapshots until cycle %ld" min_cycle)
-    Data_encoding.(obj1 (req "min_cycle" int32))
-    (function
-      | No_available_snapshots {min_cycle} -> Some min_cycle | _ -> None)
-    (fun min_cycle -> No_available_snapshots {min_cycle})
-
-module Snapshot_index = struct
-  module S = struct
-    let cycle_query : Cycle.t option RPC_query.t =
-      let open RPC_query in
-      query (fun x -> x)
-      |+ opt_field "cycle" Cycle.rpc_arg (fun cycle -> cycle)
-      |> seal
-
-    let selected_snapshot =
-      RPC_service.get_service
-        ~description:
-          "Returns the index of the selected snapshot for the current cycle or \
-           for the specific `cycle` passed as argument, if any."
-        ~query:cycle_query
-        ~output:Data_encoding.int31
-        RPC_path.(custom_root / "context" / "selected_snapshot")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 ~chunked:false S.selected_snapshot (fun ctxt cycle () ->
-        (* max_snapshot_index can be determined using constants only *)
-        let blocks_per_stake_snapshot =
-          Alpha_context.Constants.blocks_per_stake_snapshot ctxt
-        in
-        let blocks_per_cycle = Alpha_context.Constants.blocks_per_cycle ctxt in
-        let preserved_cycles =
-          Int32.of_int (Alpha_context.Constants.preserved_cycles ctxt)
-        in
-        let cycle =
-          match cycle with
-          | None -> Level.(current ctxt).cycle
-          | Some cycle -> cycle
-        in
-        if Compare.Int32.(Cycle.to_int32 cycle <= Int32.succ preserved_cycles)
-        then
-          (* Early cycles are corner cases, fail if requested *)
-          tzfail
-            (No_available_snapshots {min_cycle = Int32.add preserved_cycles 2l})
-        else
-          let max_snapshot_index =
-            Int32.div blocks_per_cycle blocks_per_stake_snapshot |> Int32.to_int
-          in
-          Alpha_context.Stake_distribution.compute_snapshot_index
-            ctxt
-            cycle
-            ~max_snapshot_index)
-
-  let get ctxt block ?cycle () =
-    RPC_context.make_call0 S.selected_snapshot ctxt block cycle ()
-end
-
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
@@ -341,7 +274,6 @@ let register () =
   Constants.register () ;
   Delegate.register () ;
   Nonce.register () ;
-  Snapshot_index.register () ;
   Voting.register () ;
   Sapling.register () ;
   Liquidity_baking.register () ;
