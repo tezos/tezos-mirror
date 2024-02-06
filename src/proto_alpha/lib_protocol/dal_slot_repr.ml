@@ -1110,14 +1110,8 @@ module History_v2 = struct
         Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
   end
 
-  (*  TODO: will be uncommented incrementally on the next MRs *)
-  (*
   module V1 = struct
-    (* The content of a cell is the hash of all the slot commitments
-       represented as a merkle list. *)
-    (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3765
-       Decide how to store attested slots in the skip list's content. *)
-    type content = Header.t
+    type content = Content.t
 
     (* A pointer to a cell is the hash of its content and all the back
        pointers. *)
@@ -1127,22 +1121,52 @@ module History_v2 = struct
 
     type t = history
 
+    let genesis, genesis_level =
+      (Skip_list.genesis Content.zero, Content.zero_level)
+
     let history_encoding =
-      Skip_list.encoding Pointer_hash.encoding Header.encoding
+      let open Data_encoding in
+      (* The history_encoding is given as a union of two versions of the skip
+         list. The legacy case is only used to deserialize the skip list cells
+         which may appear in refutation games started on a previous version of
+         the protocol, before the activation of the DAL. In this case, the
+         snapshotted cells are always the genesis one and cannot be used by the
+         players so we deserialize it on the fly to the new representation of
+         the genesis cell. *)
+      union
+        ~tag_size:`Uint8
+        [
+          case
+            ~title:"dal_skip_list_legacy"
+            (Tag 0)
+            (obj2
+               (req "kind" (constant "dal_skip_list_legacy"))
+               (req "skip_list" (Data_encoding.Fixed.bytes Hex 57)))
+            (fun _ -> None)
+            (fun ((), _) -> genesis);
+          case
+            ~title:"dal_skip_list_v2"
+            (Tag 1)
+            (obj2
+               (req "kind" (constant "dal_skip_list_v2"))
+               (req
+                  "skip_list"
+                  (Skip_list.encoding Pointer_hash.encoding Content.encoding)))
+            (fun x -> Some ((), x))
+            (fun ((), x) -> x);
+        ]
 
     let equal_history : history -> history -> bool =
-      Skip_list.equal Pointer_hash.equal Header.equal
+      Skip_list.equal Pointer_hash.equal Content.equal
 
     let encoding = history_encoding
 
     let equal : t -> t -> bool = equal_history
 
-    let genesis : t = Skip_list.genesis Header.zero
-
     let hash cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Data_encoding.Binary.to_bytes_exn Header.encoding current_slot
+      Data_encoding.Binary.to_bytes_exn Content.encoding current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
@@ -1153,8 +1177,10 @@ module History_v2 = struct
         "@[hash : %a@;%a@]"
         Pointer_hash.pp
         history_hash
-        (Skip_list.pp ~pp_content:Header.pp ~pp_ptr:Pointer_hash.pp)
+        (Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp)
         history
+
+    let pp = pp_history
 
     module History_cache =
       Bounded_history_repr.Make
@@ -1172,25 +1198,104 @@ module History_v2 = struct
           let equal = equal_history
         end)
 
-    let add_confirmed_slot_header (t, cache) slot_header =
+    (* Insert a cell in the skip list [t] and the corresponding association [(hash(t),
+       t)] in the given [cache].
+
+       Note that if the given skip list contains the genesis cell, its content is
+       reset with the given content. This ensures the invariant that
+       there are no gaps in the successive cells of the list. *)
+    let add_cell (t, cache) next_cell_content ~number_of_slots =
       let open Result_syntax in
       let prev_cell_ptr = hash t in
-      let* cache = History_cache.remember prev_cell_ptr t cache in
-      let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot_header in
-      return (new_cell, cache)
+      let Header.{published_level; _} =
+        Skip_list.content t |> Content.content_id
+      in
+      if Raw_level_repr.equal published_level genesis_level then
+        (* If this is the first real cell of DAL, replace dummy genesis. *)
+        return (Skip_list.genesis next_cell_content, cache)
+      else
+        let* cache = History_cache.remember prev_cell_ptr t cache in
+        let* new_head =
+          Skip_list.next
+            ~prev_cell:t
+            ~prev_cell_ptr
+            next_cell_content
+            ~number_of_slots
+        in
+        return (new_head, cache)
 
-    let add_confirmed_slot_headers (t : t) cache slot_headers =
-      List.fold_left_e add_confirmed_slot_header (t, cache) slot_headers
+    (* Given a list [attested_slot_headers] of well-ordered (wrt slots indices)
+       (attested) slot headers, this function builds an extension [l] of
+       [attested_slot_headers] such that:
+
+       - all elements in [attested_slot_headers] are in [l],
+
+       - for every slot index i in [0, number_of_slots - 1] that doesn't appear
+       in [attested_slot_headers], an unattested slot id is inserted in [l],
+
+       - [l] is well sorted wrt. slots indices. *)
+    let fill_slot_headers ~number_of_slots ~published_level
+        attested_slot_headers =
+      let open Result_syntax in
+      let module I = Dal_slot_index_repr in
+      let* all_indices =
+        I.slots_range ~number_of_slots ~lower:0 ~upper:(number_of_slots - 1)
+      in
+      let mk_unattested index =
+        Content.Unattested Header.{published_level; index}
+      in
+      (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
+         indices. *)
+      let rec aux indices slots =
+        match (indices, slots) with
+        | _, [] -> List.map mk_unattested indices |> ok
+        | [], s :: _ ->
+            tzfail Add_element_in_slots_skip_list_violates_ordering_v2
+        | i :: indices', s :: slots' ->
+            if I.(i = s.Header.id.index) then
+              let* res = aux indices' slots' in
+              Content.Attested s :: res |> ok
+            else if I.(i < s.Header.id.index) then
+              let* res = aux indices' slots in
+              mk_unattested i :: res |> ok
+            else
+              (* i > s.Header.id.index *)
+              tzfail Add_element_in_slots_skip_list_violates_ordering_v2
+      in
+      aux all_indices attested_slot_headers
+
+    (* Assuming a [number_of_slots] per L1 level, we will ensure below that we
+       insert exactly [number_of_slots] cells in the skip list per level. This
+       will simplify the shape of proofs and help bounding the history cache
+       required for their generation. *)
+    let add_confirmed_slot_headers (t : t) cache published_level
+        ~number_of_slots attested_slot_headers =
+      let open Result_syntax in
+      let* slot_headers =
+        fill_slot_headers
+          ~number_of_slots
+          ~published_level
+          attested_slot_headers
+      in
+      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
     let add_confirmed_slot_headers_no_cache =
-      let open Result_syntax in
-      let no_cache = History_cache.empty ~capacity:0L in
-      fun t slots ->
+      let empty_cache = History_cache.empty ~capacity:0L in
+      fun t published_level ~number_of_slots slots ->
+        let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
-          List.fold_left_e add_confirmed_slot_header (t, no_cache) slots
+          add_confirmed_slot_headers
+            t
+            empty_cache
+            published_level
+            ~number_of_slots
+            slots
         in
         cell
 
+    (*  TODO: will be uncommented incrementally on the next MRs *)
+
+    (*
     (* Dal proofs section *)
 
     (** An inclusion proof, for a page ID, is a list of the slots' history
@@ -1715,8 +1820,8 @@ module History_v2 = struct
                 true
             | _ -> false)
     end
+  *)
   end
 
   include V1
-*)
 end

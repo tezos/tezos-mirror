@@ -72,9 +72,11 @@ let to_int slot_index = slot_index [@@ocaml.inline always]
 
 let to_int_list l = l [@@ocaml.inline always]
 
-let compare = Compare.Int.compare
+include Compare.Make (struct
+  type nonrec t = t
 
-let equal = Compare.Int.equal
+  let compare = Compare.Int.compare
+end)
 
 let slots_range ~number_of_slots ~lower ~upper =
   let open Result_syntax in
