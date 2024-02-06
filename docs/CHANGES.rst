@@ -3,6 +3,26 @@
 Changelog
 '''''''''
 
+Version 19.1
+============
+
+Node
+----
+
+- Added ``--max-active-rpc-connections <NUM>`` that limits the number
+  of active RPC connections per server to the provided argument. The
+  default limit is set to 100.
+
+- Enforced the proposed default ACL list.
+
+Smart Rollup node
+-----------------
+
+- Fixed a critical bug that could lead to data loss when chain
+  reorganizations happen while a GC is running. (MR :gl:`!11358`)
+
+- Fixed issue with constants fetching during protocol migration. (MR :gl:`!11804`)
+
 Version 19.0
 ============
 
@@ -11,7 +31,7 @@ Miscellaneous
 
 - References to ``teztnets.xyz`` have been changed to ``teztnets.com``.
 
-Version 19.0-rc1
+Version 19.0~rc1
 ================
 
 Node

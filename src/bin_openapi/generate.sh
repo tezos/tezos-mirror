@@ -17,9 +17,9 @@ tezos_client=./octez-client
 smart_rollup_node=./octez-smart-rollup-node
 
 # Protocol configuration.
-protocol_hash=ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
-protocol_parameters=src/proto_018_Proxford/parameters/sandbox-parameters.json
-protocol_name=oxford
+protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
+protocol_name=alpha
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -36,10 +36,10 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi.json
-proto_openapi_json=docs/api/$protocol_name-openapi.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi.json
+openapi_json=docs/api/rpc-openapi-dev.json
+proto_openapi_json=docs/api/$protocol_name-openapi-dev.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-dev.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-dev.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)

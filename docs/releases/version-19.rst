@@ -1,12 +1,22 @@
-Version 19.0
+Version 19.1
 ============
 
-Version 19.0 contains a new version (V11) of the protocol environment,
+Version 19 contains a new version (V11) of the protocol environment,
 which is the set of functions that a protocol can call.
 This new version is used by the new version of :doc:`Oxford <../protocols/018_oxford>`,
 protocol proposal for the successor of Nairobi.
 This release contains the Oxford 2 protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
+.. _acl_fix:
+
+Following the recent `security alert <https://forum.tezosagora.org/t/security-alert-recommendations-for-operators-of-public-rpc-nodes/6003>`_ for RPC nodes (and other public-facing infrastructure) operators, version 19.1 hardens the default RPC ACL whitelist when starting an RPC server. The same document provides further recommendations on operating securely public facing infra.
+
+In addition, Octez v19.1 introduces a ``--max-active-rpc-connections <NUM>`` option, that limits the number
+of active RPC connections *per server* to the provided argument. The
+default limit is set to 100.
+
+Finally, version 19.1 now shuts down the node gracefully when hitting an "unknown key" error raised by Irmin.
+This prevents the node to run indefinitely in a failing state.
 
 Rollup node
 ~~~~~~~~~~~
@@ -51,6 +61,14 @@ It can be either ``archive`` or ``full``.
 The ``full`` mode integrates garbage collection that reduces the disk usage.
 By default, the rollup node runs in ``archive`` mode, without the GC.
 
+Version 19.1 fixes a critical bug that could happen on a ``full`` rollup node.
+This bug leads to data loss when chain reorganizations happen while a GC is running.
+
+In addition, it fixes the protocol migration on the rollup node. The constants are now fetched from a correct context, preventing failure in case the rollup node is stopped before processing the protocol migration.
+
+.. warning::
+
+   Due to the :ref:`new default ACL <acl_fix>`, the Octez node requires allowing some specific RPCs from the rollup node if it is running on a remote machine or a different network interface. Check :ref:`the rollup node documentation <smart_rollup_node_prerequisites>` for more details on the prerequisites.
 
 Update Instructions
 -------------------
@@ -58,21 +76,22 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v19.0
+  git checkout v19.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v19.0`` Docker images of Octez.
+If you are using Docker instead, use the ``v19.1`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
-It is now also possible to download experimental Debian and Redhat packages on the `release page <https://gitlab.com/tezos/tezos/-/releases/v19.0>`_  and in the `package registry <https://gitlab.com/tezos/tezos/-/packages>`_.
+It is now also possible to download experimental Debian and Redhat packages on the `release page <https://gitlab.com/tezos/tezos/-/releases/v19.1>`_  and in the `package registry <https://gitlab.com/tezos/tezos/-/packages>`_.
 
 Changelog
 ---------
 
+- `Version 19.1 <../CHANGES.html#version-19-1>`_
 - `Version 19.0 <../CHANGES.html#version-19-0>`_
 - `Version 19.0~rc1 <../CHANGES.html#version-19-0-rc1>`_
