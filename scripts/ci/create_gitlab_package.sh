@@ -111,6 +111,6 @@ tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_versio
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
 sha512sum "${source_tarball}" > "${source_tarball}.sha512"
 
-gitlab_upload "${source_tarball}" "${source_tarball}"
-gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256"
-gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512"
+gitlab_upload "${source_tarball}" "${source_tarball}" "${gitlab_octez_source_package_url}"
+gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256" "${gitlab_octez_source_package_url}"
+gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512" "${gitlab_octez_source_package_url}"

@@ -29,12 +29,17 @@ rpm_web_path=$(curl -fsSL -X GET \
   "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_rpm_package_name}" |
   jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
+source_web_path=$(curl -fsSL -X GET \
+  -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_octez_source_package_name}" |
+  jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
+
 if [ -z "${web_path}" ]; then
   echo "Error: could not find package matching version ${gitlab_package_version}"
   exit 1
 else
   gitlab_binaries_url="https://${CI_SERVER_HOST}${web_path}"
-  gitlab_octez_source_url="${gitlab_binaries_url}/${gitlab_octez_package_name}.tar.bz2"
+  gitlab_octez_source_url="https://${CI_SERVER_HOST}${source_web_path}"
 fi
 
 if [ -z "${deb_web_path}" ]; then
