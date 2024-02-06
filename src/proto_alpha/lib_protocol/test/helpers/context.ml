@@ -210,9 +210,14 @@ let get_first_different_baker baker bakers =
        (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers
 
-let get_first_different_bakers ctxt =
+let get_first_different_bakers ?(excluding = []) ctxt =
   let open Lwt_result_syntax in
   let+ bakers = get_bakers ctxt in
+  let bakers =
+    List.filter
+      (fun baker -> not (List.mem ~equal:( = ) baker excluding))
+      bakers
+  in
   match bakers with
   | [] -> assert false
   | baker_1 :: other_bakers ->

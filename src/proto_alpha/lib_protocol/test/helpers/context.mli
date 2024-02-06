@@ -95,7 +95,9 @@ val get_first_different_baker :
   public_key_hash -> public_key_hash trace -> public_key_hash
 
 val get_first_different_bakers :
-  t -> (public_key_hash * public_key_hash) tzresult Lwt.t
+  ?excluding:public_key_hash list ->
+  t ->
+  (public_key_hash * public_key_hash) tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 

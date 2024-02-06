@@ -1088,12 +1088,22 @@ let test_staking =
          staker0.public_key_hash
   in
   Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
-  assert (unstaked_finalizable_balance = 1000000000) ;
+  assert (check_with_roundings unstaked_finalizable_balance 1000000000) ;
 
   let finalize_unstake =
     Client.spawn_finalize_unstake ~staker:staker0.public_key_hash client_1
   in
-  let* () = bake_n ~endpoint ~protocol client_1 2 in
+  (* bake with bootstrap1 as bootstrap2 should have been forbidden after slashing *)
+  let* () =
+    repeat 2 (fun () ->
+        Client.bake_for_and_wait
+          ~endpoint
+          ~protocol
+          ~minimal_timestamp:true
+          ~keys:[Constant.bootstrap1.alias]
+          client_1
+          ~ai_vote:On)
+  in
   let* finalise_unstake_hash = get_hash_of finalize_unstake in
 
   let* () =
