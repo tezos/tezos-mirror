@@ -106,6 +106,7 @@ let install_finalizer_seq server private_server =
   let* () = Events.shutdown_rpc_server ~private_:true in
   let* () = Tx_pool.shutdown () in
   let* () = Tx_pool_events.shutdown () in
+  let* () = Rollup_node_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   let* () = Blueprint_events.publisher_shutdown () in
   let* () = Delayed_inbox.shutdown () in
@@ -242,6 +243,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* () =
     Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
   in
+  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in
