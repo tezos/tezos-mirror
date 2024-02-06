@@ -331,6 +331,57 @@ pub fn handle_input(
     Ok(())
 }
 
+enum ReadStatus {
+    FinishedIgnore,
+    FinishedRead,
+    Ongoing,
+}
+
+fn read_and_dispatch_input<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+    tezos_contracts: &TezosContracts,
+    delayed_bridge: &Option<ContractKt1Hash>,
+    sequencer: &Option<PublicKey>,
+    inbox_is_empty: &mut bool,
+    res: &mut InboxContent,
+) -> anyhow::Result<ReadStatus> {
+    let input = read_input(
+        host,
+        smart_rollup_address,
+        tezos_contracts,
+        inbox_is_empty,
+        delayed_bridge,
+        sequencer,
+    )?;
+    match input {
+        InputResult::NoInput => {
+            if *inbox_is_empty {
+                // If `inbox_is_empty` is true, that means we haven't see
+                // any input in the current call of `read_inbox`. Therefore,
+                // the inbox of this level has already been consumed.
+                Ok(ReadStatus::FinishedIgnore)
+            } else {
+                // If it's a `NoInput` and `inbox_is_empty` is false, we
+                // have simply reached the end of the inbox.
+                Ok(ReadStatus::FinishedRead)
+            }
+        }
+        InputResult::Unparsable => Ok(ReadStatus::Ongoing),
+        InputResult::Simulation => {
+            // kernel enters in simulation mode, reading will be done by the
+            // simulation and all the previous and next transactions are
+            // discarded.
+            simulation::start_simulation_mode(host)?;
+            Ok(ReadStatus::FinishedIgnore)
+        }
+        InputResult::Input(input) => {
+            handle_input(host, input, res)?;
+            Ok(ReadStatus::Ongoing)
+        }
+    }
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -348,37 +399,31 @@ pub fn read_inbox<Host: Runtime>(
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_input(
+        match read_and_dispatch_input(
             host,
             smart_rollup_address,
             &tezos_contracts,
-            &mut inbox_is_empty,
             &delayed_bridge,
             &sequencer,
-        )? {
-            InputResult::NoInput => {
-                if inbox_is_empty {
-                    // If `inbox_is_empty` is true, that means we haven't see
-                    // any input in the current call of `read_inbox`. Therefore,
-                    // the inbox of this level has already been consumed.
-                    return Ok(None);
-                } else {
-                    // If it's a `NoInput` and `inbox_is_empty` is false, we
-                    // have simply reached the end of the inbox.
-                    return Ok(Some(res));
-                }
+            &mut inbox_is_empty,
+            &mut res,
+        ) {
+            Err(err) =>
+            // If we failed to read or dispatch the input.
+            // We allow ourselves to continue with the inbox consumption.
+            // In order to make sure we can retrieve any kernel upgrade
+            // present in the inbox.
+            {
+                log!(
+                    host,
+                    Fatal,
+                    "An input made `read_and_dispatch_input` fail, we ignore it ({:?})",
+                    err
+                )
             }
-            InputResult::Unparsable => (),
-            InputResult::Simulation => {
-                // kernel enters in simulation mode, reading will be done by the
-                // simulation and all the previous and next transactions are
-                // discarded.
-                simulation::start_simulation_mode(host)?;
-                return Ok(None);
-            }
-            InputResult::Input(input) => {
-                handle_input(host, input, &mut res)?;
-            }
+            Ok(ReadStatus::Ongoing) => (),
+            Ok(ReadStatus::FinishedRead) => return Ok(Some(res)),
+            Ok(ReadStatus::FinishedIgnore) => return Ok(None),
         }
     }
 }
