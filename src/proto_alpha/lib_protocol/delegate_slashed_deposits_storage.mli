@@ -88,6 +88,22 @@ val punish_double_signing :
 val clear_outdated_already_denounced :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
+(** Applies pending denunciations in {!Storage.Pending_denunciations}
+    at the end of a cycle. The applicable denunciations are those that
+    point to a misbehavior whose max slashable period is ending.
+    (because [max_slashable_period = 2], the misbehavior must be
+    in the previous cycle).
+
+    The denunciations are applied in chronological order of misbehaviour.
+    This function slashes the misbehaving bakers, by a proportion defined
+    in {!Slash_percentage}, and updates the respective
+    {!Storage.Contract.Slashed_deposits}. The applied denunciations are
+    removed from the storage.
+
+    It returns the updated context, and all the balance updates,
+    which includes slashes for the bakers, the stakers, and the rewards
+    for the denouncers.
+*)
 val apply_and_clear_denunciations :
   Raw_context.t -> (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 

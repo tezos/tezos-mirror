@@ -144,6 +144,12 @@ let clear_outdated_already_denounced ctxt ~new_cycle =
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
 
+(* Misbehaviour Map: orders denunciations for application.
+   See {!Misbehaviour_repr.compare} for the order on misbehaviours:
+   - by increasing level, then increasing round, then kind, ignoring the slot
+   - for the kind: double baking > double attesting > double preattesting *)
+module MisMap = Map.Make (Misbehaviour_repr)
+
 let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
@@ -181,13 +187,14 @@ let apply_and_clear_denunciations ctxt =
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     {reward; amount_to_burn}
   in
-  let* ctxt, balance_updates, remaining_denunciations =
+  (* Split denunciations into two groups: to be applied, and to be delayed *)
+  let*! block_denunciations_map, remaining_denunciations =
     Pending_denunciations_storage.fold
       ctxt
       ~order:`Undefined
-      ~init:(Ok (ctxt, [], []))
+      ~init:(MisMap.empty, [])
       ~f:(fun delegate denunciations acc ->
-        let*? ctxt, balance_updates, remaining_denunciations = acc in
+        let block_map, remaining_denunciations = acc in
         (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
            end of this period, we "delay" the current cycle's misbehaviour's denunciations,
            while we apply the older denunciations.
@@ -212,10 +219,35 @@ let apply_and_clear_denunciations ctxt =
                 Cycle_repr.(misb_cycle < current_cycle))
               denunciations
         in
+        let block_map =
+          List.fold_left
+            (fun block_map denunciation ->
+              MisMap.update
+                denunciation.Denunciations_repr.misbehaviour
+                (function
+                  | None -> Some [(delegate, denunciation)]
+                  | Some l -> Some ((delegate, denunciation) :: l))
+                block_map)
+            block_map
+            denunciations_to_apply
+        in
+        Lwt.return
+          ( block_map,
+            (delegate, denunciations_to_delay) :: remaining_denunciations ))
+  in
+  (* Processes the applicable denunciations *)
+  let* ctxt, balance_updates =
+    MisMap.fold_es
+      (fun {Misbehaviour_repr.level = _; round = _; kind = _; _}
+           denunciations
+           acc ->
+        let ctxt, balance_updates = acc in
         let+ ctxt, balance_updates =
           List.fold_left_es
             (fun (ctxt, balance_updates)
-                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
+                 ( delegate,
+                   Denunciations_repr.{operation_hash; rewarded; misbehaviour}
+                 ) ->
               let slashing_percentage =
                 match misbehaviour.kind with
                 | Double_baking -> Slash_percentage.for_double_baking ctxt
@@ -331,12 +363,13 @@ let apply_and_clear_denunciations ctxt =
                 punish_balance_updates @ reward_balance_updates
                 @ balance_updates ))
             (ctxt, balance_updates)
-            denunciations_to_apply
+            denunciations
         in
-        ( ctxt,
-          balance_updates,
-          (delegate, denunciations_to_delay) :: remaining_denunciations ))
+        (ctxt, balance_updates))
+      block_denunciations_map
+      (ctxt, [])
   in
+  (* Updates the storage to only contain the remaining denunciations *)
   let*! ctxt = Pending_denunciations_storage.clear ctxt in
   let*! ctxt =
     List.fold_left_s
