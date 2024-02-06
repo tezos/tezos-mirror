@@ -21,13 +21,11 @@ docker_update_images() {
 }
 
 create_chain_id() {
-  number="$1"
   # Convert the number to hexadecimal and little endian format
-  hex_le=$(printf "%064x" "$number" | tac -rs ..)
+  hex_le=$(printf "%064x" "${EVM_CHAIN_ID}" | tac -rs ..)
 
   # Pad to 256 bits (64 hex characters)
-  padded_hex_le=$(printf "%064s" "$hex_le")
-  echo "$padded_hex_le"
+  printf "%064s" "$hex_le"
 }
 
 add_kernel_config_set() {
@@ -122,25 +120,20 @@ balance_account_is_enough() {
 }
 
 originate_evm_rollup() {
-  source="$1"
-  rollup_alias="$2"
-  kernel_path="$3"
-  echo "originate a new evm rollup '${rollup_alias}' with '${source}', and kernel '${kernel_path}'"
+  kernel_path="$1"
+  echo "originate a new evm rollup '${ROLLUP_ALIAS}' with '${ORIGINATOR_ALIAS}', and kernel '${kernel_path}'"
   kernel="$(xxd -p "${kernel_path}" | tr -d '\n')"
   run_in_docker octez-client --endpoint "${ENDPOINT}" \
-    originate smart rollup "${rollup_alias}" \
-    from "${source}" \
+    originate smart rollup "${ROLLUP_ALIAS}" \
+    from "${ORIGINATOR_ALIAS}" \
     of kind wasm_2_0_0 of type "(or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes)" \
     with kernel "${kernel}" \
     --burn-cap 999 --force
 }
 
 init_rollup_node_config() {
-  mode="$1"
-  rollup_alias="$2"
-  operators="$3"
   echo "create rollup node config and copy kernel preimage"
-  run_in_docker octez-smart-rollup-node init "${mode}" config for "${rollup_alias}" with operators "${operators[@]}" --rpc-addr 0.0.0.0 --rpc-port 8733 --cors-origins '*' --cors-headers '*'
+  run_in_docker octez-smart-rollup-node init "${ROLLUP_NODE_MODE}" config for "${ROLLUP_ALIAS}" with operators "${OPERATOR_ALIAS}" --rpc-addr 0.0.0.0 --rpc-port 8733 --cors-origins '*' --cors-headers '*'
   cp -R "${HOST_TEZOS_DATA_DIR}"/kernel/_evm_installer_preimages/ "${HOST_TEZOS_DATA_DIR}"/.tezos-smart-rollup-node/wasm_2_0_0
 }
 
@@ -189,9 +182,9 @@ originate_contracts() {
 init_rollup() {
   docker_update_images
   build_kernel
-  KERNEL="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
-  originate_evm_rollup "${ORIGINATOR_ALIAS}" "${ROLLUP_ALIAS}" "${KERNEL}"
-  init_rollup_node_config "${ROLLUP_NODE_MODE}" "${ROLLUP_ALIAS}" "${OPERATOR_ALIAS}"
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  originate_evm_rollup "${kernel}"
+  init_rollup_node_config
 }
 
 loop_until_balance_is_enough() {
