@@ -331,48 +331,51 @@ pub fn read_inbox<Host: Runtime>(
                 }
             }
             InputResult::Unparsable => (),
-            InputResult::Input(Input::SimpleTransaction(tx)) => {
-                res.transactions.push(*tx)
-            }
-            InputResult::Input(Input::NewChunkedTransaction {
-                tx_hash,
-                num_chunks,
-                chunk_hashes,
-            }) => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
-            InputResult::Input(Input::TransactionChunk {
-                tx_hash,
-                i,
-                chunk_hash,
-                data,
-            }) => {
-                if let Some(tx) =
-                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
-                {
-                    res.transactions.push(tx)
+            InputResult::Input(input) => match input {
+                Input::SimpleTransaction(tx) => res.transactions.push(*tx),
+                Input::NewChunkedTransaction {
+                    tx_hash,
+                    num_chunks,
+                    chunk_hashes,
+                } => {
+                    create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?
                 }
-            }
-            InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
-                res.kernel_upgrade = Some(kernel_upgrade)
-            }
-            InputResult::Input(Input::NewSequencer(sequencer)) => {
-                store_sequencer(host, sequencer)?
-            }
-            InputResult::Input(Input::Simulation) => {
-                // kernel enters in simulation mode, reading will be done by the
-                // simulation and all the previous and next transactions are
-                // discarded.
-                simulation::start_simulation_mode(host)?;
-                return Ok(None);
-            }
-            InputResult::Input(Input::Info(info)) => {
-                store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
-            }
-            InputResult::Input(Input::Deposit(deposit)) => {
-                res.transactions.push(handle_deposit(host, deposit)?)
-            }
-            InputResult::Input(Input::SequencerBlueprint(seq_blueprint)) => {
-                res.sequencer_blueprints.push(seq_blueprint)
-            }
+                Input::TransactionChunk {
+                    tx_hash,
+                    i,
+                    chunk_hash,
+                    data,
+                } => {
+                    if let Some(tx) =
+                        handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
+                    {
+                        res.transactions.push(tx)
+                    }
+                }
+                Input::Upgrade(kernel_upgrade) => {
+                    res.kernel_upgrade = Some(kernel_upgrade)
+                }
+                Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
+                Input::Simulation => {
+                    // kernel enters in simulation mode, reading will be done by the
+                    // simulation and all the previous and next transactions are
+                    // discarded.
+                    simulation::start_simulation_mode(host)?;
+                    return Ok(None);
+                }
+                Input::Info(info) => {
+                    store_last_info_per_level_timestamp(
+                        host,
+                        info.predecessor_timestamp,
+                    )?;
+                }
+                Input::Deposit(deposit) => {
+                    res.transactions.push(handle_deposit(host, deposit)?)
+                }
+                Input::SequencerBlueprint(seq_blueprint) => {
+                    res.sequencer_blueprints.push(seq_blueprint)
+                }
+            },
         }
     }
 }
