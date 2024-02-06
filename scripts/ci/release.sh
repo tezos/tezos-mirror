@@ -49,7 +49,7 @@ fi
 
 ### Compute GitLab generic package names
 
-gitlab_octez_package_name="octez-${gitlab_release_no_v}"
+gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
 gitlab_octez_deb_package_name="octez-debian-${gitlab_release_no_v}"
 gitlab_octez_rpm_package_name="octez-redhat-${gitlab_release_no_v}"
 gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
