@@ -150,7 +150,7 @@ module Simple = struct
       ~name:"smart_rollup_node_daemon_degraded_mode"
       ~msg:
         "[Daemon error]: entering degraded mode - only playing refutation game \
-         to defend commitments"
+         to defend commitments and publishing pending commitments"
       ~level:Error
       ()
 

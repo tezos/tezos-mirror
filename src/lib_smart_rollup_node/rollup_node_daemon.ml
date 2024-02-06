@@ -351,14 +351,13 @@ let degraded_refutation_mode state =
   let message = state.node_ctxt.Node_context.cctxt#message in
   let*! () = message "Shutting down Batcher@." in
   let*! () = Batcher.shutdown () in
-  let*! () = message "Shutting down Commitment Publisher@." in
-  let*! () = Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
   let*! () = Daemon_event.new_head_degraded head.hash head.level in
   let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
   let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
+  let* () = Publisher.publish_commitments () in
   let*! () = Injector.inject () in
   return_unit
 
