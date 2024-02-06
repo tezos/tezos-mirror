@@ -108,7 +108,7 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
     decode
 
 let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
-    ~abi_label ~address ~method_call ?value () =
+    ~abi_label ~address ~method_call ?value ?gas () =
   let command =
     [
       "contract:send";
@@ -119,7 +119,8 @@ let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
       Format.sprintf "%s@%s" abi_label address;
       method_call;
     ]
-    @ match value with Some v -> ["--value"; Wei.to_string v] | None -> []
+    @ Cli_arg.optional_arg "value" Wei.to_string value
+    @ Cli_arg.optional_arg "gas" Int.to_string gas
   in
   if expect_failure then spawn_command_and_read_string ~expect_failure command
   else spawn_command_and_read_json command JSON.as_string

@@ -48,3 +48,8 @@ val get_transaction_receipt :
   tx_hash:string ->
   Evm_node.t ->
   (Transaction.transaction_receipt option, error) result Lwt.t
+
+(** [estimate_gas eth_call evm_node] calls [eth_estimateGas] with [eth_call]
+    as payload. *)
+val estimate_gas :
+  (string * Ezjsonm.value) list -> Evm_node.t -> (int, error) result Lwt.t
