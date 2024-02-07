@@ -208,7 +208,6 @@ There are several services providing node snapshots. They create snapshots
 of their nodes on a regular basis (usually daily) and make them available for
 download. These include:
 
-* `XTZ-Shots <https://xtz-shots.io/mainnet/>`_
+* `Tzinit snapshots <https://snapshots.tzinit.org/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
 * `Marigold snapshots <https://snapshots.tezos.marigold.dev/>`_
-* `Tzinit snapshots <https://snapshots.tzinit.org/>`_
