@@ -275,4 +275,6 @@ end
 
 module Check : sig
   val profiles_typ : RPC.profiles Check.typ
+
+  val topics_peers_typ : (RPC.topic * string list) list Check.typ
 end

@@ -596,6 +596,14 @@ module Check = struct
       | _, _ -> false
     in
     Check.equalable pp equal
+
+  let topic_typ : topic Check.typ =
+    Check.convert
+      (fun {topic_slot_index; topic_pkh} -> (topic_slot_index, topic_pkh))
+      (Check.tuple2 Check.int Check.string)
+
+  let topics_peers_typ : (topic * string list) list Check.typ =
+    Check.list (Check.tuple2 topic_typ (Check.list Check.string))
 end
 
 module RPC = Dal_RPC

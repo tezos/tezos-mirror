@@ -2236,6 +2236,28 @@ let check_profiles ~__LOC__ dal_node ~expected =
         ~error_msg:
           (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
 
+let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
+  let normalize_peers l = List.sort String.compare l in
+  let compare_topics {Dal.RPC.topic_slot_index = s1; topic_pkh = p1}
+      {Dal.RPC.topic_slot_index = s2; topic_pkh = p2} =
+    let c = Int.compare s1 s2 in
+    if c = 0 then String.compare p1 p2 else c
+  in
+  let normalize_topics_peers l =
+    l
+    |> List.map (fun (topic, peers) -> (topic, normalize_peers peers))
+    |> List.sort (fun (t1, _p1) (t2, _p2) -> compare_topics t1 t2)
+  in
+  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ~subscribed) in
+  return
+    Check.(
+      (normalize_topics_peers topic_peers = normalize_topics_peers expected)
+        Dal.Check.topics_peers_typ
+        ~error_msg:
+          (__LOC__
+         ^ " : Unexpected topic - peers association (Actual: %L <> Expected: \
+            %R)"))
+
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
   let check_bad_attester_pkh_encoding profile =
