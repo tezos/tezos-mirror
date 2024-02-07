@@ -27,9 +27,7 @@
 open Injector_sigs
 
 module Request (L1_operation : INJECTOR_OPERATION) = struct
-  type ('a, 'b) t =
-    | New_tezos_head : (Block_hash.t * int32) -> (unit, error trace) t
-    | Inject : (unit, error trace) t
+  type ('a, 'b) t = Inject : (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -40,32 +38,12 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
     union
       [
         case
-          (Tag 1)
-          ~title:"New_tezos_head"
-          (let block_level =
-             obj2 (req "block" Block_hash.encoding) (req "level" int32)
-           in
-           obj2
-             (req "request" (constant "new_tezos_head"))
-             (req "head" block_level))
-          (function View (New_tezos_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_tezos_head b));
-        case
           (Tag 2)
           ~title:"Inject"
           (obj1 (req "request" (constant "inject")))
-          (function View Inject -> Some () | _ -> None)
+          (function View Inject -> Some ())
           (fun () -> View Inject);
       ]
 
-  let pp ppf (View r) =
-    match r with
-    | New_tezos_head (block, level) ->
-        Format.fprintf
-          ppf
-          "switching to new Tezos head %a at level %ld"
-          Block_hash.pp
-          block
-          level
-    | Inject -> Format.fprintf ppf "injection"
+  let pp ppf (View r) = match r with Inject -> Format.fprintf ppf "injection"
 end

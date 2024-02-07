@@ -1178,8 +1178,6 @@ module Make (Parameters : PARAMETERS) = struct
       match request with
       (* The execution of the request handler is protected to avoid stopping the
          worker in case of an exception. *)
-      | Request.New_tezos_head (block_hash, level) ->
-          protect @@ fun () -> on_new_tezos_head state {block_hash; level}
       | Request.Inject -> protect @@ fun () -> on_inject state
 
     type launch_error = error trace
@@ -1222,9 +1220,7 @@ module Make (Parameters : PARAMETERS) = struct
         let*! () = Event.(emit3 request_failed) state request_view st errs in
         return_unit
       in
-      match r with
-      | Request.New_tezos_head _ -> emit_and_return_errors errs
-      | Request.Inject -> emit_and_return_errors errs
+      match r with Request.Inject -> emit_and_return_errors errs
 
     let on_completion w r _ st =
       let state = Worker.state w in
@@ -1281,14 +1277,9 @@ module Make (Parameters : PARAMETERS) = struct
       workers
 
   let notify_new_tezos_head h =
-    let open Lwt_syntax in
     let workers = Worker.list table in
-    List.iter_p
-      (fun (_signer, w) ->
-        let* (_pushed : bool) =
-          Worker.Queue.push_request w (Request.New_tezos_head h)
-        in
-        return_unit)
+    List.iter_ep
+      (fun (_signer, w) -> on_new_tezos_head (Worker.state w) h)
       workers
 
   let protocols_of_head cctxt =
@@ -1336,14 +1327,13 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*! res =
       Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
-      let head = (head_hash, header.shell.level) in
+      let head = {block_hash = head_hash; level = header.shell.level} in
       let* next_protocol =
         next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
       in
       update_protocol ~next_protocol ;
       (* Notify all workers of a new Tezos head *)
-      let*! () = notify_new_tezos_head head in
-      return_unit
+      notify_new_tezos_head head
     in
     (* Ignore errors *)
     let*! () =
