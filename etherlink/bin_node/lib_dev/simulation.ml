@@ -119,6 +119,14 @@ let encode_tx tx =
   in
   return @@ List.map encode_message messages
 
+type execution_result = {value : hash option; gas_used : quantity option}
+
+type call_result = (execution_result, hash) result
+
+type validation_result = {address : address}
+
+type 'a simulation_result = ('a, string) result
+
 module Encodings = struct
   open Data_encoding
 
@@ -233,6 +241,65 @@ module Encodings = struct
           }
     | _ -> None
 
+  let decode_data =
+    let open Result_syntax in
+    function
+    | Rlp.Value v -> return (decode_hash v)
+    | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
+
+  let decode_gas_used =
+    let open Result_syntax in
+    function
+    | Rlp.Value v -> return (decode_number v)
+    | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
+
+  let decode_execution_result =
+    let open Result_syntax in
+    function
+    | Rlp.List [value; gas_used] ->
+        let* value = Rlp.decode_option decode_data value in
+        let* gas_used = Rlp.decode_option decode_gas_used gas_used in
+        return {value; gas_used}
+    | _ ->
+        error_with
+          "The simulation for eth_call/eth_estimateGas returned an ill-encoded \
+           format"
+
+  let decode_call_result v =
+    let open Result_syntax in
+    let decode_revert = function
+      | Rlp.Value msg -> return (decode_hash msg)
+      | _ -> error_with "The revert message is ill-encoded"
+    in
+    Rlp.decode_result decode_execution_result decode_revert v
+
+  let decode_validation_result =
+    let open Result_syntax in
+    function
+    | Rlp.Value address -> return {address = decode_address address}
+    | _ -> error_with "The transaction pool returned an illformed value"
+
+  let simulation_result_from_rlp decode_payload bytes =
+    let open Result_syntax in
+    let decode_error_msg = function
+      | Rlp.Value msg -> return @@ Bytes.to_string msg
+      | rlp ->
+          error_with
+            "The simulation returned an unexpected error message: %a"
+            Rlp.pp
+            rlp
+    in
+    let* rlp = Rlp.decode bytes in
+    match Rlp.decode_result decode_payload decode_error_msg rlp with
+    | Ok v -> Ok v
+    | Error e ->
+        error_with
+          "The simulation returned an unexpected format: %a, with error %a"
+          Rlp.pp
+          rlp
+          pp_print_trace
+          e
+
   let eval_result =
     conv
       (fun {state_hash; status; output; inbox_level; num_ticks; insights} ->
@@ -273,7 +340,7 @@ let call_result Encodings.{success; result; gas = _} =
       return (Ok (Hash (Hex v)))
   | Some false, Some result ->
       let error_msg = Bytes.to_string result in
-      return (Error error_msg)
+      return (Result.Error error_msg)
   | _ -> failwith "Insights of 'call_result' cannot be parsed"
 
 let gas_estimation Encodings.{success; result; gas} =
@@ -296,7 +363,7 @@ let gas_estimation Encodings.{success; result; gas} =
       return (Ok (quantity_of_z simulated_amount))
   | Some false, Some result, _ ->
       let error_msg = Bytes.to_string result in
-      return (Error error_msg)
+      return (Result.Error error_msg)
   | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
 
 let is_tx_valid Encodings.{success; result; gas = _} =
@@ -308,5 +375,5 @@ let is_tx_valid Encodings.{success; result; gas = _} =
         return (Ok address)
       else
         let error_msg = Bytes.to_string payload in
-        return (Error error_msg)
+        return (Result.Error error_msg)
   | _ -> failwith "Insights of 'is_tx_valid' is not [Some _, Some _]"
