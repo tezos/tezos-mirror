@@ -413,10 +413,17 @@ let update_known_peers dal_node known_peers =
     dal_node
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
 
-let wait_for_stored_slot dal_node slot_header =
+let wait_for_stored_slot ?shard_index dal_node commitment =
+  let check_slot_header e =
+    JSON.(e |-> "commitment" |> as_string) = commitment
+  in
+  let check_shard_index e =
+    match shard_index with
+    | None -> true
+    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+  in
   Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
-      if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
-      else None)
+      if check_slot_header e && check_shard_index e then Some () else None)
 
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
