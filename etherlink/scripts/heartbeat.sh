@@ -119,6 +119,7 @@ submit_tx_and_check() {
   elif [[ "${res_code}" -ne 0 ]]; then
     add_failed_tx_msg "${network}" "${tx_type}"
   else
+    sleep 5 # let time for the explorer to include the tx
     check_tx_applied "${op_hash}" "${tx_type}"
     tx_applied=$?
     if [[ "${tx_applied}" -eq 0 ]]; then
