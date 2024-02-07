@@ -383,13 +383,15 @@ let pp_validation_process_error ppf = function
       Format.fprintf
         ppf
         "The socket path %s is too long. Please set an alternative path using \
-         XDG_RUNTIME_DIR to specify where to create the file"
+         XDG_RUNTIME_DIR to specify where to create the file. Use, for \
+         instance, XDG_RUNTIME_DIR=/tmp/xdg-runtime-dir/"
         path
   | Socket_path_wrong_permission path ->
       Format.fprintf
         ppf
         "The socket path %s has wrong permissions. Please set an alternative \
-         path using XDG_RUNTIME_DIR to specify where to create the file"
+         path using XDG_RUNTIME_DIR to specify where to create the file. Use, \
+         for instance, XDG_RUNTIME_DIR=/tmp/xdg-runtime-dir/"
         path
   | Cannot_run_external_validator msg ->
       Format.fprintf
