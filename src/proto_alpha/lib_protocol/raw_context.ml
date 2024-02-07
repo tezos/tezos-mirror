@@ -1033,15 +1033,22 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         (* When modifying the line below, be careful that the values are
            compatible with the encodings exported by the environment did not
            change. *)
-        let cryptobox_parameters = c.dal.cryptobox_parameters in
+        let cryptobox_parameters =
+          {
+            Dal.page_size = 4096;
+            slot_size = 1 lsl 20;
+            redundancy_factor = 16;
+            number_of_shards = 2048;
+          }
+        in
         let dal =
           Constants_parametric_repr.
             {
               feature_enable = true;
               incentives_enable = false;
-              number_of_slots = c.dal.number_of_slots;
-              attestation_lag = c.dal.attestation_lag;
-              attestation_threshold = c.dal.attestation_threshold;
+              number_of_slots = 256;
+              attestation_lag = 4;
+              attestation_threshold = 50;
               cryptobox_parameters;
             }
         in
