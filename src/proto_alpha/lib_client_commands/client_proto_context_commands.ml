@@ -817,8 +817,7 @@ let commands_ro () =
             "%a"
             Data_encoding.Binary_schema.pp
             (Data_encoding.Binary.describe
-               Alpha_context.Operation
-               .unsigned_encoding_with_legacy_attestation_name)
+               Alpha_context.Operation.unsigned_encoding)
         in
         return_unit);
     command

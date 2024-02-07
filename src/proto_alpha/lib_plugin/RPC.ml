@@ -3242,7 +3242,7 @@ module Forge = struct
       (fun () operation ->
         return
           (Data_encoding.Binary.to_bytes_exn
-             Operation.unsigned_encoding_with_legacy_attestation_name
+             Operation.unsigned_encoding
              operation)) ;
     Registration.register0_noctxt
       ~chunked:true
@@ -3479,7 +3479,7 @@ module Parse = struct
     let open Result_syntax in
     match
       Data_encoding.Binary.of_bytes_opt
-        Operation.protocol_data_encoding_with_legacy_attestation_name
+        Operation.protocol_data_encoding
         op.proto
     with
     | Some protocol_data -> return {shell = op.shell; protocol_data}

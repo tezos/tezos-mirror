@@ -226,7 +226,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       hash_pp [Signature.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   item (fun ppf () ->
@@ -241,7 +241,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   let* _chain_id, branch = get_branch cctxt ~chain ~block branch in
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   let* signature =
@@ -270,11 +270,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   let packed_op =
     {shell = {branch}; protocol_data = Operation_data {contents; signature}}
   in
-  let size =
-    Data_encoding.Binary.length
-      Operation.encoding_with_legacy_attestation_name
-      packed_op
-  in
+  let size = Data_encoding.Binary.length Operation.encoding packed_op in
   let*! () =
     match fee_parameter with
     | Some fee_parameter -> check_fees cctxt fee_parameter contents size
@@ -798,12 +794,12 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             @@ Data_encoding.Binary.fixed_length
                  Tezos_base.Operation.shell_header_encoding)
             + Data_encoding.Binary.length
-                Operation.contents_encoding_with_legacy_attestation_name
+                Operation.contents_encoding
                 (Contents op)
             + signature_size_of_algo signature_algo
           else
             Data_encoding.Binary.length
-              Operation.contents_encoding_with_legacy_attestation_name
+              Operation.contents_encoding
               (Contents op)
         in
         let minimal_fees_in_nanotez =
@@ -1071,9 +1067,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
         if force then return_unit else Lwt.return res
   in
   let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Operation.encoding_with_legacy_attestation_name
-      (Operation.pack op)
+    Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
   if dry_run || simulation then
     let oph = Operation_hash.hash_bytes [bytes] in

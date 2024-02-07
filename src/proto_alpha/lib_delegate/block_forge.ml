@@ -68,8 +68,7 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
     shell = op.shell;
     proto =
       Data_encoding.Binary.to_bytes_exn
-        Alpha_context.Operation
-        .protocol_data_encoding_with_legacy_attestation_name
+        Alpha_context.Operation.protocol_data_encoding
         op.protocol_data;
   }
 

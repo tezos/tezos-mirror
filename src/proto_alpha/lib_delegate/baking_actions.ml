@@ -37,8 +37,7 @@ module Operations_source = struct
       }
 
   let operations_encoding =
-    Data_encoding.(
-      list (dynamic_size Operation.encoding_with_legacy_attestation_name))
+    Data_encoding.(list (dynamic_size Operation.encoding))
 
   let retrieve =
     let open Lwt_result_syntax in

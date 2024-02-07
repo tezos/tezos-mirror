@@ -866,9 +866,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
         (fun (vstate, contents_result) op ->
           (if check_size then
            let operation_size =
-             Data_encoding.Binary.length
-               Operation.encoding_with_legacy_attestation_name
-               op
+             Data_encoding.Binary.length Operation.encoding op
            in
            if operation_size > Constants_repr.max_operation_data_length then
              raise

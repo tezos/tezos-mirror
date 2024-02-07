@@ -188,11 +188,7 @@ let detect_script_failure :
 
 let check_operation_size ?(check_size = true) op =
   if check_size then
-    let operation_size =
-      Data_encoding.Binary.length
-        Operation.encoding_with_legacy_attestation_name
-        op
-    in
+    let operation_size = Data_encoding.Binary.length Operation.encoding op in
     if operation_size > Constants_repr.max_operation_data_length then
       raise
         (invalid_arg
