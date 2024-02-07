@@ -905,14 +905,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn execute_create(
         &mut self,
         caller: H160,
-        scheme: CreateScheme,
         value: U256,
         initial_code: Vec<u8>,
-        create_opcode: bool,
+        address: H160,
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
-
-        let address = self.create_address(scheme);
 
         // TODO: Keep address as warm when creation fails
         // issue: https://gitlab.com/tezos/tezos/-/issues/6898
@@ -921,10 +918,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 "Failed to mark callee address as hot",
             )));
         }
-
-        if create_opcode {
-            self.increment_nonce(caller)?
-        };
 
         let context = Context {
             address,
@@ -1114,13 +1107,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let default_create_scheme = CreateScheme::Legacy { caller };
 
-        let result = self.execute_create(
-            caller,
-            default_create_scheme,
-            value.unwrap_or(U256::zero()),
-            input,
-            false,
-        );
+        let address = self.create_address(default_create_scheme);
+        let result =
+            self.execute_create(caller, value.unwrap_or_default(), input, address);
 
         self.end_initial_transaction(result)
     }
@@ -1993,6 +1982,26 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Precondition::PassPrecondition => {
                 let gas_limit = self.nested_call_gas_limit(target_gas);
 
+                // The contract address is created before the increment of the nonce
+                // to generate a correct address when the scheme is `Legacy`.
+                let contract_address = self.create_address(scheme);
+
+                // The nonce of the caller is incremented before the internal tx
+                // Even if the internal transaction rollback the nonce will not
+                if let Err(err) = self.increment_nonce(caller) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Failed to increment nonce of {:?}",
+                        caller
+                    );
+
+                    return Capture::Exit((
+                        ethereum_error_to_exit_reason(&err),
+                        None,
+                        vec![],
+                    ));
+                }
                 if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
                     log!(
                         self.host,
@@ -2010,7 +2019,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     ))
                 } else {
                     let result =
-                        self.execute_create(caller, scheme, value, init_code, true);
+                        self.execute_create(caller, value, init_code, contract_address);
 
                     self.end_inter_transaction(result)
                 }
@@ -2751,8 +2760,7 @@ mod test {
 
         handler.begin_initial_transaction(false, None).unwrap();
 
-        let result =
-            handler.execute_create(caller, create_scheme, value, init_code, false);
+        let result = handler.execute_create(caller, value, init_code, expected_address);
 
         match result {
             Ok(result) => {
@@ -2817,10 +2825,11 @@ mod test {
             Opcode::REVERT.as_u8(),
         ];
 
+        let contract_address = handler.create_address(create_scheme);
         handler.begin_initial_transaction(false, None).unwrap();
 
         let result =
-            handler.execute_create(caller, create_scheme, value, initial_code, false);
+            handler.execute_create(caller, value, initial_code, contract_address);
 
         match result {
             Ok(result) => {
@@ -3334,8 +3343,9 @@ mod test {
         let scheme = CreateScheme::Legacy { caller };
         let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
 
+        let contract_address = handler.create_address(scheme);
         let result =
-            handler.execute_create(caller, scheme, U256::from(100000), code, true);
+            handler.execute_create(caller, U256::from(100000), code, contract_address);
 
         assert_eq!(
             result.unwrap(),
