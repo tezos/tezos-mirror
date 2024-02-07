@@ -145,15 +145,21 @@ let rpc_error ?data message =
 
 let missing_parameter () = rpc_error "Missing parameters"
 
+let expect_input input f =
+  match input with None -> missing_parameter () | Some v -> f v
+
+let build_with_input method_ ~f parameters =
+  build method_ ~f:(fun input -> expect_input input f) parameters
+
 let dispatch_request (config : 'a Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let open Ethereum_types in
-  let* value =
+  let*! value =
     match map_method_name method_ with
     | Unknown ->
-        return
+        Lwt.return
           (Error
              JSONRPC.
                {
@@ -162,7 +168,7 @@ let dispatch_request (config : 'a Configuration.t)
                  data = Some (`String method_);
                })
     | Unsupported ->
-        return
+        Lwt.return
           (Error
              JSONRPC.
                {
@@ -183,316 +189,222 @@ let dispatch_request (config : 'a Configuration.t)
         build ~f module_ parameters
     | Method (Chain_id.Method, module_) ->
         let f (_ : unit option) =
-          let open Lwt_result_syntax in
           let* chain_id = Backend_rpc.chain_id () in
           rpc_ok chain_id
         in
         build ~f module_ parameters
     | Method (Get_balance.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (address, _block_param) ->
-              let* balance = Backend_rpc.balance address in
-              rpc_ok balance
+        let f (address, _block_param) =
+          let* balance = Backend_rpc.balance address in
+          rpc_ok balance
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_storage_at.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (address, position, _block_param) ->
-              let* value = Backend_rpc.storage_at address position in
-              rpc_ok value
+        let f (address, position, _block_param) =
+          let* value = Backend_rpc.storage_at address position in
+          rpc_ok value
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Block_number.Method, module_) ->
         let f (_ : unit option) =
-          let open Lwt_result_syntax in
           let* block_number = Backend_rpc.current_block_number () in
           rpc_ok block_number
         in
         build ~f module_ parameters
     | Method (Get_block_by_number.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (block_param, full_transaction_object) ->
-              let* block =
-                get_block_by_number
-                  ~full_transaction_object
-                  block_param
-                  (module Backend_rpc)
-              in
-              rpc_ok block
+        let f (block_param, full_transaction_object) =
+          let* block =
+            get_block_by_number
+              ~full_transaction_object
+              block_param
+              (module Backend_rpc)
+          in
+          rpc_ok block
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_block_by_hash.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (block_hash, full_transaction_object) ->
-              let* block =
-                Backend_rpc.block_by_hash ~full_transaction_object block_hash
-              in
-              rpc_ok block
+        let f (block_hash, full_transaction_object) =
+          let* block =
+            Backend_rpc.block_by_hash ~full_transaction_object block_hash
+          in
+          rpc_ok block
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_code.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (address, _) ->
-              let* code = Backend_rpc.code address in
-              rpc_ok code
+        let f (address, _) =
+          let* code = Backend_rpc.code address in
+          rpc_ok code
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Gas_price.Method, module_) ->
         let f (_ : unit option) =
-          let open Lwt_result_syntax in
           let* base_fee = Backend_rpc.base_fee_per_gas () in
           rpc_ok base_fee
         in
         build ~f module_ parameters
     | Method (Get_transaction_count.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (address, _) ->
-              let* nonce = Tx_pool.nonce address in
-              rpc_ok nonce
+        let f (address, _) =
+          let* nonce = Tx_pool.nonce address in
+          rpc_ok nonce
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_block_transaction_count_by_hash.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some block_hash ->
-              let* block =
-                Backend_rpc.block_by_hash
-                  ~full_transaction_object:false
-                  block_hash
-              in
-              rpc_ok (block_transaction_count block)
+        let f block_hash =
+          let* block =
+            Backend_rpc.block_by_hash ~full_transaction_object:false block_hash
+          in
+          rpc_ok (block_transaction_count block)
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_block_transaction_count_by_number.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some block_param ->
-              let* block =
-                get_block_by_number
-                  ~full_transaction_object:false
-                  block_param
-                  (module Backend_rpc)
-              in
-              rpc_ok (block_transaction_count block)
+        let f block_param =
+          let* block =
+            get_block_by_number
+              ~full_transaction_object:false
+              block_param
+              (module Backend_rpc)
+          in
+          rpc_ok (block_transaction_count block)
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_hash.Method, module_) ->
-        let f input =
-          match input with
-          | None -> missing_parameter ()
-          | Some _block_param -> rpc_ok (Qty Z.zero)
-        in
-        build ~f module_ parameters
+        let f _block_param = rpc_ok (Qty Z.zero) in
+        build_with_input ~f module_ parameters
     | Method (Get_uncle_count_by_block_number.Method, module_) ->
-        let f input =
-          match input with
-          | None -> missing_parameter ()
-          | Some _block_param -> rpc_ok (Qty Z.zero)
-        in
-        build ~f module_ parameters
+        let f _block_param = rpc_ok (Qty Z.zero) in
+        build_with_input ~f module_ parameters
     | Method (Get_transaction_receipt.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some tx_hash ->
-              let* receipt = Backend_rpc.transaction_receipt tx_hash in
-              rpc_ok receipt
+        let f tx_hash =
+          let* receipt = Backend_rpc.transaction_receipt tx_hash in
+          rpc_ok receipt
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_transaction_by_hash.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some tx_hash ->
-              let* transaction_object =
-                Backend_rpc.transaction_object tx_hash
-              in
-              rpc_ok transaction_object
+        let f tx_hash =
+          let* transaction_object = Backend_rpc.transaction_object tx_hash in
+          rpc_ok transaction_object
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_transaction_by_block_hash_and_index.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (block_hash, Qty index) ->
-              let* block =
-                Backend_rpc.block_by_hash
-                  ~full_transaction_object:false
-                  block_hash
-              in
-              let* transaction_object =
-                get_transaction_from_index
-                  block
-                  (Z.to_int index)
-                  (module Backend_rpc)
-              in
-              rpc_ok transaction_object
+        let f (block_hash, Qty index) =
+          let* block =
+            Backend_rpc.block_by_hash ~full_transaction_object:false block_hash
+          in
+          let* transaction_object =
+            get_transaction_from_index
+              block
+              (Z.to_int index)
+              (module Backend_rpc)
+          in
+          rpc_ok transaction_object
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_transaction_by_block_number_and_index.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (block_number, Qty index) ->
-              let* block =
-                get_block_by_number
-                  ~full_transaction_object:false
-                  block_number
-                  (module Backend_rpc)
-              in
-              let* transaction_object =
-                get_transaction_from_index
-                  block
-                  (Z.to_int index)
-                  (module Backend_rpc)
-              in
-              rpc_ok transaction_object
+        let f (block_number, Qty index) =
+          let* block =
+            get_block_by_number
+              ~full_transaction_object:false
+              block_number
+              (module Backend_rpc)
+          in
+          let* transaction_object =
+            get_transaction_from_index
+              block
+              (Z.to_int index)
+              (module Backend_rpc)
+          in
+          rpc_ok transaction_object
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_uncle_by_block_hash_and_index.Method, module_) ->
-        let f input =
-          match input with
-          | None -> missing_parameter ()
-          | Some (_block_hash, _index) ->
-              (* A block cannot have uncles. *)
-              rpc_ok None
+        let f (_block_hash, _index) =
+          (* A block cannot have uncles. *)
+          rpc_ok None
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_uncle_by_block_number_and_index.Method, module_) ->
-        let f input =
-          match input with
-          | None -> missing_parameter ()
-          | Some (_block_number, _index) ->
-              (* A block cannot have uncles. *)
-              rpc_ok None
+        let f (_block_number, _index) =
+          (* A block cannot have uncles. *)
+          rpc_ok None
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Send_raw_transaction.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some tx_raw -> (
-              let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
-              match tx_hash with
-              | Ok tx_hash -> rpc_ok tx_hash
-              | Error reason ->
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-                  rpc_error reason)
+        let f tx_raw =
+          let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
+          match tx_hash with
+          | Ok tx_hash -> rpc_ok tx_hash
+          | Error reason ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+              rpc_error reason
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (call, _) -> (
-              let* call_result = Backend_rpc.simulate_call call in
-              match call_result with
-              | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
-              | Ok (Ok {value = None; gas_used = _}) ->
-                  rpc_ok (hash_of_string "")
-              | Ok (Error _reason) -> rpc_error "execution reverted:"
-              | Error reason ->
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-                  rpc_error reason)
+        let f (call, _) =
+          let* call_result = Backend_rpc.simulate_call call in
+          match call_result with
+          | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
+          | Ok (Ok {value = None; gas_used = _}) -> rpc_ok (hash_of_string "")
+          | Ok (Error _reason) -> rpc_error "execution reverted:"
+          | Error reason ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+              rpc_error reason
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_estimate_gas.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some (call, _) -> (
-              let* result = Backend_rpc.estimate_gas call in
-              match result with
-              | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
-              | Ok (Ok {value = _; gas_used = None}) ->
-                  rpc_error
-                    "Simulation failed before execution, cannot estimate gas."
-              | Ok (Error _reason) -> rpc_error "execution reverted:"
-              | Error reason ->
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-                  rpc_error reason)
+        let f (call, _) =
+          let* result = Backend_rpc.estimate_gas call in
+          match result with
+          | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
+          | Ok (Ok {value = _; gas_used = None}) ->
+              rpc_error
+                "Simulation failed before execution, cannot estimate gas."
+          | Ok (Error _reason) -> rpc_error "execution reverted:"
+          | Error reason ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+              rpc_error reason
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Txpool_content.Method, module_) ->
         let f (_ : unit option) =
-          let open Lwt_result_syntax in
-          return
-            (Either.Left
-               Ethereum_types.
-                 {pending = AddressMap.empty; queued = AddressMap.empty})
+          rpc_ok
+            Ethereum_types.
+              {pending = AddressMap.empty; queued = AddressMap.empty}
         in
         build ~f module_ parameters
     | Method (Web3_clientVersion.Method, module_) ->
         let f (_ : unit option) = rpc_ok client_version in
         build ~f module_ parameters
     | Method (Web3_sha3.Method, module_) ->
-        let f input =
-          match input with
-          | None -> missing_parameter ()
-          | Some data ->
-              let open Ethereum_types in
-              let (Hex h) = data in
-              let bytes = Hex.to_bytes_exn (`Hex h) in
-              let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
-              let hash = Hex.of_bytes hash_bytes |> Hex.show in
-              rpc_ok (Hash (Hex hash))
+        let f data =
+          let open Ethereum_types in
+          let (Hex h) = data in
+          let bytes = Hex.to_bytes_exn (`Hex h) in
+          let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
+          let hash = Hex.of_bytes hash_bytes |> Hex.show in
+          rpc_ok (Hash (Hex hash))
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
     | Method (Get_logs.Method, module_) ->
-        let f input =
-          let open Lwt_result_syntax in
-          match input with
-          | None -> missing_parameter ()
-          | Some filter ->
-              let* logs =
-                Filter_helpers.get_logs
-                  config.log_filter
-                  (module Backend_rpc)
-                  filter
-              in
-              rpc_ok logs
+        let f filter =
+          let* logs =
+            Filter_helpers.get_logs
+              config.log_filter
+              (module Backend_rpc)
+              filter
+          in
+          rpc_ok logs
         in
-        build ~f module_ parameters
+        build_with_input ~f module_ parameters
         (* Internal RPC methods *)
     | Method (Kernel_version.Method, module_) ->
         let f (_ : unit option) =
-          let open Lwt_result_syntax in
           let* kernel_version = Backend_rpc.kernel_version () in
           rpc_ok kernel_version
         in
         build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
-  return JSONRPC.{value; id}
+  Lwt.return JSONRPC.{value; id}
 
 let dispatch_private_request (_config : 'a Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
