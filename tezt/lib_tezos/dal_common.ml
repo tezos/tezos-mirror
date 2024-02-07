@@ -201,7 +201,7 @@ module Dal_RPC = struct
   let get_commitment_slot commitment =
     make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
 
-  let put_commitment_shards ?(with_proof = false) commitment =
+  let put_commitment_shards ?(with_proof = true) commitment =
     let data : RPC_core.data = Data (`O [("with_proof", `Bool with_proof)]) in
     make ~data PUT ["commitments"; commitment; "shards"] as_empty_object_or_fail
 
