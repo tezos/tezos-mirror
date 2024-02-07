@@ -106,13 +106,6 @@ pub fn stage_one<Host: Runtime>(
     fetch(host, smart_rollup_address, tezos_contracts, configuration)
 }
 
-fn retrieve_smart_rollup_address<Host: Runtime>(
-    host: &mut Host,
-) -> Result<[u8; 20], Error> {
-    let rollup_metadata = Runtime::reveal_metadata(host);
-    Ok(rollup_metadata.raw_rollup_address)
-}
-
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
@@ -166,8 +159,8 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
     Ok(block_fees)
 }
 
-fn fetch_configuration<Host: Runtime>(host: &mut Host) -> anyhow::Result<Configuration> {
-    let sequencer = sequencer(host)?;
+fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
+    let sequencer = sequencer(host).unwrap_or_default();
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -179,14 +172,19 @@ fn fetch_configuration<Host: Runtime>(host: &mut Host) -> anyhow::Result<Configu
                     )
                     .unwrap()
                 });
-            let delayed_inbox = Box::new(DelayedInbox::new(host)?);
-            Ok(Configuration::Sequencer {
-                delayed_bridge,
-                delayed_inbox,
-                sequencer,
-            })
+            match DelayedInbox::new(host) {
+                Ok(delayed_inbox) => Configuration::Sequencer {
+                    delayed_bridge,
+                    delayed_inbox: Box::new(delayed_inbox),
+                    sequencer,
+                },
+                Err(err) => {
+                    log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
+                    Configuration::Proxy
+                }
+            }
         }
-        None => Ok(Configuration::Proxy),
+        None => Configuration::Proxy,
     }
 }
 
@@ -218,14 +216,31 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         }
     };
 
-    // Fetch kernel metadata.
-    let smart_rollup_address = retrieve_smart_rollup_address(host)
-        .context("Failed to retrieve smart rollup address")?;
+    // In the very worst case, we want to be able to upgrade the kernel at
+    // any time. The kernel upgrades are retrieved from the inbox, therefore
+    // we need be able to to always reach the inbox and the kernel upgrade
+    // message.
+    //
+    // Therefore, the code between here and block production is allowed to
+    // fail. It should already not be the case, but we do not want to
+    // take the risk.
+
+    // Fetch kernel metadata:
+
+    // 1. Fetch the smart rollup address via the host function, it cannot fail.
+    let smart_rollup_address = Runtime::reveal_metadata(host).raw_rollup_address;
+    // 2. Fetch the kernel's ticketer, returns `None` if it is badly
+    //    encoded or absent.
     let ticketer = read_ticketer(host);
+    // 3. Fetch the kernel's administrator, returns `None` if it is badly
+    //    encoded or absent.
     let admin = read_admin(host);
+    // 4. Fetch the sequencer administrator, returns `None` if it is badly
+    //    encoded or absent.
     let sequencer_admin = read_sequencer_admin(host);
-    let mut configuration = fetch_configuration(host)?;
-    let block_fees = retrieve_block_fees(host)?;
+    // 5. Fetch the per mode configuration of the kernel. Returns the default
+    //    configuration if it fails.
+    let mut configuration = fetch_configuration(host);
 
     let tezos_contracts = TezosContracts {
         ticketer,
@@ -244,6 +259,7 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
     )
     .context("Failed during stage 1")?;
 
+    let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
     block::produce(host, chain_id, block_fees, &mut configuration)
         .map(|_| ())
