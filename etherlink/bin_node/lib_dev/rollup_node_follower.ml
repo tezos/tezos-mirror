@@ -85,9 +85,36 @@ let worker =
     | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
     | Lwt.Sleep -> Error (TzTrace.make No_l2_block_follower))
 
-let process_new_block ~rollup_node_endpoint:_ _block =
+let read_from_rollup_node path level rollup_node_endpoint =
+  let open Rollup_node_services in
+  call_service
+    ~base:rollup_node_endpoint
+    durable_state_value
+    ((), Block_id.Level level)
+    {key = path}
+    ()
+
+let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
   let open Lwt_syntax in
-  (* logic added in following commit *)
+  let* finalized_current_number =
+    read_from_rollup_node
+      Durable_storage_path.Block.current_number
+      finalized_level
+      rollup_node_endpoint
+  in
+  match finalized_current_number with
+  | Ok (Some bytes) ->
+      let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
+      let* _ = Blueprints_publisher.new_l2_head evm_block_number in
+      return_unit
+  | _ -> return_unit
+
+let process_new_block ~rollup_node_endpoint block =
+  let open Lwt_syntax in
+  let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+  let* () =
+    advertize_blueprints_publisher rollup_node_endpoint finalized_level
+  in
   return_unit
 
 let rec process_rollup_node_stream ~stream worker =
