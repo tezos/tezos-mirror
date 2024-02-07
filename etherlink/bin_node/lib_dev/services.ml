@@ -344,7 +344,7 @@ let dispatch_request (config : 'a Configuration.t)
           match call_result with
           | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
           | Ok (Ok {value = None; gas_used = _}) -> rpc_ok (hash_of_string "")
-          | Ok (Error _reason) -> rpc_error "execution reverted:"
+          | Ok (Error reason) -> rpc_error ~data:reason "execution reverted"
           | Error reason ->
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
               rpc_error reason
@@ -358,7 +358,7 @@ let dispatch_request (config : 'a Configuration.t)
           | Ok (Ok {value = _; gas_used = None}) ->
               rpc_error
                 "Simulation failed before execution, cannot estimate gas."
-          | Ok (Error _reason) -> rpc_error "execution reverted:"
+          | Ok (Error reason) -> rpc_error ~data:reason "execution reverted"
           | Error reason ->
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
               rpc_error reason
