@@ -35,6 +35,8 @@ srrpcport=8932
 evmaddr=0.0.0.0
 evmport=8545
 evmmode=proxy
+sequencer_key=""
+seq_opts=""
 
 additional_cliopts=""
 
@@ -44,6 +46,12 @@ rotateonstart=yes
 [ -r /etc/octez/evmnode.conf ] && . /etc/octez/evmnode.conf
 
 [ -z "$srnodeurl" ] && srnodeurl="http://$sraddr:$srrpcport"
+
+[ ! -z "$sequencer_key" ] && [ "$evmmode" = "sequencer" ] && \
+	seq_opts="signing with ${sequencer_key}"
+
+[ ! -z "$evmdatadir" ] && \
+	additional_cliopts="$additional_cliopts --data-dir ${evmdatadir}"
 
 logfile="${logdir}/evmnode.log"
 evm="/usr/bin/octez-evm-node"
@@ -68,7 +76,7 @@ rotate_logs ()
 case "$1" in
 start)	initial_checks
 	rotate_logs
-	su $user -c "${evm} run ${evmmode} with endpoint $srnodeurl --rpc-addr ${evmaddr} --rpc-port ${evmport} ${additional_cliopts} >> ${logfile} 2>&1 &"
+	su $user -c "${evm} run ${evmmode} with endpoint $srnodeurl ${seq_opts} --rpc-addr ${evmaddr} --rpc-port ${evmport} ${additional_cliopts} >> ${logfile} 2>&1 &"
 	;;
 stop)	
        	pkill -f octez-evm-node
