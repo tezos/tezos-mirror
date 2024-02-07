@@ -65,7 +65,9 @@ echo "Build ${image_name}"
 
 ./scripts/ci/docker_initialize.sh
 
-docker build images/rust-toolchain \
+./images/create_rust_toolchain_image.sh \
+  "${image_base}" \
+  "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --cache-from="${image_base}:${CI_COMMIT_REF_SLUG}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
@@ -74,8 +76,7 @@ docker build images/rust-toolchain \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  -t "${image_base}:${CI_COMMIT_REF_SLUG}" \
-  -t "${image_name}"
+  -t "${image_base}:${CI_COMMIT_REF_SLUG}"
 
 # Push image
 docker push --all-tags "${image_base}"
