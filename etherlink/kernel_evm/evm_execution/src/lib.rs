@@ -20,6 +20,7 @@ use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 
 pub mod abi;
+mod access_record;
 pub mod account_storage;
 pub mod handler;
 pub mod modexp;
@@ -147,6 +148,7 @@ pub fn run_transaction<'a, Host>(
     pay_for_gas: bool,
     allocated_ticks: u64,
     retriable: bool,
+    enable_warm_cold_access: bool,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
@@ -170,6 +172,7 @@ where
         precompiles,
         allocated_ticks,
         effective_gas_price,
+        enable_warm_cold_access,
     );
 
     if (!pay_for_gas)
@@ -372,6 +375,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -438,6 +442,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -498,6 +503,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -555,6 +561,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let new_address =
@@ -590,6 +597,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -619,6 +627,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
         assert!(result3.is_ok(), "execution should have succeeded");
         let result = result3.unwrap();
@@ -646,6 +655,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -702,6 +712,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         assert!(result.is_ok());
@@ -752,6 +763,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -806,6 +818,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -954,6 +967,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1018,6 +1032,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1081,6 +1096,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         // Assert
@@ -1138,6 +1154,7 @@ mod test {
             Some(U256::from(100)),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -1197,6 +1214,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -1258,6 +1276,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -1372,6 +1391,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         // Assert
@@ -1450,6 +1470,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -1544,6 +1565,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -1661,6 +1683,7 @@ mod test {
             true,
             1_000_000_000,
             false,
+            false,
         );
 
         let log_record1 = Log {
@@ -1774,6 +1797,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let log_record1 = Log {
@@ -1875,6 +1899,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
         let expected_gas = 21000 // base cost
@@ -1995,6 +2020,7 @@ mod test {
             true,
             10_000_000_000,
             false,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -2088,6 +2114,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -2164,6 +2191,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -2243,6 +2271,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         let expected_result = Err(EthereumError::EthereumAccountError(
@@ -2292,6 +2321,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -2347,6 +2377,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -2412,6 +2443,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         // Assert
@@ -2474,6 +2506,7 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
+            false,
         );
 
         // Assert
@@ -2530,6 +2563,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         )
     }
@@ -2636,6 +2670,7 @@ mod test {
             true,
             10_000_000_000,
             false,
+            false,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2700,6 +2735,7 @@ mod test {
             true,
             10_000_000_000,
             false,
+            false,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2745,6 +2781,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -2800,6 +2837,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 
@@ -2873,6 +2911,7 @@ mod test {
             true,
             10_000,
             retriable,
+            false,
         );
 
         (host, result, account, initial_balance, initial_caller_nonce)
@@ -2956,6 +2995,7 @@ mod test {
             None,
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
 

@@ -38,6 +38,7 @@
   Withdrawal contract address is now 'ff00000000000000000000000000000000000001'. (!11556)
   
 ### Internal
+- Implement warm/cold access for state access opcodes. (!11580)
 
 - `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
 

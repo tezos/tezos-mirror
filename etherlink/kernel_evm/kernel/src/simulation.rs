@@ -139,6 +139,7 @@ impl Evaluation {
             false,
             allocated_ticks,
             false,
+            false,
         ) {
             Ok(Some(ExecutionOutcome {
                 reason: ExtendedExitReason::OutOfTicks,
@@ -267,6 +268,7 @@ impl TxValidation {
             Some(transaction.value),
             false,
             allocated_ticks,
+            false,
             false,
         ) {
             Ok(Some(outcome)) => Ok(outcome.reason == ExtendedExitReason::OutOfTicks),
@@ -665,6 +667,7 @@ mod tests {
             Some(transaction_value),
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
             false,
         );
         assert!(outcome.is_ok(), "contract should have been created");

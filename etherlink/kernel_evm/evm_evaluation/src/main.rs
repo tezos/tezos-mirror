@@ -331,10 +331,6 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "static_Call50000_ecrec.json"
         | "static_Call50000.json"
 
-        // Reason: this test rely on hot/cold access and as of right now
-        // this feature will not be part of Etherlink
-        | "sloadGasCost.json"
-
         // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
         // access lists and we don't intend to implement them for now
         | "addressOpcodes.json"

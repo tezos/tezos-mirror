@@ -237,6 +237,7 @@ fn execute_transaction(
         pay_for_gas,
         u64::MAX, // don't account for ticks during the test
         false,
+        true,
     )
 }
 

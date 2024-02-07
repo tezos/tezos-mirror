@@ -593,6 +593,7 @@ mod tests {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
+            false,
         );
 
         let is_static = true;
