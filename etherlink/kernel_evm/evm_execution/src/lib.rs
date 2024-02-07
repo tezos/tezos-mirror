@@ -2676,11 +2676,11 @@ mod test {
         let caller =
             H160::from_str("0xd0bBEc6D2c628b7e2E6D5556daA14a5181b604C5").unwrap();
 
-        let sub_contract =
-            H160::from_str("0xd807115ef18e7e9b8e54188b4e9ef514277a0740").unwrap();
-
         let contract_address =
             H160::from_str("0x7658771dc6af74a3d2f8499d349ff9c1a0df8826").unwrap();
+
+        let sub_contract =
+            H160::from_str("0x6697a027694475d9f64c97566698c24cff8f17e7").unwrap();
 
         set_balance(
             &mut mock_runtime,
@@ -3045,6 +3045,122 @@ mod test {
         assert_eq!(caller_nonce, U256::one());
     }
 
+    #[test]
+    fn nested_create_check_nonce_start_at_one() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        // 6295...bf8f is the address that caller will create
+        let callee = H160::from_str("6295ee1b4f6dd65047762f924ecd367c17eabf8f").unwrap();
+
+        // a426...2701 is the address that callee will create if its nonce is at 0
+        let should_not_create: H160 =
+            H160::from_str("0xa42676447b7cedfa5fde894d1d3df24aab362701").unwrap();
+
+        // 64e2...bba6 is the address that callee will create if its nonce is at 1
+        let should_create =
+            H160::from_str("0x64e2ebd6405af8cb348aec519084d3fff42ebba6").unwrap();
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &caller,
+            U256::from(1000000000),
+        );
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &callee,
+            U256::from(10000),
+        );
+
+        // This code creates a contract that stores 0x12 in the slot 0 of the storage
+        let code = vec![
+            Opcode::PUSH5.as_u8(),
+            0x60,
+            0x12,
+            0x60,
+            0x00,
+            0x55,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x05,
+            Opcode::PUSH1.as_u8(),
+            0x1b,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::CREATE.as_u8(),
+        ];
+
+        // We create a contract that creates a contract
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            code,
+            Some(20000000),
+            U256::one(),
+            Some(U256::zero()),
+            true,
+            DUMMY_ALLOCATED_TICKS,
+            false,
+            false,
+        );
+
+        // Get info on contract that should not be created
+        let path = account_path(&should_not_create).unwrap();
+        let account = evm_account_storage.get_or_create(&host, &path).unwrap();
+        let nonce_of_should_not_create = account.nonce(&host).unwrap();
+        let storage_of_should_not_create = account
+            .get_storage(&host, &H256::zero())
+            .unwrap_or_default();
+
+        // Get info on contract that should be created
+        let path = account_path(&should_create).unwrap();
+        let account = evm_account_storage.get_or_create(&host, &path).unwrap();
+        let nonce_of_should_create = account.nonce(&host).unwrap();
+        let storage_of_should_create = account
+            .get_storage(&host, &H256::zero())
+            .unwrap_or_default();
+
+        let exec_result = unwrap_outcome!(result, true);
+        assert_eq!(
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
+            exec_result.reason,
+        );
+        assert_eq!(
+            nonce_of_should_not_create,
+            U256::zero(),
+            "Nonce of the contract that should not be created is not 0"
+        );
+        assert_eq!(
+            storage_of_should_not_create,
+            H256::zero(),
+            "Storage of the contract that should not be created is not 0"
+        );
+        assert_eq!(
+            nonce_of_should_create,
+            U256::one(),
+            "Nonce of the contract that should be created is not 1"
+        );
+        assert_eq!(
+            storage_of_should_create,
+            H256::from_low_u64_be(0x12),
+            "Storage of the contract that should be created is not 0x12"
+        );
+    }
+
     fn out_of_tick_scenario(
         retriable: bool,
     ) -> (
@@ -3333,7 +3449,7 @@ mod test {
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
 
         let internal_address =
-            H160::from_str("7335dfb20cdcd40881235a54d61cb1152d771f4d").unwrap();
+            H160::from_str("6cb631a210b05eab95b1f0b0cc83be18789bc479").unwrap();
 
         let code = hex::decode("3060025560206000600039602060006000f000").unwrap(); // Creates an infinity of contract
 
