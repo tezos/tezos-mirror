@@ -35,6 +35,7 @@ type 'a t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   mode : 'a;
+  max_active_connections : int;
 }
 
 let default_filter_config =
@@ -53,6 +54,8 @@ let default_devmode = false
 let default_cors_origins = []
 
 let default_cors_headers = []
+
+let default_max_active_connections = 100
 
 let default_proxy = {rollup_node_endpoint = Uri.empty}
 
@@ -168,15 +171,24 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
            cors_headers;
            log_filter;
            mode;
+           max_active_connections;
          } ->
-      (rpc_addr, rpc_port, devmode, cors_origins, cors_headers, log_filter, mode))
+      ( rpc_addr,
+        rpc_port,
+        devmode,
+        cors_origins,
+        cors_headers,
+        log_filter,
+        mode,
+        max_active_connections ))
     (fun ( rpc_addr,
            rpc_port,
            devmode,
            cors_origins,
            cors_headers,
            log_filter,
-           mode ) ->
+           mode,
+           max_active_connections ) ->
       {
         rpc_addr;
         rpc_port;
@@ -185,15 +197,17 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
         cors_headers;
         log_filter;
         mode;
+        max_active_connections;
       })
-    ((obj7
-        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-        (dft "devmode" bool default_devmode)
-        (dft "cors_origins" (list string) default_cors_origins)
-        (dft "cors_headers" (list string) default_cors_headers)
-        (dft "log_filter" log_filter_config_encoding default_filter_config))
-       (req "mode" mode_encoding))
+    (obj8
+       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+       (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+       (dft "devmode" bool default_devmode)
+       (dft "cors_origins" (list string) default_cors_origins)
+       (dft "cors_headers" (list string) default_cors_headers)
+       (dft "log_filter" log_filter_config_encoding default_filter_config)
+       (req "mode" mode_encoding)
+       (dft "max_active_connections" int31 default_max_active_connections))
 
 let save ~force ~data_dir encoding config =
   let open Lwt_result_syntax in
@@ -249,6 +263,7 @@ module Cli = struct
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter = Option.value ~default:default_filter_config log_filter;
       mode;
+      max_active_connections = default_max_active_connections;
     }
 
   let create_proxy ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
@@ -318,6 +333,7 @@ module Cli = struct
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter = Option.value ~default:default_filter_config log_filter;
       mode;
+      max_active_connections = configuration.max_active_connections;
     }
 
   let patch_proxy_configuration_from_args ~devmode ?rpc_addr ?rpc_port

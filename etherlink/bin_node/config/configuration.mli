@@ -45,6 +45,7 @@ type 'a t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   mode : 'a;
+  max_active_connections : int;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
