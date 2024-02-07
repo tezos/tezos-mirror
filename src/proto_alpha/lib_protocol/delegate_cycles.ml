@@ -209,7 +209,11 @@ let cycle_end ctxt last_cycle =
     | Manual_staking -> return (ctxt, [])
     | Auto_staking -> adjust_frozen_stakes ctxt ~deactivated_delegates
   in
-  let* ctxt = Forbidden_delegates_storage.update_at_cycle_end ctxt ~new_cycle in
+  let* ctxt =
+    Forbidden_delegates_storage.update_at_cycle_end_after_slashing
+      ctxt
+      ~new_cycle
+  in
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in

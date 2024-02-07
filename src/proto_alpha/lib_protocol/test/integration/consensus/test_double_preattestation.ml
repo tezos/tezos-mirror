@@ -260,13 +260,17 @@ end = struct
           Op.double_preattestation (B new_head) op2 op1
         in
         let* () =
-          let*! block = bake new_head ~operations:[op] in
+          let*! block =
+            bake ~policy:(Excluding [d1; d2]) new_head ~operations:[op]
+          in
           invalid_denunciation loc block
         in
         let op : Operation.packed =
           Op.double_preattestation (B new_head) op1 op2
         in
-        let*! block = bake new_head ~operations:[op] in
+        let*! block =
+          bake ~policy:(Excluding [d1; d2]) new_head ~operations:[op]
+        in
         already_denounced loc block
     | Error _ as res -> test_expected_ko loc res
 

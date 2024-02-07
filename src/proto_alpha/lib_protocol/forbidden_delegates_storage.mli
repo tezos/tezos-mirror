@@ -11,30 +11,29 @@
 *)
 
 (** [is_forbidden ctxt delegate] returns [true] if the given [delegate]
-    is forbidden to bake or attest. This means that its current frozen deposit
-    is equal to zero. Returns [false] otherwise. *)
+    is forbidden to bake or attest. *)
 val is_forbidden : Raw_context.t -> Signature.Public_key_hash.t -> bool
 
-(** [may_forbid ctxt delegate ~current_cycle slash_history] checks the
-    forbidding criteria based on [current_cycle] and [slash_history] and, if
-    required, adds [delegate] to the set of forbidden delegates and stores the
-    updated set, which prevents this delegate from baking or attesting.
-
-    Beside the new context, it returns a boolean that is true if the delegate
-    has actually been forbidden.
- *)
-val may_forbid :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  current_cycle:Cycle_repr.t ->
-  Storage.Slashed_deposits_history.t ->
-  (Raw_context.t * bool) Lwt.t
+(** [forbid ctxt delegate] adds [delegate] to the set of forbidden
+    delegates. *)
+val forbid : Raw_context.t -> Signature.public_key_hash -> Raw_context.t Lwt.t
 
 (** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)
 val load : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val update_at_cycle_end :
+(** Unforbids all delegates who
+
+    - have no pending denunciations (for which slashing has yet to be
+    applied), and
+
+    - have enough current frozen deposits to insure their previously
+    computed baking rights for [new_cycle].
+
+    This function should be called at the end of each cycle, after
+    having applied any slashings that were scheduled for the same
+    cycle end. *)
+val update_at_cycle_end_after_slashing :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 val init_for_genesis : Raw_context.t -> Raw_context.t tzresult Lwt.t

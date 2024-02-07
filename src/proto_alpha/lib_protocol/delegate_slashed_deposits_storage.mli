@@ -58,15 +58,9 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-(** Record in the context that the given delegate is now marked for
-    slashing for the given misbehaviour. If the past and pending
-    slashings for the delegate since the previous cycle exceed a fixed
-    threshold, then this function also records in the context that the
-    delegate is now forbidden from taking part in the consensus
-    process.
-
-    Return the updated context and a boolean indicating whether the
-    delegate is actually forbidden from baking/attesting.
+(** Record in the context that the given delegate is both marked for
+    slashing for the given misbehaviour, and forbidden from taking
+    part in the consensus process (baking/attesting).
 
     [operation_hash] corresponds to the denunciation that prompted
     this punishment. The level argument is the level of the duplicate
@@ -84,7 +78,7 @@ val punish_double_signing :
   Signature.Public_key_hash.t ->
   Level_repr.t ->
   rewarded:Signature.public_key_hash ->
-  (Raw_context.t * bool) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
 
 val clear_outdated_slashed_deposits :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t

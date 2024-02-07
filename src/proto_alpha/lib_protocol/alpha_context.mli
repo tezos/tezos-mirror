@@ -2246,6 +2246,7 @@ module Delegate : sig
     unstaked : (Cycle.t * reward_and_burn) list;
   }
 
+  (** See {!Delegate_slashed_deposits_storage.punish_double_signing}. *)
   val punish_double_signing :
     context ->
     operation_hash:Operation_hash.t ->
@@ -2253,7 +2254,7 @@ module Delegate : sig
     public_key_hash ->
     Level.t ->
     rewarded:public_key_hash ->
-    (context * bool) tzresult Lwt.t
+    context tzresult Lwt.t
 
   type level_participation = Participated | Didn't_participate
 

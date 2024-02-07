@@ -52,6 +52,21 @@ Adaptive Issuance (ongoing)
 
 - The minimal frozen stake is now checked before applying limits and then re-checked after applying limits and edge. (MR :gl:`!11086`)
 
+- A delegate denounced for double baking or double attesting is now
+  always forbidden from baking and attesting in the near future
+  (previously, they were only forbidden if recent and incoming slashes
+  summed up to at least 51% of their stake). This interdiction is
+  lifted once all pending slashes have been applied and the delegate
+  has enough frozen deposits to insure their baking rights for the
+  next cycle. This will happen automatically
+  ``consensus_right_delays`` (which is 2) cycles when rights computed
+  right after the slash take effect, or possibly sooner if the
+  delegate was overstaked or actively stakes more funds to match their
+  previously computed rights. This change aims to protect bakers from
+  incurring further penalties if a faulty configuration causes them to
+  double bake/attest, by giving them some time to fix it. (MR
+  :gl:`!11704`)
+
 Gas improvements
 ----------------
 

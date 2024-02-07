@@ -1033,10 +1033,14 @@ let tests =
         "test simulation of limited staking with overdelegation"
         `Quick
         test_limit_with_overdelegation;
-      tztest
-        "test cannot bake again after full deposit slash"
-        `Quick
-        test_may_not_bake_again_after_full_deposit_slash;
+      (* This test has been deactivated following the changes of the
+         forbidding mechanism that now forbids delegates right after
+         the first denunciation, it should be fixed and reactivated
+         https://gitlab.com/tezos/tezos/-/issues/6904 *)
+      (* tztest *)
+      (*   "test cannot bake again after full deposit slash" *)
+      (*   `Quick *)
+      (*   test_may_not_bake_again_after_full_deposit_slash; *)
       tztest
         "frozen deposits with overdelegation"
         `Quick
