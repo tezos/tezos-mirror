@@ -291,6 +291,46 @@ fn handle_deposit<Host: Runtime>(
     })
 }
 
+pub fn handle_input(
+    host: &mut impl Runtime,
+    input: Input,
+    inbox_content: &mut InboxContent,
+) -> anyhow::Result<()> {
+    match input {
+        Input::SimpleTransaction(tx) => inbox_content.transactions.push(*tx),
+        Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks,
+            chunk_hashes,
+        } => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
+        Input::TransactionChunk {
+            tx_hash,
+            i,
+            chunk_hash,
+            data,
+        } => {
+            if let Some(tx) =
+                handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
+            {
+                inbox_content.transactions.push(tx)
+            }
+        }
+        Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
+        Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
+
+        Input::Info(info) => {
+            store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
+        }
+        Input::Deposit(deposit) => inbox_content
+            .transactions
+            .push(handle_deposit(host, deposit)?),
+        Input::SequencerBlueprint(seq_blueprint) => {
+            inbox_content.sequencer_blueprints.push(seq_blueprint)
+        }
+    }
+    Ok(())
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -336,44 +376,9 @@ pub fn read_inbox<Host: Runtime>(
                 simulation::start_simulation_mode(host)?;
                 return Ok(None);
             }
-            InputResult::Input(input) => match input {
-                Input::SimpleTransaction(tx) => res.transactions.push(*tx),
-                Input::NewChunkedTransaction {
-                    tx_hash,
-                    num_chunks,
-                    chunk_hashes,
-                } => {
-                    create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?
-                }
-                Input::TransactionChunk {
-                    tx_hash,
-                    i,
-                    chunk_hash,
-                    data,
-                } => {
-                    if let Some(tx) =
-                        handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
-                    {
-                        res.transactions.push(tx)
-                    }
-                }
-                Input::Upgrade(kernel_upgrade) => {
-                    store_kernel_upgrade(host, &kernel_upgrade)?
-                }
-                Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
-                Input::Info(info) => {
-                    store_last_info_per_level_timestamp(
-                        host,
-                        info.predecessor_timestamp,
-                    )?;
-                }
-                Input::Deposit(deposit) => {
-                    res.transactions.push(handle_deposit(host, deposit)?)
-                }
-                Input::SequencerBlueprint(seq_blueprint) => {
-                    res.sequencer_blueprints.push(seq_blueprint)
-                }
-            },
+            InputResult::Input(input) => {
+                handle_input(host, input, &mut res)?;
+            }
         }
     }
 }
