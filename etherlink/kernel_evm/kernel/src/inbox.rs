@@ -329,6 +329,13 @@ pub fn read_inbox<Host: Runtime>(
                 }
             }
             InputResult::Unparsable => (),
+            InputResult::Simulation => {
+                // kernel enters in simulation mode, reading will be done by the
+                // simulation and all the previous and next transactions are
+                // discarded.
+                simulation::start_simulation_mode(host)?;
+                return Ok(None);
+            }
             InputResult::Input(input) => match input {
                 Input::SimpleTransaction(tx) => res.transactions.push(*tx),
                 Input::NewChunkedTransaction {
@@ -354,13 +361,6 @@ pub fn read_inbox<Host: Runtime>(
                     store_kernel_upgrade(host, &kernel_upgrade)?
                 }
                 Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
-                Input::Simulation => {
-                    // kernel enters in simulation mode, reading will be done by the
-                    // simulation and all the previous and next transactions are
-                    // discarded.
-                    simulation::start_simulation_mode(host)?;
-                    return Ok(None);
-                }
                 Input::Info(info) => {
                     store_last_info_per_level_timestamp(
                         host,
