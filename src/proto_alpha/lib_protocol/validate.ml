@@ -724,7 +724,7 @@ module Consensus = struct
       Option.fold
         ~none:return_unit
         ~some:(fun dal ->
-          Dal_apply.validate_attestation
+          Dal_apply.validate_block_attestation
             vi.ctxt
             level
             consensus_key
@@ -753,6 +753,13 @@ module Consensus = struct
             consensus_content
             dal_content
       | Mempool ->
+          let* () =
+            Option.fold
+              ~none:return_unit
+              ~some:(fun dal ->
+                Dal_apply.validate_mempool_attestation vi.ctxt dal.attestation)
+              dal_content
+          in
           check_mempool_consensus
             vi
             consensus_info
