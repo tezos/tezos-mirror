@@ -147,6 +147,11 @@ val get_denunciations :
   t ->
   (Signature.Public_key_hash.t * Denunciations_repr.item) list tzresult Lwt.t
 
+val get_denunciations_for_delegate :
+  t ->
+  Signature.Public_key_hash.t ->
+  Denunciations_repr.item list tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
