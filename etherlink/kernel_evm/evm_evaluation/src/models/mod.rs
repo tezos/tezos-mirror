@@ -167,6 +167,7 @@ pub struct UnitEnv {
     pub current_number: U256,
     pub current_timestamp: U256,
     pub current_base_fee: Option<U256>,
+    pub current_random: Option<H256>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -193,6 +194,7 @@ pub struct BlockEnv {
     pub timestamp: U256,
     pub basefee: U256, // EIP1559
     pub gas_limit: U256,
+    pub prevrandao: Option<H256>,
 }
 
 impl Default for BlockEnv {
@@ -203,6 +205,7 @@ impl Default for BlockEnv {
             coinbase: H160::zero(),
             timestamp: U256::from(1),
             basefee: U256::zero(),
+            prevrandao: None,
         }
     }
 }

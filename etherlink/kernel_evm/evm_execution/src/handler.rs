@@ -1700,7 +1700,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn block_randomness(&self) -> Option<H256> {
-        None // STUB
+        self.block.prevrandao // Always None
     }
 
     fn chain_id(&self) -> U256 {
