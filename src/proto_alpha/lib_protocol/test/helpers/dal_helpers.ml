@@ -270,4 +270,12 @@ struct
         (Hist.Dal_proof_error
            "The page ID's slot is not confirmed, but page content and proof \
             are provided.")
+
+  let bad_history_cache ~__LOC__ =
+    failing_check_produce_result
+      ~__LOC__
+      ~expected_error:
+        (Hist.Dal_proof_error
+           "Skip_list.search returned Nearest', while all given levels to \
+            produce proofs are supposed to be in the skip list.")
 end

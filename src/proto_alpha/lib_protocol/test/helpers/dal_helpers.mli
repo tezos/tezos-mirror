@@ -180,4 +180,9 @@ end) : sig
     'a tzresult ->
     'b ->
     unit tzresult Lwt.t
+
+  (** Helper for the case where produce_proof is expected to fail because some
+      cells are missing in the history cache. *)
+  val bad_history_cache :
+    __LOC__:string -> 'a tzresult -> 'b -> unit tzresult Lwt.t
 end
