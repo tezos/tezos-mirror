@@ -678,31 +678,6 @@ module Test = struct
             Sys.remove !filename ;
             false)
 
-  let test_dal_initialisation_twice_failure =
-    let open QCheck2 in
-    Test.make
-      ~name:"DAL initialisation twice failure"
-      ~print:print_parameters
-      ~count:1
-      generate_parameters
-      (fun params ->
-        init () ;
-        assert (ensure_validity params) ;
-        let config : Cryptobox.Config.t =
-          {
-            activated = true;
-            use_mock_srs_for_testing = Some (get_cryptobox_parameters params);
-            bootstrap_peers = [];
-          }
-        in
-        let find_srs_files () : (string * string) Error_monad.tzresult =
-          Ok ("", "")
-        in
-        Lwt_main.run (Cryptobox.Config.init_dal ~find_srs_files config)
-        |> function
-        | Error [Cryptobox.Dal_initialisation_twice] -> true
-        | _ -> false)
-
   let find_trusted_setup_files () =
     let config : Cryptobox.Config.t =
       {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
@@ -712,7 +687,7 @@ module Test = struct
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
     in
     Lwt_main.run
-      (Cryptobox.Config.init_dal ~find_srs_files ~srs_size_log2:5 config)
+      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:5 config)
     |> function
     | Ok () -> ()
     | Error _ -> assert false
@@ -726,7 +701,7 @@ module Test = struct
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
     in
     Lwt_main.run
-      (Cryptobox.Config.init_dal ~find_srs_files ~srs_size_log2:6 config)
+      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:6 config)
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
         if Re.Str.(string_match (regexp "EOF") s 0) then () else assert false
@@ -1103,7 +1078,6 @@ let () =
               test_select_fft_domain;
               test_shard_proofs_load_from_file;
               test_shard_proofs_load_from_file_invalid_hash;
-              test_dal_initialisation_twice_failure;
               test_wrong_slot_size;
               test_page_length_mismatch;
               test_shard_length_mismatch;

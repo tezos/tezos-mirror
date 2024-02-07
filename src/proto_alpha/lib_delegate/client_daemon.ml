@@ -133,11 +133,8 @@ module Baker = struct
             Lwt.return_unit)
       in
       let* () =
-        let find_srs_files () =
-          Tezos_base.Dal_srs.find_trusted_setup_files ()
-        in
         let* dal_config = Node_rpc.fetch_dal_config cctxt in
-        Cryptobox.Config.init_dal ~find_srs_files dal_config
+        Cryptobox.Config.init_verifier_dal dal_config
       in
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;

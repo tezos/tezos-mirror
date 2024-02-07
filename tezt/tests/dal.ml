@@ -4281,7 +4281,7 @@ let dal_crypto_benchmark () =
       }
     in
     let* result =
-      Config.init_dal
+      Config.init_prover_dal
         ~find_srs_files:(fun () -> Error [])
         Config.
           {

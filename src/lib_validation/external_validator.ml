@@ -201,10 +201,7 @@ let init ~readonly input output =
         } =
     External_validation.recv input External_validation.parameters_encoding
   in
-  let* () =
-    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Tezos_crypto_dal.Cryptobox.Config.init_dal ~find_srs_files dal_config
-  in
+  let* () = Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal dal_config in
   let sandbox_parameters =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in

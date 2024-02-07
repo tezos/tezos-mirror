@@ -71,6 +71,7 @@ val set_ready :
   t ->
   (module Tezos_dal_node_lib.Dal_plugin.T) ->
   Cryptobox.t ->
+  Cryptobox.shards_proofs_precomputation ->
   Dal_plugin.proto_parameters ->
   int ->
   unit tzresult

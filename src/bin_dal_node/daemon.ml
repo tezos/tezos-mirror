@@ -66,12 +66,20 @@ let fetch_dal_config cctxt =
 
 let init_cryptobox dal_config (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/6906
+
+     We should load the verifier SRS by default.
+  *)
   let* () =
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Cryptobox.Config.init_dal ~find_srs_files dal_config
+    Cryptobox.Config.init_prover_dal ~find_srs_files dal_config
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
-  | Ok cryptobox -> return cryptobox
+  | Ok cryptobox ->
+      let shards_proofs_precomputation =
+        Cryptobox.precompute_shards_proofs cryptobox
+      in
+      return (cryptobox, shards_proofs_precomputation)
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
 module Handler = struct
@@ -226,7 +234,13 @@ module Handler = struct
       | Some plugin ->
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
-          let* cryptobox = init_cryptobox dal_config proto_parameters in
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
+
+             Instead of recompute those parameters, they could be stored
+             (for a given cryptobox). *)
+          let* cryptobox, shards_proofs_precomputation =
+            init_cryptobox dal_config proto_parameters
+          in
           Store.Value_size_hooks.set_share_size
             (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
           let* () =
@@ -265,6 +279,7 @@ module Handler = struct
               ctxt
               plugin
               cryptobox
+              shards_proofs_precomputation
               proto_parameters
               block_header.Block_header.shell.proto_level
           in

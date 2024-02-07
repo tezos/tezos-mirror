@@ -207,11 +207,7 @@ module Term = struct
             | Ok json -> return_some ("sandbox_parameter", json))
       in
       let* () =
-        let find_srs_files () =
-          Tezos_base.Dal_srs.find_trusted_setup_files ()
-        in
-        Tezos_crypto_dal.Cryptobox.Config.init_dal
-          ~find_srs_files
+        Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal
           node_config.blockchain_network.dal_config
       in
       let context_root = Data_version.context_dir data_dir in
