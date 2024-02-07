@@ -48,8 +48,6 @@ module Internal_for_tests = struct
   let fake_srs ?(size = max_srs_size) () =
     Srs_g1.generate_insecure size fake_srs_seed
 
-  let get_srs1 i = G1.mul G1.one (Scalar.pow fake_srs_seed (Z.of_int i))
-
   let get_srs2 i = G2.mul G2.one (Scalar.pow fake_srs_seed (Z.of_int i))
 
   let get_verifier_srs2 = get_verifier_srs2 max_srs_size get_srs2
@@ -61,8 +59,6 @@ end
 
 let max_srs_size = max_srs_g1_size
 
-let get_srs1 = Srs_g1.get srs_g1
-
 let get_srs2 i = List.assoc i srs_g2
 
 let get_verifier_srs1 () = srs_g1
@@ -70,22 +66,6 @@ let get_verifier_srs1 () = srs_g1
 let get_verifier_srs2 = get_verifier_srs2 max_srs_size get_srs2
 
 let is_in_srs2 i = List.mem_assoc i srs_g2
-
-module type S = sig
-  val max_srs_size : int
-
-  val is_in_srs2 : int -> bool
-
-  val get_verifier_srs1 : unit -> Srs_g1.t
-
-  val get_verifier_srs2 :
-    max_polynomial_length:int ->
-    page_length_domain:int ->
-    shard_length:int ->
-    srs_verifier
-
-  val get_srs1 : int -> G1.t
-end
 
 let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
     ~number_of_shards ~srs_g1_length =
@@ -179,7 +159,7 @@ module Print = struct
     shards : int list;
   }
 
-  let mainnet_params =
+  let _mainnet_params =
     {
       redundancy = [1; 2; 3; 4];
       slot = [15; 16; 17; 18; 19; 20];
@@ -187,7 +167,7 @@ module Print = struct
       shards = [11; 12];
     }
 
-  let additionnal_params =
+  let _additionnal_params =
     {redundancy = [1; 2; 3; 4]; slot = [15]; page = [12]; shards = [6]}
 
   let concat_map4 {slot; redundancy; page; shards} func =
@@ -249,7 +229,7 @@ module Print = struct
     let max_srs1_needed = List.hd page_shards in
     (max_srs1_needed, List.sort_uniq Int.compare (page_shards @ commitment_srs))
 
-  let generate_all_poly_lengths ~max_srs_size =
+  let _generate_all_poly_lengths ~max_srs_size =
     List.fold_left
       (fun (acc_size, acc_lengths) p ->
         let size, lengths = generate_poly_lengths ~max_srs_size p in
@@ -258,11 +238,11 @@ module Print = struct
 
   (* run with
      let _ = Lwt_main.run
-       @@ Srs_verifier.Print.(print_verifier_srs_from_file ~zcash_g1_path
+       @@ Srs.Print.(print_verifier_srs_from_file ~zcash_g1_path
             ~zcash_g2_path mainnet_params) in
   *)
-  let print_verifier_srs_from_file ?(max_srs_size = max_srs_size) ~zcash_g1_path
-      ~zcash_g2_path params =
+  let _print_verifier_srs_from_file ?(max_srs_size = max_srs_size)
+      ~zcash_g1_path ~zcash_g2_path params =
     let open Lwt_result_syntax in
     let srs_g1_size, lengths = generate_poly_lengths ~max_srs_size params in
     let* srs_g1 = read_srs_g1 ~len:srs_g1_size ~path:zcash_g1_path () in
@@ -284,16 +264,11 @@ module Print = struct
             (Srs_g1.get srs_g1 i |> G1.to_compressed_bytes |> Hex.of_bytes
            |> Hex.show))
     in
-    let oc = open_out "/home/anne-laure/Documents/tezos/out_bis" in
-    Printf.fprintf
-      oc
+    Printf.printf
       "\n\nlet srs_g1 = [|\n  %s\n|] |> read_srs_g1"
       (String.concat " ;\n  " @@ srs1) ;
-    Printf.fprintf
-      oc
+    Printf.printf
       "\n\nlet srs_g2 = [\n  %s\n] |> read_srs_g2"
       (String.concat " ;\n  " @@ srs2) ;
-    close_out oc ;
-    assert (1 = 2) ;
     return_unit
 end
