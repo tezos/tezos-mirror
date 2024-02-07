@@ -171,96 +171,90 @@ module Print = struct
      7 <= page size + (redundancy + 1) <= slot size <= 20
      5 <= page size <= slot size - (redundancy + 1) <= 18 - 5 = 13
      2 <= redundancy + 1 <= nb shards <= slot size - page size <= 15
-     we call range the number of logs to go through
-     we call offset the index to start (included)
   *)
   type range = {
-    redundancy_range : int;
-    redundancy_offset : int;
-    slot_range : int;
-    slot_offset : int;
-    page_range : int;
-    page_offset : int;
-    shard_range : int;
-    shard_offset : int;
+    redundancy : int list;
+    slot : int list;
+    page : int list;
+    shards : int list;
   }
-
-  let small_params_for_tests =
-    {
-      redundancy_range = 4;
-      redundancy_offset = 1;
-      slot_range = 7;
-      slot_offset = 8;
-      page_range = 4;
-      page_offset = 5;
-      shard_range = 15;
-      shard_offset = 1;
-    }
 
   let mainnet_params =
     {
-      redundancy_range = 4;
-      redundancy_offset = 1;
-      slot_range = 6;
-      slot_offset = 15;
-      page_range = 1;
-      page_offset = 12;
-      shard_range = 2;
-      shard_offset = 11;
+      redundancy = [1; 2; 3; 4];
+      slot = [15; 16; 17; 18; 19; 20];
+      page = [12];
+      shards = [11; 12];
     }
+
+  let additionnal_params =
+    {redundancy = [1; 2; 3; 4]; slot = [15]; page = [12]; shards = [6]}
+
+  let concat_map4 {slot; redundancy; page; shards} func =
+    (* Ensure validity before computing actual value *)
+    let f ~slot ~redundancy ~page ~shards =
+      Parameters_check.ensure_validity_without_srs
+        ~slot_size:(1 lsl slot)
+        ~page_size:(1 lsl page)
+        ~redundancy_factor:(1 lsl redundancy)
+        ~number_of_shards:(1 lsl shards)
+      |> function
+      | Ok () -> func ~slot ~redundancy ~page ~shards
+      | _ -> 0
+    in
+    List.concat_map
+      (fun slot ->
+        List.concat_map
+          (fun redundancy ->
+            List.concat_map
+              (fun page ->
+                List.map
+                  (fun shards -> f ~slot ~redundancy ~page ~shards)
+                  shards)
+              page)
+          redundancy)
+      slot
 
   let generate_poly_lengths ~max_srs_size p =
     let page_srs =
       let values =
-        List.init p.page_range (fun i ->
-            Parameters_check.domain_length ~size:(1 lsl (i + p.page_offset)))
+        List.map
+          (fun page -> Parameters_check.domain_length ~size:(1 lsl page))
+          p.page
       in
       values
     in
     let commitment_srs =
-      List.init p.slot_range (fun slot_size ->
-          let slot_size = slot_size + p.slot_offset in
-          List.init p.redundancy_range (fun redundancy ->
-              let redundancy = redundancy + p.redundancy_offset in
-              List.init p.page_range (fun page_size ->
-                  let page_size = page_size + p.page_offset in
-                  let res =
-                    max_srs_size
-                    - Parameters_check.slot_as_polynomial_length
-                        ~page_size:(1 lsl page_size)
-                        ~slot_size:(1 lsl slot_size)
-                  in
-                  Printf.printf
-                    "\nslot : %d    page : %d    R : %d    res : %d"
-                    slot_size
-                    page_size
-                    redundancy
-                    res ;
-                  res)))
-      |> List.concat |> List.concat
+      concat_map4 p (fun ~slot ~redundancy:_ ~page ~shards:_ ->
+          max_srs_size
+          - Parameters_check.slot_as_polynomial_length
+              ~page_size:(1 lsl page)
+              ~slot_size:(1 lsl slot))
     in
     let shard_srs =
-      List.init p.slot_range (fun slot_size ->
-          let slot_size = slot_size + p.slot_offset in
-          List.init p.redundancy_range (fun redundancy ->
-              let redundancy = redundancy + p.redundancy_offset in
-              List.init p.page_range (fun page_size ->
-                  let page_size = page_size + p.page_offset in
-                  let shard_offset = p.shard_offset in
-                  List.init p.shard_range (fun nb_shards ->
-                      let nb_shards = nb_shards + shard_offset in
-                      redundancy
-                      * Parameters_check.slot_as_polynomial_length
-                          ~page_size:(1 lsl page_size)
-                          ~slot_size:(1 lsl slot_size)
-                      / (1 lsl nb_shards)))))
-      |> List.concat |> List.concat |> List.concat
+      concat_map4 p (fun ~slot ~redundancy ~page ~shards ->
+          let max_polynomial_length =
+            Parameters_check.slot_as_polynomial_length
+              ~page_size:(1 lsl page)
+              ~slot_size:(1 lsl slot)
+          in
+          let erasure_encoded_polynomial_length =
+            (1 lsl redundancy) * max_polynomial_length
+          in
+          erasure_encoded_polynomial_length / (1 lsl shards))
     in
     let page_shards =
       List.sort_uniq (fun x y -> Int.compare y x) (page_srs @ shard_srs)
     in
     let max_srs1_needed = List.hd page_shards in
     (max_srs1_needed, List.sort_uniq Int.compare (page_shards @ commitment_srs))
+
+  let generate_all_poly_lengths ~max_srs_size =
+    List.fold_left
+      (fun (acc_size, acc_lengths) p ->
+        let size, lengths = generate_poly_lengths ~max_srs_size p in
+        (max acc_size size, List.sort_uniq Int.compare (acc_lengths @ lengths)))
+      (0, [])
 
   (* run with
      let _ = Lwt_main.run
