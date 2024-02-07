@@ -69,7 +69,7 @@ let test_kill =
     ~title:"RPC process kill"
     ~tags:["rpc"; "process"; "kill"]
   @@ fun protocol ->
-  let node = Node.create [] in
+  let node = Node.create ~rpc_external:true [] in
   let wait_RPC_process_pid = wait_for_RPC_process_pid node in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
@@ -102,6 +102,7 @@ let test_forward =
      or forwarded to the node." ;
   let* node, client =
     Client.init_with_protocol
+      ~rpc_external:true
       ~event_sections_levels:[("rpc-process", `Debug)]
       ~protocol
       `Client
@@ -229,7 +230,7 @@ let test_local_rpc_server =
     ~title:"RPC local server"
     ~tags:["rpc"; "process"; "local_server"]
   @@ fun () ->
-  let node = Node.create ~rpc_local:true [] in
+  let node = Node.create [] in
   (* Register event watchers for local RPC server before the node is running to
      ensure they will not be missed. *)
   let local_event_promise =
@@ -261,10 +262,10 @@ let test_process_rpc_server =
   Test.register
     ~__FILE__
     ~title:"RPC process server"
-    ~tags:["rpc"; "process"; "local_server"]
+    ~tags:["rpc"; "process"; "external_server"]
   @@ fun () ->
   (* By default Node module start a process RPC server. *)
-  let node = Node.create [] in
+  let node = Node.create ~rpc_external:true [] in
   (* Register event watchers for process RPC server before the node is running
      to ensure they will not be missed. *)
   let process_event_promise =
@@ -296,47 +297,40 @@ let test_local_and_process_rpc_servers =
   Test.register
     ~__FILE__
     ~title:"RPC local servers and process servers"
-    ~tags:["rpc"; "process"; "local_server"]
+    ~tags:["rpc"; "process"; "local_server"; "external_server"]
   @@ fun () ->
-  (* Generate some ports for additional process RPC servers *)
-  let process_rpc_ports = List.init 2 (fun _ -> Port.fresh ()) in
   (* Generate some ports for additional local RPC servers *)
   let local_rpc_ports = List.init 2 (fun _ -> Port.fresh ()) in
+  (* Generate some ports for additional external RPC servers *)
+  let external_rpc_ports = List.init 2 (fun _ -> Port.fresh ()) in
   let node =
     Node.create
       (List.map
          (fun port -> Node.RPC_additional_addr (point_of_port port))
-         process_rpc_ports
+         local_rpc_ports
       @ List.map
-          (fun port -> Node.RPC_additional_addr_local (point_of_port port))
-          local_rpc_ports)
+          (fun port -> Node.RPC_additional_addr_external (point_of_port port))
+          external_rpc_ports)
   in
-  (* Add the RPC server created by default in Node module. *)
-  let process_rpc_ports = Node.rpc_port node :: process_rpc_ports in
-  (* Register event watchers for both process and local RPC servers before the
-     node is running to ensure they will not be missed. *)
-  let process_event_promises =
-    List.map
-      (wait_for_starting_rpc_server_event ~local:false node)
-      process_rpc_ports
-  in
+  (* Add the local RPC server created by default in Node module. *)
+  let local_rpc_ports = Node.rpc_port node :: local_rpc_ports in
+  (* Register event watchers for both external and local RPC servers
+     before the node is running to ensure they will not be missed. *)
   let local_event_promises =
     List.map
       (wait_for_starting_rpc_server_event ~local:true node)
       local_rpc_ports
+  in
+  let external_event_promises =
+    List.map
+      (wait_for_starting_rpc_server_event ~local:false node)
+      external_rpc_ports
   in
   (* Run the node *)
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
   Log.info "Node ready." ;
   let* client = Client.init () in
-  Log.info "Checking if process hosts are available." ;
-  let* _ =
-    Lwt_list.map_p
-      (fun port ->
-        Client.RPC.call ~endpoint:(make_endpoint port) client @@ RPC.get_version)
-      process_rpc_ports
-  in
   Log.info "Checking if local hosts are available." ;
   let* _ =
     Lwt_list.map_p
@@ -344,10 +338,17 @@ let test_local_and_process_rpc_servers =
         Client.RPC.call ~endpoint:(make_endpoint port) client @@ RPC.get_version)
       local_rpc_ports
   in
-  Log.info "Checking if process RPC servers have been well started" ;
-  let* () = Lwt_list.iter_p (fun p -> p) process_event_promises in
+  Log.info "Checking if external hosts are available." ;
+  let* _ =
+    Lwt_list.map_p
+      (fun port ->
+        Client.RPC.call ~endpoint:(make_endpoint port) client @@ RPC.get_version)
+      external_rpc_ports
+  in
   Log.info "Checking if local RPC servers have been well started" ;
-  Lwt_list.iter_p (fun p -> p) local_event_promises
+  let* () = Lwt_list.iter_p (fun p -> p) local_event_promises in
+  Log.info "Checking if external RPC servers have been well started" ;
+  Lwt_list.iter_p (fun p -> p) external_event_promises
 
 let register ~protocols =
   test_kill protocols ;

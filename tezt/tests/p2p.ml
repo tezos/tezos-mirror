@@ -353,14 +353,14 @@ module Maintenance = struct
        A better way to reduce memory consumption would be to use nodes that
        only have the p2p layer. *)
     let* target_node =
-      Node.init ~rpc_local:true [Connections expected_connections]
+      Node.init ~rpc_external:false [Connections expected_connections]
     in
     let* target_client = Client.init ~endpoint:(Node target_node) () in
     Log.info "Target created." ;
     let nodes =
       Cluster.create
         max_connections
-        ~rpc_local:true
+        ~rpc_external:false
         [Connections (max_connections - 1)]
     in
     Cluster.clique nodes ;

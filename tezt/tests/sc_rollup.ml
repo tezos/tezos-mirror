@@ -142,7 +142,7 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
-    ?(src = Constant.bootstrap1.alias) ?rpc_local ?uses
+    ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses
     {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
@@ -159,7 +159,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
       ?challenge_window
       ?timeout
       ?whitelist_enable
-      ?rpc_local
+      ?rpc_external
       protocol
   in
   let* sc_rollup =
@@ -170,7 +170,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) ?rpc_local ?allow_degraded
+    ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
     {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
@@ -184,7 +184,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   let riscv_pvm_enable = kind = "riscv" in
   let* tezos_node, tezos_client =
     setup_l1
-      ?rpc_local
+      ?rpc_external
       ?commitment_period
       ?challenge_window
       ?timeout
@@ -5347,11 +5347,11 @@ let test_multiple_batcher_key ~kind =
 
      also might be related to https://gitlab.com/tezos/tezos/-/issues/3014
 
-     Test is flaky without rpc_local:true and it seems to be related to this issue. When
-     investigating it seems that the sink used by the octez node has a
-     race condition between process, it seems it due to the rpc server
-     being run in a separate process. *)
-    ~rpc_local:true
+     Test is flaky without rpc_external:false and it seems to be
+     related to this issue. When investigating it seems that the sink
+     used by the octez node has a race condition between process, it
+     seems it due to the rpc server being run in a separate process. *)
+    ~rpc_external:false
     ~kind
     {
       variant = None;
@@ -5484,7 +5484,7 @@ let test_injector_uses_available_keys ~kind =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
 
      cf multiple_batcher_test comment. *)
-    ~rpc_local:true
+    ~rpc_external:false
     ~kind
     ~operators
     ~mode:Batcher
