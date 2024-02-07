@@ -303,7 +303,8 @@ let () =
     ~id:"dal_cryptobox_error"
     ~title:"DAL cryptobox error"
     ~description:"Error occurred while initialising the cryptobox"
-    ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
+    ~pp:(fun ppf e ->
+      Format.fprintf ppf "DAL cryptobox initialisation error: %s" e)
     (obj1 (req "error" (string Plain)))
     (function
       | Dal_cryptobox_error {explanation} -> Some explanation | _ -> None)
