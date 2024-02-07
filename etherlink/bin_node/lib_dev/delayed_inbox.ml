@@ -51,54 +51,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-module Handlers = struct
-  type self = worker
-
-  let on_request :
-      type r request_error.
-      worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
-      =
-   fun _w request ->
-    match request with
-    | Request.Unit -> protect @@ fun () -> Lwt_result_syntax.return_unit
-
-  type launch_error = error trace
-
-  let on_launch _w ()
-      ({rollup_node_endpoint; delayed_inbox_interval} : Types.parameters) =
-    let state =
-      Types.
-        {
-          rollup_node_endpoint;
-          delayed_inbox_interval;
-          pending_transactions = StringSet.empty;
-        }
-    in
-    Lwt_result_syntax.return state
-
-  let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
-
-  let on_completion _ _ _ _ = Lwt.return_unit
-
-  let on_no_request _ = Lwt.return_unit
-
-  let on_close _ = Delayed_inbox_events.stopped ()
-end
-
-let table = Worker.create_table Queue
-
-let worker_promise, worker_waker = Lwt.task ()
-
-type error += No_delayed_inbox
-
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_delayed_inbox))
-
 let subkeys_from_rollup_node path level rollup_node_endpoint =
   let open Rollup_node_services in
   call_service
@@ -163,6 +115,54 @@ let include_delayed_transaction delayed_transaction =
   let* () = Delayed_inbox_events.add_transaction ~delayed_transaction in
   let* _sent = Tx_pool.add_delayed delayed_transaction in
   return_unit
+
+module Handlers = struct
+  type self = worker
+
+  let on_request :
+      type r request_error.
+      worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
+      =
+   fun _w request ->
+    match request with
+    | Request.Unit -> protect @@ fun () -> Lwt_result_syntax.return_unit
+
+  type launch_error = error trace
+
+  let on_launch _w ()
+      ({rollup_node_endpoint; delayed_inbox_interval} : Types.parameters) =
+    let state =
+      Types.
+        {
+          rollup_node_endpoint;
+          delayed_inbox_interval;
+          pending_transactions = StringSet.empty;
+        }
+    in
+    Lwt_result_syntax.return state
+
+  let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
+      unit tzresult Lwt.t =
+    Lwt_result_syntax.return_unit
+
+  let on_completion _ _ _ _ = Lwt.return_unit
+
+  let on_no_request _ = Lwt.return_unit
+
+  let on_close _ = Delayed_inbox_events.stopped ()
+end
+
+let table = Worker.create_table Queue
+
+let worker_promise, worker_waker = Lwt.task ()
+
+type error += No_delayed_inbox
+
+let worker =
+  lazy
+    (match Lwt.state worker_promise with
+    | Lwt.Return worker -> Ok worker
+    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_delayed_inbox))
 
 let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
   let open Lwt_syntax in
