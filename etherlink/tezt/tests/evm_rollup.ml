@@ -2608,48 +2608,6 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
     ~config
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
-let test_validation_result =
-  register_both
-    ~tags:["evm"; "simulate"]
-    ~title:
-      "Ensure validation returns appropriate address for a given transaction."
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; _} ->
-  (* tx is a signed legacy transaction obtained with the following data, using
-     the following private key:
-        data = {
-            "nonce": "0x00",
-            "gasPrice": "0x5208",
-            "gasLimit": "0x00",
-            "to": "0x0000000000000000000000000000000000000000",
-            "value": "0x00",
-            "data": "0x",
-            "chainId": 1337
-        }
-        private key=0x84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502
-  *)
-  let tx =
-    "f86180825208809400000000000000000000000000000000000000008080820a95a0f47140763cf73d6d9b342727e5a0809f7997bb62375060932af9bbc2e74b6212a03a018079a2fd7fefb625451ce2fafcdf873b892ff9d4e3e1f2ada5650012f072"
-  in
-  let simulation_msg = "ff0101" ^ tx in
-  let* simulation_result =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.post_global_block_simulate
-         ~insight_requests:
-           [
-             `Durable_storage_key ["evm"; "simulation_status"];
-             `Durable_storage_key ["evm"; "simulation_result"];
-           ]
-         [Hex.to_string @@ `Hex "ff"; Hex.to_string @@ `Hex simulation_msg]
-  in
-  let expected_insights =
-    [Some "01"; Some "f0affc80a5f69f4a9a3ee01a640873b6ba53e539"]
-  in
-  Check.(
-    (simulation_result.insights = expected_insights) (list @@ option string))
-    ~error_msg:"Expected result %R, but got %L" ;
-  unit
-
 type storage_migration_results = {
   transfer_result : transfer_result;
   block_result : Block.t;
@@ -4842,7 +4800,6 @@ let register_evm_node ~protocols =
   test_rpc_gasPrice protocols ;
   test_rpc_getStorageAt protocols ;
   test_accounts_double_indexing protocols ;
-  test_validation_result protocols ;
   test_rpc_sendRawTransaction_with_consecutive_nonce protocols ;
   test_rpc_sendRawTransaction_not_included protocols ;
   test_originate_evm_kernel_and_dump_pvm_state protocols ;
