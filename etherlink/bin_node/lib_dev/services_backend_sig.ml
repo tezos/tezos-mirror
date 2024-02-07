@@ -83,19 +83,21 @@ module type S = sig
   (** [simulate_call call_info] asks the rollup to simulate a call,
       and returns the result. *)
   val simulate_call :
-    Ethereum_types.call -> (Ethereum_types.hash, string) result tzresult Lwt.t
+    Ethereum_types.call ->
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [estimate_gas call_info] asks the rollup to simulate a call, and
       returns the gas used to execute the call. *)
   val estimate_gas :
     Ethereum_types.call ->
-    (Ethereum_types.quantity, string) result tzresult Lwt.t
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks
       if the nonce is correct and returns the associated public key of
       transaction. *)
   val is_tx_valid :
-    string -> (Ethereum_types.address, string) result tzresult Lwt.t
+    string ->
+    Simulation.validation_result Simulation.simulation_result tzresult Lwt.t
 
   (** [storage_at address pos] returns the value at index [pos] of the
       account [address]'s storage. *)

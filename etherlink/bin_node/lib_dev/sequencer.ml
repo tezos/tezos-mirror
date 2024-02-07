@@ -73,9 +73,9 @@ end) : Services_backend_sig.Backend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
       let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
-      match Simulation.Encodings.insights_from_list raw_insights with
-      | Some i -> return i
-      | None -> Error_monad.failwith "Invalid insights format"
+      match raw_insights with
+      | [Some bytes] -> return bytes
+      | _ -> Error_monad.failwith "Invalid insights format"
   end
 
   let inject_kernel_upgrade ~payload =

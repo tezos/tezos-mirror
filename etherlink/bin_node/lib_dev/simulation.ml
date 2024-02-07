@@ -130,19 +130,13 @@ type 'a simulation_result = ('a, string) result
 module Encodings = struct
   open Data_encoding
 
-  type insights = {
-    success : bool option;
-    result : bytes option;
-    gas : bytes option;
-  }
-
   type eval_result = {
     state_hash : string;
     status : string;
     output : unit;
     inbox_level : unit;
     num_ticks : Z.t;
-    insights : insights;
+    insights : bytes list;
         (** The simulation can ask to look at values on the state after
           the simulation. *)
   }
@@ -206,40 +200,6 @@ module Encodings = struct
               "File in which to emit kernel logs. This file will be created in \
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
-
-  let bool_as_bytes =
-    let bytes_to_bool b =
-      b |> Data_encoding.Binary.of_bytes Data_encoding.bool |> Result.to_option
-    in
-
-    let bool_to_bytes b =
-      b |> Data_encoding.Binary.to_bytes Data_encoding.bool |> Result.to_option
-    in
-    conv
-      (fun b -> Option.bind b bool_to_bytes)
-      (fun b -> Option.bind b bytes_to_bool)
-      (option bytes)
-
-  let insights =
-    conv
-      (fun {success; result; gas} -> (gas, result, success))
-      (fun (gas, result, success) -> {gas; result; success})
-      (tup3 (option bytes) (option bytes) bool_as_bytes)
-
-  let insights_from_list l =
-    match l with
-    | [gas; result; success] ->
-        Some
-          {
-            success =
-              Option.bind success (fun s ->
-                  s
-                  |> Data_encoding.Binary.of_bytes Data_encoding.bool
-                  |> Result.to_option);
-            result;
-            gas;
-          }
-    | _ -> None
 
   let decode_data =
     let open Result_syntax in
@@ -328,26 +288,20 @@ module Encodings = struct
             ~description:"Ticks taken by the PVM for evaluating the messages")
          (req
             "insights"
-            insights
+            (list bytes)
             ~description:"PVM state values requested after the simulation")
 end
 
-let call_result Encodings.{success; result; gas = _} =
-  let open Lwt_result_syntax in
-  match (success, result) with
-  | Some true, Some result ->
-      let v = result |> Hex.of_bytes |> Hex.show in
-      return (Ok (Hash (Hex v)))
-  | Some false, Some result ->
-      let error_msg = Bytes.to_string result in
-      return (Result.Error error_msg)
-  | _ -> failwith "Insights of 'call_result' cannot be parsed"
+let simulation_result bytes =
+  Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
-let gas_estimation Encodings.{success; result; gas} =
-  let open Lwt_result_syntax in
-  match (success, result, gas) with
-  | Some true, _, Some simulated_amount ->
-      let simulated_amount = Bytes.to_string simulated_amount |> Z.of_bits in
+let gas_estimation bytes =
+  let open Result_syntax in
+  let* result =
+    Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
+  in
+  match result with
+  | Ok (Ok {gas_used = Some (Qty gas_used); value}) ->
       (* See EIP2200 for reference. But the tl;dr is: we cannot do the
          opcode SSTORE if we have less than 2300 gas available, even
          if we don't consume it. The simulated amount then gives an
@@ -355,25 +309,14 @@ let gas_estimation Encodings.{success; result; gas} =
 
          The extra gas units, i.e. 2300, will be refunded.
       *)
-      let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
+      let simulated_amount = Z.(add gas_used (of_int 2300)) in
       (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
       let simulated_amount =
         Z.(add simulated_amount (cdiv simulated_amount (of_int 50)))
       in
-      return (Ok (quantity_of_z simulated_amount))
-  | Some false, Some result, _ ->
-      let error_msg = Bytes.to_string result in
-      return (Result.Error error_msg)
-  | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
+      return
+      @@ Ok (Ok {gas_used = Some (quantity_of_z @@ simulated_amount); value})
+  | _ -> return result
 
-let is_tx_valid Encodings.{success; result; gas = _} =
-  let open Lwt_result_syntax in
-  match (result, success) with
-  | Some payload, Some success ->
-      if success then
-        let address = Ethereum_types.decode_address payload in
-        return (Ok address)
-      else
-        let error_msg = Bytes.to_string payload in
-        return (Result.Error error_msg)
-  | _ -> failwith "Insights of 'is_tx_valid' is not [Some _, Some _]"
+let is_tx_valid bytes =
+  Encodings.simulation_result_from_rlp Encodings.decode_validation_result bytes
