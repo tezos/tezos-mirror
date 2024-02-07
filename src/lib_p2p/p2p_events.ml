@@ -191,7 +191,7 @@ module P2p_connect_handler = struct
       ~section
       ~name:"authenticate_status_peer_id_correct"
       ~msg:"expected peer id {peer} for this point {point}"
-      ~level:Notice
+      ~level:Info
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
