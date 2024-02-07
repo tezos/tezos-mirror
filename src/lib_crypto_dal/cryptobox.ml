@@ -54,12 +54,6 @@ type initialisation_parameters =
 (* Initialisation parameters are supposed to be instantiated once. *)
 let initialisation_parameters = ref @@ Verifier {test = false}
 
-let scalar_bytes_amount = Srs_verifier.scalar_bytes_amount
-
-let page_length = Srs_verifier.page_length
-
-let slot_as_polynomial_length = Srs_verifier.slot_as_polynomial_length
-
 (* This function is expected to be called once. *)
 let load_parameters parameters =
   let open Result_syntax in
@@ -284,6 +278,13 @@ module Inner = struct
              %d"
             number_of_shards)
     in
+    let max_polynomial_length, erasure_encoded_polynomial_length, shard_length =
+      Parameters_check.compute_lengths
+        ~redundancy_factor
+        ~slot_size
+        ~page_size
+        ~number_of_shards
+    in
     let* () =
       assert_result
         (is_power_of_two slot_size)
@@ -313,12 +314,6 @@ module Inner = struct
             "Redundancy factor is expected to be a power of 2 and greater than \
              2. Given: %d"
             redundancy_factor)
-    in
-    let max_polynomial_length =
-      slot_as_polynomial_length ~slot_size ~page_size
-    in
-    let erasure_encoded_polynomial_length =
-      redundancy_factor * max_polynomial_length
     in
     (* At this point [erasure_encoded_polynomial_length] is a power of 2, and [erasure_encoded_polynomial_length > max_polynomial_length]. *)
     let* () =
@@ -372,7 +367,6 @@ module Inner = struct
             (erasure_encoded_polynomial_length / 2)
             number_of_shards)
     in
-    let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let* () =
       assert_result
         (shard_length < max_polynomial_length)
@@ -432,14 +426,13 @@ module Inner = struct
         ~redundancy_factor
         ~number_of_shards
     in
-    let max_polynomial_length =
-      slot_as_polynomial_length ~slot_size ~page_size
-    in
-    let shard_length =
-      let erasure_encoded_polynomial_length =
-        redundancy_factor * max_polynomial_length
-      in
-      erasure_encoded_polynomial_length / number_of_shards
+    let max_polynomial_length, _erasure_encoded_polynomial_length, shard_length
+        =
+      Parameters_check.compute_lengths
+        ~redundancy_factor
+        ~slot_size
+        ~page_size
+        ~number_of_shards
     in
     let min_g1 =
       match mode with
@@ -458,7 +451,7 @@ module Inner = struct
             min_g1
             srs_g1_length)
     in
-    let page_length_domain = Srs_verifier.domain_length ~size:page_size in
+    let page_length_domain = Parameters_check.domain_length ~size:page_size in
     let module Srs_verifier = (val srs_verifier : Srs_verifier.S) in
     let offset_monomial_degree =
       Srs_verifier.max_srs_size - max_polynomial_length
@@ -532,14 +525,15 @@ module Inner = struct
       (* The cryptobox is deterministically computed from the DAL parameters and
          this computation takes time (on the order of 10ms) so we cache it. *)
       with_cache (parameters, !initialisation_parameters) @@ fun () ->
-      let max_polynomial_length =
-        slot_as_polynomial_length ~slot_size ~page_size
+      let max_polynomial_length, erasure_encoded_polynomial_length, shard_length
+          =
+        Parameters_check.compute_lengths
+          ~redundancy_factor
+          ~slot_size
+          ~page_size
+          ~number_of_shards
       in
-      let erasure_encoded_polynomial_length =
-        redundancy_factor * max_polynomial_length
-      in
-      let shard_length = erasure_encoded_polynomial_length / number_of_shards in
-      let page_length = page_length ~page_size in
+      let page_length = Parameters_check.page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
       let* mode, srs_g1, srs_verifier =
         Ok (get_srs !initialisation_parameters)
@@ -584,7 +578,7 @@ module Inner = struct
           pages_per_slot = pages_per_slot parameters;
           page_length;
           page_length_domain;
-          remaining_bytes = page_size mod scalar_bytes_amount;
+          remaining_bytes = page_size mod Parameters_check.scalar_bytes_amount;
           srs_g2;
           mode;
           kate_amortized;
@@ -639,11 +633,11 @@ module Inner = struct
            1. a serialization phase where pages are converted to sequences
            of scalar elements, which is injective: if two outputs for two
            slots are equal, then the slots are equal since we’re just
-           splitting a page into chunks of [scalar_bytes_amount] bytes and
+           splitting a page into chunks of [Parameters_check.scalar_bytes_amount] bytes and
            a last one of [t.remaining_bytes] bytes.
 
            Parse the byte sequence slot = page_0 ... page_{t.pages_per_slot-1}
-           page by page by chunks of [scalar_bytes_amount], or [t.remaining_bytes]
+           page by page by chunks of [Parameters_check.scalar_bytes_amount], or [t.remaining_bytes]
            for the last page chunk.
 
            to obtain the vector of length [polynomial_length = t.page_length * t.pages_per_slot]
@@ -677,9 +671,9 @@ module Inner = struct
              the buffer [slot] bounds. *)
           if !offset >= t.slot_size then ()
           else
-            let dst = Bytes.create scalar_bytes_amount in
-            Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
-            offset := !offset + scalar_bytes_amount ;
+            let dst = Bytes.create Parameters_check.scalar_bytes_amount in
+            Bytes.blit slot !offset dst 0 Parameters_check.scalar_bytes_amount ;
+            offset := !offset + Parameters_check.scalar_bytes_amount ;
             (* Apply the permutation. *)
             coefficients.((elt * t.pages_per_slot) + page) <-
               Scalar.of_bytes_exn dst
@@ -716,8 +710,8 @@ module Inner = struct
       for elt = 0 to t.page_length - 2 do
         let idx = (elt * t.pages_per_slot) + page in
         let coeff = Scalar.to_bytes (Evals.get evaluations idx) in
-        Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
-        offset := !offset + scalar_bytes_amount
+        Bytes.blit coeff 0 slot !offset Parameters_check.scalar_bytes_amount ;
+        offset := !offset + Parameters_check.scalar_bytes_amount
       done ;
       let idx = ((t.page_length - 1) * t.pages_per_slot) + page in
       let coeff = Scalar.to_bytes (Evals.get evaluations idx) in
@@ -1219,16 +1213,16 @@ module Inner = struct
         let evaluations =
           Array.init t.page_length_domain (function
               | i when i < t.page_length - 1 ->
-                  (* Parse the [page] by chunks of [scalar_bytes_amount] bytes.
+                  (* Parse the [page] by chunks of [Parameters_check.scalar_bytes_amount] bytes.
                      These chunks are interpreted as [Scalar.t] elements and stored
                      in [evaluations]. *)
-                  let dst = Bytes.create scalar_bytes_amount in
+                  let dst = Bytes.create Parameters_check.scalar_bytes_amount in
                   Bytes.blit
                     page
-                    (i * scalar_bytes_amount)
+                    (i * Parameters_check.scalar_bytes_amount)
                     dst
                     0
-                    scalar_bytes_amount ;
+                    Parameters_check.scalar_bytes_amount ;
                   Scalar.of_bytes_exn dst
               | i when i = t.page_length - 1 ->
                   (* Store the remaining bytes in the last nonzero coefficient
@@ -1236,7 +1230,7 @@ module Inner = struct
                   let dst = Bytes.create t.remaining_bytes in
                   Bytes.blit
                     page
-                    (i * scalar_bytes_amount)
+                    (i * Parameters_check.scalar_bytes_amount)
                     dst
                     0
                     t.remaining_bytes ;
@@ -1355,7 +1349,7 @@ module Internal_for_tests = struct
     | Ok _ -> true
     | _ -> false
 
-  let slot_as_polynomial_length = slot_as_polynomial_length
+  let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
 module Config = struct

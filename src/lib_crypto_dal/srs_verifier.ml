@@ -31,29 +31,6 @@ type srs_verifier = {shards : G2.t; pages : G2.t; commitment : G2.t}
 
 let max_verifier_srs_size = Srs_g1.size srs_g1
 
-(* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
-   r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
-let scalar_bytes_amount = Scalar.size_in_bytes - 1
-
-(* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
-   hence the + 1 to account for the remainder of the division. *)
-let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
-
-(* for a given [size] (in bytes), return the length of the corresponding
-   domain *)
-let domain_length ~size =
-  let length = page_length ~page_size:size in
-  let length_domain, _, _ = Kzg.Utils.FFT.select_fft_domain length in
-  length_domain
-
-(* [slot_as_polynomial_length ~slot_size ~page_size] returns the length of the
-   polynomial of maximal degree representing a slot of size [slot_size] with
-   [slot_size / page_size] pages (page_size must divides slot_size). The
-   returned length thus depends on the number of pages. *)
-let slot_as_polynomial_length ~slot_size ~page_size =
-  let page_length_domain = domain_length ~size:page_size in
-  slot_size / page_size * page_length_domain
-
 let get_verifier_srs2 max_srs_size get_srs2 ~max_polynomial_length
     ~page_length_domain ~shard_length =
   let shards = get_srs2 shard_length in
@@ -227,7 +204,7 @@ module Print = struct
     let page_srs =
       let values =
         List.init p.page_range (fun i ->
-            domain_length ~size:(1 lsl (i + p.page_offset)))
+            Parameters_check.domain_length ~size:(1 lsl (i + p.page_offset)))
       in
       values
     in
@@ -240,7 +217,7 @@ module Print = struct
                   let page_size = page_size + p.page_offset in
                   let res =
                     max_srs_size
-                    - slot_as_polynomial_length
+                    - Parameters_check.slot_as_polynomial_length
                         ~page_size:(1 lsl page_size)
                         ~slot_size:(1 lsl slot_size)
                   in
@@ -264,7 +241,7 @@ module Print = struct
                   List.init p.shard_range (fun nb_shards ->
                       let nb_shards = nb_shards + shard_offset in
                       redundancy
-                      * slot_as_polynomial_length
+                      * Parameters_check.slot_as_polynomial_length
                           ~page_size:(1 lsl page_size)
                           ~slot_size:(1 lsl slot_size)
                       / (1 lsl nb_shards)))))
