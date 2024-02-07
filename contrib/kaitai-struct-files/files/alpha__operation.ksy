@@ -120,6 +120,13 @@ types:
     seq:
     - id: alpha__mutez
       type: n
+  alpha__operation__alpha__contents_and_signature:
+    seq:
+    - id: contents_and_signature_prefix
+      type: contents_and_signature_prefix_entries
+      repeat: eos
+    - id: signature_suffix
+      size: 64
   alpha__operation__alpha__contents_or_signature_prefix:
     seq:
     - id: alpha__operation__alpha__contents_or_signature_prefix_tag
@@ -234,13 +241,6 @@ types:
     - id: zk_rollup_update
       type: zk_rollup_update
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::zk_rollup_update)
-  alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature:
-    seq:
-    - id: contents_and_signature_prefix
-      type: contents_and_signature_prefix_entries
-      repeat: eos
-    - id: signature_suffix
-      size: 64
   alpha__per_block_votes:
     seq:
     - id: alpha__per_block_votes_tag
@@ -2012,5 +2012,5 @@ enums:
 seq:
 - id: alpha__operation
   type: operation__shell_header
-- id: alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature
-  type: alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature
+- id: alpha__operation__alpha__contents_and_signature
+  type: alpha__operation__alpha__contents_and_signature

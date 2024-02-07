@@ -1,10 +1,10 @@
 meta:
-  id: alpha__operation_with_attestation
+  id: alpha__operation_with_legacy_attestation_name
   endian: be
   imports:
   - block_header__shell
   - operation__shell_header
-doc: ! 'Encoding id: alpha.operation_with_attestation'
+doc: ! 'Encoding id: alpha.operation_with_legacy_attestation_name'
 types:
   activate_account:
     seq:
@@ -120,13 +120,6 @@ types:
     seq:
     - id: alpha__mutez
       type: n
-  alpha__operation__alpha__contents_and_signature:
-    seq:
-    - id: contents_and_signature_prefix
-      type: contents_and_signature_prefix_entries
-      repeat: eos
-    - id: signature_suffix
-      size: 64
   alpha__operation__alpha__contents_or_signature_prefix:
     seq:
     - id: alpha__operation__alpha__contents_or_signature_prefix_tag
@@ -241,6 +234,13 @@ types:
     - id: zk_rollup_update
       type: zk_rollup_update
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::zk_rollup_update)
+  alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature:
+    seq:
+    - id: contents_and_signature_prefix
+      type: contents_and_signature_prefix_entries
+      repeat: eos
+    - id: signature_suffix
+      size: 64
   alpha__per_block_votes:
     seq:
     - id: alpha__per_block_votes_tag
@@ -2010,7 +2010,7 @@ enums:
     0: dissection
     1: proof
 seq:
-- id: alpha__operation_with_attestation
+- id: alpha__operation_with_legacy_attestation_name
   type: operation__shell_header
-- id: alpha__operation__alpha__contents_and_signature
-  type: alpha__operation__alpha__contents_and_signature
+- id: alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature
+  type: alpha__operation_with_legacy_attestation_name__alpha__contents_and_signature
