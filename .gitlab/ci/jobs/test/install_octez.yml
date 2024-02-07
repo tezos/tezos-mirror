@@ -36,6 +36,11 @@ oc.install_bin_ubuntu_jammy:
     - .oc.base-test-install-scripts-template
   script:
     - ./docs/introduction/install-bin-ubuntu.sh rc
+  # These jobs currently fail because the last rc packages can't be installed anymore.
+  # See https://gitlab.com/tezos/tezos/-/issues/6902.
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6915
+  # This should be removed after the next release candidate.
+  allow_failure: true
 
 oc.install_bin_rc_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
