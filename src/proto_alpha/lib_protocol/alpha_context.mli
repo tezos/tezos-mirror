@@ -1227,8 +1227,6 @@ module Level : sig
 
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
-  val may_snapshot_stake_distribution : context -> bool
-
   val may_compute_randao : context -> bool
 end
 
@@ -4920,9 +4918,6 @@ end
 (** This module re-exports definitions from {!Stake_storage},
     {!Delegate_storage} and {!Delegate}. *)
 module Stake_distribution : sig
-  val compute_snapshot_index :
-    context -> Cycle.t -> max_snapshot_index:int -> int tzresult Lwt.t
-
   val baking_rights_owner :
     context ->
     Level.t ->

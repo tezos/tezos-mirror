@@ -71,10 +71,6 @@ val last_finalized_block_level : Raw_context.t -> Raw_level_repr.t
    cycle. *)
 val dawn_of_a_new_cycle : Raw_context.t -> Cycle_repr.t option
 
-(** Returns [true] if the stake distribution should be snapshot at the current
-   level. *)
-val may_snapshot_stake_distribution : Raw_context.t -> bool
-
 (** Returns [true] if RANDAO should be computed at the current level, that is
     if the current level, relative to the cycle's start, equals the nonce
     revelation period cut-off. *)
