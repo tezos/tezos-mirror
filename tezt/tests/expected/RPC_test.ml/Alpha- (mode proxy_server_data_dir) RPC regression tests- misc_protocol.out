@@ -39,9 +39,9 @@
   "dal_parametric":
     { "feature_enable": false, "incentives_enable": false,
       "number_of_slots": 16, "attestation_lag": 4,
-      "attestation_threshold": 50, "blocks_per_epoch": 1,
-      "redundancy_factor": 8, "page_size": 128, "slot_size": 32768,
-      "number_of_shards": 64 }, "smart_rollup_arith_pvm_enable": false,
+      "attestation_threshold": 50, "redundancy_factor": 8, "page_size": 128,
+      "slot_size": 32768, "number_of_shards": 64 },
+  "smart_rollup_arith_pvm_enable": false,
   "smart_rollup_origination_size": 6314,
   "smart_rollup_challenge_window_in_blocks": 120960,
   "smart_rollup_stake_amount": "10000000000",
