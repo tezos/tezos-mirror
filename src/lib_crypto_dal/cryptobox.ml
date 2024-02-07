@@ -487,14 +487,6 @@ module Inner = struct
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
 
-  module Cache = Hashtbl.Make (struct
-    type t = parameters
-
-    let equal = ( = )
-
-    let hash = Hashtbl.hash
-  end)
-
   let select_srs_verifier test =
     if test then (module Srs_verifier.Internal_for_tests : Srs_verifier.S)
     else (module Srs_verifier)
@@ -508,24 +500,38 @@ module Inner = struct
         let module Srs = (val select_srs_verifier test) in
         (`Prover, srs, (module Srs))
 
+  module Cache = Hashtbl.Make (struct
+    type t = parameters * initialisation_parameters
+
+    let equal (param, init_param) (param', init_param') =
+      param = param'
+      &&
+      match (init_param, init_param') with
+      | Verifier {test; _}, Verifier {test = test'; _} when test = test' -> true
+      | Prover {test; _}, Prover {test = test'; _} when test = test' -> true
+      | _ -> false
+
+    let hash = Hashtbl.hash
+  end)
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
   let make =
     let open Result_syntax in
     let table = Cache.create 5 in
-    let with_cache parameters f =
-      match Cache.find_opt table parameters with
+    let with_cache (parameters, initialisation_parameters) f =
+      match Cache.find_opt table (parameters, initialisation_parameters) with
       | Some x -> return x
       | None ->
           let* x = f () in
-          Cache.replace table parameters x ;
+          Cache.replace table (parameters, initialisation_parameters) x ;
           return x
     in
     fun ({redundancy_factor; slot_size; page_size; number_of_shards} as
         parameters) ->
       (* The cryptobox is deterministically computed from the DAL parameters and
          this computation takes time (on the order of 10ms) so we cache it. *)
-      with_cache parameters @@ fun () ->
+      with_cache (parameters, !initialisation_parameters) @@ fun () ->
       let max_polynomial_length =
         slot_as_polynomial_length ~slot_size ~page_size
       in
