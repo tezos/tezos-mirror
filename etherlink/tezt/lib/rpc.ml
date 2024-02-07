@@ -56,6 +56,8 @@ module Request = struct
       method_ = "eth_getTransactionCount";
       parameters = `A [`String address; `String "latest"];
     }
+
+  let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
 end
 
 let block_number evm_node =
@@ -162,4 +164,11 @@ let get_transaction_count ~address evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
+       response
+
+let tez_kernelVersion evm_node =
+  let* response = Evm_node.call_evm_rpc evm_node Request.tez_kernelVersion in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
