@@ -32,8 +32,6 @@ pk1=$4
 addr1=$5
 pk2=$6
 addr2=$7
-oregon=https://node-ore.ghostnet.etherlink.com
-dublin=https://node-dub.ghostnet.etherlink.com
 node=https://node.ghostnet.etherlink.com
 explorer=https://testnet-explorer.etherlink.com
 
@@ -121,6 +119,7 @@ submit_tx_and_check() {
   elif [[ "${res_code}" -ne 0 ]]; then
     add_failed_tx_msg "${network}" "${tx_type}"
   else
+    sleep 5 # let time for the explorer to include the tx
     check_tx_applied "${op_hash}" "${tx_type}"
     tx_applied=$?
     if [[ "${tx_applied}" -eq 0 ]]; then
@@ -155,14 +154,11 @@ erc20_tx() {
   submit_tx_and_check "ERC20 transferFrom" "${cmd[@]}"
 }
 
-allow_erc20_tx "${contract}" "${pk1}" "${addr1}" "${oregon}"
-erc20_tx "${contract}" "${pk1}" "${addr1}" "${addr2}" "${oregon}"
-add_report_msg "------------------------"
-allow_erc20_tx "${contract}" "${pk2}" "${addr2}" "${dublin}"
-erc20_tx "${contract}" "${pk2}" "${addr2}" "${addr1}" "${dublin}"
+allow_erc20_tx "${contract}" "${pk1}" "${addr1}" "${node}"
+erc20_tx "${contract}" "${pk1}" "${addr1}" "${addr2}" "${node}"
+allow_erc20_tx "${contract}" "${pk2}" "${addr2}" "${node}"
+erc20_tx "${contract}" "${pk2}" "${addr2}" "${addr1}" "${node}"
 add_report_msg "------------------------"
 tx "${pk1}" "${addr2}" "${node}"
 tx "${pk2}" "${addr1}" "${node}"
-tx "${pk1}" "${addr2}" "${oregon}"
-tx "${pk2}" "${addr1}" "${dublin}"
 send_msg "${report}"
