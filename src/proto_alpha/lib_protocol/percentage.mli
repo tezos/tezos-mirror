@@ -9,6 +9,9 @@
     Precision of the representation is 0.01% *)
 type t
 
+(* TODO #6918: Remove after P *)
+val encoding_legacy_in_o : t Data_encoding.t
+
 val encoding : t Data_encoding.t
 
 (** Rounds down to the nearest 0.01% *)

@@ -25,20 +25,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Remove after P *)
+(* TODO #6918: Remove after P *)
 let update_slashing_storage_for_p ctxt =
-  Storage.Contract.Slashed_deposits.fold
-    ctxt
-    ~order:`Undefined
-    ~init:ctxt
-    ~f:(fun contract slashed_history ctxt ->
-      let slashed_history =
-        List.map
-          (fun (cycle, percentage) ->
-            (cycle, Percentage.convert_from_o_to_p percentage))
-          slashed_history
-      in
-      Storage.Contract.Slashed_deposits.add ctxt contract slashed_history)
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    Storage.Contract.Slashed_deposits__Oxford.fold
+      ctxt
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun contract slashed_history ctxt ->
+        let slashed_history =
+          List.map
+            (fun (cycle, percentage) ->
+              (cycle, Percentage.convert_from_o_to_p percentage))
+            slashed_history
+        in
+        Storage.Contract.Slashed_deposits.add ctxt contract slashed_history)
+  in
+  Storage.Contract.Slashed_deposits__Oxford.clear ctxt
 
 let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
     round =

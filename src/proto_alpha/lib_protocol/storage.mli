@@ -70,6 +70,10 @@ module Slashed_deposits_history : sig
   val get : Cycle_repr.t -> t -> slashed_percentage
 end
 
+(* TODO #6918: Remove after P *)
+module Slashed_deposits_history__Oxford :
+    module type of Slashed_deposits_history
+
 module Unstake_request : sig
   type request = Cycle_repr.t * Tez_repr.t
 
@@ -278,6 +282,13 @@ module Contract : sig
       25 cycles) or clean up this storage manually or automatically.
   *)
   module Slashed_deposits :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Slashed_deposits_history.t
+       and type t := Raw_context.t
+
+  (* TODO #6918: Remove after P *)
+  module Slashed_deposits__Oxford :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Slashed_deposits_history.t

@@ -13,14 +13,25 @@ let precision_factor = 100
 
 let one_hundred_percent = 100 * precision_factor
 
-(* Remove after P *)
+(* TODO #6918: Remove after P *)
 let convert_from_o_to_p x = x * precision_factor
+
+(* TODO #6918: Remove after P *)
+let of_int_guarded_legacy_in_o i =
+  if Compare.Int.(i >= 0 && i <= 100) then Ok i
+  else Error "Value must be between 0 and 100"
 
 let of_int_guarded i =
   if Compare.Int.(i >= 0 && i <= one_hundred_percent) then Ok i
-  else Error "Value must be between 0 and 10000"
+  else
+    Error (Format.asprintf "Value must be between 0 and %d" one_hundred_percent)
 
 let of_int_bounded i = Compare.Int.(max 0 (min one_hundred_percent i))
+
+(* TODO #6918: Remove after P *)
+let encoding_legacy_in_o =
+  let open Data_encoding in
+  conv_with_guard (fun i -> i) of_int_guarded_legacy_in_o uint8
 
 let encoding =
   let open Data_encoding in

@@ -632,10 +632,10 @@ let encoding =
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
-                      Percentage.encoding)
+                      Percentage.encoding_legacy_in_o)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_attestation"
-                      Percentage.encoding)
+                      Percentage.encoding_legacy_in_o)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
