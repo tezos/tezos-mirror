@@ -8489,6 +8489,8 @@ let _tezt_etherlink =
       ]
     ~with_macos_security_framework:true
     ~dep_files:["etherlink/tezt/tests/evm_kernel_inputs"]
+    ~dep_globs:["etherlink/tezos_contracts/*"]
+    ~dep_globs_rec:["etherlink/kernel_evm/*/*.rs"]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let _evm_node =
