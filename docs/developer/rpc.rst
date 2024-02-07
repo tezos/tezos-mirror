@@ -5,13 +5,10 @@ The Octez node provides a JSON/RPC interface. Note that it is an RPC
 interface, and it is JSON based, but it does not follow the “JSON-RPC”
 protocol. It is not active by default and it must be explicitly
 activated with the ``--rpc-addr`` option. In that case, an RPC server
-is started in a separate process, alongside the node, that is
-responsible of dealing with the RPCs. Starting the RPC server as an
-independent process avoids slowing down the node when an intensive RPC
-usage is being done. It is also possible to run an RPC server locally
-to the node thanks to the ``--local-rpc-addr`` command. Use
-``--local-rpc-addr`` to use an in-node process RPC server only if you
-understand the associated performance issues.
+is started by the node. It is also possible to run an RPC server that
+is external to the node, as a separate process, thanks to the
+``--external-rpc-addr`` command. However, it is not recommended to use
+``--external-rpc-addr`` as the external RPC server is not yet stable.
 
 As an example, if you are not trying to run a public RPC node, but you
 just want to explore the RPC interface on your own, you would run:
