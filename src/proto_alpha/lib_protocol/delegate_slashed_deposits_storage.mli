@@ -90,3 +90,16 @@ val clear_outdated_already_denounced :
 
 val apply_and_clear_denunciations :
   Raw_context.t -> (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+module For_RPC : sig
+  (** Returns the pending denunciations for the given delegate. *)
+  val pending_denunciations :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    Denunciations_repr.t tzresult Lwt.t
+
+  (** Returns all the pending denunciations. *)
+  val pending_denunciations_list :
+    Raw_context.t ->
+    (Signature.Public_key_hash.t * Denunciations_repr.item) list Lwt.t
+end

@@ -560,14 +560,7 @@ module Delegate = struct
     include For_RPC
     include Delegate_storage.For_RPC
     include Delegate_missed_attestations_storage.For_RPC
-
-    let pending_denunciations_list ctxt =
-      let open Lwt_syntax in
-      let* r = Storage.Pending_denunciations.bindings ctxt in
-      let r =
-        List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
-      in
-      return r
+    include Delegate_slashed_deposits_storage.For_RPC
   end
 end
 

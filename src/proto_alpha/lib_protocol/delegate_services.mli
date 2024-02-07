@@ -190,4 +190,10 @@ val pending_staking_parameters :
   public_key_hash ->
   (Cycle.t * Staking_parameters_repr.t) list shell_tzresult Lwt.t
 
+val pending_denunciations :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Denunciations_repr.t shell_tzresult Lwt.t
+
 val register : unit -> unit
