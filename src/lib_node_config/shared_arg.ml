@@ -49,7 +49,7 @@ type t = {
   advertised_net_port : int option;
   discovery_addr : string option;
   rpc_listen_addrs : string list;
-  local_rpc_listen_addrs : string list;
+  external_rpc_listen_addrs : string list;
   private_mode : bool;
   disable_p2p_maintenance : bool;
   disable_p2p_swap : bool;
@@ -187,7 +187,7 @@ let wrap data_dir config_file network connections max_download_speed
     advertised_net_port discovery_addr peers no_bootstrap_peers
     bootstrap_threshold private_mode disable_p2p_maintenance disable_p2p_swap
     disable_mempool enable_testchain expected_pow rpc_listen_addrs
-    local_rpc_listen_addrs rpc_tls cors_origins cors_headers log_output
+    external_rpc_listen_addrs rpc_tls cors_origins cors_headers log_output
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
     max_active_rpc_connections metrics_addr operation_metadata_size_limit =
@@ -218,7 +218,7 @@ let wrap data_dir config_file network connections max_download_speed
     advertised_net_port;
     discovery_addr;
     rpc_listen_addrs;
-    local_rpc_listen_addrs;
+    external_rpc_listen_addrs;
     private_mode;
     disable_p2p_maintenance;
     disable_p2p_swap;
@@ -655,20 +655,22 @@ module Term = struct
 
   let rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this RPC server instance can be reached."
+      "The TCP socket address at which this RPC server instance can be \
+       reached. Note that: as a local RPC server is handled by the node \
+       itself, calling computational intensive RPCs can affect the \
+       performances of the node."
     in
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
-  let local_rpc_listen_addrs =
+  let external_rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this local RPC server instance can be \
-       reached. As a local RPC server is handled by the node itself, calling \
-       computational intensive RPCs can affect the performances of the node."
+      "The TCP socket address at which this external RPC server instance can \
+       be reached. Warning: this feature is unstable -- use it with care."
     in
     Arg.(
       value & opt_all string []
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["local-rpc-addr"])
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["external-rpc-addr"])
 
   let rpc_tls =
     let doc =
@@ -741,7 +743,7 @@ module Term = struct
     $ peers $ no_bootstrap_peers $ bootstrap_threshold $ private_mode
     $ disable_p2p_maintenance $ disable_p2p_swap $ disable_mempool
     $ enable_testchain $ expected_pow $ rpc_listen_addrs
-    $ local_rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
+    $ external_rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
@@ -875,7 +877,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     disable_mempool;
     enable_testchain;
     rpc_listen_addrs;
-    local_rpc_listen_addrs;
+    external_rpc_listen_addrs;
     rpc_tls;
     cors_origins;
     cors_headers;
@@ -1030,7 +1032,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?advertised_net_port
     ?discovery_addr
     ~rpc_listen_addrs
-    ~local_rpc_listen_addrs
+    ~external_rpc_listen_addrs
     ~allow_all_rpc
     ~media_type
     ?max_active_rpc_connections

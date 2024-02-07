@@ -357,7 +357,7 @@ and p2p = {
 
 and rpc = {
   listen_addrs : string list;
-  local_listen_addrs : string list;
+  external_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
@@ -386,7 +386,7 @@ let default_p2p =
 let default_rpc =
   {
     listen_addrs = [];
-    local_listen_addrs = [];
+    external_listen_addrs = [];
     cors_origins = [];
     cors_headers = [];
     tls = None;
@@ -559,7 +559,7 @@ let rpc : rpc Data_encoding.t =
            cors_origins;
            cors_headers;
            listen_addrs;
-           local_listen_addrs;
+           external_listen_addrs;
            tls;
            acl;
            media_type;
@@ -571,7 +571,7 @@ let rpc : rpc Data_encoding.t =
         | Some {cert; key} -> (Some cert, Some key)
       in
       ( Some listen_addrs,
-        Some local_listen_addrs,
+        Some external_listen_addrs,
         None,
         cors_origins,
         cors_headers,
@@ -581,7 +581,7 @@ let rpc : rpc Data_encoding.t =
         media_type,
         max_active_rpc_connections ))
     (fun ( listen_addrs,
-           local_listen_addrs,
+           external_listen_addrs,
            legacy_listen_addr,
            cors_origins,
            cors_headers,
@@ -605,12 +605,14 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
-      let local_listen_addrs =
-        Option.value local_listen_addrs ~default:default_rpc.local_listen_addrs
+      let external_listen_addrs =
+        Option.value
+          external_listen_addrs
+          ~default:default_rpc.external_listen_addrs
       in
       {
         listen_addrs;
-        local_listen_addrs;
+        external_listen_addrs;
         cors_origins;
         cors_headers;
         tls;
@@ -626,7 +628,7 @@ let rpc : rpc Data_encoding.t =
              port 8732 will be assumed."
           (list string))
        (opt
-          "local-listen-addrs"
+          "external-listen-addrs"
           ~description:
             "Hosts to listen to. If the port is not specified, the default \
              port 8732 will be assumed."
@@ -853,7 +855,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(local_rpc_listen_addrs = []) ?(allow_all_rpc = [])
+    ?(external_rpc_listen_addrs = []) ?(allow_all_rpc = [])
     ?(media_type = Media_type.Command_line.Any)
     ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
     ?(metrics_addr = []) ?operation_metadata_size_limit
@@ -937,8 +939,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and rpc : rpc =
     {
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
-      local_listen_addrs =
-        unopt_list ~default:cfg.rpc.local_listen_addrs local_rpc_listen_addrs;
+      external_listen_addrs =
+        unopt_list
+          ~default:cfg.rpc.external_listen_addrs
+          external_rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;

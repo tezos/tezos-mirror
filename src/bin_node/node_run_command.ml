@@ -502,7 +502,7 @@ let init_local_rpc_server (config : Config_file.t) dir =
                 in
                 launch_rpc_server config dir (Local (mode, port)) addr)
               addrs)
-      config.rpc.local_listen_addrs
+      config.rpc.listen_addrs
   in
   return (Local_rpc_server servers)
 
@@ -562,7 +562,10 @@ let init_external_rpc_server config node_version dir internal_events =
                    start so that it contains a single listen
                    address. *)
                 let config =
-                  {config with rpc = {config.rpc with listen_addrs = [addr]}}
+                  {
+                    config with
+                    rpc = {config.rpc with external_listen_addrs = [addr]};
+                  }
                 in
                 let rpc_process =
                   Octez_rpc_process.Rpc_process_worker.create
@@ -576,7 +579,7 @@ let init_external_rpc_server config node_version dir internal_events =
                 in
                 return (local_rpc_server, rpc_process))
               addrs)
-      config.rpc.listen_addrs
+      config.rpc.external_listen_addrs
   in
   return (External_rpc_server rpc_servers)
 
@@ -637,14 +640,13 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
       dir
       Tezos_rpc.Service.description_service
   in
-
   let* local_rpc_server =
-    if config.rpc.local_listen_addrs = [] then return No_server
+    if config.rpc.listen_addrs = [] then return No_server
     else init_local_rpc_server config dir
   in
   (* Start RPC process only when at least one listen addr is given. *)
   let* rpc_server =
-    if config.rpc.listen_addrs = [] then return No_server
+    if config.rpc.external_listen_addrs = [] then return No_server
     else
       (* Starts the node's local RPC server that aims to handle the
          RPCs forwarded by the rpc_process, if they cannot be

@@ -53,7 +53,7 @@ type t = {
   discovery_addr : string option;
   rpc_listen_addrs : string list;
       (** a list of addresses to listen to RPC requests on *)
-  local_rpc_listen_addrs : string list;
+  external_rpc_listen_addrs : string list;
       (** a list of addresses to listen to RPC requests on *)
   private_mode : bool;
       (** enables the private mode, see
