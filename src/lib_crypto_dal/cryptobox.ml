@@ -495,6 +495,19 @@ module Inner = struct
     let hash = Hashtbl.hash
   end)
 
+  let select_srs_verifier test =
+    if test then (module Srs_verifier.Internal_for_tests : Srs_verifier.S)
+    else (module Srs_verifier)
+
+  let get_srs initialisation_parameters =
+    match initialisation_parameters with
+    | Verifier {test} ->
+        let module Srs = (val select_srs_verifier test) in
+        (`Verifier, Srs.get_verifier_srs1 (), (module Srs : Srs_verifier.S))
+    | Prover {test; srs} ->
+        let module Srs = (val select_srs_verifier test) in
+        (`Prover, srs, (module Srs))
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
   let make =
@@ -523,22 +536,7 @@ module Inner = struct
       let page_length = page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
       let* mode, srs_g1, srs_verifier =
-        match !initialisation_parameters with
-        | Verifier {test} ->
-            if test then
-              Ok
-                ( `Verifier,
-                  Srs_verifier.Internal_for_tests.get_verifier_srs1 (),
-                  (module Srs_verifier.Internal_for_tests : Srs_verifier.S) )
-            else
-              Ok
-                ( `Verifier,
-                  Srs_verifier.get_verifier_srs1 (),
-                  (module Srs_verifier : Srs_verifier.S) )
-        | Prover {test; srs} ->
-            if test then
-              Ok (`Prover, srs, (module Srs_verifier.Internal_for_tests))
-            else Ok (`Prover, srs, (module Srs_verifier))
+        Ok (get_srs !initialisation_parameters)
       in
       let* () =
         ensure_validity
@@ -553,16 +551,11 @@ module Inner = struct
       let srs_g2 =
         match !initialisation_parameters with
         | Verifier {test} | Prover {test; _} ->
-            if test then
-              Srs_verifier.Internal_for_tests.get_verifier_srs2
-                ~max_polynomial_length
-                ~page_length_domain
-                ~shard_length
-            else
-              Srs_verifier.get_verifier_srs2
-                ~max_polynomial_length
-                ~page_length_domain
-                ~shard_length
+            let module Srs = (val select_srs_verifier test) in
+            Srs.get_verifier_srs2
+              ~max_polynomial_length
+              ~page_length_domain
+              ~shard_length
       in
       let kate_amortized =
         Kate_amortized.
@@ -1339,21 +1332,16 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let mode, srs_g1_length =
-      match !initialisation_parameters with
-      | Verifier {test = _} ->
-          (`Verifier, Srs_g1.size (Srs_verifier.get_verifier_srs1 ()))
-      | Prover {test = _; srs} -> (`Prover, Srs_g1.size srs)
-    in
+    let mode, srs_g1, srs_verifier = get_srs !initialisation_parameters in
     match
       ensure_validity
-        ~srs_verifier:(module Srs_verifier.Internal_for_tests)
+        ~srs_verifier
         ~mode
         ~slot_size
         ~page_size
         ~redundancy_factor
         ~number_of_shards
-        ~srs_g1_length
+        ~srs_g1_length:(Srs_g1.size srs_g1)
     with
     | Ok _ -> true
     | _ -> false
