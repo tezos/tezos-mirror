@@ -594,7 +594,7 @@ let test_staking =
       client_1
   in
 
-  log_step 9 "Check set_deposit_limits is not allowed after AI activation" ;
+  log_step 9 "Check set_deposits_limit is not allowed after AI activation" ;
   let set_deposits_limit =
     Client.spawn_set_deposits_limit
       ~src:Constant.bootstrap1.alias
@@ -605,9 +605,8 @@ let test_staking =
   (* lets bake 2 more blocks and delegate should accept staking *)
   let* () = bake_n ~endpoint ~protocol client_1 2 in
 
-  (* TODO  https://gitlab.com/tezos/tezos/-/issues/6613
-     set_deposit_limits should fail after AI activation *)
-  let* () = Process.check set_deposits_limit in
+  (* set_deposits_limit fails after AI activation *)
+  let* () = Process.check ~expect_failure:true set_deposits_limit in
 
   let* numerator =
     Client.RPC.call client_1

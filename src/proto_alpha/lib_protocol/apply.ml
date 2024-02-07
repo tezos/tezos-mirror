@@ -33,6 +33,7 @@ open Alpha_context
 type error +=
   | Faulty_validation_wrong_slot
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Set_deposits_limit_when_automated_staking_off
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
@@ -78,6 +79,22 @@ let () =
     (function
       | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
     (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
+
+  register_error_kind
+    `Temporary
+    ~id:"operation.set_deposits_limit_when_automated_staking_off"
+    ~title:"Set deposits limit when automated staking off"
+    ~description:
+      "Cannot set deposits limit when automated staking is off or Adaptive \
+       Issuance is active."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot set a deposits limit when automated staking off.")
+    Data_encoding.unit
+    (function
+      | Set_deposits_limit_when_automated_staking_off -> Some () | _ -> None)
+    (fun () -> Set_deposits_limit_when_automated_staking_off) ;
 
   let error_while_taking_fees_description =
     "There was an error while taking the fees, which should not happen and \
@@ -1396,6 +1413,16 @@ let apply_manager_operation :
           error_unless
             is_registered
             (Set_deposits_limit_on_unregistered_delegate source)
+        in
+        let is_autostaking_enabled =
+          match Staking.staking_automation ctxt with
+          | Manual_staking -> false
+          | Auto_staking -> true
+        in
+        let*? () =
+          error_unless
+            is_autostaking_enabled
+            Set_deposits_limit_when_automated_staking_off
         in
         let*! ctxt = Delegate.set_frozen_deposits_limit ctxt source limit in
         return
