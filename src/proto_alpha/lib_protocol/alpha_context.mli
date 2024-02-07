@@ -2233,11 +2233,11 @@ module Delegate : sig
     Cycle.t ->
     (context * Receipt.balance_updates * public_key_hash list) tzresult Lwt.t
 
-  val already_slashed_for_double_attesting :
-    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
+  val already_denounced_for_double_attesting :
+    context -> public_key_hash -> Level.t -> Round.t -> bool tzresult Lwt.t
 
-  val already_slashed_for_double_baking :
-    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
+  val already_denounced_for_double_baking :
+    context -> public_key_hash -> Level.t -> Round.t -> bool tzresult Lwt.t
 
   type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
 

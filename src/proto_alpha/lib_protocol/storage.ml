@@ -1090,13 +1090,13 @@ module Pending_denunciations =
 
 (** Per cycle storage *)
 
-type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
+type denounced = {for_double_attesting : bool; for_double_baking : bool}
 
-let default_slashed_level =
+let default_denounced =
   {for_double_attesting = false; for_double_baking = false}
 
-module Slashed_level = struct
-  type t = slashed_level
+module Denounced = struct
+  type t = denounced
 
   let encoding =
     let open Data_encoding in
@@ -1117,14 +1117,28 @@ module Cycle = struct
          end))
          (Make_index (Cycle_repr.Index))
 
-  module Slashed_deposits =
+  module Already_denounced =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["already_denounced"]
+         end))
+         (Pair
+            (Pair
+               (Make_index
+                  (Raw_level_repr.Index))
+                  (Make_index (Round_repr.Index)))
+               (Public_key_hash_index))
+      (Denounced)
+
+  module Already_denounced__Oxford =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
          (struct
            let name = ["slashed_deposits"]
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-      (Slashed_level)
+      (Denounced)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
@@ -1266,7 +1280,8 @@ module Cycle = struct
       (Staking_parameters_repr)
 end
 
-module Slashed_deposits = Cycle.Slashed_deposits
+module Already_denounced = Cycle.Already_denounced
+module Already_denounced__Oxford = Cycle.Already_denounced__Oxford
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 

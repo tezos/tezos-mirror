@@ -109,6 +109,31 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+let migrate_already_denounced_from_Oxford ctxt =
+  let open Lwt_syntax in
+  let migrate_cycle ctxt cycle =
+    let* ctxt =
+      Storage.Already_denounced__Oxford.fold
+        (ctxt, cycle)
+        ~order:`Undefined
+        ~init:ctxt
+        ~f:(fun (level, delegate) denounced ctxt ->
+          Storage.Already_denounced.add
+            (ctxt, cycle)
+            ((level, Round_repr.zero), delegate)
+            denounced)
+    in
+    Storage.Already_denounced__Oxford.clear (ctxt, cycle)
+  in
+  (* Since the max_slashing_period is 2, denunciations are only
+     relevant if the misbehaviour happened in either the current cycle
+     or the previous cycle. *)
+  let current_cycle = (Level_storage.current ctxt).cycle in
+  let* ctxt = migrate_cycle ctxt current_cycle in
+  match Cycle_repr.pred current_cycle with
+  | None -> return ctxt
+  | Some previous_cycle -> migrate_cycle ctxt previous_cycle
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -200,12 +225,14 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
+        (* Adaptive Issuance-related migrations from Oxford to P. *)
         (* We usually clear the table at the end of the cycle but the migration
            can happen in the middle of the cycle, so we clear it here.
            Possible consequence: the slashing history could be inconsistent with
            the pending denunciations, i.e., there could be unstaked_frozen_deposits
            that are not slashed whereas unstake_requests are slashed. *)
         let*! ctxt = Storage.Pending_denunciations.clear ctxt in
+        let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
         return (ctxt, [])
   in
   let* ctxt =
