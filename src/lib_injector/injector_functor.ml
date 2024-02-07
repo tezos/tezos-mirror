@@ -1158,10 +1158,12 @@ module Make (Parameters : PARAMETERS) = struct
   (* The worker for the injector. *)
   module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
-  (* The queue for the requests to the injector worker is infinite. *)
-  type worker = Worker.infinite Worker.queue Worker.t
+  (* The injector worker can have a single pending injection request at a
+     time. *)
+  type worker = Worker.dropbox Worker.t
 
-  let table = Worker.create_table Queue
+  let table =
+    Worker.create_table (Dropbox {merge = (fun _w new_r _old_r -> Some new_r)})
 
   let tags_table = Tags_table.create 7
 
@@ -1269,10 +1271,10 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (_signer, w) ->
         let open Lwt_syntax in
         let worker_state = Worker.state w in
-        if has_tag_in ~tags worker_state then
+        if has_tag_in ~tags worker_state then (
           delay_strategy worker_state header @@ fun () ->
-          let* _pushed = Worker.Queue.push_request w Request.Inject in
-          return_unit
+          Worker.Dropbox.put_request w Request.Inject ;
+          return_unit)
         else Lwt.return_unit)
       workers
 
