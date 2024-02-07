@@ -8,15 +8,16 @@
 use crate::configuration::TezosContracts;
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
 use crate::sequencer_blueprint::SequencerBlueprint;
-use crate::simulation;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, create_chunked_transaction,
-    get_and_increment_deposit_nonce, remove_chunked_transaction, remove_sequencer,
-    store_last_info_per_level_timestamp, store_sequencer, store_transaction_chunk,
+    get_and_increment_deposit_nonce, read_last_info_per_level_timestamp,
+    remove_chunked_transaction, remove_sequencer, store_last_info_per_level_timestamp,
+    store_sequencer, store_transaction_chunk,
 };
 use crate::upgrade::*;
 use crate::Error;
+use crate::{simulation, upgrade};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
@@ -259,6 +260,23 @@ fn handle_deposit<Host: Runtime>(
     })
 }
 
+fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
+    match upgrade::read_kernel_upgrade(host)? {
+        Some(kernel_upgrade) => {
+            let current_timestamp = read_last_info_per_level_timestamp(host)?.i64();
+            let activation_timestamp = kernel_upgrade.activation_timestamp.i64();
+
+            if current_timestamp >= (activation_timestamp + 86400i64) {
+                // If the kernel upgrade still exist 1 day after it was supposed
+                // to be activated. It is possible to force its execution.
+                upgrade::upgrade(host, kernel_upgrade.preimage_hash)?
+            };
+            Ok(())
+        }
+        None => Ok(()),
+    }
+}
+
 pub fn handle_input(
     host: &mut impl Runtime,
     input: Input,
@@ -295,6 +313,7 @@ pub fn handle_input(
         Input::SequencerBlueprint(seq_blueprint) => {
             inbox_content.sequencer_blueprints.push(seq_blueprint)
         }
+        Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
     }
     Ok(())
 }

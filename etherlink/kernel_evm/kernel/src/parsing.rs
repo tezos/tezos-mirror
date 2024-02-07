@@ -68,6 +68,8 @@ const TRANSACTION_CHUNK_TAG: u8 = 2;
 
 const SEQUENCER_BLUEPRINT_TAG: u8 = 3;
 
+const FORCE_KERNEL_UPGRADE_TAG: u8 = 0xff;
+
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 1 // ExternalMessageFrame tag
             - 20 // Smart rollup address size (ExternalMessageFrame::Targetted)
@@ -96,6 +98,7 @@ pub enum Input {
     },
     Info(InfoPerLevel),
     SequencerBlueprint(SequencerBlueprint),
+    ForceKernelUpgrade,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -281,6 +284,7 @@ impl InputResult {
                     remaining,
                 )
             }
+            FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
             _ => InputResult::Unparsable,
         }
     }
