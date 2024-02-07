@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -32,6 +32,7 @@ const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 pub fn create_installer_config(
     root_hash: PreimageHash,
     setup_file: Option<OsString>,
+    preimages_dir: Option<&Path>,
 ) -> Result<OwnedConfigProgram, ConfigurationError> {
     let mut reveal_instructions = vec![
         OwnedConfigInstruction::reveal_instr(
@@ -44,6 +45,10 @@ pub fn create_installer_config(
         ),
     ];
 
+    let content_to_config = |content: Vec<u8>| {
+        crate::preimages::content_to_preimages(content, preimages_dir.unwrap()).ok()
+    };
+
     let setup_program: OwnedConfigProgram = match setup_file {
         None => OwnedConfigProgram(vec![]),
         Some(setup_file) => {
@@ -51,7 +56,7 @@ pub fn create_installer_config(
                 .map_err(ConfigurationError::FileNotFound)?;
             let yaml_config: YamlConfig = YamlConfig::from_reader(setup_file)
                 .map_err(ConfigurationError::ParseError)?;
-            yaml_config.try_into()?
+            yaml_config.to_config_program(content_to_config)?
         }
     };
 
