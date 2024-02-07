@@ -3049,14 +3049,24 @@ let event_with_topic_to_string = function
 
     More precisely, since topics depend on a pkh and the number of DAL slots,
     this function monitors all the events {pkh; slot_index = 0} ... {pkh;
-    slot_index = num_slots - 1}.
+    slot_index = num_slots - 1}. When the [already_seen_slots] array paramenter
+    is used however, the events corresponding to slot indices marked with [true]
+    in this array are not monitored.
 
     Depending on the value of [event_with_topic], some extra checks, such as the
     peer id in case of Graft and Subscribe, are also done.
 *)
-let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
-  let remaining = ref num_slots in
-  let seen = Array.make num_slots false in
+let check_events_with_topic ~event_with_topic dal_node ~num_slots
+    ?(already_seen_slots = Array.make num_slots false) expected_pkh =
+  assert (Array.length already_seen_slots = num_slots) ;
+  let remaining =
+    ref
+      (Array.fold_left
+         (fun remaining b -> if b then remaining else remaining + 1)
+         0
+         already_seen_slots)
+  in
+  let seen = Array.copy already_seen_slots in
   let get_slot_index_opt event =
     let*?? topic =
       match event_with_topic with
