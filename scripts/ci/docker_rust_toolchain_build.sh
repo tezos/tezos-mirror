@@ -25,12 +25,14 @@ if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
   git fetch origin "${CI_MERGE_REQUEST_DIFF_BASE_SHA}"
   merge_parent=$(git show -s --pretty=format:%H "${CI_MERGE_REQUEST_DIFF_BASE_SHA}^2" ||
     echo "merge_parent_not_found")
-else
+elif [ "{$CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]; then
   # This script is running in a master_branch pipelines.
   # Attempt to fetch cache from the predecessor of this commit.
   git fetch origin "${CI_COMMIT_BRANCH}" --depth 2
   merge_parent=$(git show -s --pretty=format:%H HEAD^2 ||
     echo "merge_parent_not_found")
+else
+  merge_parent="merge_parent_not_found"
 fi
 
 # Build image
