@@ -20,8 +20,6 @@ type secret = Poly.t
    X^{d-n} on G_2. *)
 
 (* Proves that degree(p) < t.max_polynomial_length *)
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
-   Generalize this function to pass the slot_size in parameter. *)
 let prove ~max_commit ~max_degree srs p =
   (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
      (2^21 elements in practice), so roughly 100MB. We can get rid of the
