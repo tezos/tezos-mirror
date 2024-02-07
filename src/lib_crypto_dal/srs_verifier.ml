@@ -135,76 +135,37 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
         page_length_domain
         offset_monomial_degree)
 
+exception Failed_to_load_trusted_setup of string
+
+let read_srs ?len ~path srs_of_bigstring =
+  let open Lwt_syntax in
+  let to_bigstring ~path =
+    let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
+    Lwt.finalize
+      (fun () ->
+        match
+          Lwt_bytes.map_file ~fd:(Lwt_unix.unix_file_descr fd) ~shared:false ()
+        with
+        | exception Unix.Unix_error (error_code, function_name, _) ->
+            raise
+              (Failed_to_load_trusted_setup
+                 (Format.sprintf
+                    "%s: Unix.Unix_error: %s"
+                    function_name
+                    (Unix.error_message error_code)))
+        | exception e ->
+            raise (Failed_to_load_trusted_setup (Printexc.to_string e))
+        | res -> Lwt.return res)
+      (fun () -> Lwt_unix.close fd)
+  in
+  let* srs_g1_bigstring = to_bigstring ~path in
+  Lwt.return @@ srs_of_bigstring ?len srs_g1_bigstring
+
+let read_srs_g1 ?len ~path () = read_srs ?len ~path Srs_g1.of_bigstring
+
+let read_srs_g2 ?len ~path () = read_srs ?len ~path Srs_g2.of_bigstring
+
 module Print = struct
-  (* This code is duplicated in cryptobox.ml *)
-  module Read = struct
-    type error += Failed_to_load_trusted_setup of string
-
-    let () =
-      register_error_kind
-        `Permanent
-        ~id:"dal.node.SRS_loading_failed"
-        ~title:"Trusted setup loading failed"
-        ~description:"Trusted setup failed to load"
-        ~pp:(fun ppf msg ->
-          Format.fprintf ppf "Trusted setup failed to load: %s" msg)
-        Data_encoding.(obj1 (req "msg" string))
-        (function
-          | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
-        (fun parameter -> Failed_to_load_trusted_setup parameter)
-      [@@coverage off]
-
-    let read_srs ?len ~srs_path srs_of_bigstring =
-      let open Lwt_result_syntax in
-      let to_bigstring ~path =
-        let open Lwt_syntax in
-        let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
-        Lwt.finalize
-          (fun () ->
-            return
-              (match
-                 Lwt_bytes.map_file
-                   ~fd:(Lwt_unix.unix_file_descr fd)
-                   ~shared:false
-                   ()
-               with
-              | exception Unix.Unix_error (error_code, function_name, _) ->
-                  Error
-                    [
-                      Failed_to_load_trusted_setup
-                        (Format.sprintf
-                           "%s: Unix.Unix_error: %s"
-                           function_name
-                           (Unix.error_message error_code));
-                    ]
-              | exception e ->
-                  Error [Failed_to_load_trusted_setup (Printexc.to_string e)]
-              | res -> Ok res))
-          (fun () -> Lwt_unix.close fd)
-      in
-      let* srs_bigstring = to_bigstring ~path:srs_path in
-      match srs_of_bigstring ?len srs_bigstring with
-      | Error (`End_of_file s) ->
-          tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
-      | Error (`Invalid_point p) ->
-          tzfail
-            (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
-      | Ok srs -> return srs
-
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
-
-       An integrity check is run to ensure the validity of the files. *)
-    let initialisation_parameters_from_file ?srs_size_log2 ~zcash_g1_path () =
-      let len = Option.map (fun i -> 1 lsl i) srs_size_log2 in
-      read_srs ?len ~srs_path:zcash_g1_path Srs_g1.of_bigstring
-
-    let read_srs_g1 ?len ~zcash_g1_path () =
-      read_srs ?len ~srs_path:zcash_g1_path Srs_g1.of_bigstring
-
-    let read_srs_g2 ?len ~zcash_g2_path () =
-      read_srs ?len ~srs_path:zcash_g2_path Srs_g2.of_bigstring
-  end
-
   (* Bounds (in log₂)
      1 <= redundancy<= 4
      7 <= page size + (redundancy + 1) <= slot size <= 20
@@ -310,8 +271,8 @@ module Print = struct
       ~zcash_g2_path params =
     let open Lwt_result_syntax in
     let srs_g1_size, lengths = generate_poly_lengths ~max_srs_size params in
-    let* srs_g1 = Read.read_srs_g1 ~len:srs_g1_size ~zcash_g1_path () in
-    let* srs_g2 = Read.read_srs_g2 ~zcash_g2_path () in
+    let* srs_g1 = read_srs_g1 ~len:srs_g1_size ~path:zcash_g1_path () in
+    let* srs_g2 = read_srs_g2 ~path:zcash_g2_path () in
     let srs2 =
       List.map
         (fun i ->

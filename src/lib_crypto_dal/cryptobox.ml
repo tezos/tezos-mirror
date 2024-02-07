@@ -63,41 +63,14 @@ let load_parameters parameters =
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
 
    An integrity check is run to ensure the validity of the files. *)
-(* This code is duplicated in Srs_verifier *)
-let initialisation_parameters_from_files ~srs_g1_path ~srs_size:len =
-  let open Lwt_result_syntax in
-  let to_bigstring ~path =
-    let open Lwt_syntax in
-    let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
-    Lwt.finalize
-      (fun () ->
-        return
-          (match
-             Lwt_bytes.map_file
-               ~fd:(Lwt_unix.unix_file_descr fd)
-               ~shared:false
-               ()
-           with
-          | exception Unix.Unix_error (error_code, function_name, _) ->
-              Error
-                [
-                  Failed_to_load_trusted_setup
-                    (Format.sprintf
-                       "%s: Unix.Unix_error: %s"
-                       function_name
-                       (Unix.error_message error_code));
-                ]
-          | exception e ->
-              Error [Failed_to_load_trusted_setup (Printexc.to_string e)]
-          | res -> Ok res))
-      (fun () -> Lwt_unix.close fd)
-  in
-  let* srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
-  match
-    let open Result_syntax in
-    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ~len in
-    return srs_g1
-  with
+(* TODO catch Failed_to_load_trusted_setup *)
+let initialisation_parameters_from_files ~srs_g1_path ~srs_size =
+  let open Lwt_syntax in
+  let* srs_g1 = Srs_verifier.read_srs_g1 ~len:srs_size ~path:srs_g1_path () in
+  let open Result_syntax in
+  Lwt.return
+  @@
+  match srs_g1 with
   | Error (`End_of_file s) ->
       tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
   | Error (`Invalid_point p) ->
