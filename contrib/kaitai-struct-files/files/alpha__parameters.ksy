@@ -183,8 +183,6 @@ types:
       type: s2
     - id: attestation_threshold
       type: s2
-    - id: blocks_per_epoch
-      type: s4
     - id: redundancy_factor
       type: u1
     - id: page_size
