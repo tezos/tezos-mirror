@@ -86,20 +86,16 @@ let delayed_transaction_hashes level rollup_node_endpoint =
       in
       return hashes
 
-let fetch_delayed_inbox_hashes ~level worker =
-  let state = Worker.state worker in
-  delayed_transaction_hashes level state.rollup_node_endpoint
+let fetch_delayed_inbox_hashes ~level ~rollup_node_endpoint =
+  delayed_transaction_hashes level rollup_node_endpoint
 
-let fetch_delayed_transactions ~hashes ~level worker =
+let fetch_delayed_transactions ~hashes ~level ~rollup_node_endpoint =
   let open Lwt_syntax in
-  let state = Worker.state worker in
   List.filter_map_p
     (fun key ->
       let hash = Ethereum_types.hash_of_string key in
       let path = Durable_storage_path.Delayed_transaction.transaction hash in
-      let* bytes =
-        read_from_rollup_node path level state.rollup_node_endpoint
-      in
+      let* bytes = read_from_rollup_node path level rollup_node_endpoint in
       match bytes with
       | Ok (Some bytes) ->
           return (Ethereum_types.Delayed_transaction.of_bytes hash bytes)
