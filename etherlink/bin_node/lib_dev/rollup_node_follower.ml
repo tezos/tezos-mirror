@@ -112,6 +112,7 @@ let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
 let process_new_block ~rollup_node_endpoint block =
   let open Lwt_syntax in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+  let* _ = Delayed_inbox.new_rollup_block finalized_level in
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in

@@ -34,17 +34,31 @@ module Name = struct
 end
 
 module Request = struct
-  type ('a, 'b) t = Unit : (unit, tztrace) t
+  type ('a, 'b) t = New_rollup_node_block : Int32.t -> (unit, error trace) t
 
   type view = View : _ t -> view
 
   let view (req : _ t) = View req
 
-  let encoding : view Data_encoding.t =
+  let encoding =
     let open Data_encoding in
-    conv (fun (View _) -> ()) (fun () -> View Unit) unit
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"New_rollup_node_block"
+          (obj2
+             (req "request" (constant "new_rollup_node_block"))
+             (req "rollup_head" int32))
+          (function
+            | View (New_rollup_node_block rollup_head) -> Some ((), rollup_head))
+          (fun ((), rollup_head) -> View (New_rollup_node_block rollup_head));
+      ]
 
-  let pp _ppf (View _) = ()
+  let pp ppf (View r) =
+    match r with
+    | New_rollup_node_block rollup_head ->
+        Format.fprintf ppf "New_rollup_node_block (level %ld)" rollup_head
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -112,6 +126,58 @@ let include_delayed_transaction delayed_transaction =
   let* _sent = Tx_pool.add_delayed delayed_transaction in
   return_unit
 
+let on_new_head
+    ({delayed_inbox_interval; rollup_node_endpoint; _} as state : Types.state)
+    level =
+  let open Lwt_syntax in
+  (* Fetch the delayed inbox with the given interval *)
+  if Int32.(rem level (of_int delayed_inbox_interval) <> 0l) then return_unit
+  else
+    (* Hashes in the delayed inbox *)
+    let* delayed_transaction_hashes =
+      fetch_delayed_inbox_hashes ~level ~rollup_node_endpoint
+    in
+    let* () =
+      match delayed_transaction_hashes with
+      | Error _err -> Delayed_inbox_events.fetch_failed ~level
+      | Ok delayed_transaction_hashes ->
+          (* Compute new hashes to avoid fetching transactions we already
+             know about. *)
+          let new_transaction_hashes =
+            List.filter
+              (fun tx_hash ->
+                not (StringSet.mem tx_hash state.pending_transactions))
+              delayed_transaction_hashes
+          in
+          let* () =
+            Delayed_inbox_events.fetch_succeeded
+              ~level
+              ~nb_txs:(List.length new_transaction_hashes)
+          in
+          (* The new pending set is just the fetched delayed inbox.
+             It's important to drop the transactions from the pending
+             set that are no longer present in the delayed inbox.
+             On the contrary, a transaction that is sent twice to the
+             delayed inbox at different levels would only be added to the
+             tx-pool once.
+          *)
+          let pending = StringSet.of_list delayed_transaction_hashes in
+          (* Fetch transactions for new hashes *)
+          let* new_delayed_transactions =
+            fetch_delayed_transactions
+              ~hashes:new_transaction_hashes
+              ~level
+              ~rollup_node_endpoint
+          in
+          state.pending_transactions <- pending ;
+          (* Add new transactions to the tx-pool *)
+          let* () =
+            List.iter_p include_delayed_transaction new_delayed_transactions
+          in
+          return_unit
+    in
+    return_unit
+
 module Handlers = struct
   type self = worker
 
@@ -119,9 +185,13 @@ module Handlers = struct
       type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
-   fun _w request ->
+   fun worker request ->
+    let open Lwt_result_syntax in
     match request with
-    | Request.Unit -> protect @@ fun () -> Lwt_result_syntax.return_unit
+    | Request.New_rollup_node_block rollup_block_lvl ->
+        protect @@ fun () ->
+        let*! () = on_new_head (Worker.state worker) rollup_block_lvl in
+        return_unit
 
   type launch_error = error trace
 
@@ -160,85 +230,10 @@ let worker =
     | Lwt.Return worker -> Ok worker
     | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_delayed_inbox))
 
-let rec subscribe_delayed_inbox ~stream_l2 ~interval worker =
-  let open Lwt_syntax in
-  let open Sc_rollup_block in
-  let* new_head = Lwt_stream.get stream_l2 in
-  match new_head with
-  | None ->
-      let* () = Delayed_inbox_events.connection_lost () in
-      Worker.shutdown worker
-  | Some block ->
-      let level = block.header.level in
-      (* Fetch the delayed inbox with the given interval *)
-      if Int32.(rem level (of_int interval) <> 0l) then
-        subscribe_delayed_inbox ~stream_l2 ~interval worker
-      else
-        (* Retrieve the delayed transactions 2 blocks before,
-           to make sure the block is final. *)
-        let final_level = Int32.(sub level 2l) in
-        let state = Worker.state worker in
-        (* Hashes in the delayed inbox *)
-        let* delayed_transaction_hashes =
-          fetch_delayed_inbox_hashes ~level:final_level worker
-        in
-        let* () =
-          match delayed_transaction_hashes with
-          | Error _err -> Delayed_inbox_events.fetch_failed ~level
-          | Ok delayed_transaction_hashes ->
-              (* Compute new hashes to avoid fetching transactions we already
-                 know about. *)
-              let new_transaction_hashes =
-                List.filter
-                  (fun tx_hash ->
-                    not (StringSet.mem tx_hash state.pending_transactions))
-                  delayed_transaction_hashes
-              in
-              let* () =
-                Delayed_inbox_events.fetch_succeeded
-                  ~level
-                  ~nb_txs:(List.length new_transaction_hashes)
-              in
-              (* The new pending set is just the fetched delayed inbox.
-                 It's important to drop the transactions from the pending
-                 set that are no longer present in the delayed inbox.
-                 On the contrary, a transaction that is sent twice to the
-                 delayed inbox at different levels would only be added to the
-                 tx-pool once.
-              *)
-              let pending = StringSet.of_list delayed_transaction_hashes in
-              (* Fetch transactions for new hashes *)
-              let* new_delayed_transactions =
-                fetch_delayed_transactions
-                  ~hashes:new_transaction_hashes
-                  ~level:final_level
-                  worker
-              in
-              state.pending_transactions <- pending ;
-              (* Add new transactions to the tx-pool *)
-              let* () =
-                List.iter_p include_delayed_transaction new_delayed_transactions
-              in
-              return_unit
-        in
-        subscribe_delayed_inbox ~stream_l2 ~interval worker
-
-let start ({rollup_node_endpoint; delayed_inbox_interval; _} as parameters) =
+let start parameters =
   let open Lwt_result_syntax in
   let*! () = Delayed_inbox_events.started () in
   let+ worker = Worker.launch table () parameters (module Handlers) in
-  let () =
-    Lwt.dont_wait
-      (fun () ->
-        let*! stream_l2 =
-          Rollup_node_services.make_streamed_call ~rollup_node_endpoint
-        in
-        subscribe_delayed_inbox
-          ~stream_l2
-          ~interval:delayed_inbox_interval
-          worker)
-      (fun _ -> ())
-  in
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
@@ -248,3 +243,15 @@ let shutdown () =
       (* There is no delayed inbox, nothing to do *)
       Lwt.return_unit
   | Ok w -> Worker.shutdown w
+
+let worker_add_request ~request : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  match Lazy.force worker with
+  | Ok w ->
+      let*! (_pushed : bool) = Worker.Queue.push_request w request in
+      return_unit
+  | Error [No_delayed_inbox] -> return_unit
+  | Error e -> Lwt.return (Error e)
+
+let new_rollup_block rollup_level =
+  worker_add_request ~request:(New_rollup_node_block rollup_level)
