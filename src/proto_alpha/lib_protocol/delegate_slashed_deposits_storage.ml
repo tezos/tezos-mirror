@@ -60,14 +60,10 @@ let record_denunciation ctxt ~operation_hash
     Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
   in
   let delegate_contract = Contract_repr.Implicit delegate in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* slash_history_opt =
     Storage.Contract.Slashed_deposits.find ctxt delegate_contract
   in
   let slash_history = Option.value slash_history_opt ~default:[] in
-  let previously_slashed_this_cycle =
-    Storage.Slashed_deposits_history.get current_cycle slash_history
-  in
   let slash_history =
     Storage.Slashed_deposits_history.add
       level.cycle
@@ -78,18 +74,12 @@ let record_denunciation ctxt ~operation_hash
     Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
   in
   let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
-  let* ctxt =
-    if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
-      (* Do not store denunciations that have no effects .*) return ctxt
-    else
-      Pending_denunciations_storage.add_denunciation
-        ctxt
-        ~misbehaving_delegate:delegate
-        operation_hash
-        ~rewarded_delegate:rewarded
-        misbehaviour
-  in
-  return ctxt
+  Pending_denunciations_storage.add_denunciation
+    ctxt
+    ~misbehaving_delegate:delegate
+    operation_hash
+    ~rewarded_delegate:rewarded
+    misbehaviour
 
 let punish_double_signing ctxt ~operation_hash misbehaviour delegate
     (level : Level_repr.t) ~rewarded =
