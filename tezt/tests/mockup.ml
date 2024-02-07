@@ -1189,9 +1189,9 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              ("consensus_threshold", `Float 0.0);
            ]
     in
-    (* To fulfill the requirement that [blocks_per_epoch] divides
-       [blocks_per_cycle], we set [blocks_per_cycle] to 1, for simplicity (even
-       if the default value is also 1). *)
+    (* To fulfill the requirement that [blocks_per_epoch], present in protocols
+       up to O, divides [blocks_per_cycle], we set [blocks_per_cycle] to 1, for
+       simplicity (even if the default value is also 1). *)
     let updated_dal_parametric =
       let dal_parametric_constants_succ =
         JSON.(parametric_constants_succ |-> "dal_parametric")
@@ -1260,12 +1260,18 @@ let test_create_mockup_config_show_init_roundtrip protocols =
                  JSON.unannotate new_adaptive_rewards_params );
              ]
     in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
+       remove when `blocks_per_epoch` is not used anymore in tests *)
+    let parametric_constants_succ =
+      if Protocol.number protocol > 018 then parametric_constants_succ
+      else JSON.merge_objects parametric_constants_succ updated_dal_parametric
+    in
     return
       JSON.(
         merge_objects
           (merge_objects
              (merge_objects
-                (merge_objects parametric_constants_succ updated_dal_parametric)
+                parametric_constants_succ
                 constant_parametric_constants)
              mockup_constants)
           co_primed_adaptive_rewards)
