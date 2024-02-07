@@ -141,7 +141,7 @@ let default_cryptobox_parameters =
 let default_dal =
   Constants.Parametric.
     {
-      feature_enable = false;
+      feature_enable = true;
       incentives_enable = false;
       number_of_slots = 256;
       attestation_lag = 4;
