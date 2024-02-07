@@ -45,7 +45,6 @@ module Plugin = struct
       attestation_lag;
       attestation_threshold;
       cryptobox_parameters;
-      blocks_per_epoch;
     } =
       parametric.dal
     in
@@ -57,7 +56,6 @@ module Plugin = struct
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
-        blocks_per_epoch;
       }
 
   let block_info ?chain ?block ~metadata ctxt =

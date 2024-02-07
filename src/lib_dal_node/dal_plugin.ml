@@ -40,7 +40,6 @@ type proto_parameters = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
-  blocks_per_epoch : int32;
 }
 
 module type T = sig

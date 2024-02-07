@@ -77,11 +77,7 @@ module Publish_slot_header : Benchmark.S = struct
     let open Lwt_result_wrap_syntax in
     let bench_promise =
       let dal =
-        {
-          Default_parameters.constants_mainnet.dal with
-          blocks_per_epoch = 1l;
-          feature_enable = true;
-        }
+        {Default_parameters.constants_mainnet.dal with feature_enable = true}
       in
       let* ctxt, _ = Execution_context.make ~dal ~rng_state () in
       let* cryptobox =
