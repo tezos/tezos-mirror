@@ -284,11 +284,16 @@ module Print = struct
             (Srs_g1.get srs_g1 i |> G1.to_compressed_bytes |> Hex.of_bytes
            |> Hex.show))
     in
-    Printf.printf
+    let oc = open_out "/home/anne-laure/Documents/tezos/out_bis" in
+    Printf.fprintf
+      oc
       "\n\nlet srs_g1 = [|\n  %s\n|] |> read_srs_g1"
       (String.concat " ;\n  " @@ srs1) ;
-    Printf.printf
+    Printf.fprintf
+      oc
       "\n\nlet srs_g2 = [\n  %s\n] |> read_srs_g2"
       (String.concat " ;\n  " @@ srs2) ;
+    close_out oc ;
+    assert (1 = 2) ;
     return_unit
 end

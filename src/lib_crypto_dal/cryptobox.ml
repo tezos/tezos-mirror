@@ -25,7 +25,11 @@
 
 open Error_monad
 include Cryptobox_intf
-open Kzg.Bls
+module Srs_g1 = Kzg.Bls.Srs_g1
+module Scalar = Kzg.Bls.Scalar
+module Poly = Kzg.Bls.Poly
+module Domain = Kzg.Bls.Domain
+module Evals = Kzg.Bls.Evals
 module FFT = Kzg.Utils.FFT
 module Degree_check = Kzg.Degree_check
 module Kate_amortized = Kzg.Kate_amortized
@@ -66,7 +70,7 @@ let load_parameters parameters =
 (* TODO catch Failed_to_load_trusted_setup *)
 let initialisation_parameters_from_files ~srs_g1_path ~srs_size =
   let open Lwt_syntax in
-  let* srs_g1 = Srs_verifier.read_srs_g1 ~len:srs_size ~path:srs_g1_path () in
+  let* srs_g1 = Srs.read_srs_g1 ~len:srs_size ~path:srs_g1_path () in
   let open Result_syntax in
   Lwt.return
   @@
@@ -231,7 +235,7 @@ module Inner = struct
        polynomial. *)
     remaining_bytes : int;
     (* These srs_g2_* parameters are used by the verifier to check the proofs *)
-    srs_g2 : Srs_verifier.srs_verifier;
+    srs_g2 : Srs.srs_verifier;
     mode : [`Verifier | `Prover];
     kate_amortized : Kate_amortized.public_parameters;
   }
@@ -246,7 +250,7 @@ module Inner = struct
         ~redundancy_factor
         ~number_of_shards
     in
-    Srs_verifier.ensure_srs_validity
+    Srs.ensure_srs_validity
       ~test
       ~mode
       ~slot_size
@@ -270,8 +274,8 @@ module Inner = struct
     match initialisation_parameters with
     | Verifier {test} ->
         let srs =
-          if test then Srs_verifier.Internal_for_tests.get_verifier_srs1 ()
-          else Srs_verifier.get_verifier_srs1 ()
+          if test then Srs.Internal_for_tests.get_verifier_srs1 ()
+          else Srs.get_verifier_srs1 ()
         in
         (`Verifier, srs, test)
     | Prover {test; srs} -> (`Prover, srs, test)
@@ -330,8 +334,8 @@ module Inner = struct
           ~srs_g1_length:(Srs_g1.size srs_g1)
       in
       let srs_g2 =
-        (if test then Srs_verifier.Internal_for_tests.get_verifier_srs2
-        else Srs_verifier.get_verifier_srs2)
+        (if test then Srs.Internal_for_tests.get_verifier_srs2
+        else Srs.get_verifier_srs2)
           ~max_polynomial_length
           ~page_length_domain
           ~shard_length
@@ -863,7 +867,7 @@ module Inner = struct
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
-    let srs_0 = G2.one in
+    let srs_0 = Kzg.Bls.G2.one in
     let srs_n_d = t.srs_g2.commitment in
     Degree_check.verify {srs_0; srs_n_d} cm proof
 
@@ -1036,7 +1040,7 @@ module Verifier = Inner
 
 module Internal_for_tests = struct
   let prover_parameters () =
-    Prover {test = true; srs = Srs_verifier.Internal_for_tests.fake_srs ()}
+    Prover {test = true; srs = Srs.Internal_for_tests.fake_srs ()}
 
   (* Since computing fake_srs is costly, we avoid to recompute it. *)
   let init_prover_dal () =
