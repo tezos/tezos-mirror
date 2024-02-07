@@ -1,0 +1,2772 @@
+[
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_storage.ml",
+    "title": "alpha: sc rollup storage (fetching last final commitment hash and level of missing rollup fails)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "11598",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_global_constants_storage.ml",
+    "title": "alpha: Global constants storage (register: fails with unregistered references)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "8886",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_gas_monad.ml",
+    "title": "alpha: gas monad (successful result with remaining gas)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "11906",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_fixed_point.ml",
+    "title": "alpha: fixed point computation (FP tests (3 decimals))",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "232",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_dal_slot_proof.ml",
+    "title": "alpha: dal slot proof ([test] add a slot on top of genesis that satisfies ordering (1/2))",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "8116816",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_adaptive_issuance.ml",
+    "title": "alpha: adaptive issuance (adaptive issuance - reward coeff computation)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "175",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/operations/test_zk_rollup.ml",
+    "title": "alpha: zk rollup (update with more public operations than pending)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "2972684",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/operations/test_sc_rollup.ml",
+    "title": "alpha: sc rollup (win refutation game by forfeit)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "109369",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_typechecking.ml",
+    "title": "alpha: typechecking (lambda_rec instruction with apply)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "10499",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_ticket_storage.ml",
+    "title": "alpha: ticket storage (no overlapping keys for content)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "8454",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_ticket_lazy_storage_diff.ml",
+    "title": "alpha: ticket lazy storage diff (Remove)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "9934",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_script_typed_ir_size.ml",
+    "title": "alpha: script typed ir size (micheline sizes)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "190",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_sapling.ml",
+    "title": "alpha: sapling (use state from other contract and transact)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "943162",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/consensus/test_preattestation.ml",
+    "title": "alpha: preattestation (ConstrMode: ko: preattestation_in_block_with_wrong_signature)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "18377",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/consensus/test_delegation.ml",
+    "title": "alpha: delegation (valid delegate registration: credit 1μꜩ, self delegation (init with delegation))",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "15954",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/consensus/test_attestation.ml",
+    "title": "alpha: attestation (two DAL attestations with same attester in a block)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "14744",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_liquidity_baking.ml",
+    "title": "alpha: liquidity baking (liquidity baking toggle vote with 80% of bakers voting Per_block_vote_off baking one block longer)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "1216903",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_constants.ml",
+    "title": "alpha: test constants (test liquidity_baking_subsidy parameter is 1/16th of total baking rewards)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "166",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "alpha: adaptive issuance roundtrip (Test simple roundtrip: AI activated, self stake, no wait after stake, half unstake)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "324708",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "alpha: adaptive issuance roundtrip (Test simple slashing: ns_enable = true, No AI, double attesting, denounce next cycle, another slash, double preattesting)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "111027",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "alpha: adaptive issuance roundtrip (Test slashed is forbidden: ns_enable = true, Two double attestations, too far apart to forbid, late first denounce, late second denounce)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "282880",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "alpha: adaptive issuance roundtrip (Test slash timing: ns_enable = false, stake, without another slash, 4 cycles lag)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "134014",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_client/test/test_michelson_v1_macros.ml",
+    "title": "alpha: micheline v1 macros (if_right unexpansion)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "291",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/unit/test_tez_repr.ml",
+    "title": "018-Proxford: Tez_repr.ml (Tez.mul: overflow case)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "183",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/unit/test_sc_rollup_storage.ml",
+    "title": "018-Proxford: sc rollup storage (withdraw fails when staked after LCC)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "11372",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/unit/test_sc_rollup_management_protocol.ml",
+    "title": "018-Proxford: sc rollup management protocol (Whitelist size is borned by max_msg_size)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "19651",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/unit/test_merkle_list.ml",
+    "title": "018-Proxford: merkle list (path_encoding)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "203",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/regression/test_logging.ml",
+    "title": "018_Proxford: ticket_join",
+    "tags": [
+      "regression",
+      "protocol",
+      "regression",
+      "logging"
+    ],
+    "successful_runs": {
+      "total_time": "11466",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/validate/test_manager_operation_validation.ml",
+    "title": "018-Proxford: single manager validation (zkru disabled)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "17700283",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/operations/test_voting.ml",
+    "title": "018-Proxford: voting (voting proposal, with quorum)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "15538",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/operations/test_transfer.ml",
+    "title": "018-Proxford: transfer (storage fees after contract call and allocation)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "14570",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/operations/test_sc_rollup.ml",
+    "title": "018-Proxford: sc rollup (Update the whitelist with duplicated keys)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "11828",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/operations/test_reveal.ml",
+    "title": "018-Proxford: revelation (empty account on reveal)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "11935",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/michelson/test_ticket_scanner.ml",
+    "title": "018-Proxford: ticket scanner (tickets in big map with include lazy set to false)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "9944",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/michelson/test_ticket_balance.ml",
+    "title": "018-Proxford: ticket balance (swap big-map)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "20883",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/michelson/test_interpretation.ml",
+    "title": "018-Proxford: interpretation (test error encoding: Cannot_serialize_storage)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "208",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/consensus/test_frozen_deposits.ml",
+    "title": "018-Proxford: frozen deposits (deposits after stake removal)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "32685",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/consensus/test_double_attestation.ml",
+    "title": "018-Proxford: double attestation (too late double attestation evidence)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "29317",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/consensus/test_delegation.ml",
+    "title": "018-Proxford: delegation (bootstrap contracts can change their delegate (max fee))",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "9367",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/consensus/test_baking.ml",
+    "title": "018-Proxford: baking (committee sampling)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "201159",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "018-Proxford: adaptive issuance roundtrip (Test auto-staking: No Ai, increase delegation)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "126567",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "018-Proxford: adaptive issuance roundtrip (Test simple slashing: No AI, double preattesting, denounce next cycle, another slash, double preattesting)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "99042",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_protocol/test/integration/test_adaptive_issuance_roundtrip.ml",
+    "title": "018-Proxford: adaptive issuance roundtrip (Test slashed is forbidden: Two double attestations, in consecutive cycles, late first denounce, late second denounce)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "192348",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_plugin/test/test_conflict_handler.ml",
+    "title": "018-Proxford/plugin: conflict_handler: manager operations",
+    "tags": [
+      "oxford",
+      "plugin",
+      "mempool",
+      "conflict_handler",
+      "manager",
+      "random"
+    ],
+    "successful_runs": {
+      "total_time": "449594",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_018_Proxford/lib_client/test/test_michelson_v1_macros.ml",
+    "title": "018-Proxford: micheline v1 macros (unpair expansion)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "185",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_tez_repr.ml",
+    "title": "017-PtNairob: Tez_repr.ml (Tez.add: overflow)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "149",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_sc_rollup_storage.ml",
+    "title": "017-PtNairob: sc rollup storage (remove staker)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "8414",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "017-PtNairob: sc rollup inbox (Empty merkelized payload hashes proof fails.)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "138",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_saturation.ml",
+    "title": "017-PtNairob: saturation arithmetic (Subtraction)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "133",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_liquidity_baking_repr.ml",
+    "title": "017-PtNairob: liquidity baking (voting On and Off have symmetric effects on the EMA)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "141",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_gas_monad.ml",
+    "title": "017-PtNairob: gas monad (inner error)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "7747",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/unit/test_fitness.ml",
+    "title": "017-PtNairob: fitness (from/to raw fitness is identity)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "154",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/validate/test_validation_batch.ml",
+    "title": "017-PtNairob: batched managers validation (empty balance in middle of batch)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "10359742",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/validate/test_manager_operation_validation.ml",
+    "title": "017-PtNairob: single manager validation (unallocated source)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "9801927",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/operations/test_voting.ml",
+    "title": "017-PtNairob: voting (voting quorum, quorum capped minimum)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "205141",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/operations/test_transfer.ml",
+    "title": "017-PtNairob: transfer (transfer to originated contract paying transaction fee)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "10990",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/michelson/test_ticket_scanner.ml",
+    "title": "017-PtNairob: ticket scanner (tickets in list with zero amount)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "7378",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/michelson/test_ticket_balance_key.ml",
+    "title": "017-PtNairob: ticket balance key (annotations for paired ors)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "7726",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/consensus/test_preendorsement.ml",
+    "title": "017-PtNairob: preendorsement (Preendorsement for old level)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "9978",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/consensus/test_double_baking.ml",
+    "title": "017-PtNairob: double baking (wrong delegate)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "9092",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_protocol/test/integration/consensus/test_delegation.ml",
+    "title": "017-PtNairob: delegation (bootstrap contracts delegate to themselves)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "4937",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_017_PtNairob/lib_client/test/test_michelson_v1_macros.ml",
+    "title": "017-PtNairob: micheline v1 macros (map_car expansion)",
+    "tags": [
+      "alcotezt",
+      "quick",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "164",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_tree_encoding/test/test_encoding.ml",
+    "title": "test lib tree encoding: Encodings (Int)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "154",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_store/unix/test/test_store.ml",
+    "title": "tezos-store: store (new blocks)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "24017",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_store/unix/test/test.ml",
+    "title": "tezos-store: reconstruct (Reconstructing on a bootstrapped Full mode + 1 extra cycles node with 57 blocks.)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "837828",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_store/unix/test/test.ml",
+    "title": "tezos-store: history_mode_switch (switching from Full mode + 5 extra cycles to Full mode + 1 extra cycles with 72 blocks baked and cycle length 8)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "622488",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_stdlib/test-unix/test_lwt_utils.ml",
+    "title": "Lwt_utils: pick_fulfilled (test_multi_successful)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "209",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_stdlib/test-unix/test_circular_buffer.ml",
+    "title": "tezos-stdlib: circular_buffer.constant-chunks.partial-read-write-interleaving (perfect-fit)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "7652",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_stdlib/test/test_hash_queue.ml",
+    "title": "stdlib: hash_queue (replace)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "134",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_shell/test/test_shell_operation.ml",
+    "title": "Shell_operation: Ddb leaks (handle_refused:128 calls)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "427",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_shell/test/test_consensus_heuristic.ml",
+    "title": "tezos-shell: consensus heuristic sync (create_state_bad_threshold)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "106",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_wasm_pvm.ml",
+    "title": "test lib scoru wasm: WASM PVM (Test store-list-size kernel (2.0.0-r4))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "6384",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_wasm_pvm.ml",
+    "title": "test lib scoru wasm: WASM PVM (Test modifying read-only storage fails (2.0.0-r4))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "3380",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_input.ml",
+    "title": "test lib scoru wasm: Input (Write input beyond memory bounds doesn't dequeue the input)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "147",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_init.ml",
+    "title": "test lib scoru wasm: Module Initialisation (init requires memory 0 export (2.0.0-r1))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "2076",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_get_set.ml",
+    "title": "test lib scoru wasm: Set/get (Set input (2.0.0-r2))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "305",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_durable_storage.ml",
+    "title": "test lib scoru wasm: Durable storage (store_copy missing node (2.0.0))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "374",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_durable_storage.ml",
+    "title": "test lib scoru wasm: Durable storage (store_move missing node (2.0.0))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "371",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/regressions/tezos_scoru_wasm_regressions.ml",
+    "title": "kernel link_reveal run (proof, v3)",
+    "tags": [
+      "regression",
+      "wasm_2_0_0",
+      "link_reveal",
+      "proof",
+      "v3"
+    ],
+    "successful_runs": {
+      "total_time": "3556088",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_scoru_wasm/fast/test/test_fast.ml",
+    "title": "test lib scoru-wasm-fast: Fast Execution (Computation kernel (2.0.0-r4))",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "233947",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_requester/test/test_requester.ml",
+    "title": "tezos-requester: all (test clear_or_cancel: removes)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "241",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_polynomial/test/test_with_finite_field.ml",
+    "title": "Polynomials with F379 and some random prime fields: Test evaluation, field order = 209015887 (evaluation at any point of the polynomial X)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "216",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_polynomial/test/test_with_finite_field.ml",
+    "title": "Polynomials with F379 and some random prime fields: Tests for constant polynomials, field order = 209015887 (Non constant polynomial)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "1153",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_polynomial/test/test_with_finite_field.ml",
+    "title": "Polynomials with F379 and some random prime fields: Evaluation FFT for prime field 52435875175126190479447740508185965837690552500527637822603658699938581184513 (test evaluation at random points)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "1106",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_vesta_projective.ml",
+    "title": "Vesta projective coordinates: value generation (double_with_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "191",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_vesta_jacobian.ml",
+    "title": "Vesta jacobian coordinates: Group properties (opposite_of_opposite_of_zero_is_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "191",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_vesta_affine.ml",
+    "title": "Vesta affine coordinates: Group properties (check_bytes_one)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "131",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_tweedledum_projective.ml",
+    "title": "Tweedledum projective coordinates: Group properties (check_bytes_random_double)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13783",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_tweedledum_affine.ml",
+    "title": "Tweedledum affine coordinates: value generation (double_with_one)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "179",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_tweedledee_projective.ml",
+    "title": "Tweedledee projective coordinates: Group properties (zero is the identity)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13583",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_tweedledee_jacobian.ml",
+    "title": "Tweedledee jacobian coordinates: Group properties (check_bytes_random_sum)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "27410",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_secp256r1_projective.ml",
+    "title": "secp256r1 projective coordinates: Group properties (zero is the identity)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "4215",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_secp256r1_jacobian.ml",
+    "title": "secp256r1 jacobian coordinates: Group properties (check_bytes_random_sum)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "8177",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_secp256k1_projective.ml",
+    "title": "secp256k1 projective coordinates: value generation (double_with_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "166",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_secp256k1_jacobian.ml",
+    "title": "secp256k1 jacobian coordinates: Group properties (opposite_of_opposite_using_scalar)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "4169",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_secp256k1_affine.ml",
+    "title": "secp256k1 affine coordinates: Group properties (check_bytes_random_double)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "4937",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_poseidon252.ml",
+    "title": "Poseidon252: Test vectors for Poseidon252 (Test vectors from dusk-network/poseidon252)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "6747",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_pallas_projective.ml",
+    "title": "Pallas projective coordinates: Group properties (opposite_existential_property)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13063",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_pallas_jacobian.ml",
+    "title": "Pallas jacobian coordinates: Group properties (additive_associativity)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "41207",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_jubjub_weierstrass.ml",
+    "title": "Jubjub - Weierstrass - Affine coordinates: Compressed representation (Compressed version is half the size)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "357",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_jubjub.ml",
+    "title": "Jubjub: Group properties (check_bytes_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "16849",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_digestif.ml",
+    "title": "Digestif fork: Blake2b properties (Feed twice and finalize gives the same result than feeding with the concatenation and finalize)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13427",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_curve25519_montgomery.ml",
+    "title": "Curve25519: value generation (of_bytes_exn and to_bytes are inverse functions)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "10441",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_curve25519_affine_edwards.ml",
+    "title": "Curve25519 edwards form and affine coordinates: Group properties (zero_scalar_nullifier_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "152",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bn254_projective.ml",
+    "title": "BN254 projective form: value generation (negate generates a valid point)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "3524",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bn254_jacobian.ml",
+    "title": "BN254 jacobian coordinates: Group properties (opposite_of_opposite_using_scalar)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "3429",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bn254_affine.ml",
+    "title": "BN254 affine form: Group properties (check_bytes_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "3372",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bls12_381_affine.ml",
+    "title": "BLS12-381 G1 affine form: value generation (negate_with_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "183053",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bandersnatch_affine_weierstrass.ml",
+    "title": "Bandersnatch Weierstrass form, affine coordinates: value generation (double_with_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "200",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bandersnatch_affine_montgomery.ml",
+    "title": "Bandersnatch Montgomery form and affine coordinates: Group properties (zero_scalar_nullifier_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13982",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_bandersnatch_affine_edwards.ml",
+    "title": "Bandersnatch Edwards form, affine coordinates: Group properties (inverse on scalar)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "910526",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_mec/test/test_babyjubjub.ml",
+    "title": "BabyJubjub: Group properties (check_bytes_one)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "200",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_lwt_result_stdlib/test/test_list_basic.ml",
+    "title": "list-basic: product (big)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "159",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_hacl/test/test_hacl.ml",
+    "title": "tezos-crypto: hash (sha256_seq)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "154",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_dac/test/test_dac_clic_helpers.ml",
+    "title": "lib_dac: Dac_clic_helpers.Parsed_rpc (Test `https://{endpoint}:{port}` is valid)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "194",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_context/memory/test/test.ml",
+    "title": "tezos-context-memory: hash (large-dir-300)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "5322",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_signature/test/test_signature.ml",
+    "title": "BLS Signature: MinPk Properties and test vectors for Message augmentation (Sign and verify same message with correct keys)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "261778",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_signature/test/test_signature.ml",
+    "title": "BLS Signature: MinSig Properties and test vectors for Message augmentation (Sign and verify different message with different keys)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "260430",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_signature/test/test_aggregated_signature.ml",
+    "title": "BLS Aggregated Signature: minSig Properties for Proof of possession (Sign and verify correct signature with some incorrect pks and correct pops and msg)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "143699",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_polynomial/test/test_main.ml",
+    "title": "PlonK: Polynomial_c (test_linear)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "14900",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_polynomial/test/test_main.ml",
+    "title": "PlonK: Evaluations_c (test_add_zero)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "3177",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_hash/test/test_anemoi.ml",
+    "title": "The permutation Anemoi and the mode of operation Jive: Generic instantiations (l = 3 -> tests vectors from reference implementation)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "983",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_pairing.ml",
+    "title": "Pairing: Properties (test miller loop on empty list returns one)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "119",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_gt.ml",
+    "title": "GT: value generation (negate_with_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "86493",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_g2.ml",
+    "title": "G2: Curve properties (zero_scalar_nullifier_random)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "128051",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_g1.ml",
+    "title": "G1: Bulk operations (pippenger contiguous with len argument)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "13753",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_g1.ml",
+    "title": "G1: Representation of G1 Uncompressed (of_bytes_[opt/exn] verifies the point is in the prime subgroup)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "1335",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381/test/test_fr.ml",
+    "title": "Fr: Inplace operations (mul with same value as output)",
+    "tags": [
+      "alcotezt",
+      "quick"
+    ],
+    "successful_runs": {
+      "total_time": "373",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check RPC web3_clientVersion (sequencer)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "client_version",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "6177460",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: RPC methods eth_getUncleByBlockHashAndIndex and eth_getUncleByBlockNumberAndIndex (sequencer)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "get_uncle_by_block_arg_and_index",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "7311229",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/client_keys.ml",
+    "title": "Add a duplicate address",
+    "tags": [
+      "admin_client",
+      "client",
+      "duplicate",
+      "keys"
+    ],
+    "successful_runs": {
+      "total_time": "2142354",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - node advances PVM state with messages (external)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "etherlink",
+      "node",
+      "pvm",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "10490703",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: wasm_2_0_0 - Rollup node uses argument boot sector file",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "boot_sector",
+      "boot_sector_file",
+      "client",
+      "etherlink",
+      "node",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "3558349",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/protocol_migration.ml",
+    "title": "protocol migration at level 11",
+    "tags": [
+      "admin_client",
+      "client",
+      "migration",
+      "node",
+      "protocol",
+      "sandbox"
+    ],
+    "successful_runs": {
+      "total_time": "16952081",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/baker_test.ml",
+    "title": "Alpha: baker stresstest with forced application",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "apply",
+      "baker",
+      "baker_alpha",
+      "client",
+      "node",
+      "stresstest"
+    ],
+    "successful_runs": {
+      "total_time": "22250956",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/baking.ml",
+    "title": "Nairobi: baking ordering",
+    "tags": [
+      "admin_client",
+      "baking",
+      "client",
+      "nairobi",
+      "node",
+      "ordering"
+    ],
+    "successful_runs": {
+      "total_time": "6211526",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/baking.ml",
+    "title": "Nairobi: External operations are ordered (1 transfers, max 1 operations)",
+    "tags": [
+      "admin_client",
+      "baking",
+      "client",
+      "nairobi",
+      "node",
+      "operations_pool"
+    ],
+    "successful_runs": {
+      "total_time": "6077492",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/client_fa12.ml",
+    "title": "Nairobi: test fa1.2, get total_supply offchain [mini_scenarios/fa12_reference]",
+    "tags": [
+      "admin_client",
+      "client",
+      "fa12",
+      "fa12_reference",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "1582817",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/client_keys.ml",
+    "title": "Oxford: Test remember contract",
+    "tags": [
+      "admin_client",
+      "client",
+      "contract",
+      "oxford",
+      "remember"
+    ],
+    "successful_runs": {
+      "total_time": "2083728",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_onchain_opcodes.ml",
+    "title": "Oxford: Contract onchain opcodes: test_contract_fails",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "contract",
+      "onchain",
+      "opcodes",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "930666",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_onchain_opcodes.ml",
+    "title": "Alpha: Contract onchain opcodes: test_contract_fails",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "contract",
+      "onchain",
+      "opcodes"
+    ],
+    "successful_runs": {
+      "total_time": "928376",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [slice--storage364922380--input551316239]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "306784",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: opcodes [not--storage921624073--input954397288]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "295797",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [or--storage921624073--input908807505]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "309724",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: opcodes [shifts--storage921624073--input340971987]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "299381",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: opcodes [concat_list--storage79230375--input457300675]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "315989",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: opcodes [concat_hello_bytes--storage457300675--input441061063]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "298632",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [list_iter--storage680650890--input568817463]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "301141",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: opcodes [set_iter--storage492856247--input802622031]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "295905",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: opcodes [if--storage921624073--input954397288]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "303121",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [abs--storage125992234--input254251340]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "298295",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [dign--storage680650890--input529388602]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "310407",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: opcodes [keccak--storage921624073--input1008262038]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "297391",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Nairobi: opcodes [bls12_381_fr_z_nat--storage994282947--input453441034]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "303703",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: opcodes [bls12_381_fr_push_bytes_not_padded--storage921624073--input125992234]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "300616",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: opcodes [bls12_381_fr_to_int--storage680650890--input151303925]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "294968",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: opcodes [mutez_to_bls12_381_fr--storage151303925--input216277421]",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "294078",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Oxford: test Michelson opcodes: check_signature",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "902611",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_opcodes.ml",
+    "title": "Alpha: test Michelson opcodes: hash_consistency",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "894857",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_macros.ml",
+    "title": "Alpha: macros [build_list--storage457300675--input654274102]",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "macros",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "296362",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_macros.ml",
+    "title": "Oxford: macros [max_in_list--storage921624073--input457300675]",
+    "tags": [
+      "admin_client",
+      "client",
+      "macros",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "294116",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_macros.ml",
+    "title": "Nairobi: macro failure [assert_eq--storage125992234--input694127922]",
+    "tags": [
+      "admin_client",
+      "client",
+      "macros",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "312193",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_macros.ml",
+    "title": "Nairobi: Macro expansion: macros/max_in_list",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "macros",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "303490",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/contract_macros.ml",
+    "title": "Alpha: Macro expansion: macros/assert_le",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "macros",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "306252",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/encoding.ml",
+    "title": "Nairobi: protocol encoding regression test: vote.ballots",
+    "tags": [
+      "regression",
+      "ballots",
+      "codec",
+      "encoding",
+      "nairobi",
+      "protocol",
+      "vote"
+    ],
+    "successful_runs": {
+      "total_time": "574733",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/manager_operations.ml",
+    "title": "Oxford: Simple transfer with not enough fees to cover gas",
+    "tags": [
+      "admin_client",
+      "client",
+      "codec",
+      "node",
+      "oxford",
+      "transaction",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "4621824",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/manager_operations.ml",
+    "title": "Nairobi: Successful smart contract call",
+    "tags": [
+      "admin_client",
+      "call",
+      "client",
+      "codec",
+      "contract",
+      "nairobi",
+      "node",
+      "simple_contract_calls",
+      "smart"
+    ],
+    "successful_runs": {
+      "total_time": "5514358",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/mockup.ml",
+    "title": "Nairobi: (Mockup) Multi transfer/multi baking (asynchronous)",
+    "tags": [
+      "admin_client",
+      "asynchronous",
+      "client",
+      "mockup",
+      "nairobi",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "7828541",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/mockup.ml",
+    "title": "Alpha: (Mockup) Retrieve addresses",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "mockup",
+      "wallet"
+    ],
+    "successful_runs": {
+      "total_time": "609581",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/mockup.ml",
+    "title": "Oxford: (Mockup) Create mockup config show / init roundtrip [None,None,init,show]",
+    "tags": [
+      "admin_client",
+      "base_dir",
+      "client",
+      "init",
+      "mockup",
+      "oxford",
+      "roundtrip",
+      "show"
+    ],
+    "successful_runs": {
+      "total_time": "1236030",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Oxford: Max refused operations outdated",
+    "tags": [
+      "admin_client",
+      "client",
+      "max",
+      "mempool",
+      "node",
+      "outdated",
+      "oxford",
+      "refused"
+    ],
+    "successful_runs": {
+      "total_time": "4999198",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Oxford: pending operation version",
+    "tags": [
+      "admin_client",
+      "client",
+      "mempool",
+      "node",
+      "oxford",
+      "pending_operations",
+      "version"
+    ],
+    "successful_runs": {
+      "total_time": "3664378",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/prevalidator.ml",
+    "title": "Oxford: force invalid operation injection",
+    "tags": [
+      "admin_client",
+      "client",
+      "force",
+      "mempool",
+      "node",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "5423265",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/proxy.ml",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/current_period) No useless RPC call",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "get",
+      "layer1",
+      "node",
+      "proxy",
+      "rpc"
+    ],
+    "successful_runs": {
+      "total_time": "2544849",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/proxy.ml",
+    "title": "Oxford: (Proxy) (/chains/main/blocks/head/votes/ballots) Cache at most once",
+    "tags": [
+      "admin_client",
+      "client",
+      "get",
+      "layer1",
+      "node",
+      "oxford",
+      "proxy",
+      "rpc"
+    ],
+    "successful_runs": {
+      "total_time": "2514708",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/RPC_test.ml",
+    "title": "Nairobi: (mode client) RPC regression tests: delegates",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "delegates",
+      "nairobi",
+      "node",
+      "rpc"
+    ],
+    "successful_runs": {
+      "total_time": "7820296",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/RPC_test.ml",
+    "title": "Oxford: (mode proxy_server_data_dir) RPC tests: deprecated",
+    "tags": [
+      "admin_client",
+      "client",
+      "deprecated",
+      "node",
+      "oxford",
+      "proxy_server",
+      "proxy_server_data_dir",
+      "rpc"
+    ],
+    "successful_runs": {
+      "total_time": "3565515",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/rpc_versioning_attestation.ml",
+    "title": "Oxford: Forge pre-consensus operations",
+    "tags": [
+      "admin_client",
+      "client",
+      "consensus",
+      "forge",
+      "layer1",
+      "node",
+      "operations",
+      "oxford",
+      "pre",
+      "rpc",
+      "versioning"
+    ],
+    "successful_runs": {
+      "total_time": "3658953",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/replace_by_fees.ml",
+    "title": "Alpha: Replacing a batched op is possible if enough fees are provided",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "fee",
+      "manager",
+      "node",
+      "replace"
+    ],
+    "successful_runs": {
+      "total_time": "6097551",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/retro.ml",
+    "title": "Alpha: Test retro compatibility for format of transfer",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "codec",
+      "retro",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "2195133",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/run_code.ml",
+    "title": "Oxford: Run code with extra_big_maps",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "597210",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sapling.ml",
+    "title": "Nairobi: address generation in sapling wallet",
+    "tags": [
+      "admin_client",
+      "client",
+      "generation",
+      "nairobi",
+      "sapling",
+      "wallet"
+    ],
+    "successful_runs": {
+      "total_time": "9132259",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/script_illtyped.ml",
+    "title": "Nairobi: Test Ill Typecheck - stack_bottom_unpopable_in_lambda",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi",
+      "script",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "599366",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/script_illtyped.ml",
+    "title": "Oxford: Test Ill Typecheck - pack_big_map",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford",
+      "script",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "606066",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/script_illtyped.ml",
+    "title": "Alpha: Test Ill Typecheck - big_dip",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson",
+      "script",
+      "typechecking"
+    ],
+    "successful_runs": {
+      "total_time": "596153",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Nairobi: wasm_2_0_0 - refutation games winning strategies (pvm_proof_0)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "etherlink",
+      "nairobi",
+      "node",
+      "refutation",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "27797414",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Oxford: arith - reveal more than 4kB of data",
+    "tags": [
+      "4k",
+      "admin_client",
+      "arith",
+      "client",
+      "etherlink",
+      "node",
+      "oxford",
+      "reveals",
+      "sc_rollup",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "3451420",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Oxford: wasm_2_0_0 - RPC API should work and be stable",
+    "tags": [
+      "regression",
+      "admin_client",
+      "api",
+      "client",
+      "etherlink",
+      "node",
+      "oxford",
+      "rpc",
+      "sc_rollup",
+      "smart_rollup_node",
+      "wasm_2_0_0"
+    ],
+    "successful_runs": {
+      "total_time": "10142083",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: arith - output exec (0, entrypoint: %default, eager: 5, intern, no_parameters_ty)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "arith",
+      "client",
+      "codec",
+      "default",
+      "etherlink",
+      "intern",
+      "no_parameters_ty",
+      "node",
+      "outbox",
+      "sc_rollup",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "7248383",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Alpha: storage snapshot info command",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "command",
+      "info",
+      "layer1",
+      "node",
+      "snapshot",
+      "storage"
+    ],
+    "successful_runs": {
+      "total_time": "5390606",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/test_contract_bls12_381.ml",
+    "title": "Alpha: Bls12_381 contract primitives, g1: add",
+    "tags": [
+      "regression",
+      "add",
+      "admin_client",
+      "alpha",
+      "bls12_381",
+      "client",
+      "contract",
+      "crypto",
+      "g1",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "43010430",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/test_contract_bls12_381.ml",
+    "title": "Nairobi: Bls12_381 contract primitives, g1: mul",
+    "tags": [
+      "regression",
+      "admin_client",
+      "bls12_381",
+      "client",
+      "contract",
+      "crypto",
+      "g1",
+      "michelson",
+      "mul",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "43004039",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/tickets.ml",
+    "title": "Alpha: Send tickets from contracts to implicit accounts with the wrong type must fail",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "1571199",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/tzip4_view.ml",
+    "title": "Nairobi: Run tzip4_view `tzip4_view_const`",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi",
+      "tzip4_view"
+    ],
+    "successful_runs": {
+      "total_time": "897868",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/views.ml",
+    "title": "Nairobi: Test view runtimes - op_id - (Pair 0 0)",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "nairobi"
+    ],
+    "successful_runs": {
+      "total_time": "1560942",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/views.ml",
+    "title": "Oxford: Typecheck view - view_op_bad_name_non_printable_char",
+    "tags": [
+      "admin_client",
+      "client",
+      "michelson",
+      "oxford"
+    ],
+    "successful_runs": {
+      "total_time": "611056",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL L1 integration (slots attestation operation behavior)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "layer1",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "48294827",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (GS valid messages exchange)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "gossipsub",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "45907016",
+      "count": "1"
+    }
+  }
+]
