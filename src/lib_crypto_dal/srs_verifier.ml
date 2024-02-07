@@ -87,6 +87,54 @@ module type S = sig
   val get_srs1 : int -> G1.t
 end
 
+let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
+    ~number_of_shards ~srs_g1_length =
+  let open Result_syntax in
+  let assert_result condition error_message =
+    if not condition then fail (`Fail (error_message ())) else return_unit
+  in
+  let max_polynomial_length, _erasure_encoded_polynomial_length, shard_length =
+    Parameters_check.compute_lengths
+      ~redundancy_factor
+      ~slot_size
+      ~page_size
+      ~number_of_shards
+  in
+  let min_g1 =
+    match mode with
+    | `Prover -> max_polynomial_length
+    | `Verifier -> shard_length
+  in
+  let* () =
+    assert_result
+      (min_g1 <= srs_g1_length)
+      (* The committed polynomials have degree t.max_polynomial_length - 1 at most,
+         so t.max_polynomial_length coefficients. *)
+      (fun () ->
+        Format.asprintf
+          "SRS on G1 size is too small. Expected more than %d. Got %d. Hint: \
+           you can reduce the size of a slot."
+          min_g1
+          srs_g1_length)
+  in
+  let page_length_domain = Parameters_check.domain_length ~size:page_size in
+  let max_srs_size, is_in_srs2 =
+    if test then Internal_for_tests.(max_srs_size, is_in_srs2)
+    else (max_srs_size, is_in_srs2)
+  in
+  let offset_monomial_degree = max_srs_size - max_polynomial_length in
+  assert_result
+    (is_in_srs2 shard_length
+    && is_in_srs2 page_length_domain
+    && is_in_srs2 offset_monomial_degree)
+    (fun () ->
+      Format.asprintf
+        "SRS on shourd contain points of indices shard_length = %d, \
+         page_length_domain = %d & offset_monomial_degree = %d."
+        shard_length
+        page_length_domain
+        offset_monomial_degree)
+
 module Print = struct
   (* This code is duplicated in cryptobox.ml *)
   module Read = struct
