@@ -84,8 +84,6 @@ struct
     let* commitment = dal_commit cryptobox polynomial in
     (* Insert the slots of a level. *)
     let add_slots (cell, cache, slots_info) (level, slots_data) =
-      (* We start at level one, and we skip even levels for test purpose (which
-         means that no DAL slot is confirmed for them). *)
       let curr_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
       let slots_headers =
         List.mapi
@@ -208,26 +206,21 @@ struct
   let tests =
     let gen_dal_config : levels QCheck2.Gen.t =
       QCheck2.Gen.(
-        let nb_slots = 10 -- Parameters.(dal_parameters.number_of_slots) in
-        let nb_levels = 4 -- 8 in
-        let gaps_between_levels = 1 -- 1 in
+        let nb_slots = 0 -- Parameters.(dal_parameters.number_of_slots) in
+        let nb_levels = 4 -- 30 in
+        let* start_level = small_nat in
         (* The slot is confirmed iff the boolean is true *)
         let slot = bool in
         let slots = list_size nb_slots slot in
         (* For each level, we generate the gap/delta w.r.t. the previous level,
            and the slots' flags (confirmed or not). *)
-        let* l = list_size nb_levels (pair gaps_between_levels slots) in
-        (* We compute the list of slots with explicit levels instead levels
-           gaps. *)
-        let rl, _level =
-          List.fold_left
-            (fun (acc, prev_level) (delta_level, slots) ->
-              let level = prev_level + delta_level in
-              ((level, slots) :: acc, level))
-            ([], 0)
-            l
-        in
-        return @@ List.rev rl)
+        let* list = list_size nb_levels slots in
+        List.mapi
+          (fun i slots ->
+            let level = start_level + i in
+            (level, slots))
+          list
+        |> return)
     in
     [
       Tztest.tztest_qcheck2
