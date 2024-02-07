@@ -11,6 +11,7 @@ oc.build_kernels:
   needs: [oc.docker:rust-toolchain]
   script:
     - make -f kernels.mk build
+    - make -f etherlink.mk evm_kernel.wasm
   artifacts:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:

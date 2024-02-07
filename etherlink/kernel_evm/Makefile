@@ -31,6 +31,9 @@ build-evm-evaluation:
 
 .PHONY: build-deps
 build-deps:
+	# 'rustup show' will install the toolchain in addition to showing
+	# toolchain information.
+	@rustup show active-toolchain 2> /dev/null
 	@rustup target add wasm32-unknown-unknown
 
 .PHONY: build-dev-deps

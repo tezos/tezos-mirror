@@ -4,16 +4,13 @@
 #
 # SPDX-License-Identifier: MIT
 
-KERNELS=evm_kernel.wasm tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf jstz
+KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm risc-v-dummy risc-v-dummy.elf jstz
 SDK_DIR=src/kernel_sdk
 RISC_V_DIR=src/risc_v
 RISC_V_DUMMY_DIR=src/risc_v/dummy_kernel
 RISC_V_JSTZ_DIR=src/risc_v/jstz
 RISC_V_TESTS_DIR=src/risc_v/tests
-EVM_DIR=etherlink/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
-EVM_KERNEL_PREIMAGES=_evm_installer_preimages
-EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
 .PHONY: all
 all: build-dev-deps check test build
@@ -28,57 +25,6 @@ kernel_sdk:
 risc-v-sandbox:
 	@make -C $(RISC_V_DIR) build-sandbox
 	@ln -f $(RISC_V_DIR)/target/$(NATIVE_TARGET)/release/risc-v-sandbox $@
-
-.PHONY: evm-execution
-evm-execution:
-	@make -C etherlink/kernel_evm build-evm-execution
-
-.PHONY: evm-evaluation-assessor
-evm-evaluation-assessor:
-	@make -C etherlink/kernel_evm build-evm-evaluation
-	@cp etherlink/kernel_evm/target/release/evm-evaluation $@
-
-evm_kernel_unstripped.wasm::
-	@make -C etherlink/kernel_evm build
-	@cp etherlink/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
-
-evm_kernel.wasm:: evm_kernel_unstripped.wasm
-	@cp evm_kernel_unstripped.wasm $@
-	@wasm-strip $@
-
-evm_installer.wasm:: kernel_sdk evm_kernel.wasm
-ifdef EVM_CONFIG
-	$(eval CONFIG := --setup-file ${EVM_CONFIG})
-endif
-	@./smart-rollup-installer get-reveal-installer \
-	--upgrade-to evm_kernel.wasm \
-	--preimages-dir ${EVM_KERNEL_PREIMAGES} \
-	--output $@ \
-	${CONFIG}
-
-evm_unstripped_installer.wasm:: kernel_sdk evm_kernel_unstripped.wasm
-ifdef EVM_CONFIG
-	$(eval CONFIG := --setup-file ${EVM_CONFIG})
-endif
-	@./smart-rollup-installer get-reveal-installer \
-	--upgrade-to evm_kernel_unstripped.wasm \
-	--preimages-dir ${EVM_UNSTRIPPED_KERNEL_PREIMAGES} \
-	--output $@ \
-	${CONFIG}
-
-evm_benchmark_installer.wasm::
-	@${MAKE} -f kernels.mk \
-	EVM_CONFIG=etherlink/config/benchmarking.yaml \
-	EVM_KERNEL_FEATURES=benchmark,debug \
-	evm_unstripped_installer.wasm
-	cp evm_unstripped_installer.wasm $@
-
-evm_installer_dev.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm
-
-sequencer.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
-	@cp evm_installer.wasm sequencer.wasm
 
 .PHONY: tx_demo_collector
 tx_demo_collector:
@@ -120,7 +66,7 @@ risc-v-tests:
 	@make -C ${RISC_V_TESTS_DIR} build
 
 .PHONY: build
-build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk risc-v-sandbox risc-v-tests
+build: ${KERNELS} kernel_sdk risc-v-sandbox risc-v-tests
 
 .PHONY: clang-supports-wasm
 clang-supports-wasm:
@@ -129,13 +75,11 @@ clang-supports-wasm:
 .PHONY: build-dev-deps
 build-dev-deps: clang-supports-wasm build-deps
 	@make -C ${SDK_DIR} build-dev-deps
-	@make -C ${EVM_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
 
 .PHONY: build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
-	@make -C ${EVM_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
 	@make -C ${RISC_V_DIR} build-deps
 
@@ -147,14 +91,12 @@ build-deps:
 test:
 	@make -C ${SDK_DIR} test
 	@make -C ${RISC_V_DIR} test
-	@make -C ${EVM_DIR} test
 	@make -C ${DEMO_DIR} test
 
 .PHONY: check
 check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${RISC_V_DIR} check
-	@make -C ${EVM_DIR} check
 	@make -C ${DEMO_DIR} check
 	@make -C ${RISC_V_TESTS_DIR} check
 
@@ -174,8 +116,6 @@ clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
 	@make -C ${RISC_V_DIR} clean
-	@make -C ${EVM_DIR} clean
 	@make -C ${DEMO_DIR} clean
-	@rm -rf ${EVM_KERNEL_PREIMAGES}
 	@rm -f risc-v-sandbox
 	@make -C ${RISC_V_TESTS_DIR} clean

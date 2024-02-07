@@ -1,0 +1,13 @@
+test_etherlink_kernel:
+  extends:
+    - .test_etherlink_kernel
+  rules:
+    - changes:
+        # Run if the `rust-toolchain` image is updated
+        - images/**/*
+        - etherlink.mk
+        - etherlink/kernel_evm/**/*
+        - src/kernel_sdk/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success

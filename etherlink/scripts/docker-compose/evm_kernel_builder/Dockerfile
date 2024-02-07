@@ -12,7 +12,7 @@ WORKDIR /tezos
 ARG EVM_CHAIN_ID_CONFIG
 RUN echo "${EVM_CHAIN_ID_CONFIG}" >> /tezos/etherlink/config/sequencer.yaml
 RUN cat /tezos/etherlink/config/sequencer.yaml
-RUN make -f /tezos/kernels.mk build-deps sequencer.wasm
+RUN make -f /tezos/kernels.mk build-deps && make -f etherlink.mk build-deps sequencer.wasm
 
 FROM alpine:3.14
 COPY --from=kernel_build /tezos/sequencer.wasm /tezos/evm_kernel.wasm /kernel/
