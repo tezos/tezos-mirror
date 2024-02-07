@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, Manager};
+use super::{AllocatedOf, Atom, Elem, Manager};
 use std::mem;
 
 /// Dedicated region in a [`super::Backend`]
@@ -158,6 +158,14 @@ impl<E: Elem, M: Manager + ?Sized> Cell<E, M> {
     #[inline(always)]
     pub fn write(&mut self, value: E) {
         self.region.write(0, value)
+    }
+}
+
+impl<E: Elem, M: Manager> Cell<E, M> {
+    pub fn new_in(space: AllocatedOf<Atom<E>, M>) -> Self {
+        Self {
+            region: space.region,
+        }
     }
 }
 

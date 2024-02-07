@@ -12,7 +12,8 @@ pub mod memory_backend;
 mod mode;
 pub mod registers;
 
-use bus::{main_memory, Bus};
+use backend::{Atom, Cell};
+use bus::{main_memory, Address, Bus};
 
 /// RISC-V hart state
 pub struct HartState<M: backend::Manager> {
@@ -27,6 +28,9 @@ pub struct HartState<M: backend::Manager> {
 
     /// Current running mode of hart
     mode: mode::ModeCell<M>,
+
+    /// Program counter
+    pc: Cell<Address, M>,
 }
 
 impl<M: backend::Manager> HartState<M> {
@@ -183,6 +187,7 @@ pub type HartStateLayout = (
     registers::FRegistersLayout,
     csregisters::CSRegistersLayout,
     mode::ModeLayout,
+    Atom<Address>, // Program counter layout
 );
 
 impl<M: backend::Manager> HartState<M> {
@@ -193,6 +198,7 @@ impl<M: backend::Manager> HartState<M> {
             fregisters: registers::FRegisters::new_in(space.1),
             csregisters: csregisters::CSRegisters::new_in(space.2),
             mode: mode::ModeCell::new_in(space.3),
+            pc: Cell::new_in(space.4),
         }
     }
 }
