@@ -1228,9 +1228,11 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               limit_of_delegation_over_baking =
                 c.limit_of_delegation_over_baking;
               percentage_of_frozen_deposits_slashed_per_double_baking =
-                c.percentage_of_frozen_deposits_slashed_per_double_baking;
+                Percentage.convert_from_o_to_p
+                  c.percentage_of_frozen_deposits_slashed_per_double_baking;
               percentage_of_frozen_deposits_slashed_per_double_attestation =
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation;
+                Percentage.convert_from_o_to_p
+                  c.percentage_of_frozen_deposits_slashed_per_double_attestation;
               (* The `testnet_dictator` should absolutely be None on mainnet *)
               testnet_dictator = c.testnet_dictator;
               initial_seed = c.initial_seed;
