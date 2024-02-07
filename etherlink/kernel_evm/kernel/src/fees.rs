@@ -166,7 +166,10 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 mod tests {
     use super::*;
     use evm::{ExitReason, ExitSucceed};
-    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
+    use evm_execution::{
+        account_storage::{account_path, EthereumAccountStorage},
+        handler::ExtendedExitReason,
+    };
     use primitive_types::{H160, U256};
     use tezos_smart_rollup_mock::MockHost;
 
@@ -329,7 +332,7 @@ mod tests {
         ExecutionOutcome {
             gas_used,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             new_address: None,
             logs: Vec::new(),
             result: None,

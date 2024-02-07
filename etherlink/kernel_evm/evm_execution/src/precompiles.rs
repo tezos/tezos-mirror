@@ -624,7 +624,7 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(expected_hash),
@@ -655,7 +655,7 @@ mod tests {
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(expected_hash),
@@ -705,7 +705,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -760,7 +760,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -800,7 +800,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Revert(ExitRevert::Reverted),
+            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
             is_success: false,
             new_address: None,
             logs: vec![],
@@ -823,7 +823,7 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Revert(ExitRevert::Reverted),
+            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
             is_success: false,
             new_address: None,
             logs: vec![],

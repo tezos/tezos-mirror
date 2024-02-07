@@ -39,6 +39,8 @@ extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
 
+use crate::handler::ExtendedExitReason;
+
 #[derive(Error, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DurableStorageError {
     /// Some runtime error happened while using durable storage
@@ -144,13 +146,15 @@ pub fn run_transaction<'a, Host>(
     value: Option<U256>,
     pay_for_gas: bool,
     allocated_ticks: u64,
+    retriable: bool,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
 {
     fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
         match outcome.reason {
-            ExitReason::Revert(_) => pay_for_gas,
+            ExtendedExitReason::Exit(ExitReason::Revert(_))
+            | ExtendedExitReason::OutOfTicks => pay_for_gas,
             _ => pay_for_gas && outcome.is_success,
         }
     }
@@ -180,22 +184,29 @@ where
 
         match result {
             Ok(result) => {
-                handler.increment_nonce(caller)?;
+                if !(result.reason == ExtendedExitReason::OutOfTicks && retriable) {
+                    handler.increment_nonce(caller)?;
+                }
 
                 if do_refund(&result, pay_for_gas) {
-                    let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-                    handler.repay_gas(caller, unused_gas, effective_gas_price)?
+                    // In case of `OutOfTicks` and the transaction can be
+                    // retried, the gas is entirely refunded as it will be
+                    // repaid in the next attempt
+                    if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                        log!(
+                            handler.borrow_host(),
+                            Debug,
+                            "The transaction exhausted the ticks of the \
+                             current reboot and is retriable: refunding all the gas."
+                        );
+                        handler.repay_gas(caller, gas_limit, effective_gas_price)?;
+                    } else {
+                        let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+                        handler.repay_gas(caller, unused_gas, effective_gas_price)?;
+                    }
                 }
 
                 Ok(Some(result))
-            }
-            // In case of `OutOfTicks` the gas is entirely refunded as it will
-            // be repaid in the next attempt
-            Err(EthereumError::OutOfTicks) => {
-                if pay_for_gas {
-                    handler.repay_gas(caller, gas_limit, effective_gas_price)?;
-                }
-                Err(EthereumError::OutOfTicks)
             }
             Err(e) => Err(e),
         }
@@ -356,12 +367,13 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: false,
-            reason: ExitReason::Error(ExitError::OutOfFund),
+            reason: ExitReason::Error(ExitError::OutOfFund).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -421,12 +433,13 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: config.gas_transaction_call,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -480,12 +493,13 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Error(ExitError::OutOfFund),
+            reason: ExitReason::Error(ExitError::OutOfFund).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -536,6 +550,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let new_address =
@@ -570,6 +585,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -598,6 +614,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
         assert!(result3.is_ok(), "execution should have succeeded");
         let result = result3.unwrap();
@@ -625,6 +642,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -679,6 +697,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         assert!(result.is_ok());
@@ -729,12 +748,13 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Error(ExitError::DesignatedInvalid),
+            reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -782,6 +802,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000; // base cost
@@ -790,7 +811,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -928,6 +949,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -937,7 +959,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -991,6 +1013,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1000,7 +1023,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: false,
-            reason: ExitReason::Revert(ExitRevert::Reverted),
+            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -1053,13 +1076,14 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Error(ExitError::DesignatedInvalid),
+            reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1110,12 +1134,13 @@ mod test {
             Some(U256::from(100)),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 0,
             is_success: false,
-            reason: ExitReason::Error(ExitError::DesignatedInvalid),
+            reason: ExitReason::Error(ExitError::DesignatedInvalid).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -1168,6 +1193,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1178,7 +1204,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![1u8; 32]),
@@ -1228,6 +1254,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         // Assert
@@ -1237,7 +1264,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: 25676,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(hex::decode(expected_address).unwrap()),
@@ -1340,6 +1367,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         // Assert
@@ -1418,6 +1446,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1430,7 +1459,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -1511,6 +1540,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -1523,7 +1553,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             // No logs were produced
             logs: vec![],
@@ -1626,6 +1656,7 @@ mod test {
             None,
             true,
             1_000_000_000,
+            false,
         );
 
         let log_record1 = Log {
@@ -1646,7 +1677,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
@@ -1738,6 +1769,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let log_record1 = Log {
@@ -1752,7 +1784,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![log_record1],
             result: Some(vec![]),
@@ -1839,13 +1871,14 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
         let expected_gas = 21000 // base cost
         + 30124; // execution gas cost (taken at face value from tests)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Stopped),
+            reason: ExitReason::Succeed(ExitSucceed::Stopped).into(),
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
@@ -1957,12 +1990,13 @@ mod test {
             None,
             true,
             10_000_000_000,
+            false,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: all_the_gas,
             is_success: false,
-            reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)),
+            reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)).into(),
             new_address: None,
             logs: vec![],
             result: None,
@@ -2045,6 +2079,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -2054,7 +2089,7 @@ mod test {
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             new_address: None,
             logs: vec![],
             result: Some(chain_id_bytes.into()),
@@ -2117,6 +2152,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_gas = 21000 // base cost
@@ -2125,7 +2161,7 @@ mod test {
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned),
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -2194,6 +2230,7 @@ mod test {
             Some(U256::from(100)),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let expected_result = Err(EthereumError::EthereumAccountError(
@@ -2243,6 +2280,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let result = unwrap_outcome!(result);
@@ -2297,6 +2335,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2356,6 +2395,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         // Assert
@@ -2413,6 +2453,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         // Assert
@@ -2465,6 +2506,7 @@ mod test {
             None,
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         )
     }
 
@@ -2478,7 +2520,9 @@ mod test {
         // Assert
         let result = unwrap_outcome!(&result, false);
         assert_eq!(
-            ExitReason::Error(ExitError::InvalidCode(Opcode(0xef))),
+            ExtendedExitReason::Exit(ExitReason::Error(ExitError::InvalidCode(Opcode(
+                0xef
+            )))),
             result.reason
         );
     }
@@ -2503,7 +2547,10 @@ mod test {
 
         // Assert
         let result = unwrap_outcome!(&result);
-        assert_eq!(ExitReason::Succeed(ExitSucceed::Returned), result.reason);
+        assert_eq!(
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Returned)),
+            result.reason
+        );
     }
 
     // Test case from https://eips.ethereum.org/EIPS/eip-684
@@ -2564,11 +2611,12 @@ mod test {
             None,
             true,
             10_000_000_000,
+            false,
         );
 
         let result = unwrap_outcome!(&result, false);
         match &result.reason {
-            ExitReason::Error(ExitError::CreateCollision) => (),
+            ExtendedExitReason::Exit(ExitReason::Error(ExitError::CreateCollision)) => (),
             exit_error => panic!(
                 "ExitReason: {:?}. Expect ExitReason::Error(ExitError::CreateCollision)",
                 exit_error
@@ -2627,11 +2675,12 @@ mod test {
             None,
             true,
             10_000_000_000,
+            false,
         );
 
         let result = unwrap_outcome!(&result, false);
         match &result.reason {
-            ExitReason::Error(ExitError::CreateCollision) => (),
+            ExtendedExitReason::Exit(ExitReason::Error(ExitError::CreateCollision)) => (),
             exit_error => panic!(
                 "ExitReason: {:?}. Expect ExitReason::Error(ExitError::CreateCollision)",
                 exit_error
@@ -2672,6 +2721,7 @@ mod test {
             Some(transaction_value),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let result = unwrap_outcome!(result);
@@ -2706,7 +2756,10 @@ mod test {
             U256::from(10000),
         );
 
-        let code = hex::decode("74600c60005566602060406000f060205260076039f36000526015600b620186a0f060005500").unwrap();
+        let code = hex::decode(
+            "74600c60005566602060406000f060205260076039f36000526015600b620186a0f060005500",
+        )
+        .unwrap();
         set_account_code(&mut host, &mut evm_account_storage, &callee, &code);
 
         let result = run_transaction(
@@ -2723,6 +2776,7 @@ mod test {
             Some(U256::zero()),
             true,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let path = account_path(&caller).unwrap();
@@ -2734,15 +2788,22 @@ mod test {
         let callee_nonce = account.nonce(&host).unwrap();
 
         assert_eq!(
-            ExitReason::Succeed(ExitSucceed::Stopped),
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             result.unwrap().unwrap().reason,
         );
         assert_eq!(callee_nonce, U256::zero());
         assert_eq!(caller_nonce, U256::one());
     }
 
-    #[test]
-    fn transactions_has_no_impact_if_retriable() {
+    fn out_of_tick_scenario(
+        retriable: bool,
+    ) -> (
+        MockHost,
+        Result<Option<ExecutionOutcome>, EthereumError>,
+        EthereumAccount,
+        U256,
+        U256,
+    ) {
         let mut host = MockHost::default();
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockHost>();
@@ -2787,23 +2848,54 @@ mod test {
             Some(transaction_value),
             true,
             10_000,
+            retriable,
         );
 
-        let caller_balance = account.balance(&host).unwrap();
-        let caller_nonce = account.nonce(&host).unwrap();
+        (host, result, account, initial_balance, initial_caller_nonce)
+    }
+
+    #[test]
+    fn transaction_has_no_impact_if_retriable() {
+        let (host, result, caller, initial_caller_balance, initial_caller_nonce) =
+            out_of_tick_scenario(true);
+        let caller_balance = caller.balance(&host).unwrap();
+        let caller_nonce = caller.nonce(&host).unwrap();
 
         assert_eq!(
-            Err(EthereumError::OutOfTicks),
-            result,
+            ExtendedExitReason::OutOfTicks,
+            result.unwrap().unwrap().reason,
             "Contract creation was expected to fail and run out of ticks: \n"
         );
         assert_eq!(
-            initial_balance, caller_balance,
+            initial_caller_balance, caller_balance,
             "Balance shouldn't have changed as gas should have been repaid"
         );
         assert_eq!(
             initial_caller_nonce, caller_nonce,
             "Nonce shouldn't have changed"
+        )
+    }
+
+    #[test]
+    fn non_retriable_transaction_pays_for_exhausted_ticks() {
+        let (host, result, caller, initial_caller_balance, initial_caller_nonce) =
+            out_of_tick_scenario(false);
+        let caller_balance = caller.balance(&host).unwrap();
+        let caller_nonce = caller.nonce(&host).unwrap();
+
+        assert_eq!(
+            ExtendedExitReason::OutOfTicks,
+            result.unwrap().unwrap().reason,
+            "Contract creation was expected to fail and run out of ticks: \n"
+        );
+        assert_ne!(
+            initial_caller_balance, caller_balance,
+            "Gas was not deducted from the caller account"
+        );
+        assert_eq!(
+            initial_caller_nonce + 1,
+            caller_nonce,
+            "Nonce should have been incremented"
         )
     }
 
@@ -2840,6 +2932,7 @@ mod test {
             None,
             false,
             DUMMY_ALLOCATED_TICKS,
+            false,
         );
 
         let internal_address_nonce =
@@ -2847,7 +2940,7 @@ mod test {
         let caller_nonce = get_nonce(&mut host, &mut evm_account_storage, &caller);
 
         assert_eq!(
-            ExitReason::Succeed(ExitSucceed::Stopped),
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             result.unwrap().unwrap().reason,
         );
 

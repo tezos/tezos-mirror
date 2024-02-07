@@ -77,6 +77,8 @@ fn compute<Host: Runtime>(
             block_in_progress.estimated_ticks,
             data_size,
         );
+
+        let retriable = !is_first_transaction || !is_first_block_of_reboot;
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match apply_transaction(
@@ -88,6 +90,7 @@ fn compute<Host: Runtime>(
             evm_account_storage,
             accounts_index,
             allocated_ticks,
+            retriable,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -108,6 +111,20 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks
                 );
             }
+
+            ExecutionResult::Retriable(_) => {
+                // It is the first block processed in this reboot. Additionally,
+                // it is the first transaction processed from this block in this
+                // reboot. The tick limit cannot be larger.
+                log!(
+                    host,
+                    Debug,
+                    "The transaction exhausted the ticks of the \
+                         current reboot but will be retried."
+                );
+                block_in_progress.repush_tx(transaction);
+                return Ok(ComputationResult::RebootNeeded);
+            }
             ExecutionResult::Invalid => {
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
@@ -116,21 +133,6 @@ fn compute<Host: Runtime>(
                     "Estimated ticks after tx: {}",
                     block_in_progress.estimated_ticks
                 );
-            }
-            ExecutionResult::OutOfTicks => {
-                // Is is the first block processed in this reboot. Aditionnaly,
-                // it is the first transaction processed from this block in this
-                // reboot. The tick limit cannot be larger.
-                if is_first_transaction && is_first_block_of_reboot {
-                    log!(
-                        host,
-                        Debug,
-                        "Transaction is discarded as it uses too much ticks to be applied in a kernel run."
-                    );
-                } else {
-                    block_in_progress.repush_tx(transaction);
-                    return Ok(ComputationResult::RebootNeeded);
-                }
             }
         };
         is_first_transaction = false;
@@ -320,6 +322,7 @@ mod tests {
     use crate::mock_internal::MockInternal;
     use crate::safe_storage::SafeStorage;
     use crate::storage::read_block_in_progress;
+    use crate::storage::read_current_block;
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
@@ -1290,6 +1293,9 @@ mod tests {
     const LOOP_4600: &str =
         "0b7d796e00000000000000000000000000000000000000000000000000000000000011f8";
 
+    const LOOP_5800: &str =
+        "0b7d796e00000000000000000000000000000000000000000000000000000000000016a8";
+
     const TEST_SK: &str =
         "84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502";
 
@@ -1559,5 +1565,95 @@ mod tests {
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(Some(expected_created_contract), receipt.contract_address);
+    }
+
+    #[test]
+    fn test_non_retriable_transaction_are_marked_as_failed() {
+        // init host
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
+
+        // sanity check: no current block
+        assert!(
+            storage::read_current_block_number(&host).is_err(),
+            "Should not have found current block number"
+        );
+
+        //provision sender account
+        let sender = H160::from_str(TEST_ADDR).unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        // These transactions are generated with the loop.sol contract, which are:
+        // - create the contract
+        // - call `loop(1200)`
+        // - call `loop(5800)`
+        let create_transaction =
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+        let loop_addr: H160 =
+            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_5800_tx = create_and_sign_transaction(
+            LOOP_5800,
+            1,
+            4_000_000,
+            Some(loop_addr),
+            TEST_SK,
+        );
+
+        let proposals_first_reboot = vec![wrap_transaction(0, create_transaction)];
+
+        store_blueprints(&mut host, vec![blueprint(proposals_first_reboot)]);
+
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            dummy_block_fees(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Should have produced");
+
+        assert!(
+            storage::read_current_block_number(&host).is_ok(),
+            "Should have found a block"
+        );
+
+        // We start a new proposal, calling produce again simulates a reboot.
+
+        let proposals_second_reboot = vec![wrap_transaction(2, loop_5800_tx)];
+
+        store_blueprints(&mut host, vec![blueprint(proposals_second_reboot)]);
+
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            dummy_block_fees(),
+            &mut Configuration::Proxy,
+        )
+        .expect("Should have produced");
+
+        let block = read_current_block(&mut host).expect("Should have found a block");
+        let failed_loop_hash = block
+            .transactions
+            .first()
+            .expect("There should have been a transaction");
+        let failed_loop_status =
+            storage::read_transaction_receipt_status(&mut host, failed_loop_hash)
+                .expect("There should have been a receipt");
+
+        assert_eq!(
+            failed_loop_status,
+            TransactionStatus::Failure,
+            "The transaction should have failed"
+        )
     }
 }

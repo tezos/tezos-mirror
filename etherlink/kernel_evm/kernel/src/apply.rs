@@ -10,9 +10,9 @@ use evm::{ExitError, ExitReason, ExitSucceed};
 use evm_execution::account_storage::{
     account_path, EthereumAccount, EthereumAccountStorage,
 };
-use evm_execution::handler::ExecutionOutcome;
+use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason};
 use evm_execution::precompiles::PrecompileBTreeMap;
-use evm_execution::{run_transaction, EthereumError};
+use evm_execution::run_transaction;
 use primitive_types::{H160, U256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::block::BlockConstants;
@@ -270,6 +270,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
     allocated_ticks: u64,
+    retriable: bool,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let caller = match is_valid_ethereum_transaction_common(
@@ -301,9 +302,9 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         Some(value),
         true,
         allocated_ticks,
+        retriable,
     ) {
         Ok(outcome) => outcome,
-        Err(EthereumError::OutOfTicks) => return Ok(ExecutionResult::OutOfTicks),
         Err(err) => {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
             // Because the proposal's state is unclear, and we do not have a sequencer
@@ -313,7 +314,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used) = match &execution_outcome {
+    let (gas_used, estimated_ticks_used, out_of_ticks) = match &execution_outcome {
         Some(execution_outcome) => {
             log!(
                 host,
@@ -324,27 +325,34 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             (
                 execution_outcome.gas_used.into(),
                 execution_outcome.estimated_ticks_used,
+                execution_outcome.reason == ExtendedExitReason::OutOfTicks,
             )
         }
         None => {
             log!(host, Debug, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0)
+            (U256::zero(), 0, false)
         }
     };
 
-    Ok(ExecutionResult::Valid(TransactionResult {
+    let transaction_result = TransactionResult {
         caller,
         execution_outcome,
         gas_used,
         estimated_ticks_used,
-    }))
+    };
+
+    if out_of_ticks && retriable {
+        Ok(ExecutionResult::Retriable(transaction_result))
+    } else {
+        Ok(ExecutionResult::Valid(transaction_result))
+    }
 }
 
 fn apply_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
-) -> Result<Option<TransactionResult>, Error> {
+) -> Result<ExecutionResult<TransactionResult>, Error> {
     let Deposit { amount, receiver } = deposit;
 
     let mut do_deposit = |()| -> Option<()> {
@@ -370,7 +378,7 @@ fn apply_deposit<Host: Runtime>(
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
-        reason,
+        reason: reason.into(),
         new_address: None,
         logs: vec![],
         result: None,
@@ -380,7 +388,7 @@ fn apply_deposit<Host: Runtime>(
 
     let caller = H160::zero();
 
-    Ok(Some(TransactionResult {
+    Ok(ExecutionResult::Valid(TransactionResult {
         caller,
         execution_outcome: Some(execution_outcome),
         gas_used: gas_used.into(),
@@ -457,7 +465,7 @@ pub struct ExecutionInfo {
 pub enum ExecutionResult<T> {
     Valid(T),
     Invalid,
-    OutOfTicks,
+    Retriable(T),
 }
 
 impl<T> From<Option<T>> for ExecutionResult<T> {
@@ -470,6 +478,62 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn handle_transaction_result<Host: Runtime>(
+    host: &mut Host,
+    block_constants: &BlockConstants,
+    transaction: &Transaction,
+    index: u32,
+    evm_account_storage: &mut EthereumAccountStorage,
+    accounts_index: &mut IndexableStorage,
+    transaction_result: TransactionResult,
+    pay_fees: bool,
+) -> Result<ExecutionInfo, anyhow::Error> {
+    let TransactionResult {
+        caller,
+        mut execution_outcome,
+        gas_used,
+        estimated_ticks_used: ticks_used,
+    } = transaction_result;
+
+    let to = transaction.to();
+
+    let fee_updates = match &transaction.content {
+        TransactionContent::Deposit(_) => FeeUpdates::for_deposit(gas_used),
+        TransactionContent::Ethereum(tx) => {
+            FeeUpdates::for_tx(tx, &block_constants.block_fees, gas_used)
+        }
+    };
+
+    if let Some(outcome) = &mut execution_outcome {
+        log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
+        fee_updates.modify_outcome(outcome);
+        post_withdrawals(host, &outcome.withdrawals)?
+    }
+
+    if pay_fees {
+        fee_updates.apply(host, evm_account_storage, caller)?;
+    }
+
+    let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
+
+    let receipt_info = make_receipt_info(
+        transaction.tx_hash,
+        index,
+        execution_outcome,
+        caller,
+        to,
+        object_info.gas_price,
+    );
+
+    index_new_accounts(host, accounts_index, &receipt_info)?;
+    Ok(ExecutionInfo {
+        receipt_info,
+        object_info,
+        estimated_ticks_used: ticks_used,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -479,8 +543,8 @@ pub fn apply_transaction<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
     allocated_ticks: u64,
+    retriable: bool,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
-    let to = transaction.to();
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
@@ -489,57 +553,43 @@ pub fn apply_transaction<Host: Runtime>(
             evm_account_storage,
             tx,
             allocated_ticks,
+            retriable,
         )?,
         TransactionContent::Deposit(deposit) => {
-            ExecutionResult::from(apply_deposit(host, evm_account_storage, deposit)?)
+            apply_deposit(host, evm_account_storage, deposit)?
         }
     };
 
     match apply_result {
-        ExecutionResult::Valid(TransactionResult {
-            caller,
-            mut execution_outcome,
-            gas_used,
-            estimated_ticks_used: ticks_used,
-        }) => {
-            let fee_updates = match &transaction.content {
-                TransactionContent::Deposit(_) => FeeUpdates::for_deposit(gas_used),
-                TransactionContent::Ethereum(tx) => {
-                    FeeUpdates::for_tx(tx, &block_constants.block_fees, gas_used)
-                }
-            };
-
-            if let Some(outcome) = &mut execution_outcome {
-                fee_updates.modify_outcome(outcome);
-                log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
-            }
-
-            if let Some(ref execution_outcome) = execution_outcome {
-                post_withdrawals(host, &execution_outcome.withdrawals)?
-            }
-
-            fee_updates.apply(host, evm_account_storage, caller)?;
-
-            let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
-
-            let receipt_info = make_receipt_info(
-                transaction.tx_hash,
+        ExecutionResult::Valid(tx_result) => {
+            let execution_result = handle_transaction_result(
+                host,
+                block_constants,
+                transaction,
                 index,
-                execution_outcome,
-                caller,
-                to,
-                object_info.gas_price,
-            );
-
-            index_new_accounts(host, accounts_index, &receipt_info)?;
-            Ok(ExecutionResult::Valid(ExecutionInfo {
-                receipt_info,
-                object_info,
-                estimated_ticks_used: ticks_used,
-            }))
+                evm_account_storage,
+                accounts_index,
+                tx_result,
+                true,
+            )?;
+            Ok(ExecutionResult::Valid(execution_result))
+        }
+        // Note that both branch must be differentiated as the fees won't be
+        // collected yet if the transaction is retriable.
+        ExecutionResult::Retriable(tx_result) => {
+            let execution_result = handle_transaction_result(
+                host,
+                block_constants,
+                transaction,
+                index,
+                evm_account_storage,
+                accounts_index,
+                tx_result,
+                false,
+            )?;
+            Ok(ExecutionResult::Retriable(execution_result))
         }
         ExecutionResult::Invalid => Ok(ExecutionResult::Invalid),
-        ExecutionResult::OutOfTicks => Ok(ExecutionResult::OutOfTicks),
     }
 }
 
