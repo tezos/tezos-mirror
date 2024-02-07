@@ -73,17 +73,6 @@ module Test = struct
      their length must be greater than the number of shards. *)
   let max_page_size_log2 = max_slot_size_log2 - size_offset_log2
 
-  (* The set of parameters maximizing the SRS length, and which
-     is in the codomain of [generate_parameters]. *)
-  let parameters =
-    lazy Cryptobox.Internal_for_tests.(parameters_initialisation ())
-
-  (* Initializes the DAL parameters *)
-  let init () =
-    Cryptobox.Internal_for_tests.load_parameters (Lazy.force parameters)
-
-  let reset = Cryptobox.Internal_for_tests.reset_initialisation_parameters
-
   type parameters = {
     slot_size : int;
     page_size : int;
@@ -180,7 +169,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -223,7 +212,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -266,7 +255,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -301,7 +290,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -338,7 +327,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let state = QCheck_base_runner.random_state () in
@@ -359,7 +348,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -379,7 +368,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -393,7 +382,9 @@ module Test = struct
              (page_index * params.page_size)
              params.page_size
          in
-         reset () ;
+         (* Testing the initialisation logic, even if the prover’s would be
+            enough to verify *)
+         Cryptobox.Internal_for_tests.init_verifier_dal () ;
          let* t = make params in
          Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
@@ -410,7 +401,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -427,8 +418,6 @@ module Test = struct
              (page_index * params.page_size)
              params.page_size
          in
-         reset () ;
-         let* t = make params in
          Cryptobox.verify_page t commitment ~page_index page altered_proof)
         |> function
         | Error `Invalid_page -> true
@@ -444,7 +433,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -465,7 +454,9 @@ module Test = struct
                 (the queried index is out of bounds) doesn't happen. *)
              assert false
          | Some shard ->
-             reset () ;
+             (* Testing the initialisation logic, even if the prover’s would be
+                enough to verify *)
+             Cryptobox.Internal_for_tests.init_verifier_dal () ;
              let* t = make params in
              Cryptobox.verify_shard
                t
@@ -480,7 +471,7 @@ module Test = struct
     (* The following parameters used to be accepted by the [ensure_validity]
        function, while they were actually unsupported (they indeed break an
        invariant and trigger a runtime exception). *)
-    init () ;
+    Cryptobox.Internal_for_tests.init_prover_dal () ;
     let params =
       {
         slot_size = 512;
@@ -502,7 +493,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -527,8 +518,6 @@ module Test = struct
                Cryptobox.Internal_for_tests.alter_shard_proof
                  shard_proofs.(shard_index)
              in
-             reset () ;
-             let* t = make params in
              Cryptobox.verify_shard t commitment shard altered_proof)
         |> function
         | Error `Invalid_shard -> true
@@ -545,13 +534,15 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
          let* commitment = Cryptobox.commit t polynomial in
          let* commitment_proof = Cryptobox.prove_commitment t polynomial in
-         reset () ;
+         (* Testing the initialisation logic, even if the prover’s would be
+            enough to verify *)
+         Cryptobox.Internal_for_tests.init_verifier_dal () ;
          let* t = make params in
          return (Cryptobox.verify_commitment t commitment commitment_proof))
         |> function
@@ -567,7 +558,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -576,8 +567,6 @@ module Test = struct
          let altered_proof =
            Cryptobox.Internal_for_tests.alter_commitment_proof commitment_proof
          in
-         reset () ;
-         let* t = make params in
          return (Cryptobox.verify_commitment t commitment altered_proof))
         |> function
         | Ok false -> true
@@ -607,7 +596,7 @@ module Test = struct
       ~count:1
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t =
            Result.map_error
@@ -647,7 +636,7 @@ module Test = struct
       ~count:1
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t =
            Result.map_error
@@ -682,7 +671,6 @@ module Test = struct
     let config : Cryptobox.Config.t =
       {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
     in
-    Cryptobox.Internal_for_tests.reset_initialisation_parameters () ;
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
     in
@@ -696,7 +684,6 @@ module Test = struct
     let config : Cryptobox.Config.t =
       {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
     in
-    Cryptobox.Internal_for_tests.reset_initialisation_parameters () ;
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
     in
@@ -716,7 +703,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
          let slot =
@@ -743,7 +730,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
          let state = QCheck_base_runner.random_state () in
@@ -761,8 +748,6 @@ module Test = struct
          let page_index =
            randrange (Cryptobox.Internal_for_tests.number_of_pages t)
          in
-         reset () ;
-         let* t = make params in
          Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
         | Error `Page_length_mismatch -> true
@@ -777,7 +762,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let state = QCheck_base_runner.random_state () in
@@ -797,8 +782,6 @@ module Test = struct
          let shard_proof =
            Cryptobox.Internal_for_tests.dummy_shard_proof ~state ()
          in
-         reset () ;
-         let* t = make params in
          Cryptobox.verify_shard t commitment shard shard_proof)
         |> function
         | Error `Shard_length_mismatch -> true
@@ -813,7 +796,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
@@ -836,7 +819,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
          let state = QCheck_base_runner.random_state () in
@@ -856,8 +839,6 @@ module Test = struct
              ~min:0
              ~max:(Cryptobox.Internal_for_tests.number_of_pages t)
          in
-         reset () ;
-         let* t = make params in
          Cryptobox.verify_page t commitment ~page_index page page_proof)
         |> function
         | Error `Page_index_out_of_range -> true
@@ -872,7 +853,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = Cryptobox.make (get_cryptobox_parameters params) in
          let state = QCheck_base_runner.random_state () in
@@ -889,8 +870,6 @@ module Test = struct
              ~index:shard_index
              ~length:(Cryptobox.Internal_for_tests.shard_length t)
          in
-         reset () ;
-         let* t = make params in
          Cryptobox.verify_shard t commitment shard shard_proof)
         |> function
         | Error (`Shard_index_out_of_range _) -> true
@@ -905,7 +884,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          let state = QCheck_base_runner.random_state () in
@@ -927,7 +906,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         let deg = ref 0 in
         let size_srs_g1 = ref 0 in
         assert (ensure_validity params) ;
@@ -956,7 +935,7 @@ module Test = struct
       ~count:30
       generate_parameters
       (fun params ->
-        init () ;
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
         assert (ensure_validity params) ;
         (let* t = make params in
          (* This encoding has not a fixed size since it depends on the DAL
@@ -988,7 +967,7 @@ module Test = struct
      This test should be adapted with the new constraints on the DAL parameters. *)
   let _test_collision_page_size () =
     let slot_size = 1 lsl 6 in
-    init () ;
+    Cryptobox.Internal_for_tests.init_prover_dal () ;
     let open Error_monad.Result_syntax in
     (let* t1 =
        Cryptobox.make

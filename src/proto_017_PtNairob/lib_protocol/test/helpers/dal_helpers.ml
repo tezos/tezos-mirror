@@ -48,8 +48,7 @@ let () =
 
 let mk_cryptobox dal_params =
   let open Result_syntax in
-  let parameters = Cryptobox.Internal_for_tests.parameters_initialisation () in
-  let () = Cryptobox.Internal_for_tests.load_parameters parameters in
+  let () = Cryptobox.Internal_for_tests.init_prover_dal () in
   match Cryptobox.make dal_params with
   | Ok dal -> return dal
   | Error (`Fail s) -> fail [Test_failure s]

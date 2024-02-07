@@ -1262,10 +1262,16 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let parameters_initialisation () =
+  let prover_parameters () =
     Prover {test = true; srs = Srs_verifier.Internal_for_tests.fake_srs ()}
 
-  let load_parameters parameters = initialisation_parameters := parameters
+  (* Since computing fake_srs is costly, we avoid to recompute it. *)
+  let init_prover_dal () =
+    match !initialisation_parameters with
+    | Prover {test; _} when test -> ()
+    | _ -> initialisation_parameters := prover_parameters ()
+
+  let init_verifier_dal () = initialisation_parameters := Verifier {test = true}
 
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
@@ -1299,9 +1305,6 @@ module Internal_for_tests = struct
   let select_fft_domain = FFT.select_fft_domain
 
   let precomputation_equal = Kate_amortized.preprocess_equal
-
-  let reset_initialisation_parameters () =
-    initialisation_parameters := Verifier {test = false}
 
   let dummy_commitment ~state () = Commitment_proof.random ~state ()
 
@@ -1382,13 +1385,7 @@ module Config = struct
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
-        | Some _parameters ->
-            return
-              (Prover
-                 {
-                   test = true;
-                   srs = Srs_verifier.Internal_for_tests.fake_srs ();
-                 })
+        | Some _parameters -> return (Internal_for_tests.prover_parameters ())
         | None ->
             let*? srs_g1_path, _ = find_srs_files () in
             let* srs =
