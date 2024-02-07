@@ -28,7 +28,6 @@ open Injector_sigs
 
 module Request (Inj_operation : INJECTOR_OPERATION) : sig
   type ('a, 'b) t =
-    | Add_pending : Inj_operation.t -> (unit, error trace) t
     | New_tezos_head : (Block_hash.t * int32) -> (unit, error trace) t
     | Inject : (unit, error trace) t
 

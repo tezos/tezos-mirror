@@ -1176,10 +1176,8 @@ module Make (Parameters : PARAMETERS) = struct
      fun w request ->
       let state = Worker.state w in
       match request with
-      | Request.Add_pending op ->
-          (* The execution of the request handler is protected to avoid stopping the
-             worker in case of an exception. *)
-          protect @@ fun () -> add_pending_operation state op
+      (* The execution of the request handler is protected to avoid stopping the
+         worker in case of an exception. *)
       | Request.New_tezos_head (block_hash, level) ->
           protect @@ fun () -> on_new_tezos_head state {block_hash; level}
       | Request.Inject -> protect @@ fun () -> on_inject state
@@ -1225,7 +1223,6 @@ module Make (Parameters : PARAMETERS) = struct
         return_unit
       in
       match r with
-      | Request.Add_pending _ -> emit_and_return_errors errs
       | Request.New_tezos_head _ -> emit_and_return_errors errs
       | Request.Inject -> emit_and_return_errors errs
 
@@ -1484,9 +1481,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let operation = Inj_operation.make op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
-    let*! (_pushed : bool) =
-      Worker.Queue.push_request w (Request.Add_pending operation)
-    in
+    let* () = add_pending_operation (Worker.state w) operation in
     return operation.hash
 
   let shutdown () =

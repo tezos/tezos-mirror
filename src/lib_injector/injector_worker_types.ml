@@ -28,7 +28,6 @@ open Injector_sigs
 
 module Request (L1_operation : INJECTOR_OPERATION) = struct
   type ('a, 'b) t =
-    | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head : (Block_hash.t * int32) -> (unit, error trace) t
     | Inject : (unit, error trace) t
 
@@ -40,14 +39,6 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
     let open Data_encoding in
     union
       [
-        case
-          (Tag 0)
-          ~title:"Add_pending"
-          (merge_objs
-             (obj1 (req "request" (constant "add_pending")))
-             L1_operation.encoding)
-          (function View (Add_pending op) -> Some ((), op) | _ -> None)
-          (fun ((), op) -> View (Add_pending op));
         case
           (Tag 1)
           ~title:"New_tezos_head"
@@ -69,8 +60,6 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
 
   let pp ppf (View r) =
     match r with
-    | Add_pending op ->
-        Format.fprintf ppf "request add %a to pending queue" L1_operation.pp op
     | New_tezos_head (block, level) ->
         Format.fprintf
           ppf
