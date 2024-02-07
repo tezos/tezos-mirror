@@ -92,7 +92,6 @@ pub enum Input {
         chunk_hash: TransactionHash,
         data: Vec<u8>,
     },
-    Simulation,
     Info(InfoPerLevel),
     SequencerBlueprint(SequencerBlueprint),
 }
@@ -103,6 +102,8 @@ pub enum InputResult {
     NoInput,
     /// Some decoded input
     Input(Input),
+    /// Simulation mode starts after this input
+    Simulation,
     #[default]
     /// Unparsable input, to be ignored
     Unparsable,
@@ -280,7 +281,7 @@ impl InputResult {
 
     fn parse_simulation(input: &[u8]) -> Self {
         if input.is_empty() {
-            InputResult::Input(Input::Simulation)
+            InputResult::Simulation
         } else {
             InputResult::Unparsable
         }
