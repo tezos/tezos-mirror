@@ -157,6 +157,28 @@ let migrate_staking_balance_and_active_delegates_for_p ctxt =
   in
   return ctxt
 
+(* This should clean most of the remaining fields [frozen_deposits].
+   The field was removed in Oxford but cleaning it using [remove] was too
+   costly as it iterated over all contracts.
+   Instead we iterate over activate delegates.
+   If there are remaining [frozen_deposits] once P activates, they can still be
+   removed one by one in Q. *)
+let clean_frozen_deposits_for_p ctxt =
+  let open Lwt_result_syntax in
+  let contracts_index = ["contracts"; "index"] in
+  let* contracts_tree = Raw_context.get_tree ctxt contracts_index in
+  let field = ["frozen_deposits"] in
+  let*! contracts_tree =
+    Storage.Stake.Active_delegates_with_minimal_stake.fold
+      ctxt
+      ~order:`Undefined
+      ~init:contracts_tree
+      ~f:(fun pkh contracts_tree ->
+        let path = Contract_repr.Index.to_path (Implicit pkh) field in
+        Raw_context.Tree.remove contracts_tree path)
+  in
+  Raw_context.update_tree ctxt contracts_index contracts_tree
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -257,6 +279,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let*! ctxt = Storage.Pending_denunciations.clear ctxt in
         let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
         let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
+        let* ctxt = clean_frozen_deposits_for_p ctxt in
         return (ctxt, [])
   in
   let* ctxt =
