@@ -1475,7 +1475,7 @@ let dal_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Dal_publish_slot_header slot_header))
+         (Dal_publish_commitment slot_header))
     |> Injection.inject_manager_operation
          cctxt
          ~chain

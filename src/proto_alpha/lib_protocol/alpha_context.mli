@@ -2838,7 +2838,7 @@ module Dal : sig
   end
 
   module Operations : sig
-    module Publish_slot_header : sig
+    module Publish_commitment : sig
       type t = {
         slot_index : Slot_index.t;
         commitment : Slot.Commitment.t;
@@ -2909,14 +2909,14 @@ module Dal_errors : sig
   type error +=
     | Dal_feature_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
-    | Dal_publish_slot_header_invalid_index of {
+    | Dal_publish_commitment_invalid_index of {
         given : Dal.Slot_index.t;
         maximum : Dal.Slot_index.t;
       }
-    | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
+    | Dal_publish_commitment_candidate_with_low_fees of {proposed_fees : Tez.t}
     | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
-    | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
-    | Dal_publish_slot_header_invalid_proof of {
+    | Dal_publish_commitment_duplicate of {slot_header : Dal.Slot.Header.t}
+    | Dal_publish_commitment_invalid_proof of {
         commitment : Dal.Slot.Commitment.t;
         commitment_proof : Dal.Slot.Commitment_proof.t;
       }
@@ -4379,7 +4379,7 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
-  type dal_publish_slot_header = Dal_publish_slot_header_kind
+  type dal_publish_commitment = Dal_publish_commitment_kind
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
@@ -4415,7 +4415,7 @@ module Kind : sig
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
-    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
+    | Dal_publish_commitment_manager_kind : dal_publish_commitment manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -4574,9 +4574,9 @@ and _ manager_operation =
       entrypoint : Entrypoint.t;
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header :
-      Dal.Operations.Publish_slot_header.t
-      -> Kind.dal_publish_slot_header manager_operation
+  | Dal_publish_commitment :
+      Dal.Operations.Publish_commitment.t
+      -> Kind.dal_publish_commitment manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
@@ -4802,8 +4802,8 @@ module Operation : sig
 
     val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
-    val dal_publish_slot_header_case :
-      Kind.dal_publish_slot_header Kind.manager case
+    val dal_publish_commitment_case :
+      Kind.dal_publish_commitment Kind.manager case
 
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
@@ -4871,7 +4871,7 @@ module Operation : sig
 
       val transfer_ticket_case : Kind.transfer_ticket case
 
-      val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
+      val dal_publish_commitment_case : Kind.dal_publish_commitment case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

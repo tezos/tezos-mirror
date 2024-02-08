@@ -3755,7 +3755,7 @@ let commands_rw () =
                 (number_of_slots - 1)
         in
         let slot_header =
-          Alpha_context.Dal.Operations.Publish_slot_header.
+          Alpha_context.Dal.Operations.Publish_commitment.
             {slot_index; commitment; commitment_proof}
         in
         let* _res =

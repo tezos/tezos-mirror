@@ -88,7 +88,7 @@ module Plugin = struct
         (result : (kind, _, _) Protocol.Apply_operation_result.operation_result)
         =
       match op with
-      | Dal_publish_slot_header operation ->
+      | Dal_publish_commitment operation ->
           (operation.slot_index, operation.commitment, status_of_result result)
           :: acc
       | _ -> acc

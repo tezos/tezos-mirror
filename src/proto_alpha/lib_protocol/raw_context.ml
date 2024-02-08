@@ -1828,7 +1828,7 @@ module Dal = struct
     | Some (dal_slot_fee_market, updated) ->
         if not updated then
           tzfail
-            (Dal_errors_repr.Dal_publish_slot_header_duplicate {slot_header})
+            (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
         else return {ctxt with back = {ctxt.back with dal_slot_fee_market}}
 
   let candidates ctxt =

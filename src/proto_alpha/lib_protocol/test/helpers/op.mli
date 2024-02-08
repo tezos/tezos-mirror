@@ -559,7 +559,7 @@ val sc_rollup_timeout :
   Sc_rollup.Game.Index.t ->
   Operation.packed tzresult Lwt.t
 
-val dal_publish_slot_header :
+val dal_publish_commitment :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
@@ -567,7 +567,7 @@ val dal_publish_slot_header :
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  Dal.Operations.Publish_slot_header.t ->
+  Dal.Operations.Publish_commitment.t ->
   (packed_operation, tztrace) result Lwt.t
 
 (** [zk_rollup_origination ctxt source ~public_parameters ~circuits_info

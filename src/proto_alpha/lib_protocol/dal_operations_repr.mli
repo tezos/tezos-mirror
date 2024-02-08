@@ -30,7 +30,7 @@
     This module ensures the consistency with the internal
    data-structures like [Dal_slot_index_repr.t]. *)
 
-module Publish_slot_header : sig
+module Publish_commitment : sig
   (** A "publish slot header" operation contains
 
       - a [slot_index] which is the slot index associated with the

@@ -3143,7 +3143,7 @@ let publish_slot_info_encoding =
 type 'uri publish_dal_slot = {
   slot_info : publish_slot_info;
   target_published_level : string option;
-      (** We target the inclusion of the publish slot header operation at this
+      (** We target the inclusion of the publish commitment operation at this
           level, so the operation should be inject at least one level before. *)
   l1_node_uri : 'uri;
       (** An URI to a Layer 1 node. If [None], we target the next level. *)

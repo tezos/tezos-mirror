@@ -75,7 +75,7 @@ let ensure_kind infos kind =
       | Sc_rollup_timeout _, K_Sc_rollup_timeout
       | Sc_rollup_execute_outbox_message _, K_Sc_rollup_execute_outbox_message
       | Sc_rollup_recover_bond _, K_Sc_rollup_recover_bond
-      | Dal_publish_slot_header _, K_Dal_publish_slot_header
+      | Dal_publish_commitment _, K_Dal_publish_commitment
       | Zk_rollup_origination _, K_Zk_rollup_origination
       | Zk_rollup_publish _, K_Zk_rollup_publish
       | Zk_rollup_update _, K_Zk_rollup_update ->
@@ -86,7 +86,7 @@ let ensure_kind infos kind =
           | Sc_rollup_originate _ | Sc_rollup_publish _ | Sc_rollup_cement _
           | Sc_rollup_add_messages _ | Sc_rollup_refute _ | Sc_rollup_timeout _
           | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
-          | Dal_publish_slot_header _ | Zk_rollup_origination _
+          | Dal_publish_commitment _ | Zk_rollup_origination _
           | Zk_rollup_publish _ | Zk_rollup_update _ ),
           _ ) ->
           assert false)

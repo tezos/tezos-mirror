@@ -99,17 +99,17 @@ let apply_attestation ctxt consensus_key level attestation =
    checks that cannot fail unless the source of the operation is
    malicious (or if there is a bug). In that case, it is better to
    ensure fees will be taken. *)
-let validate_publish_slot_header ctxt _operation =
+let validate_publish_commitment ctxt _operation =
   assert_dal_feature_enabled ctxt
 
-let apply_publish_slot_header ctxt operation =
+let apply_publish_commitment ctxt operation =
   let open Result_syntax in
-  let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_slot_header in
+  let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_commitment in
   let number_of_slots = Dal.number_of_slots ctxt in
   let* ctxt, cryptobox = Dal.make ctxt in
   let current_level = (Level.current ctxt).level in
   let* slot_header =
-    Dal.Operations.Publish_slot_header.slot_header
+    Dal.Operations.Publish_commitment.slot_header
       ~cryptobox
       ~number_of_slots
       ~current_level

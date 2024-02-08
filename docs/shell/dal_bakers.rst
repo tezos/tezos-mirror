@@ -19,7 +19,7 @@ Based on the DAL attestations included in a block , the protocol decides which s
 It's important for bakers to note the following:
 
 - No DAL attestation is injected if there is no slot to attest (i.e. if the bitset is zero).
-- If a slot header is included in an L1 block at some level PL (a.k.a ``published_level``), the DAL consensus operations that possibly attest its shards are injected on top of the block(s) at level ``PL + attestation_lag - 1`` and target inclusion at level ``PL + attestation_lag``.
+- If a slot commitment is included in an L1 block at some level PL (a.k.a ``published_level``), the DAL consensus operations that possibly attest its shards are injected on top of the block(s) at level ``PL + attestation_lag - 1`` and target inclusion at level ``PL + attestation_lag``.
 - Theoretically, if a baker is assigned more than ``number_of_shards / redundancy_factor`` shards, it could declare the shards as available if it succeeds in downloading ``number_of_shards / redundancy_factor`` shards at least. The missing shards could be calculated by reconstructing the whole slot (but this is not implemented yet).
 - It is planned to merge Tenderbake and DAL attestations in the same operation in the future, as they share a few fields. This would avoid an extra signature verification per baker.
 - As the number of shards is quite small compared to the number of Tenderbake slots, DAL and Tenderbake committees might not always coincide in practice: there might be bakers in the Tenderbake's committee that are not part of the DAL's for some levels. However, any baker in the DAL committee is part of the Tenderbake committee.

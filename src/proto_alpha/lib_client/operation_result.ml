@@ -343,11 +343,11 @@ let pp_manager_operation_content (type kind) source ppf
         sc_rollup
         Signature.Public_key_hash.pp
         staker
-  | Dal_publish_slot_header operation ->
+  | Dal_publish_commitment operation ->
       Format.fprintf
         ppf
         "Data availability slot header publishing:@,Slot: %a"
-        Dal.Operations.Publish_slot_header.pp
+        Dal.Operations.Publish_commitment.pp
         operation
   | Zk_rollup_origination _ ->
       Format.fprintf ppf "Epoxy origination:@,From: %a" Contract.pp source
@@ -694,8 +694,8 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
-  let pp_dal_publish_slot_header_result
-      (Dal_publish_slot_header_result {slot_header; consumed_gas}) =
+  let pp_dal_publish_commitment_result
+      (Dal_publish_commitment_result {slot_header; consumed_gas}) =
     pp_slot_header ppf slot_header ;
     pp_consumed_gas ppf consumed_gas
   in
@@ -828,7 +828,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart output message execution"
     | Sc_rollup_recover_bond_result _ -> "smart rollup bond retrieval"
-    | Dal_publish_slot_header_result _ ->
+    | Dal_publish_commitment_result _ ->
         "data availability slot header publishing"
     | Zk_rollup_origination_result _ -> "epoxy originate"
     | Zk_rollup_publish_result _ -> "epoxy publish"
@@ -862,8 +862,8 @@ let pp_manager_operation_contents_result ppf op_result =
         pp_sc_rollup_execute_outbox_message_result op
     | Sc_rollup_recover_bond_result _ as op ->
         pp_sc_rollup_recover_bond_result op
-    | Dal_publish_slot_header_result _ as op ->
-        pp_dal_publish_slot_header_result op
+    | Dal_publish_commitment_result _ as op ->
+        pp_dal_publish_commitment_result op
     | Zk_rollup_origination_result _ as op -> pp_zk_rollup_origination_result op
     | Zk_rollup_publish_result _ as op -> pp_zk_rollup_publish_result op
     | Zk_rollup_update_result _ as op -> pp_zk_rollup_update_result op

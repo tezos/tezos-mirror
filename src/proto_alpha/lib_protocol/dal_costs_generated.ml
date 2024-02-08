@@ -9,6 +9,6 @@
 module S = Saturation_repr
 open S.Syntax
 
-(* model dal/Dal_publish_slot_header *)
+(* model dal/Dal_publish_commitment *)
 (* max 10 1160000. *)
-let cost_Dal_publish_slot_header = S.safe_int 1160000
+let cost_Dal_publish_commitment = S.safe_int 1160000

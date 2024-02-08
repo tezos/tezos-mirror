@@ -191,9 +191,9 @@ types:
     - id: transfer_ticket
       type: transfer_ticket
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::transfer_ticket)
-    - id: dal_publish_slot_header
-      type: dal_publish_slot_header
-      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::dal_publish_slot_header)
+    - id: dal_publish_commitment
+      type: dal_publish_commitment
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::dal_publish_commitment)
     - id: smart_rollup_originate
       type: smart_rollup_originate
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::smart_rollup_originate)
@@ -373,7 +373,7 @@ types:
       type: u1
     - id: page_index
       type: s2
-  dal_publish_slot_header:
+  dal_publish_commitment:
     seq:
     - id: source
       type: public_key_hash
@@ -1894,7 +1894,7 @@ enums:
     205: smart_rollup_timeout
     206: smart_rollup_execute_outbox_message
     207: smart_rollup_recover_bond
-    230: dal_publish_slot_header
+    230: dal_publish_commitment
     250: zk_rollup_origination
     251: zk_rollup_publish
     252: zk_rollup_update

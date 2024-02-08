@@ -463,7 +463,7 @@ module Helpers = struct
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg
 
-  let publish_slot_header ?counter ?force ?source ?fee ?error ~index ~commitment
+  let publish_commitment ?counter ?force ?source ?fee ?error ~index ~commitment
       ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
        Doing this here allows to keep the diff small as gas cost for
@@ -475,7 +475,7 @@ module Helpers = struct
         ?force
         [
           make ?source ?fee ?counter
-          @@ dal_publish_slot_header ~index ~commitment ~proof;
+          @@ dal_publish_commitment ~index ~commitment ~proof;
         ]
         client)
 
