@@ -333,17 +333,6 @@ let check_constants constants =
   in
   let* () =
     error_unless
-      Compare.Int32.(
-        constants.dal.blocks_per_epoch > 0l
-        && constants.dal.blocks_per_epoch <= constants.blocks_per_cycle
-        && Int32.rem constants.blocks_per_cycle constants.dal.blocks_per_epoch
-           = 0l)
-      (Invalid_protocol_constants
-         "The epoch length must be between 1 and blocks_per_cycle, and \
-          blocks_per_epoch must divide blocks_per_cycle.")
-  in
-  let* () =
-    error_unless
       Compare.Int.(constants.dal.attestation_lag > 1)
       (Invalid_protocol_constants
          "The attestation_lag must be strictly greater than 1, because only \

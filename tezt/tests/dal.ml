@@ -549,44 +549,23 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
+let test_one_committee_per_level _protocol _parameters _cryptobox node _client
     _bootstrap_key =
-  let blocks_per_epoch = parameters.Dal.Parameters.blocks_per_epoch in
   let* current_level =
     Node.RPC.(call node @@ get_chain_block_helper_current_level ())
   in
   (* The test assumes we are at a level when an epoch starts. And
      that is indeed the case. *)
   assert (current_level.cycle_position = 0) ;
-  let* first_committee =
+  let* current_committee =
     Dal.Committee.at_level node ~level:current_level.level
   in
-  (* We iterate through (the committees at) levels [current_level +
-     offset], with [offset] from 1 to [blocks_per_epoch]. At offset 0
-     we have the [first_committee] (first in the current epoch). The
-     committees at offsets 1 to [blocks_per_epoch - 1] should be the
-     same as the one at offset 0, the one at [blocks_per_epoch] (first
-     in the next epoch) should be different. *)
-  let rec iter offset =
-    if offset > blocks_per_epoch then unit
-    else
-      let level = current_level.level + offset in
-      let* committee = Dal.Committee.at_level node ~level in
-      if offset < blocks_per_epoch then (
-        Check.((first_committee = committee) Dal.Committee.typ)
-          ~error_msg:
-            "Unexpected different DAL committees at first level: %L, versus \
-             current level: %R" ;
-        iter (offset + 1))
-      else if offset = blocks_per_epoch then (
-        Check.((first_committee <> committee) Dal.Committee.typ)
-          ~error_msg:
-            "Unexpected equal DAL committees at first levels in subsequent \
-             epochs: %L and %R" ;
-        unit)
-      else iter (offset + 1)
+  let* next_committee =
+    Dal.Committee.at_level node ~level:(current_level.level + 1)
   in
-  iter 1
+  Check.((current_committee <> next_committee) Dal.Committee.typ)
+    ~error_msg:"Unexpected equal DAL committees at subsequent levels: %L and %R" ;
+  unit
 
 let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof = Dal.(Commitment.dummy_commitment cryptobox message) in
@@ -987,7 +966,6 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   let preserved_cycles = JSON.(proto_params |-> "preserved_cycles" |> as_int) in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
-  let blocks_per_epoch = parameters.Dal.Parameters.blocks_per_epoch in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
      get roughly n / 64 = 16 TB slots on average. So the probability that it is
      on TB committee is high. With [number_of_shards = 16] (which is the minimum
@@ -1034,10 +1012,8 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
                     [get_chain_block_context_dal_shards] RPC")
     in
     if List.mem new_account.public_key_hash committee then (
-      Log.info
-        "Bake another %d blocks to change the DAL committee"
-        blocks_per_epoch ;
-      let* () = bake_for ~count:blocks_per_epoch client in
+      Log.info "Bake another block to change the DAL committee" ;
+      let* () = bake_for client in
       iter ())
     else
       let* (`OpHash _oph) =
@@ -4459,8 +4435,8 @@ let register ~protocols =
     test_feature_flag
     protocols ;
   scenario_with_layer1_node
-    "one_committee_per_epoch"
-    test_one_committee_per_epoch
+    "one_committee_per_level"
+    test_one_committee_per_level
     protocols ;
 
   (* Tests with layer1 and dal nodes *)

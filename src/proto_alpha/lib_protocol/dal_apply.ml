@@ -196,24 +196,8 @@ let finalisation ctxt =
 let compute_committee ctxt level =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
-  let blocks_per_epoch = (Constants.parametric ctxt).dal.blocks_per_epoch in
-  let first_level_in_epoch =
-    match
-      Level.sub
-        ctxt
-        level
-        (Int32.to_int @@ Int32.rem level.Level.cycle_position blocks_per_epoch)
-    with
-    | Some v -> v
-    | None ->
-        (* unreachable, because level.level >= level.cycle_position >=
-           (level.cycle_position mod blocks_per_epoch) *)
-        assert false
-  in
   let pkh_from_tenderbake_slot slot =
-    let+ ctxt, consensus_key =
-      Stake_distribution.slot_owner ctxt first_level_in_epoch slot
-    in
+    let+ ctxt, consensus_key = Stake_distribution.slot_owner ctxt level slot in
     (ctxt, pkh_of_consensus_key consensus_key)
   in
   (* This committee is cached because it is the one we will use
