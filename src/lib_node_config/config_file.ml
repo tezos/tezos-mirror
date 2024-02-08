@@ -358,6 +358,7 @@ and p2p = {
 and rpc = {
   listen_addrs : string list;
   local_listen_addrs : string list;
+  external_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
@@ -387,6 +388,7 @@ let default_rpc =
   {
     listen_addrs = [];
     local_listen_addrs = [];
+    external_listen_addrs = [];
     cors_origins = [];
     cors_headers = [];
     tls = None;
@@ -560,6 +562,7 @@ let rpc : rpc Data_encoding.t =
            cors_headers;
            listen_addrs;
            local_listen_addrs;
+           external_listen_addrs;
            tls;
            acl;
            media_type;
@@ -570,26 +573,26 @@ let rpc : rpc Data_encoding.t =
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
       in
-      ( Some listen_addrs,
-        Some local_listen_addrs,
-        None,
-        cors_origins,
-        cors_headers,
-        cert,
-        key,
-        acl,
-        media_type,
-        max_active_rpc_connections ))
-    (fun ( listen_addrs,
-           local_listen_addrs,
-           legacy_listen_addr,
-           cors_origins,
-           cors_headers,
-           cert,
-           key,
-           acl,
-           media_type,
-           max_active_rpc_connections ) ->
+      let local_listen_addrs =
+        match local_listen_addrs with [] -> None | v -> Some v
+      in
+      let external_listen_addrs =
+        match external_listen_addrs with [] -> None | v -> Some v
+      in
+      ( ( Some listen_addrs,
+          local_listen_addrs,
+          external_listen_addrs,
+          None,
+          cors_origins ),
+        (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
+      ))
+    (fun ( ( listen_addrs,
+             local_listen_addrs,
+             external_listen_addrs,
+             legacy_listen_addr,
+             cors_origins ),
+           (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
+         ) ->
       let tls =
         match (cert, key) with
         | None, _ | _, None -> None
@@ -605,12 +608,18 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
+      let external_listen_addrs =
+        Option.value
+          external_listen_addrs
+          ~default:default_rpc.external_listen_addrs
+      in
       let local_listen_addrs =
         Option.value local_listen_addrs ~default:default_rpc.local_listen_addrs
       in
       {
         listen_addrs;
         local_listen_addrs;
+        external_listen_addrs;
         cors_origins;
         cors_headers;
         tls;
@@ -618,55 +627,71 @@ let rpc : rpc Data_encoding.t =
         media_type;
         max_active_rpc_connections;
       })
-    (obj10
-       (opt
-          "listen-addrs"
-          ~description:
-            "Hosts to listen to. If the port is not specified, the default \
-             port 8732 will be assumed."
-          (list string))
-       (opt
-          "local-listen-addrs"
-          ~description:
-            "Hosts to listen to. If the port is not specified, the default \
-             port 8732 will be assumed."
-          (list string))
-       (opt "listen-addr" ~description:"Legacy value: Host to listen to" string)
-       (dft
-          "cors-origin"
-          ~description:
-            "Cross Origin Resource Sharing parameters, see \
-             https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
-          (list string)
-          default_rpc.cors_origins)
-       (dft
-          "cors-headers"
-          ~description:
-            "Cross Origin Resource Sharing parameters, see \
-             https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
-          (list string)
-          default_rpc.cors_headers)
-       (opt
-          "crt"
-          ~description:"Certificate file (necessary when TLS is used)."
-          string)
-       (opt "key" ~description:"Key file (necessary when TLS is used)." string)
-       (dft
-          "acl"
-          ~description:"A list of RPC ACLs for specific listening addresses."
-          RPC_server.Acl.policy_encoding
-          default_rpc.acl)
-       (dft
-          "media-type"
-          ~description:"The media types supported by the server."
-          Media_type.Command_line.encoding
-          default_rpc.media_type)
-       (dft
-          "max_active_rpc_connections"
-          ~description:
-            "The maximum number of active connections per RPC endpoint."
-          int31
-          default_rpc.max_active_rpc_connections))
+    (merge_objs
+       (obj5
+          (opt
+             "listen-addrs"
+             ~description:
+               "Hosts to listen to. If the port is not specified, the default \
+                port 8732 will be assumed."
+             (list string))
+          ((*FIXME: https://gitlab.com/tezos/tezos/-/issues/6925
+             Remove this deprecated config field. *)
+           opt
+             "local-listen-addrs"
+             ~description:
+               "DEPRECATED: Hosts to listen to. If the port is not specified, \
+                the default port 8732 will be assumed."
+             (list string))
+          (opt
+             "external-listen-addrs"
+             ~description:
+               "Hosts to listen to. If the port is not specified, the default \
+                port 8732 will be assumed."
+             (list string))
+          (opt
+             "listen-addr"
+             ~description:"Legacy value: Host to listen to"
+             string)
+          (dft
+             "cors-origin"
+             ~description:
+               "Cross Origin Resource Sharing parameters, see \
+                https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)
+             default_rpc.cors_origins))
+       (obj6
+          (dft
+             "cors-headers"
+             ~description:
+               "Cross Origin Resource Sharing parameters, see \
+                https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)
+             default_rpc.cors_headers)
+          (opt
+             "crt"
+             ~description:"Certificate file (necessary when TLS is used)."
+             string)
+          (opt
+             "key"
+             ~description:"Key file (necessary when TLS is used)."
+             string)
+          (dft
+             "acl"
+             ~description:"A list of RPC ACLs for specific listening addresses."
+             RPC_server.Acl.policy_encoding
+             default_rpc.acl)
+          (dft
+             "media-type"
+             ~description:"The media types supported by the server."
+             Media_type.Command_line.encoding
+             default_rpc.media_type)
+          (dft
+             "max_active_rpc_connections"
+             ~description:
+               "The maximum number of active connections per RPC endpoint."
+             int31
+             default_rpc.max_active_rpc_connections)))
 
 let rpc_encoding = rpc
 
@@ -853,8 +878,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(local_rpc_listen_addrs = []) ?(allow_all_rpc = [])
-    ?(media_type = Media_type.Command_line.Any)
+    ?(local_rpc_listen_addrs = []) ?(external_rpc_listen_addrs = [])
+    ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
     ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
     ?(metrics_addr = []) ?operation_metadata_size_limit
     ?(private_mode = default_p2p.private_mode)
@@ -939,6 +964,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
       local_listen_addrs =
         unopt_list ~default:cfg.rpc.local_listen_addrs local_rpc_listen_addrs;
+      external_listen_addrs =
+        unopt_list
+          ~default:cfg.rpc.external_listen_addrs
+          external_rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;

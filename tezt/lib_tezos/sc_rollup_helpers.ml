@@ -208,8 +208,8 @@ let make_bool_parameter name = function
   | Some value -> [([name], `Bool value)]
 
 let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
-    ?commitment_period ?challenge_window ?timeout ?whitelist_enable ?rpc_local
-    ?(riscv_pvm_enable = false) protocol =
+    ?commitment_period ?challenge_window ?timeout ?whitelist_enable
+    ?rpc_external ?(riscv_pvm_enable = false) protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -239,7 +239,7 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     `Client
     ~protocol
     ~nodes_args
-    ?rpc_local
+    ?rpc_external
     ()
 
 (** This helper injects an SC rollup origination via octez-client. Then it

@@ -57,7 +57,7 @@ type argument =
   | Disable_mempool
   | Version
   | RPC_additional_addr of string
-  | RPC_additional_addr_local of string
+  | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
 
 let make_argument = function
@@ -89,7 +89,7 @@ let make_argument = function
   | Disable_mempool -> ["--disable-mempool"]
   | Version -> ["--version"]
   | RPC_additional_addr addr -> ["--rpc-addr"; addr]
-  | RPC_additional_addr_local addr -> ["--local-rpc-addr"; addr]
+  | RPC_additional_addr_external addr -> ["--external-rpc-addr"; addr]
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
 
@@ -137,7 +137,7 @@ let is_redundant = function
   | Cors_origin _, _
   | Disable_mempool, _
   | RPC_additional_addr _, _
-  | RPC_additional_addr_local _, _
+  | RPC_additional_addr_external _, _
   | Version, _
   | Max_active_rpc_connections _, _ ->
       false
@@ -163,7 +163,7 @@ module Parameters = struct
     advertised_net_port : int option;
     metrics_addr : string option;
     metrics_port : int;
-    rpc_local : bool;
+    rpc_external : bool;
     rpc_host : string;
     rpc_port : int;
     rpc_tls : tls_config option;
@@ -215,7 +215,7 @@ let advertised_net_port node = node.persistent_state.advertised_net_port
 let rpc_scheme node =
   match node.persistent_state.rpc_tls with Some _ -> "https" | None -> "http"
 
-let rpc_local node = node.persistent_state.rpc_local
+let rpc_external node = node.persistent_state.rpc_external
 
 let rpc_host node = node.persistent_state.rpc_host
 
@@ -712,7 +712,7 @@ let wait_for_disconnections node disconnections =
 
 let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
     ?data_dir ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
-    ?metrics_port ?(rpc_local = false) ?(rpc_host = Constant.default_host)
+    ?metrics_port ?(rpc_external = false) ?(rpc_host = Constant.default_host)
     ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
     ?(max_active_rpc_connections = 500) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -745,7 +745,7 @@ let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
         net_addr;
         net_port;
         advertised_net_port;
-        rpc_local;
+        rpc_external;
         rpc_host;
         rpc_port;
         rpc_tls;
@@ -858,7 +858,7 @@ let runlike_command_arguments node command arguments =
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
   :: "--metrics-addr"
   :: (metrics_addr ^ string_of_int node.persistent_state.metrics_port)
-  :: (if node.persistent_state.rpc_local then "--local-rpc-addr"
+  :: (if node.persistent_state.rpc_external then "--external-rpc-addr"
      else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
   :: "--max-active-rpc-connections"
@@ -922,7 +922,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_local ?rpc_host
+    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external ?rpc_host
     ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
     ?snapshot arguments =
   let run_arguments, config_arguments =
@@ -940,7 +940,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?advertised_net_port
       ?metrics_addr
       ?metrics_port
-      ?rpc_local
+      ?rpc_external
       ?rpc_host
       ?rpc_port
       ?rpc_tls

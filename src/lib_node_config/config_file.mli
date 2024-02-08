@@ -76,6 +76,7 @@ and p2p = {
 and rpc = {
   listen_addrs : string list;
   local_listen_addrs : string list;
+  external_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
@@ -121,6 +122,7 @@ val update :
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
   ?local_rpc_listen_addrs:string list ->
+  ?external_rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
   ?max_active_rpc_connections:int ->
