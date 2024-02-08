@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::storage::{
@@ -280,9 +280,9 @@ fn read_all_chunks_and_validate<Host: Runtime>(
             StoreBlueprint::SequencerChunk(chunk) => chunks.push(chunk),
         }
     }
-    match config {
-        Configuration::Proxy => Ok(None),
-        Configuration::Sequencer { delayed_inbox, .. } => {
+    match &mut config.mode {
+        ConfigurationMode::Proxy => Ok(None),
+        ConfigurationMode::Sequencer { delayed_inbox, .. } => {
             let validity = parse_and_validate_blueprint(
                 host,
                 chunks.concat().as_slice(),
@@ -363,10 +363,12 @@ mod tests {
             "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
         )
         .unwrap();
-        let mut config = Configuration::Sequencer {
-            delayed_bridge,
-            delayed_inbox: Box::new(delayed_inbox),
-            sequencer,
+        let mut config = Configuration {
+            mode: ConfigurationMode::Sequencer {
+                delayed_bridge,
+                delayed_inbox: Box::new(delayed_inbox),
+                sequencer,
+            },
         };
 
         // Create empty blueprint with an invalid delayed hash

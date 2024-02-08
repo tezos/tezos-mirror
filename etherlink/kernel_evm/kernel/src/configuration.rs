@@ -7,7 +7,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_debug::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 
-pub enum Configuration {
+pub enum ConfigurationMode {
     Proxy,
     Sequencer {
         delayed_bridge: ContractKt1Hash,
@@ -16,20 +16,31 @@ pub enum Configuration {
     },
 }
 
+pub struct Configuration {
+    pub mode: ConfigurationMode,
+}
+
 impl Default for Configuration {
     fn default() -> Self {
-        Self::Proxy
+        Self {
+            mode: ConfigurationMode::Proxy,
+        }
     }
 }
 
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Configuration::Proxy => write!(f, "Proxy"),
-            Configuration::Sequencer {
-                delayed_bridge,
-                delayed_inbox: _, // Ignoring delayed_inbox
-                sequencer,
+            Self {
+                mode: ConfigurationMode::Proxy,
+            } => write!(f, "Proxy"),
+            Self {
+                mode:
+                    ConfigurationMode::Sequencer {
+                        delayed_bridge,
+                        delayed_inbox: _, // Ignoring delayed_inbox
+                        sequencer,
+                    },
             } => write!(
                 f,
                 "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
@@ -53,10 +64,12 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                     .unwrap()
                 });
             match DelayedInbox::new(host) {
-                Ok(delayed_inbox) => Configuration::Sequencer {
-                    delayed_bridge,
-                    delayed_inbox: Box::new(delayed_inbox),
-                    sequencer,
+                Ok(delayed_inbox) => Configuration {
+                    mode: ConfigurationMode::Sequencer {
+                        delayed_bridge,
+                        delayed_inbox: Box::new(delayed_inbox),
+                        sequencer,
+                    },
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
