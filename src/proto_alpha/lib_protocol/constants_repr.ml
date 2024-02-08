@@ -238,20 +238,6 @@ let check_constants constants =
   in
   let* () =
     error_unless
-      (let snapshot_frequence =
-         Int32.div
-           constants.blocks_per_cycle
-           constants.blocks_per_stake_snapshot
-       in
-       Compare.Int32.(
-         snapshot_frequence > Int32.zero
-         && snapshot_frequence < Int32.of_int (1 lsl 16)))
-      (Invalid_protocol_constants
-         "The ratio blocks_per_cycle per blocks_per_stake_snapshot should be \
-          between 1 and 65535")
-  in
-  let* () =
-    error_unless
       Compare.Int32.(
         constants.nonce_revelation_threshold > Int32.zero
         && constants.nonce_revelation_threshold < constants.blocks_per_cycle)

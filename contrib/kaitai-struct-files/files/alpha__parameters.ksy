@@ -476,8 +476,6 @@ seq:
   type: s4
 - id: nonce_revelation_threshold
   type: s4
-- id: blocks_per_stake_snapshot
-  type: s4
 - id: cycles_per_voting_period
   type: s4
 - id: hard_gas_limit_per_operation
