@@ -44,7 +44,6 @@ val ensure_srs_validity :
   page_size:int ->
   redundancy_factor:int ->
   number_of_shards:int ->
-  srs_g1_length:int ->
   (unit, [> `Fail of string]) result
 
 exception Failed_to_load_trusted_setup of string

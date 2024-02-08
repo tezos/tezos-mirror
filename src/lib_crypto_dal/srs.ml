@@ -68,7 +68,7 @@ let get_verifier_srs2 = get_verifier_srs2 max_srs_size get_srs2
 let is_in_srs2 i = List.mem_assoc i srs_g2
 
 let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
-    ~number_of_shards ~srs_g1_length =
+    ~number_of_shards =
   let open Result_syntax in
   let assert_result condition error_message =
     if not condition then fail (`Fail (error_message ())) else return_unit
@@ -80,10 +80,12 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
       ~page_size
       ~number_of_shards
   in
-  let min_g1 =
+  let min_g1, srs_g1_length =
     match mode with
-    | `Prover -> max_polynomial_length
-    | `Verifier -> shard_length
+    | `Prover when test ->
+        (max_polynomial_length, Internal_for_tests.max_srs_size)
+    | `Prover -> (max_polynomial_length, max_srs_size)
+    | `Verifier -> (shard_length, max_verifier_srs_size)
   in
   let* () =
     assert_result

@@ -241,7 +241,7 @@ module Inner = struct
   }
 
   let ensure_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
-      ~number_of_shards ~srs_g1_length =
+      ~number_of_shards =
     let open Result_syntax in
     let* () =
       Parameters_check.ensure_validity_without_srs
@@ -257,7 +257,6 @@ module Inner = struct
       ~page_size
       ~redundancy_factor
       ~number_of_shards
-      ~srs_g1_length
 
   type parameters = Dal_config.parameters = {
     redundancy_factor : int;
@@ -269,16 +268,6 @@ module Inner = struct
   let parameters_encoding = Dal_config.parameters_encoding
 
   let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
-
-  let get_srs initialisation_parameters =
-    match initialisation_parameters with
-    | Verifier {test} ->
-        let srs =
-          if test then Srs.Internal_for_tests.get_verifier_srs1 ()
-          else Srs.get_verifier_srs1 ()
-        in
-        (`Verifier, srs, test)
-    | Prover {test; srs} -> (`Prover, srs, test)
 
   module Cache = Hashtbl.Make (struct
     type t = parameters * initialisation_parameters
@@ -322,7 +311,16 @@ module Inner = struct
       in
       let page_length = Parameters_check.page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-      let mode, srs_g1, test = get_srs !initialisation_parameters in
+      let mode, srs_g1, test =
+        match !initialisation_parameters with
+        | Verifier {test} ->
+            let srs =
+              if test then Srs.Internal_for_tests.get_verifier_srs1 ()
+              else Srs.get_verifier_srs1 ()
+            in
+            (`Verifier, srs, test)
+        | Prover {test; srs} -> (`Prover, srs, test)
+      in
       let* () =
         ensure_validity
           ~test
@@ -331,7 +329,6 @@ module Inner = struct
           ~page_size
           ~redundancy_factor
           ~number_of_shards
-          ~srs_g1_length:(Srs_g1.size srs_g1)
       in
       let srs_g2 =
         (if test then Srs.Internal_for_tests.get_verifier_srs2
@@ -1118,7 +1115,11 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let mode, srs_g1, test = get_srs !initialisation_parameters in
+    let mode, test =
+      match !initialisation_parameters with
+      | Verifier {test} -> (`Verifier, test)
+      | Prover {test; _} -> (`Prover, test)
+    in
     match
       ensure_validity
         ~test
@@ -1127,7 +1128,6 @@ module Internal_for_tests = struct
         ~page_size
         ~redundancy_factor
         ~number_of_shards
-        ~srs_g1_length:(Srs_g1.size srs_g1)
     with
     | Ok _ -> true
     | _ -> false
