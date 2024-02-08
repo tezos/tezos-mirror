@@ -342,18 +342,3 @@ let apply_and_clear_denunciations ctxt =
       remaining_denunciations
   in
   return (ctxt, balance_updates)
-
-module For_RPC = struct
-  let pending_denunciations ctxt delegate =
-    let open Lwt_result_syntax in
-    let+ denunciations = Storage.Pending_denunciations.find ctxt delegate in
-    Option.value denunciations ~default:[]
-
-  let pending_denunciations_list ctxt =
-    let open Lwt_syntax in
-    let* r = Storage.Pending_denunciations.bindings ctxt in
-    let r =
-      List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
-    in
-    return r
-end

@@ -560,7 +560,9 @@ module Delegate = struct
     include For_RPC
     include Delegate_storage.For_RPC
     include Delegate_missed_attestations_storage.For_RPC
-    include Delegate_slashed_deposits_storage.For_RPC
+    include Pending_denunciations_storage.For_RPC
+
+    let pending_denunciations = Pending_denunciations_storage.find
   end
 end
 

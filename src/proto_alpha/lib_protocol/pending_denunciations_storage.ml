@@ -38,3 +38,10 @@ let has_pending_denunciations ctxt delegate =
 let fold = Storage.Pending_denunciations.fold
 
 let clear ctxt = Storage.Pending_denunciations.clear ctxt
+
+module For_RPC = struct
+  let pending_denunciations_list ctxt =
+    let open Lwt_syntax in
+    let+ r = Storage.Pending_denunciations.bindings ctxt in
+    List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
+end

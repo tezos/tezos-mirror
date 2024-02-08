@@ -49,3 +49,10 @@ val fold :
 
 (** See {!Storage.Pending_denunciations.clear}  *)
 val clear : Raw_context.t -> Raw_context.t Lwt.t
+
+module For_RPC : sig
+  (** Returns a list of all denunciations paired with the offending delegate pkh. *)
+  val pending_denunciations_list :
+    Raw_context.t ->
+    (Signature.public_key_hash * Denunciations_repr.item) list Lwt.t
+end
