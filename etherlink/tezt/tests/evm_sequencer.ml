@@ -59,6 +59,7 @@ type sequencer_setup = {
   sc_rollup_address : string;
   sc_rollup_node : Sc_rollup_node.t;
   sequencer : Evm_node.t;
+  proxy : Evm_node.t;
   l1_contracts : l1_contracts;
 }
 
@@ -194,8 +195,21 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
   let* sequencer =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* proxy =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   return
-    {node; client; sequencer; l1_contracts; sc_rollup_address; sc_rollup_node}
+    {
+      node;
+      client;
+      sequencer;
+      proxy;
+      l1_contracts;
+      sc_rollup_address;
+      sc_rollup_node;
+    }
 
 let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
     ~sc_rollup_node ~node ~client ~l1_contracts ~sc_rollup_address raw_tx =
@@ -240,7 +254,8 @@ let test_remove_sequencer =
     ~uses
   @@ fun protocol ->
   let* {
-         evm_node;
+         sequencer;
+         proxy;
          sc_rollup_node;
          node;
          client;
@@ -250,11 +265,6 @@ let test_remove_sequencer =
        } =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
-  let* proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
   (* Produce blocks to show that both the sequencer and proxy are not
      progressing. *)
   let* _ =
@@ -263,7 +273,7 @@ let test_remove_sequencer =
         unit)
   in
   (* Both are at genesis *)
-  let*@ sequencer_head = Rpc.block_number evm_node in
+  let*@ sequencer_head = Rpc.block_number sequencer in
   let*@ proxy_head = Rpc.block_number proxy in
   Check.((sequencer_head = 0l) int32)
     ~error_msg:"Sequencer should be at genesis" ;
@@ -287,7 +297,7 @@ let test_remove_sequencer =
         unit)
   in
   (* Sequencer is at genesis, proxy is at [advance]. *)
-  let*@ sequencer_head = Rpc.block_number evm_node in
+  let*@ sequencer_head = Rpc.block_number sequencer in
   let*@ proxy_head = Rpc.block_number proxy in
   Check.((sequencer_head = 0l) int32)
     ~error_msg:"Sequencer should still be at genesis" ;
@@ -333,7 +343,7 @@ let test_publish_blueprints =
     ~title:"Sequencer publishes the blueprints to L1"
     ~uses
   @@ fun protocol ->
-  let* {sequencer; node; client; sc_rollup_node; _} =
+  let* {sequencer; proxy; node; client; sc_rollup_node; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
   let* _ =
@@ -355,17 +365,12 @@ let test_publish_blueprints =
         unit)
   in
 
-  (* Open an EVM node in proxy mode to fetch the rollup node storage. *)
-  let proxy_mode = Evm_node.Proxy {devmode = true} in
-  let* proxy_evm =
-    Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
-  in
   (* We have unfortunately noticed that the test can be flaky. Sometimes,
      the following RPC is done before the proxy being initialised, even though
      we wait for it. The source of flakiness is unknown but happens very rarely,
      we put a small sleep to make the least flaky possible. *)
   let* () = Lwt_unix.sleep 2. in
-  let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy_evm in
+  let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_head.hash) (option string))
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit
@@ -389,20 +394,13 @@ let test_resilient_to_rollup_node_disconnect =
   let first_batch_blueprints_count = 5 in
   let ensure_rollup_node_publish = 5 in
 
-  let* {sequencer; sc_rollup_node; sc_rollup_address; node; client; _} =
+  let* {sequencer; proxy; sc_rollup_node; sc_rollup_address; node; client; _} =
     setup_sequencer
       ~max_blueprints_lag
       ~max_blueprints_catchup
       ~catchup_cooldown
       ~time_between_blocks:Nothing
       protocol
-  in
-
-  (* Start a proxy node to see the state of the rollup node *)
-  let* evm_proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Produce blueprints *)
@@ -427,7 +425,7 @@ let test_resilient_to_rollup_node_disconnect =
 
   (* Check sequencer and rollup consistency *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head should be the same before the outage" ;
 
@@ -481,7 +479,7 @@ let test_resilient_to_rollup_node_disconnect =
         unit)
   in
 
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.(
     (rollup_node_head.number
     = Int32.(of_int (first_batch_blueprints_count + max_blueprints_catchup)))
@@ -499,7 +497,7 @@ let test_resilient_to_rollup_node_disconnect =
 
   (* Check the consistency again *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head should be the same after the outage" ;
 
@@ -890,7 +888,7 @@ let test_init_from_rollup_node_data_dir =
       ])
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
   @@ fun protocol ->
-  let* {sc_rollup_node; sequencer; client; _} =
+  let* {sc_rollup_node; sequencer; proxy; client; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
   (* a sequencer is needed to produce an initial block *)
@@ -902,11 +900,6 @@ let test_init_from_rollup_node_data_dir =
         unit)
   in
   let* () = Evm_node.terminate sequencer in
-  let* proxy_node =
-    Evm_node.init
-      ~mode:(Proxy {devmode = false})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
   let evm_node' =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
@@ -914,14 +907,14 @@ let test_init_from_rollup_node_data_dir =
   in
   let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
   let* () = Evm_node.run evm_node' in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
   Check.((sequencer_head.number = rollup_node_head.number) int32)
     ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
   let* _l2_lvl = Rpc.produce_block sequencer in
   let* _lvl = Client.bake_for_and_wait client in
   let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy_node in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
   Check.((sequencer_head.number = rollup_node_head.number) int32)
     ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
@@ -999,6 +992,7 @@ let test_upgrade_kernel_unsync =
          sc_rollup_address;
          client;
          sequencer;
+         proxy;
          node;
          _;
        } =
@@ -1041,14 +1035,8 @@ let test_upgrade_kernel_unsync =
         unit)
   in
 
-  let* evm_proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head should be the same before the upgrade" ;
 
@@ -1068,7 +1056,7 @@ let test_upgrade_kernel_unsync =
   in
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash <> rollup_node_head.hash) (option string))
     ~error_msg:"The head shouldn't be the same after upgrade" ;
   Check.((sequencer_head.number > rollup_node_head.number) int32)
@@ -1098,6 +1086,7 @@ let test_upgrade_kernel_sync =
          sc_rollup_address;
          client;
          sequencer;
+         proxy;
          node;
          _;
        } =
@@ -1141,15 +1130,8 @@ let test_upgrade_kernel_sync =
         let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
         unit)
   in
-
-  let* evm_proxy =
-    Evm_node.init
-      ~mode:(Proxy {devmode = true})
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head should be the same before the upgrade" ;
 
@@ -1170,7 +1152,7 @@ let test_upgrade_kernel_sync =
   in
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" evm_proxy in
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head shouldn't be the same after upgrade" ;
 
@@ -1184,7 +1166,7 @@ let test_external_transaction_to_delayed_inbox_fails =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; node; sequencer; sc_rollup_node; _} =
+  let* {client; node; sequencer; proxy; sc_rollup_node; _} =
     setup_sequencer
       protocol
       ~time_between_blocks:Nothing
@@ -1194,12 +1176,8 @@ let test_external_transaction_to_delayed_inbox_fails =
   (* Bake a couple more levels for the blueprint to be final *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
-  let proxy_mode = Evm_node.Proxy {devmode = true} in
-  let* proxy_evm =
-    Evm_node.init ~mode:proxy_mode (Sc_rollup_node.endpoint sc_rollup_node)
-  in
   let raw_tx, _ = read_tx_from_file () |> List.hd in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy_evm in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
   (* Bake enough levels to make sure the transaction would be processed
      if added *)
   let* () =
@@ -1209,7 +1187,7 @@ let test_external_transaction_to_delayed_inbox_fails =
         unit)
   in
   (* Response should be none *)
-  let*@ response = Rpc.get_transaction_receipt ~tx_hash proxy_evm in
+  let*@ response = Rpc.get_transaction_receipt ~tx_hash proxy in
   assert (Option.is_none response) ;
   let*@ response = Rpc.get_transaction_receipt ~tx_hash sequencer in
   assert (Option.is_none response) ;
