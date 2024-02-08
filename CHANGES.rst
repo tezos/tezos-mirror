@@ -45,6 +45,11 @@ Node
   ``2``. Version ``0`` has been removed and version ``1`` can still be used
   with ``?version=1`` argument. (MR :gl:`!11872`)
 
+- Bump RPCs ``POST ../helpers/parse/operations``, ``POST
+  ../helpers/scripts/run_operation`` and ``POST
+  ../helpers/scripts/simulate_operation`` default version to version ``1``.
+  Version ``0`` can still be used with ``?version=0`` argument. (MR :gl:`!11889`)
+
 Client
 ------
 
