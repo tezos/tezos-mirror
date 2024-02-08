@@ -327,7 +327,7 @@ let apply_and_clear_denunciations ctxt =
           balance_updates,
           (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
-  let*! ctxt = Storage.Pending_denunciations.clear ctxt in
+  let*! ctxt = Pending_denunciations_storage.clear ctxt in
   let*! ctxt =
     List.fold_left_s
       (fun ctxt (delegate, current_cycle_denunciations) ->

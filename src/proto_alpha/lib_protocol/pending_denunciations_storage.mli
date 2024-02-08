@@ -46,3 +46,6 @@ val fold :
     'a ->
     'a Lwt.t) ->
   'a Lwt.t
+
+(** See {!Storage.Pending_denunciations.clear}  *)
+val clear : Raw_context.t -> Raw_context.t Lwt.t

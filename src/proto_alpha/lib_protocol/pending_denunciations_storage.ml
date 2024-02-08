@@ -36,3 +36,5 @@ let has_pending_denunciations ctxt delegate =
   Storage.Pending_denunciations.mem ctxt delegate
 
 let fold = Storage.Pending_denunciations.fold
+
+let clear ctxt = Storage.Pending_denunciations.clear ctxt
