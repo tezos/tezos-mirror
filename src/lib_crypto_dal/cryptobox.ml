@@ -1069,9 +1069,6 @@ module Inner = struct
      X^{d-n} on G_2. *)
 
   (* Proves that degree(p) < t.max_polynomial_length *)
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
-
-     Generalize this function to pass the slot_size in parameter. *)
   let prove_commitment ({mode; max_polynomial_length; kate_amortized; _} : t) p
       =
     match mode with
