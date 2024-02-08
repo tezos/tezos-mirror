@@ -81,9 +81,18 @@ let check_tx_succeeded ~endpoint ~tx =
   unit
 
 let check_tx_failed ~endpoint ~tx =
-  let* status = get_transaction_status ~endpoint ~tx in
-  Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
-  unit
+  (* Eth-cli sometimes wraps receipt of failed transaction in its own error
+     message. This means that the [tx] could be an empty string.
+     Additionally, the output of eth-cli might contain some extra characters,
+     so we use a regular expression to make sure we get a valid hash.
+  *)
+  let tx = tx =~* rex "(0x[0-9a-fA-F]{64})" in
+  match tx with
+  | Some tx ->
+      let* status = get_transaction_status ~endpoint ~tx in
+      Check.(is_false status) ~error_msg:"Expected transaction to fail." ;
+      unit
+  | None -> unit
 
 (* Check simple transfer flat fee is correct
 
@@ -3866,6 +3875,7 @@ let test_l2_revert_returns_unused_gas =
       ()
   in
   let gas_used = transaction_receipt.gasUsed in
+  Format.printf "TXHASH: %s\n%!" transaction_hash ;
   let* () = check_tx_failed ~endpoint ~tx:transaction_hash in
   Check.((gas_used < 100000l) int32)
     ~error_msg:"Expected gas usage less than %R logs, got %L" ;
@@ -3918,17 +3928,7 @@ let test_l2_create_collision =
   in
 
   let* () = check_tx_succeeded ~tx:tx1 ~endpoint in
-
-  (* Eth-cli would wrap receipt of failed transaction in its own error message.
-      Since we currently don't parse error message from eth-cli,
-      we cannot fetch the tx_hash in this case and would get an empty string as tx_hash for failed transaction.
-      After handling of failed transaction is correctly implemented, the following check would need to be replaced with
-      let* () = check_tx_failed ~tx:tx2 ~endpoint in *)
-  Check.(
-    (tx2 = "")
-      string
-      ~error_msg:"Expected returned transaction hash to be %R but was %L.") ;
-  unit
+  check_tx_failed ~tx:tx2 ~endpoint
 
 let test_l2_intermediate_OOG_call =
   register_both
