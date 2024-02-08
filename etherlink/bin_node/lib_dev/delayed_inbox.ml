@@ -215,7 +215,7 @@ module Handlers = struct
 
   let on_no_request _ = Lwt.return_unit
 
-  let on_close _ = Delayed_inbox_events.stopped ()
+  let on_close _ = Lwt.return_unit
 end
 
 let table = Worker.create_table Queue
