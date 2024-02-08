@@ -283,7 +283,7 @@ let test_manual_bake =
   in
   let op_hashes =
     JSON.(
-      pending_ops |-> "applied" |> as_list
+      pending_ops |-> "validated" |> as_list
       |> List.map (fun op -> op |-> "hash" |> as_string))
   in
   Check.(list_mem string)

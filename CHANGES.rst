@@ -35,6 +35,16 @@ Node
 - Introduced a new ``--local-rpc-addr`` that starts the RPC server
   locally, not using the dedicated RPC-process.
 
+- Bump RPCs ``GET ../mempool/monitor_operations``, ``POST
+  ../helpers/preapply/operations``, ``GET ../blocks/<block>``, ``GET
+  ../blocks/<blocks>/metadata``. and ``GET ../blocks/<blocks>/operations``
+  default version to version ``1``. Version ``0`` can still be used with
+  ``?version=0`` argument. (MR :gl:`!11872`)
+
+- Bump RPC ``GET ../mempool/pending_operations`` default version to version
+  ``2``. Version ``0`` has been removed and version ``1`` can still be used
+  with ``?version=1`` argument. (MR :gl:`!11872`)
+
 Client
 ------
 
