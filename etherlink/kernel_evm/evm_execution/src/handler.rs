@@ -1715,6 +1715,33 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                         false,
                     )
                 }
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                    ExitError::CreateContractLimit,
+                )) => {
+                    // For more context for why we need this specific case and behaviour
+                    // look out for [MAX_INIT_CODE_SIZE_RETURN_HACK] in this file.
+
+                    let create_contract_limit =
+                        ExitReason::Error(ExitError::CreateContractLimit);
+                    let execution_result = execution_result.unwrap(); // safe unwrap
+
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction produced the following error: {:?}",
+                        create_contract_limit
+                    );
+
+                    Self::rollback_inter_transaction_side_effect(
+                        self,
+                        (
+                            create_contract_limit,
+                            execution_result.1,
+                            execution_result.2,
+                        ),
+                        false,
+                    )
+                }
                 ExitReason::Fatal(_) => {
                     log!(
                         self.host,
@@ -2020,8 +2047,24 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 // can not be reached.
                 if let Some(max_initcode_size) = self.config.max_initcode_size {
                     if init_code.len() > max_initcode_size {
+                        // [MAX_INIT_CODE_SIZE_RETURN_HACK]
+                        // The normal behavior stated by https://www.evm.codes/#f0?fork=shanghai
+                        // would be to return a simple error.
+                        // « Error cases: [..]
+                        //  * size is greater than the chain's maximum initcode size (since Shanghai fork) »
+                        //
+                        // Unfortunately there is a bug in [evm-runtime-0.39.0] where the `finish_create`
+                        // function will always consider error/revert/succed as a "Ok(()) => Control::Continue"
+                        // flow which makes it that we can not rollback anything as it should in this case.
+                        // The hack-ish way to be able to capture that error and rollback as it should is
+                        // to consider this error as fatal and then catch it in `end_inter_transaction`,
+                        // rollback what needs to be and then transform the outputed fatal error to a simple
+                        // `ExitReason::Error(ExitError::CreateContractLimit)`.
+
                         return Capture::Exit((
-                            ExitReason::Error(ExitError::CreateContractLimit),
+                            ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                                ExitError::CreateContractLimit,
+                            )),
                             None,
                             vec![],
                         ));
