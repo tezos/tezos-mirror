@@ -1037,13 +1037,10 @@ module Verifier = Inner
 
 module Internal_for_tests = struct
   let prover_parameters () =
-    Prover {test = true; srs = Srs.Internal_for_tests.fake_srs ()}
+    Prover {test = true; srs = Lazy.force Srs.Internal_for_tests.fake_srs}
 
   (* Since computing fake_srs is costly, we avoid to recompute it. *)
-  let init_prover_dal () =
-    match !initialisation_parameters with
-    | Prover {test; _} when test -> ()
-    | _ -> initialisation_parameters := prover_parameters ()
+  let init_prover_dal () = initialisation_parameters := prover_parameters ()
 
   let init_verifier_dal () = initialisation_parameters := Verifier {test = true}
 

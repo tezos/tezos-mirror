@@ -66,8 +66,8 @@ val read_srs_g1 :
 (** This module is used to handle a fake SRS in the DAL. This is more flexible
     and easier to handle in the CI than loading ZCash SRS *)
 module Internal_for_tests : sig
-  (** Generates an unsafe SRS₁ from a known seed *)
-  val fake_srs : ?size:int -> unit -> Kzg.Bls.Srs_g1.t
+  (** Generates an unsafe SRS₁ of size 2¹⁶ from a known seed *)
+  val fake_srs : Kzg.Bls.Srs_g1.t Lazy.t
 
   (** Same as [fake_srs] but the returned SRS₁ is of size 2⁸, which is enough
        to suit the verifier needs in our tests *)
