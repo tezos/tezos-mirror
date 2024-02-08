@@ -400,6 +400,7 @@ val play :
   step:step ->
   choice:Sc_rollup_tick_repr.t ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+  dal_attested_slots_validity_lag:int ->
   (game_result, t) Either.t tzresult Lwt.t
 
 (** [cost_play ~step ~choice] returns the gas cost of [play] applied with[step],
