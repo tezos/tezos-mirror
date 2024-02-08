@@ -88,7 +88,7 @@
 /whitedoc/the_big_picture.html /shell/the_big_picture.html 301
 /whitedoc/validation.html /shell/validation.html 301
 /whitedoc/voting.html /active/voting.html 301
-/introduction/support.html /global/support.html 301
-/introduction/test_networks.html /global/test_networks.html 301
+/introduction/support.html /introduction/tezos.html 301
+/introduction/test_networks.html /user/multinetwork.html 301
 /user/various.html /user/exits.html 301
 /user/versioning.html /introduction/versioning.html 301
