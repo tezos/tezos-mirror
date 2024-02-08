@@ -4,6 +4,15 @@
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
+(** This module deals with pending denunciations before they are used to slash
+    delegates.
+
+    This module is responsible for maintaining the table
+    {!Storage.Pending_denunciations}
+
+    In particular, it maintains the invariant that no key is pointing to an
+    empty denunciation list.
+*)
 
 (** Returns the pending denunciations list of the given delegate.
     It returns an empty list if none are registered.
