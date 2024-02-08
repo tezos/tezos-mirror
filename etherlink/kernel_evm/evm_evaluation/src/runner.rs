@@ -158,6 +158,7 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
     env.block.timestamp = unit.env.current_timestamp;
     env.block.gas_limit = unit.env.current_gas_limit;
     env.block.basefee = unit.env.current_base_fee.unwrap_or_default();
+    env.block.prevrandao = unit.env.current_random;
 
     // TxEnv
     env.tx.caller = if let Some(caller) =
@@ -202,6 +203,7 @@ fn execute_transaction(
         gas_limit: env.block.gas_limit.as_u64(),
         block_fees,
         chain_id: U256::from(1337),
+        prevrandao: env.block.prevrandao,
     };
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
     let caller = env.tx.caller.to_fixed_bytes().into();

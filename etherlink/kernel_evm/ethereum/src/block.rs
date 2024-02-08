@@ -76,6 +76,10 @@ pub struct BlockConstants {
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
+    /// A random number depending on previous block
+    /// NB: this field is not relevant for Etherlink but is required to enable other
+    /// relevant test from the Ethereum test suit   
+    pub prevrandao: Option<H256>,
 }
 
 impl BlockConstants {
@@ -90,6 +94,7 @@ impl BlockConstants {
             gas_limit: 1u64,
             block_fees,
             chain_id,
+            prevrandao: None,
         }
     }
 
@@ -184,6 +189,7 @@ impl L2Block {
             gas_limit: self.gas_limit.unwrap_or(1u64),
             block_fees,
             chain_id,
+            prevrandao: None,
         }
     }
 

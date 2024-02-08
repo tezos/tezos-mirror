@@ -30,6 +30,7 @@
   in initialisation code. (!11637)
 - Fix a bug where SELFDESTRUCT deletes contracts immediately rather than at the end of the transaction. (!11658)
 - `CallTooDeep` is treated as a simple error (not as fatal). (!11794)
+- Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 
 ### Breaking changes
 
@@ -37,6 +38,8 @@
   Withdrawal contract address is now 'ff00000000000000000000000000000000000001'. (!11556)
   
 ### Internal
+
+- `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
 
 ## Version 9978f3a5f8bee0be78686c5c568109d2e6148f13
 
