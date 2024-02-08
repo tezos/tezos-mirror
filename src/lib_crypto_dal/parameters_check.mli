@@ -23,14 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
+   r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
 val scalar_bytes_amount : int
 
+(** The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
+   hence the + 1 to account for the remainder of the division. *)
 val page_length : page_size:int -> int
 
+(** for a given [size] (in bytes), return the length of the corresponding
+   domain *)
 val domain_length : size:int -> int
 
+(** [slot_as_polynomial_length ~slot_size ~page_size] returns the length of the
+   polynomial of maximal degree representing a slot of size [slot_size] with
+   [slot_size / page_size] pages (page_size must divides slot_size). The
+   returned length thus depends on the number of pages. *)
 val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 
+(** Returns [max_polynomial_length], [erasure_encoded_polynomial_length] &
+   [shard_length] for the given parameters *)
 val compute_lengths :
   redundancy_factor:int ->
   slot_size:int ->
@@ -38,6 +50,7 @@ val compute_lengths :
   number_of_shards:int ->
   int * int * int
 
+(** Fails if and only if the given parameters are not suitable for the DAL. *)
 val ensure_validity_without_srs :
   slot_size:int ->
   page_size:int ->
