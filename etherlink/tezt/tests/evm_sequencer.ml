@@ -998,27 +998,18 @@ let test_upgrade_kernel_unsync =
        } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
-  (* Prepare upgrade to the debug kernel. *)
-  let upgrade_to = Constant.WASM.debug_kernel in
-  let preimages_dir =
-    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
-  in
-  let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir upgrade_to
-  in
-  let* payload = Evm_node.upgrade_payload ~root_hash ~activation_timestamp in
-
   (* Sends the upgrade to L1, but not to the sequencer. *)
   let* () =
-    Client.transfer
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.public_key_hash
-      ~receiver:l1_contracts.admin
-      ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
-      ~burn_cap:Tez.one
-      client
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.debug_kernel
+      ~activation_timestamp
+      ~evm_node:None
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Per the activation timestamp, the state will remain synchronised until
      the kernel is upgraded. *)
@@ -1092,29 +1083,18 @@ let test_upgrade_kernel_sync =
        } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
-  (* Prepare upgrade to the debug kernel. *)
-  let upgrade_to = Constant.WASM.debug_kernel in
-  let preimages_dir =
-    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
-  in
-  let* {root_hash; _} =
-    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir upgrade_to
-  in
-  let* payload = Evm_node.upgrade_payload ~root_hash ~activation_timestamp in
-
-  (* Sends the upgrade to L1. *)
+  (* Sends the upgrade to L1 and sequencer. *)
   let* () =
-    Client.transfer
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.public_key_hash
-      ~receiver:l1_contracts.admin
-      ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
-      ~burn_cap:Tez.one
-      client
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.debug_kernel
+      ~activation_timestamp
+      ~evm_node:(Some sequencer)
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-  (* Sends the upgrade to sequencer. *)
-  let* () = Rpc.inject_upgrade ~payload sequencer in
 
   (* Per the activation timestamp, the state will remain synchronised until
      the kernel is upgraded. *)
