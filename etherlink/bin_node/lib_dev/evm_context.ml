@@ -88,7 +88,7 @@ let load_metadata ~data_dir index =
         Ethereum_types.genesis_parent_hash,
         false )
 
-let commit (ctxt : t) evm_state =
+let commit ~number (ctxt : t) evm_state =
   let open Lwt_result_syntax in
   let*! context = Irmin_context.PVMState.set ctxt.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
@@ -102,7 +102,7 @@ let commit (ctxt : t) evm_state =
       }
   in
   ctxt.context <- context ;
-  return_unit
+  Store.Context_hashes.store ctxt.store number checkpoint
 
 let evm_state {context; _} = Irmin_context.PVMState.get context
 
@@ -113,15 +113,12 @@ let execution_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ()
 
-let execute =
-  let perform_commit = commit in
-  fun ?(commit = false) ctxt inbox ->
-    let open Lwt_result_syntax in
-    let config = execution_config ctxt in
-    let*! evm_state = evm_state ctxt in
-    let* evm_state = Evm_state.execute ~config evm_state inbox in
-    let* () = when_ commit (fun () -> perform_commit ctxt evm_state) in
-    return (ctxt, evm_state)
+let execute ctxt inbox =
+  let open Lwt_result_syntax in
+  let config = execution_config ctxt in
+  let*! evm_state = evm_state ctxt in
+  let* evm_state = Evm_state.execute ~config evm_state inbox in
+  return (ctxt, evm_state)
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
@@ -165,7 +162,7 @@ let apply_blueprint ctxt payload =
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       ctxt.current_block_hash <- current_block_hash ;
       let*! () = Blueprint_events.blueprint_applied blueprint_number in
-      let* () = commit ctxt evm_state in
+      let* () = commit ~number:(Qty blueprint_number) ctxt evm_state in
       Lwt_watcher.notify
         ctxt.blueprint_watcher
         {number = Qty blueprint_number; payload} ;
@@ -223,7 +220,8 @@ let init ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
           return_unit
         else
           let* evm_state = Evm_state.init ~kernel in
-          commit ctxt evm_state
+          (* The state prior to the genesis blueprint is indexed by [-1] *)
+          commit ~number:(Qty Z.(pred zero)) ctxt evm_state
     | None ->
         if loaded then return_unit
         else
