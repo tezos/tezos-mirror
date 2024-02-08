@@ -77,3 +77,23 @@ let read_tx_from_file () =
          match String.split_on_char ' ' line with
          | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
          | _ -> failwith "Unexpected tx_raw and tx_hash.")
+
+let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
+  let force_kernel_upgrade_payload =
+    (* Framed protocol tag. *)
+    "\000"
+    (* Smart rollup address bytes. *)
+    ^ Tezos_crypto.Hashed.Smart_rollup_address.(
+        of_b58check_exn sc_rollup_address |> to_string)
+    ^ (* Force kernel upgrade tag.
+         See [FORCE_KERNEL_UPGRADE_TAG] in [etherlink/kernel_evm/kernel/src/parsing.rs] *)
+    "\255"
+    |> Hex.of_string |> Hex.show
+  in
+  let* () =
+    Sc_rollup_helpers.send_message
+      client
+      (sf "hex:[%S]" force_kernel_upgrade_payload)
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client ~node in
+  unit
