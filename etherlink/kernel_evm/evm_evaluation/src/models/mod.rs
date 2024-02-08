@@ -181,7 +181,7 @@ pub struct TransactionParts {
     #[serde(deserialize_with = "deserialize_maybe_empty")]
     pub to: Option<H160>,
     pub value: Vec<U256>,
-    pub max_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<U256>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

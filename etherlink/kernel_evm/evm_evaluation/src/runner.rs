@@ -169,10 +169,13 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
         let private_key = unit.transaction.secret_key.unwrap();
         return Err(TestError::UnknownPrivateKey { private_key });
     };
-    env.tx.gas_price = unit
-        .transaction
-        .gas_price
-        .unwrap_or_else(|| unit.transaction.max_fee_per_gas.unwrap_or_default());
+    env.tx.gas_price = unit.transaction.gas_price.unwrap_or(
+        env.block.basefee
+            + unit
+                .transaction
+                .max_priority_fee_per_gas
+                .unwrap_or_default(),
+    );
     Ok(env)
 }
 
