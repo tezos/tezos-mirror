@@ -334,7 +334,7 @@ let apply_and_clear_denunciations ctxt =
         match current_cycle_denunciations with
         | [] -> Lwt.return ctxt
         | _ ->
-            Storage.Pending_denunciations.add
+            Pending_denunciations_storage.set_denunciations
               ctxt
               delegate
               current_cycle_denunciations)

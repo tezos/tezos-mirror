@@ -25,3 +25,8 @@ let add_denunciation ctxt ~misbehaving_delegate operation_hash
     Storage.Pending_denunciations.add ctxt misbehaving_delegate denunciations
   in
   return ctxt
+
+let set_denunciations ctxt delegate denunciations =
+  match denunciations with
+  | [] -> Storage.Pending_denunciations.remove ctxt delegate
+  | _ -> Storage.Pending_denunciations.add ctxt delegate denunciations

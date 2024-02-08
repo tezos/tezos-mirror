@@ -21,3 +21,12 @@ val add_denunciation :
   rewarded_delegate:Signature.public_key_hash ->
   Misbehaviour_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** Set the denunciation list of the given delegate.
+    Previously set denunciations would be erased.
+*)
+val set_denunciations :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Denunciations_repr.t ->
+  Raw_context.t Lwt.t
