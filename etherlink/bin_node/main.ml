@@ -620,7 +620,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args14
+    (args15
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -634,7 +634,8 @@ let sequencer_command =
        genesis_timestamp_arg
        maximum_blueprints_lag_arg
        maximum_blueprints_catchup_arg
-       catchup_cooldown_arg)
+       catchup_cooldown_arg
+       devmode_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -662,7 +663,8 @@ let sequencer_command =
            genesis_timestamp,
            max_blueprints_lag,
            max_blueprints_catchup,
-           catchup_cooldown )
+           catchup_cooldown,
+           devmode )
          rollup_node_endpoint
          sequencer
          () ->
@@ -708,17 +710,27 @@ let sequencer_command =
       let* () =
         Configuration.save_sequencer ~force:true ~data_dir configuration
       in
-      Evm_node_lib_dev.Sequencer.main
-        ~data_dir
-        ~rollup_node_endpoint
-        ~max_blueprints_lag
-        ~max_blueprints_catchup
-        ~catchup_cooldown
-        ?genesis_timestamp
-        ~sequencer
-        ~configuration
-        ?kernel
-        ())
+      if devmode then
+        Evm_node_lib_dev.Sequencer.main
+          ~data_dir
+          ~rollup_node_endpoint
+          ~max_blueprints_lag
+          ~max_blueprints_catchup
+          ~catchup_cooldown
+          ?genesis_timestamp
+          ~sequencer
+          ~configuration
+          ?kernel
+          ()
+      else
+        Evm_node_lib_prod.Sequencer.main
+          ~data_dir
+          ~rollup_node_endpoint
+          ?genesis_timestamp
+          ~sequencer
+          ~configuration
+          ?kernel
+          ())
 
 let observer_command =
   let open Tezos_clic in

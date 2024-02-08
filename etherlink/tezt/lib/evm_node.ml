@@ -39,6 +39,7 @@ type mode =
       max_blueprints_lag : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
+      devmode : bool;
     }
   | Proxy of {devmode : bool}
 
@@ -281,6 +282,7 @@ let run_args evm_node =
           max_blueprints_lag;
           max_blueprints_catchup;
           catchup_cooldown;
+          devmode;
         } ->
         [
           "run";
@@ -321,6 +323,7 @@ let run_args evm_node =
             (fun timestamp ->
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
+        @ Cli_arg.optional_switch "devmode" devmode
     | Observer {preimage_dir; initial_kernel} ->
         [
           "run";
