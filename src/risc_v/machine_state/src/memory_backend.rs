@@ -82,7 +82,6 @@ impl<L: Layout> backend::Backend for InMemoryBackend<L> {
         placed: backend::PlacedOf<Self::Layout>,
     ) -> backend::AllocatedOf<Self::Layout, Self::Manager<'_>> {
         let mut manager = SliceManager::new(self.borrow_mut());
-
         L::allocate(&mut manager, placed)
     }
 
@@ -197,7 +196,7 @@ mod tests {
         }
 
         impl<M: Manager> T<M> {
-            fn new_in(space: AllocatedOf<L, M>) -> Self {
+            fn bind(space: AllocatedOf<L, M>) -> Self {
                 T {
                     first: space.0,
                     second: space.1,
@@ -211,13 +210,13 @@ mod tests {
         const SECOND: [u32; 4] = [1, 3, 3, 7];
 
         {
-            let mut instance = T::new_in(backend.allocate(placed));
+            let mut instance = T::bind(backend.allocate(placed));
             instance.first.write(FIRST);
             instance.second.write_all(&SECOND);
         }
 
         {
-            let instance = T::new_in(backend.allocate(L::placed().into_location()));
+            let instance = T::bind(backend.allocate(L::placed().into_location()));
             assert_eq!(instance.first.read(), FIRST);
             assert_eq!(instance.second.read_all(), SECOND);
         }

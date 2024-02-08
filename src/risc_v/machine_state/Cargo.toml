@@ -7,5 +7,9 @@ edition = "2021"
 proptest = "1.3.1"
 rand = "0.8.5"
 
+[dependencies.strum]
+version = "0.26.1"
+features = ["derive"]
+
 [dependencies]
 paste = "1.0.14"

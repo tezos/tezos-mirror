@@ -177,7 +177,7 @@ create_field!(XS, ExtensionValue, 15, 2);
 create_field!(FS, ExtensionValue, 13, 2);
 create_field!(MPP, MPPValue, 11, 2);
 create_field!(VS, ExtensionValue, 9, 2);
-create_field!(SPP, bool, 8, 1);
+create_field!(SPP, SPPValue, 8, 1);
 create_field!(MPIE, bool, 7, 1);
 create_field!(UBE, bool, 6, 1);
 create_field!(SPIE, bool, 5, 1);

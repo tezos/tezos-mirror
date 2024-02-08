@@ -131,8 +131,15 @@ pub type XRegistersLayout = backend::Array<XValue, 31>;
 
 impl<M: backend::Manager> XRegisters<M> {
     /// Bind the integer register state to the given allocated space.
-    pub fn new_in(space: backend::AllocatedOf<XRegistersLayout, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<XRegistersLayout, M>) -> Self {
         XRegisters { registers: space }
+    }
+
+    /// Reset the integer registers.
+    pub fn reset(&mut self) {
+        for i in 0..31 {
+            self.registers.write(i, XValue::default());
+        }
     }
 }
 
@@ -216,7 +223,7 @@ pub const ft11: FRegister = f31;
 // XXX: We probably want this wrapper around f64 to implement deterministic
 // floating-point arithmetic.
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Default)]
 pub struct FValue(f64);
 
 impl backend::Elem for FValue {
@@ -261,26 +268,37 @@ pub type FRegistersLayout = backend::Array<FValue, 32>;
 
 impl<M: backend::Manager> FRegisters<M> {
     /// Bind the floating-point register space to the allocated space.
-    pub fn new_in(space: backend::AllocatedOf<FRegistersLayout, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<FRegistersLayout, M>) -> Self {
         FRegisters { registers: space }
+    }
+
+    /// Reset the floating-point registers.
+    pub fn reset(&mut self) {
+        for i in 0..32 {
+            self.registers.write(i, FValue::default());
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::backend::{tests::TestBackendFactory, Backend, BackendManagement, Layout};
+    use crate::backend::{
+        tests::{test_determinism, ManagerFor, TestBackendFactory},
+        Backend, Layout,
+    };
 
     pub fn test_backend<F: TestBackendFactory>() {
         test_zero::<F>();
         test_arbitrary_register::<F>();
+        test_xregs_reset::<F>();
+        test_fregs_reset::<F>();
     }
 
     fn test_zero<F: TestBackendFactory>() {
         let mut backend = F::new::<XRegistersLayout>();
-        let mut registers: XRegisters<
-            <F::Backend<XRegistersLayout> as BackendManagement>::Manager<'_>,
-        > = XRegisters::new_in(backend.allocate(XRegistersLayout::placed().into_location()));
+        let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
+            XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
 
         // x0 should always read 0.
         assert_eq!(registers.read(x0), 0);
@@ -297,9 +315,8 @@ pub mod tests {
 
     fn test_arbitrary_register<F: TestBackendFactory>() {
         let mut backend = F::new::<XRegistersLayout>();
-        let mut registers: XRegisters<
-            <F::Backend<XRegistersLayout> as BackendManagement>::Manager<'_>,
-        > = XRegisters::new_in(backend.allocate(XRegistersLayout::placed().into_location()));
+        let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
+            XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
 
         // Initialise the registers with something.
         for reg in NONZERO_REGISTERS {
@@ -322,5 +339,21 @@ pub mod tests {
             let after = NONZERO_REGISTERS.map(|r| registers.read(r));
             assert_eq!(after, expected);
         }
+    }
+
+    fn test_xregs_reset<F: TestBackendFactory>() {
+        test_determinism::<F, XRegistersLayout, _>(|space| {
+            let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
+                XRegisters::bind(space);
+            registers.reset();
+        });
+    }
+
+    fn test_fregs_reset<F: TestBackendFactory>() {
+        test_determinism::<F, FRegistersLayout, _>(|space| {
+            let mut registers: FRegisters<ManagerFor<'_, F, FRegistersLayout>> =
+                FRegisters::bind(space);
+            registers.reset();
+        });
     }
 }
