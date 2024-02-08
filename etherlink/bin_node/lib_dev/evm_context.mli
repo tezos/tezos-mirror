@@ -48,10 +48,6 @@ val init_from_rollup_node :
     to disk the changes, and update the checkpoint. *)
 val commit : t -> Evm_state.t -> unit tzresult Lwt.t
 
-(** [sync ctxt] synchronizes the [ctxt] based on on-disk information, loads the
-    latest checkpoint. *)
-val sync : t -> t tzresult Lwt.t
-
 (** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
 val evm_state : t -> Evm_state.t Lwt.t
 

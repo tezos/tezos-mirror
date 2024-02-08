@@ -77,13 +77,6 @@ let commit (ctxt : t) evm_state =
   ctxt.context <- context ;
   return_unit
 
-let sync ctxt =
-  let open Lwt_result_syntax in
-  let* context, next_blueprint_number, current_block_hash, _loaded =
-    load_metadata ~data_dir:ctxt.data_dir ctxt.index
-  in
-  return {ctxt with context; next_blueprint_number; current_block_hash}
-
 let evm_state {context; _} = Irmin_context.PVMState.get context
 
 let store_blueprint ctxt number blueprint =
