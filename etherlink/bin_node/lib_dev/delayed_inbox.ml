@@ -237,12 +237,15 @@ let start parameters =
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
+  let open Lwt_syntax in
   let w = Lazy.force worker in
   match w with
   | Error _ ->
       (* There is no delayed inbox, nothing to do *)
       Lwt.return_unit
-  | Ok w -> Worker.shutdown w
+  | Ok w ->
+      let* () = Delayed_inbox_events.shutdown () in
+      Worker.shutdown w
 
 let worker_add_request ~request : unit tzresult Lwt.t =
   let open Lwt_result_syntax in

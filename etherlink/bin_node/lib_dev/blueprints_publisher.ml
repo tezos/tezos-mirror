@@ -268,8 +268,11 @@ let new_l2_head rollup_head =
   worker_add_request ~request:(New_l2_head {rollup_head})
 
 let shutdown () =
+  let open Lwt_syntax in
   match Lazy.force worker with
   | Error _ ->
       (* There is no publisher, nothing to do *)
       Lwt.return_unit
-  | Ok w -> Worker.shutdown w
+  | Ok w ->
+      let* () = Blueprint_events.publisher_shutdown () in
+      Worker.shutdown w
