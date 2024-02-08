@@ -542,6 +542,15 @@ module History = struct
     let add_confirmed_slot_headers (t : t) cache published_level
         ~number_of_slots attested_slot_headers =
       let open Result_syntax in
+      let* () =
+        List.iter_e
+          (fun slot_header ->
+            error_unless
+              Raw_level_repr.(
+                published_level = slot_header.Header.id.published_level)
+              Add_element_in_slots_skip_list_violates_ordering)
+          attested_slot_headers
+      in
       let* slot_headers =
         fill_slot_headers
           ~number_of_slots
