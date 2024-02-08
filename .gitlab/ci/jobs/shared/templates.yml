@@ -51,6 +51,7 @@
     - changes:
         paths:
           - images/**/*
+          - scripts/ci/**/*
           - kernels.mk
           - etherlink.mk
           - src/**/*
