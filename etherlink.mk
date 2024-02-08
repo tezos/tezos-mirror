@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -52,14 +53,14 @@ endif
 	${CONFIG}
 
 evm_benchmark_installer.wasm::
-	@${MAKE} -f kernels.mk \
+	@${MAKE} -f etherlink.mk \
 	EVM_CONFIG=etherlink/config/benchmarking.yaml \
 	EVM_KERNEL_FEATURES=benchmark,debug \
 	evm_unstripped_installer.wasm
 	cp evm_unstripped_installer.wasm $@
 
 evm_installer_dev.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm
+	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm
 
 .PHONY: build
 build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk
@@ -91,5 +92,5 @@ clean:
 	@rm -rf ${EVM_KERNEL_PREIMAGES}
 
 sequencer.wasm::
-	@${MAKE} -f kernels.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
+	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
