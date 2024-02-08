@@ -553,26 +553,11 @@ let tests =
       test_launch_without_vote;
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       issuance launches (vote enabled)"
+       issuance launches (very low threshold, vote enabled)"
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
          88l);
-    Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level and adaptive \
-       issuance does not launch (vote disabled)"
-      `Quick
-      (test_does_not_launch_without_feature_flag
-         1000000l (* This means that the threshold is set at 0.05% *)
-         88l);
-  ]
-
-(* These tests have been unplugged because they are too long for the
-   CI (more than 3 minutes). For unit tests of the fact that the 80%
-   threshold can be reached by iteration of the EMA update function,
-   see ../unit/test_adaptive_issuance_ema.ml *)
-let _unplugged_tests =
-  [
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance launches (realistic threshold, vote enabled)"
@@ -584,6 +569,13 @@ let _unplugged_tests =
          (* This vote duration is consistent with the result of the
             unit test for this EMA in
             ../unit/test_adaptive_issuance_ema.ml*));
+    Tztest.tztest
+      "the EMA reaches the vote threshold at the expected level and adaptive \
+       issuance does not launch (very low threshold, vote disabled)"
+      `Quick
+      (test_does_not_launch_without_feature_flag
+         1000000l (* This means that the threshold is set at 0.05% *)
+         88l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance does not launch (realistic threshold, vote disabled)"
