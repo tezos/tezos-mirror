@@ -217,7 +217,10 @@ pub trait Backend: BackendManagement + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::machine_state::{bus, interpreter, mode, registers};
+    use crate::{
+        interpreter,
+        machine_state::{bus, mode, registers},
+    };
     use rand::{Fill, Rng};
     use std::collections::VecDeque;
 
@@ -433,7 +436,8 @@ pub mod tests {
         registers::tests::test_backend::<F>();
         bus::tests::test_backend::<F>();
         mode::tests::test_mode::<F>();
-        interpreter::tests::test::<F>();
+        interpreter::rv32i::tests::test::<F>();
+        interpreter::rv64i::tests::test::<F>();
         test_example::<F>();
         crate::machine_state::tests::test_backend::<F>();
     }
