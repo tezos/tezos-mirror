@@ -1299,104 +1299,103 @@ module Anonymous = struct
       (Outdated_denunciation
          {kind; level = given_level; last_cycle = last_slashable_cycle})
 
-  let check_double_attesting_evidence (type kind)
-      ~consensus_operation:denunciation_kind vi
+  let check_double_attesting_evidence (type kind) vi
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
     let open Lwt_result_syntax in
-    match (op1.protocol_data.contents, op2.protocol_data.contents) with
-    | Single (Preattestation e1), Single (Preattestation e2)
-    | ( Single (Attestation {consensus_content = e1; dal_content = _}),
-        Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
-        let op1_hash = Operation.hash op1 in
-        let op2_hash = Operation.hash op2 in
-        let same_levels = Raw_level.(e1.level = e2.level) in
-        let same_rounds = Round.(e1.round = e2.round) in
-        let same_payload =
-          Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
-        in
-        let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
-        let same_slots = Slot.(e1.slot = e2.slot) in
-        let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
-        let is_denunciation_consistent =
-          same_levels && same_rounds
-          (* For the double (pre)attestations to be punishable, they
-             must point to the same block (same level and round), but
-             also have at least a difference that is the delegate's
-             fault: different payloads, different branches, or
-             different slots. Note that different payloads would
-             endanger the consensus process, while different branches
-             or slots could be used to spam mempools with a lot of
-             valid operations (since the minimality of the slot in not
-             checked in mempool mode, only in block-related modes). On
-             the other hand, if the operations have identical levels,
-             rounds, payloads, branches, and slots, then only their
-             signatures are different, which is not considered the
-             delegate's fault and therefore is not punished. *)
-          && ((not same_payload) || (not same_branches) || not same_slots)
-          && (* we require an order on hashes to avoid the existence of
-                   equivalent evidences *)
-          ordered_hashes
-        in
-        let*? () =
-          error_unless
-            is_denunciation_consistent
-            (Invalid_denunciation denunciation_kind)
-        in
-        (* Disambiguate: levels are equal *)
-        let level = Level.from_raw vi.ctxt e1.level in
-        let*? () = check_denunciation_age vi denunciation_kind level.level in
-        let* ctxt, consensus_key1 =
-          Stake_distribution.slot_owner vi.ctxt level e1.slot
-        in
-        let* ctxt, consensus_key2 =
-          Stake_distribution.slot_owner ctxt level e2.slot
-        in
-        let delegate1, delegate2 =
-          (consensus_key1.delegate, consensus_key2.delegate)
-        in
-        let*? () =
-          error_unless
-            (Signature.Public_key_hash.equal delegate1 delegate2)
-            (Inconsistent_denunciation
-               {kind = denunciation_kind; delegate1; delegate2})
-        in
-        let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
-        let* already_slashed =
-          let kind =
-            match denunciation_kind with
-            | Preattestation -> Misbehaviour.Double_preattesting
-            | Attestation -> Double_attesting
-            | Block -> Double_baking
-          in
-          Delegate.already_denounced ctxt delegate level e1.round kind
-        in
-        let*? () =
-          error_unless
-            (not already_slashed)
-            (Already_denounced {kind = denunciation_kind; delegate; level})
-        in
-        let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
-        let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
-        return_unit
+    let e1, e2, denunciation_kind =
+      match (op1.protocol_data.contents, op2.protocol_data.contents) with
+      | Single (Preattestation e1), Single (Preattestation e2) ->
+          (e1, e2, Preattestation)
+      | ( Single (Attestation {consensus_content = e1; dal_content = _}),
+          Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
+          (e1, e2, Attestation)
+    in
+    let op1_hash = Operation.hash op1 in
+    let op2_hash = Operation.hash op2 in
+    let same_levels = Raw_level.(e1.level = e2.level) in
+    let same_rounds = Round.(e1.round = e2.round) in
+    let same_payload =
+      Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
+    in
+    let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
+    let same_slots = Slot.(e1.slot = e2.slot) in
+    let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
+    let is_denunciation_consistent =
+      same_levels && same_rounds
+      (* For the double (pre)attestations to be punishable, they
+         must point to the same block (same level and round), but
+         also have at least a difference that is the delegate's
+         fault: different payloads, different branches, or
+         different slots. Note that different payloads would
+         endanger the consensus process, while different branches
+         or slots could be used to spam mempools with a lot of
+         valid operations (since the minimality of the slot in not
+         checked in mempool mode, only in block-related modes). On
+         the other hand, if the operations have identical levels,
+         rounds, payloads, branches, and slots, then only their
+         signatures are different, which is not considered the
+         delegate's fault and therefore is not punished. *)
+      && ((not same_payload) || (not same_branches) || not same_slots)
+      && (* we require an order on hashes to avoid the existence of
+               equivalent evidences *)
+      ordered_hashes
+    in
+    let*? () =
+      error_unless
+        is_denunciation_consistent
+        (Invalid_denunciation denunciation_kind)
+    in
+    (* Disambiguate: levels are equal *)
+    let level = Level.from_raw vi.ctxt e1.level in
+    let*? () = check_denunciation_age vi denunciation_kind level.level in
+    let* ctxt, consensus_key1 =
+      Stake_distribution.slot_owner vi.ctxt level e1.slot
+    in
+    let* ctxt, consensus_key2 =
+      Stake_distribution.slot_owner ctxt level e2.slot
+    in
+    let delegate1, delegate2 =
+      (consensus_key1.delegate, consensus_key2.delegate)
+    in
+    let*? () =
+      error_unless
+        (Signature.Public_key_hash.equal delegate1 delegate2)
+        (Inconsistent_denunciation
+           {kind = denunciation_kind; delegate1; delegate2})
+    in
+    let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
+    let* already_slashed =
+      let kind =
+        match denunciation_kind with
+        | Preattestation -> Misbehaviour.Double_preattesting
+        | Attestation -> Double_attesting
+        | Block -> Double_baking
+      in
+      Delegate.already_denounced ctxt delegate level e1.round kind
+    in
+    let*? () =
+      error_unless
+        (not already_slashed)
+        (Already_denounced {kind = denunciation_kind; delegate; level})
+    in
+    let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
+    let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
+    return_unit
 
   let check_double_preattestation_evidence vi
       (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preattestation_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
-    check_double_attesting_evidence
-      ~consensus_operation:Preattestation
-      vi
-      op1
-      op2
+    check_double_attesting_evidence vi op1 op2
 
   let check_double_attestation_evidence vi
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
-    check_double_attesting_evidence ~consensus_operation:Attestation vi op1 op2
+    check_double_attesting_evidence vi op1 op2
 
   let double_operation_conflict_key (type kind)
       (op1 : kind Kind.consensus Operation.t) =
