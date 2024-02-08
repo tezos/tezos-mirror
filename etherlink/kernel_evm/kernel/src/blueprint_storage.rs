@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
+use crate::configuration::Configuration;
 use crate::error::{Error, StorageError};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
-use crate::stage_one::Configuration;
 use crate::storage::{
     self, read_current_block_number, read_rlp, store_read_slice, store_rlp, write_u256,
 };
