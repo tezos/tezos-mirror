@@ -1138,6 +1138,95 @@ let test_upgrade_kernel_sync =
 
   unit
 
+(** This tests the situation where the kernel does not produce blocks but
+    still can be forced to upgrade via an external message. *)
+let test_force_kernel_upgrade =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
+    ~title:"Force kernel upgrade"
+    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+  @@ fun protocol ->
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
+  in
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         sequencer;
+         node;
+         _;
+       } =
+    setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
+  in
+  (* Wait for the sequencer to publish its genesis block. *)
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  let* proxy =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  (* Assert the kernel version is the same at start up. *)
+  let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
+  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
+  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+    ~error_msg:"Kernel versions should be the same at start up" ;
+
+  (* Activation timestamp is 1 day before the genesis. Therefore, it can
+     be forced immediatly. *)
+  let activation_timestamp = "2020-01-09T00:00:00Z" in
+  (* Sends the upgrade to L1 and sequencer. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~activation_timestamp
+      ~evm_node:(Some sequencer)
+  in
+
+  (* We bake a few blocks. As the sequencer is not producing anything, the
+     kernel will not upgrade. *)
+  let* () =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  (* Assert the kernel version is the same, it proves the upgrade did not
+     happen. *)
+  let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
+  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
+  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+    ~error_msg:"Kernel versions should be the same even after the message" ;
+
+  (* Now we force the kernel upgrade via an external message. They will
+     become unsynchronised. *)
+  let* () =
+    force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~node ~client
+  in
+
+  (* Assert the kernel version are now different, it shows that only the rollup
+     node upgraded. *)
+  let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
+  let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
+  Check.((sequencer_kernelVersion <> new_proxy_kernelVersion) string)
+    ~error_msg:"Kernel versions should be different after forced upgrade" ;
+  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+    ~error_msg:"Sequencer should be on the previous version" ;
+  unit
+
 let test_external_transaction_to_delayed_inbox_fails =
   Protocol.register_test
     ~__FILE__
@@ -1189,4 +1278,5 @@ let () =
   test_observer_applies_blueprint [Alpha] ;
   test_upgrade_kernel_unsync [Alpha] ;
   test_upgrade_kernel_sync [Alpha] ;
+  test_force_kernel_upgrade [Alpha] ;
   test_external_transaction_to_delayed_inbox_fails [Alpha]
