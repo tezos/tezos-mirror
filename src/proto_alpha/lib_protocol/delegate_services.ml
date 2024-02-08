@@ -511,6 +511,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:(list pending_staking_parameters_encoding)
       RPC_path.(path / "pending_staking_parameters")
+
+  let pending_denunciations =
+    RPC_service.get_service
+      ~description:"Returns the pending denunciations for the given delegate."
+      ~query:RPC_query.empty
+      ~output:(list Denunciations_repr.item_encoding)
+      RPC_path.(path / "denunciations")
 end
 
 let check_delegate_registered ctxt pkh =
@@ -710,7 +717,9 @@ let register () =
   register1 ~chunked:false S.active_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
-      Delegate.Staking_parameters.pending_updates ctxt pkh)
+      Delegate.Staking_parameters.pending_updates ctxt pkh) ;
+  register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
+      Delegate.For_RPC.pending_denunciations ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
@@ -782,3 +791,6 @@ let active_staking_parameters ctxt block pkh =
 
 let pending_staking_parameters ctxt block pkh =
   RPC_context.make_call1 S.pending_staking_parameters ctxt block pkh () ()
+
+let pending_denunciations ctxt block pkh =
+  RPC_context.make_call1 S.pending_denunciations ctxt block pkh () ()
