@@ -164,7 +164,7 @@ module Make
           ~msg:
             "Injector's queue: there is currently {number_of_operations} \
              operations waiting to be injected"
-          ~level:Debug
+          ~level:Info
           ("number_of_operations", Data_encoding.int31)
 
       let considered_operations_info =
@@ -183,7 +183,7 @@ module Make
           ~msg:
             "Dropping operations: the following operations are dropped \
              {operations}"
-          ~level:Debug
+          ~level:Info
           ("operations", Data_encoding.list Operation.encoding)
           ~pp1:(pp_operations_list ~numbered:false)
 
@@ -191,7 +191,7 @@ module Make
         declare_2
           ~name:"simulating_operations"
           ~msg:"Simulating operations (force = {force}): {operations}"
-          ~level:Debug
+          ~level:Info
           ("operations", Data_encoding.list Operation.encoding)
           ("force", Data_encoding.bool)
           ~pp1:(pp_operations_list ~numbered:true)
@@ -241,14 +241,14 @@ module Make
         declare_1
           ~name:"total_injected_ops"
           ~msg:"Total {nb} operations injected in the last round"
-          ~level:Debug
+          ~level:Info
           ("nb", Data_encoding.int31)
 
       let add_pending =
         declare_1
           ~name:"add_pending"
           ~msg:"Add {operation} to pending"
-          ~level:Debug
+          ~level:Info
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
 
@@ -274,7 +274,7 @@ module Make
         declare_1
           ~name:"revert_operations"
           ~msg:"Reverting operations: {operations}"
-          ~level:Debug
+          ~level:Info
           ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp1:pp_operations_hash_list
 
