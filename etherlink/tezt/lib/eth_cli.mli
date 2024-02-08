@@ -136,3 +136,7 @@ val block_number : endpoint:string -> int Lwt.t
     mined transaction if it exists. *)
 val get_receipt :
   endpoint:string -> tx:string -> Transaction.transaction_receipt option Lwt.t
+
+(** [encode_method ~abi_label ~method_] returns the data corresponding to
+    [method_] call considering the given [abi]. *)
+val encode_method : abi_label:string -> method_:string -> string Lwt.t

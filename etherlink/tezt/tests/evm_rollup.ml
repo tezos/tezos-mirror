@@ -1092,6 +1092,15 @@ let recursive =
     bin = kernel_inputs_path ^ "/recursive.bin";
   }
 
+(** The info for the "error.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/error.sol] *)
+let error =
+  {
+    label = "error";
+    abi = kernel_inputs_path ^ "/error.abi";
+    bin = kernel_inputs_path ^ "/error.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
@@ -4476,7 +4485,9 @@ let test_estimate_gas_out_of_ticks =
       ("to", `String loop_address);
     ]
   in
-  let*@? {message; code = _} = Rpc.estimate_gas estimateGas evm_node in
+  let*@? {message; code = _; data = _} =
+    Rpc.estimate_gas estimateGas evm_node
+  in
   Check.(message =~ rex "The transaction would exhaust all the ticks")
     ~error_msg:"The estimate gas should fail with out of ticks message." ;
   unit
@@ -4721,6 +4732,26 @@ let test_blockhash_opcode =
        the BLOCKHASH opcode, got %L, but %R was expected." ;
   unit
 
+let test_revert_is_correctly_propagated =
+  register_both
+    ~tags:["evm"; "revert"]
+    ~title:"Check that the node propagates reverts reason correctly."
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* error_address, _tx = deploy ~contract:error ~sender evm_setup in
+  let* data =
+    Eth_cli.encode_method ~abi_label:error.label ~method_:"testRevert(0)"
+  in
+  let* call = Rpc.call ~to_:error_address ~data evm_node in
+  match call with
+  | Ok _ -> Test.fail "Call should have reverted"
+  | Error {data = None; _} ->
+      Test.fail "Call should have reverted with a reason"
+  | Error {data = Some _reason; _} ->
+      (* TODO: #6893
+         eth-cli cannot decode an encoded string using Ethereum format. *)
+      unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4802,7 +4833,8 @@ let register_evm_node ~protocols =
   test_transaction_exhausting_ticks_is_rejected protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
-  test_blockhash_opcode protocols
+  test_blockhash_opcode protocols ;
+  test_revert_is_correctly_propagated protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;

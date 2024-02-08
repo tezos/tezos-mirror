@@ -143,3 +143,9 @@ let get_receipt ~endpoint ~tx =
   spawn_command_and_read_json_opt
     ["transaction:get"; tx; "--network"; endpoint]
     (fun j -> JSON.(j |-> "receipt") |> Transaction.transaction_receipt_of_json)
+
+let encode_method ~abi_label ~method_ =
+  let* data =
+    spawn_command_and_read_string ["method:encode"; abi_label; method_]
+  in
+  return (String.trim data)

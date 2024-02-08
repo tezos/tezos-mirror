@@ -6,18 +6,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = {code : int; message : string}
+type error = {code : int; message : string; data : string option}
 
-let pp_error ppf {code; message} =
-  Format.fprintf ppf "{code: %d, message: %S}" code message
+let pp_error ppf {code; message; data} =
+  let pp_data ppf = function
+    | None -> Format.fprintf ppf "null"
+    | Some data -> Format.fprintf ppf "%s" data
+  in
+  Format.fprintf
+    ppf
+    "{code: %d, message: %S; data: %a}"
+    code
+    message
+    pp_data
+    data
 
 let decode_or_error decode json =
   match JSON.(json |-> "error" |> as_opt) with
   | Some json ->
       let code = JSON.(json |-> "code" |> as_int) in
       let message = JSON.(json |-> "message" |> as_string) in
-      Error {code; message}
+      let data = JSON.(json |-> "data" |> as_opt |> Option.map as_string) in
+      Error {code; message; data}
   | None -> Ok (decode json)
+
+let eth_call_obj ~to_ ~data = `O [("to", `String to_); ("data", `String data)]
 
 module Request = struct
   open Evm_node
@@ -55,6 +68,12 @@ module Request = struct
     }
 
   let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
+
+  let eth_call ~to_ ~data =
+    {
+      method_ = "eth_call";
+      parameters = `A [eth_call_obj ~to_ ~data; `String "latest"];
+    }
 end
 
 let block_number evm_node =
@@ -156,6 +175,15 @@ let get_transaction_count ~address evm_node =
 
 let tez_kernelVersion evm_node =
   let* response = Evm_node.call_evm_rpc evm_node Request.tez_kernelVersion in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let call ~to_ ~data evm_node =
+  let* response =
+    Evm_node.call_evm_rpc evm_node (Request.eth_call ~to_ ~data)
+  in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
