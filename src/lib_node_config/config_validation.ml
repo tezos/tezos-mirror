@@ -477,8 +477,24 @@ let testchain_is_deprecated =
     ~msg:"The option `p2p.enable_testchain` is deprecated."
     ()
 
-let warn_deprecated_fields (config : Config_file.t) =
+let local_listen_addrs_is_deprecated =
+  E.declare_0
+    ~level:Warning
+    ~name:"local_listen_addrs_is_deprecated_in_configuration_file"
+    ~msg:
+      "The option `rpc.local_listen_addrs` is deprecated. Use `listen_addrs` \
+       instead and remove `local_listen_addrs` from your config file."
+    ()
+
+let warn_deprecated_testchain (config : Config_file.t) =
   when_ config.p2p.enable_testchain ~event:testchain_is_deprecated ~payload:()
+  |> Lwt_result.return
+
+let warn_deprecated_local_listen_addrs (config : Config_file.t) =
+  when_
+    (not (config.rpc.local_listen_addrs = []))
+    ~event:local_listen_addrs_is_deprecated
+    ~payload:()
   |> Lwt_result.return
 
 (* Main validation passes. *)
@@ -490,7 +506,8 @@ let validation_passes ignore_testchain_warning =
     validate_connections;
     warn_maintenance_deactivated;
   ]
-  @ if ignore_testchain_warning then [] else [warn_deprecated_fields]
+  @ (if ignore_testchain_warning then [] else [warn_deprecated_testchain])
+  @ [warn_deprecated_local_listen_addrs]
 
 let validate_passes ?(ignore_testchain_warning = false) config =
   List.concat_map_es
