@@ -30,3 +30,7 @@ val set_denunciations :
   Signature.public_key_hash ->
   Denunciations_repr.t ->
   Raw_context.t Lwt.t
+
+(** Tells if the given delegate has some pending denunciations  *)
+val has_pending_denunciations :
+  Raw_context.t -> Signature.public_key_hash -> bool Lwt.t
