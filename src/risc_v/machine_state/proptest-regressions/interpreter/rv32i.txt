@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc db2f6ce07af6b4e47b87397dbbe9fb04ac44a7ee5cf0fe0ef2c68bc7dddbf779 # shrinks to imm = 0, reg_val = -2147483649
+cc aaef879cf6a347731deae81ab9b28d741db357b03808f5a36981ca6973e19af6 # shrinks to init_pc = 0, imm = 11, r1_val = 0, r2_val = 1
