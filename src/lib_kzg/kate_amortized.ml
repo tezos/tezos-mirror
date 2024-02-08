@@ -313,8 +313,8 @@ let multiple_multi_reveals t ~preprocess:(domain, sj) ~coefficients :
   let domain = Domain.build t.number_of_shards in
   G1_carray.(to_array (evaluation_ecfft ~domain ~points))
 
-(* [interpolation_poly root domain evaluations] returns the unique
-   polynomial P of degree [< Domains.length domain] verifying
+(* [interpolation_poly root domain evaluations] returns the
+   polynomial P of minimam degree ([< Domains.length domain]) verifying
    P(root * domain[i]) = evaluations[i].
 
    Requires:
