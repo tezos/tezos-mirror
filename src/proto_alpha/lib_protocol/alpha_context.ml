@@ -557,7 +557,6 @@ module Delegate = struct
   module Shared_stake = Shared_stake
 
   module For_RPC = struct
-    include For_RPC
     include Delegate_storage.For_RPC
     include Delegate_missed_attestations_storage.For_RPC
     include Pending_denunciations_storage.For_RPC
