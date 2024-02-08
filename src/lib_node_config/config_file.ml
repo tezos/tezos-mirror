@@ -576,9 +576,12 @@ let rpc : rpc Data_encoding.t =
       let local_listen_addrs =
         match local_listen_addrs with [] -> None | v -> Some v
       in
+      let external_listen_addrs =
+        match external_listen_addrs with [] -> None | v -> Some v
+      in
       ( ( Some listen_addrs,
           local_listen_addrs,
-          Some external_listen_addrs,
+          external_listen_addrs,
           None,
           cors_origins ),
         (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
