@@ -502,7 +502,10 @@ let init_local_rpc_server (config : Config_file.t) dir =
                 in
                 launch_rpc_server config dir (Local (mode, port)) addr)
               addrs)
-      config.rpc.listen_addrs
+        (* For backward compatibility, and as the default behaviour is
+           the local RPC server, we merge the listen_addrs and
+           local_listen_addrs arguments. *)
+      (config.rpc.listen_addrs @ config.rpc.local_listen_addrs)
   in
   return (Local_rpc_server servers)
 
@@ -641,7 +644,11 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
       Tezos_rpc.Service.description_service
   in
   let* local_rpc_server =
-    if config.rpc.listen_addrs = [] then return No_server
+    (* For backward compatibility, and as the default behaviour is the
+       local RPC server, we merge the listen_addrs and
+       local_listen_addrs arguments. *)
+    if config.rpc.listen_addrs @ config.rpc.local_listen_addrs = [] then
+      return No_server
     else init_local_rpc_server config dir
   in
   (* Start RPC process only when at least one listen addr is given. *)
