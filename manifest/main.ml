@@ -8440,6 +8440,7 @@ let evm_node_lib_dev =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_rpc_http |> open_;
+        octez_rpc_http_server;
         octez_workers |> open_;
         octez_rpc_http_client_unix;
         octez_version_value;
