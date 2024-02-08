@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 //! Implementation of RV_64_I extension for RISC-V
 //!
 //! Chapter 5 - Unprivileged spec

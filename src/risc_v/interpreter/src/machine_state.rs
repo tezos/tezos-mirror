@@ -7,7 +7,6 @@
 pub mod backend;
 pub mod bus;
 pub mod csregisters;
-mod interpreter;
 pub mod memory_backend;
 mod mode;
 pub mod registers;
@@ -30,10 +29,10 @@ pub struct HartState<M: backend::Manager> {
     pub csregisters: csregisters::CSRegisters<M>,
 
     /// Current running mode of hart
-    mode: mode::ModeCell<M>,
+    pub mode: mode::ModeCell<M>,
 
     /// Program counter
-    pc: Cell<Address, M>,
+    pub pc: Cell<Address, M>,
 }
 
 impl<M: backend::Manager> HartState<M> {
