@@ -9,27 +9,11 @@ type kind = Double_baking | Double_attesting | Double_preattesting
 
 let kind_encoding =
   let open Data_encoding in
-  union
-    ~tag_size:`Uint8
+  string_enum
     [
-      case
-        (Tag 0)
-        ~title:"Double baking"
-        (constant "double baking")
-        (function Double_baking -> Some () | _ -> None)
-        (fun () -> Double_baking);
-      case
-        (Tag 1)
-        ~title:"Double attesting"
-        (constant "double attesting")
-        (function Double_attesting -> Some () | _ -> None)
-        (fun () -> Double_attesting);
-      case
-        (Tag 2)
-        ~title:"Double preattesting"
-        (constant "double preattesting")
-        (function Double_preattesting -> Some () | _ -> None)
-        (fun () -> Double_preattesting);
+      ("preattestation", Double_preattesting);
+      ("attestation", Double_attesting);
+      ("block", Double_baking);
     ]
 
 type t = {level : Raw_level_repr.t; round : Round_repr.t; kind : kind}
