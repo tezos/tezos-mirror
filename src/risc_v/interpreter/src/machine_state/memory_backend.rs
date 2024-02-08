@@ -184,7 +184,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
+    use crate::machine_state::backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
 
     #[test]
     fn test_backend_reuse() {

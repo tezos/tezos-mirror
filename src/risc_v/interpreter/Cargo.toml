@@ -3,5 +3,14 @@ name = "risc-v-interpreter"
 version = "0.0.0"
 edition = "2021"
 
-[dependencies.risc-v-machine-state]
-path = "../machine_state"
+[dependencies]
+paste = "1.0.14"
+
+[dependencies.strum]
+version = "0.26.1"
+features = ["derive"]
+
+[dev-dependencies]
+goblin = "0.7.1"
+rand = "0.8.5"
+proptest = "1.4.0"

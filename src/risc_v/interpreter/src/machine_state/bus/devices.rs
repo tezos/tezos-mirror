@@ -6,7 +6,7 @@
 //! to devices.
 
 use super::Addressable;
-use crate::backend::{self, Region};
+use crate::machine_state::backend::{self, Region};
 
 /// Length of the devices address space
 pub const DEVICES_ADDRESS_SPACE_LENGTH: u64 = 1024 * 1024 * 1024;
@@ -49,7 +49,7 @@ impl<E: backend::Elem, M: backend::Manager> Addressable<E> for Devices<M> {
 #[cfg(test)]
 pub mod tests {
     use super::{Devices, DevicesLayout};
-    use crate::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
+    use crate::machine_state::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
 
     pub fn test_backend<F: TestBackendFactory>() {
         test_reset::<F>();

@@ -3,10 +3,8 @@ resolver = "2"
 members = [
   # Libraries
   "kernel_loader",
-  "machine_state",
   "interpreter",
   "pvm",
-  "parser",
   # Executables
   "sandbox",
 ]

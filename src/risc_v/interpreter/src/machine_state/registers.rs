@@ -6,7 +6,7 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::backend::{self, Region};
+use crate::machine_state::backend::{self, Region};
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -283,7 +283,7 @@ impl<M: backend::Manager> FRegisters<M> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::backend::{
+    use crate::machine_state::backend::{
         tests::{test_determinism, ManagerFor, TestBackendFactory},
         Backend, Layout,
     };
