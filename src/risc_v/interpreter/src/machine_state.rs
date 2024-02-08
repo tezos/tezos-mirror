@@ -4,17 +4,15 @@
 
 #![deny(rustdoc::broken_intra_doc_links)]
 
-pub mod backend;
 pub mod bus;
 pub mod csregisters;
-pub mod memory_backend;
 mod mode;
 pub mod registers;
 
 #[cfg(test)]
 extern crate proptest;
 
-use backend::{Atom, Cell};
+use crate::state_backend::{self as backend, Atom, Cell};
 use bus::{main_memory, Address, Bus};
 
 /// RISC-V hart state
