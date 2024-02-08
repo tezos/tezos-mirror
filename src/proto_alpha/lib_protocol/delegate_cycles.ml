@@ -204,11 +204,11 @@ let cycle_end ctxt last_cycle =
     Delegate_slashed_deposits_storage.apply_and_clear_denunciations ctxt
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
+  let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
   in
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
-  let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
   let* ctxt, autostake_balance_updates =
     match Staking.staking_automation ctxt with
