@@ -164,3 +164,26 @@ val adaptive_issuance_force_activation : Raw_context.t -> bool
 val adaptive_issuance_ns_enable : Raw_context.t -> bool
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
+
+(** The following accessors are not actual parameters, but constants that
+    derive from the protocol parameter. *)
+
+(** Delay, in cycles, before the current state of the stake impacts the
+    issuance rate.*)
+val issuance_modification_delay : Raw_context.t -> int
+
+(** Delay, in cycles, before activation of AI after the voting EMA threshold is
+   reached *)
+val adaptive_issuance_activation_delay : Raw_context.t -> int
+
+(** Tolerated period of inactivity, in cycles, before a delegate is
+    deactivated *)
+val tolerated_inactivity_period : Raw_context.t -> int
+
+(** Delay before the activation of a consensus key, in cycles *)
+val consensus_key_activation_delay : Raw_context.t -> int
+
+(** Number of cycles during which a misbehavior of a delegate will induce a
+    slashing of the funds that are currently in its frozen deposit. *)
+
+val slashable_deposits_period : Raw_context.t -> int

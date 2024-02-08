@@ -142,9 +142,11 @@ let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
     if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
     else current_cycle
   in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
   let oldest_slashable_cycle =
-    Cycle_repr.sub current_cycle (preserved_cycles + 1)
+    Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
     |> Option.value ~default:Cycle_repr.root
   in
   return

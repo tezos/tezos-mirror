@@ -220,7 +220,7 @@ let collect_expected_rewards ~ctxt =
         }
     else
       (* This coeff is correct only when applied to Cycle lesser than
-         [preserved_cycles] after the current context, otherwise the coeff will
+         [issuance_modification_delay] after the current context, otherwise the coeff will
          not be set and thus we get the default values. *)
       let open Delegate.Rewards.For_RPC in
       let* coeff = get_reward_coeff ctxt ~cycle in
@@ -261,7 +261,9 @@ let collect_expected_rewards ~ctxt =
         }
   in
   let queried_cycles =
-    Cycle.(ctxt_cycle ---> add ctxt_cycle csts.preserved_cycles)
+    Cycle.(
+      ctxt_cycle
+      ---> add ctxt_cycle (Constants.issuance_modification_delay ctxt))
   in
   List.map_es reward_of_cycle queried_cycles
 

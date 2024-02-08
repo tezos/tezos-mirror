@@ -146,7 +146,9 @@ let apply_and_clear_denunciations ctxt =
     | None -> current_cycle
     | Some previous_cycle -> previous_cycle
   in
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
   let global_limit_of_staking_over_baking_plus_two =
     let global_limit_of_staking_over_baking =
       Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
@@ -283,7 +285,7 @@ let apply_and_clear_denunciations ctxt =
               in
               let* to_burn, to_reward =
                 let oldest_slashable_cycle =
-                  Cycle_repr.sub misbehaviour_cycle preserved_cycles
+                  Cycle_repr.sub misbehaviour_cycle slashable_deposits_period
                   |> Option.value ~default:Cycle_repr.root
                 in
                 let slashable_cycles =

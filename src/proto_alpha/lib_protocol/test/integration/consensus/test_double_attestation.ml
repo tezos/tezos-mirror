@@ -711,6 +711,7 @@ let test_freeze_more_with_low_balance =
         consensus_threshold = 0;
         origination_size = 0;
         preserved_cycles = 5;
+        consensus_rights_delay = 5;
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
           Percentage.p50;
