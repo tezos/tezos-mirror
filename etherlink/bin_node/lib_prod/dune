@@ -8,6 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.rpc-http
+  octez-libs.rpc-http-server
   octez-libs.tezos-workers
   octez-libs.rpc-http-client-unix
   octez-version.value

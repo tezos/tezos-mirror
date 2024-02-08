@@ -51,6 +51,7 @@ type mode =
       max_blueprints_lag : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
+      devmode : bool;  (** --devmode flag. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

@@ -174,6 +174,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
         max_blueprints_lag;
         max_blueprints_catchup;
         catchup_cooldown;
+        devmode = true;
       }
   in
   let* evm_node =
