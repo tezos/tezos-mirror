@@ -568,6 +568,24 @@ let inject_dal_attestations_and_bake node client ~number_of_slots indexes =
   in
   bake_for ~delegates:(`For [baker]) client
 
+let inject_dal_attestation_for_assigned_shards ~nb_slots ~attested_level
+    ~attester_account ~attester_dal_node client =
+  let* attestable_slots =
+    Dal_RPC.(
+      call attester_dal_node
+      @@ get_attestable_slots ~attester:attester_account ~attested_level)
+  in
+  match attestable_slots with
+  | Not_in_committee ->
+      Test.fail "attester %s not in committee" attester_account.alias
+  | Attestable_slots slots ->
+      inject_dal_attestation
+        ~level:(attested_level - 1)
+        (Bitset (Array.of_list slots))
+        ~signer:attester_account
+        ~nb_slots
+        client
+
 let get_validated_dal_attestations_in_mempool node for_level =
   let* mempool_json =
     Node.RPC.call node
