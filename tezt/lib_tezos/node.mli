@@ -303,10 +303,10 @@ val show_history_mode : history_mode -> string
 (** Run [octez-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
-(** Run [tezos-node config update]. *)
+(** Run [octez-node config update]. *)
 val config_update : t -> argument list -> unit Lwt.t
 
-(** Run [tezos-node config reset]. *)
+(** Run [octez-node config reset]. *)
 val config_reset : t -> argument list -> unit Lwt.t
 
 (** Run [octez-node config show]. Returns the node configuration. *)

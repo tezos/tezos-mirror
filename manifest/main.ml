@@ -3825,7 +3825,7 @@ let octez_client_base =
     "client-base"
     ~internal_name:"tezos_client_base"
     ~path:"src/lib_client_base"
-    ~synopsis:"Tezos: common helpers for `tezos-client`"
+    ~synopsis:"Tezos: common helpers for `octez-client`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3888,7 +3888,7 @@ let octez_signer_backends =
     "signer-backends"
     ~internal_name:"tezos_signer_backends"
     ~path:"src/lib_signer_backends"
-    ~synopsis:"Tezos: remote-signature backends for `tezos-client`"
+    ~synopsis:"Tezos: remote-signature backends for `octez-client`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3970,7 +3970,7 @@ let octez_client_commands =
     "client-commands"
     ~internal_name:"tezos_client_commands"
     ~path:"src/lib_client_commands"
-    ~synopsis:"Tezos: protocol agnostic commands for `tezos-client`"
+    ~synopsis:"Tezos: protocol agnostic commands for `octez-client`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -4216,7 +4216,7 @@ let octez_client_base_unix =
     ~internal_name:"tezos_client_base_unix"
     ~path:"src/lib_client_base_unix"
     ~synopsis:
-      "Tezos: common helpers for `tezos-client` (unix-specific fragment)"
+      "Tezos: common helpers for `octez-client` (unix-specific fragment)"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -5944,7 +5944,7 @@ let hash = Protocol.hash
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
         ~path:(Name.base_path name // "lib_client")
-        ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
+        ~synopsis:"Tezos/Protocol: protocol specific library for `octez-client`"
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -5978,7 +5978,7 @@ let hash = Protocol.hash
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
         ~path:(Name.base_path name // "lib_client")
-        ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
+        ~synopsis:"Tezos/Protocol: protocol specific library for `octez-client`"
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -6150,13 +6150,16 @@ let hash = Protocol.hash
         ~modules:["Plugin_registerer"]
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
     in
+    let client_name =
+      if N.(number >= 015) then "`octez-client`" else "`tezos-client`"
+    in
     let client =
       only_if not_overridden @@ fun () ->
       octez_protocol_lib
         "client"
         ~internal_name:(sf "tezos_client_%s" name_dash)
         ~path:(path // "lib_client")
-        ~synopsis:"Protocol specific library for `tezos-client`"
+        ~synopsis:("Protocol specific library for " ^ client_name)
         ~release_status:optional_library_release_status
         ~deps:
           [

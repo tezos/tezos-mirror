@@ -5,9 +5,9 @@ This is a package containing some libraries used by the shell of Octez.
 It contains the following libraries:
 
 - {{!module-Mocked}Mocked}
-- {{!module-Tezos_client_base}Tezos_client_base}: Tezos: common helpers for `tezos-client`
-- {{!module-Tezos_client_base_unix}Tezos_client_base_unix}: Tezos: common helpers for `tezos-client` (unix-specific fragment)
-- {{!module-Tezos_client_commands}Tezos_client_commands}: Tezos: protocol agnostic commands for `tezos-client`
+- {{!module-Tezos_client_base}Tezos_client_base}: Tezos: common helpers for `octez-client`
+- {{!module-Tezos_client_base_unix}Tezos_client_base_unix}: Tezos: common helpers for `octez-client` (unix-specific fragment)
+- {{!module-Tezos_client_commands}Tezos_client_commands}: Tezos: protocol agnostic commands for `octez-client`
 - {{!module-Tezos_context_ops}Tezos_context_ops}: Backend-agnostic operations on contexts
 - {{!module-Tezos_mockup}Tezos_mockup}: Tezos: library of auto-documented RPCs (mockup mode)
 - {{!module-Tezos_mockup_commands}Tezos_mockup_commands}: Tezos: library of auto-documented RPCs (commands)
@@ -21,7 +21,7 @@ It contains the following libraries:
 - {{!module-Tezos_shell_benchmarks}Tezos_shell_benchmarks}: Tezos: shell benchmarks
 - {{!module-Tezos_shell_context}Tezos_shell_context}
 - {{!module-Tezos_shell_services}Tezos_shell_services}: Descriptions of RPCs exported by [tezos-shell]
-- {{!module-Tezos_signer_backends}Tezos_signer_backends}: Tezos: remote-signature backends for `tezos-client`
+- {{!module-Tezos_signer_backends}Tezos_signer_backends}: Tezos: remote-signature backends for `octez-client`
 - {{!module-Tezos_signer_services}Tezos_signer_services}: Tezos: descriptions of RPCs exported by `tezos-signer`
 - {{!module-Tezos_store}Tezos_store}: Store for `octez-node`
 - {{!module-Tezos_validation}Tezos_validation}: Library for block validation

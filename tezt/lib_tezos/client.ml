@@ -3621,7 +3621,7 @@ let spawn_compute_chain_id_from_block_hash ?endpoint client block_hash =
   spawn_command ?endpoint client
   @@ ["compute"; "chain"; "id"; "from"; "block"; "hash"; block_hash]
 
-(** Run [tezos-client compute chain id from block hash]. *)
+(** Run [octez-client compute chain id from block hash]. *)
 let compute_chain_id_from_block_hash ?endpoint client block_hash =
   let* output =
     spawn_compute_chain_id_from_block_hash ?endpoint client block_hash
@@ -3633,7 +3633,7 @@ let spawn_compute_chain_id_from_seed ?endpoint client seed =
   spawn_command ?endpoint client
   @@ ["compute"; "chain"; "id"; "from"; "seed"; seed]
 
-(** Run [tezos-client compute chain id from seed]. *)
+(** Run [octez-client compute chain id from seed]. *)
 let compute_chain_id_from_seed ?endpoint client seed =
   let* output =
     spawn_compute_chain_id_from_seed ?endpoint client seed

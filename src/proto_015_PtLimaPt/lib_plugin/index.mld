@@ -4,6 +4,6 @@ This is a package containing some libraries related to the Tezos 015-PtLimaPt pr
 
 It contains the following libraries:
 
-- {{!module-Tezos_client_015_PtLimaPt}Tezos_client_015_PtLimaPt}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_015_PtLimaPt}Tezos_client_015_PtLimaPt}: Protocol specific library for `octez-client`
 - {{!module-Tezos_protocol_plugin_015_PtLimaPt}Tezos_protocol_plugin_015_PtLimaPt}: Protocol plugin
 - {{!module-Tezos_protocol_plugin_015_PtLimaPt_registerer}Tezos_protocol_plugin_015_PtLimaPt_registerer}: Protocol plugin registerer

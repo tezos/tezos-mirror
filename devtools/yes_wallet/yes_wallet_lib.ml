@@ -31,7 +31,7 @@
    Given a list of aliases and public key hashes:
    - encodes each public key as a fake secret key that can be used
      with the yes-node.patch
-   - creates a 'yes-wallet' directory to be passed to tezos-client -d option
+   - creates a 'yes-wallet' directory to be passed to octez-client -d option
  *)
 
 let pp_protocol ppf (module P : Sigs.PROTOCOL) = Protocol_hash.pp ppf P.hash
