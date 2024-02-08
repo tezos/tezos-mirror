@@ -219,7 +219,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt, commitments_balance_updates =
           List.fold_left_es init_commitment (ctxt, []) param.commitments
         in
-        let* ctxt = Storage.Stake.Last_snapshot.init ctxt 0 in
         let* ctxt =
           Seed_storage.init ?initial_seed:param.constants.initial_seed ctxt
         in
@@ -280,6 +279,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
         let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
         let* ctxt = clean_frozen_deposits_for_p ctxt in
+        let*! ctxt = Raw_context.remove ctxt ["last_snapshot"] in
         return (ctxt, [])
   in
   let* ctxt =
