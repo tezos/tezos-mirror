@@ -114,21 +114,12 @@ let punish_double_signing ctxt ~operation_hash
     if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
       (* Do not store denunciations that have no effects .*) return ctxt
     else
-      let* denunciations_opt =
-        Storage.Pending_denunciations.find ctxt delegate
-      in
-      let denunciations = Option.value denunciations_opt ~default:[] in
-      let denunciations =
-        Denunciations_repr.add
-          operation_hash
-          rewarded
-          misbehaviour
-          denunciations
-      in
-      let*! ctxt =
-        Storage.Pending_denunciations.add ctxt delegate denunciations
-      in
-      return ctxt
+      Pending_denunciations_storage.add_denunciation
+        ctxt
+        ~misbehaving_delegate:delegate
+        operation_hash
+        ~rewarded_delegate:rewarded
+        misbehaviour
   in
   return ctxt
 
