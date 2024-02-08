@@ -23,20 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** SRS points needed by the verifier of the DAL *)
 type srs_verifier = {
   shards : Kzg.Bls.G2.t;
   pages : Kzg.Bls.G2.t;
   commitment : Kzg.Bls.G2.t;
 }
 
+(** Returns ZCash SRS₁ resized for the verifier, according to mainnet parameters *)
 val get_verifier_srs1 : unit -> Kzg.Bls.Srs_g1.t
 
+(** Return the ZCash SRS₂ points needed by the verifier, according to mainnet
+   parameters *)
 val get_verifier_srs2 :
   max_polynomial_length:int ->
   page_length_domain:int ->
   shard_length:int ->
   srs_verifier
 
+(** Fails if and only if the SRS does not suits the parameters, ie SRS₁ would
+    be too short to commit or SRS₂ does not contain the needed points *)
 val ensure_srs_validity :
   test:bool ->
   mode:[< `Prover | `Verifier] ->
@@ -48,6 +54,8 @@ val ensure_srs_validity :
 
 exception Failed_to_load_trusted_setup of string
 
+(** Returns SRS₁ of size [len] (by default, 2²¹) read from the file given by
+   [path]. May raise [Failed_to_load_trusted_setup] exception *)
 val read_srs_g1 :
   ?len:int ->
   path:string ->
@@ -55,11 +63,17 @@ val read_srs_g1 :
   (Kzg.Bls.Srs_g1.t, [> `End_of_file of string | `Invalid_point of int]) result
   Lwt.t
 
+(** This module is used to handle a fake SRS in the DAL. This is more flexible
+    and easier to handle in the CI than loading ZCash SRS *)
 module Internal_for_tests : sig
+  (** Generates an unsafe SRS₁ from a known seed *)
   val fake_srs : ?size:int -> unit -> Kzg.Bls.Srs_g1.t
 
+  (** Same as [fake_srs] but the returned SRS₁ is of size 2⁸, which is enough
+       to suit the verifier needs in our tests *)
   val get_verifier_srs1 : unit -> Kzg.Bls.Srs_g1.t
 
+  (** Returns the fake SRS₂ points needed by the verifier *)
   val get_verifier_srs2 :
     max_polynomial_length:int ->
     page_length_domain:int ->
