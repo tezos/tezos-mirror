@@ -539,7 +539,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             block_fees,
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 

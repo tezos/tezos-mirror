@@ -16,6 +16,12 @@ pub enum Configuration {
     },
 }
 
+impl Default for Configuration {
+    fn default() -> Self {
+        Self::Proxy
+    }
+}
+
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -54,10 +60,10 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
-                    Configuration::Proxy
+                    Configuration::default()
                 }
             }
         }
-        None => Configuration::Proxy,
+        None => Configuration::default(),
     }
 }
