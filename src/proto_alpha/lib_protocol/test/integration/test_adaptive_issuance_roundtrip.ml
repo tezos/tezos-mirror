@@ -2566,12 +2566,6 @@ module Slashing = struct
                  ~expected_error:(fun (_block, state) ->
                    let ds = state.State.double_signings in
                    let ds = match ds with [a] -> a | _ -> assert false in
-                   let kind =
-                     match ds.kind with
-                     | Double_baking -> Protocol.Validate_errors.Anonymous.Block
-                     | Double_attesting -> Attestation
-                     | Double_preattesting -> Preattestation
-                   in
                    let level =
                      Protocol.Alpha_context.Raw_level.of_int32_exn
                        (Int32.succ ds.level)
@@ -2583,6 +2577,16 @@ module Slashing = struct
                             state.State.constants.blocks_per_cycle
                           ~current_level:ds.level)
                        Protocol.Constants_repr.max_slashing_period
+                   in
+                   let (kind : Protocol.Alpha_context.Misbehaviour.kind) =
+                     (* This conversion would not be needed if
+                        Misbehaviour_repr.kind were moved to a
+                        separate file that doesn't have under/over
+                        Alpha_context versions. *)
+                     match ds.kind with
+                     | Double_baking -> Double_baking
+                     | Double_attesting -> Double_attesting
+                     | Double_preattesting -> Double_preattesting
                    in
                    [
                      Environment.Ecoproto_error

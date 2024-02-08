@@ -485,8 +485,8 @@ let test_too_early_double_baking_evidence () =
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Block ->
+      | Validate_errors.Anonymous.Too_early_denunciation
+          {kind = Misbehaviour.Double_baking; _} ->
           true
       | _ -> false)
 
@@ -501,8 +501,8 @@ let test_too_late_double_baking_evidence () =
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Block ->
+      | Validate_errors.Anonymous.Outdated_denunciation
+          {kind = Misbehaviour.Double_baking; _} ->
           true
       | _ -> false)
 
@@ -584,8 +584,8 @@ let test_double_evidence () =
   let*! e = Block.bake ~operations:[evidence; evidence] blk in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Block ->
+        | Validate_errors.Anonymous.Conflicting_denunciation
+            {kind = Misbehaviour.Double_baking; _} ->
             true
         | _ -> false)
   in

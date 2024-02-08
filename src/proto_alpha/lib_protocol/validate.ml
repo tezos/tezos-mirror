@@ -1303,13 +1303,13 @@ module Anonymous = struct
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
     let open Lwt_result_syntax in
-    let e1, e2, denunciation_kind =
+    let e1, e2, kind =
       match (op1.protocol_data.contents, op2.protocol_data.contents) with
       | Single (Preattestation e1), Single (Preattestation e2) ->
-          (e1, e2, Preattestation)
+          (e1, e2, Misbehaviour.Double_preattesting)
       | ( Single (Attestation {consensus_content = e1; dal_content = _}),
           Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
-          (e1, e2, Attestation)
+          (e1, e2, Double_attesting)
     in
     let op1_hash = Operation.hash op1 in
     let op2_hash = Operation.hash op2 in
@@ -1342,13 +1342,11 @@ module Anonymous = struct
       ordered_hashes
     in
     let*? () =
-      error_unless
-        is_denunciation_consistent
-        (Invalid_denunciation denunciation_kind)
+      error_unless is_denunciation_consistent (Invalid_denunciation kind)
     in
     (* Disambiguate: levels are equal *)
     let level = Level.from_raw vi.ctxt e1.level in
-    let*? () = check_denunciation_age vi denunciation_kind level.level in
+    let*? () = check_denunciation_age vi kind level.level in
     let* ctxt, consensus_key1 =
       Stake_distribution.slot_owner vi.ctxt level e1.slot
     in
@@ -1361,23 +1359,16 @@ module Anonymous = struct
     let*? () =
       error_unless
         (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_denunciation
-           {kind = denunciation_kind; delegate1; delegate2})
+        (Inconsistent_denunciation {kind; delegate1; delegate2})
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
-      let kind =
-        match denunciation_kind with
-        | Preattestation -> Misbehaviour.Double_preattesting
-        | Attestation -> Double_attesting
-        | Block -> Double_baking
-      in
       Delegate.already_denounced ctxt delegate level e1.round kind
     in
     let*? () =
       error_unless
         (not already_slashed)
-        (Already_denounced {kind = denunciation_kind; delegate; level})
+        (Already_denounced {kind; delegate; level})
     in
     let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
     let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
@@ -1514,7 +1505,7 @@ module Anonymous = struct
         (Invalid_double_baking_evidence
            {hash1; level1; round1; hash2; level2; round2})
     in
-    let*? () = check_denunciation_age vi Block level1 in
+    let*? () = check_denunciation_age vi Double_baking level1 in
     let level = Level.from_raw vi.ctxt level1 in
     let committee_size = Constants.consensus_committee_size vi.ctxt in
     let*? slot1 = Round.to_slot round1 ~committee_size in
@@ -1531,7 +1522,7 @@ module Anonymous = struct
     let*? () =
       error_unless
         Signature.Public_key_hash.(delegate1 = delegate2)
-        (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
+        (Inconsistent_denunciation {kind = Double_baking; delegate1; delegate2})
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
@@ -1540,7 +1531,7 @@ module Anonymous = struct
     let*? () =
       error_unless
         (not already_slashed)
-        (Already_denounced {kind = Block; delegate; level})
+        (Already_denounced {kind = Double_baking; delegate; level})
     in
     let*? () = Block_header.check_signature bh1 vi.chain_id delegate_pk in
     let*? () = Block_header.check_signature bh2 vi.chain_id delegate_pk in
@@ -2737,7 +2728,7 @@ let validate_operation ?(check_signature = true)
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Preattestation
+            |> wrap_denunciation_conflict Double_preattesting
           in
           let operation_state =
             add_double_preattestation_evidence operation_state oph operation
@@ -2751,7 +2742,7 @@ let validate_operation ?(check_signature = true)
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Attestation
+            |> wrap_denunciation_conflict Double_attesting
           in
           let operation_state =
             add_double_attestation_evidence operation_state oph operation
@@ -2762,7 +2753,7 @@ let validate_operation ?(check_signature = true)
           let* () = check_double_baking_evidence info operation in
           let*? () =
             check_double_baking_evidence_conflict operation_state oph operation
-            |> wrap_denunciation_conflict Block
+            |> wrap_denunciation_conflict Double_baking
           in
           let operation_state =
             add_double_baking_evidence operation_state oph operation

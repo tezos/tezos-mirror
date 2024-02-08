@@ -669,21 +669,12 @@ module Anonymous = struct
         | _ -> None)
       (fun (edpkh, conflict) -> Conflicting_activation {edpkh; conflict})
 
-  type denunciation_kind = Preattestation | Attestation | Block
-
-  let denunciation_kind_encoding =
-    let open Data_encoding in
-    string_enum
-      [
-        ("preattestation", Preattestation);
-        ("attestation", Attestation);
-        ("block", Block);
-      ]
+  type denunciation_kind = Misbehaviour.kind
 
   let pp_denunciation_kind fmt : denunciation_kind -> unit = function
-    | Preattestation -> Format.fprintf fmt "preattestation"
-    | Attestation -> Format.fprintf fmt "attestation"
-    | Block -> Format.fprintf fmt "block"
+    | Double_preattesting -> Format.fprintf fmt "preattestation"
+    | Double_attesting -> Format.fprintf fmt "attestation"
+    | Double_baking -> Format.fprintf fmt "block"
 
   type error +=
     | Invalid_double_baking_evidence of {
@@ -767,7 +758,7 @@ module Anonymous = struct
           "Malformed double-%a evidence"
           pp_denunciation_kind
           kind)
-      Data_encoding.(obj1 (req "kind" denunciation_kind_encoding))
+      Data_encoding.(obj1 (req "kind" Misbehaviour.kind_encoding))
       (function Invalid_denunciation kind -> Some kind | _ -> None)
       (fun kind -> Invalid_denunciation kind) ;
     register_error_kind
@@ -788,7 +779,7 @@ module Anonymous = struct
           delegate2)
       Data_encoding.(
         obj3
-          (req "kind" denunciation_kind_encoding)
+          (req "kind" Misbehaviour.kind_encoding)
           (req "delegate1" Signature.Public_key_hash.encoding)
           (req "delegate2" Signature.Public_key_hash.encoding))
       (function
@@ -814,7 +805,7 @@ module Anonymous = struct
           kind)
       Data_encoding.(
         obj3
-          (req "denunciation_kind" denunciation_kind_encoding)
+          (req "denunciation_kind" Misbehaviour.kind_encoding)
           (req "delegate" Signature.Public_key_hash.encoding)
           (req "level" Level.encoding))
       (function
@@ -840,7 +831,7 @@ module Anonymous = struct
           existing)
       Data_encoding.(
         obj2
-          (req "denunciation_kind" denunciation_kind_encoding)
+          (req "denunciation_kind" Misbehaviour.kind_encoding)
           (req "conflict" operation_conflict_encoding))
       (function
         | Conflicting_denunciation {kind; conflict} -> Some (kind, conflict)
@@ -864,7 +855,7 @@ module Anonymous = struct
           level)
       Data_encoding.(
         obj3
-          (req "kind" denunciation_kind_encoding)
+          (req "kind" Misbehaviour.kind_encoding)
           (req "level" Raw_level.encoding)
           (req "current" Raw_level.encoding))
       (function
@@ -891,7 +882,7 @@ module Anonymous = struct
           level)
       Data_encoding.(
         obj3
-          (req "kind" denunciation_kind_encoding)
+          (req "kind" Misbehaviour.kind_encoding)
           (req "level" Raw_level.encoding)
           (req "last" Cycle.encoding))
       (function
