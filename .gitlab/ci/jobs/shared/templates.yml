@@ -52,6 +52,7 @@
         paths:
           - images/**/*
           - kernels.mk
+          - etherlink.mk
           - src/**/*
           - etherlink/**/*
           - tezt/**/*
