@@ -4530,26 +4530,25 @@ let dal_crypto_benchmark () =
           err
     | Ok x -> f x
   in
+  Log.info "Downloading SRS files..." ;
+  let* () =
+    Process.run (Base.project_root // "scripts/install_dal_trusted_setup.sh") []
+  in
+  Log.info "SRS files downloaded." ;
   let* () =
     Profiler.record_f Profiler.main "SRS" @@ fun () ->
-    let parameters =
-      {
-        redundancy_factor = 16;
-        slot_size = 1 lsl 20;
-        page_size = 4096;
-        number_of_shards = 2048;
-      }
-    in
+    Log.info "Loading SRS..." ;
     let* result =
       Config.init_prover_dal
-        ~find_srs_files:(fun () -> Error [])
+        ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
         Config.
           {
             activated = true;
             bootstrap_peers = [];
-            use_mock_srs_for_testing = Some parameters;
+            use_mock_srs_for_testing = None;
           }
     in
+    Log.info "SRS loaded." ;
     let*? config =
       Result.map_error
         (fun x ->
