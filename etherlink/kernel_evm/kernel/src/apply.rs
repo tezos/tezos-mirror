@@ -611,7 +611,11 @@ mod tests {
     const CHAIN_ID: u32 = 1337;
 
     fn mock_block_constants() -> BlockConstants {
-        let block_fees = BlockFees::new(U256::from(12345), U256::from(1_000_000));
+        let block_fees = BlockFees::new(
+            U256::from(12345),
+            U256::from(1_000_000),
+            U256::from(2_000_000_000_000u64),
+        );
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),
             CHAIN_ID.into(),

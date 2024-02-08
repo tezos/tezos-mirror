@@ -58,3 +58,5 @@ let kernel_boot_wasm = kernel "/boot.wasm"
 let delayed_bridge_path = evm "/delayed_bridge"
 
 let flat_fee_path = evm "/flat_fee"
+
+let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"

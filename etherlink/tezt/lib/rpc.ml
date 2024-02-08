@@ -152,7 +152,7 @@ let estimate_gas eth_call evm_node =
   in
   return
   @@ decode_or_error
-       (fun response -> Evm_node.extract_result response |> JSON.as_int)
+       (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
 let get_transaction_count ~address evm_node =

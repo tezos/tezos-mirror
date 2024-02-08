@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,8 +29,8 @@ type transaction_object = {
   blockHash : string;
   blockNumber : int32;
   from : string;
-  gas : int32;
-  gasPrice : int32;
+  gas : int64;
+  gasPrice : int64;
   hash : string;
   input : string option;
   nonce : int32;
@@ -47,8 +48,8 @@ let transaction_object_of_json json =
     blockHash = json |-> "blockHash" |> as_string;
     blockNumber = json |-> "blockNumber" |> as_int32;
     from = json |-> "from" |> as_string;
-    gas = json |-> "gas" |> as_int32;
-    gasPrice = json |-> "gasPrice" |> as_int32;
+    gas = json |-> "gas" |> as_int64;
+    gasPrice = json |-> "gasPrice" |> as_int64;
     hash = json |-> "hash" |> as_string;
     input = json |-> "input" |> as_string_opt;
     nonce = json |-> "nonce" |> as_int32;
@@ -98,9 +99,9 @@ type transaction_receipt = {
   from : string;
   to_ : string option;
   contractAddress : string option;
-  cumulativeGasUsed : int32;
-  effectiveGasPrice : int32;
-  gasUsed : int32;
+  cumulativeGasUsed : int64;
+  effectiveGasPrice : int64;
+  gasUsed : int64;
   logs : tx_log list;
   logsBloom : string;
   type_ : int32;
@@ -122,9 +123,9 @@ let transaction_receipt_of_json json =
     from = json |-> "from" |> as_string;
     to_ = json |-> "to" |> as_string_opt;
     contractAddress = json |-> "contractAddress" |> as_string_opt;
-    cumulativeGasUsed = json |-> "cumulativeGasUsed" |> as_int32;
-    effectiveGasPrice = json |-> "effectiveGasPrice" |> as_int32;
-    gasUsed = json |-> "gasUsed" |> as_int32;
+    cumulativeGasUsed = json |-> "cumulativeGasUsed" |> as_int64;
+    effectiveGasPrice = json |-> "effectiveGasPrice" |> as_int64;
+    gasUsed = json |-> "gasUsed" |> as_int64;
     logs = json |-> "logs" |> as_list |> List.map logs_of_json;
     logsBloom = json |-> "logsBloom" |> as_string;
     type_ = json |-> "type" |> as_int32;
