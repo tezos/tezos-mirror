@@ -34,3 +34,5 @@ let set_denunciations ctxt delegate denunciations =
 let has_pending_denunciations ctxt delegate =
   (* we rely here on the fact that we never insert an empty list in the table *)
   Storage.Pending_denunciations.mem ctxt delegate
+
+let fold = Storage.Pending_denunciations.fold

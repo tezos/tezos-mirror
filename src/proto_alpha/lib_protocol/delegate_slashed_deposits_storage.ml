@@ -167,7 +167,7 @@ let apply_and_clear_denunciations ctxt =
     {reward; amount_to_burn}
   in
   let* ctxt, balance_updates, remaining_denunciations =
-    Storage.Pending_denunciations.fold
+    Pending_denunciations_storage.fold
       ctxt
       ~order:`Undefined
       ~init:(Ok (ctxt, [], []))

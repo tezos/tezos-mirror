@@ -34,3 +34,15 @@ val set_denunciations :
 (** Tells if the given delegate has some pending denunciations  *)
 val has_pending_denunciations :
   Raw_context.t -> Signature.public_key_hash -> bool Lwt.t
+
+(** See {!Storage.Pending_denunciations.fold}  *)
+val fold :
+  Raw_context.t ->
+  order:[`Sorted | `Undefined] ->
+  init:'a ->
+  f:
+    (Signature.public_key_hash ->
+    Denunciations_repr.item list ->
+    'a ->
+    'a Lwt.t) ->
+  'a Lwt.t
