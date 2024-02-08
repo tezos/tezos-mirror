@@ -109,7 +109,7 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
     && is_in_srs2 offset_monomial_degree)
     (fun () ->
       Format.asprintf
-        "SRS on shourd contain points of indices shard_length = %d, \
+        "SRS on should contain points of indices shard_length = %d, \
          page_length_domain = %d & offset_monomial_degree = %d."
         shard_length
         page_length_domain
