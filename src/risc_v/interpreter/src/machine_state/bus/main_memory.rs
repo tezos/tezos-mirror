@@ -46,10 +46,10 @@ gen_memory_layout!(M4G = 4 GiB);
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
 pub trait MainMemoryLayout: backend::Layout {
-    type Region8<M: backend::Manager>: backend::VolatileRegion<u8>;
-    type Region16<M: backend::Manager>: backend::VolatileRegion<u16>;
-    type Region32<M: backend::Manager>: backend::VolatileRegion<u32>;
-    type Region64<M: backend::Manager>: backend::VolatileRegion<u64>;
+    type Region8<M: backend::Manager>: backend::VolatileRegion<Elem = u8>;
+    type Region16<M: backend::Manager>: backend::VolatileRegion<Elem = u16>;
+    type Region32<M: backend::Manager>: backend::VolatileRegion<Elem = u32>;
+    type Region64<M: backend::Manager>: backend::VolatileRegion<Elem = u64>;
 
     const LEN8: usize;
     const LEN16: usize;

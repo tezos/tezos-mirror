@@ -150,9 +150,13 @@ pub struct VolatileRegion<'backend, E, const LEN: usize> {
     _pd: PhantomData<&'backend mut [u8]>,
 }
 
-impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
+impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion
     for VolatileRegion<'backend, E, LEN>
 {
+    type Elem = E;
+
+    const LEN: usize = LEN;
+
     #[inline(always)]
     fn read(&self, index: usize) -> E {
         // Make sure the access is within bounds.
