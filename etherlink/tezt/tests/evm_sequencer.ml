@@ -50,6 +50,7 @@ type l1_contracts = {
   exchanger : string;
   bridge : string;
   admin : string;
+  sequencer_admin : string;
 }
 
 type sequencer_setup = {
@@ -61,7 +62,7 @@ type sequencer_setup = {
   l1_contracts : l1_contracts;
 }
 
-let setup_l1_contracts ?(admin = Constant.bootstrap1) client =
+let setup_l1_contracts ?(dictator = Constant.bootstrap1) client =
   (* Originates the delayed transaction bridge. *)
   let* delayed_transaction_bridge =
     Client.originate_contract
@@ -103,13 +104,25 @@ let setup_l1_contracts ?(admin = Constant.bootstrap1) client =
       ~alias:"evm-admin"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~init:(sf "%S" dictator.Account.public_key_hash)
       ~prg:(admin_path ())
       ~burn_cap:Tez.one
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  return {delayed_transaction_bridge; exchanger; bridge; admin}
+  (* Originates the administrator contract. *)
+  let* sequencer_admin =
+    Client.originate_contract
+      ~alias:"evm-sequencer-admin"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "%S" dictator.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  return {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_admin}
 
 let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_catchup ?catchup_cooldown
@@ -132,6 +145,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
+      ~sequencer_administrator:l1_contracts.sequencer_admin
       ()
   in
   let config =
@@ -216,6 +230,69 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
       client
   in
   let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  unit
+
+let test_remove_sequencer =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "admin"]
+    ~title:"Remove sequencer via sequencer admin contract"
+    ~uses
+  @@ fun protocol ->
+  let* {
+         evm_node;
+         sc_rollup_node;
+         node;
+         client;
+         sc_rollup_address;
+         l1_contracts;
+         _;
+       } =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  let* proxy =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  (* Produce blocks to show that both the sequencer and proxy are not
+     progressing. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  (* Both are at genesis *)
+  let*@ sequencer_head = Rpc.block_number evm_node in
+  let*@ proxy_head = Rpc.block_number proxy in
+  Check.((sequencer_head = 0l) int32)
+    ~error_msg:"Sequencer should be at genesis" ;
+  Check.((sequencer_head = proxy_head) int32)
+    ~error_msg:"Sequencer and proxy should have the same block number" ;
+  (* Remove the sequencer via the sequencer-admin contract. *)
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:l1_contracts.sequencer_admin
+      ~arg:(sf "Pair %S 0x" sc_rollup_address)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  (* Produce L1 blocks to show that only the proxy is progressing *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  (* Sequencer is at genesis, proxy is at [advance]. *)
+  let*@ sequencer_head = Rpc.block_number evm_node in
+  let*@ proxy_head = Rpc.block_number proxy in
+  Check.((sequencer_head = 0l) int32)
+    ~error_msg:"Sequencer should still be at genesis" ;
+  Check.((proxy_head > 0l) int32) ~error_msg:"Proxy should have advanced" ;
+
   unit
 
 let test_persistent_state =
@@ -1130,6 +1207,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   unit
 
 let () =
+  test_remove_sequencer [Alpha] ;
   test_persistent_state [Alpha] ;
   test_publish_blueprints [Alpha] ;
   test_resilient_to_rollup_node_disconnect [Alpha] ;
