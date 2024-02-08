@@ -2965,6 +2965,176 @@ mod test {
     // If runned locally, use:
     // RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
     // with <value> set to 104857600 or something similar in size.
+    // Multiple recursive call and stopping when storage 0 is equal to 1024 (will succeed)
+    #[test]
+    fn multiple_call_all_the_way_to_1024() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let contract_address =
+            H160::from_str("7335dfb20cdcd40881235a54d61cb1152d771f4d").unwrap();
+
+        // This contract calls itself until its storage slot 0 is 1024 (reach the limit of the stack but not reverting calltoodeep)
+        let contract_code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::SLOAD.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::PUSH2.as_u8(),
+            0x04, // 0x0400 = 1024
+            0x00,
+            Opcode::EQ.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x22,
+            Opcode::JUMPI.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x01,
+            Opcode::ADD.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::SSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::ADDRESS.as_u8(),
+            Opcode::GAS.as_u8(),
+            Opcode::CALL.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x22,
+            Opcode::JUMPI.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::REVERT.as_u8(),
+            Opcode::JUMPDEST.as_u8(),
+            Opcode::STOP.as_u8(),
+        ];
+
+        set_account_code(
+            &mut host,
+            &mut evm_account_storage,
+            &contract_address,
+            &contract_code,
+        );
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(contract_address),
+            caller,
+            vec![],
+            // gas limit comes from GeneralStateTests/stRevertTest/LoopCallsDepthThenRevert3.json
+            Some(9214364837600034817),
+            U256::one(),
+            None,
+            false,
+            u64::MAX,
+            false,
+            false,
+        );
+
+        unwrap_outcome!(result, true);
+    }
+
+    // If runned locally, use:
+    // RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
+    // with <value> set to 104857600 or something similar in size.
+    // This test is the same as `multiple_call_all_the_way_to_1024` but instead of stopping
+    // at 1024 we stop at 1025 (this should fail)
+    #[test]
+    fn multiple_call_fails_right_after_1024() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let contract_address =
+            H160::from_str("7335dfb20cdcd40881235a54d61cb1152d771f4d").unwrap();
+
+        // This contract calls itself until its storage slot 0 is 1025 (reach the limit of the stack and revert)
+        let contract_code: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::SLOAD.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::PUSH2.as_u8(),
+            0x04, // 0x0401 = 1025
+            0x01,
+            Opcode::EQ.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x22,
+            Opcode::JUMPI.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x01,
+            Opcode::ADD.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::SSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::DUP1.as_u8(),
+            Opcode::ADDRESS.as_u8(),
+            Opcode::GAS.as_u8(),
+            Opcode::CALL.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x22,
+            Opcode::JUMPI.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::PUSH1.as_u8(),
+            0x00,
+            Opcode::REVERT.as_u8(),
+            Opcode::JUMPDEST.as_u8(),
+            Opcode::STOP.as_u8(),
+        ];
+
+        set_account_code(
+            &mut host,
+            &mut evm_account_storage,
+            &contract_address,
+            &contract_code,
+        );
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(contract_address),
+            caller,
+            vec![],
+            Some(9214364837600034817), // gas limit comes from GeneralStateTests/stRevertTest/LoopCallsDepthThenRevert3.json
+            U256::one(),
+            None,
+            false,
+            u64::MAX,
+            false,
+            false,
+        );
+
+        unwrap_outcome!(result, false);
+    }
+
+    // If runned locally, use:
+    // RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
+    // with <value> set to 104857600 or something similar in size.
     #[test]
     fn call_too_deep_not_revert() {
         let mut host = MockHost::default();
