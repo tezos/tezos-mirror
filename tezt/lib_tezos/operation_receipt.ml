@@ -108,4 +108,33 @@ module Balance_updates = struct
              origin;
            })
          bu
+
+  let to_string t =
+    let staker_to_string = function
+      | Delegate {delegate; contract} ->
+          Format.sprintf
+            "Delegate %s %s"
+            delegate
+            (Option.value ~default:"" contract)
+      | Baker {baker} -> Format.sprintf "Baker %s" baker
+    in
+    let staker_to_string = function
+      | Some staker -> staker_to_string staker
+      | None -> "None"
+    in
+    Format.sprintf
+      "{kind: %s\n\
+       contract: %s\n\
+       change: %d\n\
+       staker: %s\n\
+       category: %s\n\
+       delayed_operation_hash: %s\n\
+       origin: %s}"
+      t.kind
+      (Option.value ~default:"None" t.contract)
+      t.change
+      (staker_to_string t.staker)
+      (Option.value ~default:"None" t.category)
+      (Option.value ~default:"None" t.delayed_operation_hash)
+      t.origin
 end

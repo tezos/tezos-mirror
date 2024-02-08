@@ -398,12 +398,11 @@ let bake_n ~endpoint ~protocol client i =
         client
         ~ai_vote:On)
 
-let check_balance_updates balance_updates predicates =
-  List.iter
-    (fun (pred, msg) ->
-      if not (List.exists pred balance_updates) then
-        Test.fail "Inconsistant balance update: %s" msg)
-    predicates
+type bu_check = {
+  pred : Operation_receipt.Balance_updates.t -> bool;
+  change : int;
+  msg : string;
+}
 
 (* some values might be slightly different (+-1 mutez) because of roundings and
    randomness in baking rights that may affect the overall rewards coming from
@@ -411,6 +410,30 @@ let check_balance_updates balance_updates predicates =
    values *)
 let check_with_roundings got expected =
   got >= expected - 1 && got <= expected + 1
+
+let check_balance_updates balance_updates (predicates : bu_check list) =
+  List.iter
+    (fun {pred; change; msg} ->
+      let pre_filtered = List.filter pred balance_updates in
+      if pre_filtered = [] then Test.fail "Inconsistant balance update: %s" msg
+      else if
+        not
+          (List.exists
+             (fun x ->
+               check_with_roundings
+                 x.Operation_receipt.Balance_updates.change
+                 change)
+             pre_filtered)
+      then
+        Test.fail
+          "Inconsistant balance update: %s, could it be a regression, got:  %s"
+          msg
+          (List.fold_left
+             (fun acc x ->
+               acc ^ "\n" ^ Operation_receipt.Balance_updates.to_string x)
+             ""
+             pre_filtered))
+    predicates
 
 let check_balance_updates_for operation_hash predicates client =
   let* receipt = Operation_receipt.get_result_for operation_hash client in
@@ -585,11 +608,11 @@ let test_staking =
     check_balance_updates_for
       operation_hash
       [
-        ( (fun opr ->
-            opr.kind = "freezer" && opr.change = 600000000
-            && opr.staker
-               = Some (Baker {baker = Constant.bootstrap2.public_key_hash})),
-          " Frozen balance deposit of 600tez" );
+        {
+          pred = (fun opr -> opr.kind = "freezer");
+          change = 600000000;
+          msg = "Frozen balance deposit of 600tez";
+        };
       ]
       client_1
   in
@@ -603,25 +626,31 @@ let test_staking =
     check_balance_updates_for
       operation_hash
       [
-        ( (fun opr ->
-            opr.kind = "freezer"
-            && opr.category = Some "deposits"
-            && opr.change = -200000000
-            && opr.staker
-               = Some (Baker {baker = Constant.bootstrap2.public_key_hash})),
-          "Frozen deposits decreased by 200tez" );
-        ( (fun opr ->
-            opr.kind = "freezer"
-            && opr.category = Some "unstaked_deposits"
-            && opr.change = 200000000
-            && opr.staker
-               = Some
-                   (Delegate
-                      {
-                        delegate = Constant.bootstrap2.public_key_hash;
-                        contract = Some Constant.bootstrap2.public_key_hash;
-                      })),
-          "Unstaked frozen increased by 200tez" );
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "freezer"
+              && opr.category = Some "deposits"
+              && opr.staker
+                 = Some (Baker {baker = Constant.bootstrap2.public_key_hash}));
+          change = -200000000;
+          msg = "Frozen deposits decreased by 200tez";
+        };
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "freezer"
+              && opr.category = Some "unstaked_deposits"
+              && opr.staker
+                 = Some
+                     (Delegate
+                        {
+                          delegate = Constant.bootstrap2.public_key_hash;
+                          contract = Some Constant.bootstrap2.public_key_hash;
+                        }));
+          change = 200000000;
+          msg = "Unstaked frozen increased by 200tez";
+        };
       ]
       client_1
   in
@@ -657,23 +686,30 @@ let test_staking =
     check_balance_updates_for
       operation_hash
       [
-        ( (fun opr ->
-            opr.kind = "freezer"
-            && opr.category = Some "unstaked_deposits"
-            && opr.change = -200000000
-            && opr.staker
-               = Some
-                   (Delegate
-                      {
-                        delegate = Constant.bootstrap2.public_key_hash;
-                        contract = Some Constant.bootstrap2.public_key_hash;
-                      })),
-          "Pending unstaked deposit decreased by 200tez" );
-        ( (fun opr ->
-            opr.kind = "freezer" && opr.change = 400000000
-            && opr.staker
-               = Some (Baker {baker = Constant.bootstrap2.public_key_hash})),
-          " Frozen balance deposit of 400tez" );
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "freezer"
+              && opr.category = Some "unstaked_deposits"
+              && opr.staker
+                 = Some
+                     (Delegate
+                        {
+                          delegate = Constant.bootstrap2.public_key_hash;
+                          contract = Some Constant.bootstrap2.public_key_hash;
+                        }));
+          change = -200000000;
+          msg = "Pending unstaked deposit decreased by 200tez";
+        };
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "freezer"
+              && opr.staker
+                 = Some (Baker {baker = Constant.bootstrap2.public_key_hash}));
+          change = 400000000;
+          msg = " Frozen balance deposit of 400tez";
+        };
       ]
       client_1
   in
@@ -818,58 +854,87 @@ let test_staking =
         check_balance_updates
           bu
           [
-            ( (fun opr ->
-                opr.kind = "minted"
-                && opr.category = Some "baking rewards"
-                && opr.change = -amount_baker_share),
-              "Minting baker share" );
-            ( (fun opr ->
-                opr.kind = "freezer"
-                && opr.category = Some "deposits"
-                && opr.change = amount_baker_share
-                && opr.staker
-                   = Some (Baker {baker = Constant.bootstrap2.public_key_hash})),
-              "Baker's frozen deposits increased by baker share" );
-            ( (fun opr ->
-                opr.kind = "minted"
-                && opr.category = Some "baking rewards"
-                && opr.change = -amount_delegation),
-              "Minting from staking rights" );
-            ( (fun opr ->
-                opr.kind = "contract"
-                && opr.contract = Some Constant.bootstrap2.public_key_hash
-                && opr.change = amount_delegation),
-              "Delegate's spendable balance increased" );
-            ( (fun opr ->
-                opr.kind = "minted"
-                && opr.category = Some "baking rewards"
-                && opr.change = -amount_edge),
-              "Baker's edge on staker rewards" );
-            ( (fun opr ->
-                opr.kind = "freezer"
-                && opr.category = Some "deposits"
-                && opr.change = amount_edge
-                && opr.staker
-                   = Some (Baker {baker = Constant.bootstrap2.public_key_hash})),
-              "Baker's frozen deposits increased by its edge on staker rewards"
-            );
-            ( (fun opr ->
-                opr.kind = "minted"
-                && opr.category = Some "baking rewards"
-                && opr.change = -amount_stakers),
-              "Minting staker rewards" );
-            ( (fun opr ->
-                opr.kind = "freezer"
-                && opr.category = Some "deposits"
-                && opr.change = amount_stakers
-                && opr.staker
-                   = Some
-                       (Delegate
-                          {
-                            delegate = Constant.bootstrap2.public_key_hash;
-                            contract = None;
-                          })),
-              "Delegates frozen deposits increased by staker rewards" );
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "minted" && opr.category = Some "baking rewards");
+              change = -amount_baker_share;
+              msg = "Minting baker share";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "freezer"
+                  && opr.category = Some "deposits"
+                  && opr.staker
+                     = Some
+                         (Baker {baker = Constant.bootstrap2.public_key_hash}));
+              change = amount_baker_share;
+              msg = "Baker's frozen deposits increased by baker share";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "minted"
+                  && opr.category = Some "baking rewards"
+                  && opr.change = -amount_delegation);
+              change = -amount_delegation;
+              msg = "Minting from staking rights";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "contract"
+                  && opr.contract = Some Constant.bootstrap2.public_key_hash);
+              change = amount_delegation;
+              msg = "Delegate's spendable balance increased";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "minted"
+                  && opr.category = Some "baking rewards"
+                  && opr.change = -amount_edge);
+              change = -amount_edge;
+              msg = "Baker's edge on staker rewards";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "freezer"
+                  && opr.category = Some "deposits"
+                  && opr.staker
+                     = Some
+                         (Baker {baker = Constant.bootstrap2.public_key_hash}));
+              change = amount_edge;
+              msg =
+                "Baker's frozen deposits increased by its edge on staker \
+                 rewards";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "minted"
+                  && opr.category = Some "baking rewards"
+                  && opr.change = -amount_stakers);
+              change = -amount_stakers;
+              msg = "Minting staker rewards";
+            };
+            {
+              pred =
+                (fun opr ->
+                  opr.kind = "freezer"
+                  && opr.category = Some "deposits"
+                  && opr.staker
+                     = Some
+                         (Delegate
+                            {
+                              delegate = Constant.bootstrap2.public_key_hash;
+                              contract = None;
+                            }));
+              change = amount_stakers;
+              msg = "Delegates frozen deposits increased by staker rewards";
+            };
           ] ;
 
         Lwt.return_unit)
@@ -1046,100 +1111,114 @@ let test_staking =
      + amount_rewarded_from_baker_deposits)
       total_amount_rewarded) ;
 
-  let check_opr ~kind ~category ~change ~staker ~delayed_operation_hash opr =
+  assert (
+    check_with_roundings
+      (amount_slashed_from_unstake_stakers_deposits
+     + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits
+      )
+      total_amount_slashed) ;
+
+  let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
     let open Operation_receipt.Balance_updates in
-    opr.kind = kind && opr.category = category
-    && check_with_roundings opr.change change
-    && opr.staker = staker
-    &&
-    match delayed_operation_hash with
-    | None -> true
-    | Some oph -> opr.delayed_operation_hash = Some oph
+    {
+      pred =
+        (fun opr ->
+          opr.kind = kind && opr.category = category && opr.staker = staker
+          &&
+          match delayed_operation_hash with
+          | None -> true
+          | Some oph -> opr.delayed_operation_hash = Some oph);
+      change;
+      msg;
+    }
   in
 
   check_balance_updates
     bu
     [
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "deposits")
-          ~change:(-amount_slashed_from_baker_deposits)
-          ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
-          ~delayed_operation_hash:None,
-        "Slashed from baker deposits" );
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "deposits")
-          ~change:(-amount_slashed_from_stakers_deposits)
-          ~staker:
-            (Some
-               (Delegate
-                  {
-                    delegate = Constant.bootstrap2.public_key_hash;
-                    contract = None;
-                  }))
-          ~delayed_operation_hash:None,
-        "Slashed from stakers deposits" );
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "unstaked_deposits")
-          ~change:(-amount_slashed_from_unstake_stakers_deposits)
-          ~staker:
-            (Some
-               (Delegate
-                  {
-                    delegate = Constant.bootstrap2.public_key_hash;
-                    contract = None;
-                  }))
-          ~delayed_operation_hash:(Some denunciation_oph),
-        "Slashed from unstake deposits" );
-      ( check_opr
-          ~kind:"burned"
-          ~category:(Some "punishments")
-          ~change:total_amount_slashed
-          ~staker:None
-          ~delayed_operation_hash:None,
-        "Punishment for double baking" );
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "deposits")
-          ~change:(-amount_rewarded_from_baker_deposits)
-          ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
-          ~delayed_operation_hash:(Some denunciation_oph),
-        "Reward from delegate's deposits" );
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "deposits")
-          ~change:(-amount_rewarded_from_stakers_deposits)
-          ~staker:
-            (Some
-               (Delegate
-                  {
-                    delegate = Constant.bootstrap2.public_key_hash;
-                    contract = None;
-                  }))
-          ~delayed_operation_hash:(Some denunciation_oph),
-        "Reward from stakers deposits" );
-      ( check_opr
-          ~kind:"freezer"
-          ~category:(Some "unstaked_deposits")
-          ~change:(-amount_rewarded_from_unstake_stakers_deposits)
-          ~staker:
-            (Some
-               (Delegate
-                  {
-                    delegate = Constant.bootstrap2.public_key_hash;
-                    contract = None;
-                  }))
-          ~delayed_operation_hash:(Some denunciation_oph),
-        "Reward from unstake deposits" );
-      ( (fun opr ->
-          opr.kind = "contract"
-          && opr.change = total_amount_rewarded
-          && opr.origin = "delayed_operation"
-          && opr.contract = Some Constant.bootstrap1.public_key_hash
-          && opr.delayed_operation_hash = Some denunciation_oph),
-        "Reward for denunciator" );
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "unstaked_deposits")
+        ~change:(-amount_slashed_from_unstake_stakers_deposits)
+        ~staker:
+          (Some
+             (Delegate
+                {
+                  delegate = Constant.bootstrap2.public_key_hash;
+                  contract = None;
+                }))
+        ~delayed_operation_hash:(Some denunciation_oph)
+        ~msg:"Slashed from unstake(+baker) deposits";
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "deposits")
+        ~change:(-amount_slashed_from_baker_deposits)
+        ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
+        ~msg:"Slashed from baker deposits"
+        ~delayed_operation_hash:None;
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "deposits")
+        ~change:(-amount_slashed_from_stakers_deposits)
+        ~staker:
+          (Some
+             (Delegate
+                {
+                  delegate = Constant.bootstrap2.public_key_hash;
+                  contract = None;
+                }))
+        ~delayed_operation_hash:None
+        ~msg:"Slashed from stakers deposits";
+      check_opr
+        ~kind:"burned"
+        ~category:(Some "punishments")
+        ~change:total_amount_slashed
+        ~staker:None
+        ~delayed_operation_hash:None
+        ~msg:"Punishment for double baking";
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "unstaked_deposits")
+        ~change:(-amount_rewarded_from_unstake_stakers_deposits)
+        ~staker:
+          (Some
+             (Delegate
+                {
+                  delegate = Constant.bootstrap2.public_key_hash;
+                  contract = None;
+                }))
+        ~delayed_operation_hash:(Some denunciation_oph)
+        ~msg:"Reward from unstake stakers(+baker) deposits";
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "deposits")
+        ~change:(-amount_rewarded_from_baker_deposits)
+        ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
+        ~delayed_operation_hash:(Some denunciation_oph)
+        ~msg:"Reward from baker deposits";
+      check_opr
+        ~kind:"freezer"
+        ~category:(Some "deposits")
+        ~change:(-amount_rewarded_from_stakers_deposits)
+        ~staker:
+          (Some
+             (Delegate
+                {
+                  delegate = Constant.bootstrap2.public_key_hash;
+                  contract = None;
+                }))
+        ~delayed_operation_hash:(Some denunciation_oph)
+        ~msg:"Reward from stakers deposits";
+      {
+        pred =
+          (fun opr ->
+            opr.kind = "contract"
+            && opr.origin = "delayed_operation"
+            && opr.contract = Some Constant.bootstrap1.public_key_hash
+            && opr.delayed_operation_hash = Some denunciation_oph);
+        msg = "Reward for denunciator";
+        change = total_amount_rewarded;
+      };
     ] ;
 
   log_step 21 "Test finalize_unstake" ;
@@ -1191,24 +1270,31 @@ let test_staking =
     check_balance_updates_for
       finalise_unstake_hash
       [
-        ( check_opr
-            ~kind:"freezer"
-            ~category:(Some "unstaked_deposits")
-            ~change:(-unstaked_finalizable_balance)
-            ~staker:
-              (Some
-                 (Delegate
-                    {
-                      delegate = Constant.bootstrap2.public_key_hash;
-                      contract = Some staker0.public_key_hash;
-                    }))
-            ~delayed_operation_hash:None,
-          "Retrieved from staker0 unstaked_deposits" );
-        ( (fun opr ->
-            opr.kind = "contract"
-            && check_with_roundings opr.change unstaked_finalizable_balance
-            && opr.contract = Some staker0.public_key_hash),
-          "Added to staker0 spendable balance" );
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "freezer"
+              && opr.category = Some "unstaked_deposits"
+              && opr.staker
+                 = Some
+                     (Delegate
+                        {
+                          delegate = Constant.bootstrap2.public_key_hash;
+                          contract = Some staker0.public_key_hash;
+                        })
+              && opr.delayed_operation_hash = None);
+          change = -unstaked_finalizable_balance;
+          msg = "Retrieved from staker0 unstaked_deposits";
+        };
+        {
+          pred =
+            (fun opr ->
+              opr.kind = "contract"
+              && opr.contract = Some staker0.public_key_hash
+              && check_with_roundings opr.change unstaked_finalizable_balance);
+          change = unstaked_finalizable_balance;
+          msg = "Added to staker0 spendable balance";
+        };
       ]
       client_1
   in
