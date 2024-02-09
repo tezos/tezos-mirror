@@ -261,7 +261,7 @@ module Inner = struct
        polynomial. *)
     remaining_bytes : int;
     (* These srs_g2_* parameters are used by the verifier to check the proofs *)
-    srs_g2 : Srs.srs_verifier;
+    srs_verifier : Srs.srs_verifier;
     mode : [`Verifier | `Prover];
     (* Kate amortized public parameters for proving and verifying ;
        contain, among others, SRS₁ *)
@@ -360,7 +360,7 @@ module Inner = struct
           ~redundancy_factor
           ~number_of_shards
       in
-      let srs_g2 =
+      let srs_verifier =
         (if test then Srs.Internal_for_tests.get_verifier_srs2
         else Srs.get_verifier_srs2)
           ~max_polynomial_length
@@ -389,7 +389,7 @@ module Inner = struct
           page_length;
           page_length_domain;
           remaining_bytes = page_size mod Parameters_check.scalar_bytes_amount;
-          srs_g2;
+          srs_verifier;
           mode;
           kate_amortized;
           degree_check;
@@ -891,7 +891,7 @@ module Inner = struct
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
-    Degree_check.verify t.srs_g2.commitment cm proof
+    Degree_check.verify t.srs_verifier.commitment cm proof
 
   let save_precompute_shards_proofs precomputation ~filename =
     protect (fun () ->
@@ -977,7 +977,7 @@ module Inner = struct
           Domain.get t.domain_erasure_encoded_polynomial_length shard_index
         in
         let domain = Domain.build t.shard_length in
-        let srs_point = t.srs_g2.shards in
+        let srs_point = t.srs_verifier.shards in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1043,7 +1043,7 @@ module Inner = struct
               | _ -> Scalar.(copy zero))
         in
         let root = Domain.get t.domain_polynomial_length page_index in
-        let srs_point = t.srs_g2.pages in
+        let srs_point = t.srs_verifier.pages in
         if
           Kate_amortized.verify
             t.kate_amortized
