@@ -353,7 +353,7 @@ fn read_and_dispatch_input<Host: Runtime>(
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: TezosContracts,
+    tezos_contracts: &TezosContracts,
     delayed_bridge: Option<ContractKt1Hash>,
     sequencer: Option<PublicKey>,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
@@ -370,7 +370,7 @@ pub fn read_inbox<Host: Runtime>(
         match read_and_dispatch_input(
             host,
             smart_rollup_address,
-            &tezos_contracts,
+            tezos_contracts,
             &delayed_bridge,
             &sequencer,
             &mut inbox_is_empty,
@@ -529,7 +529,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -559,7 +559,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -609,7 +609,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             [0; 20],
-            TezosContracts {
+            &TezosContracts {
                 ticketer: None,
                 admin: Some(sender),
                 sequencer_admin: None,
@@ -659,7 +659,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -708,7 +708,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -746,7 +746,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -800,7 +800,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -821,7 +821,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -882,7 +882,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -906,7 +906,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -917,7 +917,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )

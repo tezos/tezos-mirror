@@ -1,6 +1,9 @@
 use crate::{
     delayed_inbox::DelayedInbox,
-    storage::{read_delayed_transaction_bridge, sequencer},
+    storage::{
+        read_admin, read_delayed_transaction_bridge, read_sequencer_admin, read_ticketer,
+        sequencer,
+    },
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -16,13 +19,32 @@ pub enum ConfigurationMode {
     },
 }
 
+impl std::fmt::Display for ConfigurationMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigurationMode::Proxy => write!(f, "Proxy"),
+            ConfigurationMode::Sequencer {
+                delayed_bridge,
+                delayed_inbox: _, // Ignoring delayed_inbox
+                sequencer,
+            } => write!(
+                f,
+                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
+                delayed_bridge, sequencer
+            ),
+        }
+    }
+}
+
 pub struct Configuration {
+    pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
 }
 
 impl Default for Configuration {
     fn default() -> Self {
         Self {
+            tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
         }
     }
@@ -30,23 +52,11 @@ impl Default for Configuration {
 
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self {
-                mode: ConfigurationMode::Proxy,
-            } => write!(f, "Proxy"),
-            Self {
-                mode:
-                    ConfigurationMode::Sequencer {
-                        delayed_bridge,
-                        delayed_inbox: _, // Ignoring delayed_inbox
-                        sequencer,
-                    },
-            } => write!(
-                f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
-                delayed_bridge, sequencer
-            ),
-        }
+        write!(
+            f,
+            "Tezos Contracts: {}, Mode: {}",
+            &self.tezos_contracts, &self.mode
+        )
     }
 }
 
@@ -82,7 +92,27 @@ impl TezosContracts {
     }
 }
 
+fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
+    // 1. Fetch the kernel's ticketer, returns `None` if it is badly
+    //    encoded or absent.
+    let ticketer = read_ticketer(host);
+    // 2. Fetch the kernel's administrator, returns `None` if it is badly
+    //    encoded or absent.
+    let admin = read_admin(host);
+    // 3. Fetch the sequencer administrator, returns `None` if it is badly
+    //    encoded or absent.
+    let sequencer_admin = read_sequencer_admin(host);
+
+    TezosContracts {
+        ticketer,
+        admin,
+        sequencer_admin,
+    }
+}
+
 pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
+    let tezos_contracts = fetch_tezos_contracts(host);
+
     let sequencer = sequencer(host).unwrap_or_default();
     match sequencer {
         Some(sequencer) => {
@@ -97,6 +127,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                 });
             match DelayedInbox::new(host) {
                 Ok(delayed_inbox) => Configuration {
+                    tezos_contracts,
                     mode: ConfigurationMode::Sequencer {
                         delayed_bridge,
                         delayed_inbox: Box::new(delayed_inbox),
@@ -109,6 +140,9 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                 }
             }
         }
-        None => Configuration::default(),
+        None => Configuration {
+            tezos_contracts,
+            mode: ConfigurationMode::Proxy,
+        },
     }
 }

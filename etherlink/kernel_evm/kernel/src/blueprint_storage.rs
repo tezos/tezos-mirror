@@ -341,6 +341,7 @@ pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 mod tests {
 
     use super::*;
+    use crate::configuration::TezosContracts;
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
     use crate::Timestamp;
@@ -364,6 +365,7 @@ mod tests {
         )
         .unwrap();
         let mut config = Configuration {
+            tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Sequencer {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
