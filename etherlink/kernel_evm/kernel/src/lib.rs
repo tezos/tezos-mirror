@@ -66,7 +66,9 @@ pub const CHAIN_ID: u32 = 1337;
 pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// Default base fee (flat), applied to every transaction. Set to 0.005 tez.
-pub const FLAT_FEE: u64 = 5 * 10_u64.pow(15);
+///
+/// Disabled: set to zero
+pub const FLAT_FEE: u64 = 0;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::shanghai();
