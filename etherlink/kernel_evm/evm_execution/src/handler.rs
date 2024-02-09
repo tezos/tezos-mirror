@@ -911,14 +911,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
 
-        // TODO: Keep address as warm when creation fails
-        // issue: https://gitlab.com/tezos/tezos/-/issues/6898
-        if self.mark_address_as_hot(address).is_err() {
-            return Err(EthereumError::InconsistentState(Cow::from(
-                "Failed to mark callee address as hot",
-            )));
-        }
-
         let context = Context {
             address,
             caller,
@@ -1108,6 +1100,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let default_create_scheme = CreateScheme::Legacy { caller };
 
         let address = self.create_address(default_create_scheme);
+
+        if self.mark_address_as_hot(address).is_err() {
+            return Err(EthereumError::InconsistentState(Cow::from(
+                "Failed to mark callee address as hot",
+            )));
+        }
+
         let result =
             self.execute_create(caller, value.unwrap_or_default(), input, address);
 
@@ -1985,6 +1984,19 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
                 let contract_address = self.create_address(scheme);
+
+                // This `mark_address_as_hot` must be before the `begin_inter_transaction`
+                // so the address will still be hot even if the creation fails
+                if self.mark_address_as_hot(contract_address).is_err() {
+                    let err = EthereumError::InconsistentState(Cow::from(
+                        "Failed to mark callee address as hot",
+                    ));
+                    return Capture::Exit((
+                        ethereum_error_to_exit_reason(&err),
+                        None,
+                        vec![],
+                    ));
+                }
 
                 // The nonce of the caller is incremented before the internal tx
                 // Even if the internal transaction rollback the nonce will not
