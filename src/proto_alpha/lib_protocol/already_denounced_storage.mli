@@ -35,21 +35,25 @@ val already_denounced :
 
 (** Records a denunciation in {!Storage.Already_denounced}.
 
+    Returns a pair [(ctxt, already_denounced)], where
+    [already_denounced] is a boolean indicating whether the
+    denunciation was already recorded in the storage previously.
+
+    When [already_denounced] is [true], the returned [ctxt] is
+    actually the unchanged context argument.
+
     Precondition: the given level should be more recent than
     [current_cycle - max_slashing_period] in order to maintain the
     invariant on the age of tracked denunciations. Fortunately, this
     is already enforced in {!Validate} by
-    [Anonymous.check_denunciation_age].
-
-    @raise [Assert_failure] if the same denunciation is already
-    present in {!Storage.Already_denounced}. *)
+    [Anonymous.check_denunciation_age]. *)
 val add_denunciation :
   Raw_context.t ->
   Signature.public_key_hash ->
   Level_repr.t ->
   Round_repr.t ->
   Misbehaviour_repr.kind ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * bool) tzresult Lwt.t
 
 (** Clear {!Storage.Already_denounced} for the cycle [new_cycle -
     max_slashing_period]. Indeed, denunciations on events which

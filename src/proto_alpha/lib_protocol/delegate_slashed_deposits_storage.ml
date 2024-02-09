@@ -51,18 +51,10 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-let punish_double_signing ctxt ~operation_hash
+let record_denunciation ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  let* ctxt =
-    Already_denounced_storage.add_denunciation
-      ctxt
-      delegate
-      level
-      misbehaviour.round
-      misbehaviour.kind
-  in
   (* Placeholder value *)
   let* ctxt, slashing_percentage =
     Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
@@ -98,6 +90,51 @@ let punish_double_signing ctxt ~operation_hash
         misbehaviour
   in
   return ctxt
+
+let punish_double_signing ctxt ~operation_hash misbehaviour delegate
+    (level : Level_repr.t) ~rewarded =
+  let open Lwt_result_syntax in
+  let* ctxt, was_already_denounced =
+    Already_denounced_storage.add_denunciation
+      ctxt
+      delegate
+      level
+      misbehaviour.Misbehaviour_repr.round
+      misbehaviour.kind
+  in
+  if was_already_denounced then
+    (* This can only happen in the very specific case where a delegate
+       has crafted at least three attestations (respectively
+       preattestations) on the same level and round but with three
+       different slots owned by this delegate. Indeed, this makes it
+       possible to have two denunciations about the same delegate,
+       level, round, and kind, but different slots. Such denunciations
+       are considered identical by {!Already_denounced_storage}, which
+       is good because the delegate shouldn't get slashed twice on the
+       same level, round, and kind. However, {!Validate}'s conflict
+       handler identifies denunciations via their slot rather than
+       delegate for technical reasons (because the slot is readily
+       available whereas retrieving the delegate requires a call to
+       {!Delegate_sampler.slot_owner} which is in Lwt and thus
+       incompatible with some signatures). Therefore, if these
+       denunciations (which differ only in their slots) are both
+       included in the same block, then they will both be successfully
+       validated, and then [was_already_denounced] will be [true]
+       during the application of the second one.
+
+       In this unlikely scenario, we simply ignore the redundant
+       denunciation silently. Returning an error or raising an
+       exception here would cause the whole block application to fail,
+       which we don't want. *)
+    return ctxt
+  else
+    record_denunciation
+      ctxt
+      ~operation_hash
+      misbehaviour
+      delegate
+      level
+      ~rewarded
 
 (* Misbehaviour Map: orders denunciations for application.
    See {!Misbehaviour_repr.compare} for the order on misbehaviours:
