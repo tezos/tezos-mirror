@@ -63,6 +63,8 @@ let injector_operation_to_manager :
       Manager
         (Sc_rollup_execute_outbox_message
            {rollup; cemented_commitment; output_proof})
+  | Publish_dal_commitment _ ->
+      Stdlib.failwith "Publish_dal_commitment will be supported in Alpha"
 
 let injector_operation_of_manager :
     type kind.

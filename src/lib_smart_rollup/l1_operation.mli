@@ -41,6 +41,11 @@ type t =
       cemented_commitment : Commitment.Hash.t;
       output_proof : string;
     }
+  | Publish_dal_commitment of {
+      slot_index : Dal.Slot_index.t;
+      commitment : Dal.Commitment.t;
+      commitment_proof : Dal.Commitment_proof.t;
+    }
 
 val encoding : t Data_encoding.t
 
