@@ -67,6 +67,8 @@ Adaptive Issuance (ongoing)
   double bake/attest, by giving them some time to fix it. (MR
   :gl:`!11704`)
 
+- Activating adaptive issuance per-block vote (MR !11935)
+
 Gas improvements
 ----------------
 
