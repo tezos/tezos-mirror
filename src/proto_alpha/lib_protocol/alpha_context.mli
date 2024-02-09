@@ -2841,7 +2841,7 @@ module Dal : sig
     val finalize_current_slot_headers : context -> context Lwt.t
 
     val finalize_pending_slot_headers :
-      context -> (context * Attestation.t) tzresult Lwt.t
+      context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
   end
 
   module Operations : sig
@@ -2886,11 +2886,17 @@ module Dal : sig
       Bounded_history_repr.S with type key = hash and type value = t
 
     val add_confirmed_slot_headers_no_cache :
-      t -> Slot.Header.t list -> t tzresult
+      t ->
+      Raw_level.t ->
+      number_of_slots:int ->
+      Slot.Header.t list ->
+      t tzresult
 
     val add_confirmed_slot_headers :
       t ->
       History_cache.t ->
+      Raw_level.t ->
+      number_of_slots:int ->
       Slot.Header.t list ->
       (t * History_cache.t) tzresult
 

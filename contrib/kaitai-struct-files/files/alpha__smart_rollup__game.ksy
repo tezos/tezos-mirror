@@ -13,6 +13,14 @@ types:
       if: (state_tag == bool::true)
     - id: tick
       type: n
+  attested:
+    seq:
+    - id: level
+      type: s4
+    - id: index
+      type: u1
+    - id: commitment
+      size: 48
   back_pointers:
     seq:
     - id: back_pointers_entries
@@ -57,20 +65,26 @@ types:
       type: s4
   content_0:
     seq:
-    - id: level
-      type: s4
-    - id: index
+    - id: content_tag
       type: u1
-    - id: commitment
-      size: 48
+      enum: content_tag
+    - id: unattested
+      type: unattested
+      if: (content_tag == content_tag::unattested)
+    - id: attested
+      type: attested
+      if: (content_tag == content_tag::attested)
   dal_snapshot:
     seq:
-    - id: index
-      type: n
-    - id: content
-      type: content_0
-    - id: back_pointers
-      type: back_pointers_2
+    - id: dal_snapshot_tag
+      type: u1
+      enum: dal_snapshot_tag
+    - id: dal_skip_list_legacy
+      size: 57
+      if: (dal_snapshot_tag == dal_snapshot_tag::dal_skip_list_legacy)
+    - id: dal_skip_list
+      type: skip_list
+      if: (dal_snapshot_tag == dal_snapshot_tag::dal_skip_list)
   dissecting:
     seq:
     - id: dissection
@@ -148,10 +162,30 @@ types:
       if: (state_tag == bool::true)
     - id: tick
       type: n
+  skip_list:
+    seq:
+    - id: index
+      type: n
+    - id: content
+      type: content_0
+    - id: back_pointers
+      type: back_pointers_2
+  unattested:
+    seq:
+    - id: level
+      type: s4
+    - id: index
+      type: u1
 enums:
   bool:
     0: false
     255: true
+  content_tag:
+    0: unattested
+    1: attested
+  dal_snapshot_tag:
+    0: dal_skip_list_legacy
+    1: dal_skip_list
   game_state_tag:
     0: dissecting
     1: final_move

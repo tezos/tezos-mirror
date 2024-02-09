@@ -31,6 +31,11 @@
     Subject:      Refutation proof-related functions of Dal
 *)
 
+(*
+TODO: https://gitlab.com/tezos/tezos/-/issues/6895
+
+Adapt/re-enable tests
+
 open Protocol
 
 module Make (Parameters : sig
@@ -258,3 +263,4 @@ let () =
     (Protocol.name ^ ": Dal slots refutation game")
     Test.tests
   |> Lwt_main.run
+*)

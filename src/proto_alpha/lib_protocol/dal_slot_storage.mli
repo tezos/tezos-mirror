@@ -58,13 +58,15 @@ val find_slot_headers :
    context.  *)
 val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 
-(** [finalize_pending_slot_headers ctxt] finalizes pending slot headers which
-    are old enough (i.e. registered at level [current_level -
+(** [finalize_pending_slot_headers ctxt ~number_of_slots] finalizes pending slot
+    headers which are old enough (i.e. registered at level [current_level -
     attestation_lag]). All slots marked as available are returned. All the
     pending slots at [current_level - attestation_lag] level are removed from
     the context. *)
 val finalize_pending_slot_headers :
-  Raw_context.t -> (Raw_context.t * Dal_attestation_repr.t) tzresult Lwt.t
+  Raw_context.t ->
+  number_of_slots:int ->
+  (Raw_context.t * Dal_attestation_repr.t) tzresult Lwt.t
 
 (** [get_slot_headers_history ctxt] returns the current value of slots_history stored
    in [ctxt], or Slots_history.genesis if no value is stored yet. *)

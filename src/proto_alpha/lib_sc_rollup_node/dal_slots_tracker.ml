@@ -312,10 +312,18 @@ module Confirmed_slots_history = struct
     let* pred = Node_context.get_predecessor node_ctxt head in
     let* slots_history = slots_history_of_hash node_ctxt pred in
     let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
+    let* level =
+      Node_context.level_of_hash
+        node_ctxt
+        confirmation_info.published_block_hash
+    in
+    let*? level = Raw_level.of_int32 level |> Environment.wrap_tzresult in
     let*? slots_history, slots_cache =
       Dal.Slots_history.add_confirmed_slot_headers
+        ~number_of_slots:constants.dal.number_of_slots
         slots_history
         slots_cache
+        level
         slots_to_save
       |> Environment.wrap_tzresult
     in

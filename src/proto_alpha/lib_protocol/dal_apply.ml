@@ -190,7 +190,10 @@ let finalisation ctxt =
          - disallow proofs involving pages of slots that have been confirmed at the
            level where the game started.
       *)
-      let+ ctxt, attestation = Dal.Slot.finalize_pending_slot_headers ctxt in
+      let number_of_slots = (Constants.parametric ctxt).dal.number_of_slots in
+      let+ ctxt, attestation =
+        Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
+      in
       (ctxt, Some attestation))
 
 let compute_committee ctxt level =
