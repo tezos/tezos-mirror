@@ -1,12 +1,44 @@
-include: .gitlab/ci/jobs/build/common.yml
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
 
 oc.docker:amd64:
-  extends:
-    - .oc.build_docker_release_template
-    - .rules__octez_docker_changes_or_master
-    - .tags_template__build
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
   stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_COMMIT_BRANCH == "master"
+    when: always
+  - changes:
+    - scripts/**/*
+    - script-inputs/**/*
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - opam
+    - Makefile
+    - kernels.mk
+    - build.Dockerfile
+    - Dockerfile
+    - .gitlab/**/*
+    - .gitlab-ci.yml
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
   variables:
-    IMAGE_ARCH_PREFIX: "amd64_"
+    DOCKER_VERSION: 24.0.6
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
     CI_DOCKER_HUB: "true"
-    EXECUTABLE_FILES: "script-inputs/released-executables"
+    EXECUTABLE_FILES: script-inputs/released-executables

@@ -45,7 +45,7 @@ module Stages = struct
 
   let _publish_package_gitlab = Stage.register "publish_package_gitlab"
 
-  let _manual = Stage.register "manual"
+  let manual = Stage.register "manual"
 end
 
 (* Get the [build_deps_image_version] from the environment, which is
@@ -264,13 +264,17 @@ let trigger =
     - Sets the appropriate image.
     - Activates the Docker daemon as a service.
     - It sets up authentification with docker registries *)
-let job_docker_authenticated ?(skip_docker_initialization = false) ?variables
-    ?rules ?dependencies ?artifacts ~stage ~name script : job =
+let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
+    ?variables ?rules ?dependencies ?arch ?when_ ?allow_failure ~stage ~name
+    script : job =
   let docker_version = "24.0.6" in
   job
     ?rules
     ?dependencies
     ?artifacts
+    ?arch
+    ?when_
+    ?allow_failure
     ~image:Images.docker
     ~variables:
       ([("DOCKER_VERSION", docker_version)] @ Option.value ~default:[] variables)
@@ -413,6 +417,176 @@ let _job_docker_rust_toolchain_master =
 
 let _job_docker_rust_toolchain_other =
   job_external ~filename_suffix:"other" @@ job_docker_rust_toolchain ()
+
+(** Type of Docker build jobs.
+
+    The semantics of the type is summed up in this table:
+
+    |                       | Release    | Experimental | Test   | Test_manual |
+    |-----------------------+------------+--------------+--------+-------------|
+    | Image registry        | Docker hub | Docker hub   | GitLab | GitLab      |
+    | Experimental binaries | no         | yes          | yes    | yes         |
+    | EVM Kernels           | no         | On amd64     | no     | On amd64    |
+    | Manual job            | no         | no           | no     | yes         |
+
+    - [Release] Docker builds include only released executables whereas other
+      types also includes experimental ones.
+    - [Test_manual] and [Experimental] Docker builds include the EVM kernels in
+      amd64 builds.
+    - [Release] and [Experimental] Docker builds are pushed to Docker hub,
+      whereas other types are pushed to the GitLab registry.
+    - [Test_manual] Docker builds are triggered manually, put in the stage
+      [manual] and their failure is allowed. The other types are in the build
+      stage, run [on_success] and are not allowed to fail. *)
+type docker_build_type = Experimental | Release | Test | Test_manual
+
+(** Creates a Docker build job of the given [arch] and [docker_build_type].
+
+    If [external_] is set to true (default [false]), then the job is
+    also written to an external file. *)
+let job_docker_build ?rules ?dependencies ~arch ?(external_ = false)
+    docker_build_type : job =
+  let arch_string =
+    match arch with Tezos_ci.Amd64 -> "amd64" | Arm64 -> "arm64"
+  in
+  let variables =
+    [
+      ( "DOCKER_BUILD_TARGET",
+        match (arch, docker_build_type) with
+        | Amd64, (Test_manual | Experimental) -> "with-evm-artifacts"
+        | _ -> "without-evm-artifacts" );
+      ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
+      ( "CI_DOCKER_HUB",
+        Bool.to_string
+          (match docker_build_type with
+          | Release | Experimental -> true
+          | Test | Test_manual -> false) );
+      ( "EXECUTABLE_FILES",
+        match docker_build_type with
+        | Release -> "script-inputs/released-executables"
+        | Test | Test_manual | Experimental ->
+            "script-inputs/released-executables \
+             script-inputs/experimental-executables" );
+    ]
+  in
+  let stage, when_, (allow_failure : allow_failure_job option) =
+    match docker_build_type with
+    | Test_manual -> (Stages.manual, Some Manual, Some Yes)
+    | _ -> (Stages.build, None, None)
+  in
+  let name = "oc.docker:" ^ arch_string in
+  let filename_suffix =
+    match docker_build_type with
+    | Release -> "release"
+    | Experimental -> "experimental"
+    | Test -> "test"
+    | Test_manual -> "test_manual"
+  in
+  let job =
+    job_docker_authenticated
+      ?when_
+      ?allow_failure
+      ?rules
+      ?dependencies
+      ~stage
+      ~arch
+      ~name
+      ~variables
+      ["./scripts/ci/docker_release.sh"]
+  in
+  if external_ then job_external ~directory:"build" ~filename_suffix job
+  else job
+
+let changeset_octez_docker_changes_or_master =
+  [
+    "scripts/**/*";
+    "script-inputs/**/*";
+    "src/**/*";
+    "tezt/**/*";
+    "vendors/**/*";
+    "dune";
+    "dune-project";
+    "dune-workspace";
+    "opam";
+    "Makefile";
+    "kernels.mk";
+    "build.Dockerfile";
+    "Dockerfile";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
+let rules_octez_docker_changes_or_master =
+  [
+    job_rule ~if_:Rules.on_master ~when_:Always ();
+    job_rule ~changes:changeset_octez_docker_changes_or_master ();
+  ]
+
+let _job_docker_amd64_experimental : job =
+  job_docker_build
+    ~external_:true
+      (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
+         For now we can set any variant to get the correct name of the need. *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Amd64
+    Experimental
+
+let _job_docker_amd64_release : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Amd64
+    Release
+
+let _job_docker_amd64_test_manual : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:
+      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
+    ~arch:Amd64
+    Test_manual
+
+let _job_docker_amd64_test : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Amd64
+    Test
+
+let _job_docker_arm64_experimental : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Arm64
+    Experimental
+
+let _job_docker_arm64_release : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Arm64
+    Release
+
+let _job_docker_arm64_test_manual : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:
+      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
+    ~arch:Arm64
+    Test_manual
+
+let _job_docker_arm64_test : job =
+  job_docker_build
+    ~external_:true (* TODO: see above *)
+    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
+    ~rules:rules_octez_docker_changes_or_master
+    ~arch:Arm64
+    Test
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
