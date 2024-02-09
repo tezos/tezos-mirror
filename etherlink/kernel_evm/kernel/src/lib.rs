@@ -5,12 +5,13 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::inbox::TezosContracts;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
-use crate::stage_one::{fetch, Configuration};
+use crate::stage_one::fetch;
 use crate::Error::UpgradeError;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
@@ -18,14 +19,12 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    read_admin, read_base_fee_per_gas, read_chain_id, read_da_fee,
-    read_delayed_transaction_bridge, read_flat_fee, read_kernel_version,
-    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_sequencer_admin, read_ticketer, sequencer, store_base_fee_per_gas,
-    store_chain_id, store_da_fee, store_flat_fee, store_kernel_version,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_admin, read_base_fee_per_gas, read_chain_id, read_da_fee, read_flat_fee,
+    read_kernel_version, read_last_info_per_level_timestamp,
+    read_last_info_per_level_timestamp_stats, read_sequencer_admin, read_ticketer,
+    store_base_fee_per_gas, store_chain_id, store_da_fee, store_flat_fee,
+    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -38,6 +37,7 @@ mod block;
 mod block_in_progress;
 mod blueprint;
 mod blueprint_storage;
+mod configuration;
 mod delayed_inbox;
 mod error;
 mod fees;
@@ -167,35 +167,6 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
     let block_fees = BlockFees::new(base_fee_per_gas, flat_fee, da_fee);
 
     Ok(block_fees)
-}
-
-fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
-    let sequencer = sequencer(host).unwrap_or_default();
-    match sequencer {
-        Some(sequencer) => {
-            let delayed_bridge = read_delayed_transaction_bridge(host)
-                // The sequencer must declare a delayed transaction bridge. This
-                // default value is only to facilitate the testing.
-                .unwrap_or_else(|| {
-                    ContractKt1Hash::from_base58_check(
-                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
-                    )
-                    .unwrap()
-                });
-            match DelayedInbox::new(host) {
-                Ok(delayed_inbox) => Configuration::Sequencer {
-                    delayed_bridge,
-                    delayed_inbox: Box::new(delayed_inbox),
-                    sequencer,
-                },
-                Err(err) => {
-                    log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
-                    Configuration::Proxy
-                }
-            }
-        }
-        None => Configuration::Proxy,
-    }
 }
 
 pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
@@ -357,9 +328,9 @@ mod tests {
     use std::str::FromStr;
 
     use crate::blueprint_storage::store_inbox_blueprint;
+    use crate::configuration::Configuration;
     use crate::mock_internal::MockInternal;
     use crate::safe_storage::{KernelRuntime, SafeStorage};
-    use crate::stage_one::Configuration;
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
@@ -568,7 +539,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             block_fees,
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 

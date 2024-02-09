@@ -4,6 +4,7 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
+use crate::configuration::{Configuration, ConfigurationMode};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::InboxContent;
@@ -15,32 +16,6 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
-
-pub enum Configuration {
-    Proxy,
-    Sequencer {
-        delayed_bridge: ContractKt1Hash,
-        delayed_inbox: Box<DelayedInbox>,
-        sequencer: PublicKey,
-    },
-}
-
-impl std::fmt::Display for Configuration {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Configuration::Proxy => write!(f, "Proxy"),
-            Configuration::Sequencer {
-                delayed_bridge,
-                delayed_inbox: _, // Ignoring delayed_inbox
-                sequencer,
-            } => write!(
-                f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?} }}",
-                delayed_bridge, sequencer
-            ),
-        }
-    }
-}
 
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
@@ -107,8 +82,8 @@ pub fn fetch<Host: Runtime>(
     tezos_contracts: TezosContracts,
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
-    match config {
-        Configuration::Sequencer {
+    match &mut config.mode {
+        ConfigurationMode::Sequencer {
             delayed_bridge,
             delayed_inbox,
             sequencer,
@@ -120,7 +95,7 @@ pub fn fetch<Host: Runtime>(
             delayed_inbox,
             sequencer.clone(),
         ),
-        Configuration::Proxy => {
+        ConfigurationMode::Proxy => {
             fetch_inbox_blueprints(host, smart_rollup_address, tezos_contracts)
         }
     }

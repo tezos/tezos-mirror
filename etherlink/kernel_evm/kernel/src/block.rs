@@ -562,7 +562,7 @@ mod tests {
             host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
     }
@@ -608,7 +608,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -651,7 +651,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -697,7 +697,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
@@ -775,7 +775,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -828,7 +828,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
@@ -896,7 +896,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -954,7 +954,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -993,7 +993,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -1004,7 +1004,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -1055,7 +1055,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -1216,7 +1216,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
         assert!(
@@ -1266,7 +1266,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
@@ -1278,7 +1278,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
@@ -1290,7 +1290,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
@@ -1433,7 +1433,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 
@@ -1505,7 +1505,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 
@@ -1529,8 +1529,9 @@ mod tests {
             "There should be some transactions left"
         );
 
-        let _next_blueprint = read_next_blueprint(&mut host, &mut Configuration::Proxy)
-            .expect("The next blueprint should be available");
+        let _next_blueprint =
+            read_next_blueprint(&mut host, &mut Configuration::default())
+                .expect("The next blueprint should be available");
     }
 
     #[test]
@@ -1594,7 +1595,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("The block production failed.");
 
@@ -1659,7 +1660,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 
@@ -1678,7 +1679,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::Proxy,
+            &mut Configuration::default(),
         )
         .expect("Should have produced");
 
