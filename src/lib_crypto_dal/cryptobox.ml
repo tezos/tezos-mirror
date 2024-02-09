@@ -131,7 +131,7 @@ module Inner = struct
     let of_b58check = of_b58check
   end
 
-  module Commitment_proof_G1 = Degree_check.Proof
+  module Proof = Degree_check.Proof
 
   module Commitment_proof = struct
     open Kzg.Bls
@@ -166,11 +166,11 @@ module Inner = struct
 
   type commitment = Commitment.t
 
-  type shard_proof = Commitment_proof_G1.t
+  type shard_proof = Proof.t
 
   type commitment_proof = Kzg.Bls.G2.t
 
-  type page_proof = Commitment_proof_G1.t
+  type page_proof = Proof.t
 
   type page = bytes
 
@@ -185,11 +185,11 @@ module Inner = struct
   module Encoding = struct
     open Data_encoding
 
-    let page_proof_encoding = Commitment_proof_G1.encoding
+    let page_proof_encoding = Proof.encoding
 
     let share_encoding = array Scalar.encoding
 
-    let shard_proof_encoding = Commitment_proof_G1.encoding
+    let shard_proof_encoding = Proof.encoding
 
     let shard_encoding =
       conv
@@ -1093,13 +1093,11 @@ module Internal_for_tests = struct
 
   let polynomials_equal = Poly.equal
 
-  let page_proof_equal = Commitment_proof_G1.equal
+  let page_proof_equal = Proof.equal
 
-  let alter_page_proof (proof : page_proof) =
-    Commitment_proof_G1.alter_proof proof
+  let alter_page_proof (proof : page_proof) = Proof.alter_proof proof
 
-  let alter_shard_proof (proof : shard_proof) =
-    Commitment_proof_G1.alter_proof proof
+  let alter_shard_proof (proof : shard_proof) = Proof.alter_proof proof
 
   let alter_commitment_proof (proof : commitment_proof) =
     Kzg.Bls.G2.(add proof one)
@@ -1111,11 +1109,11 @@ module Internal_for_tests = struct
 
   let precomputation_equal = Kate_amortized.preprocess_equal
 
-  let dummy_commitment ~state () = Commitment_proof_G1.random ~state ()
+  let dummy_commitment ~state () = Proof.random ~state ()
 
-  let dummy_page_proof ~state () = Commitment_proof_G1.random ~state ()
+  let dummy_page_proof ~state () = Proof.random ~state ()
 
-  let dummy_shard_proof ~state () = Commitment_proof_G1.random ~state ()
+  let dummy_shard_proof ~state () = Proof.random ~state ()
 
   let make_dummy_shard ~state ~index ~length =
     {index; share = Array.init length (fun _ -> Scalar.(random ~state ()))}
