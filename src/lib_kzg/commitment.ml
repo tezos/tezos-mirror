@@ -70,7 +70,6 @@ module Single = struct
     [@@coverage off]
 end
 
-(* module Commitment = struct *)
 type public_parameters = Single.public_parameters
 
 type secret = Single.secret SMap.t
