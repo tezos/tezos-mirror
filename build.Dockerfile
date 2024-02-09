@@ -45,7 +45,7 @@ RUN while read -r protocol; do \
 FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_VERSION} AS layer2-builder
 WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
-COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel
+COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
 COPY --chown=tezos:nogroup src evm_kernel/src
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 RUN make -C evm_kernel -f etherlink.mk build-deps \
