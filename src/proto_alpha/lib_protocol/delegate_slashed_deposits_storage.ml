@@ -55,35 +55,20 @@ let punish_double_signing ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, misbehaviour.round), delegate)
-  in
-  let denounced =
-    Option.value denounced_opt ~default:Storage.default_denounced
+  let* ctxt =
+    Already_denounced_storage.add_denunciation
+      ctxt
+      delegate
+      level
+      misbehaviour.round
+      misbehaviour.kind
   in
   (* Placeholder value *)
   let* ctxt, slashing_percentage =
     Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
   in
-  let already_denounced, updated_denounced =
-    let Storage.{for_double_baking; for_double_attesting} = denounced in
-    match misbehaviour.kind with
-    | Double_baking ->
-        (for_double_baking, {denounced with for_double_baking = true})
-    | Double_attesting | Double_preattesting ->
-        (for_double_attesting, {denounced with for_double_attesting = true})
-  in
-  assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let*! ctxt =
-    Storage.Already_denounced.add
-      (ctxt, level.cycle)
-      ((level.level, misbehaviour.round), delegate)
-      updated_denounced
-  in
   let* slash_history_opt =
     Storage.Contract.Slashed_deposits.find ctxt delegate_contract
   in

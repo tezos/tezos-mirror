@@ -30,3 +30,15 @@ val already_denounced_for_double_attesting :
   Level_repr.t ->
   Round_repr.t ->
   bool tzresult Lwt.t
+
+(** Records a denunciation in {!Storage.Already_denounced}.
+
+    @raise [Assert_failure] if the same denunciation is already
+    present in {!Storage.Already_denounced}. *)
+val add_denunciation :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Level_repr.t ->
+  Round_repr.t ->
+  Misbehaviour_repr.kind ->
+  Raw_context.t tzresult Lwt.t
