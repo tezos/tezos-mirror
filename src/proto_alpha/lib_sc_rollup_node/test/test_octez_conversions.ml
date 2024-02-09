@@ -220,12 +220,7 @@ let compare_slot_header_id (s1 : Octez_smart_rollup.Dal.Slot_header.id)
   let c = Int32.compare s1.published_level s2.published_level in
   if c <> 0 then c else Int.compare s1.index s2.index
 
-let gen_slot_headers = QCheck2.Gen.return []
-(*
-TODO: https://gitlab.com/tezos/tezos/-/issues/6895
-
-Adapt/re-enable tests
-
+let gen_slot_headers =
   let open QCheck2.Gen in
   let size = int_bound 50 in
   let+ l = list_size size gen_slot_header in
@@ -247,7 +242,6 @@ Adapt/re-enable tests
           let h = {h with id = {h.id with published_level}} in
           (published_level, [h]))
         l
-*)
 
 let gen_slot_history =
   let open Protocol.Alpha_context in

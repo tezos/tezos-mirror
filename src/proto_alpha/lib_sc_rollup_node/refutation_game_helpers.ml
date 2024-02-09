@@ -71,6 +71,7 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
     ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
+  let dal_number_of_slots = constants.Rollup_constants.dal.number_of_slots in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->
@@ -81,6 +82,18 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
         (* For older protocol, constants don't have the notion of reveal
            activation level. *)
         fun ~current_block_level:_ _ -> true
+  in
+  let* dal_activation_level =
+    if constants.dal.feature_enable then
+      match constants.sc_rollup.reveal_activation_level with
+      | None -> return_none
+      | Some reveal_activation_level ->
+          let*? level =
+            Raw_level.of_int32 reveal_activation_level.dal_parameters
+            |> Environment.wrap_tzresult
+          in
+          return_some level
+    else return_none
   in
   let*! input_request =
     let open (val Pvm.of_kind node_ctxt.kind) in
@@ -93,7 +106,9 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
       let Dal.Page.{slot_id; page_index} = page_id in
       let* pages =
         Dal_pages_request.slot_pages
+          ~dal_activation_level
           ~dal_attestation_lag
+          ~dal_number_of_slots
           ~inbox_level
           node_ctxt
           slot_id
@@ -169,7 +184,18 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let dal_parameters = dal_l1_parameters.cryptobox_parameters in
   let dal_attestation_lag = dal_l1_parameters.attestation_lag in
   let dal_number_of_slots = dal_l1_parameters.number_of_slots in
-
+  let* dal_activation_level =
+    if dal_l1_parameters.feature_enable then
+      match constants.sc_rollup.reveal_activation_level with
+      | None -> return_none
+      | Some reveal_activation_level ->
+          let*? level =
+            Raw_level.of_int32 reveal_activation_level.dal_parameters
+            |> Environment.wrap_tzresult
+          in
+          return_some level
+    else return_none
+  in
   let* page_info =
     page_info_from_pvm_state
       constants
@@ -244,6 +270,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let dal_number_of_slots = dal_number_of_slots
 
       let page_info = page_info
+
+      let dal_activation_level = dal_activation_level
     end
   end in
   let metadata = metadata node_ctxt in
@@ -292,6 +320,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
       (Raw_level.of_int32_exn game.inbox_level)
       dal_slots_history
       dal_parameters
+      ~dal_activation_level
       ~dal_attestation_lag
       ~dal_number_of_slots
       ~pvm:(module PVM)

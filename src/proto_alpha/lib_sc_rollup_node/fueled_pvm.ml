@@ -94,6 +94,19 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag = constants.dal.attestation_lag in
+    let dal_number_of_slots = constants.dal.number_of_slots in
+    let* dal_activation_level =
+      if constants.dal.feature_enable then
+        match constants.sc_rollup.reveal_activation_level with
+        | None -> return_none
+        | Some reveal_activation_level ->
+            let*? level =
+              Raw_level.of_int32 reveal_activation_level.dal_parameters
+              |> Environment.wrap_tzresult
+            in
+            return_some level
+      else return_none
+    in
     let dal_parameters =
       Sc_rollup.Dal_parameters.
         {
@@ -129,8 +142,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Request_dal_page dal_page -> (
           let*! content =
             Dal_pages_request.page_content
+              ~dal_activation_level
               ~inbox_level:(Int32.of_int level)
               ~dal_attestation_lag
+              ~dal_number_of_slots
               node_ctxt
               dal_page
           in
@@ -254,7 +269,9 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           let* content_opt =
             Dal_pages_request.page_content
               ~inbox_level:(Int32.of_int level)
+              ~dal_activation_level
               ~dal_attestation_lag
+              ~dal_number_of_slots
               node_ctxt
               page_id
           in

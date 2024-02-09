@@ -242,7 +242,13 @@ let test_invalid_serialized_inbox_proof () =
   let inbox = Sc_rollup_helpers.dumb_init level in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
   let dal_snapshot = Dal.Slots_history.genesis in
-  let dal_parameters = Default_parameters.constants_mainnet.dal in
+  let constants = Default_parameters.constants_mainnet in
+  let dal_parameters = constants.dal in
+  let dal_activation_level =
+    if constants.dal.feature_enable then
+      Some constants.sc_rollup.reveal_activation_level.dal_parameters
+    else None
+  in
   let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
   let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
   let*! state = Arith_pvm.initial_state ~empty in
@@ -275,6 +281,7 @@ let test_invalid_serialized_inbox_proof () =
       Raw_level.root
       dal_snapshot
       dal_parameters.cryptobox_parameters
+      ~dal_activation_level
       ~dal_attestation_lag:dal_parameters.attestation_lag
       ~dal_number_of_slots:dal_parameters.number_of_slots
       ~is_reveal_enabled
