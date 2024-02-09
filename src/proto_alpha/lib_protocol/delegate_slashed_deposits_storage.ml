@@ -114,21 +114,12 @@ let punish_double_signing ctxt ~operation_hash
     if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
       (* Do not store denunciations that have no effects .*) return ctxt
     else
-      let* denunciations_opt =
-        Storage.Pending_denunciations.find ctxt delegate
-      in
-      let denunciations = Option.value denunciations_opt ~default:[] in
-      let denunciations =
-        Denunciations_repr.add
-          operation_hash
-          rewarded
-          misbehaviour
-          denunciations
-      in
-      let*! ctxt =
-        Storage.Pending_denunciations.add ctxt delegate denunciations
-      in
-      return ctxt
+      Pending_denunciations_storage.add_denunciation
+        ctxt
+        ~misbehaving_delegate:delegate
+        operation_hash
+        ~rewarded_delegate:rewarded
+        misbehaviour
   in
   return ctxt
 
@@ -176,7 +167,7 @@ let apply_and_clear_denunciations ctxt =
     {reward; amount_to_burn}
   in
   let* ctxt, balance_updates, remaining_denunciations =
-    Storage.Pending_denunciations.fold
+    Pending_denunciations_storage.fold
       ctxt
       ~order:`Undefined
       ~init:(Ok (ctxt, [], []))
@@ -336,14 +327,14 @@ let apply_and_clear_denunciations ctxt =
           balance_updates,
           (delegate, denunciations_to_delay) :: remaining_denunciations ))
   in
-  let*! ctxt = Storage.Pending_denunciations.clear ctxt in
+  let*! ctxt = Pending_denunciations_storage.clear ctxt in
   let*! ctxt =
     List.fold_left_s
       (fun ctxt (delegate, current_cycle_denunciations) ->
         match current_cycle_denunciations with
         | [] -> Lwt.return ctxt
         | _ ->
-            Storage.Pending_denunciations.add
+            Pending_denunciations_storage.set_denunciations
               ctxt
               delegate
               current_cycle_denunciations)
@@ -351,18 +342,3 @@ let apply_and_clear_denunciations ctxt =
       remaining_denunciations
   in
   return (ctxt, balance_updates)
-
-module For_RPC = struct
-  let pending_denunciations ctxt delegate =
-    let open Lwt_result_syntax in
-    let+ denunciations = Storage.Pending_denunciations.find ctxt delegate in
-    Option.value denunciations ~default:[]
-
-  let pending_denunciations_list ctxt =
-    let open Lwt_syntax in
-    let* r = Storage.Pending_denunciations.bindings ctxt in
-    let r =
-      List.map (fun (x, l) -> List.map (fun y -> (x, y)) l) r |> List.flatten
-    in
-    return r
-end

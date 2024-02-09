@@ -42,21 +42,14 @@ let set_forbidden_delegates ctxt forbidden_delegates =
   in
   return ctxt
 
-let has_pending_denunciations ctxt delegate =
-  let open Lwt_result_syntax in
-  let* pending_denunciations =
-    Storage.Pending_denunciations.find ctxt delegate
-  in
-  match pending_denunciations with
-  | None | Some [] -> return_false
-  | Some (_ :: _) -> return_true
-
 let should_unforbid ctxt delegate ~selection_for_new_cycle =
   let open Lwt_result_syntax in
   (* A delegate who has pending denunciations for which slashing has
      not been applied yet should stay forbidden, because their frozen
      deposits are going to decrease by a yet unknown amount. *)
-  let* has_pending_denunciations = has_pending_denunciations ctxt delegate in
+  let*! has_pending_denunciations =
+    Pending_denunciations_storage.has_pending_denunciations ctxt delegate
+  in
   if has_pending_denunciations then return_false
   else
     (* To get unforbidden, a delegate's current frozen deposits must

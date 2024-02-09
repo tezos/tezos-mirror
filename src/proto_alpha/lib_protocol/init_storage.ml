@@ -313,7 +313,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
            Possible consequence: the slashing history could be inconsistent with
            the pending denunciations, i.e., there could be unstaked_frozen_deposits
            that are not slashed whereas unstake_requests are slashed. *)
-        let*! ctxt = Storage.Pending_denunciations.clear ctxt in
+        let*! ctxt = Pending_denunciations_storage.clear ctxt in
         let*! ctxt = migrate_already_denounced_from_Oxford ctxt in
         let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
         let* ctxt = clean_frozen_deposits_for_p ctxt in
