@@ -30,8 +30,8 @@ end
 
 module Scalar_map = Map.Make (Scalar)
 
-module G1 = struct
-  include Bls12_381.G1
+module G (G : Bls12_381.CURVE) = struct
+  include G
 
   let t : t Repr.t =
     Repr.(
@@ -47,16 +47,8 @@ module G1 = struct
       (Fixed.bytes (size_in_bytes / 2))
 end
 
-module G2 = struct
-  include Bls12_381.G2
-
-  let t : t Repr.t =
-    Repr.(
-      map
-        (bytes_of (`Fixed (size_in_bytes / 2)))
-        of_compressed_bytes_exn
-        to_compressed_bytes)
-end
+module G1 = G (Bls12_381.G1)
+module G2 = G (Bls12_381.G2)
 
 module GT = struct
   include Bls12_381.GT

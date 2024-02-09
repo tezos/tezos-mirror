@@ -138,18 +138,9 @@ module Inner = struct
 
     type t = G2.t
 
-    let encoding =
-      conv
-        G2.to_compressed_bytes
-        G2.of_compressed_bytes_exn
-        (Fixed.bytes (G2.size_in_bytes / 2))
+    let encoding = G2.encoding
 
-    let t : t Repr.t =
-      Repr.(
-        map
-          (bytes_of (`Fixed (G2.size_in_bytes / 2)))
-          G2.of_compressed_bytes_exn
-          G2.to_compressed_bytes)
+    let t : t Repr.t = G2.t
 
     let _random = G2.random
 
