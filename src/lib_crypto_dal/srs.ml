@@ -84,22 +84,20 @@ module Internal_for_tests = struct
     Scalar.of_string
       "20812168509434597367146703229805575690060615791308155437936410982393987532344"
 
-  let compute_fake_srs ?(size = max_srs_size) () =
-    Srs_g1.generate_insecure size fake_srs_seed
+  let compute_fake_srs ?(size = max_srs_size) gen () = gen size fake_srs_seed
 
   let get_srs2 i = G2.mul G2.one (Scalar.pow fake_srs_seed (Z.of_int i))
 
   let get_verifier_srs2 = get_verifier_srs2_aux max_srs_size get_srs2
 
-  let get_verifier_srs1 = compute_fake_srs ~size:max_verifier_srs_size
+  let get_verifier_srs1 =
+    compute_fake_srs ~size:max_verifier_srs_size Srs_g1.generate_insecure
 
   let is_in_srs2 _ = true
 
-  let fake_srs = Lazy.from_fun compute_fake_srs
+  let fake_srs1 = Lazy.from_fun (compute_fake_srs Srs_g1.generate_insecure)
 
-  let fake_srs2 =
-    Lazy.from_fun (fun () ->
-        Srs_g2.generate_insecure max_srs_size fake_srs_seed)
+  let fake_srs2 = Lazy.from_fun (compute_fake_srs Srs_g2.generate_insecure)
 
   module Print = struct
     (* Bounds (in log₂)

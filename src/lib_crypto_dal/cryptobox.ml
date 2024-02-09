@@ -1065,7 +1065,7 @@ module Internal_for_tests = struct
     Prover
       {
         test = true;
-        srs_g1 = Lazy.force Srs.Internal_for_tests.fake_srs;
+        srs_g1 = Lazy.force Srs.Internal_for_tests.fake_srs1;
         srs_g2 = Lazy.force Srs.Internal_for_tests.fake_srs2;
       }
 

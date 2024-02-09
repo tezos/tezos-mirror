@@ -70,7 +70,7 @@ val read_srs :
     and easier to handle in the CI than loading ZCash SRS *)
 module Internal_for_tests : sig
   (** Generates an unsafe SRS₁ of size 2¹⁶ from a known seed *)
-  val fake_srs : Kzg.Bls.Srs_g1.t Lazy.t
+  val fake_srs1 : Kzg.Bls.Srs_g1.t Lazy.t
 
   (** Generates an unsafe SRS₂ of size 2¹⁶ from a known seed *)
   val fake_srs2 : Kzg.Bls.Srs_g2.t Lazy.t
