@@ -678,6 +678,74 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
+(* Check that if an attester includes some DAL content but is not in the DAL
+   committee, then an error is returned at block validation.
+
+   Note that we change the value of [consensus_committee_size] because with the
+   default test parameters, [consensus_committee_size = 25 < 32 =
+   number_of_shards], so that test would not work! *)
+let test_attester_not_in_dal_committee () =
+  let open Lwt_result_syntax in
+  let bal_high = 80_000_000_000L in
+  let bal_low = 08_000_000_000L in
+  (* Create many accounts with balance [bal_high] and one with [bal_low]. *)
+  let n = 10 in
+  let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
+  let* genesis, contracts =
+    Context.init_gen
+      ~dal_enable:true
+      ~consensus_committee_size:100
+      ~consensus_threshold:0
+      ~bootstrap_balances
+      (Context.TList (n + 1))
+      ()
+  in
+  let pkh = Stdlib.List.hd contracts |> Context.Contract.pkh in
+  let rec iter b i =
+    let* committee = Context.get_attesters (B b) in
+    let* dal_committee = Context.Dal.shards (B b) () in
+    let in_committee =
+      List.exists
+        (fun del ->
+          Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
+        committee
+    in
+    let in_dal_committee =
+      List.mem_assoc ~equal:Signature.Public_key_hash.equal pkh dal_committee
+    in
+    if in_committee && not in_dal_committee then
+      let dal_content = {attestation = Dal.Attestation.empty} in
+      let* op = Op.attestation ~delegate:pkh ~dal_content b in
+      let* ctxt = Incremental.begin_construction b in
+      let expect_apply_failure = function
+        | [
+            Environment.Ecoproto_error
+              (Alpha_context.Dal_errors
+               .Dal_data_availibility_attester_not_in_committee
+                {attester; level});
+          ]
+          when Signature.Public_key_hash.equal attester pkh
+               && Raw_level.to_int32 level = b.header.shell.level ->
+            return_unit
+        | errs ->
+            failwith
+              "Error trace:@, %a does not match the expected one"
+              Error_monad.pp_print_trace
+              errs
+      in
+      Incremental.add_operation ctxt op ~expect_failure:expect_apply_failure
+    else
+      let* b = Block.bake b in
+      if i = 100 then
+        failwith
+          "The account is in all DAL committees for 100 levels! The test needs \
+           to be adapted."
+      else iter b (i + 1)
+  in
+  let* b = Block.bake genesis in
+  let* _ = iter b 0 in
+  return_unit
+
 let tests =
   [
     (* Positive tests *)
@@ -733,6 +801,10 @@ let tests =
       "two attestations with same attester in a block"
       `Quick
       test_two_attestations_with_same_attester;
+    Tztest.tztest
+      "attester not in DAL committee"
+      `Quick
+      test_attester_not_in_dal_committee;
   ]
 
 let () =

@@ -347,6 +347,7 @@ type 'accounts init :=
   ?bootstrap_balances:int64 list ->
   ?bootstrap_delegations:Signature.Public_key_hash.t option list ->
   ?bootstrap_consensus_keys:Signature.Public_key.t option list ->
+  ?consensus_committee_size:int ->
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
