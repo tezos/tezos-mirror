@@ -9,4 +9,3 @@ docker:hadolint-before_merging:
     - changes:
         - build.Dockerfile
         - Dockerfile
-      allow_failure: true
