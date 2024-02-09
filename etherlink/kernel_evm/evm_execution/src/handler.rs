@@ -1661,6 +1661,35 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     )
                 }
             },
+            Err(EthereumError::PrecompileFailed(failure_reason)) => {
+                // We need this case, otherwise the failure will be considered as fatal
+                // when it shouldn't.
+
+                log!(
+                    self.host,
+                    Debug,
+                    "Intermediate precompiled call ended with failure: {:?}",
+                    failure_reason
+                );
+
+                if let Err(err) = self.rollback_inter_transaction(false) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Rolling back reverted transaction caused an error: {:?}",
+                        err
+                    );
+                }
+
+                Capture::Exit((
+                    ExitReason::Error(ExitError::Other(Cow::Owned(format!(
+                        "{:?}",
+                        EthereumError::PrecompileFailed(failure_reason)
+                    )))),
+                    None,
+                    vec![],
+                ))
+            }
             Err(err) => {
                 log!(
                     self.host,
