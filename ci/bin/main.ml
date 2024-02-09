@@ -23,7 +23,7 @@ let default = default ~interruptible:true ()
    The "manual" stage exists to fix a UI problem that occurs when mixing
    manual and non-manual jobs. *)
 module Stages = struct
-  let _trigger = Stage.register "trigger"
+  let trigger = Stage.register "trigger"
 
   let _sanity = Stage.register "sanity"
 
@@ -175,7 +175,7 @@ module Images = struct
      used for the [build_deps_image_name] images and specified in the
      variable [alpine_version] in [scripts/version.sh]. This is
      checked by the jobs [trigger] and [sanity_ci]. *)
-  let _alpine =
+  let alpine =
     Image.register ~name:"alpine" ~image_path:("alpine:" ^ alpine_version)
 end
 
@@ -192,6 +192,40 @@ let job_dummy : job =
     ~name:"dummy_job"
     ~script:[{|echo "This job will never execute"|}]
     ()
+
+(* Define the [trigger] job
+
+   §1: The purpose of this job is to launch the CI manually in certain cases.
+   The objective is not to run computing when it is not
+   necessary and the decision to do so belongs to the developer
+
+   §2: We also perform some fast sanity checks. *)
+let _trigger =
+  job_external
+  @@ job
+       ~image:Images.alpine
+       ~stage:Stages.trigger
+       ~allow_failure:No
+       ~rules:
+         [
+           job_rule
+             ~if_:(If.not Rules.assigned_to_marge_bot)
+             ~allow_failure:No
+             ~when_:Manual
+             ();
+           job_rule ~when_:Always ();
+         ]
+       ~timeout:(Minutes 10)
+       ~name:"trigger"
+       [
+         "echo 'Trigger pipeline!'";
+         (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
+            [scripts/version.sh]'s [opam_repository_tag] are the same. *)
+         "./scripts/ci/check_opam_repository_tag.sh";
+         (* Check that the Alpine version of the trigger job's image
+            corresponds to the value in scripts/version.sh. *)
+         "./scripts/ci/check_alpine_version.sh";
+       ]
 
 (** Helper to create jobs that uses the docker deamon.
 
