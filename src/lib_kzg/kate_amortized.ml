@@ -1,6 +1,6 @@
 open Bls
 module FFT = Utils.FFT
-module Commitment = Commitment.Single
+module Commitment = Commitment.Single_G1
 
 type public_parameters = {
   max_polynomial_length : int;

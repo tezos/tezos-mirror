@@ -85,7 +85,7 @@ let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path ~srs_size =
 
 module Inner = struct
   module Commitment = struct
-    include Kzg.Commitment.Single
+    include Kzg.Commitment.Single_G1
 
     type Tezos_crypto.Base58.data += Data of t
 
@@ -101,7 +101,7 @@ module Inner = struct
     let raw_encoding = encoding [@@coverage off]
 
     include Tezos_crypto.Helpers.Make (struct
-      type t = Kzg.Commitment.Single.t
+      type t = Kzg.Commitment.Single_G1.t
 
       let name = "DAL_commitment"
 
@@ -132,22 +132,7 @@ module Inner = struct
   end
 
   module Proof = Commitment
-
-  module Commitment_proof = struct
-    open Kzg.Bls
-
-    type t = G2.t
-
-    let encoding = G2.encoding
-
-    let t : t Repr.t = G2.t
-
-    let _random = G2.random
-
-    let zero = G2.zero
-
-    let alter_proof x = G2.add x G2.one
-  end
+  module Commitment_proof = Degree_check.Proof
 
   type slot = bytes
 
@@ -159,7 +144,7 @@ module Inner = struct
 
   type shard_proof = Proof.t
 
-  type commitment_proof = Kzg.Bls.G2.t
+  type commitment_proof = Commitment_proof.t
 
   type page_proof = Proof.t
 
@@ -1095,7 +1080,7 @@ module Internal_for_tests = struct
   let alter_shard_proof (proof : shard_proof) = Proof.alter_proof proof
 
   let alter_commitment_proof (proof : commitment_proof) =
-    Kzg.Bls.G2.(add proof one)
+    Commitment_proof.alter_proof proof
 
   let minimum_number_of_shards_to_reconstruct_slot (t : t) =
     t.number_of_shards / t.redundancy_factor

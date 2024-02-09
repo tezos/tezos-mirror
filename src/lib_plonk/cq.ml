@@ -41,6 +41,7 @@
 open Kzg.Bls
 open Identities
 open Kzg.Utils
+module Degree_check = Kzg.Degree_check.G1_proof
 
 module type Cq_sig = sig
   exception Entry_not_in_table
@@ -124,7 +125,7 @@ module Internal = struct
     cm_b0 : PC.Commitment.t;
     cm_qa : PC.Commitment.t;
     cm_m : PC.Commitment.t;
-    cm_p : Kzg.Degree_check.Proof.t;
+    cm_p : Degree_check.Proof.t;
     cm_b0_qb_f : PC.Commitment.t;
     (* evaluations *)
     a0 : Scalar.t list;
@@ -381,7 +382,7 @@ module Internal = struct
     if Poly.is_zero r then q else raise Entry_not_in_table
 
   let compute_p (pp : prover_public_parameters) transcript k b0 =
-    Kzg.Degree_check.prove_multi
+    Degree_check.prove_multi
       ~max_commit:(pp.n - 1)
       ~max_degree:(k - 2)
       (PC.Public_parameters.get_commit_parameters pp.pc)
@@ -615,7 +616,7 @@ module Internal = struct
 
     (* 2.10 *)
     let cm_p, transcript =
-      Kzg.Degree_check.prove_multi
+      Degree_check.prove_multi
         ~max_commit:(pp.n - 1)
         ~max_degree:(k - 2)
         (PC.Public_parameters.get_commit_parameters pp.pc)
@@ -624,9 +625,7 @@ module Internal = struct
         b0
     in
 
-    let transcript =
-      Transcript.expand Kzg.Degree_check.Proof.t cm_p transcript
-    in
+    let transcript = Transcript.expand Degree_check.Proof.t cm_p transcript in
 
     (* 3.3 *)
     let a0 = List.map (compute_a0 pp.n) a in
@@ -685,7 +684,7 @@ module Internal = struct
     (* At this point, b0 already has been added to the transcript, & it is
        added again in Degree_check *)
     let check_b0, transcript =
-      Kzg.Degree_check.verify_multi
+      Degree_check.verify_multi
         pp.srs2_N_1_k_2
         transcript
         proof.cm_b0
@@ -693,7 +692,7 @@ module Internal = struct
     in
 
     let transcript =
-      Transcript.expand Kzg.Degree_check.Proof.t proof.cm_p transcript
+      Transcript.expand Degree_check.Proof.t proof.cm_p transcript
     in
 
     (* 3.6.a *)

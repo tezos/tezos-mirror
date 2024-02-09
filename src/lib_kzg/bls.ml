@@ -1,8 +1,6 @@
 module Poly = Polynomial
 module Pairing = Bls12_381.Pairing
 module Srs = Srs
-module Srs_g1 = Srs.Srs_g1
-module Srs_g2 = Srs.Srs_g2
 module Evals = Evaluations
 
 module Scalar = struct
@@ -30,7 +28,8 @@ end
 
 module Scalar_map = Map.Make (Scalar)
 
-module G (G : Bls12_381.CURVE) = struct
+module G (G : Bls12_381.CURVE) (Srs : Srs_sig with type elt = G.t) = struct
+  module Srs = Srs
   include G
 
   let t : t Repr.t =
@@ -47,8 +46,20 @@ module G (G : Bls12_381.CURVE) = struct
       (Fixed.bytes (size_in_bytes / 2))
 end
 
-module G1 = G (Bls12_381.G1)
-module G2 = G (Bls12_381.G2)
+module Srs_g1 = Srs.Srs_g1
+module Srs_g2 = Srs.Srs_g2
+module G1 = G (Bls12_381.G1) (Srs_g1)
+module G2 = G (Bls12_381.G2) (Srs_g2)
+
+module type G_sig = sig
+  include Bls12_381.CURVE
+
+  module Srs : Srs_sig with type elt = t
+
+  val t : t Repr.ty
+
+  val encoding : t encoding
+end
 
 module GT = struct
   include Bls12_381.GT
