@@ -44,30 +44,6 @@ let update_slashing_storage_for_p ctxt =
   in
   Storage.Contract.Slashed_deposits__Oxford.clear ctxt
 
-let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
-    round =
-  let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, round), delegate)
-  in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_attesting
-
-let already_denounced_for_double_baking ctxt delegate (level : Level_repr.t)
-    round =
-  let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, round), delegate)
-  in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_baking
-
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
 type punishing_amounts = {

@@ -524,6 +524,7 @@ module Misbehaviour = Misbehaviour_repr
 module Delegate = struct
   include Delegate_storage
   include Delegate_missed_attestations_storage
+  include Already_denounced_storage
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
