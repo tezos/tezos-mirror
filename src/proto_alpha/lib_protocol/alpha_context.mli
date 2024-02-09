@@ -890,7 +890,6 @@ module Constants : sig
     }
 
     type t = {
-      preserved_cycles : int;
       consensus_rights_delay : int;
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
@@ -955,8 +954,6 @@ module Constants : sig
   val parametric : context -> Parametric.t
 
   val sc_rollup : context -> Parametric.sc_rollup
-
-  val preserved_cycles : context -> int
 
   val consensus_rights_delay : context -> int
 
@@ -2346,9 +2343,9 @@ module Delegate : sig
       (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
           from the storage.
           Returns [Q.one] if the given cycle is not between [current_cycle] and
-          [current_cycle + preserved_cycles].
+          [current_cycle + consensus_rights_delay].
           If adaptive issuance has not been activated, or has been activated and the
-          given cycle is less than [preserved_cycles] after the activation cycle,
+          given cycle is less than [consensus_rights_delay] after the activation cycle,
           then this function returns [Q.one].
           Used only for RPCs. To get the actual rewards, use the reward functions
           defined above. *)
@@ -2358,7 +2355,7 @@ module Delegate : sig
           from the storage. If cycle is [None], returns 0.
 
           Returns 0 if the given cycle is not between [current_cycle] and
-          [current_cycle + preserved_cycles].
+          [current_cycle + consensus_rights_delay].
 
           If adaptive issuance has not been activated,
           then this function returns 0.
@@ -2499,7 +2496,7 @@ module Staking : sig
     requests from [contract] that can be finalized.
     An unstake request can be finalized if it is old enough, specifically the
     requested amount must not be at stake anymore and must not be slashable
-    anymore, i.e. after [preserved_cycles + max_slashing_period] after the
+    anymore, i.e. after [consensus_rights_delay + max_slashing_period] after the
     request.
     Amounts are transferred from the [contract]'s delegate (at request time)
     unstaked frozen deposits to [contract]'s spendable balance, minus slashing

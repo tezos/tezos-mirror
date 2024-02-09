@@ -77,7 +77,7 @@ let check_delegate_staking_invariant blk delegate_pkh =
 
 let update_consensus_key blk delegate public_key =
   let open Lwt_result_syntax in
-  let nb_delay_cycles = constants.preserved_cycles + 1 in
+  let nb_delay_cycles = constants.consensus_rights_delay + 1 in
   let* update_ck =
     Op.update_consensus_key (B blk) (Contract.Implicit delegate) public_key
   in

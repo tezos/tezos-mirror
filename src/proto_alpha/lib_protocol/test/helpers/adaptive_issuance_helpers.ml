@@ -397,7 +397,7 @@ module Unstaked_frozen = struct
           let info, rest = pop_cycle cycle t in
           (info, h :: rest)
 
-  let slash ~preserved_cycles slashed_cycle pct_times_100 a =
+  let slash ~slashable_deposits_period slashed_cycle pct_times_100 a =
     remove_zeros a
     |> List.map
          (fun
@@ -407,7 +407,7 @@ module Unstaked_frozen = struct
            if
              Cycle.(
                cycle > slashed_cycle
-               || add cycle preserved_cycles < slashed_cycle)
+               || add cycle slashable_deposits_period < slashed_cycle)
            then (r, Tez.zero)
            else
              let new_current =
@@ -814,13 +814,13 @@ let apply_transfer amount src_name dst_name account_map =
         update_account ~f:f_dst dst_name account_map
   | _ -> raise Not_found
 
-let stake_from_unstake amount current_cycle preserved_cycles delegate_name
+let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
     account_map =
   match String.Map.find delegate_name account_map with
   | None -> raise Not_found
   | Some ({unstaked_frozen; frozen_deposits; slashed_cycles; _} as account) ->
       let oldest_slashable_cycle =
-        Cycle.(sub current_cycle (preserved_cycles + 1))
+        Cycle.(sub current_cycle (consensus_rights_delay + 1))
         |> Option.value ~default:Cycle.root
       in
       if
@@ -864,7 +864,8 @@ let stake_from_unstake amount current_cycle preserved_cycles delegate_name
         in
         (account_map, rem_amount)
 
-let apply_stake amount current_cycle preserved_cycles staker_name account_map =
+let apply_stake amount current_cycle consensus_rights_delay staker_name
+    account_map =
   match String.Map.find staker_name account_map with
   | None -> raise Not_found
   | Some staker -> (
@@ -879,7 +880,7 @@ let apply_stake amount current_cycle preserved_cycles staker_name account_map =
               stake_from_unstake
                 amount
                 current_cycle
-                preserved_cycles
+                consensus_rights_delay
                 staker_name
                 account_map
             else (account_map, amount)
@@ -1088,7 +1089,7 @@ let apply_slashing
     let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in
     let unstaked_frozen, slashed_unstaked =
       Unstaked_frozen.slash
-        ~preserved_cycles:constants.preserved_cycles
+        ~slashable_deposits_period:constants.consensus_rights_delay
         slashed_cycle
         slashed_pct
         unstaked_frozen
@@ -1127,7 +1128,8 @@ let apply_slashing
   in
   (account_map, actual_total_burnt_amount)
 
-(* Given cycle is the cycle for which the rights are computed, usually current + preserved cycles *)
+(* Given cycle is the cycle for which the rights are computed, usually current +
+   consensus rights delay *)
 let update_frozen_rights_cycle cycle account_map =
   String.Map.map
     (fun ({frozen_deposits; frozen_rights; _} as acc) ->

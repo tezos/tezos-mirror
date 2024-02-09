@@ -201,7 +201,7 @@ Indeed, by relying on the ancestor context, this mode can *only*
 assert the validity of consensus-related preconditions (attesting
 power, block fitness, etc.), as future consensus slots are known in
 advance -- how much in advance being specified by the
-``<PRESERVED_CYCLES>`` protocol constant. Thus, the ``Partial
+``<CONSENSUS_RIGHTS_DELAY>`` protocol constant. Thus, the ``Partial
 application`` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.

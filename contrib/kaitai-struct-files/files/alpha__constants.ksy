@@ -212,8 +212,6 @@ seq:
   type: int31
 - id: smart_rollup_max_number_of_messages_per_level
   type: n
-- id: preserved_cycles
-  type: u1
 - id: consensus_rights_delay
   type: u1
 - id: blocks_preservation_cycles

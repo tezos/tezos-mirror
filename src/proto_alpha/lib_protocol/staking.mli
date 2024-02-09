@@ -58,7 +58,7 @@ val request_unstake :
     be finalized.
     An unstake request can be finalized if it is old enough, specifically the
     requested amount must not be at stake anymore and must not be slashable
-    anymore, i.e. after [preserved_cycles + max_slashing_period] after the
+    anymore, i.e. after [consensus_rights_delay + max_slashing_period] after the
     request.
     Amounts are transferred from the [contract]'s delegate (at request time)
     unstaked frozen deposits to [contract]'s spendable balance, minus slashing

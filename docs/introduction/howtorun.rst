@@ -125,7 +125,7 @@ your implicit account::
 
    octez-client register key bob as delegate
 
-Once registered, you need to wait ``preserved_cycles + 2 = 7`` cycles
+Once registered, you need to wait ``consensus_rights_delay + 2 = 7`` cycles
 for your rights to be considered.
 
 There is a simple rpc that can be used to check your rights for every
@@ -143,7 +143,7 @@ baking rights at higher rounds, like 2 in the example above.
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
-If a delegate doesn't show any sign of activity for ``preserved_cycles``
+If a delegate doesn't show any sign of activity for ``consensus_rights_delay``
 it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working

@@ -27,9 +27,11 @@
 
 let update_activity ctxt last_cycle =
   let open Lwt_result_syntax in
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  match Cycle_repr.sub last_cycle preserved with
-  | None -> return (ctxt, [])
+  let rights_delay = Constants_storage.consensus_rights_delay ctxt in
+  match Cycle_repr.sub last_cycle rights_delay with
+  | None ->
+      (* do not update activity in the first cycles of a network.*)
+      return (ctxt, [])
   | Some _unfrozen_cycle ->
       Stake_storage.fold_on_active_delegates_with_minimal_stake_s
         ctxt
@@ -227,10 +229,10 @@ let cycle_end ctxt last_cycle =
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =
-  let preserved = Constants_storage.preserved_cycles ctxt in
+  let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
   List.fold_left_es
     (fun ctxt c ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Delegate_sampler.select_distribution_for_cycle ctxt cycle)
     ctxt
-    Misc.(0 --> preserved)
+    Misc.(0 --> consensus_rights_delay)

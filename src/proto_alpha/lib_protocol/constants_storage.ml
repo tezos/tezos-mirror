@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let preserved_cycles c =
-  let constants = Raw_context.constants c in
-  constants.preserved_cycles
-
 let consensus_rights_delay c =
   let constants = Raw_context.constants c in
   constants.consensus_rights_delay

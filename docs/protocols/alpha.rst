@@ -82,11 +82,10 @@ Operation receipts
 Protocol parameters
 -------------------
 
-- Added ``consensus_rights_delay`` parametric constant. (MR :gl:`!11188`)
-
-- Added ``blocks_preservation_cycles`` parametric constant. (MR :gl:`!11280`)
-
-- Added ``delegate_parameters_activation_delay`` parametric constant. (MR :gl:`!11279`)
+- replace ``preserved_cycles`` with 3 constants ``consensus_rights_delay``,
+  ``blocks_preservation_cycles`` and
+  ``delegate_parameters_activation_delay``. (MR :gl:`!11188`, :gl:`!11280`,
+  :gl:`!11279`, :gl:`!11220`)
 
 - Set the number of blocks preservation cycles to 1. (MR :gl:`!11325`)
 
@@ -157,3 +156,11 @@ Minor Changes
 
 Internal
 --------
+
+- On top of the 3 new parametric constants ``consensus_rights_delay``,
+  ``blocks_preservation_cycles`` and ``delegate_parameters_activation_delay``
+  which replace ``preserved_cycles``, we added pseudo-constants that derive from
+  them : ``issuance_modification_delay``,
+  ``adaptive_issuance_activation_delay``, ``tolerated_inactivity_period``,
+  ``consensus_key_activation_delay``, ``slashable_deposits_period`` (MR
+  :gl:`!11188`, :gl:`!11280`, :gl:`!11279`, :gl:`!11629`)

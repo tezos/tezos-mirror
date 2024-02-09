@@ -462,8 +462,6 @@ seq:
 - id: no_reward_cycles
   type: int31
   if: (no_reward_cycles_tag == bool::true)
-- id: preserved_cycles
-  type: u1
 - id: consensus_rights_delay
   type: u1
 - id: blocks_preservation_cycles

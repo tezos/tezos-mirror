@@ -60,7 +60,7 @@ let get_first_2_accounts_contracts (a1, a2) =
       balance; it is computed in [Delegate_sampler.select_distribution_for_cycle]
 
    - frozen deposits = represents frozen_deposits_percentage of the maximum stake during
-      preserved_cycles + max_slashing_period cycles; obtained with
+      consensus_rights_delay + max_slashing_period cycles; obtained with
       Delegate.current_frozen_deposits
 
    - spendable balance = full balance - frozen deposits; obtained with Contract.balance
@@ -250,7 +250,7 @@ let test_limit_with_overdelegation () =
     Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -484,7 +484,7 @@ let test_cannot_bake_with_zero_deposits_limit () =
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
   let expected_number_of_cycles_with_rights_from_previous_deposit =
-    constants.preserved_cycles + Constants.max_slashing_period - 1
+    constants.consensus_rights_delay + Constants.max_slashing_period - 1
   in
   let* b =
     Block.bake_until_n_cycle_end
@@ -601,7 +601,7 @@ let test_deposits_after_stake_removal () =
   (* the frozen deposits for account1 do not change until [preserved cycles +
      max_slashing_period] are baked (-1 because we already baked a cycle) *)
   let* b =
-    loop b (constants.preserved_cycles + Constants.max_slashing_period - 1)
+    loop b (constants.consensus_rights_delay + Constants.max_slashing_period - 1)
   in
   (* and still after preserved cycles + max_slashing_period, the frozen_deposits
      for account1 won't reflect the decrease in account1's active stake
@@ -631,15 +631,17 @@ let test_deposits_unfrozen_after_deactivation () =
      expected last cycles at which it is considered active and at
      which it has non-zero deposits *)
   let last_active_cycle =
-    1 + (2 * constants.preserved_cycles)
+    1 + (2 * constants.consensus_rights_delay)
     (* according to [Delegate_storage.set_active] *)
   in
   let last_cycle_with_deposits =
-    last_active_cycle + constants.preserved_cycles
+    last_active_cycle + constants.consensus_rights_delay
     + Constants.max_slashing_period
     (* according to [Delegate_storage.freeze_deposits] *)
   in
-  let cycles_to_bake = last_cycle_with_deposits + constants.preserved_cycles in
+  let cycles_to_bake =
+    last_cycle_with_deposits + constants.consensus_rights_delay
+  in
   let rec loop b n =
     if n = 0 then return b
     else
@@ -733,7 +735,7 @@ let test_frozen_deposits_with_delegation () =
       expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -835,7 +837,7 @@ let test_frozen_deposits_with_overdelegation () =
       expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
   in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1
@@ -929,7 +931,7 @@ let test_set_limit_with_overdelegation () =
     Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.preserved_cycles + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -952,7 +954,7 @@ let test_set_limit_with_overdelegation () =
   return_unit
 
 (** This test fails when [to_cycle] in [Delegate.freeze_deposits] is smaller than
-   [new_cycle + preserved_cycles]. *)
+   [new_cycle + consensus_rights_delay]. *)
 let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   let open Lwt_result_syntax in
   let* genesis, contracts = Context.init_with_constants2 constants in
@@ -960,10 +962,10 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   let account1 = Context.Contract.pkh contract1 in
   (* [account2] delegates (through [new_account]) to [account1] its spendable
      balance. The point is to make [account1] have a lot of staking balance so
-     that, after [preserved_cycles] when the active stake reflects this increase
+     that, after [consensus_rights_delay] when the active stake reflects this increase
      in staking balance, its [maximum_stake_to_be_deposited] is bigger than the frozen
      deposit which is computed on a smaller window because [to_cycle] is smaller
-     than [new_cycle + preserved_cycles]. *)
+     than [new_cycle + consensus_rights_delay]. *)
   let* delegated_amount = Context.Contract.balance (B genesis) contract2 in
   let new_account = Account.new_account () in
   let new_contract = Contract.Implicit new_account.pkh in
@@ -989,9 +991,9 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   in
   let* b = Block.bake ~operation b in
   let* (_ : Block.t) =
-    Block.bake_until_n_cycle_end constants.preserved_cycles b
+    Block.bake_until_n_cycle_end constants.consensus_rights_delay b
   in
-  (* By this time, after [preserved_cycles] passed after [account1] has emptied
+  (* By this time, after [consensus_rights_delay] passed after [account1] has emptied
         its spendable balance, because [account1] had a big staking balance at
         cycle 0, at this cycle it has a big active stake, and so its
         [maximum_stake_to_be_deposited] too is bigger than [frozen_deposits.current_amount],
@@ -999,7 +1001,7 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
      Because the spendable balance of [account1] is 0, an error "Underflowing
         subtraction" is raised at the end of the cycle when updating the balance by
         subtracting [to_freeze] in [freeze_deposits].
-     Note that by taking [to_cycle] is [new_cycle + preserved_cycles],
+     Note that by taking [to_cycle] is [new_cycle + consensus_rights_delay],
         [frozen_deposits.current_amount] can no longer be smaller
         than [maximum_stake_to_be_deposited], that is, the invariant
         maximum_stake_to_be_deposited <= frozen_deposits + balance is preserved.

@@ -36,7 +36,7 @@ let hooks = Tezos_regression.hooks
 
 let blocks_per_cycle = 4
 
-let preserved_cycles = 1
+let consensus_rights_delay = 1
 
 let manual_staking (_ : Protocol.t) =
   (* Currently all protocols use autostaking by default; this will
@@ -96,16 +96,16 @@ let test_update_consensus_key =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    let p =
-      [
-        (["blocks_per_cycle"], `Int blocks_per_cycle);
-        (["nonce_revelation_threshold"], `Int 2);
-        (["preserved_cycles"], `Int preserved_cycles);
-      ]
+    let consensus_rights_delay_str =
+      if Protocol.number protocol > Protocol.number Protocol.Oxford then
+        "consensus_rights_delay"
+      else "preserved_cycles"
     in
-    if Protocol.number protocol > Protocol.number Protocol.Oxford then
-      (["consensus_rights_delay"], `Int preserved_cycles) :: p
-    else p
+    [
+      (["blocks_per_cycle"], `Int blocks_per_cycle);
+      (["nonce_revelation_threshold"], `Int 2);
+      ([consensus_rights_delay_str], `Int consensus_rights_delay);
+    ]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -220,7 +220,10 @@ let test_update_consensus_key =
 
   Log.info "Bake until the end of the next cycle with bootstrap1..." ;
   let* () =
-    bake_n_cycles preserved_cycles ~keys:[Constant.bootstrap1.alias] client
+    bake_n_cycles
+      consensus_rights_delay
+      ~keys:[Constant.bootstrap1.alias]
+      client
   in
 
   Log.info "Bootstrap1 should not be able to bake anymore..." ;
@@ -243,7 +246,10 @@ let test_update_consensus_key =
 
   Log.info "Bake until the end of the next cycle, again." ;
   let* () =
-    bake_n_cycles preserved_cycles ~keys:[Constant.bootstrap2.alias] client
+    bake_n_cycles
+      consensus_rights_delay
+      ~keys:[Constant.bootstrap2.alias]
+      client
   in
 
   Log.info "`key_c` is now able to bake as well." ;
@@ -261,7 +267,9 @@ let test_update_consensus_key =
   in
 
   Log.info "Bake until the end of the next cycle..." ;
-  let* () = bake_n_cycles (preserved_cycles + 1) ~keys:[key_a.alias] client in
+  let* () =
+    bake_n_cycles (consensus_rights_delay + 1) ~keys:[key_a.alias] client
+  in
 
   Log.info "We are not able to bake with `key_a` nor `key_c` anymore..." ;
   let* () = Client.bake_for ~expect_failure:true ~keys:[key_a.alias] client in
@@ -290,7 +298,7 @@ let test_update_consensus_key =
   Log.info "Bake until the end of the next cycle..." ;
   let* () =
     bake_n_cycles
-      (preserved_cycles + 1)
+      (consensus_rights_delay + 1)
       ~keys:[Constant.bootstrap1.alias]
       client
   in
@@ -474,7 +482,7 @@ let update_consensus_key ?(expect_failure = false)
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate src.public_key_hash
   in
-  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate src.public_key_hash
@@ -484,7 +492,7 @@ let update_consensus_key ?(expect_failure = false)
 let test_consensus_key_update ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(src : Account.key)
     ~(consensus_key : Account.key) client =
-  (* Update the consensus key and go past [preserved_cycles + 1] *)
+  (* Update the consensus key and go past [consensus_rights_delay + 1] *)
   let* () =
     update_consensus_key ~expect_failure ~baker ~src ~consensus_key client
   in
@@ -598,7 +606,7 @@ let register_key_as_delegate ?(expect_failure = false)
   in
 
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles preserved_cycles client in
+  let* () = bake_n_cycles consensus_rights_delay client in
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
@@ -630,16 +638,16 @@ let register ?(regression = true) title test =
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
-    let p =
-      [
-        (["blocks_per_cycle"], `Int blocks_per_cycle);
-        (["nonce_revelation_threshold"], `Int 2);
-        (["preserved_cycles"], `Int preserved_cycles);
-      ]
+    let consensus_rights_delay_str =
+      if Protocol.number protocol > Protocol.number Protocol.Oxford then
+        "consensus_rights_delay"
+      else "preserved_cycles"
     in
-    if Protocol.number protocol > Protocol.number Protocol.Oxford then
-      (["consensus_rights_delay"], `Int preserved_cycles) :: p
-    else p
+    [
+      (["blocks_per_cycle"], `Int blocks_per_cycle);
+      (["nonce_revelation_threshold"], `Int 2);
+      ([consensus_rights_delay_str], `Int consensus_rights_delay);
+    ]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -692,7 +700,7 @@ let test_register_delegate_with_consensus_key ~manual_staking
       in
 
       Log.info "Bake until the end of the next cycle with `baker`..." ;
-      bake_n_cycles (preserved_cycles + 1) ~keys:[baker] client)
+      bake_n_cycles (consensus_rights_delay + 1) ~keys:[baker] client)
     else return ()
   in
 
@@ -718,7 +726,7 @@ let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
       ~__LOC__
       owner
       ~expected_pending:
-        [(level_information.cycle + preserved_cycles + 1, consensus_key)]
+        [(level_information.cycle + consensus_rights_delay + 1, consensus_key)]
       client
   in
 
@@ -740,7 +748,7 @@ let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
   in
 
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles preserved_cycles client in
+  let* () = bake_n_cycles consensus_rights_delay client in
   let* () =
     check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
   in
@@ -767,10 +775,10 @@ let update_consensus_key_no_reg ?(baker = Constant.bootstrap1.alias)
       src
       ~expected_active
       ~expected_pending:
-        [(level_information.cycle + preserved_cycles + 1, consensus_key)]
+        [(level_information.cycle + consensus_rights_delay + 1, consensus_key)]
       client
   in
-  let* () = bake_n_cycles (preserved_cycles + 1) client in
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   check_consensus_key
     ~__LOC__
     consensus_key

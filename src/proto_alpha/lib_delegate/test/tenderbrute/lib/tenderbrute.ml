@@ -73,7 +73,7 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
    function is always called after {!init_context}. *)
 let change_seed ?initial_seed ctxt =
   let open Lwt_result_syntax in
-  let preserved = Constants_storage.preserved_cycles ctxt in
+  let delay = Constants_storage.consensus_rights_delay ctxt in
   let+ (_ : int), ctxt =
     List.fold_left_es
       (fun (c, ctxt) seed ->
@@ -82,7 +82,7 @@ let change_seed ?initial_seed ctxt =
         let+ ctxt = Storage.Seed.For_cycle.init ctxt cycle seed in
         (c + 1, ctxt))
       (0, ctxt)
-      (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
+      (Seed_repr.initial_seeds ?initial_seed (delay + 2))
   in
   ctxt
 

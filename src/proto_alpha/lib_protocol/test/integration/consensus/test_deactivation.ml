@@ -168,7 +168,7 @@ let test_deactivation_then_bake () =
     b
     deactivated_account
 
-(** check that an account which is deactivated for [preserved_cycles] cannot be
+(** check that an account which is deactivated for [consensus_rights_delay] cannot be
    part of a committee *)
 let test_a_really_deactivated_account_is_not_in_the_committee () =
   let open Lwt_result_syntax in
@@ -179,12 +179,12 @@ let test_a_really_deactivated_account_is_not_in_the_committee () =
   in
   (* at this point, the deactivated account can either bake (because it still
      has rights) and become active again, or, in case it is inactive for another
-     [preserved_cycles], it has no more rights, thus cannot be part of the
+     [consensus_rights_delay], it has no more rights, thus cannot be part of the
      committee. *)
   let constants = Default_parameters.constants_test in
   let* b =
     Block.bake_until_n_cycle_end
-      (constants.preserved_cycles + 1)
+      (constants.consensus_rights_delay + 1)
       ~policy:(By_account m2.pkh)
       b
   in

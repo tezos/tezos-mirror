@@ -174,9 +174,9 @@ module Contract : sig
       [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
       They won't be part of the stake for future distributions.
-      For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
+      For cycles [current_cycle - consensus_rights_delay - max_slashing_period + 1] to
       [current_cycle] they are still slashable.
-      For cycle [current_cycle - preserved_cycles - max_slashing_period] they are
+      For cycle [current_cycle - consensus_rights_delay - max_slashing_period] they are
       not slashable anymore and hence any other older cycles must be squashed
       into this one at cycle end. *)
   module Unstaked_frozen_deposits :
@@ -208,7 +208,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** If there is a value, the frozen balance for the contract won't
-     exceed it (starting in preserved_cycles + 1). *)
+     exceed it (starting in consensus_rights_delay + 1). *)
   module Frozen_deposits_limit :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -452,7 +452,7 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all active consensus keys in cycle `current + preserved_cycles + 1` *)
+(** Set of all active consensus keys in cycle `current + consensus_rights_delay + 1` *)
 module Consensus_keys :
   Data_set_storage
     with type t := Raw_context.t

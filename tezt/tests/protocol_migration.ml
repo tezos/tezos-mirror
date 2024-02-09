@@ -129,7 +129,11 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
-  let preserved_cycles = JSON.(get "preserved_cycles" parameters |> as_int) in
+  let consensus_rights_delay =
+    if Protocol.number migrate_to > Protocol.number Protocol.Oxford then
+      JSON.(get "consensus_rights_delay" parameters |> as_int)
+    else JSON.(get "preserved_cycles" parameters |> as_int)
+  in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
     Test.register
       ~__FILE__
@@ -142,7 +146,8 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
         ~migration_level
         ~migrate_from
         ~migrate_to
-        ~baked_blocks_after_migration:(2 * preserved_cycles * blocks_per_cycle)
+        ~baked_blocks_after_migration:
+          (2 * consensus_rights_delay * blocks_per_cycle)
         ()
     in
     unit

@@ -43,6 +43,6 @@ val cycle_end :
 (** [init_first_cycles ctxt] computes and records the distribution of
     the total active stake among active delegates. This concerns the total
     active stake involved in the calculation of baking rights for all cycles
-    in the range [0, preserved_cycles]. It also freezes the deposits for all
+    in the range [0, consensus_rights_delay]. It also freezes the deposits for all
     the active delegates. *)
 val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t

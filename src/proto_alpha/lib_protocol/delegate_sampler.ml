@@ -227,8 +227,8 @@ let select_distribution_for_cycle ctxt cycle =
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
 let select_new_distribution_at_cycle_end ctxt ~new_cycle =
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  let for_cycle = Cycle_repr.add new_cycle preserved in
+  let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
+  let for_cycle = Cycle_repr.add new_cycle consensus_rights_delay in
   select_distribution_for_cycle ctxt for_cycle
 
 let clear_outdated_sampling_data ctxt ~new_cycle =

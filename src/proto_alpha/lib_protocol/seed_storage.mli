@@ -47,7 +47,7 @@ type error +=
   | Unverified_vdf
   | Too_early_revelation
 
-(** Generates the first [preserved_cycles+2] seeds for which
+(** Generates the first [consensus_rights_delay+2] seeds for which
     there are no nonces. *)
 val init :
   ?initial_seed:State_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t

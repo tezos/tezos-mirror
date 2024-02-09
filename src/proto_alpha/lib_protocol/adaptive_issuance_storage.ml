@@ -40,8 +40,8 @@ let () =
   let open Data_encoding in
   let undetermined_issuance_coeff_for_cycle_description =
     "Issuance coefficient is only determined for the current cycle and the \
-     next [preserved_cycles] cycles to come. Requested cycle is not in this \
-     window."
+     next [consensus_rights_delay] cycles to come. Requested cycle is not in \
+     this window."
   in
   register_error_kind
     `Permanent

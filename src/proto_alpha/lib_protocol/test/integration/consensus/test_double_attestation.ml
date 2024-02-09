@@ -710,7 +710,6 @@ let test_freeze_more_with_low_balance =
           };
         consensus_threshold = 0;
         origination_size = 0;
-        preserved_cycles = 5;
         consensus_rights_delay = 5;
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
@@ -832,20 +831,20 @@ let test_freeze_more_with_low_balance =
     let* () =
       Assert.equal_tez ~loc:__LOC__ info6.current_frozen_deposits Tez.zero
     in
-    (* We bake [2 * preserved_cycles - 1] additional cycles only with [account2].
+    (* We bake [2 * consensus_rights_delay - 1] additional cycles only with [account2].
        Because [account1] does not bake during this period, it loses its rights.
     *)
     let* d1 =
       Block.bake_until_n_cycle_end
         ~policy:(By_account account2)
-        ((2 * constants.preserved_cycles) - 1)
+        ((2 * constants.consensus_rights_delay) - 1)
         c3
     in
     let* info7 = Context.Delegate.info (B d1) account1 in
-    (* [account1] is only deactivated after 1 + [2 * preserved_cycles] (see
+    (* [account1] is only deactivated after 1 + [2 * consensus_rights_delay] (see
        [Delegate_activation_storage.set_active] since the last time it was
        active, that is, since the first cycle. Thus the cycle at which
-       [account1] is deactivated is 2 + [2 * preserved_cycles] from genesis. *)
+       [account1] is deactivated is 2 + [2 * consensus_rights_delay] from genesis. *)
     let* () = Assert.equal_bool ~loc:__LOC__ info7.deactivated false in
     (* account1 is still active, but has no rights. *)
     let* () = check_unique_attester d1 account2 in
