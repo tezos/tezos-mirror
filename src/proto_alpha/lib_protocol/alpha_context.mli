@@ -2196,6 +2196,10 @@ module Misbehaviour : sig
   type kind = Double_baking | Double_attesting | Double_preattesting
 
   type t = {kind : kind; level : Raw_level.t; round : Round.t; slot : Slot.t}
+
+  val kind_encoding : kind Data_encoding.t
+
+  val compare_kind : kind -> kind -> int
 end
 
 (** This module re-exports definitions from {!Delegate_storage},

@@ -142,14 +142,15 @@ module Double_baking_evidence_map = struct
         list (tup2 (tup2 Raw_level.encoding Round.encoding) elt_encoding))
 end
 
-module Double_attesting_evidence_map = struct
+module Double_operation_evidence_map = struct
   include Map.Make (struct
-    type t = Raw_level.t * Round.t * Slot.t
+    type t = Raw_level.t * Round.t * Slot.t * Misbehaviour.kind
 
-    let compare (l, r, s) (l', r', s') =
+    let compare (l, r, s, k) (l', r', s', k') =
       Compare.or_else (Raw_level.compare l l') @@ fun () ->
       Compare.or_else (Round.compare r r') @@ fun () ->
-      Compare.or_else (Slot.compare s s') @@ fun () -> 0
+      Compare.or_else (Slot.compare s s') @@ fun () ->
+      Misbehaviour.compare_kind k k'
   end)
 
   let encoding elt_encoding =
@@ -159,7 +160,11 @@ module Double_attesting_evidence_map = struct
       Data_encoding.(
         list
           (tup2
-             (tup3 Raw_level.encoding Round.encoding Slot.encoding)
+             (tup4
+                Raw_level.encoding
+                Round.encoding
+                Slot.encoding
+                Misbehaviour.kind_encoding)
              elt_encoding))
 end
 
@@ -179,7 +184,7 @@ type anonymous_state = {
   activation_pkhs_seen : Operation_hash.t Ed25519.Public_key_hash.Map.t;
   double_baking_evidences_seen : Operation_hash.t Double_baking_evidence_map.t;
   double_attesting_evidences_seen :
-    Operation_hash.t Double_attesting_evidence_map.t;
+    Operation_hash.t Double_operation_evidence_map.t;
   seed_nonce_levels_seen : Operation_hash.t Raw_level.Map.t;
   vdf_solution_seen : Operation_hash.t option;
 }
@@ -229,7 +234,7 @@ let anonymous_state_encoding =
              (Double_baking_evidence_map.encoding Operation_hash.encoding))
           (req
              "double_attesting_evidences_seen"
-             (Double_attesting_evidence_map.encoding Operation_hash.encoding))
+             (Double_operation_evidence_map.encoding Operation_hash.encoding))
           (req
              "seed_nonce_levels_seen"
              (raw_level_map_encoding Operation_hash.encoding))
@@ -239,7 +244,7 @@ let empty_anonymous_state =
   {
     activation_pkhs_seen = Ed25519.Public_key_hash.Map.empty;
     double_baking_evidences_seen = Double_baking_evidence_map.empty;
-    double_attesting_evidences_seen = Double_attesting_evidence_map.empty;
+    double_attesting_evidences_seen = Double_operation_evidence_map.empty;
     seed_nonce_levels_seen = Raw_level.Map.empty;
     vdf_solution_seen = None;
   }
@@ -1393,19 +1398,26 @@ module Anonymous = struct
     in
     check_double_attesting_evidence ~consensus_operation:Attestation vi op1 op2
 
+  let double_operation_conflict_key (type kind)
+      (op1 : kind Kind.consensus Operation.t) =
+    let {slot; level; round; block_payload_hash = _}, kind =
+      match op1.protocol_data.contents with
+      | Single (Preattestation cc) -> (cc, Misbehaviour.Double_preattesting)
+      | Single (Attestation {consensus_content; dal_content = _}) ->
+          (consensus_content, Double_attesting)
+    in
+    (level, round, slot, kind)
+
   let check_double_attesting_evidence_conflict (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
-    match op1.protocol_data.contents with
-    | Single (Preattestation e1)
-    | Single (Attestation {consensus_content = e1; dal_content = _}) -> (
-        match
-          Double_attesting_evidence_map.find
-            (e1.level, e1.round, e1.slot)
-            vs.anonymous_state.double_attesting_evidences_seen
-        with
-        | None -> ok_unit
-        | Some existing ->
-            Error (Operation_conflict {existing; new_operation = oph}))
+    match
+      Double_operation_evidence_map.find
+        (double_operation_conflict_key op1)
+        vs.anonymous_state.double_attesting_evidences_seen
+    with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let check_double_preattestation_evidence_conflict vs oph
       (operation : Kind.double_preattestation_evidence operation) =
@@ -1427,20 +1439,17 @@ module Anonymous = struct
 
   let add_double_attesting_evidence (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
-    match op1.protocol_data.contents with
-    | Single (Preattestation e1)
-    | Single (Attestation {consensus_content = e1; dal_content = _}) ->
-        let double_attesting_evidences_seen =
-          Double_attesting_evidence_map.add
-            (e1.level, e1.round, e1.slot)
-            oph
-            vs.anonymous_state.double_attesting_evidences_seen
-        in
-        {
-          vs with
-          anonymous_state =
-            {vs.anonymous_state with double_attesting_evidences_seen};
-        }
+    let double_attesting_evidences_seen =
+      Double_operation_evidence_map.add
+        (double_operation_conflict_key op1)
+        oph
+        vs.anonymous_state.double_attesting_evidences_seen
+    in
+    {
+      vs with
+      anonymous_state =
+        {vs.anonymous_state with double_attesting_evidences_seen};
+    }
 
   let add_double_attestation_evidence vs oph
       (operation : Kind.double_attestation_evidence operation) =
@@ -1458,18 +1467,15 @@ module Anonymous = struct
 
   let remove_double_attesting_evidence (type kind) vs
       (op : kind Kind.consensus Operation.t) =
-    match op.protocol_data.contents with
-    | Single (Attestation {consensus_content = e; dal_content = _})
-    | Single (Preattestation e) ->
-        let double_attesting_evidences_seen =
-          Double_attesting_evidence_map.remove
-            (e.level, e.round, e.slot)
-            vs.anonymous_state.double_attesting_evidences_seen
-        in
-        let anonymous_state =
-          {vs.anonymous_state with double_attesting_evidences_seen}
-        in
-        {vs with anonymous_state}
+    let double_attesting_evidences_seen =
+      Double_operation_evidence_map.remove
+        (double_operation_conflict_key op)
+        vs.anonymous_state.double_attesting_evidences_seen
+    in
+    let anonymous_state =
+      {vs.anonymous_state with double_attesting_evidences_seen}
+    in
+    {vs with anonymous_state}
 
   let remove_double_preattestation_evidence vs
       (operation : Kind.double_preattestation_evidence operation) =

@@ -30,6 +30,8 @@ type t = {
   slot : Slot_repr.t;
 }
 
+val kind_encoding : kind Data_encoding.t
+
 val encoding : t Data_encoding.t
 
 val compare_kind : kind -> kind -> int
