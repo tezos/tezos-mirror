@@ -55,7 +55,7 @@ origination using the ``--delegate`` option:
 
 Once the contract is originated, the only way to stop or modify its
 delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
-:ref:`the Michelson documentation<MichelsonSetDelegate>` for more
+`the Michelson documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ for more
 details).
 
 
@@ -227,14 +227,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PtNairob``, you can
+For instance, if the name is ``mainnet_baker-Proxford``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PtNairob
+    docker logs mainnet_baker-Proxford
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PtNairob -f
+    docker logs mainnet_baker-Proxford -f
 
 This allows you to know if you baked.
 You should see lines such as::

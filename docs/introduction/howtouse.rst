@@ -31,8 +31,8 @@ After a successful compilation, you should have the following binaries:
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to.
 More precisely, the suffix consists of the first 8 characters of the protocol hash; except for protocol Alpha, for which the suffix is simply ``-alpha``.
-For instance, ``octez-baker-PtNairob`` is the baker
-for the Nairobi protocol, and ``octez-baker-alpha`` is the baker
+For instance, ``octez-baker-Proxford`` is the baker
+for the Oxford protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 

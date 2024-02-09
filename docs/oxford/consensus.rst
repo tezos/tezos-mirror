@@ -50,6 +50,7 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_oxford:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,12 +80,14 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_oxford:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_oxford:
 
 Unlike Emmy*, Tenderbake has `two types of
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_oxford:
 
 Transaction and block finality
@@ -138,6 +142,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake:
 .. _active_stake_oxford:
 
 Validator selection: staking balance, active stake, and frozen deposits
@@ -370,6 +375,7 @@ included during that cycle has been ``2,123,456`` slots. Given that this number 
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an attesting
 reward of ``2,867,200 * 0.001428 = 4094.3616`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_oxford:
 
 Slashing
@@ -414,6 +420,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_oxford:
 
 Consensus related protocol parameters
@@ -454,6 +461,7 @@ Consensus related protocol parameters
 
 These are a subset of the :ref:`protocol constants <protocol_constants_oxford>`.
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_oxford:
 
 Shell-protocol interaction revisited
@@ -475,6 +483,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_oxford>`.
 
+.. _fitness:
 .. _fitness_oxford:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.

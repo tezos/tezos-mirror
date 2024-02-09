@@ -55,19 +55,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Nairobi RPCs
-------------
-
-The OpenAPI specifications for RPCs which are specific to the Nairobi (``PtNairob``)
-protocol can be found at:
-
-- `nairobi-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-openapi.json>`_
-
-The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Nairobi protocol can be found at:
-
-- `nairobi-mempool-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
-
 Oxford RPCs
 -----------
 
@@ -89,14 +76,7 @@ protocol in use. Their specification is given in the sections below.
 (The exact versions of the rollup node for which these files are produced can be
 seen in the field ``.info.version`` within each file.)
 
-Nairobi RPCs
-------------
-
-The OpenAPI specifications for the RPCs of the smart rollup node for the Nairobi
-(``PtNairob``) protocol can be found at:
-
-- `nairobi-smart-rollup-node-openapi.json (version from master branch)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-smart-rollup-node-openapi.json>`_
+.. TODO tezos/tezos#2170: add/remove section(s)
 
 Oxford RPCs
 -----------

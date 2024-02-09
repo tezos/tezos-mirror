@@ -183,7 +183,7 @@ Tickets
 
 Tickets are a generic and composable mechanism for authenticating data
 from smart contracts, managing permissions, and representing assets.
-More information can be found in the :ref:`Ticket documentation <MichelsonTickets>`.
+More information can be found in the :doc:`Ticket documentation <../active/tickets>`.
 
 Comb pairs
 ~~~~~~~~~~
