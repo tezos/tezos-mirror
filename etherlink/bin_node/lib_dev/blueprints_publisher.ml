@@ -245,21 +245,17 @@ let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_catchup
 type error += No_worker
 
 let worker =
-  let open Result_syntax in
   lazy
     (match Lwt.state worker_promise with
-    | Lwt.Return worker -> return worker
-    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error No_worker)
+    | Lwt.Return worker -> Ok worker
+    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
+    | Lwt.Sleep -> Error (TzTrace.make No_worker))
 
 let worker_add_request ~request =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
-  | Ok w ->
-      let*! (_pushed : bool) = Worker.Queue.push_request w request in
-      return_unit
-  | Error No_worker -> return_unit
-  | Error e -> tzfail e
+  let*? w = Lazy.force worker in
+  let*! (_pushed : bool) = Worker.Queue.push_request w request in
+  return_unit
 
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})

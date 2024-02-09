@@ -435,7 +435,8 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
+    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
+    | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
 
 let handle_request_error rq =
   let open Lwt_syntax in

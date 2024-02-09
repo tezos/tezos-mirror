@@ -228,7 +228,8 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_delayed_inbox))
+    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
+    | Lwt.Sleep -> Error (TzTrace.make No_delayed_inbox))
 
 let start parameters =
   let open Lwt_result_syntax in
@@ -253,7 +254,6 @@ let worker_add_request ~request : unit tzresult Lwt.t =
   | Ok w ->
       let*! (_pushed : bool) = Worker.Queue.push_request w request in
       return_unit
-  | Error [No_delayed_inbox] -> return_unit
   | Error e -> Lwt.return (Error e)
 
 let new_rollup_block rollup_level =
