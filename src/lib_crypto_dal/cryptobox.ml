@@ -891,9 +891,7 @@ module Inner = struct
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
-    let srs_0 = Kzg.Bls.G1.one in
-    let srs_n_d = t.srs_g2.commitment in
-    Degree_check.verify srs_0 srs_n_d cm proof
+    Degree_check.verify t.srs_g2.commitment cm proof
 
   let save_precompute_shards_proofs precomputation ~filename =
     protect (fun () ->

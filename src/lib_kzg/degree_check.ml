@@ -4,7 +4,7 @@ module Proof = Commitment.Single
 
 type prover_public_parameters = Srs_g1.t
 
-type verifier_public_parameters = {srs_0 : G2.t; srs_n_d : G2.t}
+type verifier_public_parameters = G2.t
 
 type secret = Poly.t
 
@@ -35,14 +35,14 @@ let prove ~max_commit ~max_degree srs p =
   |> Commitment.Commit.with_srs2 srs
 
 (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
-let verify_g1 {srs_0; srs_n_d} (cm : Commitment.Single.t) proof =
+let verify_g1 srs_n_d (cm : Commitment.Single.t) proof =
   (* checking that cm * committed_offset_monomial = proof *)
-  Pairing.pairing_check [(G1.negate cm, srs_n_d); (proof, srs_0)]
+  Pairing.pairing_check [(G1.negate cm, srs_n_d); (proof, G2.one)]
 
 (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
-let verify srs_0 srs_n_d (cm : Commitment.Single.t) proof =
+let verify srs_n_d (cm : Commitment.Single.t) proof =
   (* checking that cm * committed_offset_monomial = proof *)
-  Pairing.pairing_check [(G1.negate cm, srs_n_d); (srs_0, proof)]
+  Pairing.pairing_check [(G1.negate cm, srs_n_d); (G1.one, proof)]
 
 let prove_multi ~max_commit ~max_degree srs transcript cm p =
   let transcript = Transcript.expand Commitment.t cm transcript in
