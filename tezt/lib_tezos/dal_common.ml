@@ -187,6 +187,27 @@ module Dal_RPC = struct
     let data : RPC_core.data = Data (JSON.unannotate slot) in
     make ~data POST ["commitments"] JSON.as_string
 
+  (* Converts a possibly invalid UTF-8 string into a JSON object using
+     Data-encoding's unistring representation. *)
+  let unistring_to_json s =
+    let l =
+      String.to_seq s
+      |> Seq.map (fun c -> `Float (float_of_int @@ Char.code c))
+      |> List.of_seq
+    in
+    `O [("invalid_utf8_string", `A l)]
+
+  let post_slot slot =
+    let data : RPC_core.data = Data (unistring_to_json slot) in
+    make
+      ~data
+      POST
+      ["slot"]
+      JSON.(
+        fun json ->
+          ( json |-> "commitment" |> as_string,
+            json |-> "commitment_proof" |> as_string ))
+
   let patch_commitment commitment ~slot_level ~slot_index =
     let data : RPC_core.data =
       Data
@@ -201,7 +222,7 @@ module Dal_RPC = struct
   let get_commitment_slot commitment =
     make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
 
-  let put_commitment_shards ?(with_proof = false) commitment =
+  let put_commitment_shards ?(with_proof = true) commitment =
     let data : RPC_core.data = Data (`O [("with_proof", `Bool with_proof)]) in
     make ~data PUT ["commitments"; commitment; "shards"] as_empty_object_or_fail
 
@@ -466,18 +487,23 @@ module Helpers = struct
       | Either.Left node -> Dal_RPC.Local.call node
       | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
     in
-    let* commitment =
-      call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
-    in
-    let* () =
-      Dal_RPC.(
-        call dal_node_or_endpoint
-        @@ put_commitment_shards ?with_proof commitment)
-    in
-    let* proof =
-      Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
-    in
-    return (commitment, proof)
+    (* Use the POST /slot RPC except if shard proof computation is
+       explicitly deactivated with with_proof:false *)
+    match with_proof with
+    | None | Some true -> call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
+    | Some false ->
+        let* commitment =
+          call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
+        in
+        let* () =
+          Dal_RPC.(
+            call dal_node_or_endpoint
+            @@ put_commitment_shards ~with_proof:false commitment)
+        in
+        let* proof =
+          Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
+        in
+        return (commitment, proof)
 end
 
 module Commitment = struct

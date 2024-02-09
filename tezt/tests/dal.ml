@@ -2477,7 +2477,9 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     let* () = publish source ~index slot_content in
     let* _commitment, _proof =
-      Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
+      Helpers.(
+        store_slot ~with_proof:false dal_node
+        @@ make_slot ~slot_size slot_content)
     in
     unit
   in
@@ -2606,6 +2608,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
       level ;
     let promise =
       publish_and_store_slot
+        ~with_proof:false
         ~force:true
         ~counter:!counter
         l1_client
