@@ -39,7 +39,6 @@ module Internal_for_tests = struct
   module Domain_unsafe = Domain.Domain_unsafe
   module Polynomial_unsafe = Polynomial.Polynomial_unsafe
   module Evaluations_unsafe = Evaluations.Evaluations_unsafe
-  module Srs_unsafe = Srs.Srs_g1_unsafe
 end
 
 module Evaluations = Evaluations

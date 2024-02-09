@@ -51,11 +51,6 @@ module Internal_for_tests : sig
       with type scalar = scalar
        and type domain = Domain_unsafe.t
        and type polynomial = Polynomial_unsafe.t
-
-  module Srs_unsafe :
-    Srs.S_unsafe
-      with type elt = Bls12_381.G1.t
-       and type polynomial = Polynomial_unsafe.t
 end
 
 module Domain : Domain.Domain_sig with type scalar = scalar

@@ -300,12 +300,3 @@ module Srs = struct
 
   let check = Checks.pairings
 end
-
-(* testing only *)
-module type S_unsafe = sig
-  include S
-
-  val of_array : elt array -> t
-end
-
-module Srs_g1_unsafe = Make (Elt_g1)
