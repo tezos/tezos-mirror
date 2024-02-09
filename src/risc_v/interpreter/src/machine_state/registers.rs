@@ -11,7 +11,7 @@ use crate::machine_state::backend::{self, Region};
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(usize)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum XRegister {
     // The `usize` representation of these constructors shall be used as an
     // index into the 31-element array holding the registers.
@@ -88,6 +88,45 @@ pub const t3: XRegister = x28;
 pub const t4: XRegister = x29;
 pub const t5: XRegister = x30;
 pub const t6: XRegister = x31;
+
+pub fn parse_register(r: u32) -> XRegister {
+    use XRegister::*;
+    match r {
+        0b0_0000 => x0,
+        0b0_0001 => x1,
+        0b0_0010 => x2,
+        0b0_0011 => x3,
+        0b0_0100 => x4,
+        0b0_0101 => x5,
+        0b0_0110 => x6,
+        0b0_0111 => x7,
+        0b0_1000 => x8,
+        0b0_1001 => x9,
+        0b0_1010 => x10,
+        0b0_1011 => x11,
+        0b0_1100 => x12,
+        0b0_1101 => x13,
+        0b0_1110 => x14,
+        0b0_1111 => x15,
+        0b1_0000 => x16,
+        0b1_0001 => x17,
+        0b1_0010 => x18,
+        0b1_0011 => x19,
+        0b1_0100 => x20,
+        0b1_0101 => x21,
+        0b1_0110 => x22,
+        0b1_0111 => x23,
+        0b1_1000 => x24,
+        0b1_1001 => x25,
+        0b1_1010 => x26,
+        0b1_1011 => x27,
+        0b1_1100 => x28,
+        0b1_1101 => x29,
+        0b1_1110 => x30,
+        0b1_1111 => x31,
+        _ => panic!("Invalid register"),
+    }
+}
 
 impl XRegister {
     #[inline]
