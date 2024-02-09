@@ -206,6 +206,10 @@ let changeset_octez =
     "tzt_reference_test_suite/**/*";
   ]
 
+let changeset_octez_or_kernels =
+  ["images/**/*"; "scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"]
+  @ changeset_octez
+
 (* Dummy job.
 
    This fixes the "configuration must contain at least one
@@ -260,13 +264,20 @@ let trigger =
     - Sets the appropriate image.
     - Activates the Docker daemon as a service.
     - It sets up authentification with docker registries *)
-let job_docker_authenticated ?variables ~stage ~name script : job =
+let job_docker_authenticated ?(skip_docker_initialization = false) ?variables
+    ?rules ?dependencies ?artifacts ~stage ~name script : job =
   let docker_version = "24.0.6" in
   job
+    ?rules
+    ?dependencies
+    ?artifacts
     ~image:Images.docker
     ~variables:
       ([("DOCKER_VERSION", docker_version)] @ Option.value ~default:[] variables)
-    ~before_script:["./scripts/ci/docker_initialize.sh"]
+    ~before_script:
+      (if not skip_docker_initialization then
+       ["./scripts/ci/docker_initialize.sh"]
+      else [])
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~stage
     ~name
@@ -370,6 +381,38 @@ let _job_static_x86_64_release =
        ~release:true
        ~rules:rules_static_build_other
        ()
+
+let job_docker_rust_toolchain ?rules ?dependencies () =
+  job_docker_authenticated
+    ?rules
+    ?dependencies
+    ~skip_docker_initialization:true
+    ~stage:Stages.build
+    ~name:"oc.docker:rust-toolchain"
+    ~variables:[("CI_DOCKER_HUB", "false")]
+    ~artifacts:
+      (artifacts
+         ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
+         [])
+    ["./scripts/ci/docker_rust_toolchain_build.sh"]
+
+let _job_docker_rust_toolchain_before_merging =
+  job_external ~filename_suffix:"before_merging"
+  @@ job_docker_rust_toolchain
+       ~dependencies:(Dependent [Optional trigger])
+       ~rules:
+         [
+           job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
+           job_rule ~when_:Manual ();
+         ]
+       ()
+
+let _job_docker_rust_toolchain_master =
+  job_external ~filename_suffix:"master"
+  @@ job_docker_rust_toolchain ~rules:[job_rule ~when_:Always ()] ()
+
+let _job_docker_rust_toolchain_other =
+  job_external ~filename_suffix:"other" @@ job_docker_rust_toolchain ()
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
