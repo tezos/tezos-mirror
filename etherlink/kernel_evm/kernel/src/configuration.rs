@@ -50,6 +50,38 @@ impl std::fmt::Display for Configuration {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct TezosContracts {
+    pub ticketer: Option<ContractKt1Hash>,
+    pub admin: Option<ContractKt1Hash>,
+    pub sequencer_admin: Option<ContractKt1Hash>,
+}
+
+impl std::fmt::Display for TezosContracts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Ticketer is {:?}. Administrator is {:?}. Sequencer administrator is {:?}.",
+            self.ticketer, self.admin, self.sequencer_admin,
+        )
+    }
+}
+fn contains(contract: &Option<ContractKt1Hash>, expected: &ContractKt1Hash) -> bool {
+    contract.as_ref().map_or(false, |kt1| kt1 == expected)
+}
+
+impl TezosContracts {
+    pub fn is_admin(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.admin, contract)
+    }
+    pub fn is_sequencer_admin(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.sequencer_admin, contract)
+    }
+    pub fn is_ticketer(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.ticketer, contract)
+    }
+}
+
 pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let sequencer = sequencer(host).unwrap_or_default();
     match sequencer {

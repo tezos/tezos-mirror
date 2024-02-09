@@ -5,8 +5,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::configuration::TezosContracts;
 use crate::{
-    inbox::{Deposit, TezosContracts, Transaction, TransactionContent},
+    inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
 };

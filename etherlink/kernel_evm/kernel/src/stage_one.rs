@@ -4,11 +4,11 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
-use crate::configuration::{Configuration, ConfigurationMode};
+use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
+use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
-use crate::inbox::{read_inbox, TezosContracts};
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};

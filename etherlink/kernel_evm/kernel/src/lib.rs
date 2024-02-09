@@ -5,10 +5,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::configuration::{fetch_configuration, Configuration};
+use crate::configuration::{fetch_configuration, Configuration, TezosContracts};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::inbox::TezosContracts;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::fetch;
