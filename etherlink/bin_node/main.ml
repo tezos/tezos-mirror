@@ -791,7 +791,7 @@ let observer_command =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
 
-  let* ctxt =
+  let* ctxt, _loaded =
     Evm_context.init
       ~data_dir
       ?kernel_path:kernel

@@ -21,6 +21,7 @@ depends: [
   "bisect_ppx" { >= "2.7.0" }
   "camlzip" { >= "1.11" & < "1.12" }
   "caqti"
+  "caqti-driver-sqlite3" { >= "2.0.1" }
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
   "checkseum" { != "0.5.0" }
