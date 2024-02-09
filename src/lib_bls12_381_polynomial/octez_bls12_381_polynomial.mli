@@ -69,6 +69,8 @@ module Evaluations :
      and type domain = Domain.t
      and type polynomial = Polynomial.t
 
+module type Srs_sig = Srs.S with type polynomial = Polynomial.t
+
 module Srs : sig
   module Srs_g1 :
     Srs.S with type polynomial = Polynomial.t and type elt = Bls12_381.G1.t
