@@ -99,12 +99,6 @@ let punish_double_signing ctxt ~operation_hash
   in
   return ctxt
 
-let clear_outdated_already_denounced ctxt ~new_cycle =
-  let max_slashable_period = Constants_repr.max_slashing_period in
-  match Cycle_repr.(sub new_cycle max_slashable_period) with
-  | None -> Lwt.return ctxt
-  | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
-
 (* Misbehaviour Map: orders denunciations for application.
    See {!Misbehaviour_repr.compare} for the order on misbehaviours:
    - by increasing level, then increasing round, then kind, ignoring the slot

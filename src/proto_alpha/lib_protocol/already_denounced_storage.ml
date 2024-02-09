@@ -57,3 +57,8 @@ let add_denunciation ctxt delegate (level : Level_repr.t) round kind =
       updated_denounced
   in
   return ctxt
+
+let clear_outdated_cycle ctxt ~new_cycle =
+  match Cycle_repr.(sub new_cycle Constants_repr.max_slashing_period) with
+  | None -> Lwt.return ctxt
+  | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
