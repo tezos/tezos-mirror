@@ -80,6 +80,7 @@ pub enum Input {
     SimpleTransaction(Box<Transaction>),
     Deposit(Deposit),
     Upgrade(KernelUpgrade),
+    RemoveSequencer,
     NewSequencer(PublicKey),
     NewChunkedTransaction {
         tx_hash: TransactionHash,
@@ -190,9 +191,13 @@ impl InputResult {
     }
 
     fn parse_sequencer_update(bytes: &[u8]) -> Self {
-        let pk_b58 = parsable!(String::from_utf8(bytes.to_vec()).ok());
-        let pk = parsable!(PublicKey::from_b58check(&pk_b58).ok());
-        Self::Input(Input::NewSequencer(pk))
+        if bytes.is_empty() {
+            Self::Input(Input::RemoveSequencer)
+        } else {
+            let pk_b58 = parsable!(String::from_utf8(bytes.to_vec()).ok());
+            let pk = parsable!(PublicKey::from_b58check(&pk_b58).ok());
+            Self::Input(Input::NewSequencer(pk))
+        }
     }
 
     fn parse_sequencer_blueprint_input(sequencer: &PublicKey, bytes: &[u8]) -> Self {

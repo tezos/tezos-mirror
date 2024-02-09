@@ -831,6 +831,11 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
         Ok(None)
     }
 }
+
+pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&SEQUENCER).map_err(Into::into)
+}
+
 pub fn store_sequencer<Host: Runtime>(
     host: &mut Host,
     public_key: PublicKey,

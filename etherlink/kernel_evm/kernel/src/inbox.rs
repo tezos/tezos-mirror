@@ -13,7 +13,7 @@ use crate::simulation;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, create_chunked_transaction,
-    get_and_increment_deposit_nonce, remove_chunked_transaction,
+    get_and_increment_deposit_nonce, remove_chunked_transaction, remove_sequencer,
     store_last_info_per_level_timestamp, store_sequencer, store_transaction_chunk,
 };
 use crate::upgrade::*;
@@ -316,8 +316,8 @@ pub fn handle_input(
             }
         }
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
+        Input::RemoveSequencer => remove_sequencer(host)?,
         Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
-
         Input::Info(info) => {
             store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
         }
