@@ -1159,8 +1159,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                 c.adaptive_issuance.edge_of_staking_over_delegation;
               launch_ema_threshold = c.adaptive_issuance.launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable =
-                c.adaptive_issuance.activation_vote_enable;
+              activation_vote_enable = true;
               autostaking_enable = c.adaptive_issuance.autostaking_enable;
               force_activation = false;
               ns_enable = false;
