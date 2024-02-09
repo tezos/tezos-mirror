@@ -179,10 +179,48 @@ let clean_frozen_deposits_for_p ctxt =
   in
   Raw_context.update_tree ctxt contracts_index contracts_tree
 
+let cleanup_values_for_protocol_p ctxt
+    (previous_proto_constants : Constants_parametric_previous_repr.t option)
+    level =
+  let open Lwt_result_syntax in
+  let preserved_cycles =
+    let previous_proto_constants =
+      match previous_proto_constants with
+      | None ->
+          (* Shouldn't happen *)
+          failwith
+            "Internal error: cannot read previous protocol constants in \
+             context."
+      | Some c -> c
+    in
+    previous_proto_constants.preserved_cycles
+  in
+  let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
+  let new_cycle =
+    let next_level = Raw_level_repr.succ level in
+    let cycle_eras = Raw_context.cycle_eras ctxt in
+    (Level_repr.level_from_raw ~cycle_eras next_level).cycle
+  in
+  let* ctxt =
+    Stake_storage.cleanup_values_for_protocol_p
+      ctxt
+      ~preserved_cycles
+      ~consensus_rights_delay
+      ~new_cycle
+  in
+  let* ctxt =
+    Delegate_sampler.cleanup_values_for_protocol_p
+      ctxt
+      ~preserved_cycles
+      ~consensus_rights_delay
+      ~new_cycle
+  in
+  return ctxt
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
-  let* previous_protocol, ctxt =
+  let* previous_protocol, previous_proto_constants, ctxt =
     Raw_context.prepare_first_block ~level ~timestamp chain_id ctxt
   in
   let parametric = Raw_context.constants ctxt in
@@ -280,6 +318,9 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = migrate_staking_balance_and_active_delegates_for_p ctxt in
         let* ctxt = clean_frozen_deposits_for_p ctxt in
         let*! ctxt = Raw_context.remove ctxt ["last_snapshot"] in
+        let* ctxt =
+          cleanup_values_for_protocol_p ctxt previous_proto_constants level
+        in
         return (ctxt, [])
   in
   let* ctxt =

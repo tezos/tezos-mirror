@@ -180,7 +180,7 @@ let constants_mainnet : Constants.Parametric.t =
   in
   let sc_rollup = make_sc_rollup_parameter ~dal_activation_level block_time in
   {
-    consensus_rights_delay = 5;
+    consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
     delegate_parameters_activation_delay = 5;
     blocks_per_cycle = 24576l;

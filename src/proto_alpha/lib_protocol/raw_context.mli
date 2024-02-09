@@ -100,7 +100,8 @@ val prepare_first_block :
   timestamp:Time.t ->
   Chain_id.t ->
   Context.t ->
-  (previous_protocol * t) tzresult Lwt.t
+  (previous_protocol * Constants_parametric_previous_repr.t option * t) tzresult
+  Lwt.t
 
 val activate : t -> Protocol_hash.t -> t Lwt.t
 

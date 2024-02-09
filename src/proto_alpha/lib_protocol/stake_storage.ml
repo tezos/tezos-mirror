@@ -71,6 +71,15 @@ module Selected_distribution_for_cycle = struct
     let id = identifier_of_cycle cycle in
     let*? ctxt = Cache.update ctxt id None in
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
+
+  let remove ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let*? ctxt = Cache.update ctxt id None in
+    let*! ctxt =
+      Storage.Stake.Selected_distribution_for_cycle.remove ctxt cycle
+    in
+    return ctxt
 end
 
 let get_full_staking_balance = Storage.Stake.Staking_balance.get
@@ -262,6 +271,27 @@ let add_contract_delegated_stake ctxt contract amount =
   match delegate_opt with
   | None -> return ctxt
   | Some delegate -> add_delegated_stake ctxt delegate amount
+
+(* let's assume that consensus_rights_delay <= preserved_cycles;
+   we need to keep [ new_cycles; new_cycles + consensus_rights_delay ]
+   and remove the rest, i.e.,
+   [ new_cycles + consensus_rights_delay + 1; new_cycles + preserved_cycles ] *)
+let cleanup_values_for_protocol_p ctxt ~preserved_cycles ~consensus_rights_delay
+    ~new_cycle =
+  let open Lwt_result_syntax in
+  assert (Compare.Int.(consensus_rights_delay <= preserved_cycles)) ;
+  if Compare.Int.(consensus_rights_delay = preserved_cycles) then return ctxt
+  else
+    let start_cycle = Cycle_repr.add new_cycle (consensus_rights_delay + 1) in
+    let end_cycle = Cycle_repr.add new_cycle preserved_cycles in
+    List.fold_left_es
+      (fun ctxt cycle_to_clear ->
+        let*! ctxt =
+          Storage.Stake.Total_active_stake.remove ctxt cycle_to_clear
+        in
+        Selected_distribution_for_cycle.remove ctxt cycle_to_clear)
+      ctxt
+      Cycle_repr.(start_cycle ---> end_cycle)
 
 module For_RPC = struct
   let get_staking_balance ctxt delegate =
