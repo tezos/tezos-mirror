@@ -6,9 +6,14 @@
 
 ### Bug fixes
 
+- Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
+
 ### Breaking changes
 
 ### Internal
+
+- `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
+- Implement warm/cold access for state access opcodes. (!11580)
 
 ## Version a41f30ddb8787e5ff5c461d949a9ae3f71e4eea9
 
@@ -17,7 +22,6 @@
 - Implement Call stipend for inner call with transfer. (!11587)
 - Support 'modexp' precompiled contract. (!11732)
 - Support 'ecAdd', 'ecMul' and 'ecPairing' precompiled contracts. (!11746)
-
 
 ### Bug fixes
 
@@ -30,7 +34,6 @@
   in initialisation code. (!11637)
 - Fix a bug where SELFDESTRUCT deletes contracts immediately rather than at the end of the transaction. (!11658)
 - `CallTooDeep` is treated as a simple error (not as fatal). (!11794)
-- Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 
 ### Breaking changes
 
@@ -38,9 +41,6 @@
   Withdrawal contract address is now 'ff00000000000000000000000000000000000001'. (!11556)
   
 ### Internal
-- Implement warm/cold access for state access opcodes. (!11580)
-
-- `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
 
 ## Version 9978f3a5f8bee0be78686c5c568109d2e6148f13
 
