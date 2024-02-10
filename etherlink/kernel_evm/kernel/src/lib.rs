@@ -8,7 +8,6 @@
 use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::inbox::TezosContracts;
 use crate::migration::storage_migration;
 use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::fetch;
@@ -19,11 +18,11 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    read_admin, read_base_fee_per_gas, read_chain_id, read_da_fee, read_flat_fee,
+    read_base_fee_per_gas, read_chain_id, read_da_fee, read_flat_fee,
     read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, read_sequencer_admin, read_ticketer,
-    store_base_fee_per_gas, store_chain_id, store_da_fee, store_flat_fee,
-    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_last_info_per_level_timestamp_stats, store_base_fee_per_gas, store_chain_id,
+    store_da_fee, store_flat_fee, store_kernel_version, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
@@ -97,14 +96,12 @@ pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: TezosContracts,
     configuration: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage one.");
-    log!(host, Info, "tezos_contracts: {}", tezos_contracts);
     log!(host, Info, "Configuration: {}", configuration);
 
-    fetch(host, smart_rollup_address, tezos_contracts, configuration)
+    fetch(host, smart_rollup_address, configuration)
 }
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
@@ -210,35 +207,16 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     // 1. Fetch the smart rollup address via the host function, it cannot fail.
     let smart_rollup_address = Runtime::reveal_metadata(host).raw_rollup_address;
-    // 2. Fetch the kernel's ticketer, returns `None` if it is badly
-    //    encoded or absent.
-    let ticketer = read_ticketer(host);
-    // 3. Fetch the kernel's administrator, returns `None` if it is badly
-    //    encoded or absent.
-    let admin = read_admin(host);
-    // 4. Fetch the sequencer administrator, returns `None` if it is badly
-    //    encoded or absent.
-    let sequencer_admin = read_sequencer_admin(host);
-    // 5. Fetch the per mode configuration of the kernel. Returns the default
+    // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
     let mut configuration = fetch_configuration(host);
 
-    let tezos_contracts = TezosContracts {
-        ticketer,
-        admin,
-        sequencer_admin,
-    };
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    stage_one(
-        host,
-        smart_rollup_address,
-        tezos_contracts,
-        &mut configuration,
-    )
-    .context("Failed during stage 1")?;
+    stage_one(host, smart_rollup_address, &mut configuration)
+        .context("Failed during stage 1")?;
 
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints

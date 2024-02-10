@@ -5,8 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fmt::Display;
-
+use crate::configuration::TezosContracts;
 use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK};
 use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::simulation;
@@ -29,37 +28,6 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct TezosContracts {
-    pub ticketer: Option<ContractKt1Hash>,
-    pub admin: Option<ContractKt1Hash>,
-    pub sequencer_admin: Option<ContractKt1Hash>,
-}
-
-impl Display for TezosContracts {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Ticketer is {:?}. Administrator is {:?}. Sequencer administrator is {:?}.",
-            self.ticketer, self.admin, self.sequencer_admin,
-        )
-    }
-}
-fn contains(contract: &Option<ContractKt1Hash>, expected: &ContractKt1Hash) -> bool {
-    contract.as_ref().map_or(false, |kt1| kt1 == expected)
-}
-
-impl TezosContracts {
-    pub fn is_admin(&self, contract: &ContractKt1Hash) -> bool {
-        contains(&self.admin, contract)
-    }
-    pub fn is_sequencer_admin(&self, contract: &ContractKt1Hash) -> bool {
-        contains(&self.sequencer_admin, contract)
-    }
-    pub fn is_ticketer(&self, contract: &ContractKt1Hash) -> bool {
-        contains(&self.ticketer, contract)
-    }
-}
 #[derive(Debug, PartialEq, Clone)]
 pub struct Deposit {
     pub amount: U256,
@@ -385,7 +353,7 @@ fn read_and_dispatch_input<Host: Runtime>(
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: TezosContracts,
+    tezos_contracts: &TezosContracts,
     delayed_bridge: Option<ContractKt1Hash>,
     sequencer: Option<PublicKey>,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
@@ -402,7 +370,7 @@ pub fn read_inbox<Host: Runtime>(
         match read_and_dispatch_input(
             host,
             smart_rollup_address,
-            &tezos_contracts,
+            tezos_contracts,
             &delayed_bridge,
             &sequencer,
             &mut inbox_is_empty,
@@ -431,6 +399,7 @@ pub fn read_inbox<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::configuration::TezosContracts;
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
@@ -560,7 +529,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -590,7 +559,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -640,7 +609,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             [0; 20],
-            TezosContracts {
+            &TezosContracts {
                 ticketer: None,
                 admin: Some(sender),
                 sequencer_admin: None,
@@ -690,7 +659,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -739,7 +708,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -777,7 +746,7 @@ mod tests {
         let _inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -831,7 +800,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -852,7 +821,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -913,7 +882,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -937,7 +906,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )
@@ -948,7 +917,7 @@ mod tests {
         let inbox_content = read_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
-            TezosContracts::default(),
+            &TezosContracts::default(),
             None,
             None,
         )

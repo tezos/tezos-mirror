@@ -4,11 +4,11 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{store_inbox_blueprint, store_sequencer_blueprint};
-use crate::configuration::{Configuration, ConfigurationMode};
+use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
+use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
-use crate::inbox::{read_inbox, TezosContracts};
 use anyhow::Ok;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -20,7 +20,7 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub fn fetch_inbox_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    tezos_contracts: TezosContracts,
+    tezos_contracts: &TezosContracts,
 ) -> Result<(), anyhow::Error> {
     if let Some(InboxContent {
         transactions,
@@ -41,7 +41,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
 fn fetch_sequencer_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    tezos_contracts: TezosContracts,
+    tezos_contracts: &TezosContracts,
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
@@ -79,7 +79,6 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
 pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    tezos_contracts: TezosContracts,
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
     match &mut config.mode {
@@ -90,13 +89,13 @@ pub fn fetch<Host: Runtime>(
         } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
-            tezos_contracts,
+            &config.tezos_contracts,
             delayed_bridge.clone(),
             delayed_inbox,
             sequencer.clone(),
         ),
         ConfigurationMode::Proxy => {
-            fetch_inbox_blueprints(host, smart_rollup_address, tezos_contracts)
+            fetch_inbox_blueprints(host, smart_rollup_address, &config.tezos_contracts)
         }
     }
 }
