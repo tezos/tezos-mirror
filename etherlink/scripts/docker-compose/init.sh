@@ -10,7 +10,7 @@ script_dir=$(dirname "$0")
 run_in_docker() {
   bin="$1"
   shift 1
-  docker_run=(docker run --log-driver=json-file -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}")
+  docker_run=(docker run -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}")
   "${docker_run[@]}" "/usr/local/bin/${bin}" "$@"
 }
 
