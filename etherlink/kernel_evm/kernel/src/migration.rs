@@ -5,13 +5,22 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    read_storage_version, store_storage_version, KERNEL_GOVERNANCE, STORAGE_VERSION,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn add_kernel_governance(host: &mut impl Runtime) -> Result<(), Error> {
+    let contract_b58 = "KT1Nn8bjcPSpg7EUHcZwYPCcfT1W8Z5Q8ug5";
+    let bytes = contract_b58.as_bytes();
+    host.store_write_all(&KERNEL_GOVERNANCE, bytes)
+        .map_err(Into::into)
 }
 
 // The workflow for migration is the following:
@@ -36,10 +45,9 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
-
         // raise da fee from 2 to 4 mutez/byte
         crate::storage::store_da_fee(host, crate::fees::DA_FEE_PER_BYTE.into())?;
-
+        add_kernel_governance(host)?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
