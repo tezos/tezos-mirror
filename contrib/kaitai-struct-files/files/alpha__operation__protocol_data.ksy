@@ -151,9 +151,6 @@ types:
     - id: double_attestation_evidence
       type: double_attestation_evidence
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::double_attestation_evidence)
-    - id: dal_attestation
-      type: dal_attestation
-      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::dal_attestation)
     - id: seed_nonce_revelation
       type: seed_nonce_revelation
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::seed_nonce_revelation)
@@ -387,16 +384,6 @@ types:
       type: dal_page_id
     - id: dal_proof
       type: bytes_dyn_uint30
-  dal_attestation:
-    seq:
-    - id: attestation
-      type: z
-    - id: level
-      type: s4
-    - id: round
-      type: s4
-    - id: slot
-      type: u2
   dal_page_id:
     seq:
     - id: published_level
@@ -1908,7 +1895,6 @@ enums:
     17: failing_noop
     20: preattestation
     21: attestation
-    22: dal_attestation
     23: attestation_with_dal
     107: reveal
     108: transaction

@@ -54,22 +54,6 @@ val validate_block_attestation :
     attestation (like level, round, slot) are done by the caller. *)
 val validate_mempool_attestation : t -> Dal.Attestation.t -> unit tzresult Lwt.t
 
-(** [validate_dal_attestation ctxt get_consensus_key_and_round op] checks whether
-    the DAL attestation [op] is valid. If an [Error _] is returned, the [op]
-    is not valid. The checks made are:
-    * the attestation size does not exceed the maximum;
-    * the level as expected;
-    * the round is as expected;
-    * the delegate is in the DAL committee.
-    [get_consensus_key_and_round_opt ()] returns the delegate that supposedly
-    issued the attestation and optionally the round at which it was emitted. The
-    round is not provided in the mempool validation mode. *)
-val validate_dal_attestation :
-  t ->
-  (unit -> (Consensus_key.pk * Round.t option) tzresult Lwt.t) ->
-  Dal.Attestation.operation ->
-  Consensus_key.pk tzresult Lwt.t
-
 (** [apply_attestation ctxt consensus_key level attestation] applies
     [attestation] into the [ctxt] assuming [consensus_key.delegate] issued those
     attestations at level [level]. *)

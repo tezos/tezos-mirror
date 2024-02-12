@@ -43,13 +43,6 @@
 (* A set of (attested) slot indexes. *)
 type t = Bitset.t
 
-type operation = {
-  attestation : t;
-  level : Raw_level_repr.t;
-  round : Round_repr.t;
-  slot : Slot_repr.t;
-}
-
 let encoding = Bitset.encoding
 
 let empty = Bitset.empty

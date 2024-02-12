@@ -30,9 +30,8 @@
     For the data-availability layer, the layer 1 provides a list of
    slots at every level (see {!Dal_slot_repr}). Slots are not posted
    directly onto L1 blocks. Stakeholders, called attesters in this
-   context, can commit on the availability of the data (via
-   attestation operations, see
-   https://gitlab.com/tezos/tezos/-/issues/3115).
+   context, can attest on the availability of the data via
+   attestation operations.
 
     The slot is uniformly split into shards. Each attester commits,
    for every slot, on the availability of all shards they are assigned
@@ -43,27 +42,6 @@
    overloading the network, this representation should be compact.  *)
 
 type t = private Bitset.t
-
-(** The shape of Dal attestation operations injected by delegates. *)
-type operation = {
-  attestation : t;
-      (** The bitset of slots that are attested to be available. *)
-  level : Raw_level_repr.t;
-      (** Similar to {!Operation_repr.consensus_content.level}. It is the level
-          at which the operation is valid in the mempool. It is the predecessor
-          at the level of the block that contains it. It should be equal to the
-          attested slot's published level plus the DAL attestation lag minus
-          one. Whenever there is a need to disambiguate, one should use
-          "attestation level" for the level inside the operation and "attested
-          level" for the level of the block. We have:
-          - [attestation_level + 1 = attested_level]
-          - [published_level + attestation_lag = attested_level] *)
-  round : Round_repr.t;
-      (** Similar to {!Operation_repr.consensus_content.round}. *)
-  slot : Slot_repr.t;
-      (** Similar to {!Operation_repr.consensus_content.slot}. It is the
-          attester's first consensus slot at [level]. *)
-}
 
 (** The size of the encoding is not bounded. However, the size of a DAL
     attestation bitset is checked during validation of an attestation; and there

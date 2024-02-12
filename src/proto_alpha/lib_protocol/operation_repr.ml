@@ -39,8 +39,6 @@ module Kind = struct
 
   type attestation = attestation_consensus_kind consensus
 
-  type dal_attestation = Dal_attestation_kind
-
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type vdf_revelation = Vdf_revelation_kind
@@ -185,15 +183,11 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
-  | Dal_attestation of Chain_id.t
 
 let to_watermark = function
   | Preattestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
-  | Dal_attestation chain_id ->
-      Signature.Custom
-        (Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id))
   | Attestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
@@ -209,10 +203,6 @@ let of_watermark = function
         | '\x13' ->
             Option.map
               (fun chain_id -> Attestation chain_id)
-              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
-        | '\x14' ->
-            Option.map
-              (fun chain_id -> Dal_attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -245,9 +235,6 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
-  | Dal_attestation :
-      Dal_attestation_repr.operation
-      -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -1305,31 +1292,6 @@ module Encoding = struct
                        ]))
                (varopt "signature" Signature.encoding)))
 
-  let dal_attestation_encoding =
-    obj4
-      (req "attestation" Dal_attestation_repr.encoding)
-      (req "level" Raw_level_repr.encoding)
-      (req "round" Round_repr.encoding)
-      (req "slot" Slot_repr.encoding)
-
-  let dal_attestation_case =
-    Case
-      {
-        tag = 22;
-        name = "dal_attestation";
-        encoding = dal_attestation_encoding;
-        select =
-          (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Dal_attestation
-                 Dal_attestation_repr.{attestation; level; round; slot}) ->
-            (attestation, level, round, slot));
-        inj =
-          (fun (attestation, level, round, slot) ->
-            Dal_attestation
-              Dal_attestation_repr.{attestation; level; round; slot});
-      }
-
   let seed_nonce_revelation_case =
     Case
       {
@@ -1686,7 +1648,6 @@ module Encoding = struct
 
   let common_cases =
     [
-      PCase dal_attestation_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
       PCase double_baking_evidence_case;
@@ -2027,7 +1988,6 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preattestation _) -> Some consensus_pass
   | Single (Attestation _) -> Some consensus_pass
-  | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
@@ -2119,7 +2079,6 @@ let check_signature (type kind) key chain_id (op : kind operation) =
         match op.protocol_data.contents with
         | Single (Preattestation _) -> to_watermark (Preattestation chain_id)
         | Single (Attestation _) -> to_watermark (Attestation chain_id)
-        | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
             | Vdf_revelation _ | Double_attestation_evidence _
@@ -2204,8 +2163,6 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preattestation _, _ -> None
   | Attestation _, Attestation _ -> Some Eq
   | Attestation _, _ -> None
-  | Dal_attestation _, Dal_attestation _ -> Some Eq
-  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
@@ -2320,9 +2277,6 @@ type attestation_infos = {
   number_of_dal_attested_slots : int;
 }
 
-(** [dal_attestation_infos] gives the weight of a DAL attestation. *)
-type dal_attestation_infos = attestation_infos
-
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
 type double_baking_infos = {round : round_infos; bh_hash : Block_hash.t}
@@ -2378,22 +2332,6 @@ let attestation_infos_from_content (c : consensus_content)
         d;
   }
 
-let dal_attestation_infos_from_dal_operation
-    {Dal_attestation_repr.attestation; level; round; slot} =
-  let round_infos =
-    (* copy of {!round_infos_from_consensus_content} *)
-    let level = Raw_level_repr.to_int32 level in
-    match Round_repr.to_int round with
-    | Ok round -> {level; round}
-    | Error _ -> {level; round = -1}
-  in
-  {
-    round_infos;
-    slot = Slot_repr.to_int slot;
-    number_of_dal_attested_slots =
-      Dal_attestation_repr.number_of_attested_slots attestation;
-  }
-
 (** Compute a {!double_baking_infos} and a {!Block_header_repr.hash}
    from a {!Block_header_repr.t}. It is used to compute the weight of
    a {!Double_baking_evidence}.
@@ -2427,9 +2365,6 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     {!attestation_infos}. For {!Attestation}s it also depends on the number of
     attested DAL slots.
 
-    The [weight] of a {!Dal_attestation} is the same as that of an
-    {!Attestation}.
-
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
 
@@ -2458,7 +2393,6 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : preattestation_infos -> consensus_pass_type weight
-  | Weight_dal_attestation : dal_attestation_infos -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
       -> voting_pass_type weight
@@ -2557,11 +2491,6 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_content consensus_content dal_content) )
-  | Single (Dal_attestation content) ->
-      W
-        ( Consensus,
-          Weight_dal_attestation
-            (dal_attestation_infos_from_dal_operation content) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2675,12 +2604,6 @@ let compare_attestation_infos
     ((infos1, slot1), n1)
     ((infos2, slot2), n2)
 
-(** Two valid {!Dal_attestation} are compared in the lexicographic order of
-    their level, round, reverse slot, and number of attested slots, meaning
-    that, in order, higher level is better, higher round is better, smaller slot
-    is better, higher number of attested slots is better. *)
-let compare_dal_attestation_infos = compare_attestation_infos
-
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
@@ -2709,14 +2632,6 @@ let compare_consensus_weight w1 w2 =
       Weight_attestation {round_infos = round_infos2; _} ) ->
       let cmp = compare_round_infos round_infos1 round_infos2 in
       if Compare.Int.(cmp <> 0) then cmp else -1
-  | Weight_dal_attestation infos1, Weight_dal_attestation infos2 ->
-      compare_dal_attestation_infos infos1 infos2
-  | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
-    ->
-      -1
-  | (Weight_attestation _ | Weight_preattestation _), Weight_dal_attestation _
-    ->
-      1
 
 (** {5 Comparison of valid voting operations} *)
 

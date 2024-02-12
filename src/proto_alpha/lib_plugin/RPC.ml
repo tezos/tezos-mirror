@@ -1143,8 +1143,7 @@ module Scripts = struct
     let*? () =
       match packed_operation.protocol_data with
       | Operation_data {contents = Single (Preattestation _); _}
-      | Operation_data {contents = Single (Attestation _); _}
-      | Operation_data {contents = Single (Dal_attestation _); _} ->
+      | Operation_data {contents = Single (Attestation _); _} ->
           Environment.Error_monad.Result_syntax.tzfail
             Run_operation_does_not_support_consensus_operations
       | _ -> Result_syntax.return_unit

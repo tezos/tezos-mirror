@@ -552,9 +552,6 @@ let pre_filter info config
         {level = consensus_content.level; round = consensus_content.round}
       in
       prefilter_consensus_operation info config level_and_round
-  | Single (Dal_attestation {level; round; _}) ->
-      let level_and_round : level_and_round = {level; round} in
-      prefilter_consensus_operation info config level_and_round
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
@@ -692,11 +689,10 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
   | Single (Manager_operation {source; _}) -> Some source
   | Cons (Manager_operation {source; _}, _) -> Some source
   | Single
-      ( Preattestation _ | Attestation _ | Dal_attestation _ | Proposals _
-      | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
-      | Double_baking_evidence _ | Double_preattestation_evidence _
-      | Double_attestation_evidence _ | Activate_account _ | Drain_delegate _
-      | Failing_noop _ ) ->
+      ( Preattestation _ | Attestation _ | Proposals _ | Ballot _
+      | Seed_nonce_revelation _ | Vdf_revelation _ | Double_baking_evidence _
+      | Double_preattestation_evidence _ | Double_attestation_evidence _
+      | Activate_account _ | Drain_delegate _ | Failing_noop _ ) ->
       None
 
 (* The purpose of this module is to offer a version of

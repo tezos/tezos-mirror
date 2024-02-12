@@ -154,7 +154,6 @@ module Proto_client = struct
     match op_result with
     | Preattestation_result _ -> Successful
     | Attestation_result _ -> Successful
-    | Dal_attestation_result _ -> Successful
     | Seed_nonce_revelation_result _ -> Successful
     | Vdf_revelation_result _ -> Successful
     | Double_attestation_evidence_result _ -> Successful

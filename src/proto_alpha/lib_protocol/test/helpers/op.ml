@@ -134,48 +134,6 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
   in
   return (Operation.pack op)
 
-let raw_dal_attestation ?delegate ?attestation block =
-  let open Lwt_result_wrap_syntax in
-  let ctxt = Context.B block in
-  let*? level = Context.get_level ctxt in
-  let*?@ round = Block.get_round block in
-  let* committee = Context.Dal.shards ctxt () in
-  let delegate =
-    match delegate with None -> Stdlib.List.hd committee |> fst | Some d -> d
-  in
-  match
-    List.assoc ~equal:Signature.Public_key_hash.equal delegate committee
-  with
-  | None -> return_none
-  | Some _interval -> (
-      let* slots = Context.get_attester_slot ctxt delegate in
-      match slots with
-      | None -> return_none
-      | Some slots -> (
-          match List.hd slots with
-          | None -> assert false
-          | Some slot ->
-              let attestation =
-                Option.value attestation ~default:Dal.Attestation.empty
-              in
-              let branch = block.Block.header.shell.predecessor in
-              let* signer = Account.find delegate in
-              let op =
-                Single (Dal_attestation {attestation; level; round; slot})
-              in
-              sign
-                ~watermark:
-                  Operation.(to_watermark (Dal_attestation Chain_id.zero))
-                signer.sk
-                branch
-                op
-              |> return_some))
-
-let dal_attestation ?delegate ?attestation block =
-  let open Lwt_result_wrap_syntax in
-  let* op = raw_dal_attestation ?delegate ?attestation block in
-  return (Option.map Operation.pack op)
-
 let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     attested_block =
   let open Lwt_result_syntax in

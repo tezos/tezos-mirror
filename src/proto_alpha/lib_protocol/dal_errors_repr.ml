@@ -26,7 +26,6 @@
 type error +=
   | Dal_feature_disabled
   | Dal_slot_index_above_hard_limit of {given : int; limit : int}
-  | Dal_attestation_unexpected_size of {expected : int; got : int}
   | Dal_publish_slot_header_invalid_index of {
       given : Dal_slot_index_repr.t;
       maximum : Dal_slot_index_repr.t;
@@ -44,24 +43,11 @@ type error +=
       attester : Signature.Public_key_hash.t;
       level : Raw_level_repr.t;
     }
-  | Dal_operation_for_old_level of {
-      expected : Raw_level_repr.t;
-      given : Raw_level_repr.t;
-    }
-  | Dal_operation_for_future_level of {
-      expected : Raw_level_repr.t;
-      given : Raw_level_repr.t;
-    }
-  | Dal_attestation_for_wrong_round of {
-      expected : Round_repr.t;
-      given : Round_repr.t;
-    }
   | Dal_cryptobox_error of {explanation : string}
   | Dal_register_invalid_slot_header of {
       length : int;
       slot_header : Dal_slot_repr.Header.t;
     }
-  | Dal_unexpected_attestation_at_root_level
 
 let () =
   let open Data_encoding in
@@ -78,21 +64,6 @@ let () =
     (function Dal_feature_disabled -> Some () | _ -> None)
     (fun () -> Dal_feature_disabled) ;
 
-  let description =
-    "The attestation for data availability has a different size"
-  in
-  register_error_kind
-    `Permanent
-    ~id:"dal_attestation_unexpected_size"
-    ~title:"DAL attestation unexpected size"
-    ~description
-    ~pp:(fun ppf (expected, got) ->
-      Format.fprintf ppf "%s: Expected %d. Got %d." description expected got)
-    (obj2 (req "expected_size" int31) (req "got" int31))
-    (function
-      | Dal_attestation_unexpected_size {expected; got} -> Some (expected, got)
-      | _ -> None)
-    (fun (expected, got) -> Dal_attestation_unexpected_size {expected; got}) ;
   let description = "Slot index above hard limit" in
   register_error_kind
     `Permanent
@@ -211,71 +182,6 @@ let () =
     (fun (commitment, commitment_proof) ->
       Dal_publish_slot_header_invalid_proof {commitment; commitment_proof}) ;
   register_error_kind
-    `Outdated
-    ~id:"Dal_operation_for_old_level"
-    ~title:"Dal operation for an old level"
-    ~description:"The Dal operation targets an old level"
-    ~pp:(fun ppf (expected_lvl, given_lvl) ->
-      Format.fprintf
-        ppf
-        "Dal operation targets an old level %a. Expected level is %a."
-        Raw_level_repr.pp
-        given_lvl
-        Raw_level_repr.pp
-        expected_lvl)
-    Data_encoding.(
-      obj2
-        (req "expected_level" Raw_level_repr.encoding)
-        (req "given_level" Raw_level_repr.encoding))
-    (function
-      | Dal_operation_for_old_level {expected; given} -> Some (expected, given)
-      | _ -> None)
-    (fun (expected, given) -> Dal_operation_for_old_level {expected; given}) ;
-  register_error_kind
-    `Temporary
-    ~id:"Dal_operation_for_future_level"
-    ~title:"Dal operation for a future level"
-    ~description:"The Dal operation targets a future level"
-    ~pp:(fun ppf (expected_lvl, given_lvl) ->
-      Format.fprintf
-        ppf
-        "Dal operation targets a future level %a. Expected level is %a."
-        Raw_level_repr.pp
-        given_lvl
-        Raw_level_repr.pp
-        expected_lvl)
-    Data_encoding.(
-      obj2
-        (req "expected_level" Raw_level_repr.encoding)
-        (req "given_level" Raw_level_repr.encoding))
-    (function
-      | Dal_operation_for_future_level {expected; given} ->
-          Some (expected, given)
-      | _ -> None)
-    (fun (expected, given) -> Dal_operation_for_future_level {expected; given}) ;
-  register_error_kind
-    `Temporary
-    ~id:"Dal_attestation_for_wrong_round"
-    ~title:"Dal attestation for a wrong round"
-    ~description:"The DAL attestation targets an unexpected round."
-    ~pp:(fun ppf (expected_round, given_round) ->
-      Format.fprintf
-        ppf
-        "The DAL attestation targets unexpected round %a, expected %a."
-        Round_repr.pp
-        given_round
-        Round_repr.pp
-        expected_round)
-    Data_encoding.(
-      obj2
-        (req "expected_round" Round_repr.encoding)
-        (req "given_round" Round_repr.encoding))
-    (function
-      | Dal_attestation_for_wrong_round {expected; given} ->
-          Some (expected, given)
-      | _ -> None)
-    (fun (expected, given) -> Dal_attestation_for_wrong_round {expected; given}) ;
-  register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_attester_not_in_committee"
     ~title:"The attester is not part of the DAL committee for this level"
@@ -333,14 +239,4 @@ let () =
           Some (length, slot_header)
       | _ -> None)
     (fun (length, slot_header) ->
-      Dal_register_invalid_slot_header {length; slot_header}) ;
-  let description = "DAL attestations are not expected at root level" in
-  register_error_kind
-    `Temporary
-    ~id:"dal_unexpected_attestation_at_root_level"
-    ~title:"DAL unexpected attestation at root level"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    empty
-    (function Dal_unexpected_attestation_at_root_level -> Some () | _ -> None)
-    (fun () -> Dal_unexpected_attestation_at_root_level)
+      Dal_register_invalid_slot_header {length; slot_header})

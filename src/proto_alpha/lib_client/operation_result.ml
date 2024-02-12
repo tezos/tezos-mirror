@@ -1021,12 +1021,6 @@ let pp_contents_and_result :
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
           consensus_power
-    | Dal_attestation _, Dal_attestation_result {delegate} ->
-        Format.fprintf
-          ppf
-          "@[<v 2>Slot attestation:@,Delegate: %a@]"
-          Signature.Public_key_hash.pp
-          delegate
     | ( Double_attestation_evidence {op1; op2},
         Double_attestation_evidence_result {forbidden_delegate; balance_updates}
       ) ->

@@ -49,7 +49,7 @@ let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
 let all_non_manager_passes = [`PConsensus; `PAnonymous; `PVote]
 
-let consensus_kinds = [`KPreattestation; `KAttestation; `KDal_attestation]
+let consensus_kinds = [`KPreattestation; `KAttestation]
 
 let anonymous_kinds =
   [
@@ -388,14 +388,6 @@ let generate_attestation =
   let+ cc = generate_consensus_content in
   Attestation {consensus_content = cc; dal_content = None}
 
-let generate_dal_attestation =
-  let open QCheck2.Gen in
-  let* level = gen_level in
-  let* round = gen_round in
-  let+ slot = gen_slot in
-  Dal_attestation
-    Dal.Attestation.{attestation = Dal.Attestation.empty; level; round; slot}
-
 let generate_vdf_revelation =
   let open QCheck2.Gen in
   let+ solution = oneofl vdf_solutions in
@@ -644,7 +636,6 @@ let generate_non_manager_operation =
   match kind with
   | `KPreattestation -> generate_operation generate_preattestation
   | `KAttestation -> generate_operation generate_attestation
-  | `KDal_attestation -> generate_operation generate_dal_attestation
   | `KSeed_nonce_revelation -> generate_operation generate_seed_nonce_revelation
   | `KVdf_revelation -> generate_operation generate_vdf_revelation
   | `KDouble_attestation -> generate_operation generate_double_attestation
@@ -718,7 +709,6 @@ let generate_operation =
     match kind with
     | `KPreattestation -> generate_operation generate_preattestation
     | `KAttestation -> generate_operation generate_attestation
-    | `KDal_attestation -> generate_operation generate_dal_attestation
     | `KSeed_nonce_revelation ->
         generate_operation generate_seed_nonce_revelation
     | `KVdf_revelation -> generate_operation generate_vdf_revelation
