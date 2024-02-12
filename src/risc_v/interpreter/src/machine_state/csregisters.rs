@@ -1182,18 +1182,22 @@ impl<M: backend::Manager> CSRegisters<M> {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use crate::machine_state::{
-        backend::{
-            tests::{test_determinism, ManagerFor, TestBackendFactory},
-            Backend, BackendManagement, Layout, Region,
+#[allow(clippy::identity_op)]
+mod tests {
+    use crate::{
+        backend_test,
+        machine_state::{
+            backend::{
+                tests::{test_determinism, ManagerFor},
+                Backend, BackendManagement, Layout, Region,
+            },
+            csregisters::{CSRegister, CSRegisters, CSRegistersLayout, Exception},
+            mode::Mode,
         },
-        csregisters::{CSRegister, CSRegisters, CSRegistersLayout, Exception},
-        mode::Mode,
     };
 
     #[test]
-    pub fn test_privilege_access() {
+    fn test_privilege_access() {
         use crate::machine_state::csregisters::check_privilege as check;
         use crate::machine_state::csregisters::CSRegister as csreg;
 
@@ -1372,14 +1376,7 @@ pub mod tests {
         assert!(check(csreg::instret, 0x42) == 0x42);
     }
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        test_write_read::<F>();
-        test_reset::<F>();
-    }
-
-    fn test_write_read<F: TestBackendFactory>() {
-        #![allow(clippy::identity_op)]
-
+    backend_test!(test_write_read, F, {
         let mut backend = F::new::<CSRegistersLayout>();
         let placed = CSRegistersLayout::placed().into_location();
 
@@ -1439,13 +1436,13 @@ pub mod tests {
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
         let read_sstatus = csrs.read(CSRegister::sstatus);
         assert_eq!(read_sstatus, 1 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8);
-    }
+    });
 
-    fn test_reset<F: TestBackendFactory>() {
+    backend_test!(test_reset, F, {
         test_determinism::<F, CSRegistersLayout, _>(|space| {
             let mut csregs: CSRegisters<ManagerFor<'_, F, CSRegistersLayout>> =
                 CSRegisters::bind(space);
             csregs.reset();
         });
-    }
+    });
 }

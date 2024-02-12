@@ -185,22 +185,17 @@ impl_volatile_region!(doublewords, u64);
 
 #[cfg(test)]
 pub mod tests {
-    use crate::machine_state::{
-        backend::{
-            tests::{test_determinism, TestBackendFactory},
-            Backend, Layout,
+    use crate::{
+        backend_test,
+        machine_state::{
+            backend::{tests::test_determinism, Backend, Layout},
+            bus::Addressable,
         },
-        bus::Addressable,
     };
 
     gen_memory_layout!(T1K = 1 KiB);
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        test_endianess::<F>();
-        test_reset::<F>();
-    }
-
-    fn test_endianess<F: TestBackendFactory>() {
+    backend_test!(test_endianess, F, {
         let mut backend = F::new::<T1K>();
         let mut memory = backend.allocate(T1K::placed().into_location());
 
@@ -230,11 +225,11 @@ pub mod tests {
         check_address!(u8, 5, 0x33);
         check_address!(u8, 6, 0x22);
         check_address!(u8, 7, 0x11);
-    }
+    });
 
-    fn test_reset<F: TestBackendFactory>() {
+    backend_test!(test_reset, F, {
         test_determinism::<F, T1K, _>(|mut memory| {
             memory.reset();
         });
-    }
+    });
 }

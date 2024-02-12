@@ -107,20 +107,17 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::{main_memory::tests::T1K, Bus, BusLayout};
-    use crate::machine_state::backend::tests::{test_determinism, ManagerFor, TestBackendFactory};
+    use crate::{
+        backend_test,
+        machine_state::backend::tests::{test_determinism, ManagerFor},
+    };
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        super::main_memory::tests::test_backend::<F>();
-        super::devices::tests::test_backend::<F>();
-        test_reset::<F>();
-    }
-
-    fn test_reset<F: TestBackendFactory>() {
+    backend_test!(test_reset, F, {
         test_determinism::<F, BusLayout<T1K>, _>(|space| {
             let mut bus: Bus<T1K, ManagerFor<'_, F, BusLayout<T1K>>> = Bus::bind(space);
             bus.reset();
         });
-    }
+    });
 }

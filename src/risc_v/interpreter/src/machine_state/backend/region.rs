@@ -180,19 +180,15 @@ pub trait VolatileRegion<E: Elem> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::machine_state::backend::{
-        layout::{Atom, Layout},
-        tests::TestBackendFactory,
-        Array, Backend, Elem, Region,
+    use crate::{
+        backend_test,
+        machine_state::backend::{
+            layout::{Atom, Layout},
+            Array, Backend, Elem, Region,
+        },
     };
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        test_region_overlap::<F>();
-        test_cell_overlap::<F>();
-        test_region_stored_format::<F>();
-    }
-
-    fn test_region_overlap<F: TestBackendFactory>() {
+    backend_test!(test_region_overlap, F, {
         const LEN: usize = 64;
         type OurLayout = (Array<u64, LEN>, Array<u64, LEN>);
         let mut backend = F::new::<OurLayout>();
@@ -235,9 +231,9 @@ pub(crate) mod tests {
             // first array.
             assert_eq!(item, array1.read(i));
         }
-    }
+    });
 
-    fn test_cell_overlap<F: TestBackendFactory>() {
+    backend_test!(test_cell_overlap, F, {
         type OurLayout = (Atom<[u64; 4]>, Atom<[u64; 4]>);
         let mut backend = F::new::<OurLayout>();
         let (mut cell1, mut cell2) = backend.allocate(OurLayout::placed().into_location());
@@ -261,9 +257,9 @@ pub(crate) mod tests {
 
         // Cell 1 should not have its value changed.
         assert_eq!(cell1.read(), cell1_value);
-    }
+    });
 
-    fn test_region_stored_format<F: TestBackendFactory>() {
+    backend_test!(test_region_stored_format, F, {
         /// Dummy type that helps us implement custom normalisation via [Elem]
         #[repr(packed)]
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
@@ -360,5 +356,5 @@ pub(crate) mod tests {
         let mut buffer = [0; 8];
         backend.read(0, &mut buffer);
         assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
-    }
+    });
 }

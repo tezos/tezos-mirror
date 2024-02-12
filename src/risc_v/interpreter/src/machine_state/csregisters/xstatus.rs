@@ -242,7 +242,7 @@ pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::machine_state::csregisters::xstatus::{
         ExtensionValue, FieldValue, MPPValue, SPPValue, XLenValue,
     };

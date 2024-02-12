@@ -242,18 +242,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 #[cfg(test)]
 mod tests {
     use super::{
-        backend::tests::{test_determinism, ManagerFor, TestBackendFactory},
+        backend::tests::{test_determinism, ManagerFor},
         bus::main_memory::tests::T1K,
         mode, HartState, HartStateLayout, MachineState, MachineStateLayout,
     };
+    use crate::backend_test;
     use strum::IntoEnumIterator;
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        test_hart_state_reset::<F>();
-        test_machine_state_reset::<F>();
-    }
-
-    fn test_hart_state_reset<F: TestBackendFactory>() {
+    backend_test!(test_hart_state_reset, F, {
         mode::Mode::iter().for_each(|mode: mode::Mode| {
             proptest::proptest!(|(pc: u64)| {
                 test_determinism::<F, HartStateLayout, _>(|space| {
@@ -262,9 +258,9 @@ mod tests {
                 });
             });
         });
-    }
+    });
 
-    fn test_machine_state_reset<F: TestBackendFactory>() {
+    backend_test!(test_machine_state_reset, F, {
         mode::Mode::iter().for_each(|mode: mode::Mode| {
             proptest::proptest!(|(pc: u64)| {
                 test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {
@@ -274,5 +270,5 @@ mod tests {
                 });
             });
         });
-    }
+    });
 }

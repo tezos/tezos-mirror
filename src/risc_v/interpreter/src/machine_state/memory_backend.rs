@@ -182,7 +182,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion<E>
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::machine_state::backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
 
@@ -222,18 +222,13 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_backend() {
-        struct InMemoryBackendFactory;
+    pub struct InMemoryBackendFactory;
 
-        impl backend::tests::TestBackendFactory for InMemoryBackendFactory {
-            type Backend<L: Layout> = InMemoryBackend<L>;
+    impl backend::tests::TestBackendFactory for InMemoryBackendFactory {
+        type Backend<L: Layout> = InMemoryBackend<L>;
 
-            fn new<L: Layout>() -> Self::Backend<L> {
-                InMemoryBackend::<L>::new().0
-            }
+        fn new<L: Layout>() -> Self::Backend<L> {
+            InMemoryBackend::<L>::new().0
         }
-
-        backend::tests::test_backend::<InMemoryBackendFactory>();
     }
 }

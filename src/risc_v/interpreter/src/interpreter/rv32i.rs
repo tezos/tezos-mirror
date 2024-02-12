@@ -152,23 +152,13 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::machine_state::{
-        backend::tests::TestBackendFactory,
         registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
         HartState, HartStateLayout,
     };
-    use crate::{create_backend, create_state};
+    use crate::{backend_test, create_backend, create_state};
     use proptest::{prelude::any, prop_assert_eq, prop_assume, proptest};
 
-    pub fn test<F: TestBackendFactory>() {
-        test_addi::<F>();
-        test_auipc::<F>();
-        test_beq_bne::<F>();
-        test_jal::<F>();
-        test_jalr::<F>();
-        test_lui::<F>();
-    }
-
-    fn test_addi<F: TestBackendFactory>() {
+    backend_test!(test_addi, F, {
         let imm_rs1_rd_res = [
             (0_i64, 0_u64, t3, 0_u64),
             (0, 0xFFF0_0420, t2, 0xFFF0_0420),
@@ -197,9 +187,9 @@ pub mod tests {
             // check against wrapping addition performed on the lowest 32 bits
             assert_eq!(state.xregisters.read(rd), res)
         }
-    }
+    });
 
-    fn test_auipc<F: TestBackendFactory>() {
+    backend_test!(test_auipc, F, {
         let pc_imm_res_rd = [
             (0, 0, 0, a2),
             (0, 0xFF_FFF0_0000, 0xFF_FFF0_0000, a0),
@@ -222,7 +212,7 @@ pub mod tests {
 
             assert_eq!(read_pc, res);
         }
-    }
+    });
 
     macro_rules! test_branch_instr {
         ($state:ident, $branch_fn:tt, $imm:expr,
@@ -239,7 +229,7 @@ pub mod tests {
         };
     }
 
-    fn test_beq_bne<F: TestBackendFactory>() {
+    backend_test!(test_beq_bne, F, {
         proptest!(|(
             init_pc in any::<u64>(),
             imm in any::<i64>(),
@@ -286,9 +276,9 @@ pub mod tests {
             // BNE - same register
             test_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, init_pc, next_pc);
         });
-    }
+    });
 
-    fn test_jalr<F: TestBackendFactory>() {
+    backend_test!(test_jalr, F, {
         let ipc_imm_irs1_rs1_rd_fpc_frd = [
             (42, 42, 4, a2, t1, 46, 46),
             (0, 1001, 100, a1, t1, 1100, 4),
@@ -323,9 +313,9 @@ pub mod tests {
             assert_eq!(new_pc, res_pc);
             assert_eq!(state.xregisters.read(rd), res_rd);
         }
-    }
+    });
 
-    fn test_jal<F: TestBackendFactory>() {
+    backend_test!(test_jal, F, {
         let ipc_imm_rd_fpc_frd = [
             (42, 42, t1, 84, 46),
             (0, 1000, t1, 1000, 4),
@@ -350,9 +340,9 @@ pub mod tests {
             assert_eq!(new_pc, res_pc);
             assert_eq!(state.xregisters.read(rd), res_rd);
         }
-    }
+    });
 
-    fn test_lui<F: TestBackendFactory>() {
+    backend_test!(test_lui, F, {
         proptest!(|(imm in any::<i64>())| {
             let mut backend = create_backend!(XRegistersLayout, F);
             let mut xregs = create_state!(XRegisters, F, backend);
@@ -368,5 +358,5 @@ pub mod tests {
             prop_assert_eq!(xregs.read(a2), 0);
             prop_assert_eq!(xregs.read(a4), 0);
         });
-    }
+    });
 }

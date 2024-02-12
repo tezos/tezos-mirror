@@ -320,21 +320,17 @@ impl<M: backend::Manager> FRegisters<M> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
-    use crate::machine_state::backend::{
-        tests::{test_determinism, ManagerFor, TestBackendFactory},
-        Backend, Layout,
+    use crate::{
+        backend_test,
+        machine_state::backend::{
+            tests::{test_determinism, ManagerFor},
+            Backend, Layout,
+        },
     };
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        test_zero::<F>();
-        test_arbitrary_register::<F>();
-        test_xregs_reset::<F>();
-        test_fregs_reset::<F>();
-    }
-
-    fn test_zero<F: TestBackendFactory>() {
+    backend_test!(test_zero, F, {
         let mut backend = F::new::<XRegistersLayout>();
         let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
             XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
@@ -345,14 +341,14 @@ pub mod tests {
         // Writing anything to x0 must not have an effect.
         registers.write(x0, 1337);
         assert_eq!(registers.read(x0), 0);
-    }
+    });
 
     const NONZERO_REGISTERS: [XRegister; 31] = [
         x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20,
         x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31,
     ];
 
-    fn test_arbitrary_register<F: TestBackendFactory>() {
+    backend_test!(test_arbitrary_register, F, {
         let mut backend = F::new::<XRegistersLayout>();
         let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
             XRegisters::bind(backend.allocate(XRegistersLayout::placed().into_location()));
@@ -378,21 +374,21 @@ pub mod tests {
             let after = NONZERO_REGISTERS.map(|r| registers.read(r));
             assert_eq!(after, expected);
         }
-    }
+    });
 
-    fn test_xregs_reset<F: TestBackendFactory>() {
+    backend_test!(test_xregs_reset, F, {
         test_determinism::<F, XRegistersLayout, _>(|space| {
             let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
                 XRegisters::bind(space);
             registers.reset();
         });
-    }
+    });
 
-    fn test_fregs_reset<F: TestBackendFactory>() {
+    backend_test!(test_fregs_reset, F, {
         test_determinism::<F, FRegistersLayout, _>(|space| {
             let mut registers: FRegisters<ManagerFor<'_, F, FRegistersLayout>> =
                 FRegisters::bind(space);
             registers.reset();
         });
-    }
+    });
 }

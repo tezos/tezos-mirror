@@ -217,10 +217,6 @@ pub trait Backend: BackendManagement + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        interpreter,
-        machine_state::{bus, mode, registers},
-    };
     use rand::{Fill, Rng};
     use std::collections::VecDeque;
 
@@ -431,18 +427,22 @@ pub mod tests {
         };
     }
 
-    pub fn test_backend<F: TestBackendFactory>() {
-        region::tests::test_backend::<F>();
-        registers::tests::test_backend::<F>();
-        bus::tests::test_backend::<F>();
-        mode::tests::test_mode::<F>();
-        interpreter::rv32i::tests::test::<F>();
-        interpreter::rv64i::tests::test::<F>();
-        test_example::<F>();
-        crate::machine_state::tests::test_backend::<F>();
+    /// Generate a test against all test backends.
+    #[macro_export]
+    macro_rules! backend_test {
+        ( $name:ident, $fac_name:ident, $expr:block ) => {
+            #[test]
+            fn $name() {
+                fn inner<$fac_name: $crate::machine_state::backend::tests::TestBackendFactory>() {
+                    $expr
+                }
+
+                inner::<$crate::machine_state::memory_backend::tests::InMemoryBackendFactory>();
+            }
+        };
     }
 
-    fn test_example<F: TestBackendFactory>() {
+    backend_test!(test_example, F, {
         struct Example<M: Manager> {
             first: Cell<u64, M>,
             second: M::Region<u32, 4>,
@@ -492,5 +492,5 @@ pub mod tests {
             &mut *(&mut second_value_read as *mut [u32; 4] as *mut [u8; 16])
         });
         assert_eq!(second_value_read.map(u32::from_le), second_value);
-    }
+    });
 }
