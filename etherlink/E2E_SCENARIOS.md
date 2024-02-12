@@ -144,6 +144,45 @@ As Etherlink do not support EIP-1559 for the moment, all the interactions using 
 
 ## Scenario 7: interactions with Hardhat
 
+Basic scenario using a simple Counter contract to test the deployment and interaction between Hardhat and Etherlink.
+
+Hardhat is a development environment tailored for Ethereum and EVM compatible chains, streamlining smart contract development, testing, and deployment. It offers a simple setup for writing contracts in Solidity, built-in tasks for compiling, testing, and deploying contracts, and seamless integration with Ethereum networks. With debugging tools, scriptable deployment, and extensibility through plugins, Hardhat accelerates Ethereum development with efficiency and reliability. The language used with the tool is Javascript/Typescript.
+
+The scenarios 1, 2 and 3 are using hardhat but the interactions are tested with the hardhat-deploy plugin and with the test system. Here we use [Ethers.js](https://docs.ethers.org/v6) lib which is integrated by hardhat by default for the communication with the RPC node and openzeppelin [hardhat-upgrades](https://github.com/OpenZeppelin/openzeppelin-upgrades) plugin used for proxy interaction. The interactions are made directly in simple script files to easily control hardhat calls.
+
+The code for the scenario can be found in [Counter.sol](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/hardhat/contracts/Counter.sol).
+
+### Actions:
+
+1. User can deploy the Counter
+   * The contract is deployed on Etherlink
+   * User can see the contract address
+2. User can verify the Counter
+   * User can verify the contract
+   * User can see the contract verified on Blockscout
+3. User can increment the value in the Counter
+   * User can make a transaction to increment the value in the Counter by 1
+   * User can see the value in the Counter before and after the transaction
+4. User can set the value in the Counter
+   * User can make a transaction to set the value in the Counter
+   * User can see the value in the Counter before and after the transaction
+5. User can use the tool in an error situation
+   * User can cause a transaction to revert
+   * The tool handle correctly the response from the node (no crash and/or error well parsed)
+6. User can use the tool with openzeppelin [hardhat-upgrades](https://github.com/OpenZeppelin/openzeppelin-upgrades) plugin
+   * User can deploy the counter with a proxy
+   * User can see in the console the addresses of the proxy, the implementation and the admin parts
+
+The code for the Actions can be found in the [scripts/](https://github.com/trilitech/development-tools-compatibility-etherlink/tree/main/hardhat/scripts) folder.
+
+### Testing
+
+Follow [these instructions](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/hardhat/README.md#deploy-the-contract-and-run-some-tests-on-etherlink) to deploy and test the Actions with the tool.
+
+### Special note
+
+We also test Ethers.js because Hardhat use directly this library.
+
 ## Scenario 8: interactions with Remix
 
 ## Scenario 9: interactions with MetaMask
