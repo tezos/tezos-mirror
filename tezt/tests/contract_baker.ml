@@ -44,7 +44,7 @@ let test_origination_call =
   Protocol.register_test
     ~__FILE__
     ~title:"contract baker"
-    ~tags:["client"; "michelson"]
+    ~tags:[Tag.layer1; "client"; "michelson"]
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   Log.info "Contract origination" ;
