@@ -97,6 +97,9 @@ impl TezosContracts {
     pub fn is_ticketer(&self, contract: &ContractKt1Hash) -> bool {
         contains(&self.ticketer, contract)
     }
+    pub fn is_kernel_governance(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.kernel_governance, contract)
+    }
 }
 
 fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
