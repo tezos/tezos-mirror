@@ -756,7 +756,7 @@ module Illtyped_originations = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Contract's body illtyped 1"
-      ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~tags:[Tag.layer1; "precheck"; "illtyped"; "origination"; "typing"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -780,7 +780,7 @@ module Illtyped_originations = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Contract's body illtyped 2"
-      ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~tags:[Tag.layer1; "precheck"; "illtyped"; "origination"; "typing"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -804,7 +804,7 @@ module Illtyped_originations = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Contract's initial storage illtyped"
-      ~tags:["precheck"; "illtyped"; "origination"; "typing"]
+      ~tags:[Tag.layer1; "precheck"; "illtyped"; "origination"; "typing"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -888,7 +888,7 @@ module Deserialisation = struct
       ~__FILE__
       ~title:
         "Smart contract call that should succeeds with the provided gas limit"
-      ~tags:["precheck"; "gas"; "deserialization"; "canary"]
+      ~tags:[Tag.layer1; "precheck"; "gas"; "deserialization"; "canary"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -918,7 +918,7 @@ module Deserialisation = struct
       ~__FILE__
       ~title:"Contract call with not enough gas to deserialize argument"
       ~supports:(Protocol.From_protocol 14)
-      ~tags:["precheck"; "gas"; "deserialization"]
+      ~tags:[Tag.layer1; "precheck"; "gas"; "deserialization"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -945,7 +945,7 @@ module Deserialisation = struct
       ~title:
         "Smart contract call that would succeed if we did not account \
          deserialization gas correctly"
-      ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
+      ~tags:[Tag.layer1; "precheck"; "gas"; "deserialization"; "lazy_expr"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1004,7 +1004,7 @@ module Gas_limits = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Batch below block limit with each operation below limit"
-      ~tags:["precheck"; "batch"; "gas"]
+      ~tags:[Tag.layer1; "precheck"; "batch"; "gas"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* limits = Helpers.gas_limits nodes.main.client in
@@ -1027,7 +1027,7 @@ module Gas_limits = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Batch below block limit with operations over limit"
-      ~tags:["precheck"; "batch"; "gas"; "op_gas"]
+      ~tags:[Tag.layer1; "precheck"; "batch"; "gas"; "op_gas"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* limits = Helpers.gas_limits nodes.main.client in
@@ -1047,7 +1047,7 @@ module Gas_limits = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Batch over block limit with operations below limit"
-      ~tags:["precheck"; "batch"; "gas"; "block_gas"]
+      ~tags:[Tag.layer1; "precheck"; "batch"; "gas"; "block_gas"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* limits = Helpers.gas_limits nodes.main.client in
@@ -1091,7 +1091,7 @@ module Reveal = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple revelation with a wrong public key"
-      ~tags:["reveal"; "revelation"; "batch"]
+      ~tags:[Tag.layer1; "reveal"; "revelation"; "batch"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1115,7 +1115,7 @@ module Reveal = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple revelation with something that is not a public key"
-      ~tags:["reveal"; "revelation"]
+      ~tags:[Tag.layer1; "reveal"; "revelation"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1141,7 +1141,7 @@ module Reveal = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Correct public key revealed twice in a batch"
-      ~tags:["reveal"; "revelation"; "batch"]
+      ~tags:[Tag.layer1; "reveal"; "revelation"; "batch"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
@@ -1163,7 +1163,7 @@ module Reveal = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Two reveals in a batch. First key is wrong"
-      ~tags:["reveal"; "revelation"; "batch"]
+      ~tags:[Tag.layer1; "reveal"; "revelation"; "batch"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1184,7 +1184,7 @@ module Reveal = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Two reveals in a batch. Second key is wrong"
-      ~tags:["reveal"; "revelation"]
+      ~tags:[Tag.layer1; "reveal"; "revelation"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
@@ -1215,7 +1215,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer applied"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1227,7 +1227,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer not enough balance to pay fees"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1261,7 +1261,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer not enough balance to make transfer"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1300,7 +1300,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer counter in the past"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1338,7 +1338,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer counter in the future"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1377,7 +1377,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with wrong signature"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1412,7 +1412,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with not enough gas"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
       ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
@@ -1444,7 +1444,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with not enough fees to cover gas"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1469,7 +1469,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test simple transfer with low balance to pay allocation (1)"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1510,7 +1510,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test simple transfer with low balance to pay allocation (2)"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1551,7 +1551,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test simple transfer of the whole balance"
-      ~tags:["transaction"; "transfer"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1587,7 +1587,7 @@ module Simple_transfers = struct
       ~__FILE__
       ~title:"Test succesive injections with same manager"
       ~supports:(Protocol.From_protocol 14)
-      ~tags:["transaction"; "transfer"; "counters"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"; "counters"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1659,7 +1659,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test batch with wrong counters (+1, +2, +2)"
-      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"; "counters"; "batch"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* counter =
@@ -1683,7 +1683,7 @@ module Simple_transfers = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test batch with wrong counters (+1, +2, +4)"
-      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+      ~tags:[Tag.layer1; "transaction"; "transfer"; "counters"; "batch"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* counter =
@@ -1725,7 +1725,7 @@ module Simple_contract_calls = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Successful smart contract call"
-      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~tags:[Tag.layer1; "simple_contract_calls"; "smart"; "contract"; "call"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1755,7 +1755,7 @@ module Simple_contract_calls = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Smart contract call with illtyped argument"
-      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~tags:[Tag.layer1; "simple_contract_calls"; "smart"; "contract"; "call"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1786,7 +1786,7 @@ module Simple_contract_calls = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Smart contract call that throws a failwith"
-      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~tags:[Tag.layer1; "simple_contract_calls"; "smart"; "contract"; "call"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1818,7 +1818,7 @@ module Simple_contract_calls = struct
       ~__FILE__
       ~title:
         "Smart contract call that loops/fails with 'not enough gas' at exec"
-      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+      ~tags:[Tag.layer1; "simple_contract_calls"; "smart"; "contract"; "call"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
