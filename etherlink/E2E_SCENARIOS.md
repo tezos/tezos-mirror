@@ -107,6 +107,41 @@ The test should go through, even if the interaction actually fails because of so
 
 ## Scenario 6: interactions with Foundry
 
+Basic scenario using a simple Counter contract to test the deployment and interaction between Foundry and Etherlink.
+
+Foundry is a development platform that simplifies the process of building and deploying decentralized applications (DApps) on the Ethereum blockchain. It provides developers with a suite of tools and features to streamline smart contract development, testing, deployment, and interaction with Ethereum networks. The deployments and tests are made directly in solidity. It countains several tools such as `forge` to compile, deploy and test, and `cast` to interact with the blockchains (testnets and mainnets). It also contains features to facilitate advanced tests and audits like fuzzing. You can find everything in [the foundry book](https://book.getfoundry.sh/).
+
+The code for the scenario can be found in [Counter.sol](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/foundry/src/Counter.sol).
+
+### Actions:
+1. User can deploy the Counter using `forge`
+   * The contract is deployed on Etherlink
+   * User can see the contract address and transaction hash
+2. User can verify the Counter using `forge`
+   * User can verify the contract
+   * User can see the contract verified on Blockscout
+3. User can check the value in the Counter using `cast`
+   * User can make a request to see the value in the Counter
+4. User can increment the value in the Counter using `cast`
+   * User can make a transaction to increment the value in the Counter by 1
+5. User can set the value in the Counter using `cast`
+   * User can make a transaction to set the value in the Counter
+6. User can use the tool in an error situation using `cast`
+   * User can make a transaction revert
+   * The tool handle correctly the response from the node (no crash and/or error well parsed)
+
+The code for the deployment can be found in [Counter.s.sol](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/foundry/script/Counter.s.sol). For all actions, different cli tools (namely `forge` and `cast`) are used to interact with Etherlink. See Testing for the commands.
+
+### Testing
+
+Follow [these instructions](https://github.com/trilitech/development-tools-compatibility-etherlink/tree/main/foundry#deploy-the-contract-and-run-some-tests-on-etherlink) to deploy and test the Actions with the tool.
+
+The test should go through, even if the interaction actually fails because of some issues in Etherlink, not the scenario. (Fixing Etherlink would be the purpose of the next task.)
+
+### Special note
+
+As Etherlink do not support EIP-1559 for the moment, all the interactions using Foundry are runned with the `--legacy` flag.
+
 ## Scenario 7: interactions with Hardhat
 
 ## Scenario 8: interactions with Remix
