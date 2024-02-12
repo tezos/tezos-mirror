@@ -108,10 +108,6 @@
     - "oc.build_x86_64-exp-dev-extra"
     - "oc.build_kernels"
     - "oc.tezt:fetch-records"
-  # WARNING: if you increase the number of parallel jobs, you need to
-  # update .gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml with the
-  # new list of jobs.
-  parallel: 60
   tags:
     - gcp_tezt
   # Add [BISECT_FILE] to the set of artifacts defined in [.tezt_template]
