@@ -185,6 +185,40 @@ We also test Ethers.js because Hardhat use directly this library.
 
 ## Scenario 8: interactions with Remix
 
+Basic scenario using a simple Counter contract to test the deployment and interaction between Remix and Etherlink.
+
+Remix is a powerful web-based Integrated Development Environment (IDE) for Ethereum smart contract development. It offers a user-friendly interface for writing, compiling, testing, and deploying smart contracts directly from the browser. Remix simplifies Ethereum development with features such as real-time compilation, debugging tools, built-in testing capabilities, and seamless integration with Ethereum networks. With Remix, developers can rapidly prototype, iterate, and deploy smart contracts without the need for additional setup or installations.
+
+The code for the scenario can be found in [Counter.sol](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/remix/Counter.sol).
+
+### Actions:
+
+1. User can deploy the Counter
+   * The contract is deployed on Etherlink
+   * User can see the contract address
+2. User can check the value in the Counter
+   * User can make a request to see the value in the Counter
+3. User can increment the value in the Counter
+   * User can make a transaction to increment the value in the Counter by 1
+4. User can set the value in the Counter
+   * User can make a transaction to set the value in the Counter
+5. User can use the tool in an error situation
+   * User can cause a transaction to revert
+   * The tool handle correctly the response from the node (no crash and/or error well parsed)
+
+There is no code for the Actions as Remix is a graphical IDE, everything must be done manually on it.
+
+### Manually testing the MR
+
+
+Follow [these instructions](https://github.com/trilitech/development-tools-compatibility-etherlink/blob/main/remix/README.md#remix) to deploy and test the Actions with the tool.
+
+**Important:** when you will test the `revertMe` method on the contract, be sure to set the second argument to 0 for the method to revert.
+
+### Special note
+
+You also realize some tests with MetaMask tool because you need it to link Remix with Etherlink.
+
 ## Scenario 9: interactions with MetaMask
 
 ## Scenario 10: interactions with ThirdWeb
