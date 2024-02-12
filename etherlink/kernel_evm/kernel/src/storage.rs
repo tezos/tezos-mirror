@@ -81,7 +81,6 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
     RefPath::assert_from(b"/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
-pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
@@ -297,17 +296,6 @@ pub fn store_current_block<Host: Runtime>(
         }
     }
 }
-
-pub fn store_tx_validation_result<Host: Runtime>(
-    host: &mut Host,
-    result: Option<Vec<u8>>,
-) -> Result<(), anyhow::Error> {
-    if let Some(result) = result {
-        host.store_write(&SIMULATION_STATUS, &result, 0)?
-    }
-    Ok(())
-}
-
 pub fn store_simulation_result<Host: Runtime, T: Encodable>(
     host: &mut Host,
     result: SimulationResult<T, String>,
@@ -315,14 +303,6 @@ pub fn store_simulation_result<Host: Runtime, T: Encodable>(
     let encoded = result.rlp_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
-}
-
-pub fn store_simulation_status<Host: Runtime>(
-    host: &mut Host,
-    result: bool,
-) -> Result<(), anyhow::Error> {
-    host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
-        .context("Failed to write the simulation status.")
 }
 
 pub fn store_transaction_receipt<Host: Runtime>(
