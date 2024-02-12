@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val cost_Dal_publish_slot_header : Gas_limit_repr.cost
+val cost_Dal_publish_commitment : Gas_limit_repr.cost

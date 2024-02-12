@@ -183,11 +183,11 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
-  | Dal_publish_slot_header_result : {
+  | Dal_publish_commitment_result : {
       slot_header : Dal.Slot.Header.t;
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.dal_publish_slot_header successful_manager_operation_result
+      -> Kind.dal_publish_commitment successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;

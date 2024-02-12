@@ -118,7 +118,7 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
-  type dal_publish_slot_header = Dal_publish_slot_header_kind
+  type dal_publish_commitment = Dal_publish_commitment_kind
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
@@ -154,7 +154,7 @@ module Kind : sig
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
-    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
+    | Dal_publish_commitment_manager_kind : dal_publish_commitment manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -414,9 +414,9 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header :
-      Dal_operations_repr.Publish_slot_header.t
-      -> Kind.dal_publish_slot_header manager_operation
+  | Dal_publish_commitment :
+      Dal_operations_repr.Publish_commitment.t
+      -> Kind.dal_publish_commitment manager_operation
       (** [Sc_rollup_originate] allows an implicit account to originate a new
           smart contract rollup (initialized with a given boot sector).
           The [parameters_ty] field allows to provide the expected interface
@@ -735,8 +735,8 @@ module Encoding : sig
 
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
-  val dal_publish_slot_header_case :
-    Kind.dal_publish_slot_header Kind.manager case
+  val dal_publish_commitment_case :
+    Kind.dal_publish_commitment Kind.manager case
 
   val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
@@ -795,7 +795,7 @@ module Encoding : sig
 
     val transfer_ticket_case : Kind.transfer_ticket case
 
-    val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
+    val dal_publish_commitment_case : Kind.dal_publish_commitment case
 
     val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

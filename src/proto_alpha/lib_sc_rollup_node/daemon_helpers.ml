@@ -214,7 +214,7 @@ let process_included_l1_operation (type kind) ~catching_up
           fail_when
             (List.exists (Node_context.is_operator node_ctxt) stakers)
             (Sc_rollup_node_errors.Lost_game Draw))
-  | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
+  | Dal_publish_commitment _, Dal_publish_commitment_result {slot_header; _}
     when Node_context.dal_supported node_ctxt ->
       let* () =
         Node_context.save_slot_header
@@ -295,7 +295,7 @@ let process_l1_operation (type kind) ~catching_up node_ctxt
     | Sc_rollup_recover_bond {sc_rollup = rollup; staker = _} ->
         Sc_rollup.Address.(
           rollup = node_ctxt.Node_context.config.sc_rollup_address)
-    | Dal_publish_slot_header _ -> true
+    | Dal_publish_commitment _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Transfer_ticket _ | Sc_rollup_originate _

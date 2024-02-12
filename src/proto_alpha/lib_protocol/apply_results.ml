@@ -78,11 +78,11 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
-  | Dal_publish_slot_header_result : {
+  | Dal_publish_commitment_result : {
       slot_header : Dal.Slot.Header.t;
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.dal_publish_slot_header successful_manager_operation_result
+      -> Kind.dal_publish_commitment successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
@@ -550,24 +550,23 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
-  let dal_publish_slot_header_case =
+  let dal_publish_commitment_case =
     make
-      ~op_case:
-        Operation.Encoding.Manager_operations.dal_publish_slot_header_case
+      ~op_case:Operation.Encoding.Manager_operations.dal_publish_commitment_case
       ~encoding:
         (obj2
            (req "slot_header" Dal.Slot.Header.encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
+        | Successful_manager_result (Dal_publish_commitment_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Dal_publish_slot_header_result {slot_header; consumed_gas} ->
+        | Dal_publish_commitment_result {slot_header; consumed_gas} ->
             (slot_header, consumed_gas))
-      ~kind:Kind.Dal_publish_slot_header_manager_kind
+      ~kind:Kind.Dal_publish_commitment_manager_kind
       ~inj:(fun (slot_header, consumed_gas) ->
-        Dal_publish_slot_header_result {slot_header; consumed_gas})
+        Dal_publish_commitment_result {slot_header; consumed_gas})
 
   let zk_rollup_origination_case =
     make
@@ -971,10 +970,10 @@ let equal_manager_kind :
   | Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind ->
       Some Eq
   | Kind.Transfer_ticket_manager_kind, _ -> None
-  | ( Kind.Dal_publish_slot_header_manager_kind,
-      Kind.Dal_publish_slot_header_manager_kind ) ->
+  | ( Kind.Dal_publish_commitment_manager_kind,
+      Kind.Dal_publish_commitment_manager_kind ) ->
       Some Eq
-  | Kind.Dal_publish_slot_header_manager_kind, _ -> None
+  | Kind.Dal_publish_commitment_manager_kind, _ -> None
   | Kind.Sc_rollup_originate_manager_kind, Kind.Sc_rollup_originate_manager_kind
     ->
       Some Eq
@@ -1633,14 +1632,13 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let dal_publish_slot_header_case =
+  let dal_publish_commitment_case =
     make_manager_case
-      Operation.Encoding.dal_publish_slot_header_case
-      Manager_result.dal_publish_slot_header_case
+      Operation.Encoding.dal_publish_commitment_case
+      Manager_result.dal_publish_commitment_case
       (function
         | Contents_and_result
-            ( (Manager_operation {operation = Dal_publish_slot_header _; _} as
-              op),
+            ( (Manager_operation {operation = Dal_publish_commitment _; _} as op),
               res ) ->
             Some (op, res)
         | _ -> None)
@@ -1787,7 +1785,7 @@ let common_cases =
     increase_paid_storage_case;
     update_consensus_key_case;
     transfer_ticket_case;
-    dal_publish_slot_header_case;
+    dal_publish_commitment_case;
     sc_rollup_originate_case;
     sc_rollup_add_messages_case;
     sc_rollup_cement_case;
@@ -2290,34 +2288,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Transfer_ticket _; _}, _ -> None
-  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+  | ( Manager_operation {operation = Dal_publish_commitment _; _},
       Manager_operation_result
-        {operation_result = Applied (Dal_publish_slot_header_result _); _} ) ->
+        {operation_result = Applied (Dal_publish_commitment_result _); _} ) ->
       Some Eq
-  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+  | ( Manager_operation {operation = Dal_publish_commitment _; _},
       Manager_operation_result
-        {
-          operation_result = Backtracked (Dal_publish_slot_header_result _, _);
-          _;
-        } ) ->
+        {operation_result = Backtracked (Dal_publish_commitment_result _, _); _}
+    ) ->
       Some Eq
-  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+  | ( Manager_operation {operation = Dal_publish_commitment _; _},
       Manager_operation_result
         {
           operation_result =
-            Failed (Alpha_context.Kind.Dal_publish_slot_header_manager_kind, _);
+            Failed (Alpha_context.Kind.Dal_publish_commitment_manager_kind, _);
           _;
         } ) ->
       Some Eq
-  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+  | ( Manager_operation {operation = Dal_publish_commitment _; _},
       Manager_operation_result
         {
           operation_result =
-            Skipped Alpha_context.Kind.Dal_publish_slot_header_manager_kind;
+            Skipped Alpha_context.Kind.Dal_publish_commitment_manager_kind;
           _;
         } ) ->
       Some Eq
-  | Manager_operation {operation = Dal_publish_slot_header _; _}, _ -> None
+  | Manager_operation {operation = Dal_publish_commitment _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_originate _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_originate_result _); _} ) ->

@@ -476,10 +476,10 @@ module Manager : sig
     unit ->
     payload
 
-  (** [dal_publish_slot_header ~level ~index ~header] builds an
+  (** [dal_publish_commitment ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a
      slot. *)
-  val dal_publish_slot_header :
+  val dal_publish_commitment :
     index:int ->
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->

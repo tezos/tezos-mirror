@@ -4,13 +4,13 @@ DAL support
 
 The support for the :doc:`DAL <../shell/dal>` within the economic protocol relies on two operations:
 
-#. ``DAL_publish_slot_header``: Allowing anyone to publish a DAL commitment
+#. ``DAL_publish_commitment``: Allowing anyone to publish a DAL commitment
 #. ``DAL_attestation``: Allowing bakers to attest the data seen onto the DAL P2P network
 
-DAL publish slot header
-=======================
+DAL publish commitment
+======================
 
-``DAL_publish_slot_header`` is a manager operation that can be issued by a user wishing to publish data onto the DAL. The payload of this operation consists in the following fields:
+``DAL_publish_commitment`` is a manager operation that can be issued by a user wishing to publish data onto the DAL. The payload of this operation consists in the following fields:
 
 - Slot index: Identifies the specific slot for which the data is being published. It is an integer between ``0`` and ``number_of_slots - 1``.
 - Commitment: The `KZG commitment <https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html>`__ over the data.
@@ -24,7 +24,7 @@ Users can create and manage these commitments and proofs through the :doc:`DAL n
 Concurrent operations
 ---------------------
 
-If a block contains a valid ``DAL_publish_slot_header`` operation, any subsequent operations of the same kind within the same block (and the same slot index) will be recognized as valid but will fail during execution. They still incur transaction fees. More details about this can be found in the :doc:`validator documentation <../active/validation>`.
+If a block contains a valid ``DAL_publish_commitment`` operation, any subsequent operations of the same kind within the same block (and the same slot index) will be recognized as valid but will fail during execution. They still incur transaction fees. More details about this can be found in the :doc:`validator documentation <../active/validation>`.
 
 Economics
 ---------

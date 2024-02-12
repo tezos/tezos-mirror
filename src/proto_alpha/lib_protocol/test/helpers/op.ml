@@ -961,8 +961,8 @@ let sc_rollup_timeout ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op
 
-let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
-    ?storage_limit ctxt (src : Contract.t) slot_header =
+let dal_publish_commitment ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ctxt (src : Contract.t) slot_header =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -973,7 +973,7 @@ let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Dal_publish_slot_header slot_header)
+      (Dal_publish_commitment slot_header)
   in
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op

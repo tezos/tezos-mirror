@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Publish_slot_header = struct
+module Publish_commitment = struct
   type t = {
     slot_index : Dal_slot_index_repr.t;
     commitment : Dal_slot_repr.Commitment.t;
@@ -63,7 +63,7 @@ module Publish_slot_header = struct
           Dal_slot_index_repr.compare slot_index max_slot_index <= 0
           && Dal_slot_index_repr.compare slot_index Dal_slot_index_repr.zero
              >= 0)
-        (Dal_errors_repr.Dal_publish_slot_header_invalid_index
+        (Dal_errors_repr.Dal_publish_commitment_invalid_index
            {given = slot_index; maximum = max_slot_index})
     in
     let* proof_ok =
@@ -75,7 +75,7 @@ module Publish_slot_header = struct
     let* () =
       error_unless
         proof_ok
-        (Dal_errors_repr.Dal_publish_slot_header_invalid_proof
+        (Dal_errors_repr.Dal_publish_commitment_invalid_proof
            {commitment; commitment_proof})
     in
     return

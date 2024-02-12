@@ -577,7 +577,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       client
   in
   let* (`OpHash oph2) =
-    Helpers.publish_slot_header ~force:true ~index:0 ~commitment ~proof client
+    Helpers.publish_commitment ~force:true ~index:0 ~commitment ~proof client
   in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
@@ -616,7 +616,7 @@ let test_one_committee_per_level _protocol _parameters _cryptobox node _client
 
 let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof = Dal.(Commitment.dummy_commitment cryptobox message) in
-  Helpers.publish_slot_header ~source ?fee ?error ~index ~commitment ~proof
+  Helpers.publish_commitment ~source ?fee ?error ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for a different
    slot leads to a proof-checking error. *)
@@ -624,7 +624,7 @@ let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
     cryptobox =
   let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox "a") in
   let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox "b") in
-  Helpers.publish_slot_header ~source ?fee ~index ~commitment ~proof
+  Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for the "same"
    slot contents but represented using a different [slot_size] leads
@@ -641,13 +641,13 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
   let msg = "a" in
   let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
   let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
-  Helpers.publish_slot_header ~source ?fee ~index ~commitment ~proof
+  Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
 
-let publish_slot_header ?counter ?force ~source ?(fee = 1200) ~index ~commitment
+let publish_commitment ?counter ?force ~source ?(fee = 1200) ~index ~commitment
     ~proof client =
   let commitment = Dal.Commitment.of_string commitment in
   let proof = Dal.Commitment.proof_of_string proof in
-  Helpers.publish_slot_header
+  Helpers.publish_commitment
     ?counter
     ?force
     ~source
@@ -801,10 +801,10 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     Client.RPC.call client @@ RPC.get_chain_block_operations ()
   in
   let fees_error =
-    Failed {error_id = "proto.alpha.dal_publish_slot_header_duplicate"}
+    Failed {error_id = "proto.alpha.dal_publish_commitment_duplicate"}
   in
   let proof_error =
-    Failed {error_id = "proto.alpha.dal_publish_slot_header_invalid_proof"}
+    Failed {error_id = "proto.alpha.dal_publish_commitment_invalid_proof"}
   in
   (* The baker sorts operations fee wise. Consequently order of
      application for the operations will be: oph3 > oph2 > oph4 > oph1
@@ -1133,7 +1133,7 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
     dal_node source ~index content =
   let* commitment, proof = Helpers.store_slot dal_node ?with_proof content in
   let* _ =
-    publish_slot_header
+    publish_commitment
       ?counter
       ?force
       ~source
@@ -1692,7 +1692,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
            "content1")
   in
   let* _oph =
-    publish_slot_header
+    publish_commitment
       ~source:Constant.bootstrap1
       ~index:0
       ~commitment
@@ -2619,7 +2619,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
 
    The publication consists in sending the slot to a DAL node, computing its
    shards on the DAL node and associating it to a slot index and published
-   level. On the L1 side, a manager operation publish_slot_header is also sent.
+   level. On the L1 side, a manager operation publish_commitment is also sent.
 
    Having the ability to inject some blocks ahead (thanks to
    [beforehand_slot_injection]) allows some pipelining, as shards computation

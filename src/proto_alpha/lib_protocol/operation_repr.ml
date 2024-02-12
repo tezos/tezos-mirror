@@ -84,7 +84,7 @@ module Kind = struct
 
   type transfer_ticket = Transfer_ticket_kind
 
-  type dal_publish_slot_header = Dal_publish_slot_header_kind
+  type dal_publish_commitment = Dal_publish_commitment_kind
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
@@ -120,7 +120,7 @@ module Kind = struct
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Update_consensus_key_manager_kind : update_consensus_key manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
-    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
+    | Dal_publish_commitment_manager_kind : dal_publish_commitment manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -336,9 +336,9 @@ and _ manager_operation =
       entrypoint : Entrypoint_repr.t;
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header :
-      Dal_operations_repr.Publish_slot_header.t
-      -> Kind.dal_publish_slot_header manager_operation
+  | Dal_publish_commitment :
+      Dal_operations_repr.Publish_commitment.t
+      -> Kind.dal_publish_commitment manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
@@ -410,7 +410,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
-  | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
+  | Dal_publish_commitment _ -> Kind.Dal_publish_commitment_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
   | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
@@ -535,7 +535,7 @@ let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
 
 let dal_offset = 230
 
-let dal_publish_slot_header_tag = dal_offset + 0
+let dal_publish_commitment_tag = dal_offset + 0
 
 let zk_rollup_operation_tag_offset = 250
 
@@ -844,21 +844,21 @@ module Encoding = struct
               Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist});
         }
 
-    let dal_publish_slot_header_case =
+    let dal_publish_commitment_case =
       MCase
         {
-          tag = dal_publish_slot_header_tag;
-          name = "dal_publish_slot_header";
+          tag = dal_publish_commitment_tag;
+          name = "dal_publish_commitment";
           encoding =
             obj1
               (req
                  "slot_header"
-                 Dal_operations_repr.Publish_slot_header.encoding);
+                 Dal_operations_repr.Publish_commitment.encoding);
           select =
             (function
-            | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
-          proj = (function Dal_publish_slot_header slot_header -> slot_header);
-          inj = (fun slot_header -> Dal_publish_slot_header slot_header);
+            | Manager (Dal_publish_commitment _ as op) -> Some op | _ -> None);
+          proj = (function Dal_publish_commitment slot_header -> slot_header);
+          inj = (fun slot_header -> Dal_publish_commitment slot_header);
         }
 
     let sc_rollup_add_messages_case =
@@ -1584,10 +1584,10 @@ module Encoding = struct
       transfer_ticket_tag
       Manager_operations.transfer_ticket_case
 
-  let dal_publish_slot_header_case =
+  let dal_publish_commitment_case =
     make_manager_case
-      dal_publish_slot_header_tag
-      Manager_operations.dal_publish_slot_header_case
+      dal_publish_commitment_tag
+      Manager_operations.dal_publish_commitment_case
 
   let sc_rollup_originate_case =
     make_manager_case
@@ -1665,7 +1665,7 @@ module Encoding = struct
       PCase failing_noop_case;
       PCase register_global_constant_case;
       PCase transfer_ticket_case;
-      PCase dal_publish_slot_header_case;
+      PCase dal_publish_commitment_case;
       PCase sc_rollup_originate_case;
       PCase sc_rollup_add_messages_case;
       PCase sc_rollup_cement_case;
@@ -2129,8 +2129,8 @@ let equal_manager_operation_kind :
   | Update_consensus_key _, _ -> None
   | Transfer_ticket _, Transfer_ticket _ -> Some Eq
   | Transfer_ticket _, _ -> None
-  | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq
-  | Dal_publish_slot_header _, _ -> None
+  | Dal_publish_commitment _, Dal_publish_commitment _ -> Some Eq
+  | Dal_publish_commitment _, _ -> None
   | Sc_rollup_originate _, Sc_rollup_originate _ -> Some Eq
   | Sc_rollup_originate _, _ -> None
   | Sc_rollup_add_messages _, Sc_rollup_add_messages _ -> Some Eq

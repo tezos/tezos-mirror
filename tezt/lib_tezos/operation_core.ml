@@ -605,7 +605,7 @@ module Manager = struct
         parameters : transfer_parameters option;
       }
     | Origination of {code : JSON.u; storage : JSON.u; balance : int}
-    | Dal_publish_slot_header of {
+    | Dal_publish_commitment of {
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
         proof : Tezos_crypto_dal.Cryptobox.commitment_proof;
@@ -627,8 +627,8 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~index ~commitment ~proof =
-    Dal_publish_slot_header {index; commitment; proof}
+  let dal_publish_commitment ~index ~commitment ~proof =
+    Dal_publish_commitment {index; commitment; proof}
 
   let origination ?(init_balance = 0) ~code ~init_storage () =
     Origination {code; storage = init_storage; balance = init_balance}
@@ -673,7 +673,7 @@ module Manager = struct
           ("balance", json_of_tez balance);
           ("script", script);
         ]
-    | Dal_publish_slot_header {index; commitment; proof} ->
+    | Dal_publish_commitment {index; commitment; proof} ->
         let slot_header =
           `O
             [
@@ -683,7 +683,7 @@ module Manager = struct
             ]
         in
         [
-          ("kind", `String "dal_publish_slot_header");
+          ("kind", `String "dal_publish_commitment");
           ("slot_header", slot_header);
         ]
     | Delegation {delegate} ->
@@ -744,7 +744,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Dal_publish_slot_header _ ->
+    | Dal_publish_commitment _ ->
         let fee = Option.value fee ~default:2_100 in
         let gas_limit = Option.value gas_limit ~default:17_000 in
         let storage_limit = Option.value storage_limit ~default:0 in

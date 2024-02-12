@@ -1459,13 +1459,13 @@ let apply_manager_operation :
             Update_consensus_key_result
               {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
             [] )
-    | Dal_publish_slot_header slot_header ->
+    | Dal_publish_commitment slot_header ->
         let*? ctxt, slot_header =
-          Dal_apply.apply_publish_slot_header ctxt slot_header
+          Dal_apply.apply_publish_commitment ctxt slot_header
         in
         let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
         let result =
-          Dal_publish_slot_header_result {slot_header; consumed_gas}
+          Dal_publish_commitment_result {slot_header; consumed_gas}
         in
         return (ctxt, result, [])
     | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist} ->
@@ -1807,7 +1807,7 @@ let burn_manager_storage_fees :
         ( ctxt,
           storage_limit,
           Transfer_ticket_result {payload with balance_updates} )
-    | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)
+    | Dal_publish_commitment_result _ -> return (ctxt, storage_limit, smopr)
     | Sc_rollup_originate_result payload ->
         let+ ctxt, storage_limit, balance_updates =
           Fees.burn_sc_rollup_origination_fees

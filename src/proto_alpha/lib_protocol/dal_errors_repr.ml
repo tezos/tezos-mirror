@@ -26,16 +26,16 @@
 type error +=
   | Dal_feature_disabled
   | Dal_slot_index_above_hard_limit of {given : int; limit : int}
-  | Dal_publish_slot_header_invalid_index of {
+  | Dal_publish_commitment_invalid_index of {
       given : Dal_slot_index_repr.t;
       maximum : Dal_slot_index_repr.t;
     }
-  | Dal_publish_slot_header_candidate_with_low_fees of {
+  | Dal_publish_commitment_candidate_with_low_fees of {
       proposed_fees : Tez_repr.t;
     }
   | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
-  | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
-  | Dal_publish_slot_header_invalid_proof of {
+  | Dal_publish_commitment_duplicate of {slot_header : Dal_slot_repr.Header.t}
+  | Dal_publish_commitment_invalid_proof of {
       commitment : Dal.commitment;
       commitment_proof : Dal.commitment_proof;
     }
@@ -88,7 +88,7 @@ let () =
   let description = "Bad index for slot header" in
   register_error_kind
     `Permanent
-    ~id:"dal_publish_slot_header_invalid_index"
+    ~id:"dal_publish_commitment_invalid_index"
     ~title:"DAL slot header invalid index"
     ~description
     ~pp:(fun ppf (given, maximum) ->
@@ -104,17 +104,17 @@ let () =
        (req "given" Dal_slot_index_repr.encoding)
        (req "got" Dal_slot_index_repr.encoding))
     (function
-      | Dal_publish_slot_header_invalid_index {given; maximum} ->
+      | Dal_publish_commitment_invalid_index {given; maximum} ->
           Some (given, maximum)
       | _ -> None)
     (fun (given, maximum) ->
-      Dal_publish_slot_header_invalid_index {given; maximum}) ;
+      Dal_publish_commitment_invalid_index {given; maximum}) ;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3114
      Better error message *)
   let description = "Slot header with too low fees" in
   register_error_kind
     `Permanent
-    ~id:"dal_publish_slot_header_with_low_fees"
+    ~id:"dal_publish_commitment_with_low_fees"
     ~title:"DAL slot header with low fees"
     ~description
     ~pp:(fun ppf proposed ->
@@ -126,11 +126,11 @@ let () =
         proposed)
     (obj1 (req "proposed" Tez_repr.encoding))
     (function
-      | Dal_publish_slot_header_candidate_with_low_fees {proposed_fees} ->
+      | Dal_publish_commitment_candidate_with_low_fees {proposed_fees} ->
           Some proposed_fees
       | _ -> None)
     (fun proposed_fees ->
-      Dal_publish_slot_header_candidate_with_low_fees {proposed_fees}) ;
+      Dal_publish_commitment_candidate_with_low_fees {proposed_fees}) ;
   let description = "The attestation for data availability is a too big" in
   register_error_kind
     `Permanent
@@ -156,19 +156,19 @@ let () =
   let description = "A slot header for this slot was already proposed" in
   register_error_kind
     `Permanent
-    ~id:"dal_publish_slot_header_duplicate"
+    ~id:"dal_publish_commitment_duplicate"
     ~title:"DAL publish slot header duplicate"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
     (obj1 (req "proposed" Dal_slot_repr.Header.encoding))
     (function
-      | Dal_publish_slot_header_duplicate {slot_header} -> Some slot_header
+      | Dal_publish_commitment_duplicate {slot_header} -> Some slot_header
       | _ -> None)
-    (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
+    (fun slot_header -> Dal_publish_commitment_duplicate {slot_header}) ;
   let description = "The slot header's commitment proof does not check" in
   register_error_kind
     `Permanent
-    ~id:"dal_publish_slot_header_invalid_proof"
+    ~id:"dal_publish_commitment_invalid_proof"
     ~title:"DAL publish slot header invalid proof"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
@@ -176,11 +176,11 @@ let () =
        (req "commitment" Dal.Commitment.encoding)
        (req "commitment_proof" Dal.Commitment_proof.encoding))
     (function
-      | Dal_publish_slot_header_invalid_proof {commitment; commitment_proof} ->
+      | Dal_publish_commitment_invalid_proof {commitment; commitment_proof} ->
           Some (commitment, commitment_proof)
       | _ -> None)
     (fun (commitment, commitment_proof) ->
-      Dal_publish_slot_header_invalid_proof {commitment; commitment_proof}) ;
+      Dal_publish_commitment_invalid_proof {commitment; commitment_proof}) ;
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_attester_not_in_committee"

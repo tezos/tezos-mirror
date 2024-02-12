@@ -60,18 +60,18 @@ val validate_mempool_attestation : t -> Dal.Attestation.t -> unit tzresult Lwt.t
 val apply_attestation :
   t -> Consensus_key.pk -> Raw_level.t -> Dal.Attestation.t -> t tzresult
 
-(** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
+(** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be
    refused on top of [ctxt]. If an [Error _] is returned, the [slot_header]
    is not valid. *)
-val validate_publish_slot_header :
-  t -> Dal.Operations.Publish_slot_header.t -> unit tzresult
+val validate_publish_commitment :
+  t -> Dal.Operations.Publish_commitment.t -> unit tzresult
 
-(** [apply_publish_slot_header ctxt slot_header] applies the publication of
+(** [apply_publish_commitment ctxt slot_header] applies the publication of
    slot header [slot_header] on top of [ctxt]. Fails if the slot contains
    already a slot header. *)
-val apply_publish_slot_header :
-  t -> Dal.Operations.Publish_slot_header.t -> (t * Dal.Slot.Header.t) tzresult
+val apply_publish_commitment :
+  t -> Dal.Operations.Publish_commitment.t -> (t * Dal.Slot.Header.t) tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots attested at level [ctxt.current_level - lag]

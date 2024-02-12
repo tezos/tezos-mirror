@@ -64,7 +64,7 @@ module Helpers : sig
   val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
-  val publish_slot_header :
+  val publish_commitment :
     ?counter:int ->
     ?force:bool ->
     ?source:Account.key ->

@@ -109,7 +109,7 @@ The life cycle of slots and shards is described by the following steps:
    This is done via the RPC ``PUT /commitments/<commitment>/shards``.
 #. The slot producer instructs the DAL node to compute the proof associated with the commitment.
    This is done via the RPC ``GET /commitments/<commitment>/proof``, which returns the corresponding commitment proof.
-#. The slot producer selects a slot index for its slot, and posts the commitment to L1, via the ``publish_slot_header`` operation.
+#. The slot producer selects a slot index for its slot, and posts the commitment to L1, via the ``publish_commitment`` operation.
    This can be done via RPCs for injecting an operation into L1, or using the Octez client, via the following command::
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>

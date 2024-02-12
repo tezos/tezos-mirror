@@ -70,7 +70,7 @@ let publish_slot dal_node client source ~slot_size ~level ~slot_index =
       ~force:true
       [
         make ~source
-        @@ dal_publish_slot_header
+        @@ dal_publish_commitment
              ~index:slot_index
              ~commitment:commitment_hash
              ~proof;

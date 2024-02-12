@@ -2053,8 +2053,8 @@ module Manager = struct
            the operations Branch_delayed if they cannot be successfully
            prechecked? *)
         return_unit
-    | Dal_publish_slot_header slot_header ->
-        Dal_apply.validate_publish_slot_header vi.ctxt slot_header
+    | Dal_publish_commitment slot_header ->
+        Dal_apply.validate_publish_commitment vi.ctxt slot_header
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         assert_zk_rollup_feature_enabled vi
 

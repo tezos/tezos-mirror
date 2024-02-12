@@ -28,8 +28,8 @@ let ns = Namespace.make Registration_helpers.ns "dal"
 
 let fv s = Free_variable.of_namespace (ns s)
 
-module Publish_slot_header : Benchmark.S = struct
-  let name = ns "Dal_publish_slot_header"
+module Publish_commitment : Benchmark.S = struct
+  let name = ns "Dal_publish_commitment"
 
   let info = "Estimating the cost of publishing a slot header"
 
@@ -55,7 +55,7 @@ module Publish_slot_header : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun () -> ())
-      (Model.unknown_const1 ~name ~const:(fv "publish_slot_header_const"))
+      (Model.unknown_const1 ~name ~const:(fv "publish_commitment_const"))
 
   let models = [("dal", model)]
 
@@ -70,7 +70,7 @@ module Publish_slot_header : Benchmark.S = struct
     let* commitment = Crypto.commit cryptobox polynomial in
     let* commitment_proof = Crypto.prove_commitment cryptobox polynomial in
     return
-    @@ Dal.Operations.Publish_slot_header.
+    @@ Dal.Operations.Publish_commitment.
          {slot_index; commitment; commitment_proof}
 
   let make_bench rng_state (config : config) () : workload Generator.benchmark =
@@ -107,7 +107,7 @@ module Publish_slot_header : Benchmark.S = struct
       in
       let workload = () in
       let closure () =
-        match Dal_apply.apply_publish_slot_header ctxt op with
+        match Dal_apply.apply_publish_commitment ctxt op with
         | Error errs ->
             Format.eprintf "%a@." Environment.Error_monad.pp_trace errs ;
             Stdlib.failwith
@@ -143,4 +143,4 @@ module Publish_slot_header : Benchmark.S = struct
     List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Publish_slot_header)
+let () = Registration_helpers.register (module Publish_commitment)

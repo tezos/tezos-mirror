@@ -345,7 +345,7 @@ let estimated_gas_single (type kind)
         | Update_consensus_key_result {consumed_gas; _}
         | Increase_paid_storage_result {consumed_gas; _}
         | Transfer_ticket_result {consumed_gas; _}
-        | Dal_publish_slot_header_result {consumed_gas; _}
+        | Dal_publish_commitment_result {consumed_gas; _}
         | Sc_rollup_originate_result {consumed_gas; _}
         | Sc_rollup_add_messages_result {consumed_gas; _}
         | Sc_rollup_cement_result {consumed_gas; _}
@@ -419,7 +419,7 @@ let estimated_storage_single (type kind) ~origination_size
         | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
         | Transaction_result (Transaction_to_sc_rollup_result _)
         | Reveal_result _ | Delegation_result _ | Set_deposits_limit_result _
-        | Increase_paid_storage_result _ | Dal_publish_slot_header_result _
+        | Increase_paid_storage_result _ | Dal_publish_commitment_result _
         | Sc_rollup_add_messages_result _
         (* The following Sc_rollup operations have zero storage cost because we
            consider them to be paid in the stake deposit.
@@ -502,7 +502,7 @@ let originated_contracts_single (type kind)
         | Register_global_constant_result _ | Reveal_result _
         | Delegation_result _ | Set_deposits_limit_result _
         | Update_consensus_key_result _ | Increase_paid_storage_result _
-        | Transfer_ticket_result _ | Dal_publish_slot_header_result _
+        | Transfer_ticket_result _ | Dal_publish_commitment_result _
         | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
         | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
         | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
