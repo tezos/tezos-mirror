@@ -95,17 +95,27 @@ let () =
 
 *)
 
+type connection_info = {
+  heads : (Block_hash.t * Block_header.t) Lwt_stream.t;
+  stopper : Tezos_rpc.Context.stopper;
+}
+
+type connection_status =
+  | Disconnected
+  | Connected of connection_info
+  | Waiting_reconnection of connection_info Lwt_condition.t
+
 type t = {
   name : string;
   protocols : Protocol_hash.t list option;
   reconnection_delay : float;
-  heads : (Block_hash.t * Block_header.t) Lwt_stream.t;
   cctxt : Client_context.full;
-  stopper : Tezos_rpc.Context.stopper;
   mutable running : bool;
+  mutable status : connection_status;
 }
 
-let rec connect ~name ?(count = 0) ~delay ~protocols cctxt =
+let rec connect ?(count = 0)
+    ({name; protocols; reconnection_delay = delay; cctxt; _} as l1_ctxt) =
   let open Lwt_syntax in
   let* () =
     if count = 0 then return_unit
@@ -123,79 +133,75 @@ let rec connect ~name ?(count = 0) ~delay ~protocols cctxt =
       let* () = Layer1_event.wait_reconnect ~name delay in
       Lwt_unix.sleep delay
   in
-  let* res =
-    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
-  in
-  match res with
-  | Ok (heads, stopper) ->
-      let heads =
-        Lwt_stream.map_s
-          (fun ( hash,
-                 (Tezos_base.Block_header.{shell = {level; _}; _} as header) ) ->
-            let+ () = Layer1_event.switched_new_head ~name hash level in
-            (hash, header))
-          heads
+  match l1_ctxt.status with
+  | Connected conn ->
+      (* Already connected *)
+      return conn
+  | Waiting_reconnection c when count = 0 ->
+      (* Reconnection triggered by someone else *)
+      Lwt_condition.wait c
+  | Disconnected | Waiting_reconnection _ -> (
+      let* res =
+        Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
       in
-      return (heads, stopper)
-  | Error e ->
-      let* () = Layer1_event.cannot_connect ~name ~count e in
-      connect ~name ~delay ~protocols ~count:(count + 1) cctxt
+      match res with
+      | Ok (heads, stopper) ->
+          let heads =
+            Lwt_stream.map_s
+              (fun ( hash,
+                     (Tezos_base.Block_header.{shell = {level; _}; _} as header)
+                   ) ->
+                let+ () = Layer1_event.switched_new_head ~name hash level in
+                (hash, header))
+              heads
+          in
+          let conn = {heads; stopper} in
+          let previous_status = l1_ctxt.status in
+          l1_ctxt.status <- Connected conn ;
+          (match previous_status with
+          | Waiting_reconnection c -> Lwt_condition.broadcast c conn
+          | _ -> ()) ;
+          return conn
+      | Error e ->
+          let* () = Layer1_event.cannot_connect ~name ~count e in
+          connect ~count:(count + 1) l1_ctxt)
 
 let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
-  let heads, _push = Lwt_stream.create () in
   {
     name;
     cctxt = (cctxt :> Client_context.full);
-    heads;
-    stopper = (fun () -> ());
     reconnection_delay;
     protocols;
     running = false;
+    status = Disconnected;
   }
 
 let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
-  let+ heads, stopper =
-    connect ~name ~delay:reconnection_delay ~protocols cctxt
-  in
-  {
-    name;
-    cctxt = (cctxt :> Client_context.full);
-    heads;
-    stopper;
-    reconnection_delay;
-    protocols;
-    running = true;
-  }
+  let l1_ctxt = create ~name ~reconnection_delay ?protocols cctxt in
+  l1_ctxt.running <- true ;
+  let* (_ : connection_info) = connect l1_ctxt in
+  return l1_ctxt
 
 let reconnect l1_ctxt =
-  let open Lwt_syntax in
-  let* heads, stopper =
-    connect
-      ~name:l1_ctxt.name
-      ~count:1
-      ~delay:l1_ctxt.reconnection_delay
-      ~protocols:l1_ctxt.protocols
-      l1_ctxt.cctxt
-  in
-  return {l1_ctxt with heads; stopper; running = true}
+  match l1_ctxt.status with
+  | Waiting_reconnection c -> Lwt_condition.wait c
+  | _ ->
+      let c = Lwt_condition.create () in
+      l1_ctxt.status <- Waiting_reconnection c ;
+      connect ~count:1 l1_ctxt
 
-let connect l1_ctxt =
-  let open Lwt_result_syntax in
-  if l1_ctxt.running then failwith "Layer_1.connect: Already connected"
-  else
-    let*! heads, stopper =
-      connect
-        ~name:l1_ctxt.name
-        ~delay:l1_ctxt.reconnection_delay
-        ~protocols:l1_ctxt.protocols
-        l1_ctxt.cctxt
-    in
-    return {l1_ctxt with heads; stopper; running = true}
+let disconnect l1_ctxt =
+  (match l1_ctxt.status with
+  | Disconnected | Waiting_reconnection _ -> ()
+  (* disconnect may leak a reconnection attempt but is used only on
+     shutdown. *)
+  | Connected {stopper; _} -> stopper ()) ;
+  l1_ctxt.status <- Disconnected
 
 let shutdown state =
-  state.stopper () ;
+  disconnect state ;
   state.running <- false ;
   Lwt.return_unit
 
@@ -268,17 +274,13 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
   loop init_timeout
 
 let iter_heads l1_ctxt f =
-  let rec loop l1_ctxt =
-    let open Lwt_result_syntax in
+  let open Lwt_result_syntax in
+  let rec loop {heads; stopper} =
     let* stopping_reason =
-      lwt_stream_iter_with_timeout
-        ~min_timeout:10.
-        ~init_timeout:300.
-        f
-        l1_ctxt.heads
+      lwt_stream_iter_with_timeout ~min_timeout:10. ~init_timeout:300. f heads
     in
     when_ l1_ctxt.running @@ fun () ->
-    l1_ctxt.stopper () ;
+    stopper () ;
     let*! () =
       match stopping_reason with
       | Closed -> Layer1_event.connection_lost ~name:l1_ctxt.name
@@ -288,22 +290,25 @@ let iter_heads l1_ctxt f =
           Format.eprintf "@[<v 2>Connection error:@ %a@]@." pp_print_trace trace ;
           Lwt.return_unit
     in
-    let*! l1_ctxt = reconnect l1_ctxt in
-    loop l1_ctxt
+    let*! conn = reconnect l1_ctxt in
+    loop conn
   in
-  loop l1_ctxt
+  let*! conn = connect l1_ctxt in
+  loop conn
 
 let wait_first l1_ctxt =
-  let rec loop l1_ctxt =
-    let open Lwt_syntax in
-    let* head = Lwt_stream.peek l1_ctxt.heads in
+  let open Lwt_syntax in
+  let rec loop conn =
+    let* head = Lwt_stream.peek conn.heads in
     match head with
     | Some head -> return head
     | None ->
-        let* l1_ctxt = reconnect l1_ctxt in
-        loop l1_ctxt
+        let* conn = reconnect l1_ctxt in
+        loop conn
   in
-  Lwt.no_cancel @@ loop l1_ctxt
+  Lwt.no_cancel
+  @@ let* conn = connect l1_ctxt in
+     loop conn
 
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
@@ -456,15 +461,13 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
 
 module Internal_for_tests = struct
   let dummy cctxt =
-    let heads, _push = Lwt_stream.create () in
     {
       name = "dummy_layer_1_for_tests";
       reconnection_delay = 5.0;
-      heads;
       cctxt = (cctxt :> Client_context.full);
-      stopper = Fun.id;
       protocols = None;
       running = false;
+      status = Disconnected;
     }
 end
 

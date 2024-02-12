@@ -60,11 +60,8 @@ val create :
   #Client_context.full ->
   t
 
-(** Connect a Layer 1 context created with {!create} to the L1 node for
-    monitoring.  *)
-val connect : t -> t tzresult Lwt.t
-
-(** [shutdown t] properly shuts the layer 1 down. *)
+(** [shutdown t] properly shuts the layer 1 down. This function is to be used on
+    exit. *)
 val shutdown : t -> unit Lwt.t
 
 (** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
