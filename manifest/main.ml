@@ -8519,6 +8519,7 @@ let _evm_node =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_stdlib_unix |> open_;
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_server;
