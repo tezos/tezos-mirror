@@ -13,8 +13,7 @@ end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
-      let*! evm_state = Evm_context.evm_state ctxt in
+      let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
       let*! res = Evm_state.inspect evm_state path in
       return res
   end
@@ -53,8 +52,7 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
-      let* raw_insights = Evm_context.execute_and_inspect ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
       match Simulation.Encodings.insights_from_list raw_insights with
       | Some i -> return i
       | None -> Error_monad.failwith "Invalid insights format"
@@ -62,15 +60,14 @@ end) : Services_backend_sig.Backend = struct
 
   let inject_kernel_upgrade ~payload =
     let open Lwt_result_syntax in
-    let* ctxt = Evm_context.sync Ctxt.ctxt in
-    let*! evm_state = Evm_context.evm_state ctxt in
+    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
     let*! evm_state =
       Evm_state.modify
         ~key:Durable_storage_path.kernel_upgrade
         ~value:payload
         evm_state
     in
-    let* _ctxt = Evm_context.commit ctxt evm_state in
+    let* () = Evm_context.commit Ctxt.ctxt evm_state in
     return_unit
 end
 
