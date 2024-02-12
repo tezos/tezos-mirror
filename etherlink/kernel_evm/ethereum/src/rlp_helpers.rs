@@ -16,6 +16,16 @@ pub fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, Decode
     decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
 }
 
+pub fn check_list(decoder: &Rlp<'_>, length: usize) -> Result<(), DecoderError> {
+    if !decoder.is_list() {
+        Err(DecoderError::RlpExpectedToBeList)
+    } else if decoder.item_count() != Ok(length) {
+        Err(DecoderError::RlpIncorrectListLen)
+    } else {
+        Ok(())
+    }
+}
+
 pub fn decode_field<T: Decodable>(
     decoder: &Rlp<'_>,
     field_name: &'static str,
@@ -267,4 +277,34 @@ pub fn decode_timestamp(decoder: &Rlp<'_>) -> Result<Timestamp, DecoderError> {
     })?)
     .into();
     Ok(timestamp)
+}
+
+/// Hardcoding the option RLP encoding for u64 in little endian. This is
+/// unfortunately necessary as we cannot redefine the u64 encoding.
+pub fn append_option_u64_le(v: &Option<u64>, stream: &mut rlp::RlpStream) {
+    match v {
+        None => {
+            stream.begin_list(0);
+        }
+        Some(value) => {
+            stream.begin_list(1);
+            append_u64_le(stream, value);
+        }
+    }
+}
+
+/// See [append_option_u64_le]
+pub fn decode_option_u64_le(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<Option<u64>, DecoderError> {
+    let items = decoder.item_count()?;
+    match items {
+        1 => {
+            let mut it = decoder.iter();
+            Ok(Some(decode_field_u64_le(&next(&mut it)?, field_name)?))
+        }
+        0 => Ok(None),
+        _ => Err(DecoderError::RlpIncorrectListLen),
+    }
 }

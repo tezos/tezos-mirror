@@ -19,9 +19,12 @@ use evm_execution::handler::ExtendedExitReason;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
-use rlp::{Decodable, DecoderError, Rlp};
+use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
+use tezos_ethereum::rlp_helpers::{
+    append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
+    next,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -36,6 +39,91 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+
+pub const OK_TAG: u8 = 0x1;
+pub const ERR_TAG: u8 = 0x2;
+
+// Redefined Result as we cannot implement Decodable and Encodable traits on Result
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SimulationResult<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExecutionResult {
+    value: Option<Vec<u8>>,
+    gas_used: Option<u64>,
+}
+
+type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ValidationResult {
+    address: H160,
+}
+
+impl<T: Encodable, E: Encodable> Encodable for SimulationResult<T, E> {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match self {
+            Self::Ok(value) => {
+                stream.append(&OK_TAG);
+                stream.append(value)
+            }
+            Self::Err(e) => {
+                stream.append(&ERR_TAG);
+                stream.append(e)
+            }
+        };
+    }
+}
+
+impl<T: Decodable, E: Decodable> Decodable for SimulationResult<T, E> {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        match decode_field(&next(&mut it)?, "tag")? {
+            OK_TAG => Ok(Self::Ok(decode_field(&next(&mut it)?, "ok")?)),
+            ERR_TAG => Ok(Self::Err(decode_field(&next(&mut it)?, "error")?)),
+            _ => Err(DecoderError::Custom("Invalid execution tag")),
+        }
+    }
+}
+
+impl Encodable for ExecutionResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append(&self.value);
+        append_option_u64_le(&self.gas_used, stream);
+    }
+}
+
+impl Decodable for ExecutionResult {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        let value = decode_field(&next(&mut it)?, "value")?;
+        let gas_used = decode_option_u64_le(&next(&mut it)?, "gas_used")?;
+        Ok(ExecutionResult { value, gas_used })
+    }
+}
+
+impl Encodable for ValidationResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.append(&self.address);
+    }
+}
+
+impl Decodable for ValidationResult {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Ok(ValidationResult {
+            address: decode_field(decoder, "caller")?,
+        })
+    }
+}
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -1042,5 +1130,38 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
+    }
+
+    pub fn check_roundtrip<R: Decodable + Encodable + core::fmt::Debug + PartialEq>(
+        v: R,
+    ) {
+        let bytes = v.rlp_bytes();
+        let decoder = Rlp::new(&bytes);
+        println!("{:?}", bytes);
+        let decoded = R::decode(&decoder).expect("Value should be decodable");
+        assert_eq!(v, decoded, "Roundtrip failed on {:?}", v)
+    }
+
+    #[test]
+    fn test_simulation_result_encoding_roundtrip() {
+        let valid: SimulationResult<ValidationResult, String> =
+            SimulationResult::Ok(ValidationResult {
+                address: address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                    .unwrap(),
+            });
+        let call: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+                value: Some(vec![0, 1, 2, 3]),
+                gas_used: Some(123),
+            }));
+        let revert: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Err(vec![3, 2, 1, 0]));
+        let error: SimulationResult<CallResult, String> =
+            SimulationResult::Err(String::from("Un festival de GADTs"));
+
+        check_roundtrip(valid);
+        check_roundtrip(call);
+        check_roundtrip(revert);
+        check_roundtrip(error)
     }
 }
