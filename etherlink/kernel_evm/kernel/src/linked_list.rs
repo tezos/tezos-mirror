@@ -421,6 +421,15 @@ where
         let to_remove = front.id.clone();
         self.remove(host, &to_remove)
     }
+
+    /// Deletes the entire list
+    pub fn delete(&mut self, host: &mut impl Runtime) -> Result<()> {
+        if host.store_has(&self.path)?.is_some() {
+            host.store_delete(&self.path)?;
+        };
+        self.pointers = None;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -603,6 +612,23 @@ mod tests {
             .expect("element should be present");
 
         assert_eq!(read, 0x33);
+    }
+
+    #[test]
+    fn test_delete() {
+        let mut host = MockHost::default();
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+        list.push(&mut host, &id_1, &0x32_u8)
+            .expect("push should have worked");
+        list.push(&mut host, &id_2, &0x33_u8)
+            .expect("push should have worked");
+        list.delete(&mut host).expect("delete should have worked");
+        let reloaded_list: LinkedList<Hash, u8> =
+            LinkedList::new(&path, &host).expect("list should be created");
+        assert!(reloaded_list.is_empty());
     }
 
     fn fill_list(

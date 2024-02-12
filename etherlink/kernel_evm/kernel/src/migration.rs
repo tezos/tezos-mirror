@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
+use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
@@ -31,10 +32,13 @@ pub enum MigrationStatus {
 //     in an inconsistent storage.
 // /!\
 //
-fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
+fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        // Flush delayed inbox
+        let mut delayed_inbox = DelayedInbox::new(host)?;
+        delayed_inbox.delete(host)?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

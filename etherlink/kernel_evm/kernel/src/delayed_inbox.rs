@@ -298,6 +298,10 @@ impl DelayedInbox {
             Some(popped)
         })
     }
+
+    pub fn delete<Host: Runtime>(&mut self, host: &mut Host) -> Result<()> {
+        self.0.delete(host)
+    }
 }
 
 #[cfg(test)]
