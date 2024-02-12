@@ -84,7 +84,7 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let* _ctxt = Evm_context.commit Ctxt.ctxt evm_state in
+    let* () = Evm_context.commit Ctxt.ctxt evm_state in
     return_unit
 end
 
