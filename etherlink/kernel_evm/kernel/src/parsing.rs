@@ -463,7 +463,8 @@ mod tests {
                 &TezosContracts {
                     ticketer: None,
                     admin: None,
-                    sequencer_admin: None
+                    sequencer_admin: None,
+                    kernel_governance: None
                 },
                 &None,
                 &None

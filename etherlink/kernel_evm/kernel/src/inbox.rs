@@ -648,6 +648,7 @@ mod tests {
                 ticketer: None,
                 admin: Some(sender),
                 sequencer_admin: None,
+                kernel_governance: None,
             },
             None,
             None,
