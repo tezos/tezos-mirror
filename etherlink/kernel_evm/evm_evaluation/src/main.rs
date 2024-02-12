@@ -340,6 +340,27 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "refund_CallA.json"
         | "refund50percentCap.json"
         | "refund600.json"
+
+        // SKIPPED BECAUSE TESTS ARE EXPECTED TO BE RUNNED VIA AN EXTERNAL CLIENT
+
+        // Reason: Invalid transaction. The gas limit is set to less than 21000.
+        // These transactions are usually handled at the client level and directly rejected.
+        // Moreover, if we comply to what's expected by the test we'd remove the balance
+        // but the test is waiting for the nonce to stay untouched, this opens a clear
+        // possibility of potential replay attacks.
+        | "invalidTr.json"
+
+        // Reason: The gas price is computed with max_fee_per_gas. But max_fee_per_gas 
+        // is used when you don't know the base fee. Usually the client verifies if the 
+        // account has enough funds to pay the max gas price (computed with max_fee_per_gas)
+        // and if that isn't the case then the client directly rejects the transaction.
+        // But in the kernel we know the real gas price because we have a base fee.
+        // Therefore, the test does not pass because it checks if the account has enough funds, 
+        // which it doesn't, but with the known base fee the account does have enough funds 
+        // and the test should pass.
+        // max_gas_price = max_fee_per_gas x gas_limit
+        // real_gas_price = (base_fee + max_priority_fee_per_gas) x gas_limit
+        | "transactionIntinsicBug.json"
     )
 }
 
