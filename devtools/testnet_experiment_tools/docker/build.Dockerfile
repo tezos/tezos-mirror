@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
 ARG BASE_IMAGE_VERSION
 ARG RUST_TOOLCHAIN_IMAGE
-ARG RUST_TOOLCHAIN_IMAGE_VERSION
+ARG RUST_TOOLCHAIN_IMAGE_TAG
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.

@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
 ARG BASE_IMAGE_VERSION
 ARG RUST_TOOLCHAIN_IMAGE
-ARG RUST_TOOLCHAIN_IMAGE_VERSION
+ARG RUST_TOOLCHAIN_IMAGE_TAG
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
@@ -42,7 +42,7 @@ RUN while read -r protocol; do \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
 
-FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_VERSION} AS layer2-builder
+FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
 WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/

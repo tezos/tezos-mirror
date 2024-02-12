@@ -37,7 +37,3 @@ export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 
 ## Other variables, used both in Makefile and scripts
 export COVERAGE_OUTPUT=_coverage_output
-
-## The version of the rust-specific image which can be used to build Rust
-## artifacts of this repository.
-export rust_toolchain_image_version="rust-toolchain--${opam_repository_tag}"
