@@ -17,6 +17,7 @@ use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
+use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
@@ -25,6 +26,7 @@ use storage::{
 };
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
@@ -46,6 +48,7 @@ mod linked_list;
 mod migration;
 mod mock_internal;
 mod parsing;
+mod reveal_storage;
 mod safe_storage;
 mod sequencer_blueprint;
 mod simulation;
@@ -237,12 +240,25 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
+
     let evm_subkeys = host
         .store_count_subkeys(&EVM_PATH)
         .expect("The kernel failed to read the number of /evm subkeys");
+
     if evm_subkeys == 0 {
         host.store_write(&EVM_PATH, "Un festival de GADT".as_bytes(), 0)
             .unwrap();
+    }
+
+    if is_revealed_storage(host) {
+        reveal_storage(
+            host,
+            option_env!("EVM_SEQUENCER").map(|s| {
+                PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
+            }),
+            option_env!("EVM_ADMIN")
+                .map(|s| PublicKey::from_b58check(s).expect("Failed parsing EVM_ADMIN")),
+        );
     }
 
     host.store_copy(&EVM_PATH, &TMP_PATH)
