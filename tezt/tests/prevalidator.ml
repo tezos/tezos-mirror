@@ -1880,7 +1880,8 @@ module Revamped = struct
            ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
            ~level
            ~round:0
-           ~block_payload_hash)
+           ~block_payload_hash
+           ())
         ~signer:delegate
         client
     in
@@ -2130,7 +2131,8 @@ module Revamped = struct
              ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
              ~level
              ~round:0
-             ~block_payload_hash)
+             ~block_payload_hash
+             ())
           ~signer:delegate
           client
       in
@@ -2514,6 +2516,7 @@ module Revamped = struct
           ~level
           ~round
           ~block_payload_hash
+          ()
       in
       return (op, branch, oph)
     in

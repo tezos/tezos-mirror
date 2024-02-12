@@ -757,6 +757,7 @@ val get_chain_block_helper_baking_rights :
   ?delegate:string ->
   ?level:int ->
   ?cycle:int ->
+  ?max_round:int ->
   unit ->
   JSON.t t
 

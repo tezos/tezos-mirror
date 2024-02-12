@@ -78,7 +78,7 @@ let check_kind json kind =
 
 let check_version ~version ~use_legacy_name ~check ~rpc ~get_name ~data client =
   let* t = Client.RPC.call client @@ rpc ~version data in
-  return (check ~use_legacy_name t (get_name use_legacy_name))
+  return (check ~use_legacy_name t (get_name ~use_legacy_name))
 
 let check_unknown_version ~version ~rpc ~data client =
   let*? p = Client.RPC.spawn client @@ rpc ~version data in
@@ -119,7 +119,7 @@ let check_rpc_versions ?(old = "0") ?(new_ = "1") ?(unknown = "2") ~check ~rpc
 let create_consensus_op ?slot ?level ?round ?block_payload_hash ~use_legacy_name
     ~signer ~kind client =
   let consensus_name =
-    Operation.Consensus.kind_to_string kind use_legacy_name
+    Operation.Consensus.kind_to_string kind ~use_legacy_name
   in
   Log.info "Create an %s operation" consensus_name ;
   let consensus =
@@ -148,12 +148,13 @@ let create_double_consensus_evidence ~use_legacy_name ~double_evidence_kind
     client =
   let consensus_kind =
     match double_evidence_kind with
-    | Operation.Anonymous.Double_attestation_evidence -> Operation.Attestation
+    | Operation.Anonymous.Double_attestation_evidence ->
+        Operation.Attestation {with_dal = false}
     | Operation.Anonymous.Double_preattestation_evidence ->
         Operation.Preattestation
   in
   let consensus_name =
-    Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+    Operation.Anonymous.kind_to_string double_evidence_kind ~use_legacy_name
   in
   Log.info "Create an %s operation" consensus_name ;
 
@@ -230,7 +231,8 @@ module Forge = struct
     register_test
       ~title:"Forge consensus operations"
       ~additionnal_tags:["forge"; "operations"; "consensus"]
-    @@ fun protocol -> test_consensus Operation.Attestation protocol
+    @@ fun protocol ->
+    test_consensus (Operation.Attestation {with_dal = false}) protocol
 
   let test_forge_preconsensus =
     register_test
@@ -287,12 +289,12 @@ module Forge = struct
       let consensus_kind =
         match double_evidence_kind with
         | Operation.Anonymous.Double_attestation_evidence ->
-            Operation.Attestation
+            Operation.Attestation {with_dal = false}
         | Operation.Anonymous.Double_preattestation_evidence ->
             Operation.Preattestation
       in
       let consensus_name =
-        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+        Operation.Anonymous.kind_to_string double_evidence_kind ~use_legacy_name
       in
       Log.info "Create an %s operation" consensus_name ;
 
@@ -415,7 +417,8 @@ module Parse = struct
       ~title:"Parse raw consensus operations"
       ~additionnal_tags:["parse"; "raw"; "operations"; "consensus"]
       ~uses:(fun _protocol -> [Constant.octez_codec])
-    @@ fun protocol -> test_parse Operation.Attestation protocol
+    @@ fun protocol ->
+    test_parse (Operation.Attestation {with_dal = false}) protocol
 
   let test_parse_preconsensus =
     register_test
@@ -508,7 +511,9 @@ module Mempool = struct
       ~title:"Pending consensus operations"
       ~additionnal_tags:["mempool"; "pending"; "operations"; "consensus"]
     @@ fun protocol ->
-    test_pending_operations_consensus Operation.Attestation protocol
+    test_pending_operations_consensus
+      (Operation.Attestation {with_dal = false})
+      protocol
 
   let test_pending_preconsensus =
     register_test
@@ -638,7 +643,7 @@ module Mempool = struct
     let* () = Client.bake_for_and_wait ~node client in
 
     let check_monitor_mempool p ~use_legacy_name =
-      let name = Operation.Consensus.kind_to_string kind use_legacy_name in
+      let name = Operation.Consensus.kind_to_string kind ~use_legacy_name in
       check_monitor_mempool p name
     in
     let* () = check_monitor_mempool p_legacy ~use_legacy_name:true in
@@ -650,7 +655,9 @@ module Mempool = struct
       ~title:"Monitor consensus operations"
       ~additionnal_tags:["mempool"; "monitor"; "operations"; "consensus"]
     @@ fun protocol ->
-    test_monitor_operations_consensus Operation.Attestation protocol
+    test_monitor_operations_consensus
+      (Operation.Attestation {with_dal = false})
+      protocol
 
   let test_monitor_preconsensus =
     register_test
@@ -680,7 +687,7 @@ module Mempool = struct
 
     let check_monitor_mempool p ~use_legacy_name =
       let name =
-        Operation.Anonymous.kind_to_string double_evidence_kind use_legacy_name
+        Operation.Anonymous.kind_to_string double_evidence_kind ~use_legacy_name
       in
       check_monitor_mempool p name
     in
@@ -763,7 +770,7 @@ module Run_Simulate = struct
     let call_and_check_error ~use_legacy_name =
       Log.info
         "Create a %s operation, call %s and check that the call fail"
-        (Operation.Consensus.kind_to_string kind use_legacy_name)
+        (Operation.Consensus.kind_to_string kind ~use_legacy_name)
         (get_rpc_name rpc) ;
 
       let* consensus_op =
@@ -780,7 +787,10 @@ module Run_Simulate = struct
       ~title:"Run operation with consensus operations"
       ~additionnal_tags:["run"; "operations"; "consensus"]
     @@ fun protocol ->
-    test_rpc_operation_unsupported Run Operation.Attestation protocol
+    test_rpc_operation_unsupported
+      Run
+      (Operation.Attestation {with_dal = false})
+      protocol
 
   let test_run_operation_preconsensus =
     register_test
@@ -794,7 +804,10 @@ module Run_Simulate = struct
       ~title:"Simulate operation with consensus operations"
       ~additionnal_tags:["simulate"; "operations"; "consensus"]
     @@ fun protocol ->
-    test_rpc_operation_unsupported Simulate Operation.Attestation protocol
+    test_rpc_operation_unsupported
+      Simulate
+      (Operation.Attestation {with_dal = false})
+      protocol
 
   let test_simulate_operation_preconsensus =
     register_test
@@ -812,7 +825,7 @@ module Run_Simulate = struct
         "Create a %s operation and call %s "
         (Operation.Anonymous.kind_to_string
            double_evidence_kind
-           use_legacy_name_in_input)
+           ~use_legacy_name:use_legacy_name_in_input)
         (get_rpc_name rpc) ;
 
       let* consensus_op =
@@ -931,7 +944,8 @@ module Preapply = struct
     register_test
       ~title:"Preapply operation with consensus operations"
       ~additionnal_tags:["preapply"; "operations"; "consensus"]
-    @@ fun protocol -> test_consensus Operation.Attestation protocol
+    @@ fun protocol ->
+    test_consensus (Operation.Attestation {with_dal = false}) protocol
 
   let test_preapply_preconsensus =
     register_test
@@ -1082,7 +1096,8 @@ module Block = struct
     register_test
       ~title:"Block consensus operations"
       ~additionnal_tags:["block"; "operations"; "consensus"]
-    @@ fun protocol -> test_block_consensus Operation.Attestation protocol
+    @@ fun protocol ->
+    test_block_consensus (Operation.Attestation {with_dal = false}) protocol
 
   let test_block_double_consensus_evidence double_evidence_kind protocol =
     let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -1137,8 +1152,8 @@ module Block = struct
       "Bake 7 blocks to reach the end of a cycle with the metadata containing \
        consensus rewards" ;
     let* () = repeat 7 (fun () -> Client.bake_for_and_wait ~node client) in
-    let get_name use_legacy_attestation_name =
-      if use_legacy_attestation_name then "endorsing" else "attesting"
+    let get_name ~use_legacy_name =
+      if use_legacy_name then "endorsing" else "attesting"
     in
 
     Log.info "Check block info RPC" ;
