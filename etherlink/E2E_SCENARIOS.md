@@ -132,6 +132,44 @@ Action 0. concerns the deployment of the marketplace and need only to be done on
 I recommend testing the dApp directly on the [live website](https://nft-marketplace-alchemy-rtw3-7-etherlink-nightly.vercel.app). Otherwise, you will need to follow the instructions to run it locally like described [here](https://github.com/Camillebzd/nft_marketplace_alchemy_rtw3_7?tab=readme-ov-file#setup). :warning: If you run it locally, you will need to create a [Pinata](https://www.pinata.cloud/) account and an API key.
 
 ## Scenario 5: the Uniswap v2 DeFi protocol
+Deploy and test the basic use of Uniswap v2 on Etherlink.
+
+**What is Uniswap?**
+Uniswap V2 is a decentralized exchange (DEX) protocol built on the Ethereum blockchain (so compatible with EVM chains). It allows users to swap various ERC-20 tokens directly without the need for intermediaries. The protocol works thanks to AMMs (Automated Market Maker system) that are represented as "pools" or "pairs". These liquidity pools are autonomous and are filled or emptied by users. Each pool is made up of 2 tokens and you can interact with them to exchange one of the two tokens for the other.
+
+**Why this scenario?**
+The goal of this scenario is to test a complete DeFi protocol on Etherlink. Uniswap v2 was chosen because it is one of the most robust and most used in the Ethereum environment. This means that if it works correctly on Etherlink, we greatly increase our credibility on the subject of compatibility but also on the fact of being able to support advanced DeFi protocols.
+
+**Technical details**
+The contract part used here is a complete fork of Uniswap v2. It is made up of 2 parts: the first called core contains the factory which creates the pairs and the second called periphery contains a number of tools to facilitate interactions with these pairs. Besides the deployment and creation of the pair itself, we test here the 3 main actions that a user can do: a swap, add liquidity or remove liquidity.
+Each test here is intended to be "standalone", meaning you don't need to run them in a specific order or even run them all, each test takes care of adding or removing liquidity if needed.
+
+The code for the scenario is a fork of [v2-core](https://github.com/Uniswap/v2-core) and [v2-periphery](https://github.com/Uniswap/v2-periphery), and can be found [here](https://github.com/trilitech/uniswap-v2-fork/tree/main/contracts).
+
+### Actions:
+0. User can deploy the Uniswap v2 protocol
+    * User can deploy the core
+    * User can deploy the periphery
+1. User can setup the Uniswap v2 protocol
+    * User can create 2 tokens (optionnal)
+    * User can create a Pair
+2. User can swap tokens using the Router
+    * User can swap the token0 to receive the token1 from the Pair using the Router
+    * Router handle all the process and emit the events correctly
+3. User can add liquidity using the Router
+    * User can add liquidity (token0 and token1) in the Pair using the Router
+    * User receive LP tokens proportionally to the liquidity added
+    * Router handle all the process and emit the events correctly
+4. User can remove liquidity using the Router
+    * User can remove liquidity (token0 and token1) in the Pair using the Router
+    * User loose LP tokens proportionally to the liquidity removed
+    * Router handle all the process and emit the events correctly
+
+The code for the Actions can be found in [UniswapV2Router02.ts](https://github.com/trilitech/uniswap-v2-fork/blob/main/test/periphery/UniswapV2Router02.ts).
+
+### Test
+
+Follow [these instructions](https://github.com/trilitech/uniswap-v2-fork/blob/main/README.md) to deploy and test the Actions.
 
 ## Scenario 6: interactions with Foundry
 
