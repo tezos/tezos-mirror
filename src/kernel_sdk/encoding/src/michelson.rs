@@ -58,6 +58,7 @@ pub trait Michelson:
 impl Michelson for MichelsonUnit {}
 impl Michelson for MichelsonContract {}
 impl Michelson for MichelsonInt {}
+impl Michelson for MichelsonNat {}
 impl Michelson for MichelsonString {}
 impl Michelson for MichelsonBytes {}
 impl<Arg0, Arg1> Michelson for MichelsonPair<Arg0, Arg1>
@@ -121,6 +122,26 @@ pub struct MichelsonBytes(pub Vec<u8>);
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelsonInt(pub Zarith);
 
+/// Michelson Nat encoding.
+#[derive(Debug, PartialEq, Eq)]
+pub struct MichelsonNat(Zarith);
+impl MichelsonNat {
+    /// Create a new nat, returns none if z is negative
+    pub fn new(z: Zarith) -> Option<Self> {
+        if z.0 >= 0.into() {
+            Some(Self(z))
+        } else {
+            None
+        }
+    }
+}
+
+impl AsRef<Zarith> for MichelsonNat {
+    fn as_ref(&self) -> &Zarith {
+        &self.0
+    }
+}
+
 // ----------
 // CONVERSION
 // ----------
@@ -145,6 +166,11 @@ impl From<Zarith> for MichelsonInt {
 impl From<i32> for MichelsonInt {
     fn from(value: i32) -> MichelsonInt {
         MichelsonInt(Zarith(value.into()))
+    }
+}
+impl From<u32> for MichelsonNat {
+    fn from(value: u32) -> MichelsonNat {
+        MichelsonNat(Zarith(value.into()))
     }
 }
 
@@ -205,6 +231,11 @@ impl HasEncoding for MichelsonBytes {
 }
 
 impl HasEncoding for MichelsonInt {
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+impl HasEncoding for MichelsonNat {
     fn encoding() -> Encoding {
         Encoding::Custom
     }
@@ -296,6 +327,23 @@ impl NomReader for MichelsonBytes {
 impl NomReader for MichelsonInt {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         map(nom_read_micheline_int, MichelsonInt)(input)
+    }
+}
+
+impl NomReader for MichelsonNat {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        use nom::error::{ErrorKind, ParseError};
+        use tezos_data_encoding::nom::error::*;
+
+        let (rest, i) = nom_read_micheline_int(input)?;
+        if i.0 >= 0.into() {
+            Ok((rest, MichelsonNat(i)))
+        } else {
+            Err(nom::Err::Error(DecodeError::from_error_kind(
+                input,
+                ErrorKind::MapRes,
+            )))
+        }
     }
 }
 
@@ -419,6 +467,11 @@ impl BinWriter for MichelsonBytes {
 }
 
 impl BinWriter for MichelsonInt {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        bin_write_micheline_int(&self.0, output)
+    }
+}
+impl BinWriter for MichelsonNat {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         bin_write_micheline_int(&self.0, output)
     }
