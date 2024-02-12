@@ -4014,4 +4014,43 @@ mod test {
             result,
         )
     }
+
+    #[test]
+    fn exceed_max_create_init_code_size_fail_with_error() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+            false,
+        );
+
+        let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
+
+        let scheme = CreateScheme::Legacy { caller };
+        let address = handler.create_address(scheme);
+
+        handler
+            .begin_initial_transaction(false, Some(150000))
+            .unwrap();
+
+        let result = handler
+            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
+            .unwrap();
+
+        assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
+    }
 }
