@@ -433,13 +433,11 @@ module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
      purposes. This function creates an unsafe initialisation
      parameters using default parameters designed to handle test cases. *)
-  val parameters_initialisation : unit -> initialisation_parameters
+  val init_prover_dal : unit -> unit
 
-  (** Same as {!val:load_parameters} except it erase parameters if
-     they were already loaded. This is used to circumvent limitation
-     from test frameworks where tests with various parameters could be
-     run using the same binary. *)
-  val load_parameters : initialisation_parameters -> unit
+  (** This function creates an unsafe initialisation parameters for the
+      verifier using default parameters designed to handle test cases. *)
+  val init_verifier_dal : unit -> unit
 
   (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
@@ -503,8 +501,6 @@ module Internal_for_tests : sig
 
   val precomputation_equal :
     shards_proofs_precomputation -> shards_proofs_precomputation -> bool
-
-  val reset_initialisation_parameters : unit -> unit
 
   val encoded_share_size : t -> int
 
