@@ -51,6 +51,7 @@
     - changes:
         paths:
           - images/**/*
+          - scripts/ci/**/*
           - kernels.mk
           - etherlink.mk
           - src/**/*
@@ -188,9 +189,7 @@
     # be in the same version.git
     DOCKER_VERSION: "24.0.6"
   before_script:
-    - ./scripts/ci/docker_wait_for_daemon.sh
-    - ./scripts/ci/docker_check_version.sh ${DOCKER_VERSION}
-    - ./scripts/ci/docker_registry_auth.sh
+    - ./scripts/ci/docker_initialize.sh
   services:
     - docker:${DOCKER_VERSION}-dind
 
@@ -226,6 +225,7 @@
     - .oc.kernels_template
   stage: test
   needs: [oc.docker:rust-toolchain]
+  dependencies: [oc.docker:rust-toolchain]
   script:
     - make -f etherlink.mk check
     - make -f etherlink.mk test

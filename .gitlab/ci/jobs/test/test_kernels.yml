@@ -2,6 +2,7 @@ test_kernels:
   extends:
     - .oc.kernels_template
   stage: test
+  dependencies: [oc.docker:rust-toolchain]
   needs: [oc.docker:rust-toolchain]
   script:
     - make -f kernels.mk check

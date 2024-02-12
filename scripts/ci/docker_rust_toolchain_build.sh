@@ -1,4 +1,39 @@
 #!/bin/sh
+#
+# Build rust-toolchain image for CI jobs and Octez docker distribution.
+#
+# Reads the following environment variables:
+#  - 'rust_toolchain_image_name'
+#  - 'rust_toolchain_image_tag' (optional)
+#  - 'CI_COMMIT_REF_SLUG': set by GitLab CI
+#  - 'CI_DEFAULT_BRANCH': set by GitLab CI
+#  - 'CI_PIPELINE_ID': set by GitLab CI
+#  - 'CI_PIPELINE_URL': set by GitLab CI
+#  - 'CI_JOB_ID': set by GitLab CI
+#  - 'CI_JOB_URL': set by GitLab CI
+#  - 'CI_COMMIT_SHA': set by GitLab CI
+#
+# The image is tagged with
+# $rust_toolchain_image_name:$CI_COMMIT_REF_SLUG and
+# $rust_toolchain_image_name:TAG. If $rust_toolchain_image_tag is set,
+# then TAG contains this value. If not, TAG contains a hash of this
+# image's inputs.
+#
+# When running in the CI, $rust_toolchain_image_tag is not set. The
+# image is tagged with the input hash. In order for subsequent jobs to
+# use the image built by this script, it stores the TAG in a dotenv
+# file that is passed as artifacts to those jobs. By also tagging with
+# the $CI_COMMIT_REF_SLUG, we allow subsequent pipelines to refer to
+# images built on a given branch, which is used for caching.
+#
+# When building the image, we get caches from
+#  - $rust_toolchain_image_name:$CI_COMMIT_REF_SLUG and
+#  - $rust_toolchain_image_name:$CI_DEFAULT_BRANCH.
+# That is, from previous builds on the same branch and from previous
+# builds on the master branch.
+#
+# The inputs of this image are the set of paths defined in
+# 'images/rust-toolchain/inputs'.
 
 set -eu
 
@@ -7,42 +42,41 @@ set -x
 # rust_toolchain_image_name is set in the variables of '.gitlab-ci.yml'
 # shellcheck disable=SC2154
 image_base="${rust_toolchain_image_name}"
-image_tag="${CI_COMMIT_SHA}"
+
+image_tag="${rust_toolchain_image_tag:-}"
+if [ -z "$image_tag" ]; then
+  # by default, tag with the hash of this image's input which is the set of paths
+  # defined in images/rust-toolchain/inputs. Requires wordsplitting on the inputs.
+  # shellcheck disable=SC2046
+  image_tag=$(git ls-files -s -- $(cat images/rust-toolchain/inputs) | git hash-object --stdin)
+fi
 image_name="${image_base}:${image_tag}"
 
-# Get SHA of the latest merge parent (note the ^2 in the git refs
-# below, signifying the second merge parent), to fetch cache from.
-#
-# We fetch caches from the image built on the merge parent (in
-# addition to caches built on the merge commits of the master branch)
-# to ensure that we have an up-to-date cache when marge-bot is merging
-# a series of MRs. In that scenario, it is unlikely that the image
-# built on the 'master_branch' by a previously merged MR pipeline is
-# ready when the 'before_merging' pipeline of the next MR is executed.
-if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
-  # This script is running in a MR before_merging pipeline.
-  # Attempt to fetch cache from the predecessor of the base of this MR.
-  git fetch origin "${CI_MERGE_REQUEST_DIFF_BASE_SHA}"
-  merge_parent=$(git show -s --pretty=format:%H "${CI_MERGE_REQUEST_DIFF_BASE_SHA}^2" ||
-    echo "merge_parent_not_found")
-elif [ "{$CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]; then
-  # This script is running in a master_branch pipelines.
-  # Attempt to fetch cache from the predecessor of this commit.
-  git fetch origin "${CI_COMMIT_BRANCH}" --depth 2
-  merge_parent=$(git show -s --pretty=format:%H HEAD^2 ||
-    echo "merge_parent_not_found")
-else
-  merge_parent="merge_parent_not_found"
+# Store the image name for jobs that use it.
+echo "rust_toolchain_image_tag=$image_tag" > rust_toolchain_image_tag.env
+
+# Build image unless it already exists in the registry.
+if docker manifest inspect "${image_name}" > /dev/null; then
+  echo "Image ${image_name} already exists in the registry, do nothing."
+  exit 0
 fi
 
-# Build image
-docker build images/rust-toolchain \
+echo "Build ${image_name}"
+
+./scripts/ci/docker_initialize.sh
+
+./images/create_rust_toolchain_image.sh \
+  "${image_base}" \
+  "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --cache-from="${image_base}:${CI_COMMIT_REF_SLUG}" \
-  --cache-from="${image_base}:${merge_parent}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
-  -t "${image_base}:${CI_COMMIT_REF_SLUG}" \
-  -t "${image_name}"
+  --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+  --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+  --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+  --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+  --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
+  -t "${image_base}:${CI_COMMIT_REF_SLUG}"
 
 # Push image
 docker push --all-tags "${image_base}"

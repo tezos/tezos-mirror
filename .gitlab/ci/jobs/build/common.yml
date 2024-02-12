@@ -63,13 +63,20 @@
   variables:
     # These image are not built for external use.
     CI_DOCKER_HUB: "false"
+  # Handle docker initialization, if necessary, in
+  # './scripts/ci/docker_rust_toolchain_build.sh'.
+  before_script: []
   script:
     - ./scripts/ci/docker_rust_toolchain_build.sh
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
 
 .oc.build_docker_release_template:
   extends:
     - .image_template__docker
     - .docker_auth_template
+  dependencies: [oc.docker:rust-toolchain]
   needs: [oc.docker:rust-toolchain]
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
