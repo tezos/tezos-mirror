@@ -50,6 +50,9 @@ Node
   ../helpers/scripts/simulate_operation`` default version to version ``1``.
   Version ``0`` can still be used with ``?version=0`` argument. (MR :gl:`!11889`)
 
+- **Breaking change** Removed the deprecated ``endorsing_rights`` RPC,
+  use ``attestation_rights`` instead. (MR :gl:`!11952`)
+
 Client
 ------
 

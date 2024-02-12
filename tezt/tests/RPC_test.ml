@@ -707,7 +707,7 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     @@ RPC.get_chain_block_helper_current_level ()
   in
   let* () =
-    if Protocol.(number protocol >= number Nairobi + 1) then
+    if Protocol.(number protocol >= number Oxford) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_context_denunciations ()
@@ -716,12 +716,10 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     else unit
   in
   let* () =
-    if Protocol.(number protocol <= number Nairobi + 1) then
+    if Protocol.(number protocol <= number Oxford) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
         @@ RPC.get_chain_block_helper_endorsing_rights ()
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
-           This RPC helper should be removed once Oxford will be frozen. *)
       in
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
