@@ -119,14 +119,46 @@ let gen_inbox level =
 
 module Index = Dal_slot_index_repr
 
-let gen_dal_slots_history () = Gen.return Dal_slot_repr.History.genesis
-(*
-TODO: https://gitlab.com/tezos/tezos/-/issues/6895
+let pack_slots_headers_by_level list =
+  let module ML = Map.Make (Raw_level_repr) in
+  let module SSH = Set.Make (struct
+    include Dal_slot_repr.Header
 
-Adapt/re-enable tests
+    let compare a b = Dal_slot_index_repr.compare a.id.index b.id.index
+  end) in
+  let map =
+    List.fold_left
+      (fun map (Dal_slot_repr.Header.{id = {published_level; _}; _} as sh) ->
+        let l =
+          ML.find published_level map |> Option.value ~default:SSH.empty
+        in
+        ML.add published_level (SSH.add sh l) map)
+      ML.empty
+      list
+  in
+  match ML.max_binding_opt map with
+  | None -> [] (* map is empty *)
+  | Some (max_level, _) ->
+      let rec loop counter map =
+        if Raw_level_repr.(counter >= max_level) then map
+        else
+          let counter = Raw_level_repr.succ counter in
+          let map =
+            if ML.mem counter map then map else ML.add counter SSH.empty map
+          in
+          loop counter map
+      in
+      loop Raw_level_repr.root map
+      |> ML.bindings
+      |> List.map (fun (k, ssh) -> (k, SSH.elements ssh))
 
+let gen_dal_slots_history () =
   let open Gen in
   let open Dal_slot_repr in
+  let constants : Alpha_context.Constants.Parametric.t =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+  in
+  let number_of_slots = constants.dal.number_of_slots in
   (* Generate a list of (level * confirmed slot ID). *)
   let* list = small_list (pair small_nat small_nat) in
   let list =
@@ -139,28 +171,40 @@ Adapt/re-enable tests
             succ @@ try of_int32_exn (Int32.of_int level) with _ -> root)
         in
         let index =
-          Index.of_int_opt ~number_of_slots:256 slot_index
+          Index.of_int_opt ~number_of_slots slot_index
           |> Option.value ~default:Index.zero
         in
         Header.{id = {published_level; index}; commitment = Commitment.zero})
       list
   in
-  let list =
-    (* Sort the list in the right ordering before adding slots to slots_history. *)
-    List.sort_uniq
-      (fun {Header.id = a; _} {id = b; _} ->
-        let c = Raw_level_repr.compare a.published_level b.published_level in
-        if c <> 0 then c else Index.compare a.index b.index)
-      list
+  let rec loop history = function
+    | [] -> return history
+    | (level, slot_headers) :: llist -> (
+        let slot_headers =
+          (* Sort the list in the right ordering before adding slots to slots_history. *)
+          List.sort_uniq
+            (fun {Header.id = a; _} {id = b; _} ->
+              let c =
+                Raw_level_repr.compare a.published_level b.published_level
+              in
+              if c <> 0 then c else Index.compare a.index b.index)
+            slot_headers
+        in
+        History.(
+          add_confirmed_slot_headers_no_cache
+            ~number_of_slots
+            history
+            level
+            slot_headers)
+        |> function
+        | Ok history -> loop history llist
+        | Error e ->
+            return
+            @@ Stdlib.failwith
+                 (Format.asprintf "%a" Error_monad.pp_print_trace
+                 @@ Environment.wrap_tztrace e))
   in
-  History.(add_confirmed_slot_headers_no_cache genesis list) |> function
-  | Ok v -> return v
-  | Error e ->
-      return
-      @@ Stdlib.failwith
-           (Format.asprintf "%a" Error_monad.pp_print_trace
-           @@ Environment.wrap_tztrace e)
-*)
+  pack_slots_headers_by_level list |> loop History.genesis
 
 let gen_inbox_history_proof inbox_level =
   let open Gen in

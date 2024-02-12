@@ -38,6 +38,11 @@ val derive_dal_parameters :
   constants_divider:int ->
   Cryptobox.parameters
 
+(** Returns the slot id of the given cell's content . *)
+val content_slot_id :
+  Dal_slot_repr.History.Internal_for_tests.cell_content ->
+  Dal_slot_repr.Header.id
+
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
@@ -103,6 +108,7 @@ end) : sig
   val mk_page_info :
     ?default_char:char ->
     ?level:Raw_level_repr.t ->
+    ?slot_index:Dal_slot_index_repr.t ->
     ?page_index:int ->
     ?custom_data:(default_char:char -> int -> bytes option) option ->
     Dal_slot_repr.Header.t ->
@@ -174,4 +180,9 @@ end) : sig
     'a tzresult ->
     'b ->
     unit tzresult Lwt.t
+
+  (** Helper for the case where produce_proof is expected to fail because some
+      cells are missing in the history cache. *)
+  val bad_history_cache :
+    __LOC__:string -> 'a tzresult -> 'b -> unit tzresult Lwt.t
 end

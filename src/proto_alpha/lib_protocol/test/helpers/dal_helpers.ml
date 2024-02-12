@@ -62,6 +62,9 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
     number_of_shards = reference.number_of_shards / constants_divider;
   }
 
+let content_slot_id = function
+  | Hist.Internal_for_tests.Unattested id | Attested {id; _} -> id
+
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
@@ -136,13 +139,17 @@ struct
 
   let no_data = Some (fun ~default_char:_ _ -> None)
 
-  let mk_page_info ?(default_char = 'x') ?level ?(page_index = P.Index.zero)
-      ?(custom_data = None) (slot : S.Header.t) polynomial =
+  let mk_page_info ?(default_char = 'x') ?level ?slot_index
+      ?(page_index = P.Index.zero) ?(custom_data = None) (slot : S.Header.t)
+      polynomial =
     let open Result_syntax in
     let level =
       match level with None -> slot.id.published_level | Some level -> level
     in
-    let page_id = mk_page_id level slot.id.index page_index in
+    let slot_index =
+      match slot_index with None -> slot.id.index | Some index -> index
+    in
+    let page_id = mk_page_id level slot_index page_index in
     let* page_proof = dal_mk_prove_page polynomial page_id in
     match custom_data with
     | None ->
@@ -263,4 +270,12 @@ struct
         (Hist.Dal_proof_error
            "The page ID's slot is not confirmed, but page content and proof \
             are provided.")
+
+  let bad_history_cache ~__LOC__ =
+    failing_check_produce_result
+      ~__LOC__
+      ~expected_error:
+        (Hist.Dal_proof_error
+           "Skip_list.search returned Nearest', while all given levels to \
+            produce proofs are supposed to be in the skip list.")
 end
