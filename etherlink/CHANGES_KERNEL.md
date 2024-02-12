@@ -7,6 +7,8 @@
 ### Bug fixes
 
 - Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
+- Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
+
 
 ### Breaking changes
 
