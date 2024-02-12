@@ -14,6 +14,14 @@ run_in_docker() {
   "${docker_run[@]}" "/usr/local/bin/${bin}" "$@"
 }
 
+docker_compose() {
+  if (command -v "docker-compose" &> /dev/null); then
+    docker-compose "$@"
+  else
+    docker compose "$@"
+  fi
+}
+
 docker_update_images() {
   # pull latest version
   docker pull tezos/tezos-bare:"${OCTEZ_TAG}"
@@ -262,13 +270,13 @@ init_rollup)
   echo "You can now start the docker with \"./init.sh run\""
   ;;
 reset_rollup)
-  docker compose stop smart-rollup-node sequencer
+  docker_compose stop smart-rollup-node sequencer
 
   rm -r "${HOST_TEZOS_DATA_DIR}/.tezos-smart-rollup-node" "${HOST_TEZOS_DATA_DIR}/.octez-evm-node" "${HOST_TEZOS_DATA_DIR}/kernel"
 
   init_rollup
 
-  docker compose up -d --remove-orphans
+  docker_compose up -d --remove-orphans
   ;;
 originate_contracts)
   originate_contracts
@@ -277,10 +285,10 @@ deposit)
   deposit "$@"
   ;;
 run)
-  docker compose up -d
+  docker_compose up -d
   ;;
 restart)
-  docker compose restart
+  docker_compose restart
   ;;
 *)
   cat << EOF
