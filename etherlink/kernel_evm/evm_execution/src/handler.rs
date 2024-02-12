@@ -1661,6 +1661,35 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     )
                 }
             },
+            Err(EthereumError::PrecompileFailed(failure_reason)) => {
+                // We need this case, otherwise the failure will be considered as fatal
+                // when it shouldn't.
+
+                log!(
+                    self.host,
+                    Debug,
+                    "Intermediate precompiled call ended with failure: {:?}",
+                    failure_reason
+                );
+
+                if let Err(err) = self.rollback_inter_transaction(false) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Rolling back reverted transaction caused an error: {:?}",
+                        err
+                    );
+                }
+
+                Capture::Exit((
+                    ExitReason::Error(ExitError::Other(Cow::Owned(format!(
+                        "{:?}",
+                        EthereumError::PrecompileFailed(failure_reason)
+                    )))),
+                    None,
+                    vec![],
+                ))
+            }
             Err(err) => {
                 log!(
                     self.host,
@@ -3589,5 +3618,63 @@ mod test {
             Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![1],)),
             result,
         )
+    }
+
+    #[test]
+    fn precompile_failure_are_not_fatal() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut host,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::from(21000),
+            false,
+        );
+
+        handler
+            .begin_initial_transaction(false, Some(150000))
+            .unwrap();
+
+        handler
+            .begin_inter_transaction(false, Some(150000))
+            .unwrap();
+
+        let ecmul = H160::from_low_u64_be(7u64);
+
+        // ecmul -> point not on curve fail
+        let failing_input = hex::decode(
+            "\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            0f00000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
+
+        let transaction_context = TransactionContext::new(caller, ecmul, U256::zero());
+
+        let result =
+            handler.execute_call(ecmul, None, failing_input, transaction_context);
+
+        let inter_result: Capture<CreateOutcome, H160> =
+            handler.end_inter_transaction(result);
+
+        // Internal result is not a Fatal case anymore.
+        match inter_result {
+            Capture::Exit((exit_reason, _, _)) => match exit_reason {
+                ExitReason::Error(_) => (),
+                e => panic!("The exit reason should be an error but got {:?}.", e),
+            },
+            Capture::Trap(_) => panic!("The internal result shouldn't be a trap case."),
+        }
     }
 }
