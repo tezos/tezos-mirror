@@ -241,7 +241,7 @@ module Dal_helpers = struct
   let valid_slot_id ~dal_number_of_slots ~dal_activation_level
       ~dal_attestation_lag ~origination_level ~commit_inbox_level
       Dal_slot_repr.Header.{published_level; index}
-      ~dal_attested_slots_validity_lag:_ =
+      ~dal_attested_slots_validity_lag =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let open Raw_level_repr in
     let dal_was_activated =
@@ -259,7 +259,18 @@ module Dal_helpers = struct
            ~number_of_slots:dal_number_of_slots
            index
     in
+    (* An attested slot is not expired if its attested level (equal to
+       [published_level + dal_attestation_lag]) is not further than
+       [dal_attested_slots_validity_lag] from the given inbox level. *)
+    let ttl_not_expired =
+      Raw_level_repr.(
+        add
+          (add published_level dal_attestation_lag)
+          dal_attested_slots_validity_lag
+        >= commit_inbox_level)
+    in
     dal_was_activated && not_too_old && not_too_recent && index_is_valid
+    && ttl_not_expired
 
   let verify ~metadata ~dal_activation_level ~dal_attestation_lag
       ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
