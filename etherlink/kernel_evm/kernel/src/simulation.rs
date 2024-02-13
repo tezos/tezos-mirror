@@ -297,7 +297,7 @@ impl TxValidation {
         // Get the nonce of the caller
         let caller_nonce = match &caller_account {
             Some(account) => account.nonce(host)?,
-            None => U256::zero(),
+            None => 0,
         };
         let block_fees = retrieve_block_fees(host)?;
         // Get the chain_id
@@ -900,7 +900,7 @@ mod tests {
             EthereumTransactionCommon::new(
                 TransactionType::Legacy,
                 Some(1337.into()),
-                0.into(),
+                0,
                 U256::default(),
                 U256::default(),
                 2000000,
@@ -960,7 +960,7 @@ mod tests {
         let transaction = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(U256::from(1)),
-            U256::from(0),
+            0,
             U256::zero(),
             gas_price,
             21000 + fee_gas,
@@ -1006,7 +1006,7 @@ mod tests {
         let transaction = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(U256::from(1)),
-            U256::from(0),
+            0,
             U256::from(0),
             block_fees.base_fee_per_gas(),
             21000, // not covering da_fee

@@ -278,7 +278,7 @@ mod benchmarks {
     }
 }
 
-pub fn create_address_legacy(caller: &H160, nonce: &U256) -> H160 {
+pub fn create_address_legacy(caller: &H160, nonce: &u64) -> H160 {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(caller);
     stream.append(nonce);
@@ -499,9 +499,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let has_code = account
             .code_size(self.borrow_host())
             .map(|s| s != U256::zero())?;
-        let non_zero_nonce = account
-            .nonce(self.borrow_host())
-            .map(|s| s != U256::zero())?;
+        let non_zero_nonce = account.nonce(self.borrow_host()).map(|s| s != 0)?;
 
         Ok(has_code || non_zero_nonce)
     }
@@ -1265,7 +1263,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> U256 {
+    fn get_nonce(&self, address: H160) -> u64 {
         self.get_account(address)
             .map(|account| account.nonce(self.host).unwrap_or_default())
             .unwrap_or_default()
@@ -1982,7 +1980,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn exists(&self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
-            || self.get_nonce(address) > U256::zero()
+            || self.get_nonce(address) > 0
             || self.balance(address) > U256::zero()
     }
 

@@ -394,7 +394,7 @@ mod tests {
     }
 
     fn dummy_eth_gen_transaction(
-        nonce: U256,
+        nonce: u64,
         type_: TransactionType,
     ) -> EthereumTransactionCommon {
         let chain_id = Some(DUMMY_CHAIN_ID);
@@ -437,7 +437,7 @@ mod tests {
     }
 
     fn make_dummy_transaction(
-        nonce: U256,
+        nonce: u64,
         type_: TransactionType,
     ) -> EthereumTransactionCommon {
         let tx = dummy_eth_gen_transaction(nonce, type_);
@@ -447,14 +447,14 @@ mod tests {
     fn dummy_eth_transaction_zero() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
-        let nonce = U256::zero();
+        let nonce = 0;
         make_dummy_transaction(nonce, TransactionType::Legacy)
     }
 
     fn dummy_eth_transaction_one() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
-        let nonce = U256::one();
+        let nonce = 1;
         make_dummy_transaction(nonce, TransactionType::Legacy)
     }
 
@@ -462,7 +462,6 @@ mod tests {
         nonce: u64,
         private_key: &str,
     ) -> EthereumTransactionCommon {
-        let nonce = U256::from(nonce);
         let gas_price = U256::from(21000u64);
         // gas limit was estimated using Remix on Shanghai network (256,842)
         // plus a safety margin for gas accounting discrepancies
@@ -1171,7 +1170,7 @@ mod tests {
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
         let default_nonce = caller_account.nonce(&host).unwrap();
-        assert_eq!(default_nonce, U256::zero(), "default nonce should be 0");
+        assert_eq!(default_nonce, 0, "default nonce should be 0");
 
         let tx = dummy_eth_transaction_zero();
         // Ensures the caller has enough balance to pay for the fees, but not
@@ -1328,7 +1327,7 @@ mod tests {
         let unsigned_tx = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(DUMMY_CHAIN_ID),
-            U256::from(nonce),
+            nonce,
             U256::from(DUMMY_BASE_FEE_PER_GAS),
             U256::from(DUMMY_BASE_FEE_PER_GAS),
             gas_limit + gas_for_fees,
@@ -1383,8 +1382,7 @@ mod tests {
         // - call `loop(4600)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_addr: H160 = evm_execution::handler::create_address_legacy(&sender, &0);
         let loop_1200_tx =
             create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
         let loop_4600_tx = create_and_sign_transaction(
@@ -1455,8 +1453,7 @@ mod tests {
         // - call `loop(4600)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_addr: H160 = evm_execution::handler::create_address_legacy(&sender, &0);
         let loop_1200_tx =
             create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
         let loop_4600_tx = create_and_sign_transaction(
@@ -1618,8 +1615,7 @@ mod tests {
         // - call `loop(5800)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_addr: H160 = evm_execution::handler::create_address_legacy(&sender, &0);
         let loop_5800_tx = create_and_sign_transaction(
             LOOP_5800,
             1,
@@ -1710,26 +1706,17 @@ mod tests {
 
         let valid_tx = Transaction {
             tx_hash,
-            content: Ethereum(make_dummy_transaction(
-                U256::zero(),
-                TransactionType::Legacy,
-            )),
+            content: Ethereum(make_dummy_transaction(0, TransactionType::Legacy)),
         };
 
         let valid_tx_eip1559 = Transaction {
             tx_hash: tx_hash_eip1559,
-            content: Ethereum(make_dummy_transaction(
-                U256::one(),
-                TransactionType::Eip1559,
-            )),
+            content: Ethereum(make_dummy_transaction(1, TransactionType::Eip1559)),
         };
 
         let valid_tx_eip2930 = Transaction {
             tx_hash: tx_hash_eip2930,
-            content: Ethereum(make_dummy_transaction(
-                U256::from(2_u8),
-                TransactionType::Eip2930,
-            )),
+            content: Ethereum(make_dummy_transaction(2, TransactionType::Eip2930)),
         };
 
         let transactions: Vec<Transaction> =

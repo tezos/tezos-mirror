@@ -65,9 +65,9 @@ impl Transaction {
         }
     }
 
-    fn nonce(&self) -> U256 {
+    fn nonce(&self) -> u64 {
         match &self.content {
-            TransactionContent::Deposit(_) => U256::zero(),
+            TransactionContent::Deposit(_) => 0,
             TransactionContent::Ethereum(transaction) => transaction.nonce,
         }
     }
@@ -97,7 +97,7 @@ pub struct TransactionObjectInfo {
     pub gas_price: U256,
     pub hash: TransactionHash,
     pub input: Vec<u8>,
-    pub nonce: U256,
+    pub nonce: u64,
     pub to: Option<H160>,
     pub index: u32,
     pub value: U256,
@@ -225,8 +225,8 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     let account = account(host, caller, evm_account_storage)?;
 
-    let (nonce, balance, code_exists): (U256, U256, bool) = match account {
-        None => (U256::zero(), U256::zero(), false),
+    let (nonce, balance, code_exists): (u64, U256, bool) = match account {
+        None => (0, U256::zero(), false),
         Some(account) => (
             account.nonce(host)?,
             account.balance(host)?,
@@ -672,7 +672,7 @@ mod tests {
         let transaction = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(CHAIN_ID.into()),
-            U256::from(0),
+            0,
             U256::zero(),
             U256::from(21000),
             gas_limit,
@@ -810,7 +810,7 @@ mod tests {
         let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
-        transaction.nonce = U256::from(42);
+        transaction.nonce = 42;
         transaction = resign(transaction);
 
         // fund account
