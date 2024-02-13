@@ -171,14 +171,14 @@ pub trait Manager {
         loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN>;
 
-    /// Like [`Self::Region`] but all element accesses are "volatile"
-    type VolatileRegion<E: Elem, const LEN: usize>: VolatileRegion<Elem = E>;
+    /// Dynamic region that has been allocated in the state storage
+    type DynRegion<const LEN: usize>: DynRegion;
 
-    /// Allocate a volatile region in the state storage.
-    fn allocate_volatile_region<E: Elem, const LEN: usize>(
+    /// Allocate a dynamic region in the state storage.
+    fn allocate_dyn_region<const LEN: usize>(
         &mut self,
-        loc: Volatile<Location<[E; LEN]>>,
-    ) -> Self::VolatileRegion<E, LEN>;
+        loc: Location<[u8; LEN]>,
+    ) -> Self::DynRegion<LEN>;
 
     /// Allocate a cell in the state storage.
     #[inline]
@@ -285,16 +285,14 @@ pub mod tests {
         }
     }
 
-    impl<E: Elem> VolatileRegion for DummyRegion<E> {
-        type Elem = E;
-
+    impl DynRegion for DummyRegion<u8> {
         const LEN: usize = 0;
 
-        fn read(&self, _index: usize) -> E {
+        fn read<E: Elem>(&self, _address: usize) -> E {
             unimplemented!()
         }
 
-        fn write(&mut self, _index: usize, _value: E) {
+        fn write<E: Elem>(&mut self, _address: usize, _value: E) {
             unimplemented!()
         }
     }
@@ -326,14 +324,13 @@ pub mod tests {
             DummyRegion(PhantomData)
         }
 
-        type VolatileRegion<E: Elem, const LEN: usize> = DummyRegion<E>;
+        type DynRegion<const LEN: usize> = DummyRegion<u8>;
 
-        fn allocate_volatile_region<E: Elem, const LEN: usize>(
+        fn allocate_dyn_region<const LEN: usize>(
             &mut self,
-            loc: Volatile<Location<[E; LEN]>>,
-        ) -> Self::VolatileRegion<E, LEN> {
-            self.regions.push_back((loc.offset(), loc.size()));
-            DummyRegion(PhantomData)
+            loc: Location<[u8; LEN]>,
+        ) -> Self::DynRegion<LEN> {
+            self.allocate_region::<u8, LEN>(loc)
         }
 
         fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {

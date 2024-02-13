@@ -183,19 +183,54 @@ impl<E: Elem, M: Manager> Cell<E, M> {
     }
 }
 
-/// Like [`Region<E>`] but accesses are treated as if the entire region is volatile
-pub trait VolatileRegion {
-    /// Type of elements in the volatile region
-    type Elem: Elem;
-
-    /// Number of elements in the region
+/// Dynamic region
+pub trait DynRegion {
+    /// Number of bytes in the region
     const LEN: usize;
 
-    /// Read an element at the given index.
-    fn read(&self, index: usize) -> Self::Elem;
+    /// Read an element in the region. `address` is in bytes.
+    fn read<E: Elem>(&self, address: usize) -> E;
 
-    /// Write an element at the given index.
-    fn write(&mut self, index: usize, value: Self::Elem);
+    /// Update an element in the region. `address` is in bytes.
+    fn write<E: Elem>(&mut self, address: usize, value: E);
+}
+
+impl<T, const LEN: usize> DynRegion for [T; LEN] {
+    const LEN: usize = mem::size_of::<T>() * LEN;
+
+    fn read<E: Elem>(&self, address: usize) -> E {
+        assert!(address + mem::size_of::<E>() <= Self::LEN);
+        unsafe {
+            self.as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .read_unaligned()
+        }
+    }
+
+    fn write<E: Elem>(&mut self, address: usize, value: E) {
+        assert!(address + mem::size_of_val(&value) <= Self::LEN);
+        unsafe {
+            self.as_mut_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .write_unaligned(value)
+        }
+    }
+}
+
+impl<T: DynRegion> DynRegion for &mut T {
+    const LEN: usize = T::LEN;
+
+    fn read<E: Elem>(&self, address: usize) -> E {
+        (self as &T).read(address)
+    }
+
+    fn write<E: Elem>(&mut self, address: usize, value: E) {
+        (self as &mut T).write(address, value)
+    }
 }
 
 #[cfg(test)]
