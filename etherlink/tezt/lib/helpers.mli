@@ -72,3 +72,28 @@ val kernel_inputs_path : string
     The list returned contains pairs of the shape [(tx_raw, tx_hash)].
 *)
 val read_tx_from_file : unit -> (string * string) list
+
+(** [force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~node
+    ~client] produces the force kernel upgrade and sends it via the
+    client. [sc_rollup_address] is expected to be the b58 address. *)
+val force_kernel_upgrade :
+  sc_rollup_address:string ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  client:Client.t ->
+  node:Node.t ->
+  unit Lwt.t
+
+(** [upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract
+    ~client ~upgrade_to ~activation_timestamp ~evm_node] prepares the
+    kernel upgrade payload and sends it to the layer 1. If [evm_node]
+    is provided, notifies the sequencer as well. *)
+val upgrade :
+  sc_rollup_node:Sc_rollup_node.t ->
+  sc_rollup_address:string ->
+  admin:string ->
+  admin_contract:string ->
+  client:Client.t ->
+  upgrade_to:Uses.t ->
+  activation_timestamp:string ->
+  evm_node:Evm_node.t option ->
+  unit Lwt.t

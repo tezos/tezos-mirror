@@ -80,3 +80,7 @@ val estimate_gas :
     with [address] as argument (on block ["latest"]). *)
 val get_transaction_count :
   address:string -> Evm_node.t -> (int64, error) result Lwt.t
+
+(** [tez_kernelVersion evm_node] calls [tez_kernelVersion]. Returns the
+    kernel commit hash. *)
+val tez_kernelVersion : Evm_node.t -> (string, error) result Lwt.t
