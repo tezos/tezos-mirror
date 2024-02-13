@@ -102,11 +102,13 @@ let fetch_pipeline_records_from_jobs records_directory pipeline =
 type from =
   | Pipeline of int
   | Last_merged_pipeline
+  | Last_schedule_extended_test
   | Last_successful_schedule_extended_test
 
 let cli_from_type =
   let parse = function
     | "last-merged-pipeline" -> Some Last_merged_pipeline
+    | "last-schedule-extended-test" -> Some Last_schedule_extended_test
     | "last-successful-schedule-extended-test" ->
         Some Last_successful_schedule_extended_test
     | s -> Option.map (fun x -> Pipeline x) (int_of_string_opt s)
@@ -114,6 +116,7 @@ let cli_from_type =
   let show = function
     | Pipeline id -> string_of_int id
     | Last_merged_pipeline -> "last-merged-pipeline"
+    | Last_schedule_extended_test -> "last-schedule-extended-test"
     | Last_successful_schedule_extended_test ->
         "last-successful-schedule-extended-test"
   in
@@ -153,6 +156,11 @@ let () =
       | Pipeline pipeline_id -> return pipeline_id
       | Last_merged_pipeline ->
           Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
+      | Last_schedule_extended_test ->
+          Gitlab_util.get_last_schedule_pipeline
+            ~project
+            ~matching:schedule_extended_test_rex
+            ()
       | Last_successful_schedule_extended_test ->
           Gitlab_util.get_last_schedule_pipeline
             ~status:"success"
