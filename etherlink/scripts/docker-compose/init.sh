@@ -94,6 +94,7 @@ create_kernel_config() {
 }
 
 build_kernel() {
+  mkdir -p "${HOST_TEZOS_DATA_DIR}/.tezos-client"
   cp "${SEQUENCER_CONFIG}" evm_kernel_builder/evm_config.yaml
   create_kernel_config evm_kernel_builder/evm_config.yaml
   # build kernel in an image (e.g. tezos/tezos-bare:master) with new chain id
@@ -259,6 +260,11 @@ init_rollup_node_config)
 init_octez_node)
   init_octez_node
   ;;
+build_kernel)
+  docker_update_images
+  build_kernel
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  ;;
 init_rollup)
   if [[ -n ${OPERATOR_ALIAS} ]]; then
     generate_key "${OPERATOR_ALIAS}"
@@ -301,6 +307,8 @@ Available commands:
     download snapshot, and init octez-node config
   - originate_contracts:
     originate contracts
+  - build_kernel:
+    build lastest evm kernel
   - init_rollup:
     build lastest evm kernel, originate the rollup, create operator, wait until operator balance
      is topped then create rollup node config.
