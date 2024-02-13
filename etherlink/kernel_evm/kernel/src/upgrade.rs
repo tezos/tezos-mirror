@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::UpgradeProcessError;
+use crate::event::Event;
 use crate::storage::read_optional_rlp;
 use anyhow::Context;
 use rlp::Decodable;
@@ -72,6 +73,7 @@ pub fn store_kernel_upgrade<Host: Runtime>(
         hex::encode(kernel_upgrade.preimage_hash),
         kernel_upgrade.activation_timestamp
     );
+    Event::Upgrade(kernel_upgrade.clone()).store(host)?;
     let path = OwnedPath::from(KERNEL_UPGRADE);
     let bytes = &kernel_upgrade.rlp_bytes();
     host.store_write_all(&path, bytes)

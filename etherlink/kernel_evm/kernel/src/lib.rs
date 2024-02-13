@@ -39,6 +39,7 @@ mod blueprint_storage;
 mod configuration;
 mod delayed_inbox;
 mod error;
+mod event;
 mod fees;
 mod inbox;
 mod indexable_storage;
