@@ -6,19 +6,16 @@ set -eu
 # 'before_script'.
 . scripts/ci/docker.env
 
-if [ -z "${build_deps_image_name:-}" ]; then echo "build_deps_image_name is unset" && exit 3; fi
-if [ -z "${build_deps_image_version:-}" ]; then echo "build_deps_image_version is unset" && exit 3; fi
-if [ -z "${rust_toolchain_image_name:-}" ]; then echo "rust_toolchain_image_name is unset" && exit 3; fi
-if [ -z "${rust_toolchain_image_tag:-}" ]; then echo "rust_toolchain_image_tag is unset" && exit 3; fi
+build_deps_image_name=${build_deps_image_name:?"build_deps_image_name is unset"}
+build_deps_image_version=${build_deps_image_version:?"build_deps_image_version is unset"}
+rust_toolchain_image_name=${rust_toolchain_image_name:?"rust_toolchain_image_name is unset"}
+rust_toolchain_image_tag=${rust_toolchain_image_tag:?"rust_toolchain_image_tag is unset"}
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
-if [ -z "${EXECUTABLE_FILES:-}" ]; then
-  echo "Error: environment variable EXECUTABLE_FILES is empty."
-  echo "Set it to e.g. 'script-inputs/released-executables'"
-  echo "or to 'script-inputs/released-executables script-inputs/experimental-executables'."
-  exit 1
-fi
+EXECUTABLE_FILES=${EXECUTABLE_FILES:?"Error: environment variable EXECUTABLE_FILES is empty.
+Set it to e.g. 'script-inputs/released-executables'
+or to 'script-inputs/released-executables script-inputs/experimental-executables'."}
 
 # shellcheck disable=SC2086
 OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
