@@ -4340,7 +4340,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
          all_shard_indices
   in
   let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
-  let* publication_level, _commitment =
+  let* publication_level, commitment =
     publish_store_and_wait_slot
       node
       client
@@ -4365,17 +4365,18 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let* slot_headers =
     Dal_RPC.(call attester @@ get_published_level_headers publication_level)
   in
-  Check.(
-    (1 = List.length slot_headers)
-      int
-      ~error_msg:"Expected a single header (got %R headers)") ;
-  let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
-  Check.(
-    (publication_level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
-  Check.((index = slot_index) int ~error_msg:"Expected index %L (got %R)") ;
-  let expected_status = "attested" in
-  Check.(
-    (expected_status = status) string ~error_msg:"Expected status %L (got %R)") ;
+  let expected_slot_header =
+    Dal_RPC.
+      {
+        slot_level = publication_level;
+        slot_index = index;
+        status = "attested";
+        commitment;
+      }
+  in
+  Check.([expected_slot_header] = slot_headers)
+    Dal.Check.slot_headers_typ
+    ~error_msg:"Expected slot headers %L (got %R)" ;
   Log.info "Slot sucessfully attested" ;
   unit
 
