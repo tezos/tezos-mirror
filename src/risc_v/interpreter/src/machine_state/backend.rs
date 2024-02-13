@@ -161,7 +161,7 @@ impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
 /// Manager of the state backend storage
 pub trait Manager {
     /// Region that has been allocated in the state storage
-    type Region<E: Elem, const LEN: usize>: Region<E>;
+    type Region<E: Elem, const LEN: usize>: Region<Elem = E>;
 
     /// Allocate a region in the state storage.
     fn allocate_region<E: Elem, const LEN: usize>(
@@ -170,7 +170,7 @@ pub trait Manager {
     ) -> Self::Region<E, LEN>;
 
     /// Like [`Self::Region`] but all element accesses are "volatile"
-    type VolatileRegion<E: Elem, const LEN: usize>: VolatileRegion<E>;
+    type VolatileRegion<E: Elem, const LEN: usize>: VolatileRegion<Elem = E>;
 
     /// Allocate a volatile region in the state storage.
     fn allocate_volatile_region<E: Elem, const LEN: usize>(
@@ -218,7 +218,7 @@ pub trait Backend: BackendManagement + Sized {
 pub mod tests {
     use super::*;
     use rand::{Fill, Rng};
-    use std::collections::VecDeque;
+    use std::{collections::VecDeque, marker::PhantomData};
 
     /// Fill the backend with random data.
     pub fn randomise_backend<B: Backend>(backend: &mut B) {
@@ -247,9 +247,13 @@ pub mod tests {
         <<F as TestBackendFactory>::Backend<L> as BackendManagement>::Manager<'a>;
 
     /// Dummy region that does nothing
-    struct DummyRegion;
+    struct DummyRegion<E>(PhantomData<E>);
 
-    impl<E: Elem> Region<E> for DummyRegion {
+    impl<E: Elem> Region for DummyRegion<E> {
+        type Elem = E;
+
+        const LEN: usize = 0;
+
         fn read(&self, _index: usize) -> E {
             unimplemented!()
         }
@@ -279,7 +283,11 @@ pub mod tests {
         }
     }
 
-    impl<E: Elem> VolatileRegion<E> for DummyRegion {
+    impl<E: Elem> VolatileRegion for DummyRegion<E> {
+        type Elem = E;
+
+        const LEN: usize = 0;
+
         fn read(&self, _index: usize) -> E {
             unimplemented!()
         }
@@ -306,30 +314,30 @@ pub mod tests {
     }
 
     impl Manager for TraceManager {
-        type Region<E: Elem, const LEN: usize> = DummyRegion;
+        type Region<E: Elem, const LEN: usize> = DummyRegion<E>;
 
         fn allocate_region<E: Elem, const LEN: usize>(
             &mut self,
             loc: Location<[E; LEN]>,
         ) -> Self::Region<E, LEN> {
             self.regions.push_back((loc.offset(), loc.size()));
-            DummyRegion
+            DummyRegion(PhantomData)
         }
 
-        type VolatileRegion<E: Elem, const LEN: usize> = DummyRegion;
+        type VolatileRegion<E: Elem, const LEN: usize> = DummyRegion<E>;
 
         fn allocate_volatile_region<E: Elem, const LEN: usize>(
             &mut self,
             loc: Volatile<Location<[E; LEN]>>,
         ) -> Self::VolatileRegion<E, LEN> {
             self.regions.push_back((loc.offset(), loc.size()));
-            DummyRegion
+            DummyRegion(PhantomData)
         }
 
         fn allocate_cell<E: Elem>(&mut self, loc: Location<E>) -> Cell<E, Self> {
             self.regions.push_back((loc.offset(), loc.size()));
             Cell {
-                region: DummyRegion,
+                region: DummyRegion(PhantomData),
             }
         }
     }

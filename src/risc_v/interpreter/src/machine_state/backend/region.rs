@@ -6,30 +6,40 @@ use super::{AllocatedOf, Atom, Elem, Manager};
 use std::mem;
 
 /// Dedicated region in a [`super::Backend`]
-pub trait Region<E: Elem> {
+pub trait Region {
+    /// Type of elements in the region
+    type Elem: Elem;
+
+    /// Number of elements in the region
+    const LEN: usize;
+
     /// Read an element in the region.
-    fn read(&self, index: usize) -> E;
+    fn read(&self, index: usize) -> Self::Elem;
 
     /// Read all elements in the region.
-    fn read_all(&self) -> Vec<E>;
+    fn read_all(&self) -> Vec<Self::Elem>;
 
     /// Read `buffer.len()` elements from the region, starting at `offset`.
-    fn read_some(&self, offset: usize, buffer: &mut [E]);
+    fn read_some(&self, offset: usize, buffer: &mut [Self::Elem]);
 
     /// Update an element in the region.
-    fn write(&mut self, index: usize, value: E);
+    fn write(&mut self, index: usize, value: Self::Elem);
 
     /// Update all elements in the region.
-    fn write_all(&mut self, value: &[E]);
+    fn write_all(&mut self, value: &[Self::Elem]);
 
     /// Update a subset of elements in the region starting at `index`.
-    fn write_some(&mut self, index: usize, buffer: &[E]);
+    fn write_some(&mut self, index: usize, buffer: &[Self::Elem]);
 
     /// Update the element in the region and return the previous value.
-    fn replace(&mut self, index: usize, value: E) -> E;
+    fn replace(&mut self, index: usize, value: Self::Elem) -> Self::Elem;
 }
 
-impl<E: Elem, const LEN: usize> Region<E> for [E; LEN] {
+impl<E: Elem, const LEN: usize> Region for [E; LEN] {
+    type Elem = E;
+
+    const LEN: usize = LEN;
+
     #[inline(always)]
     fn read(&self, index: usize) -> E {
         E::from_stored(&self[index])
@@ -105,7 +115,11 @@ impl<E: Elem, const LEN: usize> Region<E> for [E; LEN] {
     }
 }
 
-impl<E: Elem, T: Region<E>> Region<E> for &mut T {
+impl<E: Elem, T: Region<Elem = E>> Region for &mut T {
+    type Elem = E;
+
+    const LEN: usize = T::LEN;
+
     #[inline(always)]
     fn read(&self, index: usize) -> E {
         (self as &T).read(index)
@@ -170,12 +184,18 @@ impl<E: Elem, M: Manager> Cell<E, M> {
 }
 
 /// Like [`Region<E>`] but accesses are treated as if the entire region is volatile
-pub trait VolatileRegion<E: Elem> {
+pub trait VolatileRegion {
+    /// Type of elements in the volatile region
+    type Elem: Elem;
+
+    /// Number of elements in the region
+    const LEN: usize;
+
     /// Read an element at the given index.
-    fn read(&self, index: usize) -> E;
+    fn read(&self, index: usize) -> Self::Elem;
 
     /// Write an element at the given index.
-    fn write(&mut self, index: usize, value: E);
+    fn write(&mut self, index: usize, value: Self::Elem);
 }
 
 #[cfg(test)]
