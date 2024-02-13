@@ -46,6 +46,17 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
       Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
       exit 1
 
+let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
+  let open Yes_wallet_lib in
+  let open Tezos_error_monad in
+  match
+    Lwt_main.run (load_contracts ?dump_contracts ?network_opt ?level base_dir)
+  with
+  | Ok l -> l
+  | Error trace ->
+      Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
+      exit 1
+
 let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
     ~active_bakers_only ~aliases =
   let open Yes_wallet_lib in
@@ -197,6 +208,10 @@ let usage () =
      stake of at least <NUM> percent of the total stake are kept@,\
      if %s <%a> is used the store is opened using the right genesis parameter \
      (default is mainnet) @]@]@,\
+     @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
+     computes the total supply form all contracts and commitments. result is \
+     printed in stantdard output, optionally informations on all read \
+     contracts can be dumped into csv_file@]@]@,\
      @[<v 4>> dump staking balances from <base_dir> in <csv_file>]@,\
      saves the staking balances of all delegates in the target csv file@,\
      @[<v>if %s <FILE> is used, it will input aliases from an .json file.See \
@@ -363,6 +378,49 @@ let () =
           "I refuse to rewrite files in %s without confirmation or --force \
            flag@."
           base_dir
+  | _ :: "compute" :: "total" :: "supply" :: "from" :: base_dir :: tl -> (
+      let dump_contracts =
+        match tl with ["in"; csv_file] -> Some csv_file | _ -> None
+      in
+
+      let contracts_list =
+        run_load_contracts ~dump_contracts ?level:level_opt base_dir
+      in
+
+      match dump_contracts with
+      | Some csv_file ->
+          let flags =
+            if !force then [Open_wronly; Open_creat; Open_trunc; Open_text]
+            else [Open_wronly; Open_creat; Open_excl; Open_text]
+          in
+
+          Out_channel.with_open_gen flags 0o666 csv_file (fun oc ->
+              let fmtr = Format.formatter_of_out_channel oc in
+
+              Format.fprintf
+                fmtr
+                "address, balance, frozen_bonds, staked_balance, \
+                 unstaked_frozen_balance, unstaked_finalizable_balance, @." ;
+              List.iter
+                (fun {
+                       address;
+                       balance;
+                       frozen_bonds;
+                       staked_balance;
+                       unstaked_frozen_balance;
+                       unstaked_finalizable_balance;
+                     } ->
+                  Format.fprintf
+                    fmtr
+                    "%s, %Ld, %Ld, %Ld, %Ld, %Ld@."
+                    address
+                    balance
+                    frozen_bonds
+                    staked_balance
+                    unstaked_frozen_balance
+                    unstaked_finalizable_balance)
+                contracts_list)
+      | None -> exit 0)
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
       let alias_pkh_pk_list =
         run_load_bakers_public_keys
@@ -373,6 +431,7 @@ let () =
           ~active_bakers_only
           aliases
       in
+
       let flags =
         if !force then [Open_wronly; Open_creat; Open_trunc; Open_text]
         else [Open_wronly; Open_creat; Open_excl; Open_text]
