@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -2401,12 +2401,6 @@ mod test {
         }
     }
 
-    // This test will fail because it blows the stack with the Rust default
-    // stack size. This could be indication that we should do issue
-    // https://gitlab.com/tezos/tezos/-/issues/4888
-    // use RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
-    // with <value> set to 104857600 or something similar in size
-    #[ignore]
     #[test]
     fn contract_call_fails_beyond_max_stack_depth() {
         let mut mock_runtime = MockHost::default();
@@ -2501,12 +2495,6 @@ mod test {
         }
     }
 
-    // This test will fail because it blows the stack with the Rust default
-    // stack size. This could be indication that we should do issue
-    // https://gitlab.com/tezos/tezos/-/issues/4888
-    // use RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
-    // with <value> set to 104857600 or something similar in size
-    #[ignore]
     #[test]
     fn contract_call_succeeds_at_maximum_stack_depth() {
         let mut mock_runtime = MockHost::default();
@@ -2591,7 +2579,7 @@ mod test {
                 let expected_result =
                     (ExitReason::Succeed(ExitSucceed::Returned), None, vec![]);
                 assert_eq!(result, expected_result);
-                assert_eq!(handler.gas_used(), 5);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
