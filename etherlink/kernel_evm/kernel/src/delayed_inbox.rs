@@ -265,21 +265,17 @@ impl DelayedInbox {
         Ok(to_pop)
     }
 
-    fn pop_first_if_timed_out<Host: Runtime>(
+    fn pop_first<Host: Runtime>(
         &mut self,
         host: &mut Host,
-        now: Timestamp,
-        timeout: u64,
-        current_level: u32,
-        min_levels: u32,
     ) -> Result<Option<Transaction>> {
-        let to_pop =
-            self.first_if_timed_out(host, now, timeout, current_level, min_levels)?;
+        let to_pop = self.0.first_with_id(host)?;
         match to_pop {
             None => Ok(None),
             Some((hash, delayed)) => {
                 let _ = self.0.remove(host, &hash)?;
-                let transaction = Self::transaction_from_delayed(hash, delayed);
+                let transaction =
+                    Self::transaction_from_delayed(hash, delayed.transaction);
                 Ok(Some(transaction))
             }
         }
@@ -302,18 +298,14 @@ impl DelayedInbox {
     /// Computes the next vector of timed-out delayed transactions.
     /// If there are no timed-out transactions, None is returned to
     /// signal that we're done.
+    /// Note that this function assumes we're on a "timeout" state,
+    /// which should be checked before calling it.
     pub fn next_delayed_inbox_blueprint<Host: Runtime>(
         &mut self,
         host: &mut Host,
-        now: Timestamp,
-        timeout: u64,
-        current_level: u32,
-        min_levels: u32,
     ) -> Result<Option<Vec<Transaction>>> {
         let mut popped: Vec<Transaction> = vec![];
-        while let Some(tx) =
-            self.pop_first_if_timed_out(host, now, timeout, current_level, min_levels)?
-        {
+        while let Some(tx) = self.pop_first(host)? {
             popped.push(tx);
             // Check if the number of transactions has reached the limit per
             // blueprint
