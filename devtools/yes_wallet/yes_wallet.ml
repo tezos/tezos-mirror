@@ -27,7 +27,7 @@
 type error = Overwrite_forbiden of string | File_not_found of string
 
 (* We need to exit Lwt + tzResult context from Yes_wallet. *)
-let run_load_bakers_public_keys ?staking_share_opt ?network_opt base_dir
+let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
     ~active_bakers_only alias_pkh_pk_list =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
@@ -36,6 +36,7 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt base_dir
       (load_bakers_public_keys
          ?staking_share_opt
          ?network_opt
+         ?level
          base_dir
          ~active_bakers_only
          alias_pkh_pk_list)
@@ -163,6 +164,8 @@ let staking_share_opt_name = "--staking-share"
 
 let network_opt_name = "--network"
 
+let level_opt_name = "--level"
+
 let supported_network =
   List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
 
@@ -194,8 +197,8 @@ let usage () =
      stake of at least <NUM> percent of the total stake are kept@,\
      if %s <%a> is used the store is opened using the right genesis parameter \
      (default is mainnet) @]@]@,\
-     @[<v>@[<v 4>> dump staking balances from <base_dir> in <csv_file>@,\
-     saves the staking balances of all delegates in the target csv file@]@]@,\
+     @[<v 4>> dump staking balances from <base_dir> in <csv_file>]@,\
+     saves the staking balances of all delegates in the target csv file@,\
      @[<v>if %s <FILE> is used, it will input aliases from an .json file.See \
      README.md for the spec of this file and how to generate it.@],@[<v>if %s \
      is used existing files will be overwritten@]@."
@@ -241,6 +244,18 @@ let () =
     in
     aux argv
   in
+  let level_opt =
+    let rec aux argv =
+      match argv with
+      | [] -> None
+      | str :: level :: _ when str = level_opt_name ->
+          let level = Int32.of_string level in
+          Some level
+      | _ :: argv' -> aux argv'
+    in
+    aux argv
+  in
+
   (* Take an alias file as input. *)
   let alias_file_opt =
     let rec aux argv =
@@ -281,6 +296,10 @@ let () =
       | opt :: t when opt = force_opt_name -> filter t
       | opt :: num :: t
         when opt = staking_share_opt_name
+             && Str.string_match (Str.regexp "[0-9]+") num 0 ->
+          filter t
+      | opt :: num :: t
+        when opt = level_opt_name
              && Str.string_match (Str.regexp "[0-9]+") num 0 ->
           filter t
       | opt :: file :: t
@@ -349,6 +368,7 @@ let () =
         run_load_bakers_public_keys
           ~staking_share_opt
           ?network_opt
+          ?level:level_opt
           base_dir
           ~active_bakers_only
           aliases

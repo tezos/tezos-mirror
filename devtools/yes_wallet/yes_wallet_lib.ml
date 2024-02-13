@@ -246,17 +246,7 @@ let genesis ~network =
        Octez_node_config.Config_file.builtin_blockchain_networks)
     .genesis
 
-(** [load_mainnet_bakers_public_keys base_dir active_backers_only
-    alias_phk_pk_list] checkouts the head context at the given
-    [base_dir] and computes a list of triples [(alias, pkh, pk)]
-    corresponding to all delegates in that context. The [alias] for
-    the delegates are gathered from [alias_pkh_pk_list]).
-
-    if [active_bakers_only] then the deactivated delegates are filtered out of
-    the list.
-*)
-let load_bakers_public_keys ?(staking_share_opt = None)
-    ?(network_opt = "mainnet") base_dir ~active_bakers_only alias_pkh_pk_list =
+let get_context ?level ~network_opt base_dir =
   let open Lwt_result_syntax in
   let open Tezos_store in
   let genesis = genesis ~network:network_opt in
@@ -278,7 +268,20 @@ let load_bakers_public_keys ?(staking_share_opt = None)
         tzfail (Exn exn))
   in
   let main_chain_store = Store.main_chain_store store in
-  let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
+  let*! block =
+    match level with
+    | None -> Tezos_store.Store.Chain.current_head main_chain_store
+    | Some level -> (
+        Printf.printf "Loading block at level %ld@." level ;
+        let*! block =
+          Store.Block.read_block_by_level_opt main_chain_store level
+        in
+        match block with
+        | None ->
+            Printf.printf "Level %ld not found" level ;
+            exit 1
+        | Some block -> Lwt.return block)
+  in
   Format.printf
     "@[<h>Head block:@;<17 0>%a@]@."
     Block_hash.pp
@@ -290,6 +293,25 @@ let load_bakers_public_keys ?(staking_share_opt = None)
   in
   let*! protocol_hash = Store.Block.protocol_hash_exn main_chain_store block in
   let header = header.shell in
+  return (protocol_hash, context, header, store)
+
+(** [load_mainnet_bakers_public_keys base_dir ?level active_backers_only
+    alias_phk_pk_list] checkouts the head context at the given
+    [base_dir] and computes a list of triples [(alias, pkh, pk)]
+    corresponding to all delegates in that context. The [alias] for
+    the delegates are gathered from [alias_pkh_pk_list]).
+
+    if [active_bakers_only] then the deactivated delegates are
+    filtered out of the list. if an optional [level] is given, use the
+    context from this level instead of head, if it exists.
+*)
+let load_bakers_public_keys ?(staking_share_opt = None)
+    ?(network_opt = "mainnet") ?level base_dir ~active_bakers_only
+    alias_pkh_pk_list =
+  let open Lwt_result_syntax in
+  let* protocol_hash, context, header, store =
+    get_context ?level ~network_opt base_dir
+  in
   let* delegates =
     match protocol_of_hash protocol_hash with
     | None ->
