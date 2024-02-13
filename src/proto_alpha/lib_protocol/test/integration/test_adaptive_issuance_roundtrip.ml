@@ -1620,11 +1620,10 @@ let update_state_denunciation (block, state)
       else
         let misbehaviour =
           {
-            Protocol.Misbehaviour_repr.kind;
-            (* Fields level, round, and slot are unused for now. *)
+            (* Fields level and round are unused for now. *)
             level = Protocol.Raw_level_repr.of_int32_exn level;
             round = Protocol.Round_repr.zero;
-            slot = Protocol.Slot_repr.zero;
+            Protocol.Misbehaviour_repr.kind;
           }
         in
         (* for simplicity's sake (lol), the block producer and the payload producer are the same

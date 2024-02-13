@@ -32,12 +32,7 @@ let kind_encoding =
         (fun () -> Double_preattesting);
     ]
 
-type t = {
-  kind : kind;
-  level : Raw_level_repr.t;
-  round : Round_repr.t;
-  slot : Slot_repr.t;
-}
+type t = {level : Raw_level_repr.t; round : Round_repr.t; kind : kind}
 
 let compare_kind a b =
   let to_int = function
@@ -57,10 +52,9 @@ let compare a b =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {kind; level; round; slot} -> (kind, level, round, slot))
-    (fun (kind, level, round, slot) -> {kind; level; round; slot})
-    (obj4
-       (req "kind" kind_encoding)
+    (fun {level; round; kind} -> (level, round, kind))
+    (fun (level, round, kind) -> {level; round; kind})
+    (obj3
        (req "level" Raw_level_repr.encoding)
        (req "round" Round_repr.encoding)
-       (req "slot" Slot_repr.encoding))
+       (req "kind" kind_encoding))

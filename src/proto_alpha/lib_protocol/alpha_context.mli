@@ -2195,7 +2195,7 @@ end
 module Misbehaviour : sig
   type kind = Double_baking | Double_attesting | Double_preattesting
 
-  type t = {kind : kind; level : Raw_level.t; round : Round.t; slot : Slot.t}
+  type t = {level : Raw_level.t; round : Round.t; kind : kind}
 
   val kind_encoding : kind Data_encoding.t
 
