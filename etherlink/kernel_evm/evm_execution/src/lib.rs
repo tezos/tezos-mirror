@@ -327,7 +327,6 @@ mod test {
     fn dummy_first_block() -> BlockConstants {
         let block_fees = BlockFees::new(
             U256::from(12345),
-            U256::from(500_000),
             U256::from(2_000_000_000_000u64),
         );
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
@@ -2065,7 +2064,6 @@ mod test {
         chain_id.to_big_endian(&mut chain_id_bytes);
         let block_fees = BlockFees::new(
             U256::from(54321),
-            U256::from(1000),
             U256::from(2_000_000_000_000u64),
         );
         let block = BlockConstants::first_block(U256::zero(), chain_id, block_fees);
@@ -2143,7 +2141,6 @@ mod test {
         base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
         let block_fees = BlockFees::new(
             base_fee_per_gas,
-            U256::zero(),
             U256::from(2_000_000_000_000u64),
         );
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
@@ -2399,7 +2396,6 @@ mod test {
         let base_fee_per_gas = U256::from(23000);
         let block_fees = BlockFees::new(
             base_fee_per_gas,
-            U256::zero(),
             U256::from(2_000_000_000_000u64),
         );
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
@@ -2462,7 +2458,6 @@ mod test {
         let base_fee_per_gas = U256::from(23000);
         let block_fees = BlockFees::new(
             base_fee_per_gas,
-            U256::zero(),
             U256::from(2_000_000_000_000u64),
         );
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
@@ -2522,7 +2517,6 @@ mod test {
         let base_fee_per_gas = U256::from(23000);
         let block_fees = BlockFees::new(
             base_fee_per_gas,
-            U256::zero(),
             U256::from(2_000_000_000_000u64),
         );
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)

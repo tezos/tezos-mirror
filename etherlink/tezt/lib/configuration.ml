@@ -9,7 +9,7 @@
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
 let make_config ?bootstrap_accounts ?ticketer ?administrator
-    ?sequencer_administrator ?sequencer ?delayed_bridge ?(flat_fee = Wei.zero)
+    ?sequencer_administrator ?sequencer ?delayed_bridge
     ?(da_fee_per_byte = Wei.zero) () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
@@ -71,11 +71,6 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
       ~none:[]
       delayed_bridge
   in
-  let flat_fee =
-    let to_ = Durable_storage_path.flat_fee_path in
-    let value = Wei.(to_le_bytes flat_fee) |> Hex.of_bytes |> Hex.show in
-    [Set {value; to_}]
-  in
   let da_fee_per_byte =
     let to_ = Durable_storage_path.da_fee_per_byte_path in
     let value = Wei.(to_le_bytes da_fee_per_byte) |> Hex.of_bytes |> Hex.show in
@@ -83,7 +78,7 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
   in
   match
     ticketer @ bootstrap_accounts @ administrator @ sequencer_administrator
-    @ sequencer @ delayed_bridge @ flat_fee @ da_fee_per_byte
+    @ sequencer @ delayed_bridge @ da_fee_per_byte
   with
   | [] -> None
   | res -> Some (`Config res)

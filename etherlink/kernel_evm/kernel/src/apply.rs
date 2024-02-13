@@ -614,7 +614,6 @@ mod tests {
     fn mock_block_constants() -> BlockConstants {
         let block_fees = BlockFees::new(
             U256::from(12345),
-            U256::from(1_000_000),
             U256::from(2_000_000_000_000u64),
         );
         BlockConstants::first_block(
@@ -687,9 +686,9 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = block_constants.block_fees.gas_for_fees(gas_price);
-        let balance = (fee_gas + 21000) * gas_price;
-        let gas_limit = 21000 + fee_gas.as_u64();
+        let fee_gas = crate::fees::gas_for_fees(block_constants.block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
+        let balance = gas_price * (fee_gas + 21000);
+        let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
         set_balance(&mut host, &mut evm_account_storage, &address, balance);
@@ -719,10 +718,10 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = block_constants.block_fees.gas_for_fees(gas_price);
+        let fee_gas = crate::fees::gas_for_fees(block_constants.block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
         // account doesnt have enough funds for execution
-        let balance = fee_gas * gas_price;
-        let gas_limit = 21000 + fee_gas.as_u64();
+        let balance = gas_price * fee_gas;
+        let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
         set_balance(&mut host, &mut evm_account_storage, &address, balance);
@@ -752,9 +751,9 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = block_constants.block_fees.gas_for_fees(gas_price);
-        let balance = (fee_gas + 21000) * gas_price;
-        let gas_limit = 21000 + fee_gas.as_u64();
+        let fee_gas = crate::fees::gas_for_fees(block_constants.block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
+        let balance = gas_price * (fee_gas + 21000);
+        let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         transaction.signature = None;
         // fund account
@@ -785,9 +784,9 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = block_constants.block_fees.gas_for_fees(gas_price);
-        let balance = (fee_gas + 21000) * gas_price;
-        let gas_limit = 21000 + fee_gas.as_u64();
+        let fee_gas = crate::fees::gas_for_fees(block_constants.block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
+        let balance = gas_price * (fee_gas + 21000);
+        let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         transaction.nonce = U256::from(42);
         transaction = resign(transaction);
@@ -853,9 +852,9 @@ mod tests {
         // setup
         let gas_price = U256::from(21000);
         let max_gas_price = U256::one();
-        let fee_gas = block_constants.block_fees.gas_for_fees(max_gas_price);
+        let fee_gas = crate::fees::gas_for_fees(block_constants.block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
         // account doesnt have enough funds for execution
-        let gas_limit = 21000 + fee_gas.as_u64();
+        let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         // set a max base fee too low
         transaction.max_fee_per_gas = max_gas_price;

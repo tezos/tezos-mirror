@@ -94,17 +94,17 @@ let check_tx_failed ~endpoint ~tx =
       unit
   | None -> unit
 
-(* Check simple transfer flat fee is correct
+(* Check simple transfer fee is correct
 
-   We apply a flat base fee to every tx - which is paid through an
+   We apply a da_fee to every tx - which is paid through an
    increase in in either/both gas_used, gas_price.
 
    We prefer to keep [gas_used == execution_gas_used] where possible, but
    when this results in [gas_price > tx.max_price_per_gas], we set gas_price to
    tx.max_price_per_gas, and increase the gas_used in the receipt.
 *)
-let check_tx_gas_for_fee ~flat_fee ~da_fee_per_byte ~expected_execution_gas
-    ~gas_price ~gas_used ~base_fee_per_gas ~data_size =
+let check_tx_gas_for_fee ~da_fee_per_byte ~expected_execution_gas ~gas_price
+    ~gas_used ~base_fee_per_gas ~data_size =
   (* execution gas fee *)
   let expected_execution_gas = Z.of_int expected_execution_gas in
   let expected_base_fee_per_gas = Z.of_int32 base_fee_per_gas in
@@ -117,7 +117,7 @@ let check_tx_gas_for_fee ~flat_fee ~da_fee_per_byte ~expected_execution_gas
   let da_fee = Wei.(da_fee_per_byte * size) in
   (* total fee 'in gas' *)
   let expected_total_fee =
-    Z.add Wei.(of_wei_z (flat_fee + da_fee)) execution_gas_fee |> Z.to_int64
+    Z.add (Wei.of_wei_z da_fee) execution_gas_fee |> Z.to_int64
   in
   let total_fee_receipt =
     Z.(mul (of_int64 gas_price) (of_int64 gas_used)) |> Z.to_int64
@@ -330,8 +330,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ?flat_fee ?da_fee_per_byte ~admin
-    ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
+    ?(with_administrator = true) ?da_fee_per_byte ~admin ?sequencer_admin
+    ?commitment_period ?challenge_window ?timestamp
     ?(setup_mode = Setup_proxy {devmode = true}) protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -358,7 +358,6 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     in
     Configuration.make_config
       ~bootstrap_accounts
-      ?flat_fee
       ?da_fee_per_byte
       ?ticketer
       ?administrator
@@ -452,8 +451,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?flat_fee ?da_fee_per_byte ~setup_mode
-    f =
+    ?challenge_window ?bootstrap_accounts ?da_fee_per_byte ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -482,7 +480,6 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
           ?commitment_period
           ?challenge_window
           ?bootstrap_accounts
-          ?flat_fee
           ?da_fee_per_byte
           ~admin
           ~setup_mode
@@ -506,8 +503,8 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
     ~setup_mode:(Setup_proxy {devmode = true})
 
 let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
-    ?bootstrap_accounts ?flat_fee ?da_fee_per_byte ?config ?time_between_blocks
-    f protocols =
+    ?bootstrap_accounts ?da_fee_per_byte ?config ?time_between_blocks f
+    protocols =
   let register =
     register_test
       ?config
@@ -518,7 +515,6 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ?commitment_period
       ?challenge_window
       ?bootstrap_accounts
-      ?flat_fee
       ?da_fee_per_byte
       f
       protocols
@@ -1454,8 +1450,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
       receiver_balance_after;
     }
 
-let transfer ?data ~flat_fee ~da_fee_per_byte ~expected_execution_gas ~evm_setup
-    () =
+let transfer ?data ~da_fee_per_byte ~expected_execution_gas ~evm_setup () =
   let* base_fee_per_gas = Rpc.get_gas_price evm_setup.evm_node in
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
@@ -1510,7 +1505,6 @@ let transfer ?data ~flat_fee ~da_fee_per_byte ~expected_execution_gas ~evm_setup
   let data = String.sub data 2 (String.length data - 2) in
   let data_size = Bytes.length @@ Hex.to_bytes @@ `Hex data in
   check_tx_gas_for_fee
-    ~flat_fee
     ~da_fee_per_byte
     ~expected_execution_gas
     ~gas_used
@@ -1520,24 +1514,21 @@ let transfer ?data ~flat_fee ~da_fee_per_byte ~expected_execution_gas ~evm_setup
   unit
 
 let test_l2_transfer =
-  let flat_fee = Wei.of_eth_string "0.000123" in
   let da_fee_per_byte = Wei.of_eth_string "0.000002" in
   let expected_execution_gas = 21000 in
   let test_f ~protocol:_ ~evm_setup =
-    transfer ~evm_setup ~flat_fee ~da_fee_per_byte ~expected_execution_gas ()
+    transfer ~evm_setup ~da_fee_per_byte ~expected_execution_gas ()
   in
   let title = "Check L2 transfers are applied" in
   let tags = ["evm"; "l2_transfer"] in
-  register_both ~title ~tags ~flat_fee ~da_fee_per_byte test_f
+  register_both ~title ~tags ~da_fee_per_byte test_f
 
 let test_chunked_transaction =
-  let flat_fee = Wei.of_eth_string "0.005" in
   let da_fee_per_byte = Wei.of_eth_string "0.000002" in
   let expected_execution_gas = 117000 in
   let test_f ~protocol:_ ~evm_setup =
     transfer
       ~data:("0x" ^ String.make 12_000 'a')
-      ~flat_fee
       ~da_fee_per_byte
       ~evm_setup
       ~expected_execution_gas
@@ -1545,7 +1536,7 @@ let test_chunked_transaction =
   in
   let title = "Check L2 chunked transfers are applied" in
   let tags = ["evm"; "l2_transfer"; "chunked"] in
-  register_both ~title ~tags ~flat_fee ~da_fee_per_byte test_f
+  register_both ~title ~tags ~da_fee_per_byte test_f
 
 let test_rpc_txpool_content =
   register_both

@@ -562,7 +562,6 @@ mod tests {
         let mut mock_runtime = MockHost::default();
         let block_fees = BlockFees::new(
             U256::from(21000),
-            U256::from(1_000_000),
             U256::from(2_000_000_000_000u64),
         );
         let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);

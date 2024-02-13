@@ -93,7 +93,6 @@ pub struct EthereumTransactionCommon {
     /// The maximum amount of gas that the user is willing to pay.
     ///
     /// *NB* this is inclusive of any additional fees that are paid, prior to execution:
-    /// - flat fee
     /// - data availability fee
     gas_limit: u64,
     /// The 160-bit address of the message call’s recipient
