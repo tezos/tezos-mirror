@@ -58,6 +58,20 @@ let of_eth_string eth =
       Z.add (of_string eth) (of_string decimal)
   | _ -> Test.fail "Invalid ETH amount: %s" eth
 
+let of_gwei_string gwei =
+  let shift = 9 in
+  match String.split_on_char '.' (String.trim gwei) with
+  | [gwei] -> of_string (gwei ^ String.make shift '0')
+  | [gwei; decimal] ->
+      if String.length decimal > 9 then
+        Test.fail "Too many decimals for GWEI : %s" decimal
+      else
+        let decimal =
+          decimal ^ String.make (shift - String.length decimal) '0'
+        in
+        Z.add (of_string gwei) (of_string decimal)
+  | _ -> Test.fail "Invalid GWEI amount: %s" gwei
+
 let ( + ) = Z.add
 
 let ( - ) = Z.sub

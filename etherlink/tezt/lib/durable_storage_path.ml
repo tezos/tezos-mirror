@@ -59,6 +59,8 @@ let delayed_bridge_path = evm "/delayed_bridge"
 
 let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
 
+let minimum_base_fee_per_gas = evm "/fees/minimum_base_fee_per_gas"
+
 let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 
 let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"

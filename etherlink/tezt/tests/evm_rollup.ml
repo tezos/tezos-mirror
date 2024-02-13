@@ -22,6 +22,8 @@ open Contract_path
 
 let pvm_kind = "wasm_2_0_0"
 
+let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
+
 type l1_contracts = {
   exchanger : string;
   bridge : string;
@@ -122,7 +124,7 @@ let check_tx_gas_for_fee ~da_fee_per_byte ~expected_execution_gas ~gas_price
   let total_fee_receipt =
     Z.(mul (of_int64 gas_price) (of_int64 gas_used)) |> Z.to_int64
   in
-  Check.((total_fee_receipt > expected_total_fee) int64)
+  Check.((total_fee_receipt >= expected_total_fee) int64)
     ~error_msg:"total fee in receipt %L did not cover expected fees of %R"
 
 let check_status_n_logs ~endpoint ~status ~logs ~tx =
@@ -331,8 +333,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ?da_fee_per_byte ~admin ?sequencer_admin
-    ?commitment_period ?challenge_window ?timestamp
+    ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
+    ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?(setup_mode = Setup_proxy {devmode = true}) ?(force_install_kernel = true)
     protocol =
   let* node, client =
@@ -361,6 +363,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     Configuration.make_config
       ~bootstrap_accounts
       ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
       ?ticketer
       ?administrator
       ?sequencer
@@ -460,7 +463,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?da_fee_per_byte ~setup_mode f =
+    ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -490,6 +494,7 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
           ?challenge_window
           ?bootstrap_accounts
           ?da_fee_per_byte
+          ?minimum_base_fee_per_gas
           ~admin
           ~setup_mode
           protocol
@@ -497,7 +502,8 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
       f ~protocol ~evm_setup)
 
 let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
-    ?challenge_window ?bootstrap_accounts f protocols =
+    ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas f protocols
+    =
   register_test
     ?config
     ~title
@@ -507,13 +513,14 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
     ?commitment_period
     ?challenge_window
     ?bootstrap_accounts
+    ?minimum_base_fee_per_gas
     f
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
 
 let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
-    ?bootstrap_accounts ?da_fee_per_byte ?config ?time_between_blocks f
-    protocols =
+    ?bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas ?config
+    ?time_between_blocks f protocols =
   let register =
     register_test
       ?config
@@ -525,6 +532,7 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ?challenge_window
       ?bootstrap_accounts
       ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
       f
       protocols
   in
@@ -1626,6 +1634,7 @@ let test_full_blocks =
     ~title:
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
        informations"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   let txs =
     read_tx_from_file ()
@@ -1715,6 +1724,7 @@ let test_inject_100_transactions =
     ~tags:["evm"; "bigger_blocks"]
     ~title:"Check blocks can contain more than 64 transactions"
     ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -2423,6 +2433,7 @@ let test_rpc_sendRawTransaction =
     ~tags:["evm"; "tx_hash"]
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* hashes =
@@ -2508,6 +2519,7 @@ let test_rpc_getTransactionByBlockHashAndIndex =
   register_both
     ~tags:["evm"; "get_transaction_by"; "block_hash_and_index"]
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~config
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
@@ -2518,6 +2530,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
   register_both
     ~tags:["evm"; "get_transaction_by"; "block_number_and_index"]
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~config
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
@@ -2526,6 +2539,7 @@ let test_validation_result =
     ~tags:["evm"; "simulate"]
     ~title:
       "Ensure validation returns appropriate address for a given transaction."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; _} ->
   (* tx is a signed legacy transaction obtained with the following data, using
      the following private key:
@@ -2775,6 +2789,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
     ~tags:["evm"; "nonce"]
     ~title:"Returns an error if the nonce is too low"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Nonce: 0 *)
   let raw_tx =
@@ -2800,6 +2815,7 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   register_both
     ~tags:["evm"; "nonce"]
     ~title:"Accepts transactions with nonce too high."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* Nonce: 1 *)
   let raw_tx =
@@ -3096,6 +3112,7 @@ let test_rpc_getBlockTransactionCountBy =
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
     ~config
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
@@ -3240,6 +3257,7 @@ let test_cover_fees =
     ~tags:["evm"; "validity"]
     ~title:"Transaction is invalid if sender cannot cover the fees"
     ~bootstrap_accounts:[||]
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   (* No bootstrap accounts, so no one has funds. *)
   @@ fun ~protocol:_
              ~evm_setup:{evm_node; endpoint; sc_rollup_node; node; client; _} ->
@@ -3270,7 +3288,10 @@ let test_cover_fees =
   check_for_receipt 6
 
 let test_rpc_sendRawTransaction_with_consecutive_nonce =
-  register_both ~tags:["evm"; "tx_nonce"] ~title:"Can submit many transactions."
+  register_both
+    ~tags:["evm"; "tx_nonce"]
+    ~title:"Can submit many transactions."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; node; client; sc_rollup_node; _} ->
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 0*)
@@ -3309,6 +3330,7 @@ let test_rpc_sendRawTransaction_not_included =
     ~tags:["evm"; "tx_nonce"]
     ~title:
       "Tx with nonce too high are not included without previous transactions."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_
              ~evm_setup:{evm_node; node; client; sc_rollup_node; endpoint; _} ->
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
@@ -3336,15 +3358,15 @@ let test_rpc_sendRawTransaction_not_included =
 let test_rpc_gasPrice =
   register_both ~tags:["evm"; "gas_price"] ~title:"RPC methods eth_gasPrice"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let expected_gas_price = 21_000l in
+  let expected_gas_price = Wei.of_gwei_string "0.05" in
   let* gas_price =
     Evm_node.(
       let* price =
         call_evm_rpc evm_node {method_ = "eth_gasPrice"; parameters = `A []}
       in
-      return JSON.(price |-> "result" |> as_int64))
+      return JSON.(price |-> "result" |> as_int64 |> Z.of_int64 |> Wei.to_wei_z))
   in
-  Check.((gas_price = Int64.of_int32 expected_gas_price) int64)
+  Check.((gas_price = expected_gas_price) Wei.typ)
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
@@ -3755,7 +3777,10 @@ let test_rpc_getLogs =
   unit
 
 let test_tx_pool_replacing_transactions =
-  register_both ~tags:["evm"; "tx_pool"] ~title:"Transactions can be replaced"
+  register_both
+    ~tags:["evm"; "tx_pool"]
+    ~title:"Transactions can be replaced"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   let bob = Eth_account.bootstrap_accounts.(0) in
   let*@ bob_nonce = Rpc.get_transaction_count evm_node ~address:bob.address in
@@ -3859,6 +3884,7 @@ let test_block_hash_regression =
       ~config
       ~admin:None
       ~timestamp:(At (Option.get @@ Ptime.of_date (2018, 7, 1)))
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
       protocol
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
@@ -3870,7 +3896,10 @@ let test_block_hash_regression =
   unit
 
 let test_l2_revert_returns_unused_gas =
-  register_both ~tags:["evm"] ~title:"Check L2 revert returns unused gas"
+  register_both
+    ~tags:["evm"]
+    ~title:"Check L2 revert returns unused gas"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4104,6 +4133,7 @@ let test_reboot_out_of_ticks =
     ~title:
       "Check that the kernel can handle transactions that take too many ticks \
        for a single run"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =
@@ -4468,6 +4498,7 @@ let test_transaction_exhausting_ticks_is_rejected =
     ~title:
       "Check that the node will reject a transaction that wouldn't fit in a \
        kernel run."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =

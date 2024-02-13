@@ -20,6 +20,7 @@ val make_config :
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?da_fee_per_byte:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   unit ->
