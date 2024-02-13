@@ -44,6 +44,7 @@ module Make
           ~msg:"[Warning] (ignored) in monitoring: {error}"
           ~level:Warning
           ("error", trace_encoding)
+          ~pp1:pp_print_trace
 
       let pp_key_alias =
         Format.(

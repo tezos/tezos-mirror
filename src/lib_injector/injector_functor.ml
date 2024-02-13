@@ -1158,10 +1158,12 @@ module Make (Parameters : PARAMETERS) = struct
   (* The worker for the injector. *)
   module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
-  (* The queue for the requests to the injector worker is infinite. *)
-  type worker = Worker.infinite Worker.queue Worker.t
+  (* The injector worker can have a single pending injection request at a
+     time. *)
+  type worker = Worker.dropbox Worker.t
 
-  let table = Worker.create_table Queue
+  let table =
+    Worker.create_table (Dropbox {merge = (fun _w new_r _old_r -> Some new_r)})
 
   let tags_table = Tags_table.create 7
 
@@ -1176,12 +1178,8 @@ module Make (Parameters : PARAMETERS) = struct
      fun w request ->
       let state = Worker.state w in
       match request with
-      | Request.Add_pending op ->
-          (* The execution of the request handler is protected to avoid stopping the
-             worker in case of an exception. *)
-          protect @@ fun () -> add_pending_operation state op
-      | Request.New_tezos_head (block_hash, level) ->
-          protect @@ fun () -> on_new_tezos_head state {block_hash; level}
+      (* The execution of the request handler is protected to avoid stopping the
+         worker in case of an exception. *)
       | Request.Inject -> protect @@ fun () -> on_inject state
 
     type launch_error = error trace
@@ -1224,10 +1222,7 @@ module Make (Parameters : PARAMETERS) = struct
         let*! () = Event.(emit3 request_failed) state request_view st errs in
         return_unit
       in
-      match r with
-      | Request.Add_pending _ -> emit_and_return_errors errs
-      | Request.New_tezos_head _ -> emit_and_return_errors errs
-      | Request.Inject -> emit_and_return_errors errs
+      match r with Request.Inject -> emit_and_return_errors errs
 
     let on_completion w r _ st =
       let state = Worker.state w in
@@ -1276,22 +1271,17 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (_signer, w) ->
         let open Lwt_syntax in
         let worker_state = Worker.state w in
-        if has_tag_in ~tags worker_state then
+        if has_tag_in ~tags worker_state then (
           delay_strategy worker_state header @@ fun () ->
-          let* _pushed = Worker.Queue.push_request w Request.Inject in
-          return_unit
+          Worker.Dropbox.put_request w Request.Inject ;
+          return_unit)
         else Lwt.return_unit)
       workers
 
   let notify_new_tezos_head h =
-    let open Lwt_syntax in
     let workers = Worker.list table in
-    List.iter_p
-      (fun (_signer, w) ->
-        let* (_pushed : bool) =
-          Worker.Queue.push_request w (Request.New_tezos_head h)
-        in
-        return_unit)
+    List.iter_ep
+      (fun (_signer, w) -> on_new_tezos_head (Worker.state w) h)
       workers
 
   let protocols_of_head cctxt =
@@ -1339,14 +1329,13 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*! res =
       Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
-      let head = (head_hash, header.shell.level) in
+      let head = {block_hash = head_hash; level = header.shell.level} in
       let* next_protocol =
         next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
       in
       update_protocol ~next_protocol ;
       (* Notify all workers of a new Tezos head *)
-      let*! () = notify_new_tezos_head head in
-      return_unit
+      notify_new_tezos_head head
     in
     (* Ignore errors *)
     let*! () =
@@ -1484,9 +1473,7 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let operation = Inj_operation.make op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
-    let*! (_pushed : bool) =
-      Worker.Queue.push_request w (Request.Add_pending operation)
-    in
+    let* () = add_pending_operation (Worker.state w) operation in
     return operation.hash
 
   let shutdown () =
