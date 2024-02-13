@@ -379,9 +379,25 @@ let () =
       in
       Out_channel.with_open_gen flags 0o666 csv_file (fun oc ->
           let fmtr = Format.formatter_of_out_channel oc in
+
+          Format.fprintf
+            fmtr
+            "pkh, stake, spendable_balance, frozen_deposits, \
+             unstake_frozen_deposits\n" ;
           List.iter
-            (fun (_alias, pkh, _pk, stake) ->
-              Format.fprintf fmtr "%s, %Ld\n" pkh stake)
+            (fun ( _alias,
+                   pkh,
+                   _pk,
+                   stake,
+                   frozen_deposits,
+                   unstake_frozen_deposits ) ->
+              Format.fprintf
+                fmtr
+                "%s, %Ld, %Ld, %Ld\n"
+                pkh
+                stake
+                frozen_deposits
+                unstake_frozen_deposits)
             alias_pkh_pk_list)
   | _ ->
       Format.eprintf "Invalid command. Usage:@." ;
