@@ -93,8 +93,7 @@
   extends:
     - .image_template__docker
     - .docker_auth_template
-  dependencies: [oc.docker:rust-toolchain]
-  needs: [oc.docker:rust-toolchain]
+    - .needs__rust_toolchain
   variables:
     DOCKER_BUILD_TARGET: "without-evm-artifacts"
     IMAGE_ARCH_PREFIX: ""

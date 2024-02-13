@@ -31,6 +31,19 @@
     - job: trigger
       optional: true
 
+# Need and depend on the 'oc.docker:rust-toolchain'
+#
+# Should be used by all jobs that use the image
+# '.image_template__rust_toolchain': either directly in its 'image:'
+# field or as a dependency in e.g. Docker builds.
+#
+# The 'dependencies:' of this template is also necessary, since
+# 'oc.docker:rust-toolchain' produces a dotenv-report containing the
+# exact tag of the rust-toolchain image that should be used.
+.needs__rust_toolchain:
+  needs: [oc.docker:rust-toolchain]
+  dependencies: [oc.docker:rust-toolchain]
+
 # Only if octez source code has changed
 .rules__octez_changes:
   rules:
@@ -184,7 +197,7 @@
   extends:
     - .default_settings_template
     - .image_template__rust_toolchain
-    - .needs__trigger
+    - .needs__rust_toolchain
     - .rules__octez_changes_or_kernels
   variables:
     CC: clang
@@ -234,8 +247,6 @@
   extends:
     - .oc.kernels_template
   stage: test
-  needs: [oc.docker:rust-toolchain]
-  dependencies: [oc.docker:rust-toolchain]
   script:
     - make -f etherlink.mk check
     - make -f etherlink.mk test

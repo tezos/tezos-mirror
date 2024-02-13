@@ -7,12 +7,11 @@ publish_kernel_sdk:
   extends:
     - .default_settings_template
     - .image_template__rust_toolchain
+    - .needs__rust_toolchain
   stage: manual
   rules:
   - when: manual
   allow_failure: true
-  needs: [oc.docker:rust-toolchain]
-  dependencies: [oc.docker:rust-toolchain]
   interruptible: false
   script:
     - make -f kernels.mk publish-sdk-deps
