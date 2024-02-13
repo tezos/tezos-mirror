@@ -56,7 +56,7 @@
   "smart_rollup_reveal_activation_level":
     { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 2147483646,
       "dal_parameters": 2147483646,
-      "dal_attested_slots_validity_lag": 161280 },
+      "dal_attested_slots_validity_lag": 241920 },
   "smart_rollup_private_enable": true,
   "smart_rollup_riscv_pvm_enable": false, "zk_rollup_enable": false,
   "zk_rollup_origination_size": 4000, "zk_rollup_min_pending_to_process": 10,

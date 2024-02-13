@@ -1075,11 +1075,11 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             Raw_level_repr.of_int32_exn Int32.(pred max_int)
         in
         let dal_attested_slots_validity_lag =
-          (* A rollup node shouldn't import an attested whose attested level in too
-             far in the past w.r.t. the current level. Importation window is fixed to
-             161_280 levels below. It is the number of blocks produced during 28 days
-             (4 weeks) with a block time of 15 seconds. *)
-          161_280
+          (* A rollup node shouldn't import a page of an attested slot whose attested
+             level is too far in the past w.r.t. the current level. Importation window
+             is fixed to 241_920 levels below. It is the number of blocks produced
+             during 28 days (4 weeks) with a block time of 10 seconds. *)
+          241_920
         in
         let reveal_activation_level :
             Constants_parametric_repr.sc_rollup_reveal_activation_level =

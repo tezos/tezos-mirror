@@ -47,7 +47,8 @@ let test_sc_rollup_constants_consistency () =
   let block_time = 10 in
   let sc_rollup =
     Default_parameters.Internal_for_tests.make_sc_rollup_parameter
-      ~dal_attested_slots_validity_lag:161_280
+      ~dal_attested_slots_validity_lag:241_920
+        (* 4 weeks with a 10 secs block time. *)
       ~dal_activation_level:Raw_level.root
       block_time
   in
