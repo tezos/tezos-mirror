@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -2962,11 +2962,9 @@ mod test {
         )
     }
 
-    // This test will fail because it blows the stack with the Rust default
-    // stack size.
-    // use RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
-    // with <value> set to 104857600 or something similar in size
-    #[ignore]
+    // If runned locally, use:
+    // RUST_MIN_STACK=<value> cargo test -p evm-kernel --features testing
+    // with <value> set to 104857600 or something similar in size.
     #[test]
     fn call_too_deep_not_revert() {
         let mut host = MockHost::default();

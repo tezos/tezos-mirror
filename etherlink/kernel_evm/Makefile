@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
-# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -42,7 +42,9 @@ build-dev-deps: build-deps
 
 .PHONY: test
 test:
-	@cargo test --features testing ${TESTNAME}
+# Setting RUST_MIN_STACK is needed otherwise some tests will panic by reaching
+# Rust's max stack size.
+	@RUST_MIN_STACK=104857600 cargo test --features testing ${TESTNAME}
 
 .PHONY: check
 check:
