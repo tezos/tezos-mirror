@@ -34,6 +34,30 @@ where
         // (lower 12 bits cleared and the value is sign-extended)
         self.write(rd, imm as u64);
     }
+
+    /// `ANDI` I-type instruction
+    ///
+    /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
+    pub fn run_andi(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+        let result = self.read(rs1) & (imm as u64);
+        self.write(rd, result)
+    }
+
+    /// `ORI` I-type instruction
+    ///
+    /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
+    pub fn run_ori(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+        let result = self.read(rs1) | (imm as u64);
+        self.write(rd, result)
+    }
+
+    /// `XORI` I-type instruction
+    ///
+    /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
+    pub fn run_xori(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+        let result = self.read(rs1) ^ (imm as u64);
+        self.write(rd, result)
+    }
 }
 
 impl<M> HartState<M>
@@ -276,6 +300,42 @@ pub mod tests {
             // BNE - same register
             test_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, init_pc, next_pc);
         });
+    });
+
+    backend_test!(test_bitwise, F, {
+        proptest!(|(val in any::<u64>(), imm in any::<u64>())| {
+            let mut backend = create_backend!(XRegistersLayout, F);
+            let mut state = create_state!(XRegisters, F, backend);
+
+            // The sign-extension of an immediate on 12 bits has bits 31:11 equal the sign-bit
+            let prefix_mask = 0xFFFF_FFFF_FFFF_F800;
+            let negative_imm = imm | prefix_mask;
+            let positive_imm = imm & !prefix_mask;
+
+            state.write(a0, val);
+            state.run_andi(negative_imm as i64, a0, a1);
+            prop_assert_eq!(state.read(a1), val & negative_imm);
+
+            state.write(a1, val);
+            state.run_andi(positive_imm as i64, a1, a2);
+            prop_assert_eq!(state.read(a2), val & positive_imm);
+
+            state.write(a0, val);
+            state.run_ori(negative_imm as i64, a0, a0);
+            prop_assert_eq!(state.read(a0), val | negative_imm);
+
+            state.write(a0, val);
+            state.run_ori(positive_imm as i64, a0, a1);
+            prop_assert_eq!(state.read(a1), val | positive_imm);
+
+            state.write(t2, val);
+            state.run_xori(negative_imm as i64, t2, t2);
+            prop_assert_eq!(state.read(t2), val ^ negative_imm);
+
+            state.write(t2, val);
+            state.run_xori(positive_imm as i64, t2, t1);
+            prop_assert_eq!(state.read(t1), val ^ positive_imm);
+        })
     });
 
     backend_test!(test_jalr, F, {
