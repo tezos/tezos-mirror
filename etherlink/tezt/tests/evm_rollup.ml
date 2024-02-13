@@ -323,6 +323,7 @@ type setup_mode =
   | Setup_sequencer of {
       time_between_blocks : Evm_node.time_between_blocks option;
       sequencer : Account.key;
+      devmode : bool;
     }
   | Setup_proxy of {devmode : bool}
 
@@ -408,7 +409,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
   let* mode =
     match setup_mode with
     | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
-    | Setup_sequencer {time_between_blocks; sequencer} ->
+    | Setup_sequencer {time_between_blocks; sequencer; devmode} ->
         let private_rpc_port = Port.fresh () in
         let sequencer =
           match sequencer.secret_key with
@@ -428,7 +429,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
                max_blueprints_lag = None;
                max_blueprints_catchup = None;
                catchup_cooldown = None;
-               devmode = true;
+               devmode;
              })
   in
   let* evm_node =
@@ -522,7 +523,8 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
   register ~setup_mode:(Setup_proxy {devmode = true}) ;
   register
     ~setup_mode:
-      (Setup_sequencer {time_between_blocks; sequencer = Constant.bootstrap1})
+      (Setup_sequencer
+         {time_between_blocks; sequencer = Constant.bootstrap1; devmode = true})
 
 type contract = {label : string; abi : string; bin : string}
 
