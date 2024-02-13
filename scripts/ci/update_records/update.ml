@@ -26,7 +26,7 @@ let default_branch =
 let records_directory = "tezt/records"
 
 let fetch_record (uri, index, variant) =
-  let local_filename = index ^ ".json" in
+  let local_filename = string_of_int index ^ ".json" in
   let local_dir =
     match variant with
     | None -> records_directory
@@ -60,13 +60,17 @@ let remove_existing_records new_records =
 let parse_tezt_job_name =
   let with_no_variant = rex "^tezt (\\d+)/\\d+$" in
   let with_variant = rex "^tezt-([a-zA-Z0-9-_]*) (\\d+)/\\d+$" in
+  let with_variant_no_index = rex "^tezt-([a-zA-Z0-9-_]*)$" in
   fun name ->
     match name =~* with_no_variant with
-    | Some index -> Some (None, index)
+    | Some index -> Some (None, int_of_string index)
     | None -> (
         match name =~** with_variant with
-        | Some (variant, index) -> Some (Some variant, index)
-        | None -> None)
+        | Some (variant, index) -> Some (Some variant, int_of_string index)
+        | None -> (
+            match name =~* with_variant_no_index with
+            | Some variant -> Some (Some variant, 1)
+            | None -> None))
 
 let fetch_pipeline_records_from_jobs pipeline =
   Log.info "Fetching records from tezt executions in %d in %s" pipeline project ;
@@ -79,7 +83,7 @@ let fetch_pipeline_records_from_jobs pipeline =
     | Some (variant, index) ->
         let artifact_path =
           sf
-            "tezt-results-%s%s.json"
+            "tezt-results-%d%s.json"
             index
             (match variant with
             | None -> ""
