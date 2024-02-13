@@ -1098,10 +1098,30 @@ let filter_topic_encoding =
         (fun l -> Or l);
     ]
 
+type filter_address = Single of address | Vec of address list
+
+let filter_address_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"single"
+        (Tag 0)
+        address_encoding
+        (function Single address -> Some address | _ -> None)
+        (fun address -> Single address);
+      case
+        ~title:"vec"
+        (Tag 1)
+        (list address_encoding)
+        (function Vec l -> Some l | _ -> None)
+        (fun l -> Vec l);
+    ]
+
 type filter = {
   from_block : block_param option;
   to_block : block_param option;
-  address : address option;
+  address : filter_address option;
   topics : filter_topic option list option;
   block_hash : block_hash option;
 }
@@ -1116,7 +1136,7 @@ let filter_encoding =
     (obj5
        (opt "fromBlock" block_param_encoding)
        (opt "toBlock" block_param_encoding)
-       (opt "address" address_encoding)
+       (opt "address" filter_address_encoding)
        (opt "topics" (list @@ option filter_topic_encoding))
        (opt "blockHash" block_hash_encoding))
 
