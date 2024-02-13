@@ -28,8 +28,8 @@ module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
 (** An operator DAL node can play three different roles:
-    - attester for some pkh: checks that the shards assigned to this pkh are published    
-    - slot producer for some slot index: splits slots into shards and publishes the shards    
+    - attester for some pkh: checks that the shards assigned to this pkh are published
+    - slot producer for some slot index: splits slots into shards and publishes the shards
     - slot observer for some slot index: collects the shards
     corresponding to some slot index, reconstructs slots when enough
     shards are seen, and republishes missing shards.
@@ -44,6 +44,45 @@ type operator_sets = {
 
 (** A profile context stores profile-specific data used by the daemon.  *)
 type t = Bootstrap | Operator of operator_sets
+
+let operator_sets_encoding =
+  let open Data_encoding in
+  conv
+    (fun {producers; observers; attesters} ->
+      ( Slot_set.elements producers,
+        Slot_set.elements observers,
+        Pkh_set.elements attesters ))
+    (fun (producers, observers, attesters) ->
+      {
+        producers = Slot_set.of_list producers;
+        observers = Slot_set.of_list observers;
+        attesters = Pkh_set.of_list attesters;
+      })
+    (obj3
+       (req "producers" (list int16))
+       (req "observers" (list int16))
+       (req "attesters" (list Signature.Public_key_hash.encoding)))
+
+let encoding =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"Bootstrap"
+        (Tag 0)
+        (obj1 (req "kind" (constant "bootstrap")))
+        (function Bootstrap -> Some () | _ -> None)
+        (fun () -> Bootstrap);
+      case
+        ~title:"Operator"
+        (Tag 1)
+        (obj2
+           (req "kind" (constant "operator"))
+           (req "operator_profiles" operator_sets_encoding))
+        (function Operator s -> Some ((), s) | _ -> None)
+        (function (), s -> Operator s);
+    ]
 
 let empty =
   Operator
@@ -206,3 +245,47 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
     in
     let* flags = List.map_es are_shards_stored all_slot_indexes in
     return (Types.Attestable_slots {slots = flags; published_level})
+
+let profiles_filename = "profiles.json"
+
+(* TODO https://gitlab.com/tezos/tezos/-/issues/7033
+   One could use a promise to wait the completion of the previous operation, if
+   any. *)
+let lock = Lwt_mutex.create ()
+
+let load_profile_ctxt ~base_dir =
+  let open Lwt_result_syntax in
+  Lwt_mutex.with_lock lock @@ fun () ->
+  Lwt.catch
+    (fun () ->
+      let file_path = Filename.concat base_dir profiles_filename in
+      let*! ic = Lwt_io.open_file ~mode:Lwt_io.Input file_path in
+      let*! json_str = Lwt_io.read ic in
+      let*! () = Lwt_io.close ic in
+      match Data_encoding.Json.from_string json_str with
+      | Error _ ->
+          failwith "DAL node. Failed to load profile, error parsing JSON value"
+      | Ok json -> Data_encoding.Json.destruct encoding json |> return)
+    (fun exn ->
+      failwith
+        "DAL node: failed to load the profile context. Exception: %s"
+        (Printexc.to_string exn))
+
+let save_profile_ctxt ctxt ~base_dir =
+  let open Lwt_result_syntax in
+  Lwt_mutex.with_lock lock @@ fun () ->
+  Lwt.catch
+    (fun () ->
+      let value =
+        Data_encoding.Json.construct encoding ctxt
+        |> Data_encoding.Json.to_string
+      in
+      let file_path = Filename.concat base_dir profiles_filename in
+      let*! oc = Lwt_io.open_file ~mode:Lwt_io.Output file_path in
+      let*! () = Lwt_io.write_line oc value in
+      let*! () = Lwt_io.close oc in
+      return_unit)
+    (fun exn ->
+      failwith
+        "DAL node: failed to save the profile context. Exception: %s"
+        (Printexc.to_string exn))

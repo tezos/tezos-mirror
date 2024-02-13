@@ -134,7 +134,26 @@ let update_last_processed_level ctxt ~level =
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
-let set_profile_ctxt ctxt pctxt = ctxt.profile_ctxt <- pctxt
+let load_profile_ctxt ctxt =
+  let open Lwt_syntax in
+  let base_dir = Configuration_file.store_path ctxt.config in
+  let* res = Profile_manager.load_profile_ctxt ~base_dir in
+  match res with
+  | Ok pctxt -> return_some pctxt
+  | Error err ->
+      let* () = Event.(emit loading_profiles_failed err) in
+      return_none
+
+let set_profile_ctxt ctxt ?(save = false) pctxt =
+  let open Lwt_syntax in
+  ctxt.profile_ctxt <- pctxt ;
+  if save then
+    let base_dir = Configuration_file.store_path ctxt.config in
+    let* res = Profile_manager.save_profile_ctxt ctxt.profile_ctxt ~base_dir in
+    match res with
+    | Ok () -> return_unit
+    | Error err -> Event.(emit saving_profiles_failed err)
+  else return_unit
 
 let get_config ctxt = ctxt.config
 

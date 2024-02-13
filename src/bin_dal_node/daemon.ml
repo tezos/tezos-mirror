@@ -288,7 +288,8 @@ module Handler = struct
                   | None -> fail Errors.[Profile_incompatibility]
                   | Some pctxt -> return pctxt)
             in
-            return @@ Node_context.set_profile_ctxt ctxt pctxt
+            let*! () = Node_context.set_profile_ctxt ctxt pctxt in
+            return_unit
           in
           let*? () =
             Node_context.set_ready

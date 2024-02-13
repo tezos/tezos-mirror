@@ -74,3 +74,13 @@ val get_attestable_slots :
   Dal_plugin.proto_parameters ->
   attested_level:int32 ->
   (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t
+
+(** Load the profile context from disk. The file where the context is loaded
+    from is relative to the given [base_dir]. An error is returned in case of an
+    IO failure or an ill formatted file. *)
+val load_profile_ctxt : base_dir:string -> t tzresult Lwt.t
+
+(** Save the profile context to disk. The file where the context is saved is
+    relative to the given [base_dir]. An error is returned in case of an
+    IO failure. *)
+val save_profile_ctxt : t -> base_dir:string -> unit tzresult Lwt.t
