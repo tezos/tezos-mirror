@@ -547,7 +547,9 @@ mod tests {
     };
     use tezos_smart_rollup_mock::MockHost;
 
-    use crate::{current_timestamp, retrieve_block_fees, retrieve_chain_id};
+    use crate::{
+        current_timestamp, fees::gas_for_fees, retrieve_block_fees, retrieve_chain_id,
+    };
 
     use super::*;
 
@@ -945,9 +947,15 @@ mod tests {
         let mut host = MockHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
         let gas_price = U256::one();
-        let fee_gas =
-            crate::fees::gas_for_fees(block_fees.da_fee_per_byte(), gas_price, &[], &[])
-                .unwrap();
+        let tx_data = vec![];
+        let tx_access_list = vec![];
+        let fee_gas = gas_for_fees(
+            block_fees.da_fee_per_byte(),
+            gas_price,
+            tx_data.as_slice(),
+            tx_access_list.as_slice(),
+        )
+        .expect("Should have been able to compute gas for fee");
 
         let transaction = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
@@ -958,8 +966,8 @@ mod tests {
             21000 + fee_gas,
             Some(H160::zero()),
             U256::zero(),
-            vec![],
-            vec![],
+            tx_data,
+            tx_access_list,
             None,
         );
         let signed = transaction
