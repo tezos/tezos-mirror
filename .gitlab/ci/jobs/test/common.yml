@@ -32,7 +32,7 @@
       - selected_tezts.tsv
       - tezt.log
       - tezt-*.log
-      - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
+      - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
       - $JUNIT
     # Record artifacts are fetched from the scheduled pipeline.
     # If this pipeline is broken on a Friday and only gets fixed on Monday,
@@ -81,7 +81,7 @@
         --junit ${JUNIT}
         --from-record tezt/records
         --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-        --record tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
+        --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
         --job-count ${TEZT_PARALLEL:-3}
         --retry ${TEZT_RETRY:-1}
     # Only merge coverage traces if coverage output is enabled.
@@ -116,6 +116,6 @@
       - selected_tezts.tsv
       - tezt.log
       - tezt-*.log
-      - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
+      - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
       - $JUNIT
       - $BISECT_FILE
