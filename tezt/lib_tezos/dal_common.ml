@@ -173,6 +173,15 @@ module Dal_RPC = struct
       status = json |-> "status" |> as_string;
     }
 
+  let slot_header_to_json_u h : JSON.u =
+    `O
+      [
+        ("slot_level", `Float (float_of_int h.slot_level));
+        ("slot_index", `Float (float_of_int h.slot_index));
+        ("commitment", `String h.commitment);
+        ("status", `String h.status);
+      ]
+
   let slot_headers_of_json json =
     JSON.as_list json |> List.map slot_header_of_json
 
@@ -617,6 +626,11 @@ module Check = struct
 
   let topics_peers_typ : (topic * string list) list Check.typ =
     Check.list (Check.tuple2 topic_typ (Check.list Check.string))
+
+  let slot_header_typ : slot_header Check.typ =
+    Check.convert slot_header_to_json_u Check.json_u
+
+  let slot_headers_typ : slot_header list Check.typ = Check.list slot_header_typ
 end
 
 module RPC = Dal_RPC
