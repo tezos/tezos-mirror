@@ -6,6 +6,7 @@
 
 ### Bug fixes
 
+- EVM call stack is now the number of internal transaction layers. (!11719)
 - Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 - Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
 

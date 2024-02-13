@@ -742,6 +742,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    // Stack depth is the number of internal call that happened in the EVM
+    // It's just the number of transaction minus the initial one
+    // NB: Different from `stack_depth` in `src/kernel_sdk/storage/src/storage.rs`
+    fn stack_depth(&self) -> usize {
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
+        number_of_tx_layer.checked_sub(1).unwrap_or_default()
+    }
+
     fn end_create(
         &mut self,
         runtime: evm::Runtime,
@@ -847,7 +855,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         log!(self.host, Debug, "Executing a contract create");
 
-        if self.evm_account_storage.stack_depth() >= self.config.stack_limit {
+        if self.stack_depth() > self.config.stack_limit {
             return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
         }
 
@@ -909,15 +917,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         input: Vec<u8>,
         transaction_context: TransactionContext,
     ) -> Result<CreateOutcome, EthereumError> {
+        let stack_depth = self.stack_depth();
         log!(
             self.host,
             Debug,
             "Executing contract call on contract {} at depth: {}",
             address,
-            self.evm_account_storage.stack_depth()
+            stack_depth
         );
 
-        if self.evm_account_storage.stack_depth() > self.config.stack_limit {
+        if stack_depth > self.config.stack_limit {
             log!(self.host, Debug, "Execution beyond the call limit of 1024");
 
             return Ok((ExitReason::Error(ExitError::CallTooDeep), None, vec![]));
@@ -1182,24 +1191,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         is_static: bool,
         gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
-        log!(
-            self.host,
-            Debug,
-            "Begin initial transaction at transaction depth: {}",
-            current_depth
-        );
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
+        log!(self.host, Debug, "Begin initial transaction");
 
-        if current_depth > 0 {
+        if number_of_tx_layer > 0 {
             log!(
                 self.host,
                 Debug,
                 "Initial transaction when there is already {} transaction",
-                current_depth
+                number_of_tx_layer
             );
 
             return Err(EthereumError::InconsistentTransactionStack(
-                current_depth,
+                number_of_tx_layer,
                 true,
                 true,
             ));
@@ -1228,32 +1232,27 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         result: Vec<u8>,
         reason: ExitReason,
     ) -> Result<ExecutionOutcome, EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
-        log!(
-            self.host,
-            Debug,
-            "Committing initial transaction. Level is {:?}",
-            current_depth
-        );
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
+        log!(self.host, Debug, "Committing initial transaction");
 
-        if current_depth != 1 {
+        if number_of_tx_layer != 1 {
             log!(
                 self.host,
                 Debug,
-                "Committing final transaction, but there are {:?} transactions",
-                current_depth
+                "Committing initial transaction, but there are {:?} transactions",
+                number_of_tx_layer
             );
 
             return Err(EthereumError::InconsistentTransactionStack(
-                current_depth,
+                number_of_tx_layer,
                 true,
                 false,
             ));
         }
 
-        if current_depth != self.transaction_data.len() {
+        if number_of_tx_layer != self.transaction_data.len() {
             return Err(EthereumError::InconsistentTransactionData(
-                current_depth,
+                number_of_tx_layer,
                 self.transaction_data.len(),
             ));
         }
@@ -1303,32 +1302,27 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         result: Option<Vec<u8>>,
         reason: ExtendedExitReason,
     ) -> Result<ExecutionOutcome, EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
-        log!(
-            self.host,
-            Debug,
-            "Rolling back the initial transaction. Level is {:?}",
-            current_depth
-        );
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
+        log!(self.host, Debug, "Rolling back the initial transaction");
 
-        if current_depth != 1 {
+        if number_of_tx_layer != 1 {
             log!(
                 self.host,
                 Debug,
                 "Rolling back initial transaction, but there are {:?} in progress",
-                current_depth
+                number_of_tx_layer
             );
 
             return Err(EthereumError::InconsistentTransactionStack(
-                current_depth,
+                number_of_tx_layer,
                 true,
                 false,
             ));
         }
 
-        if current_depth != self.transaction_data.len() {
+        if number_of_tx_layer != self.transaction_data.len() {
             return Err(EthereumError::InconsistentTransactionData(
-                current_depth,
+                number_of_tx_layer,
                 self.transaction_data.len(),
             ));
         }
@@ -1441,16 +1435,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         is_static: bool,
         gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
         log!(
             self.host,
             Debug,
             "Begin transaction from {} at transaction depth: {}",
             self.origin(),
-            current_depth
+            self.stack_depth()
         );
 
-        if current_depth == 0 {
+        if number_of_tx_layer == 0 {
             return Err(EthereumError::InconsistentTransactionStack(0, false, true));
         }
 
@@ -1474,11 +1468,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// Commit an intermediate transaction
     fn commit_inter_transaction(&mut self) -> Result<(), EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
 
-        if current_depth < 2 {
+        if number_of_tx_layer < 2 {
             return Err(EthereumError::InconsistentTransactionStack(
-                current_depth,
+                number_of_tx_layer,
                 false,
                 false,
             ));
@@ -1488,7 +1482,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.host,
             Debug,
             "Commit transaction at transaction depth: {}",
-            current_depth
+            self.stack_depth()
         );
 
         let gas_remaining = self.gas_remaining();
@@ -1536,11 +1530,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         refund_gas: bool,
     ) -> Result<(), EthereumError> {
-        let current_depth = self.evm_account_storage.stack_depth();
+        let number_of_tx_layer = self.evm_account_storage.stack_depth();
 
-        if current_depth < 2 {
+        if number_of_tx_layer < 2 {
             return Err(EthereumError::InconsistentTransactionStack(
-                current_depth,
+                number_of_tx_layer,
                 false,
                 false,
             ));
@@ -1550,7 +1544,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.host,
             Debug,
             "Rollback transaction at transaction depth: {}",
-            current_depth
+            self.stack_depth()
         );
 
         if refund_gas {
