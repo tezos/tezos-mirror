@@ -85,6 +85,9 @@ test:
 check: build-dev-deps
 	@$(MAKE) -C ${EVM_DIR} check
 
+	# Check format of all crates
+	@exec scripts/check-format-rust.sh
+
 .PHONY: clean
 clean:
 	@rm -f ${KERNELS}
