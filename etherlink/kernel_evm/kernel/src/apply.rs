@@ -175,13 +175,14 @@ fn account<Host: Runtime>(
 
 #[derive(Debug, PartialEq)]
 pub enum Validity {
-    Valid(H160),
+    Valid(H160, u64),
     InvalidChainId,
     InvalidSignature,
     InvalidNonce,
     InvalidPrePay,
     InvalidCode,
     InvalidMaxBaseFee,
+    InvalidNotEnoughGasForFees,
 }
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
@@ -253,7 +254,13 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         return Ok(Validity::InvalidCode);
     }
 
-    Ok(Validity::Valid(caller))
+    // check that enough gas is provided to cover fees
+    let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees)
+    else {
+         return Ok(Validity::InvalidNotEnoughGasForFees)
+    };
+
+    Ok(Validity::Valid(caller, gas_limit))
 }
 
 pub struct TransactionResult {
@@ -273,20 +280,19 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     retriable: bool,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let caller = match is_valid_ethereum_transaction_common(
+    let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
         host,
         evm_account_storage,
         transaction,
         block_constants,
         effective_gas_price,
     )? {
-        Validity::Valid(caller) => caller,
+        Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => return Ok(ExecutionResult::Invalid),
     };
 
     let to = transaction.to;
     let call_data = transaction.data.clone();
-    let gas_limit = tx_execution_gas_limit(transaction, &block_constants.block_fees)?;
     let value = transaction.value;
     let execution_outcome = match run_transaction(
         host,
@@ -596,7 +602,9 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::apply::Validity;
+    use std::vec;
+
+    use crate::{apply::Validity, fees::gas_for_fees};
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
@@ -674,24 +682,30 @@ mod tests {
         resign(transaction)
     }
 
+    fn gas_for_fees_no_data(
+        block_constants: &BlockConstants,
+        effective_gas_price: U256,
+    ) -> u64 {
+        gas_for_fees(
+            block_constants.block_fees.da_fee_per_byte(),
+            effective_gas_price,
+            vec![].as_slice(),
+            vec![].as_slice(),
+        )
+        .expect("should have been able to calculate fees")
+    }
+
     #[test]
     fn test_tx_is_valid() {
         let mut host = MockHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
-
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = crate::fees::gas_for_fees(
-            block_constants.block_fees.da_fee_per_byte(),
-            gas_price,
-            &[],
-            &[],
-        )
-        .unwrap();
-        let balance = gas_price * (fee_gas + 21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
@@ -706,7 +720,7 @@ mod tests {
             gas_price,
         );
         assert_eq!(
-            Validity::Valid(address),
+            Validity::Valid(address, 21000),
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
@@ -722,15 +736,9 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = crate::fees::gas_for_fees(
-            block_constants.block_fees.da_fee_per_byte(),
-            gas_price,
-            &[],
-            &[],
-        )
-        .unwrap();
+        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
         // account doesnt have enough funds for execution
-        let balance = gas_price * fee_gas;
+        let balance = U256::from(fee_gas) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
@@ -761,14 +769,8 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = crate::fees::gas_for_fees(
-            block_constants.block_fees.da_fee_per_byte(),
-            gas_price,
-            &[],
-            &[],
-        )
-        .unwrap();
-        let balance = gas_price * (fee_gas + 21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         transaction.signature = None;
@@ -800,14 +802,8 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = crate::fees::gas_for_fees(
-            block_constants.block_fees.da_fee_per_byte(),
-            gas_price,
-            &[],
-            &[],
-        )
-        .unwrap();
-        let balance = gas_price * (fee_gas + 21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         transaction.nonce = U256::from(42);
@@ -874,14 +870,8 @@ mod tests {
         // setup
         let gas_price = U256::from(21000);
         let max_gas_price = U256::one();
-        let fee_gas = crate::fees::gas_for_fees(
-            block_constants.block_fees.da_fee_per_byte(),
-            gas_price,
-            &[],
-            &[],
-        )
-        .unwrap();
         // account doesnt have enough funds for execution
+        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         // set a max base fee too low
@@ -898,6 +888,40 @@ mod tests {
         );
         assert_eq!(
             Validity::InvalidMaxBaseFee,
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_invalid_not_enough_gas_for_fee() {
+        let mut host = MockHost::default();
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let balance = U256::from(21000) * gas_price;
+        // fund account
+        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+
+        let gas_limit = 21000; // gas limit is not enough to cover fees
+        let mut transaction = valid_tx(gas_limit);
+        transaction.data = vec![1u8];
+        transaction = resign(transaction);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+            gas_price,
+        );
+        assert_eq!(
+            Validity::InvalidNotEnoughGasForFees,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
         );
