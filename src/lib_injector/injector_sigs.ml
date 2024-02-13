@@ -162,15 +162,9 @@ module type PARAMETERS = sig
       from the client default (100). *)
   val safety_guard : Operation.t -> int option
 
-  (** When injecting the given [operations] in an L1 batch, if
-     [batch_must_succeed operations] returns [`All] then all the operations must
-     succeed in the simulation of injection. If it returns [`At_least_one], at
-     least one operation in the list [operations] must be successful in the
-     simulation. In any case, only operations which are known as successful will
-     be included in the injected L1 batch. {b Note}: Returning [`At_least_one]
-     allows to incrementally build "or-batches" by iteratively removing
-     operations that fail from the desired batch. *)
-  val batch_must_succeed : Operation.t list -> [`All | `At_least_one]
+  (** Indicate which operations should be persisted on disk to be reinjected
+      upon restart.  *)
+  val persist_operation : Operation.t -> bool
 end
 
 module type PROTOCOL_CLIENT = sig

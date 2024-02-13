@@ -288,6 +288,8 @@ end)
   type t
 
   val encoding : t Data_encoding.t
+
+  val persist : t -> bool
 end) =
 struct
   module Q = Hash_queue.Make (K) (V)
@@ -333,11 +335,13 @@ struct
   let replace q k v =
     let open Lwt_result_syntax in
     Q.replace q.queue k v ;
-    let* () = write_value (filedata q k) V.encoding v
-    and* () =
-      write_value (filemetadata q k) metadata_encoding (create_metadata ())
-    in
-    return_unit
+    if V.persist v then
+      let* () = write_value (filedata q k) V.encoding v
+      and* () =
+        write_value (filemetadata q k) metadata_encoding (create_metadata ())
+      in
+      return_unit
+    else return_unit
 
   let fold f q = Q.fold f q.queue
 

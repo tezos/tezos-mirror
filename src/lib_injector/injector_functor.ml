@@ -119,7 +119,11 @@ module Make (Parameters : PARAMETERS) = struct
         let name = "operations_queue"
       end)
       (Inj_operation.Hash)
-      (Inj_operation)
+      (struct
+        include Inj_operation
+
+        let persist o = Parameters.persist_operation o.operation
+      end)
 
   module Injected_operations = Inj_operation.Hash.Table
   module Injected_ophs = Operation_hash.Table
@@ -499,14 +503,12 @@ module Make (Parameters : PARAMETERS) = struct
       (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
       state.signers
 
-  (** [simulate_operations ~must_succeed state operations] simulates the
+  (** [simulate_operations state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
       [op] is the packed operation with the adjusted limits, [ops] is the prefix
       of [operations] which was considered (because it did not exceed the
-      quotas) and [results] are the results of the simulation. See
-      {!inject_operations_for_signer} for the specification of [must_succeed]. *)
-  let rec simulate_operations ~must_succeed state signer
-      (operations : Inj_operation.t list) =
+      quotas) and [results] are the results of the simulation. *)
+  let rec simulate_operations state signer (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let force =
       match operations with
@@ -514,10 +516,9 @@ module Make (Parameters : PARAMETERS) = struct
       | [_] ->
           (* If there is only one operation, fail when simulation fails *)
           false
-      | _ -> (
-          (* We want to see which operation failed in the batch if not all must
-             succeed *)
-          match must_succeed with `All -> false | `At_least_one -> true)
+      | _ ->
+          (* We want to see which operation failed in the batch *)
+          true
     in
     let op_operations =
       List.map (fun o -> o.Inj_operation.operation) operations
@@ -558,8 +559,7 @@ module Make (Parameters : PARAMETERS) = struct
             @@ TzTrace.cons
                  (Exn (Failure "Quotas exceeded when simulating one operation"))
                  trace
-        | Some operations ->
-            simulate_operations ~must_succeed state signer operations)
+        | Some operations -> simulate_operations state signer operations)
     | Ok {operations_statuses; unsigned_operation} ->
         let*? results =
           List.combine
@@ -619,20 +619,16 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () = Event.(emit2 ~signers:[signer] injected) state nb oph in
     return oph
 
-  (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
-    then all the operations must succeed in the simulation of injection. If
-    [must_succeed] is [`At_least_one] at least one operation in the list
-    [operations] must be successful in the simulation. In any case, only
-    operations which are known as successful will be included in the injected L1
-    batch. {b Note}: [must_succeed = `At_least_one] allows to incrementally build
-    "or-batches" by iteratively removing operations that fail from the desired
-    batch. *)
-  let rec inject_operations_for_signer ~must_succeed state signer
+  (** Inject the given [operations] in an L1 batch. Only operations which are
+      known as successful will be included in the injected L1 batch. {b Note}:
+      This function incrementally builds "or-batches" by iteratively removing
+      operations that fail from the desired batch. *)
+  let rec inject_operations_for_signer state signer
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let*! simulation_result =
       trace (Step_failed "simulation")
-      @@ simulate_operations ~must_succeed state signer operations
+      @@ simulate_operations state signer operations
     in
     let* () =
       match simulation_result with
@@ -661,11 +657,9 @@ module Make (Parameters : PARAMETERS) = struct
         operations_results
     in
     if !failure then
-      (* Invariant: must_succeed = `At_least_one, otherwise the simulation would
-         have returned an error. We try to inject without the failing
-         operation. *)
+      (* We try to inject without the failing operation. *)
       let operations = List.rev rev_non_failing_operations in
-      inject_operations_for_signer ~must_succeed state signer operations
+      inject_operations_for_signer state signer operations
     else
       (* Inject on node for real *)
       let+ oph =
@@ -779,18 +773,8 @@ module Make (Parameters : PARAMETERS) = struct
             state
             (List.length operations_to_inject)
         in
-        let must_succeed =
-          Parameters.batch_must_succeed
-          @@ List.map
-               (fun op -> op.Inj_operation.operation)
-               operations_to_inject
-        in
         let*! res =
-          inject_operations_for_signer
-            ~must_succeed
-            state
-            signer
-            operations_to_inject
+          inject_operations_for_signer state signer operations_to_inject
         in
         let* res =
           ignore_ignorable_failing_operations state operations_to_inject res
@@ -1464,7 +1448,7 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 100) ?(injection_ttl = 120)
+      ?(allowed_attempts = 10) ?(injection_ttl = 120)
       ?(reconnection_delay = 2.0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;

@@ -204,7 +204,7 @@ let default_batcher =
   }
 
 let default_injector =
-  {retention_period = 2048; attempts = 100; injection_ttl = 120}
+  {retention_period = 2048; attempts = 10; injection_ttl = 120}
 
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
