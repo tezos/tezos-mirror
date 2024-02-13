@@ -854,7 +854,6 @@ pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
             .context("Failed to delete old events")
     } else {
         Ok(())
-
     }
 }
 
