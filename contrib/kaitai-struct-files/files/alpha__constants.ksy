@@ -44,11 +44,11 @@ types:
       type: u1
       enum: bool
     - id: number_of_slots
-      type: s2
+      type: u2
     - id: attestation_lag
-      type: s2
+      type: u1
     - id: attestation_threshold
-      type: s2
+      type: u1
     - id: redundancy_factor
       type: u1
     - id: page_size
