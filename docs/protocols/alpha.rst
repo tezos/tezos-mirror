@@ -29,18 +29,35 @@ Zero Knowledge Rollups (ongoing)
 Data Availability Layer (ongoing)
 ---------------------------------
 
-- Introduced a ``round`` field in DAL attestations, with a similar meaning as
-  for consensus attestations. (MR :gl:`!11285`)
+- Introduced a new optional field ``dal_content`` to consensus
+  attestation operations. The existing encoding of consensus
+  attestations remains unchanged when this field is not present. A new
+  encoding was introduced for the case when the field is present. The
+  two cases are distinguished via an encoding tag. The newly
+  introduced tag "23" must be used for attestations containing a DAL
+  payload. (MR :gl:`!11462`).
 
-- Optimize the commitment publication operation by memoizing the
+- Introduced a new manager operation ``dal_publish_commitment``. This operation
+  can be used to send a commitment over the data (to be send) over the DAL
+  network. Do note that this operation itself does not contain the data
+  themselves. Instead, it contains the slot index, the commitment over the data,
+  and a proof regarding the size for those data. The data must be sent using the
+  DAL node. For more information on how it works, please read the `DAL
+  documentation <https://tezos.gitlab.io/shell/dal.html>`_.
+
+- Optimize the DAL commitment publication operation by memoizing the
   cryptobox. (MR :gl:`!11594`)
 
-- Introduced a new optional field ``dal_content`` to consensus attestation
-  operations. This is treated in the same way as the content of DAL attestation
-  operations, rendering these obsolete. The existing encoding of consensus
-  attestations remains unchanged when this field is not present. A new encoding
-  was introduced for the case when the field is present. The two cases are
-  distinguished via an encoding tag. (MR :gl:`!11462`)
+- For smart-rollups: Introduced two reveal inputs. One for importing
+  the data, called ``dal_page``. Data can be fed to the kernel by page
+  of size 4096 bytes. Another reveal input named ``dal_parameters``
+  enables kernel to read the DAL parameters. This should ease the
+  writing of smart rollups kernels to make them generic over the
+  values of those parameters. For more information on how it works,
+  please read the `DAL smart rollup integration
+  <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_.
+
+
 
 Adaptive Issuance (ongoing)
 ----------------------------
