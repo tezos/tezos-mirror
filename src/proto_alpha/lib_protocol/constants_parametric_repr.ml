@@ -69,9 +69,9 @@ let dal_encoding =
        (obj5
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
-          (req "number_of_slots" int16)
-          (req "attestation_lag" int16)
-          (req "attestation_threshold" int16))
+          (req "number_of_slots" uint16)
+          (req "attestation_lag" uint8)
+          (req "attestation_threshold" uint8))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
