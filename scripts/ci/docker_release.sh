@@ -2,6 +2,8 @@
 
 set -e
 
+# Read environment variables written by 'docker_registry_auth.sh' in
+# 'before_script'.
 . scripts/ci/docker.env
 
 if [ -z "${build_deps_image_name}" ]; then echo "build_deps_image_name is unset" && exit 3; fi
@@ -10,9 +12,6 @@ if [ -z "${rust_toolchain_image_name}" ]; then echo "rust_toolchain_image_name i
 if [ -z "${rust_toolchain_image_tag}" ]; then echo "rust_toolchain_image_tag is unset" && exit 3; fi
 
 cd "${CI_PROJECT_DIR}" || exit 1
-
-# Environment variables from before_script
-. ./scripts/ci/docker.env
 
 if [ -z "$EXECUTABLE_FILES" ]; then
   echo "Error: environment variable EXECUTABLE_FILES is empty."
