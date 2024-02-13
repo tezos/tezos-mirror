@@ -154,7 +154,8 @@ let () =
       | Last_merged_pipeline ->
           Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
       | Last_successful_schedule_extended_test ->
-          Gitlab_util.get_last_successful_schedule_pipeline
+          Gitlab_util.get_last_schedule_pipeline
+            ~status:"success"
             ~project
             ~matching:schedule_extended_test_rex
             ()

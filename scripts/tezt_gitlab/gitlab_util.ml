@@ -57,7 +57,7 @@ let get_last_merged_pipeline ~project ~default_branch () =
   in
   aux commits
 
-let get_last_successful_schedule_pipeline ?matching ~project () =
+let get_last_schedule_pipeline ?status ?matching ~project () =
   Log.info
     "Fetching successful scheduled pipeline for %s%s..."
     project
@@ -67,11 +67,11 @@ let get_last_successful_schedule_pipeline ?matching ~project () =
   let* pipelines =
     Gitlab.(
       project_pipelines
+        ?status
         ~project
         ~order_by:"id"
         ~sort:"desc"
         ~source:"schedule"
-        ~status:"success"
         ()
       |> get)
   in
