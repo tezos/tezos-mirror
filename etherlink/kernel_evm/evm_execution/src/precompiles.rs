@@ -165,7 +165,7 @@ macro_rules! unwrap {
     };
 }
 
-fn erec_parse_inputs(input: &[u8]) -> ([u8; 32], u8, [u8; 32], [u8; 32]) {
+fn erec_parse_inputs(input: &[u8]) -> ([u8; 32], [u8; 32], [u8; 32], [u8; 32]) {
     // input is padded with 0 on the right
     let mut clean_input: [u8; 128] = [0; 128];
     // and truncated if too large
@@ -181,8 +181,7 @@ fn erec_parse_inputs(input: &[u8]) -> ([u8; 32], u8, [u8; 32], [u8; 32]) {
     v_array.copy_from_slice(&clean_input[32..64]);
     r_array.copy_from_slice(&clean_input[64..96]);
     s_array.copy_from_slice(&clean_input[96..128]);
-    // v is encoding of 1 byte nb over 32 bytes
-    (hash, v_array[31], r_array, s_array)
+    (hash, v_array, r_array, s_array)
 }
 
 // implementation of 0x01 ECDSA recover
@@ -220,7 +219,13 @@ fn ecrecover_precompile<Host: Runtime>(
     );
 
     // parse inputs
-    let (hash, v_raw, r_array, s_array) = erec_parse_inputs(input);
+    let (hash, v_array, r_array, s_array) = erec_parse_inputs(input);
+    let v_raw = v_array[31];
+
+    if !(v_array[0..31] == [0u8; 31] && matches!(v_raw, 27 | 28)) {
+        return Ok(erec_output_for_wrong_input());
+    }
+
     let v = match v_raw.checked_sub(27) {
         Some(v) => v,
         None => return Ok(erec_output_for_wrong_input()),
@@ -844,7 +849,7 @@ mod tests {
         let (h, v, r, s) = erec_parse_inputs(&[1u8]);
         assert_eq!(1, h[0]);
         assert_eq!([0; 31], h[1..]);
-        assert_eq!(0, v);
+        assert_eq!(0, v[31]);
         assert_eq!([0; 32], r);
         assert_eq!([0; 32], s);
     }
@@ -854,7 +859,7 @@ mod tests {
         let input = [[1; 32], [2; 32], [3; 32], [4; 32]].join(&[0u8; 0][..]);
         let (h, v, r, s) = erec_parse_inputs(&input);
         assert_eq!([1; 32], h);
-        assert_eq!(2, v);
+        assert_eq!(2, v[31]);
         assert_eq!([3; 32], r);
         assert_eq!([4; 32], s);
     }
@@ -864,7 +869,7 @@ mod tests {
         let input = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]].join(&[0u8; 0][..]);
         let (h, v, r, s) = erec_parse_inputs(&input);
         assert_eq!([1; 32], h);
-        assert_eq!(2, v);
+        assert_eq!(2, v[31]);
         assert_eq!([3; 32], r);
         assert_eq!([4; 32], s);
     }
@@ -943,7 +948,7 @@ mod tests {
         let input: [u8; 128] = assemble_input(hash, v, r, s);
         let (ho, vo, ro, so) = erec_parse_inputs(&input);
         assert_eq!(hex::decode(hash).unwrap(), ho);
-        assert_eq!(27, vo);
+        assert_eq!(27, vo[31]);
         assert_eq!(hex::decode(r).unwrap(), ro);
         assert_eq!(hex::decode(s).unwrap(), so);
     }
@@ -954,7 +959,7 @@ mod tests {
         let input: [u8; 128] = assemble_input(hash, v, r, s);
         let (ho, vo, ro, so) = erec_parse_inputs(&input);
         assert_eq!(hex::decode(hash).unwrap(), ho);
-        assert_eq!(28, vo);
+        assert_eq!(28, vo[31]);
         assert_eq!(hex::decode(r).unwrap(), ro);
         assert_eq!(hex::decode(s).unwrap(), so);
     }
