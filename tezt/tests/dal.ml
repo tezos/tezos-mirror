@@ -1159,14 +1159,14 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
    can be used to wait for the shards to be received by one or several
    other DAL nodes. Returns the level at which the slot was
    published. *)
-let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) client
+let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
     ~number_of_extra_blocks_to_bake content =
   let* commitment, proof =
     Helpers.store_slot ~with_proof:true slot_producer_dal_node content
   in
   let p = wait_slot commitment in
-  let* _ =
+  let* (`OpHash ophash) =
     publish_commitment
       ?counter
       ?force
@@ -1180,6 +1180,22 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) client
   (* Bake a first block to include the operation. *)
   let* () = bake_for client in
   let* level = Client.level client in
+  (* Check that the operation is included. *)
+  let* included_manager_operations =
+    let manager_operation_pass = 3 in
+    Node.RPC.(
+      call node
+      @@ get_chain_block_operation_hashes_of_validation_pass
+           manager_operation_pass)
+  in
+  let () =
+    Check.list_mem
+      Check.string
+      ~__LOC__
+      ophash
+      included_manager_operations
+      ~error_msg:"DAL commitment publishment operation not found in head block."
+  in
   (* Bake some more blocks to finalize the block containing the publication. *)
   let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
   (* Wait for the shards to be received *)
@@ -4127,6 +4143,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
   let* publication_level =
     publish_store_and_wait_slot
+      node
       client
       producer
       source
