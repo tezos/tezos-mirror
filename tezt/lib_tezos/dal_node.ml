@@ -144,7 +144,7 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
 
 let read_identity dal_node =
   let filename = sf "%s/identity.json" @@ data_dir dal_node in
-  JSON.parse_file filename
+  JSON.(parse_file filename |-> "peer_id" |> as_string)
 
 let check_event ?timeout ?where dal_node name promise =
   let* result =
