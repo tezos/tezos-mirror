@@ -36,9 +36,6 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
-/// Maximum allowed code size as specified by EIP-170
-const MAX_CODE_SIZE: usize = 0x6000;
-
 /// Extends ExitReason with our own errors. It avoids using
 /// ExitError::Other(<string>) and matching on strings.
 #[derive(Debug, Eq, PartialEq)]
@@ -806,13 +803,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     ));
                 }
 
-                if code_out.len() > MAX_CODE_SIZE {
-                    // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
-                    return Ok((
-                        ExitReason::Error(ExitError::CreateContractLimit),
-                        None,
-                        vec![],
-                    ));
+                // We check that the maximum allowed code size as specified by EIP-170 can not
+                // be reached.
+                if let Some(create_contract_limit) = self.config.create_contract_limit {
+                    if code_out.len() > create_contract_limit {
+                        // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
+                        return Ok((
+                            ExitReason::Error(ExitError::CreateContractLimit),
+                            None,
+                            vec![],
+                        ));
+                    }
                 }
 
                 if let Err(err) = self.record_deposit(code_out.len()) {
