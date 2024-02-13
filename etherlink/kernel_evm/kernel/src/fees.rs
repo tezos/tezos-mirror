@@ -85,7 +85,7 @@ impl FeeUpdates {
         let execution_gas_fees = execution_gas_used * block_fees.base_fee_per_gas();
         let da_fee = da_fee(block_fees.da_fee_per_byte(), &tx.data, &tx.access_list);
 
-        let initial_added_fees = block_fees.flat_fee() + da_fee;
+        let initial_added_fees = da_fee;
         let initial_total_fees = initial_added_fees + execution_gas_fees;
 
         // first, we find the price of gas (with all fees), for the given gas used
@@ -104,8 +104,8 @@ impl FeeUpdates {
         let total_fees = gas_price * gas_used;
 
         // Due to rounding, we may have a small amount of unaccounted-for gas.
-        // Assign this to the flat fee (to be burned).
-        let burn_amount = block_fees.flat_fee() + total_fees - initial_total_fees;
+        // Assign this to the burned fee.
+        let burn_amount = total_fees - initial_total_fees;
 
         let compensate_sequencer_amount = execution_gas_fees + da_fee;
 
@@ -158,7 +158,6 @@ pub fn simulation_add_gas_for_fees(
 ) -> Result<ExecutionOutcome, EthereumError> {
     // Simulation does not have an access list
     let gas_for_fees = gas_for_fees(
-        block_fees.flat_fee(),
         block_fees.da_fee_per_byte(),
         tx_gas_price,
         tx_data,
@@ -172,16 +171,15 @@ pub fn simulation_add_gas_for_fees(
 /// Returns the gas limit for executing this transaction.
 ///
 /// This is strictly lower than the gas limit set by the user, as additional gas is required
-/// in order to pay for the *flat fee* and *data availability fee*.
+/// in order to pay for the *data availability fee*.
 ///
-/// The user pre-pays this (in addition to the flat fee & data availability fee) prior to execution.
+/// The user pre-pays this (in addition to the data availability fee) prior to execution.
 /// If execution does not use all of the execution gas limit, they will be partially refunded.
 pub fn tx_execution_gas_limit(
     tx: &EthereumTransactionCommon,
     fees: &BlockFees,
 ) -> Result<u64, EthereumError> {
     let gas_for_fees = gas_for_fees(
-        fees.flat_fee(),
         fees.da_fee_per_byte(),
         tx.max_fee_per_gas,
         &tx.data,
@@ -195,13 +193,12 @@ pub fn tx_execution_gas_limit(
 
 /// Calculate gas for fees
 pub(crate) fn gas_for_fees(
-    flat_fee: U256,
     da_fee_per_byte: U256,
     gas_price: U256,
     tx_data: &[u8],
     tx_access_list: &[AccessListItem],
 ) -> Result<u64, EthereumError> {
-    let fees = flat_fee.saturating_add(da_fee(da_fee_per_byte, tx_data, tx_access_list));
+    let fees = da_fee(da_fee_per_byte, tx_data, tx_access_list);
 
     let gas_for_fees = cdiv(fees, gas_price);
     gas_as_u64(gas_for_fees)
@@ -253,7 +250,6 @@ mod tests {
     proptest! {
         #[test]
         fn fee_updates_consistent(
-            flat_fee in any::<u64>().prop_map(U256::from),
             da_fee in any::<u64>().prop_map(U256::from),
             data in any::<Vec<u8>>(),
             execution_gas_used in (1_u64..).prop_map(U256::from),
@@ -264,7 +260,7 @@ mod tests {
             // Arrange
             let data_size = data.len();
             let tx = mock_tx(max_fee_per_gas, data);
-            let block_fees = BlockFees::new(base_fee_per_gas, flat_fee, da_fee);
+            let block_fees = BlockFees::new(base_fee_per_gas, da_fee);
 
             // Act
             let updates = FeeUpdates::for_tx(&tx, &block_fees, execution_gas_used);
@@ -274,7 +270,6 @@ mod tests {
             let total_fee = updates.overall_gas_price * updates.overall_gas_used;
             let expected_sequencer_comp = assumed_execution_gas_cost + da_fee * (data_size + ASSUMED_TX_ENCODED_SIZE);
 
-            assert!(updates.burn_amount >= flat_fee, "burn amount should cover flat fee");
             assert_eq!(updates.charge_user_amount, total_fee - assumed_execution_gas_cost, "inconsistent user charge");
             assert_eq!(total_fee, updates.burn_amount + updates.compensate_sequencer_amount, "inconsistent total fees");
             assert_eq!(updates.compensate_sequencer_amount, expected_sequencer_comp, "inconsistent sequencer comp");
@@ -283,15 +278,15 @@ mod tests {
 
     #[test]
     fn simulation_covers_extra_fees() {
-        let flat_fee = 15;
         let tx_data = &[0, 1, 2];
 
-        let fee = flat_fee
-            + ((tx_data.len() + ASSUMED_TX_ENCODED_SIZE) as u64) * DA_FEE_PER_BYTE;
+        let fee = ((tx_data.len() + ASSUMED_TX_ENCODED_SIZE) as u64) * DA_FEE_PER_BYTE;
 
-        expect_extra_gas(fee / 4 + 1, 4, flat_fee, DA_FEE_PER_BYTE, tx_data);
-        expect_extra_gas(fee / 5, 5, flat_fee, DA_FEE_PER_BYTE, tx_data);
-        expect_extra_gas(fee / 6 + 1, 6, flat_fee, DA_FEE_PER_BYTE, tx_data);
+        expect_extra_gas(fee / 4, 4, DA_FEE_PER_BYTE, tx_data);
+        expect_extra_gas(fee / 5, 5, DA_FEE_PER_BYTE, tx_data);
+        expect_extra_gas(fee / 6, 6, DA_FEE_PER_BYTE, tx_data);
+        // expect extra gas to cover rounding
+        expect_extra_gas(fee / 7 + 1, 7, DA_FEE_PER_BYTE, tx_data);
     }
 
     #[test]
@@ -434,13 +429,12 @@ mod tests {
     fn expect_extra_gas(
         extra: u64,
         tx_gas_price: u64,
-        flat_fee: u64,
         da_fee: u64,
         tx_data: &[u8],
     ) {
         // Arrange
         let initial_gas_used = 100;
-        let block_fees = BlockFees::new(U256::one(), U256::from(flat_fee), da_fee.into());
+        let block_fees = BlockFees::new(U256::one(), da_fee.into());
 
         let simulated_outcome = mock_execution_outcome(initial_gas_used);
 
@@ -457,7 +451,7 @@ mod tests {
         assert_eq!(
             Ok(expected),
             res,
-            "unexpected extra gas at price {tx_gas_price} and flat_fee {flat_fee} and data_len {}",
+            "unexpected extra gas at price {tx_gas_price} and data_len {}",
             tx_data.len()
         );
     }

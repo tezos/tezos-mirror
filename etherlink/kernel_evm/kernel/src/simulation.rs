@@ -943,14 +943,16 @@ mod tests {
     fn test_tx_validation_gas_price() {
         let mut host = MockHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
+        let gas_price = U256::one();
+        let fee_gas = crate::fees::gas_for_fees(block_fees.da_fee_per_byte(), gas_price, &[], &[]).unwrap();
 
         let transaction = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(U256::from(1)),
             U256::from(0),
             U256::zero(),
-            U256::from(1),
-            21000 + block_fees.gas_for_fees(U256::one()).as_u64(),
+            gas_price,
+         21000 + fee_gas,
             Some(H160::zero()),
             U256::zero(),
             vec![],

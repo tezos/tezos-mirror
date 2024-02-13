@@ -197,7 +197,7 @@ fn execute_transaction(
     env.tx.value = *unit.transaction.value.get(test.indexes.value).unwrap();
     env.tx.transact_to = unit.transaction.to;
 
-    let block_fees = BlockFees::new(env.block.basefee, U256::zero(), U256::zero());
+    let block_fees = BlockFees::new(env.block.basefee, U256::zero());
 
     let block_constants = BlockConstants {
         number: env.block.number,

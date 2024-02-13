@@ -18,10 +18,10 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    read_base_fee_per_gas, read_chain_id, read_da_fee, read_flat_fee,
+    read_base_fee_per_gas, read_chain_id, read_da_fee,
     read_kernel_version, read_last_info_per_level_timestamp,
     read_last_info_per_level_timestamp_stats, store_base_fee_per_gas, store_chain_id,
-    store_da_fee, store_flat_fee, store_kernel_version, store_storage_version,
+    store_da_fee, store_kernel_version, store_storage_version,
     STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_ethereum::block::BlockFees;
@@ -65,11 +65,6 @@ pub const CHAIN_ID: u32 = 1337;
 ///
 /// Distinct from 'intrinsic base fee' of a simple Eth transfer: which costs 21_000 gas.
 pub const BASE_FEE_PER_GAS: u32 = 21_000;
-
-/// Default base fee (flat), applied to every transaction. Set to 0.005 tez.
-///
-/// Disabled: set to zero
-pub const FLAT_FEE: u64 = 0;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::shanghai();
@@ -146,15 +141,6 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
         }
     };
 
-    let flat_fee = match read_flat_fee(host) {
-        Ok(flat_fee) => flat_fee,
-        Err(_) => {
-            let flat_fee = U256::from(FLAT_FEE);
-            store_flat_fee(host, flat_fee)?;
-            flat_fee
-        }
-    };
-
     let da_fee = match read_da_fee(host) {
         Ok(da_fee) => da_fee,
         Err(_) => {
@@ -164,7 +150,7 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
         }
     };
 
-    let block_fees = BlockFees::new(base_fee_per_gas, flat_fee, da_fee);
+    let block_fees = BlockFees::new(base_fee_per_gas, da_fee);
 
     Ok(block_fees)
 }
@@ -333,13 +319,11 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
-    const DUMMY_FLAT_FEE: u64 = 21_100_000u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
             U256::from(DUMMY_BASE_FEE_PER_GAS),
-            U256::from(DUMMY_FLAT_FEE),
             DUMMY_DA_FEE.into(),
         )
     }
@@ -422,7 +406,6 @@ mod tests {
 
         let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
         let gas_for_fees = crate::fees::gas_for_fees(
-            DUMMY_FLAT_FEE.into(),
             DUMMY_DA_FEE.into(),
             gas_price,
             &data,
