@@ -91,17 +91,21 @@ let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
   in
   Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
 
-(* Bake until some given [level] and wait for the given [dal_nodes] to finish the
-   processing of the last finalized block, that is, the one at [level - 2]. *)
-let bake_until ?dal_node_endpoint ~level client dal_nodes =
+(* Bake until a block at some given [level] has been finalized and
+   processed by the given [dal_nodes]. The head level after this is
+   [level + 2]. *)
+let bake_until_processed ?dal_node_endpoint ~level client dal_nodes =
   let* current_level = Client.level client in
-  assert (current_level < level) ;
+  let final_level = level + 2 in
+  assert (current_level < final_level) ;
   let p =
     List.map
-      (fun dal_node -> wait_for_layer1_final_block dal_node (level - 2))
+      (fun dal_node -> wait_for_layer1_final_block dal_node level)
       dal_nodes
   in
-  let* () = bake_for ?dal_node_endpoint ~count:(level - current_level) client in
+  let* () =
+    bake_for ?dal_node_endpoint ~count:(final_level - current_level) client
+  in
   Lwt.join p
 
 module Client = struct
