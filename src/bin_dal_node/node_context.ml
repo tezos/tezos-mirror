@@ -144,7 +144,7 @@ let load_profile_ctxt ctxt =
       let* () = Event.(emit loading_profiles_failed err) in
       return_none
 
-let set_profile_ctxt ctxt ?(save = false) pctxt =
+let set_profile_ctxt ctxt ?(save = true) pctxt =
   let open Lwt_syntax in
   ctxt.profile_ctxt <- pctxt ;
   if save then

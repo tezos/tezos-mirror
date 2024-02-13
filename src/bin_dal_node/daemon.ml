@@ -240,13 +240,22 @@ module Handler = struct
      to be called only once. *)
   let set_profile_context ctxt config proto_parameters =
     let open Lwt_result_syntax in
-    let pctxt = Node_context.get_profile_ctxt ctxt in
+    let*! pctxt_opt = Node_context.load_profile_ctxt ctxt in
     let pctxt_opt =
-      Profile_manager.add_profiles
-        pctxt
-        proto_parameters
-        (Node_context.get_gs_worker ctxt)
-        config.Configuration_file.profiles
+      match pctxt_opt with
+      | None ->
+          Profile_manager.add_profiles
+            Profile_manager.empty
+            proto_parameters
+            (Node_context.get_gs_worker ctxt)
+            config.Configuration_file.profiles
+      | Some pctxt ->
+          let profiles = Profile_manager.get_profiles pctxt in
+          Profile_manager.add_profiles
+            Profile_manager.empty
+            proto_parameters
+            (Node_context.get_gs_worker ctxt)
+            profiles
     in
     match pctxt_opt with
     | None -> fail Errors.[Profile_incompatibility]
@@ -553,31 +562,6 @@ let resolve points =
        ~default_port:(Configuration_file.default.listen_addr |> snd))
     points
 
-(* This function ensures the persistence of attester profiles
-   to the configuration file at shutdown.
-
-   This is especially important for attesters as the pkh they track
-   is supplied by the baker through `PATCH /profile` API calls.
-   As these profiles are added dynamically at run time, they do not exist
-   in the initial configuration file. Therefore, in order to retain these
-   profiles between restarts, we store them to the configuration file at shutdown. *)
-let store_profiles_finalizer ctxt data_dir =
-  let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun _exit_status ->
-  let profiles =
-    Profile_manager.get_profiles (Node_context.get_profile_ctxt ctxt)
-  in
-  let* r = Configuration_file.load ~data_dir in
-  match r with
-  | Ok config -> (
-      let* r = Configuration_file.save {config with profiles} in
-      match r with
-      | Ok () -> return_unit
-      | Error e -> Event.(emit failed_to_persist_profiles (profiles, e)))
-  | Error e ->
-      let* () = Event.(emit failed_to_persist_profiles (profiles, e)) in
-      return_unit
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -697,9 +681,6 @@ let run ~data_dir configuration_override =
       transport_layer
       cctxt
       metrics_server
-  in
-  let (_ : Lwt_exit.clean_up_callback_id) =
-    store_profiles_finalizer ctxt data_dir
   in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
