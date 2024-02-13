@@ -249,7 +249,9 @@ module Dal_helpers = struct
       | None -> false
       | Some dal_activation_level -> published_level >= dal_activation_level
     in
-    let not_too_old = published_level > origination_level in
+    let slot_published_after_origination =
+      published_level > origination_level
+    in
     let not_too_recent =
       add published_level dal_attestation_lag <= commit_inbox_level
     in
@@ -269,8 +271,8 @@ module Dal_helpers = struct
           dal_attested_slots_validity_lag
         >= commit_inbox_level)
     in
-    dal_was_activated && not_too_old && not_too_recent && index_is_valid
-    && ttl_not_expired
+    dal_was_activated && slot_published_after_origination && not_too_recent
+    && index_is_valid && ttl_not_expired
 
   let verify ~metadata ~dal_activation_level ~dal_attestation_lag
       ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
