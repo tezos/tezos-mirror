@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::backend::{self, Layout};
+use crate::state_backend::{self as backend, Layout};
 use std::{alloc, marker::PhantomData, mem, ptr, slice};
 
 /// In-memory state backend
@@ -188,7 +188,7 @@ impl<'backend, E: backend::Elem, const LEN: usize> backend::VolatileRegion
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::machine_state::backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
+    use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
 
     #[test]
     fn test_backend_reuse() {

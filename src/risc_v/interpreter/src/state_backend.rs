@@ -26,7 +26,7 @@
 //! We can describe the layout of this state using the following type.
 //!
 //! ```
-//! use risc_v_interpreter::machine_state::backend::{Atom, Array};
+//! use risc_v_interpreter::state_backend::{Atom, Array};
 //!
 //! type MyStateLayout = (
 //!     Atom<u64>,
@@ -54,6 +54,8 @@
 //! [Regions]: Region
 //! [Layouts]: Layout
 //! [Locations]: Location
+
+pub mod memory_backend;
 
 mod layout;
 pub use layout::*;
@@ -419,7 +421,7 @@ pub mod tests {
     macro_rules! create_state {
         ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
             {
-                use $crate::machine_state::backend::{Backend, BackendManagement, Layout};
+                use $crate::state_backend::{Backend, BackendManagement, Layout};
                 let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<<<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
@@ -441,11 +443,11 @@ pub mod tests {
         ( $name:ident, $fac_name:ident, $expr:block ) => {
             #[test]
             fn $name() {
-                fn inner<$fac_name: $crate::machine_state::backend::tests::TestBackendFactory>() {
+                fn inner<$fac_name: $crate::state_backend::tests::TestBackendFactory>() {
                     $expr
                 }
 
-                inner::<$crate::machine_state::memory_backend::tests::InMemoryBackendFactory>();
+                inner::<$crate::state_backend::memory_backend::tests::InMemoryBackendFactory>();
             }
         };
     }

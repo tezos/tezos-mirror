@@ -6,10 +6,8 @@
 //!
 //! Chapter 5 - Unprivileged spec
 
-use crate::machine_state::{
-    backend,
-    registers::{XRegister, XRegisters},
-};
+use crate::machine_state::registers::{XRegister, XRegisters};
+use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where

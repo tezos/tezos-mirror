@@ -7,11 +7,11 @@
 //! Chapter 2 - Unprivileged spec
 
 use crate::machine_state::{
-    backend,
     bus::Address,
     registers::{XRegister, XRegisters},
     HartState,
 };
+use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where

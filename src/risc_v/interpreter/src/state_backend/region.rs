@@ -202,7 +202,7 @@ pub trait VolatileRegion {
 pub(crate) mod tests {
     use crate::{
         backend_test,
-        machine_state::backend::{
+        state_backend::{
             layout::{Atom, Layout},
             Array, Backend, Elem, Region,
         },
