@@ -416,6 +416,23 @@ pub mod tests {
     /// create the location and return the created `State<M>`.
     #[macro_export]
     macro_rules! create_state {
+        // For an extra generic in the state (MachineState for example)
+        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident, $ExtraGeneric:ty) => {
+            {
+                use $crate::state_backend::{Backend, BackendManagement, Layout};
+                let loc = <$StateLayout>::placed().into_location();
+                let new_state =
+                    $State::<
+                        $ExtraGeneric,
+                        <<$Factory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>
+                    >::bind(
+                        $backend.allocate(loc),
+                    );
+
+                new_state
+            }
+        };
+
         ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
             {
                 use $crate::state_backend::{Backend, BackendManagement, Layout};

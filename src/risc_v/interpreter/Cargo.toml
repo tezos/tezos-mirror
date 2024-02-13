@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 num_enum = "0.7.2"
 paste = "1.0.14"
+thiserror = "1.0.57"
 
 [dependencies.strum]
 version = "0.26.1"

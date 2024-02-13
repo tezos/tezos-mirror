@@ -15,6 +15,14 @@ extern crate proptest;
 use crate::state_backend::{self as backend, Atom, Cell};
 use bus::{main_memory, Address, Bus};
 
+/// RISC-V exceptions
+#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug)]
+pub enum Exception {
+    IllegalInstruction,
+    LoadAccessFault,
+    StoreAccessFault,
+}
+
 /// RISC-V hart state
 pub struct HartState<M: backend::Manager> {
     /// Integer registers
