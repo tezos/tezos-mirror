@@ -42,17 +42,43 @@ let store_metadata ~data_dir metadata =
   let json = Data_encoding.Json.construct metadata_encoding metadata in
   Lwt_utils_unix.Json.write_file (metadata_path ~data_dir) json
 
+type old_metadata = {
+  checkpoint : Context_hash.t;
+  next_blueprint_number : Ethereum_types.quantity;
+}
+
+let old_metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {checkpoint; next_blueprint_number} ->
+      (checkpoint, next_blueprint_number))
+    (fun (checkpoint, next_blueprint_number) ->
+      {checkpoint; next_blueprint_number})
+    (obj2
+       (req "checkpoint" Context_hash.encoding)
+       (req "next_blueprint_number" Ethereum_types.quantity_encoding))
+
 let load_metadata ~data_dir index =
   let open Lwt_result_syntax in
   let path = metadata_path ~data_dir in
   let*! exists = Lwt_unix.file_exists path in
   if exists then
     let* content = Lwt_utils_unix.Json.read_file path in
-    let {checkpoint; next_blueprint_number; current_block_hash} =
-      Data_encoding.Json.destruct metadata_encoding content
-    in
-    let*! context = Irmin_context.checkout_exn index checkpoint in
-    return (context, next_blueprint_number, current_block_hash, true)
+    Lwt.catch
+      (fun () ->
+        let {checkpoint; next_blueprint_number; current_block_hash} =
+          Data_encoding.Json.destruct metadata_encoding content
+        in
+        let*! context = Irmin_context.checkout_exn index checkpoint in
+        return (context, next_blueprint_number, current_block_hash, true))
+      (fun _exn ->
+        let {checkpoint; next_blueprint_number} =
+          Data_encoding.Json.destruct old_metadata_encoding content
+        in
+        let*! context = Irmin_context.checkout_exn index checkpoint in
+        let*! evm_state = Irmin_context.PVMState.get context in
+        let* current_block_hash = Evm_state.current_block_hash evm_state in
+        return (context, next_blueprint_number, current_block_hash, true))
   else
     let context = Irmin_context.empty index in
     return

@@ -35,6 +35,9 @@ val execute_and_inspect :
     produced by the kernel. *)
 val current_block_height : t -> Ethereum_types.block_height Lwt.t
 
+(** Same as {!current_block_height} for the block hash. *)
+val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
+
 type apply_result =
   | Apply_success of t * Ethereum_types.block_height * Ethereum_types.block_hash
   | Apply_failure
