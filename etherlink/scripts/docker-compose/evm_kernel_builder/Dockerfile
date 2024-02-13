@@ -10,7 +10,7 @@ RUN rustup target add wasm32-unknown-unknown
 RUN git clone -b master --single-branch https://gitlab.com/tezos/tezos.git /tezos
 COPY evm_config.yaml /tezos/etherlink/config/sequencer.yaml
 WORKDIR /tezos
-RUN make -f /tezos/kernels.mk build-deps && make -f etherlink.mk build-deps sequencer.wasm
+RUN make -C /tezos/src/kernel_sdk/ build-deps && make -f etherlink.mk build-deps sequencer.wasm
 
 FROM alpine:3.14
 COPY --from=kernel_build /tezos/sequencer.wasm /tezos/evm_kernel.wasm /kernel/

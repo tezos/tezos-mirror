@@ -5,8 +5,6 @@ services:
   _tezos_with_curl_build:
     container_name: tezos_with_curl_build
     image: tezos_with_curl:${OCTEZ_TAG}
-    logging:
-      driver: "json-file"
     command: ['echo', 'build completed']  # any linux command which directly terminates.
     build:
       context: $PWD/tezos_with_curl
@@ -19,8 +17,6 @@ services:
     depends_on:
       - _tezos_with_curl_build
     image: tezos_with_curl:${OCTEZ_TAG}
-    logging:
-      driver: "json-file"
     healthcheck:
       test: curl http://0.0.0.0:8732/monitor/bootstrapped
     volumes:
@@ -35,8 +31,6 @@ services:
   smart-rollup-node:
     container_name: rollup-node
     image: tezos_with_curl:${OCTEZ_TAG}
-    logging:
-      driver: "json-file"
     depends_on:
       _tezos_with_curl_build:
         condition: service_completed_successfully
@@ -57,8 +51,6 @@ services:
   sequencer:
     container_name: evm-sequencer
     image: tezos/tezos-bare:${OCTEZ_TAG}
-    logging:
-      driver: "json-file"
     depends_on:
       smart-rollup-node:
         condition: service_healthy
@@ -70,13 +62,12 @@ services:
     ports:
       - 8545:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run sequencer with endpoint http://rollup-node:8733 signing with ${SEQUENCER_SECRET_KEY} --rpc-addr 0.0.0.0 --rpc-port 8545 --initial-kernel /home/tezos/kernel/sequencer.wasm --preimage-dir /home/tezos/kernel/_evm_installer_preimages --time-between-blocks 10 --cors-origins '*' --cors-headers '*'
+    command: run sequencer with endpoint http://rollup-node:8733 signing with ${SEQUENCER_SECRET_KEY} --rpc-addr 0.0.0.0 --rpc-port 8545 --initial-kernel /home/tezos/kernel/sequencer.wasm --preimage-dir /home/tezos/kernel/_evm_installer_preimages --time-between-blocks 10 --cors-origins '*' --cors-headers '*' --devmode
 
   blockscout-redis-db:
     image: 'redis:alpine'
     container_name: blockscout-redis-db
-    logging:
-      driver: "json-file"
+    profiles: [frontend]
     expose:
       - 6379
     command: redis-server
@@ -86,8 +77,7 @@ services:
   blockscout-db:
     image: postgres:14
     container_name: blockscout-db
-    logging:
-      driver: "json-file"
+    profiles: [frontend]
     restart: always
     command: postgres -c 'max_connections=200'
     environment:
@@ -104,9 +94,8 @@ services:
       - blockscout-db
       - blockscout-redis-db
     image: blockscout/blockscout:${DOCKER_TAG:-latest}
-    logging:
-      driver: "json-file"
     container_name: blockscout
+    profiles: [frontend]
     restart: always
     stop_grace_period: 5m
     links:

@@ -10,24 +10,30 @@ script_dir=$(dirname "$0")
 run_in_docker() {
   bin="$1"
   shift 1
-  docker_run=(docker run --log-driver=json-file -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}")
+  docker_run=(docker run -v "${HOST_TEZOS_DATA_DIR}":/home/tezos tezos/tezos-bare:"${OCTEZ_TAG}")
   "${docker_run[@]}" "/usr/local/bin/${bin}" "$@"
+}
+
+docker_compose() {
+  if (command -v "docker-compose" &> /dev/null); then
+    docker-compose "$@"
+  else
+    docker compose "$@"
+  fi
 }
 
 docker_update_images() {
   # pull latest version
   docker pull tezos/tezos-bare:"${OCTEZ_TAG}"
-  docker build -t tezos_with_curl:"${OCTEZ_TAG}" tezos_with_curl/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}"
+  docker build -t tezos_with_curl:"${OCTEZ_TAG}" "${script_dir}"/tezos_with_curl/ --build-arg OCTEZ_TAG="${OCTEZ_TAG}"
 }
 
 create_chain_id() {
-  number="$1"
   # Convert the number to hexadecimal and little endian format
-  hex_le=$(printf "%064x" "$number" | tac -rs ..)
+  hex_le=$(printf "%064x" "${EVM_CHAIN_ID}" | tac -rs ..)
 
   # Pad to 256 bits (64 hex characters)
-  padded_hex_le=$(printf "%064s" "$hex_le")
-  echo "$padded_hex_le"
+  printf "%064s" "$hex_le"
 }
 
 add_kernel_config_set() {
@@ -88,10 +94,11 @@ create_kernel_config() {
 }
 
 build_kernel() {
+  mkdir -p "${HOST_TEZOS_DATA_DIR}/.tezos-client"
   cp "${SEQUENCER_CONFIG}" evm_kernel_builder/evm_config.yaml
   create_kernel_config evm_kernel_builder/evm_config.yaml
   # build kernel in an image (e.g. tezos/tezos-bare:master) with new chain id
-  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" evm_kernel_builder/
+  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" "${script_dir}"/evm_kernel_builder/
   container_name=$(docker create etherlink_kernel:"${OCTEZ_TAG}")
   docker cp "${container_name}":/kernel/ "${HOST_TEZOS_DATA_DIR}/"
 }
@@ -122,25 +129,20 @@ balance_account_is_enough() {
 }
 
 originate_evm_rollup() {
-  source="$1"
-  rollup_alias="$2"
-  kernel_path="$3"
-  echo "originate a new evm rollup '${rollup_alias}' with '${source}', and kernel '${kernel_path}'"
+  kernel_path="$1"
+  echo "originate a new evm rollup '${ROLLUP_ALIAS}' with '${ORIGINATOR_ALIAS}', and kernel '${kernel_path}'"
   kernel="$(xxd -p "${kernel_path}" | tr -d '\n')"
   run_in_docker octez-client --endpoint "${ENDPOINT}" \
-    originate smart rollup "${rollup_alias}" \
-    from "${source}" \
+    originate smart rollup "${ROLLUP_ALIAS}" \
+    from "${ORIGINATOR_ALIAS}" \
     of kind wasm_2_0_0 of type "(or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes)" \
     with kernel "${kernel}" \
     --burn-cap 999 --force
 }
 
 init_rollup_node_config() {
-  mode="$1"
-  rollup_alias="$2"
-  operators="$3"
   echo "create rollup node config and copy kernel preimage"
-  run_in_docker octez-smart-rollup-node init "${mode}" config for "${rollup_alias}" with operators "${operators[@]}" --rpc-addr 0.0.0.0 --rpc-port 8733 --cors-origins '*' --cors-headers '*'
+  run_in_docker octez-smart-rollup-node init "${ROLLUP_NODE_MODE}" config for "${ROLLUP_ALIAS}" with operators "${OPERATOR_ALIAS}" --rpc-addr 0.0.0.0 --rpc-port 8733 --cors-origins '*' --cors-headers '*'
   cp -R "${HOST_TEZOS_DATA_DIR}"/kernel/_evm_installer_preimages/ "${HOST_TEZOS_DATA_DIR}"/.tezos-smart-rollup-node/wasm_2_0_0
 }
 
@@ -189,9 +191,9 @@ originate_contracts() {
 init_rollup() {
   docker_update_images
   build_kernel
-  KERNEL="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
-  originate_evm_rollup "${ORIGINATOR_ALIAS}" "${ROLLUP_ALIAS}" "${KERNEL}"
-  init_rollup_node_config "${ROLLUP_NODE_MODE}" "${ROLLUP_ALIAS}" "${OPERATOR_ALIAS}"
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  originate_evm_rollup "${kernel}"
+  init_rollup_node_config
 }
 
 loop_until_balance_is_enough() {
@@ -211,7 +213,7 @@ originate_contract() {
   contract_alias=$2
   storage=$3
   mkdir -p "${HOST_TEZOS_DATA_DIR}"/contracts
-  cp "../../tezos_contracts/${filename}" "${HOST_TEZOS_DATA_DIR}/contracts"
+  cp "${script_dir}/../../tezos_contracts/${filename}" "${HOST_TEZOS_DATA_DIR}/contracts"
   echo "originate ${filename} contract (alias: ${contract_alias})"
   run_in_docker octez-client --endpoint "${ENDPOINT}" originate contract "${contract_alias}" transferring 0 from "${ORIGINATOR_ALIAS}" running "contracts/${filename}" --init "$storage" --burn-cap 0.5
 }
@@ -258,6 +260,11 @@ init_rollup_node_config)
 init_octez_node)
   init_octez_node
   ;;
+build_kernel)
+  docker_update_images
+  build_kernel
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  ;;
 init_rollup)
   if [[ -n ${OPERATOR_ALIAS} ]]; then
     generate_key "${OPERATOR_ALIAS}"
@@ -269,13 +276,13 @@ init_rollup)
   echo "You can now start the docker with \"./init.sh run\""
   ;;
 reset_rollup)
-  docker compose stop smart-rollup-node sequencer blockscout blockscout-db blockscout-redis-db
+  docker_compose stop smart-rollup-node sequencer
 
   rm -r "${HOST_TEZOS_DATA_DIR}/.tezos-smart-rollup-node" "${HOST_TEZOS_DATA_DIR}/.octez-evm-node" "${HOST_TEZOS_DATA_DIR}/kernel"
 
   init_rollup
 
-  docker compose up -d --remove-orphans
+  docker_compose up -d --remove-orphans
   ;;
 originate_contracts)
   originate_contracts
@@ -284,10 +291,10 @@ deposit)
   deposit "$@"
   ;;
 run)
-  docker compose up -d
+  docker_compose up -d
   ;;
 restart)
-  docker compose restart
+  docker_compose restart
   ;;
 *)
   cat << EOF
@@ -300,6 +307,8 @@ Available commands:
     download snapshot, and init octez-node config
   - originate_contracts:
     originate contracts
+  - build_kernel:
+    build lastest evm kernel
   - init_rollup:
     build lastest evm kernel, originate the rollup, create operator, wait until operator balance
      is topped then create rollup node config.
