@@ -39,6 +39,8 @@
    Subject: Integration tests related to the data-availability layer
 *)
 
+let team = Tag.tezos2
+
 let hooks = Tezos_regression.hooks
 
 let rpc_hooks = Tezos_regression.rpc_hooks
@@ -283,12 +285,11 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["layer1"])
-    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
-    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    variant scenario =
+let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
+    ?attestation_lag ?number_of_shards ?custom_constants ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?event_sections_levels
+    ?node_arguments ?activation_timestamp ?consensus_committee_size
+    ?minimal_block_delay ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -313,11 +314,11 @@ let scenario_with_layer1_node ?(tags = ["layer1"])
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"])
-    ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
-    ?delay_increment_per_round ?attestation_lag ?attestation_threshold
-    ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?activation_timestamp ?bootstrap_profile variant scenario =
+let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
+    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
+    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
+    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile variant
+    scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
