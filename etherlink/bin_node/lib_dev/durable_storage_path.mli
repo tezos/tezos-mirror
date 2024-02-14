@@ -72,3 +72,14 @@ module Delayed_transaction : sig
   (** Path to the delayed transaction. *)
   val transaction : hash -> path
 end
+
+module Evm_events : sig
+  (** Path to the list of events of the kernel. *)
+  val events : path
+
+  (** Path to the length. *)
+  val length : path
+
+  (** Path to the nth event of the kernel. *)
+  val nth_event : int -> path
+end

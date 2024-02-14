@@ -8,6 +8,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6953
+
+   Make the sequencer node resilient to rollup node disconnect.
+
+   RPC failures makes the sequencer stop or maybe fails to parse
+   specific element.
+*)
+
 open Tezos_rpc
 open Path
 

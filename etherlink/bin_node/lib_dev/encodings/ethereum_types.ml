@@ -165,6 +165,8 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
+let encode_number (Qty v) = Z.to_bits v |> Bytes.of_string
+
 let decode_hash bytes = Hash (decode_hex bytes)
 
 let pad_to_n_bytes_le bytes length =
@@ -1233,4 +1235,50 @@ module Delayed_transaction = struct
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
 
   let pp_short fmt {hash = Hash (Hex h); _} = Format.pp_print_string fmt h
+end
+
+module Upgrade = struct
+  type t = {hash : hash; timestamp : quantity}
+
+  let of_rlp = function
+    | Rlp.List [Value hash_bytes; Value timestamp] ->
+        let hash =
+          hash_bytes |> Bytes.to_string |> Hex.of_string |> Hex.show
+          |> hash_of_string
+        in
+        let timestamp = decode_number timestamp in
+        Some {hash; timestamp}
+    | _ -> None
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
+
+  let to_bytes {hash; timestamp} =
+    let hash_bytes = hash_to_bytes hash |> String.to_bytes in
+    let timestamp_bytes = encode_number timestamp in
+    Rlp.(encode (List [Value hash_bytes; Value timestamp_bytes]))
+end
+
+module Evm_events = struct
+  type t = UpgradeEvent of Upgrade.t
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with
+    | Ok (Rlp.List [Value tag; rlp_content]) -> (
+        match Bytes.to_string tag with
+        | "\x01" ->
+            let upgrade = Upgrade.of_rlp rlp_content in
+            Option.map (fun u -> UpgradeEvent u) upgrade
+        | _ -> None)
+    | _ -> None
+
+  let pp fmt = function
+    | UpgradeEvent {hash; timestamp = Qty timestamp} ->
+        Format.fprintf
+          fmt
+          "upgrade:@ hash %a,@ timestamp %a"
+          pp_hash
+          hash
+          Z.pp_print
+          timestamp
 end

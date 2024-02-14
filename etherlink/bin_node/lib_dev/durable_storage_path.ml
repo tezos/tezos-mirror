@@ -93,3 +93,11 @@ module Delayed_transaction = struct
 
   let transaction (Hash (Hex tx_hash)) = hashes ^ "/" ^ tx_hash ^ "/data"
 end
+
+module Evm_events = struct
+  let events = EVM.make "/events"
+
+  let length = events ^ "/" ^ "length"
+
+  let nth_event i = events ^ "/" ^ string_of_int i
+end
