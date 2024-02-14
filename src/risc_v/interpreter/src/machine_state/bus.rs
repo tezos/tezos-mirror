@@ -40,7 +40,7 @@ impl AddressSpace {
         }
 
         let mem_addr = addr.saturating_sub(devices::DEVICES_ADDRESS_SPACE_LENGTH);
-        let mem_size: u64 = ML::LEN8.try_into().expect("ML::LEN8 out of bounds");
+        let mem_size: u64 = ML::BYTES.try_into().expect("ML::BYTES out of bounds");
 
         // Is the address within the main memory address space?
         if mem_addr < mem_size {
