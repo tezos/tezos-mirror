@@ -20,7 +20,10 @@ use crate::EthereumError;
 use crate::{abi, modexp::modexp_precompile};
 use alloc::borrow::Cow;
 use alloc::collections::btree_map::BTreeMap;
-use evm::{Context, ExitError, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
+use evm::{
+    executor::stack::PrecompileFailure, Context, ExitError, ExitReason, ExitRevert,
+    ExitSucceed, Handler, Transfer,
+};
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, U256};
@@ -359,32 +362,10 @@ fn ripemd160_precompile<Host: Runtime>(
     })
 }
 
-fn blake2f_output_for_wrong_input<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-) -> PrecompileOutcome {
-    if let Err(err) = handler.record_cost(handler.gas_left().as_u64()) {
-        log!(
-            handler.borrow_host(),
-            Info,
-            "Couldn't record the cost of blake2f {:?}",
-            err
-        );
-        PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks: 0,
-        }
-    } else {
-        PrecompileOutcome {
-            exit_status: ExitReason::Error(ExitError::Other(Cow::from(
-                "Wrong input for blake2f precompile",
-            ))),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks: 0,
-        }
-    }
+fn blake2f_output_for_wrong_input() -> EthereumError {
+    EthereumError::PrecompileFailed(PrecompileFailure::Error {
+        exit_status: ExitError::Other(Cow::from("Wrong input for blake2f precompile")),
+    })
 }
 
 trait Decodable {
@@ -401,18 +382,15 @@ impl<const N: usize> Decodable for [u64; N] {
     }
 }
 
-fn blake2f_precompile<Host: Runtime>(
+fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling blake2f precompile");
 
     // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
     if input.len() != 213 {
-        return Ok(blake2f_output_for_wrong_input(handler));
+        return Err(blake2f_output_for_wrong_input());
     }
 
     // the number of rounds - 32-bit unsigned big-endian word
@@ -462,7 +440,7 @@ fn blake2f_precompile<Host: Runtime>(
     let f = match input[212] {
         1 => true,
         0 => false,
-        _ => return Ok(blake2f_output_for_wrong_input(handler)),
+        _ => return Err(blake2f_output_for_wrong_input()),
     };
 
     eip152::compress(&mut h, m, t, f, rounds as usize);
@@ -483,6 +461,20 @@ fn blake2f_precompile<Host: Runtime>(
         withdrawals: vec![],
         estimated_ticks,
     })
+}
+
+fn blake2f_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    call_precompile_with_gas_draining(
+        handler,
+        input,
+        blake2f_precompile_without_gas_draining,
+    )
 }
 
 /// Implementation of Etherelink specific withdrawals precompiled contract.
@@ -1172,21 +1164,16 @@ mod tests {
 
     #[test]
     fn test_blake2f_invalid_empty() {
-        // act
         let input = [0; 0];
-        let gas_limit: u64 = 25000;
+
+        // act
         let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(gas_limit));
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
 
         // assert
-        // expected outcome is OK and empty output
+        // expected outcome is Err
 
-        assert!(result.is_ok());
-        let outcome = result.unwrap();
-        println!("{}", outcome.gas_used);
-        assert!(!outcome.is_success);
-        assert_eq!(gas_limit, outcome.gas_used); // all gas should be consumed
-        assert_eq!(None, outcome.result);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1197,16 +1184,11 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000300000000000000000000000000000002"
         ).unwrap();
-        let gas_limit: u64 = 25000;
-        let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(gas_limit));
 
-        assert!(result.is_ok());
-        let outcome = result.unwrap();
-        println!("{}", outcome.gas_used);
-        assert!(!outcome.is_success);
-        assert_eq!(gas_limit, outcome.gas_used); // all gas shoule be consumed
-        assert_eq!(None, outcome.result);
+        let result =
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+
+        assert!(result.is_err());
     }
 
     struct Blake2fTest {
