@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+num_enum = "0.7.2"
 paste = "1.0.14"
 
 [dependencies.strum]
@@ -12,5 +13,6 @@ features = ["derive"]
 
 [dev-dependencies]
 goblin = "0.7.1"
+hex = "0.4.3"
 rand = "0.8.5"
 proptest = "1.4.0"

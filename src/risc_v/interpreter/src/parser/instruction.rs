@@ -2,30 +2,32 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt;
+
 use crate::machine_state::registers::XRegister;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub rs2: XRegister,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct ITypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct SBTypeArgs {
     pub rs1: XRegister,
     pub rs2: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct UJTypeArgs {
     pub rd: XRegister,
     pub imm: i64,
@@ -34,7 +36,7 @@ pub struct UJTypeArgs {
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Instr {
     // RV64I R-type instructions
     Add(RTypeArgs),
@@ -102,4 +104,168 @@ pub enum Instr {
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
+}
+
+use Instr::*;
+
+macro_rules! r_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{:?},{:?}", $op, $args.rd, $args.rs1, $args.rs2)
+    };
+}
+
+macro_rules! i_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{:?},{}", $op, $args.rd, $args.rs1, $args.imm)
+    };
+}
+
+macro_rules! i_instr_hex {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!(
+            $f,
+            "{} {:?},{:?},0x{:x}",
+            $op, $args.rd, $args.rs1, $args.imm
+        )
+    };
+}
+
+macro_rules! i_instr_load {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{}({:?})", $op, $args.rd, $args.imm, $args.rs1)
+    };
+}
+
+macro_rules! j_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},0x{:x}", $op, $args.rd, $args.imm)
+    };
+}
+
+macro_rules! s_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{}({:?})", $op, $args.rs2, $args.imm, $args.rs1)
+    };
+}
+
+macro_rules! b_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{:?},{}", $op, $args.rs1, $args.rs2, $args.imm)
+    };
+}
+
+macro_rules! u_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{}", $op, $args.rd, $args.imm)
+    };
+}
+
+/// An objdump-style prettyprinter for parsed instructions, used in testing
+/// the parser against objdump.
+impl fmt::Display for Instr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            // RV64I R-type instructions
+            Add(args) => r_instr!(f, "add", args),
+            Sub(args) => r_instr!(f, "sub", args),
+            Xor(args) => r_instr!(f, "xor", args),
+            Or(args) => r_instr!(f, "or", args),
+            And(args) => r_instr!(f, "and", args),
+            Sll(args) => r_instr!(f, "sll", args),
+            Srl(args) => r_instr!(f, "srl", args),
+            Sra(args) => r_instr!(f, "sra", args),
+            Slt(args) => r_instr!(f, "slt", args),
+            Sltu(args) => r_instr!(f, "sltu", args),
+            Addw(args) => r_instr!(f, "addw", args),
+            Subw(args) => r_instr!(f, "subw", args),
+            Sllw(args) => r_instr!(f, "sllw", args),
+            Srlw(args) => r_instr!(f, "srlw", args),
+            Sraw(args) => r_instr!(f, "sraw", args),
+
+            // RV64I I-type instructions
+            Addi(args) => i_instr!(f, "addi", args),
+            Addiw(args) => i_instr!(f, "addiw", args),
+            Xori(args) => i_instr!(f, "xori", args),
+            Ori(args) => i_instr!(f, "ori", args),
+            Andi(args) => i_instr!(f, "andi", args),
+            Slli(args) => i_instr_hex!(f, "slli", args),
+            Srli(args) => i_instr_hex!(f, "srli", args),
+            // For consistency with objdump, only the shift amount is printed
+            Srai(args) => {
+                i_instr_hex!(
+                    f,
+                    "srai",
+                    ITypeArgs {
+                        imm: args.imm & !(1 << 10),
+                        ..*args
+                    }
+                )
+            }
+            Slliw(args) => i_instr_hex!(f, "slliw", args),
+            Srliw(args) => i_instr_hex!(f, "srliw", args),
+            Sraiw(args) => {
+                i_instr_hex!(
+                    f,
+                    "sraiw",
+                    ITypeArgs {
+                        imm: args.imm & !(1 << 10),
+                        ..*args
+                    }
+                )
+            }
+            Slti(args) => i_instr!(f, "slti", args),
+            Sltiu(args) => i_instr!(f, "sltiu", args),
+            Lb(args) => i_instr_load!(f, "lb", args),
+            Lh(args) => i_instr_load!(f, "lh", args),
+            Lw(args) => i_instr_load!(f, "lw", args),
+            Lbu(args) => i_instr_load!(f, "lbu", args),
+            Lhu(args) => i_instr_load!(f, "lhu", args),
+            Lwu(args) => i_instr_load!(f, "lwu", args),
+            Ld(args) => i_instr_load!(f, "ld", args),
+            // TODO: adjust printer once finer-grained parsing for fence is implemented
+            Fence(_) => write!(f, "fence iorw,iorw"),
+            Ecall => write!(f, "ecall"),
+            Ebreak => write!(f, "ebreak"),
+
+            // RV64I S-type instructions
+            Sb(args) => s_instr!(f, "sb", args),
+            Sh(args) => s_instr!(f, "sh", args),
+            Sw(args) => s_instr!(f, "sw", args),
+            Sd(args) => s_instr!(f, "sd", args),
+
+            // RV64I B-type instructions
+            Beq(args) => b_instr!(f, "beq", args),
+            Bne(args) => b_instr!(f, "bne", args),
+            Blt(args) => b_instr!(f, "blt", args),
+            Bge(args) => b_instr!(f, "bge", args),
+            Bltu(args) => b_instr!(f, "bltu", args),
+            Bgeu(args) => b_instr!(f, "bgeu", args),
+
+            // RV64I U-type instructions
+            // For consistency with objdump, upper immediates are shifted down
+            Lui(args) => j_instr!(
+                f,
+                "lui",
+                UJTypeArgs {
+                    rd: args.rd,
+                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+                }
+            ),
+            Auipc(args) => j_instr!(
+                f,
+                "auipc",
+                UJTypeArgs {
+                    rd: args.rd,
+                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+                }
+            ),
+
+            // RV64I jump instructions
+            Jal(args) => u_instr!(f, "jal", args),
+            Jalr(args) => i_instr_load!(f, "jalr", args),
+
+            Unknown { instr } => write!(f, "unknown {:x}", instr),
+            UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
+        }
+    }
 }

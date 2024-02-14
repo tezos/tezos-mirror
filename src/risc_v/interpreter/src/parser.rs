@@ -280,6 +280,8 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             _ => Unknown { instr },
         },
         OP_SYNCH => match funct3(instr) {
+            // TODO: finer-grained parsing of fence to extract FM, predecessor,
+            // and successor bits
             F3_0 => i_instr!(Fence, instr),
             _ => Unknown { instr },
         },
@@ -357,7 +359,7 @@ pub fn instr_iter_from_u16_iter(
     std::iter::from_fn(move || parse(iter.next()?, || iter.next().ok_or(())).ok())
 }
 
-fn parse_block(bytes: &[u8]) -> Vec<Instr> {
+pub fn parse_block(bytes: &[u8]) -> Vec<Instr> {
     let iter = bytes.iter().copied();
     instr_iter_from_u16_iter(u16_iter_from_u8_iter(iter)).collect()
 }
