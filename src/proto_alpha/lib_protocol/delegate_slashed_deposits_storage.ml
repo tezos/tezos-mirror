@@ -106,6 +106,15 @@ let punish_double_signing ctxt ~operation_hash misbehaviour delegate
    - for the kind: double baking > double attesting > double preattesting *)
 module MisMap = Map.Make (Misbehaviour_repr)
 
+let compute_punishing_amount slashing_percentage frozen_deposits =
+  let punish_value =
+    Tez_repr.mul_percentage
+      ~rounding:`Down
+      frozen_deposits.Deposits_repr.initial_amount
+      slashing_percentage
+  in
+  Tez_repr.min punish_value frozen_deposits.Deposits_repr.current_amount
+
 let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
     ~misbehaviour_cycle =
   let previous_cycle =
@@ -139,14 +148,8 @@ let apply_and_clear_denunciations ctxt =
   let compute_reward_and_burn slashing_percentage
       (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
-    let punish_value =
-      Tez_repr.mul_percentage
-        ~rounding:`Down
-        frozen_deposits.initial_amount
-        slashing_percentage
-    in
     let punishing_amount =
-      Tez_repr.min punish_value frozen_deposits.current_amount
+      compute_punishing_amount slashing_percentage frozen_deposits
     in
     let* reward =
       Tez_repr.(
