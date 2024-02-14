@@ -149,11 +149,15 @@ let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
     Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
     |> Option.value ~default:Cycle_repr.root
   in
-  return
-  @@ not
-       (List.exists
-          (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
-          slashing_history)
+  let*! is_denounced =
+    Pending_denunciations_storage.has_pending_denunciations ctxt delegate
+  in
+  let is_slashed =
+    List.exists
+      (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+      slashing_history
+  in
+  return @@ not (is_denounced || is_slashed)
 
 let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
     ~delegate ~unfinalizable_requests_opt amount =
