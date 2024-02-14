@@ -990,6 +990,24 @@ mod tests {
     }
 
     #[test]
+    fn test_ecrecover_signature_overflow() {
+        // Input was taken from the official ethereum test-suite at:
+        // GeneralStateTests/stPrecompiledContracts2/CallEcrecover_Overflow.json
+        let input_overflow = hex::decode("18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000000000000000000000000000001c48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364142").unwrap();
+
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input_overflow,
+            None,
+            Some(35000),
+        );
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.result.unwrap().is_empty());
+    }
+
+    #[test]
     fn test_ecrecover_input_spec() {
         let (hash, v, rs) = input_spec();
         let input: [u8; 128] = assemble_input(hash, v, rs);
