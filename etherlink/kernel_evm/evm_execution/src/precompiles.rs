@@ -991,6 +991,24 @@ mod tests {
     }
 
     #[test]
+    fn test_ecrecover_corrupted_data() {
+        // Input was taken from the official ethereum test-suite at:
+        // GeneralStateTests/stPrecompiledContracts2/CALLCODEEcrecoverV_prefixedf0.json
+        let corrupted_input = hex::decode("18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000000000000000000000000000f01c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549").unwrap();
+
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &corrupted_input,
+            None,
+            Some(35000),
+        );
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        assert!(outcome.result.unwrap().is_empty());
+    }
+
+    #[test]
     fn test_ecrecover_input_spec() {
         let (hash, v, r, s) = input_spec();
         let input: [u8; 128] = assemble_input(hash, v, r, s);
