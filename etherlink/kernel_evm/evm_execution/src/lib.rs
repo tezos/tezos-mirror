@@ -2334,7 +2334,8 @@ mod test {
         + 32000 // create base cost
         + 1220 // transaction data cost
         + 12600 // code deposit cost
-        + 42; // init cost
+        + 42 // init cost
+        + 4; // extra cost (EIP-3860)
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -2389,7 +2390,8 @@ mod test {
         let expected_gas = 21000 // base cost
         + 32000 // create cost
         + 32 * CONFIG.gas_transaction_non_zero_data // transaction data cost
-        + 3; // init cost
+        + 3 // init cost
+        + 2; // extra cost (EIP-3860)
 
         assert_eq!(expected_gas, result.gas_used);
     }

@@ -3462,6 +3462,11 @@ mod test {
         let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
 
         let contract_address = handler.create_address(scheme);
+
+        handler
+            .begin_initial_transaction(false, Some(10000))
+            .unwrap();
+
         let result =
             handler.execute_create(caller, U256::from(100000), code, contract_address);
 
