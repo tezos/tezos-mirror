@@ -30,6 +30,7 @@ build:
     BLST_PORTABLE: "yes"
   before_script:
     - sudo apt update
+    - eval $(opam env)
   script:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
