@@ -308,7 +308,7 @@ let constants_mainnet : Constants.Parametric.t =
         activation_vote_enable = true;
         autostaking_enable = true;
         force_activation = false;
-        ns_enable = false;
+        ns_enable = true;
       };
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
        Enable once at least the following is done:
