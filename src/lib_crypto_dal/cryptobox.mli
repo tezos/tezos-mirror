@@ -321,6 +321,40 @@ val verify_shard :
     | `Shard_index_out_of_range of string ] )
   Result.t
 
+(**
+    Batched version of verify_shard, for better verifier performance.
+    [verify_shard_multi t commitment shard_list proof_list]
+    returns [Ok ()]
+    if for all i List.nth i [shard] is an element of [shards_from_polynomial p]
+    where [commitment = commit t p] for some polynomial [p],
+    and the proofs are correctly generated.
+
+    The verification time smaller than calling List.lenght shard_list
+    times the verify_shard function.
+
+    Requires:
+    - The SRS (structured reference string) contained in [t]
+    should be the same as the one used to produce the [commitment]
+    and [proof].
+
+    Fails with:
+    - [Error `Invalid_shard] if the verification fails
+    - [Error `Invalid_degree_strictly_less_than_expected _] if the
+    SRS contained in [t] is too small to proceed with the verification
+    - [Error `Shard_length_mismatch] if one of the shard is not of the expected
+    length [shard_length] given for the initialisation of [t]
+    - [Error (`Shard_index_out_of_range msg)] if one of the shard index
+    is not within the range [0, number_of_shards - 1]
+    (where [number_of_shards] is found in [t]).
+
+    Ensures:
+    - [verify_shard_multi t commitment shard_list proof_list = Ok ()] if
+    and only if
+    [Array.mem (List.nth i shard_list) (shards_from_polynomial t polynomial]),
+    [precomputation = precompute_shards_proofs t],
+    [List.nth i proof_list = (prove_shards t ~precomputation ~polynomial).
+    (List. nth i (shard_list.index))], for all i
+    and [commitment = commit t p]. *)
 val verify_shard_multi :
   t ->
   commitment ->
