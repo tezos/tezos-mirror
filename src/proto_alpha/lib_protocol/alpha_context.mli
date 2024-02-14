@@ -264,6 +264,10 @@ module Raw_level : sig
     val add : raw_level -> int -> raw_level
 
     val sub : raw_level -> int -> raw_level option
+
+    val from_repr : Raw_level_repr.t -> raw_level
+
+    val to_repr : raw_level -> Raw_level_repr.t
   end
 end
 
@@ -376,6 +380,12 @@ module Round : sig
 
   (* store a round in context *)
   val update : context -> t -> context tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val from_repr : Round_repr.t -> t
+
+    val to_repr : t -> Round_repr.t
+  end
 end
 
 module Gas : sig
