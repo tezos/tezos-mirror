@@ -18,11 +18,10 @@ use evm_execution::Config;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
-    read_base_fee_per_gas, read_chain_id, read_da_fee,
-    read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, store_base_fee_per_gas, store_chain_id,
-    store_da_fee, store_kernel_version, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
+    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
+    store_base_fee_per_gas, store_chain_id, store_da_fee, store_kernel_version,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
@@ -322,10 +321,7 @@ mod tests {
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(
-            U256::from(DUMMY_BASE_FEE_PER_GAS),
-            DUMMY_DA_FEE.into(),
-        )
+        BlockFees::new(U256::from(DUMMY_BASE_FEE_PER_GAS), DUMMY_DA_FEE.into())
     }
 
     fn set_balance<Host: KernelRuntime>(
@@ -405,13 +401,9 @@ mod tests {
         let data = hex::decode(data).unwrap();
 
         let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
-        let gas_for_fees = crate::fees::gas_for_fees(
-            DUMMY_DA_FEE.into(),
-            gas_price,
-            &data,
-            &[],
-        )
-        .unwrap();
+        let gas_for_fees =
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[])
+                .unwrap();
 
         let unsigned_tx = EthereumTransactionCommon::new(
             TransactionType::Eip1559,

@@ -157,12 +157,8 @@ pub fn simulation_add_gas_for_fees(
     tx_data: &[u8],
 ) -> Result<ExecutionOutcome, EthereumError> {
     // Simulation does not have an access list
-    let gas_for_fees = gas_for_fees(
-        block_fees.da_fee_per_byte(),
-        tx_gas_price,
-        tx_data,
-        &[],
-    )?;
+    let gas_for_fees =
+        gas_for_fees(block_fees.da_fee_per_byte(), tx_gas_price, tx_data, &[])?;
 
     outcome.gas_used = outcome.gas_used.saturating_add(gas_for_fees);
     Ok(outcome)
@@ -426,12 +422,7 @@ mod tests {
         )
     }
 
-    fn expect_extra_gas(
-        extra: u64,
-        tx_gas_price: u64,
-        da_fee: u64,
-        tx_data: &[u8],
-    ) {
+    fn expect_extra_gas(extra: u64, tx_gas_price: u64, da_fee: u64, tx_data: &[u8]) {
         // Arrange
         let initial_gas_used = 100;
         let block_fees = BlockFees::new(U256::one(), da_fee.into());

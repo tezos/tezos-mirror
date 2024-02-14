@@ -26,10 +26,7 @@ pub struct BlockFees {
 
 impl BlockFees {
     /// Setup fee information for the current block
-    pub const fn new(
-        base_fee_per_gas: U256,
-        da_fee_per_byte: U256,
-    ) -> Self {
+    pub const fn new(base_fee_per_gas: U256, da_fee_per_byte: U256) -> Self {
         Self {
             base_fee_per_gas,
             da_fee_per_byte,
