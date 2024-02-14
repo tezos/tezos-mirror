@@ -118,7 +118,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 val on_event : t -> (event -> unit) -> unit
 
 (** See [Daemon.Make.log_events]. *)
-val log_events : t -> unit
+val log_events : ?max_length:int -> t -> unit
 
 (** {2 High-Level Functions} *)
 
