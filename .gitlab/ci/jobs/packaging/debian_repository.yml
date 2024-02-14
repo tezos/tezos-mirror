@@ -1,0 +1,83 @@
+
+variables:
+  DEP_IMAGE: registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE
+
+# This is a generic template to build both Debian- and Ubuntu-
+# packages. We use the variable $DISTRIBUTION to discriminate
+# between the two.
+.docker-build-debian-dependencies:
+  extends:
+    - .image_template__docker
+    - .docker_auth_template
+  stage: build
+  needs: []
+  rules:
+    - changes:
+        - scripts/version.sh
+        - .gitlab-ci.yml
+        - debian-deps-build.Dockerfile
+      when: on_success
+    - when: manual
+  tags:
+    - $TAGS
+  script:
+    - .gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh
+
+oc.docker-build-debian-dependencies:
+  extends:
+    - .docker-build-debian-dependencies
+  variables:
+    DISTRIBUTION: debian
+  parallel:
+    matrix:
+      - RELEASE: [unstable, bookworm]
+        TAGS: [gcp]
+
+oc.docker-build-ubuntu-dependencies:
+  extends:
+    - .docker-build-debian-dependencies
+  variables:
+    DISTRIBUTION: ubuntu
+  parallel:
+    matrix:
+      - RELEASE: [focal, jammy]
+        TAGS: [gcp]
+
+oc.build-debian-based-packages:
+  stage: manual
+  needs: []
+  when: manual
+  script:
+    echo "Trigger build debian packages"
+
+.build-debian-packages:
+  stage: manual
+  needs: [oc.build-debian-based-packages]
+  image: $DEP_IMAGE:latest
+  tags:
+    - $TAGS
+  artifacts:
+    paths:
+      - packages/$DISTRIBUTION/$RELEASE
+  script:
+    - .gitlab/ci/jobs/packaging/build-debian-packages.sh
+
+oc.build-debian:
+  extends:
+    - .build-debian-packages
+  variables:
+    DISTRIBUTION: debian
+  parallel:
+    matrix:
+      - RELEASE: [unstable, bookworm]
+        TAGS: [gcp]
+
+oc.build-ubuntu:
+  extends:
+    - .build-debian-packages
+  variables:
+    DISTRIBUTION: ubuntu
+  parallel:
+    matrix:
+      - RELEASE: [jammy, focal]
+        TAGS: [gcp]

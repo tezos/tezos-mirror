@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+# make sure to ask this question
+db_reset octez-node/purge_warning
+
+# display a warning before proceding
+db_input critical octez-node/purge_warning || true
+# shellcheck disable=SC2119
+db_go || true
+
+echo "Stopping octez-node"
+sudo systemctl stop octez-node.service

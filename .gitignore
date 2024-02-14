@@ -72,14 +72,7 @@ __pycache__
 
 contrib/kaitai-struct-files/doc
 
-*.install
 .merlin
-
-*.deb
-*.rpm
-scripts/pkg-common/baker-binaries
-scripts/pkg-common/smartrollup-binaries
-scripts/pkg-common/client-binaries
 
 *~
 \#*\#

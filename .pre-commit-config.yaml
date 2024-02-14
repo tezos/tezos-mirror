@@ -15,7 +15,7 @@ repos:
     rev: v0.0.2
     hooks:
       - id: shfmt
-        # These settings must mirror the ones set in `scripts/lint.sh`. 
+        # These settings must mirror the ones set in `scripts/lint.sh`.
         args: [ "-i", "2", "-sr", "-d" ]
   - repo: https://github.com/arenadotio/pre-commit-ocamlformat
     rev: 0439858

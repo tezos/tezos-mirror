@@ -1,0 +1,39 @@
+Template: octez-node/history-mode
+Type: string
+Default: full
+Description: The type of node you wish to install
+ - Full (default mode with 1 additional cycle). The node stores the minimal data
+   since the genesis required to reconstruct (or ‘replay’) the complete chain’s
+   ledger state.
+ - Archive: This is the heaviest mode as it keeps the whole chain data to be able
+   to query any information stored on the chain since the genesis.
+   It is particularly suitable for indexers or block explorers.
+ - Rolling: This is the lightest mode as it only maintains a minimal rolling
+   fragment of the chain data so the node can still validate new blocks and
+   synchronize with the head.
+ Source: https://tezos.gitlab.io/user/history_modes.html
+
+Template: octez-node/network
+Type: string
+Default: mainnet
+Description: The network you want to connect to
+ - mainnet:
+ - testnet:
+ - ghostnet:
+
+Template: octez-node/purge_warning
+Type: string
+Default: no
+Description: Do you really want to remove all data ?
+ This operation will remove all node data, the node
+ configuration and all associated files. Otherwise,
+ the node data will be left untouched, and only the
+ packages will be removed.
+
+ Enter "yes, please" to confirm.
+
+Template: octez-node/configure
+Type: string
+Default: no
+Description: Skipping node init ?
+ Enter "yes" to skip.

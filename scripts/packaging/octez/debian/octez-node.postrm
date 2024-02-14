@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+
+# Load debconf library
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+case "${1}" in
+purge)
+
+  DATADIR=/var/tezos
+  # display a warning before proceding
+  db_get octez-node/purge_warning || true
+  case "$RET" in
+  "yes, please")
+    rm -Rf "$DATADIR"
+    deluser --quiet tezos || true
+    delgroup --quiet --only-if-empty tezos || true
+    rm -Rf /var/log/tezos
+    ;;
+  *)
+    echo "Not purging DATADIR. Octez-node data is intact"
+    ;;
+  esac
+  # Purge debconf data for the package in any case
+  # shellcheck disable=SC2119
+  db_purge || true
+  ;;
+remove | upgrade | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+*)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 1
+  ;;
+esac
+
+#DEBHELPER#
