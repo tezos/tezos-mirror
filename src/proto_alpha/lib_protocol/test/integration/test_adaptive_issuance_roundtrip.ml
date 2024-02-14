@@ -1352,7 +1352,7 @@ let double_bake_ delegate_name (block, state) =
       denounced = false;
       evidence;
       kind = Double_baking;
-      level = block.header.shell.level;
+      level = main_branch.header.shell.level;
       misbehaviour;
     }
   in
@@ -1409,7 +1409,7 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
       denounced = false;
       evidence;
       kind;
-      level = block.header.shell.level;
+      level = main_branch.header.shell.level;
       misbehaviour =
         Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
           attestation_a;
@@ -1480,64 +1480,67 @@ let update_state_denunciation (block, state)
     let next_level =
       Protocol.Alpha_context.Raw_level.(to_int32 @@ succ block_level)
     in
-    if level > next_level then
+    let inclusion_cycle =
+      cycle_from_level block.constants.blocks_per_cycle next_level
+    in
+    let ds_cycle = cycle_from_level block.constants.blocks_per_cycle level in
+    if Cycle.(ds_cycle > inclusion_cycle) then
       (* The denunciation is trying to be included too early *)
       return (state, denounced)
+    else if
+      Cycle.(
+        add ds_cycle Protocol.Constants_repr.max_slashing_period
+        <= inclusion_cycle)
+    then
+      (* The denunciation is too late and gets refused. *)
+      return (state, denounced)
+    else if get_pending_slashed_pct_for_delegate (block, state) culprit >= 100
+    then
+      (* Culprit has been slashed too much, a denunciation is not added to the list.
+         TODO: is the double signing treated as included, or can it be included in the
+         following cycle? *)
+      return (state, denounced)
     else
-      let inclusion_cycle =
-        cycle_from_level block.constants.blocks_per_cycle next_level
+      (* for simplicity's sake (lol), the block producer and the payload producer are the same
+         We also assume that the current state baking policy will be used for the next block *)
+      let* rewarded, _, _, _ =
+        Block.get_next_baker ?policy:state.baking_policy block
       in
-      let ds_cycle = cycle_from_level block.constants.blocks_per_cycle level in
-      if Cycle.(succ ds_cycle < inclusion_cycle) then
-        (* denunciation is too late, gets refused *)
-        return (state, denounced)
-      else if get_pending_slashed_pct_for_delegate (block, state) culprit >= 100
-      then
-        (* Culprit has been slashed too much, a denunciation is not added to the list.
-           TODO: is the double signing treated as included, or can it be included in the
-           following cycle? *)
-        return (state, denounced)
-      else
-        (* for simplicity's sake (lol), the block producer and the payload producer are the same
-           We also assume that the current state baking policy will be used for the next block *)
-        let* rewarded, _, _, _ =
-          Block.get_next_baker ?policy:state.baking_policy block
-        in
-        let culprit_name, culprit_account =
-          State.find_account_from_pkh culprit state
-        in
-        let state =
-          State.update_account
-            culprit_name
-            {
-              culprit_account with
-              slashed_cycles = inclusion_cycle :: culprit_account.slashed_cycles;
-            }
-            state
-        in
-        let new_pending_slash =
-          ( culprit,
-            {
-              Protocol.Denunciations_repr.rewarded;
-              misbehaviour;
-              operation_hash = Operation_hash.zero;
-              (* unused *)
-            } )
-        in
-        (* TODO: better log... *)
-        Log.info
-          ~color:Log_module.event_color
-          "Including denunciation (misbehaviour cycle %a)"
-          Cycle.pp
-          ds_cycle ;
-        let state =
-          State.
-            {
-              state with
-              pending_slashes = new_pending_slash :: state.pending_slashes;
-            }
-        in
-        return (state, true)
+      let culprit_name, culprit_account =
+        State.find_account_from_pkh culprit state
+      in
+      let state =
+        State.update_account
+          culprit_name
+          {
+            culprit_account with
+            slashed_cycles = inclusion_cycle :: culprit_account.slashed_cycles;
+          }
+          state
+      in
+      let new_pending_slash =
+        ( culprit,
+          {
+            Protocol.Denunciations_repr.rewarded;
+            misbehaviour;
+            operation_hash = Operation_hash.zero;
+            (* unused *)
+          } )
+      in
+      (* TODO: better log... *)
+      Log.info
+        ~color:Log_module.event_color
+        "Including denunciation (misbehaviour cycle %a)"
+        Cycle.pp
+        ds_cycle ;
+      let state =
+        State.
+          {
+            state with
+            pending_slashes = new_pending_slash :: state.pending_slashes;
+          }
+      in
+      return (state, true)
 
 let make_denunciations_ ?(filter = fun {denounced; _} -> not denounced)
     (block, state) =
@@ -2484,8 +2487,7 @@ module Slashing = struct
                    let ds = state.State.double_signings in
                    let ds = match ds with [a] -> a | _ -> assert false in
                    let level =
-                     Protocol.Alpha_context.Raw_level.of_int32_exn
-                       (Int32.succ ds.level)
+                     Protocol.Alpha_context.Raw_level.of_int32_exn ds.level
                    in
                    let last_cycle =
                      Cycle.add
