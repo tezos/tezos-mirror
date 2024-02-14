@@ -171,6 +171,46 @@ let update_block_denunciations_map_with delegate denunciations initial_block_map
     initial_block_map
     denunciations
 
+let get_block_and_remaining_denunciations ctxt current_cycle =
+  Storage.Pending_denunciations.fold
+    ctxt
+    ~order:`Undefined
+    ~init:(MisMap.empty, [])
+    ~f:(fun delegate denunciations acc ->
+      let block_map, remaining_denunciations = acc in
+      (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
+         end of this period, we "delay" the current cycle's misbehaviour's denunciations,
+         while we apply the older denunciations.
+         Indeed, we apply denunciations in the cycle following the misbehaviour, so that
+         the time between the misbehaviour and the slashing is at most
+         [max_slashing_period = 2] cycles. *)
+      let denunciations_to_apply, denunciations_to_delay =
+        if not (Constants_storage.adaptive_issuance_ns_enable ctxt) then
+          (denunciations, [])
+        else
+          List.partition
+            (fun denunciation ->
+              let level = denunciation.Denunciations_repr.misbehaviour.level in
+              let misb_cycle =
+                (Level_repr.level_from_raw
+                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                   level)
+                  .cycle
+              in
+              Cycle_repr.(misb_cycle < current_cycle))
+            denunciations
+      in
+      let new_block_map =
+        update_block_denunciations_map_with
+          delegate
+          denunciations_to_apply
+          block_map
+      in
+      let new_remaining_denunciations =
+        (delegate, denunciations_to_delay) :: remaining_denunciations
+      in
+      Lwt.return (new_block_map, new_remaining_denunciations))
+
 let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
@@ -179,46 +219,7 @@ let apply_and_clear_denunciations ctxt =
   in
   (* Split denunciations into two groups: to be applied, and to be delayed *)
   let*! block_denunciations_map, remaining_denunciations =
-    Pending_denunciations_storage.fold
-      ctxt
-      ~order:`Undefined
-      ~init:(MisMap.empty, [])
-      ~f:(fun delegate denunciations acc ->
-        let block_map, remaining_denunciations = acc in
-        (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
-           end of this period, we "delay" the current cycle's misbehaviour's denunciations,
-           while we apply the older denunciations.
-           Indeed, we apply denunciations in the cycle following the misbehaviour, so that
-           the time between the misbehaviour and the slashing is at most
-           [max_slashing_period = 2] cycles. *)
-        let denunciations_to_apply, denunciations_to_delay =
-          if not (Constants_storage.adaptive_issuance_ns_enable ctxt) then
-            (denunciations, [])
-          else
-            List.partition
-              (fun denunciation ->
-                let level =
-                  denunciation.Denunciations_repr.misbehaviour.level
-                in
-                let misb_cycle =
-                  (Level_repr.level_from_raw
-                     ~cycle_eras:(Raw_context.cycle_eras ctxt)
-                     level)
-                    .cycle
-                in
-                Cycle_repr.(misb_cycle < current_cycle))
-              denunciations
-        in
-        let new_block_map =
-          update_block_denunciations_map_with
-            delegate
-            denunciations_to_apply
-            block_map
-        in
-        let new_remaining_denunciations =
-          (delegate, denunciations_to_delay) :: remaining_denunciations
-        in
-        Lwt.return (new_block_map, new_remaining_denunciations))
+    get_block_and_remaining_denunciations ctxt current_cycle
   in
   (* Processes the applicable denunciations *)
   let* ctxt, balance_updates =
