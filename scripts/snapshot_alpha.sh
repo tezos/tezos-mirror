@@ -104,37 +104,28 @@ sed -e "s/^Protocol Alpha/Protocol ${capitalized_label}/" \
   -e "s,src/proto_alpha,src/proto_${version}_${short_hash},g" \
   docs/protocols/alpha.rst > "docs/protocols/${version}_${label}.rst"
 
-# add entries in the doc index
-# copy from alpha rather from previous protocol because there may be newly added items
+# add entries in the doc index for the snaptshotted protocol by
+# pattern-matching some existing lines and inserting variations thereof
 echo "Add entries in the doc index"
-alpha_line='Alpha Dev Protocol doc'
 doc_index="docs/index.rst"
-(
-  set -e
-  grep -B9999 -F "$alpha_line" "$doc_index" |
-    head -n-1
-  grep -A9999 -F "$alpha_line" "$doc_index" |
-    grep -B9999 -F 'toctree' -m1 |
-    head -n-1 |
-    sed -e "s/Alpha Dev/${capitalized_label}/g" \
-      -e "s,alpha/,${label}/,g"
-  grep -B9999 -F "$alpha_line" "$doc_index" |
-    tac |
-    grep -B9999 -F 'toctree' -m1 |
-    tac
-  grep -A9999 -F "$alpha_line" "$doc_index" |
-    tail -n+2 |
-    awk '{
-                if ($0 ~ PATTERN) {
-                    x=$0
-                    sub(PATTERN,REPLACEMENT)
-                    print
-                    print x
-                } else {
-                    print
-                }
-             }' PATTERN='protocols/alpha' REPLACEMENT="protocols/${version}_${label}"
-) > "${doc_index}.tmp"
+awk -v PATTERN1="Alpha Dev Protocol Reference <alpha/index>" \
+  -v REPLACEMENT1="${capitalized_label} Protocol Reference <${label}/index>" \
+  -v PATTERN2='protocols/alpha' \
+  -v REPLACEMENT2="protocols/${version}_${label}" '{
+        if ($0 ~ PATTERN1) {
+            x=$0
+            sub(PATTERN1,REPLACEMENT1)
+            print
+            print x
+        } else if ($0 ~ PATTERN2) {
+            x=$0
+            sub(PATTERN2,REPLACEMENT2)
+            print
+            print x
+        } else {
+          print
+        }
+     }' < "${doc_index}" > "${doc_index}.tmp"
 mv "${doc_index}.tmp" "$doc_index"
 
 # Replace test invocation headers that mention proto_alpha
@@ -171,7 +162,7 @@ find . -name '*.old' -exec rm {} \;
 # automatically add the new protocol tag to alcotezt
 
 temp_file=$(mktemp)
-head -n -1 tezt/lib_alcotezt/alcotezt_utils.ml > "$temp_file"
+tac tezt/lib_alcotezt/alcotezt_utils.ml | tail +2 | tac > "$temp_file"
 echo "  | Some \"${version}_${short_hash}\" -> [\"${label}\"]" >> "$temp_file"
 echo "  | Some _ -> assert false" >> "$temp_file"
 mv "$temp_file" tezt/lib_alcotezt/alcotezt_utils.ml

@@ -180,23 +180,11 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Oxford Protocol Reference
+   :caption: Protocol Reference Manuals
    :hidden:
 
-   active/protocol
-   active/glossary
-   active/cli-commands
-   active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Alpha Dev Protocol Reference
-   :hidden:
-
-   alpha/protocol
-   alpha/glossary
-   alpha/cli-commands
-   alpha/rpc
+   Oxford Protocol Reference <active/index>
+   Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
    :maxdepth: 2
