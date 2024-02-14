@@ -171,10 +171,78 @@ where
     pub fn run_bne(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
         self.run_bne_impl::<4>(imm, rs1, rs2)
     }
+
+    /// `BGE` B-type instruction
+    ///
+    /// Returns branching address if rs1 is greater than or equal to rs2 in signed comparison,
+    /// otherwise the next instruction address
+    pub fn run_bge(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        let current_pc = self.pc.read();
+
+        let lhs = self.xregisters.read(rs1) as i64;
+        let rhs = self.xregisters.read(rs2) as i64;
+
+        if lhs >= rhs {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(4)
+        }
+    }
+
+    /// `BGEU` B-type instruction
+    ///
+    /// Returns branching address if rs1 is greater than or equal to rs2 in unsigned comparison,
+    /// otherwise the next instruction addres
+    pub fn run_bgeu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        let current_pc = self.pc.read();
+
+        let lhs = self.xregisters.read(rs1);
+        let rhs = self.xregisters.read(rs2);
+
+        if lhs >= rhs {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(4)
+        }
+    }
+
+    /// `BLT` B-type instruction
+    ///
+    /// Returns branching address if rs1 is lower than rs2 in signed comparison,
+    /// otherwise the next instruction address
+    pub fn run_blt(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        let current_pc = self.pc.read();
+
+        let lhs = self.xregisters.read(rs1) as i64;
+        let rhs = self.xregisters.read(rs2) as i64;
+
+        if lhs < rhs {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(4)
+        }
+    }
+
+    /// `BLTU` B-type instruction
+    ///
+    /// Returns branching address if rs1 is lower than rs2 in unsigned comparison,
+    /// otherwise the next instruction address
+    pub fn run_bltu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Address {
+        let current_pc = self.pc.read();
+
+        let lhs = self.xregisters.read(rs1);
+        let rhs = self.xregisters.read(rs2);
+
+        if lhs < rhs {
+            current_pc.wrapping_add(imm as u64)
+        } else {
+            current_pc.wrapping_add(4)
+        }
+    }
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::machine_state::{
         registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
         HartState, HartStateLayout,
@@ -302,6 +370,46 @@ pub mod tests {
         });
     });
 
+    backend_test!(test_bge_blt, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+        )| {
+            // to ensure branch_pc and init_pc are different
+            prop_assume!(imm > 10);
+            let branch_pc = init_pc.wrapping_add(imm as u64);
+            let next_pc = init_pc.wrapping_add(4);
+
+            let mut backend = create_backend!(HartStateLayout, F);
+            let mut state = create_state!(HartState, F, backend);
+
+            // lhs < rhs
+            test_branch_instr!(state, run_blt, imm, t1, 0, t2, 1, init_pc, branch_pc);
+            test_branch_instr!(state, run_bge, imm, t1, i64::MIN as u64, t2, i64::MAX as u64, init_pc, next_pc);
+
+            // lhs > rhs
+            test_branch_instr!(state, run_blt, imm, t1, -1_i64 as u64, t2, i64::MAX as u64, init_pc, branch_pc);
+            test_branch_instr!(state, run_bge, imm, t1, 0, t2, -123_123i64 as u64, init_pc, branch_pc);
+
+            // lhs = rhs
+            test_branch_instr!(state, run_blt, imm, t1, 0, t2, 0, init_pc, next_pc);
+            test_branch_instr!(state, run_bge, imm, t1, i64::MAX as u64, t2, i64::MAX as u64, init_pc, branch_pc);
+
+            // same register
+            test_branch_instr!(state, run_blt, imm, t1, -1_i64 as u64, t1, -1_i64 as u64, init_pc, next_pc);
+            test_branch_instr!(state, run_bge, imm, t2, 0, t2, 0, init_pc, branch_pc);
+
+            // imm 0
+            // lhs < rhs
+            test_branch_instr!(state, run_blt, 0, t1, 100, t2, i64::MAX as u64, init_pc, init_pc);
+            test_branch_instr!(state, run_bge, 0, t1, -1_i64 as u64, t2, i64::MIN as u64, init_pc, init_pc);
+
+            // same register
+            test_branch_instr!(state, run_blt, 0, t1, 123_123_123, t1, 123_123_123, init_pc, next_pc);
+            test_branch_instr!(state, run_bge, 0, t2, -1_i64 as u64, t2, -1_i64 as u64, init_pc, init_pc);
+        });
+    });
+
     backend_test!(test_bitwise, F, {
         proptest!(|(val in any::<u64>(), imm in any::<u64>())| {
             let mut backend = create_backend!(XRegistersLayout, F);
@@ -336,6 +444,58 @@ pub mod tests {
             state.run_xori(positive_imm as i64, t2, t1);
             prop_assert_eq!(state.read(t1), val ^ positive_imm);
         })
+    });
+
+    backend_test!(test_bge_ble_u, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+            r1_val in any::<u64>(),
+            r2_val in any::<u64>(),
+        )| {
+            prop_assume!(r1_val < r2_val);
+            // to ensure branch_pc and init_pc are different
+            prop_assume!(imm > 10);
+            let branch_pc = init_pc.wrapping_add(imm as u64);
+            let next_pc = init_pc.wrapping_add(4);
+
+            let mut backend = create_backend!(HartStateLayout, F);
+            let mut state = create_state!(HartState, F, backend);
+
+            // lhs < rhs
+            test_branch_instr!(state, run_bltu, imm, t1, r1_val, t2, r2_val, init_pc, branch_pc);
+            test_branch_instr!(state, run_bgeu, imm, t1, r1_val, t2, r2_val, init_pc, next_pc);
+
+            // lhs > rhs
+            test_branch_instr!(state, run_bltu, imm, t1, r2_val, t2, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, imm, t1, r2_val, t2, r1_val, init_pc, branch_pc);
+
+            // lhs = rhs
+            test_branch_instr!(state, run_bltu, imm, t1, r1_val, t2, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, imm, t1, r2_val, t2, r2_val, init_pc, branch_pc);
+
+            // same register
+            test_branch_instr!(state, run_bltu, imm, t1, r1_val, t1, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, imm, t2, r1_val, t2, r1_val, init_pc, branch_pc);
+
+            // imm 0
+            // lhs < rhs
+            test_branch_instr!(state, run_bltu, 0, t1, r1_val, t2, r2_val, init_pc, init_pc);
+            test_branch_instr!(state, run_bgeu, 0, t1, r1_val, t2, r2_val, init_pc, next_pc);
+
+            // lhs > rhs
+            test_branch_instr!(state, run_bltu, 0, t1, r2_val, t2, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, 0, t1, r2_val, t2, r1_val, init_pc, init_pc);
+
+            // lhs = rhs
+            test_branch_instr!(state, run_bltu, 0, t1, r1_val, t2, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, 0, t2, r2_val, t1, r2_val, init_pc, init_pc);
+
+            // same register
+            test_branch_instr!(state, run_bltu, 0, t1, r1_val, t1, r1_val, init_pc, next_pc);
+            test_branch_instr!(state, run_bgeu, 0, t2, r1_val, t2, r1_val, init_pc, init_pc);
+
+        });
     });
 
     backend_test!(test_jalr, F, {

@@ -119,7 +119,7 @@ mod tests {
         },
     };
     use crate::{create_backend, create_state};
-    use proptest::{arbitrary::any, proptest};
+    use proptest::{arbitrary::any, prop_assert_eq, proptest};
 
     backend_test!(test_addiw, F, {
         proptest!(|(
@@ -134,7 +134,7 @@ mod tests {
             // check against wrapping addition performed on the lowest 32 bits
             let r_val = reg_val as u32;
             let i_val = imm as u32;
-            assert_eq!(
+            prop_assert_eq!(
                 state.xregisters.read(a1),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
             )
