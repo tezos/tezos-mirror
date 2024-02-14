@@ -15,6 +15,9 @@
 - Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
 - Fix a bug where validation would succeed, for a transaction that failed to pay da-fee. (!11992)
 - Gas is now charged for inner create. (!11814)
+- Add missing checks on data integrity and signature overflows for
+  the `ecrecover` precompile contract. (!11997)
+
 
 ### Breaking changes
 
