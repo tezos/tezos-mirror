@@ -303,6 +303,17 @@ mod test {
         account.set_code(host, code).unwrap();
     }
 
+    fn get_code(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+    ) -> Vec<u8> {
+        let account = evm_account_storage
+            .get_or_create(host, &account_path(address).unwrap())
+            .unwrap();
+        account.code(host).unwrap()
+    }
+
     fn bump_nonce(
         host: &mut impl Runtime,
         evm_account_storage: &mut EthereumAccountStorage,
@@ -2323,7 +2334,8 @@ mod test {
         + 32000 // create base cost
         + 1220 // transaction data cost
         + 12600 // code deposit cost
-        + 42; // init cost
+        + 42 // init cost
+        + 4; // extra cost (EIP-3860)
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -2378,7 +2390,8 @@ mod test {
         let expected_gas = 21000 // base cost
         + 32000 // create cost
         + 32 * CONFIG.gas_transaction_non_zero_data // transaction data cost
-        + 3; // init cost
+        + 3 // init cost
+        + 2; // extra cost (EIP-3860)
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -3482,5 +3495,110 @@ mod test {
 
         assert_eq!(caller_nonce, U256::one());
         assert_eq!(internal_address_nonce, U256::from(2));
+    }
+
+    #[test]
+    fn exceed_max_create_init_code_size_fails() {
+        // Test is taken from:
+        // ethereum/tests/GeneralStateTests/Shanghai/stEIP3860-limitmeterinitcode/createInitCodeSizeLimit.json
+        // with the second data which is invalid (size wise)
+        // The test was a bit tweaked so that the called contract transfer 1 WEI to the called contract.
+
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let address_1 =
+            H160::from_str("000000000000000000000000000000000000c0de").unwrap();
+        let address_2 =
+            H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+        let address_3 =
+            H160::from_str("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").unwrap();
+
+        bump_nonce(&mut host, &mut evm_account_storage, &address_1);
+        bump_nonce(&mut host, &mut evm_account_storage, &address_2);
+        bump_nonce(&mut host, &mut evm_account_storage, &address_3);
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &address_2,
+            U256::from(200000000),
+        );
+
+        set_balance(&mut host, &mut evm_account_storage, &address_3, U256::one());
+
+        let code_1 = hex::decode(
+            "69600a80600080396000f360b01b6000908152355a90600080f0905a9003600a5560005500",
+        )
+        .unwrap();
+        let code_3 =
+            hex::decode("600035600052600080366000600161c0de62989680f16000556001805500")
+                .unwrap();
+
+        set_account_code(&mut host, &mut evm_account_storage, &address_1, &code_1);
+        set_account_code(&mut host, &mut evm_account_storage, &address_3, &code_3);
+
+        // Invalid initcode size = 49153 bytes (max allowed is 49152)
+        let call_data = hex::decode(
+            "000000000000000000000000000000000000000000000000000000000000c001",
+        )
+        .unwrap();
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(address_3),
+            address_2,
+            call_data,
+            Some(15000000),
+            U256::from(10),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS * 100,
+            false,
+            false,
+        )
+        .unwrap()
+        .unwrap();
+
+        // The internal call should have failed but not the initial one.
+        // Second contract tried to transfer one WEI to the second contract but
+        // the changes have been rollbacked since there was a CreateContractLimit
+        // error.
+
+        let balance_1 = get_balance(&mut host, &mut evm_account_storage, &address_1);
+        let balance_3 = get_balance(&mut host, &mut evm_account_storage, &address_3);
+
+        assert_eq!(balance_1, U256::zero());
+        assert_eq!(balance_3, U256::one());
+
+        // With call data: 0x000000000000000000000000000000000000000000000000000000000000c001
+        // 0x5f6baaeb5b7c97725f84d1569c4abc85135f4716 should be the generated address,
+        // we check that it does not exist.
+
+        let address_unknown =
+            H160::from_str("5f6baaeb5b7c97725f84d1569c4abc85135f4716").unwrap();
+
+        let balance_unknwown =
+            get_balance(&mut host, &mut evm_account_storage, &address_unknown);
+        let nonce_unknown =
+            get_nonce(&mut host, &mut evm_account_storage, &address_unknown);
+        let code_unknown =
+            get_code(&mut host, &mut evm_account_storage, &address_unknown);
+
+        assert_eq!(balance_unknwown, U256::zero());
+        assert_eq!(nonce_unknown, U256::zero());
+        assert!(code_unknown.is_empty());
+
+        // The initial call succeeds
+        assert_eq!(
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
+            result.reason
+        )
     }
 }

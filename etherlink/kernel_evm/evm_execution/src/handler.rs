@@ -36,9 +36,6 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
-/// Maximum allowed code size as specified by EIP-170
-const MAX_CODE_SIZE: usize = 0x6000;
-
 /// Extends ExitReason with our own errors. It avoids using
 /// ExitError::Other(<string>) and matching on strings.
 #[derive(Debug, Eq, PartialEq)]
@@ -806,13 +803,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     ));
                 }
 
-                if code_out.len() > MAX_CODE_SIZE {
-                    // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
-                    return Ok((
-                        ExitReason::Error(ExitError::CreateContractLimit),
-                        None,
-                        vec![],
-                    ));
+                // We check that the maximum allowed code size as specified by EIP-170 can not
+                // be reached.
+                if let Some(create_contract_limit) = self.config.create_contract_limit {
+                    if code_out.len() > create_contract_limit {
+                        // EIP-170: see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-170.md
+                        return Ok((
+                            ExitReason::Error(ExitError::CreateContractLimit),
+                            None,
+                            vec![],
+                        ));
+                    }
                 }
 
                 if let Err(err) = self.record_deposit(code_out.len()) {
@@ -907,6 +908,39 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
+
+        // We check that the maximum allowed init code size as specified by EIP-3860
+        // can not be reached.
+        if let Some(max_initcode_size) = self.config.max_initcode_size {
+            if initial_code.len() > max_initcode_size {
+                return Ok((
+                    ExitReason::Error(ExitError::CreateContractLimit),
+                    None,
+                    vec![],
+                ));
+            }
+        }
+
+        // Charge of 2 gas for every 32-byte chunk of initcode to represent
+        // the cost of jumpdest-analysis.
+        // See: https://eips.ethereum.org/EIPS/eip-3860
+        // * We target wasm32-unknown-unknown, so this conversion should be safe.
+        // * The division behave as an unsafe div_floor which we can't use since
+        //   it's nightly-only.
+        // * The `unwrap_or` is there in case there's an unexpected behaviour
+        //   that we missed.
+        let extra_cost: u64 = (initial_code.len() / 32).try_into().unwrap_or(0) * 2;
+
+        if self.record_cost(extra_cost).is_err() {
+            log!(
+                self.host,
+                Debug,
+                "Not enought gas for call. Required at least: {:?} for the init code size extra cost.",
+                extra_cost
+            );
+
+            return Ok((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
+        }
 
         let context = Context {
             address,
@@ -1681,6 +1715,33 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                         false,
                     )
                 }
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                    ExitError::CreateContractLimit,
+                )) => {
+                    // For more context for why we need this specific case and behaviour
+                    // look out for [MAX_INIT_CODE_SIZE_RETURN_HACK] in this file.
+
+                    let create_contract_limit =
+                        ExitReason::Error(ExitError::CreateContractLimit);
+                    let execution_result = execution_result.unwrap(); // safe unwrap
+
+                    log!(
+                        self.host,
+                        Debug,
+                        "Intermediate transaction produced the following error: {:?}",
+                        create_contract_limit
+                    );
+
+                    Self::rollback_inter_transaction_side_effect(
+                        self,
+                        (
+                            create_contract_limit,
+                            execution_result.1,
+                            execution_result.2,
+                        ),
+                        false,
+                    )
+                }
                 ExitReason::Fatal(_) => {
                     log!(
                         self.host,
@@ -1982,6 +2043,34 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
         match self.can_begin_inter_transaction(caller, &value) {
             Precondition::PassPrecondition => {
+                // We check that the maximum allowed init code size as specified by EIP-3860
+                // can not be reached.
+                if let Some(max_initcode_size) = self.config.max_initcode_size {
+                    if init_code.len() > max_initcode_size {
+                        // [MAX_INIT_CODE_SIZE_RETURN_HACK]
+                        // The normal behavior stated by https://www.evm.codes/#f0?fork=shanghai
+                        // would be to return a simple error.
+                        // « Error cases: [..]
+                        //  * size is greater than the chain's maximum initcode size (since Shanghai fork) »
+                        //
+                        // Unfortunately there is a bug in [evm-runtime-0.39.0] where the `finish_create`
+                        // function will always consider error/revert/succed as a "Ok(()) => Control::Continue"
+                        // flow which makes it that we can not rollback anything as it should in this case.
+                        // The hack-ish way to be able to capture that error and rollback as it should is
+                        // to consider this error as fatal and then catch it in `end_inter_transaction`,
+                        // rollback what needs to be and then transform the outputed fatal error to a simple
+                        // `ExitReason::Error(ExitError::CreateContractLimit)`.
+
+                        return Capture::Exit((
+                            ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                                ExitError::CreateContractLimit,
+                            )),
+                            None,
+                            vec![],
+                        ));
+                    }
+                }
+
                 let gas_limit = self.nested_call_gas_limit(target_gas);
 
                 if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
@@ -3373,6 +3462,11 @@ mod test {
         let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
 
         let contract_address = handler.create_address(scheme);
+
+        handler
+            .begin_initial_transaction(false, Some(10000))
+            .unwrap();
+
         let result =
             handler.execute_create(caller, U256::from(100000), code, contract_address);
 
@@ -3924,5 +4018,44 @@ mod test {
             }),
             result,
         )
+    }
+
+    #[test]
+    fn exceed_max_create_init_code_size_fail_with_error() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+            false,
+        );
+
+        let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
+
+        let scheme = CreateScheme::Legacy { caller };
+        let address = handler.create_address(scheme);
+
+        handler
+            .begin_initial_transaction(false, Some(150000))
+            .unwrap();
+
+        let result = handler
+            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
+            .unwrap();
+
+        assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
     }
 }
