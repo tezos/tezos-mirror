@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -105,14 +106,6 @@ module WASM = struct
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm"
 
   let tx_kernel_dal = Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm"
-
-  (* Note: this should probably depend on the protocol,
-     and thus be in the [Protocol] module? *)
-  let tx_kernel_fixed_dac =
-    Uses.make
-      ~tag:"tx_kernel_fixed_dac"
-      ~path:
-        "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/tx-kernel-fixed-dac.wasm"
 end
 
 (* TODO: tezos/tezos#4803

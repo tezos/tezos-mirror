@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023 Trili Tech <contact@trili.tech>                        *)
+(* Copyright (c) 2023-2024 Trilitech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1408,7 +1408,7 @@ let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
 (* Modified from tezt/tests/tx_sc_rollup.ml *)
 module Tx_kernel_e2e = struct
   open Sc_rollup_helpers
-  module Bls = Tezos_crypto.Signature.Bls
+  module Ed25519 = Tezos_crypto.Signature.Ed25519
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5577
      Once we introduce DAC API ("v1"), [Tx_kernel_e2e] test suite should
@@ -1417,211 +1417,6 @@ module Tx_kernel_e2e = struct
   let send_message ?(src = Constant.bootstrap2.alias) client msg =
     let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
     Client.bake_for_and_wait client
-
-  (* TX Kernel external messages and their encodings *)
-  module Tx_kernel = struct
-    open Tezos_protocol_alpha.Protocol
-    open Tezos_crypto.Signature
-
-    type ticket = {
-      ticketer : Alpha_context.Contract.t;
-      content : string;
-      amount : int;
-    }
-
-    let ticket_of ~ticketer ~content amount =
-      {
-        ticketer = Result.get_ok (Alpha_context.Contract.of_b58check ticketer);
-        content;
-        amount;
-      }
-
-    (* Primitive operation of tx kernel.
-       Several primitive operations might be outgoing from the same account.
-       Corresponds to kernel_core::inbox::external::v1::OperationContent
-       type in the tx kernel. *)
-    type operation =
-      | Withdrawal of {
-          receiver_contract : Contract_hash.t;
-          ticket : ticket;
-          entrypoint : string;
-        }
-      | Transfer of {
-          (* tz4 address *)
-          destination : Tezos_crypto.Signature.Bls.Public_key_hash.t;
-          ticket : ticket;
-        }
-
-    (* List of elemtary operations which are outgoing from the same account.
-       Corresponds to a pair of
-         * kernel_core::bls::BlsKey and
-         * kernel_core::inbox::external::v1::verifiable::VerifiableOperation
-       in the tx kernel.
-       VerifiableOperation::signer is replaced by its private key
-       in order to be able to sign outer [multiaccount_tx].
-       In terms of the tx kernel it is rather *sending* type not *verifiable*.
-    *)
-    type account_operations = {
-      signer : Bls.Secret_key.t;
-      counter : int64;
-      operations : operation list;
-    }
-
-    let account_operations_of ~sk ~counter operations =
-      {signer = sk; counter; operations}
-
-    (* Several account operations.
-       Content of this tx signed by each account,
-       and stored in the aggregated signature.
-       Corresponds to
-          kernel_core::inbox::external::v1::verifiable::VerifiableTransaction type
-       in the tx kernel
-    *)
-    type multiaccount_tx = {
-      accounts_operations : account_operations list;
-      encoded_accounts_ops : string; (* just encoded concatenated list above *)
-      aggregated_signature : Bls.t;
-    }
-
-    (* Batch of multiaccount transactions.
-       Corresponds to
-         kernel_core::inbox::external::v1::ParsedBatch type
-       in the tx kernel
-    *)
-    type transactions_batch = {
-      transactions : multiaccount_tx list;
-      encoded_transactions : string; (* just encoded concatenated list above *)
-      aggregated_signature : Bls.t;
-    }
-
-    module Encodings = struct
-      let list_encode xs =
-        Data_encoding.(Binary.to_string_exn string @@ String.concat "" xs)
-
-      (* String ticket encoding for tx kernel.
-         Corresponds to kernel_core::encoding::string_ticket::StringTicketRepr *)
-      let ticket_repr {ticketer; content; amount} : string =
-        let open Tezos_protocol_alpha.Protocol.Alpha_context in
-        Printf.sprintf
-          "\007\007\n\000\000\000\022%s\007\007\001%s\000%s"
-          Data_encoding.(Binary.to_string_exn Contract.encoding ticketer)
-          Data_encoding.(Binary.to_string_exn bytes @@ Bytes.of_string content)
-          Data_encoding.(Binary.to_string_exn z @@ Z.of_int amount)
-
-      (* Encoding of kernel_core::inbox::external::v1::OperationContent from tx_kernel *)
-      let operation_repr = function
-        | Withdrawal {receiver_contract; ticket; entrypoint} ->
-            let open Alpha_context in
-            let withdrawal_prefix = "\000" in
-            let contract_bytes =
-              Data_encoding.(
-                Binary.to_string_exn Contract_hash.encoding receiver_contract)
-            in
-            let entrypoint_bytes =
-              Data_encoding.(
-                Entrypoint.of_string_strict_exn entrypoint
-                |> Binary.to_string_exn Entrypoint.simple_encoding)
-            in
-            withdrawal_prefix ^ contract_bytes ^ ticket_repr ticket
-            ^ entrypoint_bytes
-        | Transfer {destination; ticket} ->
-            let transfer_prefix = "\001" in
-            let tz4address =
-              Data_encoding.(
-                Binary.to_string_exn
-                  Tezos_crypto.Signature.Bls.Public_key_hash.encoding
-                  destination)
-            in
-            transfer_prefix ^ tz4address ^ ticket_repr ticket
-
-      let account_operations_repr {signer; counter; operations} : string =
-        let signer_bytes =
-          if Int64.equal counter 0L then
-            "\000" (* PK signer tag *)
-            ^ Data_encoding.(
-                Bls.Secret_key.to_public_key signer
-                |> Binary.to_string_exn Bls.Public_key.encoding)
-          else
-            "\001" (* tz4address signer tag *)
-            ^ Data_encoding.(
-                Bls.Secret_key.to_public_key signer
-                |> Bls.Public_key.hash
-                |> Binary.to_string_exn Bls.Public_key_hash.encoding)
-        in
-        let counter = Data_encoding.(Binary.to_string_exn int64 counter) in
-        let contents = list_encode @@ List.map operation_repr operations in
-        signer_bytes ^ counter ^ contents
-
-      let list_of_account_operations_repr
-          (accounts_operations : account_operations list) : string =
-        let account_ops_encoded =
-          List.map account_operations_repr accounts_operations
-        in
-        list_encode account_ops_encoded
-
-      let list_of_multiaccount_tx_encoding (transactions : multiaccount_tx list)
-          =
-        let txs_encodings =
-          List.map (fun x -> x.encoded_accounts_ops) transactions
-        in
-        list_encode txs_encodings
-    end
-
-    let multiaccount_tx_of (accounts_operations : account_operations list) =
-      let encoded_accounts_ops =
-        Encodings.list_of_account_operations_repr accounts_operations
-      in
-      let accounts_sks = List.map (fun x -> x.signer) accounts_operations in
-      (* List consisting of single transaction, that is fine *)
-      let aggregated_signature =
-        Option.get
-        @@ Bls.(
-             aggregate_signature_opt
-             @@ List.map
-                  (fun sk -> sign sk @@ Bytes.of_string encoded_accounts_ops)
-                  accounts_sks)
-      in
-      assert (
-        Bls.aggregate_check
-          (List.map
-             (fun sk ->
-               ( Bls.Secret_key.to_public_key sk,
-                 None,
-                 Bytes.of_string encoded_accounts_ops ))
-             accounts_sks)
-          aggregated_signature) ;
-      {accounts_operations; encoded_accounts_ops; aggregated_signature}
-
-    let transactions_batch_of (transactions : multiaccount_tx list) =
-      let encoded_transactions =
-        Encodings.list_of_multiaccount_tx_encoding transactions
-      in
-      let signatures =
-        List.map
-          (fun (x : multiaccount_tx) -> x.aggregated_signature)
-          transactions
-      in
-      let aggregated_signature =
-        Option.get @@ Bls.aggregate_signature_opt signatures
-      in
-      {transactions; encoded_transactions; aggregated_signature}
-
-    let external_message_of_batch ?(should_hex_encode = true)
-        (batch : transactions_batch) =
-      let v1_batch_prefix = "\000" in
-      let signature =
-        batch.aggregated_signature |> Tezos_crypto.Signature.Bls.to_bytes
-        |> Bytes.to_string
-      in
-      let raw = v1_batch_prefix ^ batch.encoded_transactions ^ signature in
-      if should_hex_encode then hex_encode raw else raw
-
-    (* External message consisting of single transaction. *)
-    let external_message_of_account_ops (accounts_ops : account_operations list)
-        =
-      external_message_of_batch @@ transactions_batch_of
-      @@ [multiaccount_tx_of accounts_ops]
-  end
 
   let assert_ticks_advanced ?block sc_rollup_node prev_ticks =
     let* ticks =
@@ -1675,17 +1470,11 @@ module Tx_kernel_e2e = struct
       in
       bake_until cond client sc_rollup_node
 
-  let ticket mint_and_deposit_contract amount =
-    Tx_kernel.ticket_of
-      ~ticketer:mint_and_deposit_contract
-      ~content:"Hello, Ticket!"
-      amount
-
   type prepare_message_setup = {
-    sk1 : Bls.Secret_key.t;
-    sk2 : Bls.Secret_key.t;
-    pkh1 : Bls.Public_key_hash.t;
-    pkh2 : Bls.Public_key_hash.t;
+    sk1 : Ed25519.Secret_key.t;
+    sk2 : Ed25519.Secret_key.t;
+    pkh1 : Ed25519.Public_key_hash.t;
+    pkh2 : Ed25519.Public_key_hash.t;
     transfer_message : string;
     withdraw_message : string;
     mint_and_deposit_contract : string;
@@ -1699,118 +1488,93 @@ module Tx_kernel_e2e = struct
     level : int;
   }
 
-  let prepare_contracts_and_messages
-      ?(transfer_message_should_hex_encode = true) ~client ~level protocol =
-    let pkh1, _pk, sk1 = Tezos_crypto.Signature.Bls.generate_key () in
-    let pkh2, _pk2, sk2 = Tezos_crypto.Signature.Bls.generate_key () in
+  (** prepares two messages:
+      - transfer (to be sent via DAC)
+      - withdraw (to be posted directly on L1)
+   *)
+  let prepare_contracts_and_messages ~sc_rollup_address ~client ~level protocol
+      =
+    let open Tezt_tx_kernel in
+    let ticket_content = "Hello, Ticket!" in
+
+    (* gen two tz1 accounts *)
+    let pkh1, pk1, sk1 = Tezos_crypto.Signature.Ed25519.generate_key () in
+    let pkh2, pk2, sk2 = Tezos_crypto.Signature.Ed25519.generate_key () in
 
     (* Originate a contract that will mint and transfer tickets to the tx kernel. *)
     (* Originate forwarder contract to send internal messages to rollup. *)
-    let* _, mint_and_deposit_contract =
-      Client.originate_contract_at (* ~alias:"rollup_deposit" *)
-        ~amount:Tez.zero
-        ~src:Constant.bootstrap1.alias
-        ~init:"Unit"
-        ~burn_cap:Tez.(of_int 1)
-        client
-        ["mini_scenarios"; "smart_rollup_mint_and_deposit_ticket"]
-        protocol
+    let* mint_and_deposit_contract =
+      Tezt_tx_kernel.Contracts.prepare_mint_and_deposit_contract client protocol
     in
-    let* () = Client.bake_for_and_wait client in
-    Log.info
-      "The mint and deposit contract %s was successfully originated"
-      mint_and_deposit_contract ;
     let level = level + 1 in
+    let ticketer =
+      Tezos_protocol_alpha.Protocol.Contract_hash.to_b58check
+        mint_and_deposit_contract
+    in
 
     (* originate ticket receiver contract that will receive withdrawls..*)
-    let* _, receive_tickets_contract =
-      Client.originate_contract_at
-        ~amount:Tez.zero
-        ~src:Constant.bootstrap1.alias
-        ~init:"{}"
-        ~burn_cap:Tez.(of_int 1)
+    let* receive_tickets_contract =
+      Tezt_tx_kernel.Contracts.prepare_receive_withdrawn_tickets_contract
         client
-        ["mini_scenarios"; "smart_rollup_receive_tickets"]
         protocol
     in
-    let* () = Client.bake_for_and_wait client in
-    Log.info
-      "The receiver contract %s was successfully originated"
-      receive_tickets_contract ;
     let level = level + 1 in
 
     (* Construct transfer message to send to rollup. *)
     let transfer_message =
-      Tx_kernel.(
-        [
-          multiaccount_tx_of
-            [
-              (* Transfer 50 tickets *)
-              account_operations_of
-                ~sk:sk1
-                ~counter:0L
-                [
-                  Transfer
-                    {
-                      destination = pkh2;
-                      ticket = ticket mint_and_deposit_contract 60;
-                    };
-                ];
-              (* Transfer 10 tickets back *)
-              account_operations_of
-                ~sk:sk2
-                ~counter:0L
-                [
-                  Transfer
-                    {
-                      destination = pkh1;
-                      ticket = ticket mint_and_deposit_contract 10;
-                    };
-                ];
-            ];
-          multiaccount_tx_of
-            [
-              (* Transfer another 10 tickets back but in a separate tx *)
-              account_operations_of
-                ~sk:sk2
-                ~counter:1L
-                [
-                  Transfer
-                    {
-                      destination = pkh1;
-                      ticket = ticket mint_and_deposit_contract 10;
-                    };
-                ];
-            ];
-        ]
-        |> transactions_batch_of
-        |> external_message_of_batch
-             ~should_hex_encode:transfer_message_should_hex_encode)
+      Transaction_batch.(
+        empty
+        |> add_transfer
+             ~counter:0
+             ~signer:(Public_key pk1)
+             ~signer_secret_key:sk1
+             ~destination:pkh2
+             ~ticketer
+             ~ticket_content
+             ~amount:60
+        |> add_transfer
+             ~counter:0
+             ~signer:(Public_key pk2)
+             ~signer_secret_key:sk2
+             ~destination:pkh1
+             ~ticketer
+             ~ticket_content
+             ~amount:10
+        |> make_encoded_batch)
     in
-    (* Construct withdrawal *)
-    let withdrawal_op amount =
-      Tx_kernel.Withdrawal
-        {
-          receiver_contract =
-            Tezos_protocol_alpha.Protocol.Contract_hash.of_b58check_exn
-              receive_tickets_contract;
-          ticket = ticket mint_and_deposit_contract amount;
-          entrypoint = "receive_tickets";
-        }
-    in
-
     (* Construct withdrawal mesage to send to rollup. *)
-    (* pk withdraws part of his tickets, pk2 withdraws all of his tickets *)
+    (* pk withdraws part of their tickets, pk2 withdraws all of their tickets *)
+    let sc_rollup_hash =
+      Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn sc_rollup_address
+    in
     let withdraw_message =
-      Tx_kernel.(
-        [
-          account_operations_of
-            ~sk:sk1
-            ~counter:1L
-            [withdrawal_op 220; withdrawal_op 100];
-          account_operations_of ~sk:sk2 ~counter:2L [withdrawal_op 40];
-        ]
-        |> external_message_of_account_ops)
+      Transaction_batch.(
+        empty
+        |> add_withdraw
+             ~counter:1
+             ~signer:(Public_key pk1)
+             ~signer_secret_key:sk1
+             ~destination:receive_tickets_contract
+             ~entrypoint:"receive_tickets"
+             ~ticketer
+             ~ticket_content
+             ~amount:220
+        |> add_withdraw
+             ~counter:1
+             ~signer:(Public_key pk2)
+             ~signer_secret_key:sk2
+             ~destination:receive_tickets_contract
+             ~entrypoint:"receive_tickets"
+             ~ticketer
+             ~ticket_content
+             ~amount:40
+        |> make_encoded_batch
+             ~wrap_with:(`External_message_frame sc_rollup_hash)
+        |> hex_encode)
+    in
+    let receiver =
+      Tezos_protocol_alpha.Protocol.Contract_hash.to_b58check
+        receive_tickets_contract
     in
     return
       {
@@ -1820,8 +1584,8 @@ module Tx_kernel_e2e = struct
         pkh2;
         transfer_message;
         withdraw_message;
-        mint_and_deposit_contract;
-        receive_tickets_contract;
+        mint_and_deposit_contract = ticketer;
+        receive_tickets_contract = receiver;
         level;
       }
 
@@ -1876,7 +1640,7 @@ module Tx_kernel_e2e = struct
      hex encoded and returned.
   *)
   let prepare_dac_external_message ~coordinator_node ~committee_members_nodes
-      ?(should_run_committee_member_nodes = true) payload =
+      ~sc_rollup_address ?(should_run_committee_member_nodes = true) payload =
     (* monitor event emission on dac member*)
     let wait_for_signature_pushed_event dac_member =
       Dac_node.wait_for
@@ -1925,8 +1689,30 @@ module Tx_kernel_e2e = struct
       Bytes.to_string
       @@ Bytes.concat Bytes.empty [root_hash; signature; witnesses]
     in
-    let l1_external_message = hex_encode ("\042" ^ dac_certificate_bin) in
+    let sc_rollup_hash_bytes =
+      Tezos_crypto.Hashed.(
+        sc_rollup_address |> Smart_rollup_address.of_b58check_exn
+        |> Data_encoding.Binary.to_string_exn Smart_rollup_address.encoding)
+    in
+    let external_frame = "\000" ^ sc_rollup_hash_bytes in
+    let l1_external_message =
+      hex_encode (external_frame ^ "\000" ^ dac_certificate_bin)
+    in
     return @@ (`Hex l1_external_message, `Hex preimage_hash)
+
+  let installer_config ~committee_members =
+    let open Tezos_crypto.Signature.Bls in
+    let open Sc_rollup_helpers.Installer_kernel_config in
+    List.mapi
+      (fun idx Account.{aggregate_public_key; _} ->
+        let to_ = Printf.sprintf "/kernel/dac.committee/%d" idx in
+        let (`Hex value) =
+          aggregate_public_key |> Public_key.of_b58check_exn
+          |> Data_encoding.Binary.to_bytes_exn Public_key.encoding
+          |> Hex.of_bytes
+        in
+        Set {value; to_})
+      committee_members
 
   (* Test scenario where DAC Observer is in sync with the Data Availability Committee - Ideal case.
      When a DAC ceritifcate is created, the Observer should download pages from the Coordinator and
@@ -1944,6 +1730,7 @@ module Tx_kernel_e2e = struct
             client;
             key;
             coordinator_node;
+            committee_members;
             committee_members_nodes;
             observer_nodes;
             rollup_nodes;
@@ -1956,13 +1743,15 @@ module Tx_kernel_e2e = struct
     let* _ = Dac_node.init_config observer_node in
     let* () = Dac_node.run observer_node in
     let* () = check_liveness_and_readiness observer_node in
+    let config = installer_config ~committee_members in
     let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        Constant.WASM.tx_kernel_fixed_dac
+        ~config:(`Config config)
+        Constant.WASM.tx_kernel
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -1997,11 +1786,7 @@ module Tx_kernel_e2e = struct
            level;
            _;
          } =
-      prepare_contracts_and_messages
-        ~client
-        ~level
-        ~transfer_message_should_hex_encode:false
-        protocol
+      prepare_contracts_and_messages ~sc_rollup_address ~client ~level protocol
     in
 
     (* Deposit *)
@@ -2012,7 +1797,7 @@ module Tx_kernel_e2e = struct
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
-      @@ Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh1
+      @@ Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh1
     in
 
     let payload = transfer_message in
@@ -2021,21 +1806,12 @@ module Tx_kernel_e2e = struct
        Retrieve certificate after committee members have signed.
        Prepare L1 Dac message hex encoded.
     *)
-    (* Tx kernel dac messages expects the root hash page to be a content page containing
-       a list of hashes that references the actually payload's merkle tree root hash.
-       Rollup id in tx kernel is hard-coded to `0` to select the list head. *)
-    let* _, hexed_preimage_hash =
-      prepare_dac_external_message
-        ~coordinator_node
-        ~committee_members_nodes
-        payload
-    in
     let* `Hex l1_external_message, _ =
       prepare_dac_external_message
         ~coordinator_node
         ~committee_members_nodes
-        ~should_run_committee_member_nodes:false
-        (Hex.to_string hexed_preimage_hash)
+        ~sc_rollup_address
+        payload
     in
 
     (* Send DAC certificate as an External Message to L1 *)
@@ -2108,6 +1884,7 @@ module Tx_kernel_e2e = struct
             client;
             key;
             coordinator_node;
+            committee_members;
             committee_members_nodes;
             observer_nodes;
             rollup_nodes;
@@ -2116,13 +1893,15 @@ module Tx_kernel_e2e = struct
       scenario
     in
     let sc_rollup_node = List.nth rollup_nodes 0 in
+    let config = installer_config ~committee_members in
     let* {boot_sector; _} =
       prepare_installer_kernel
         ~preimages_dir:
           (Filename.concat
              (Sc_rollup_node.data_dir sc_rollup_node)
              "wasm_2_0_0")
-        Constant.WASM.tx_kernel_fixed_dac
+        ~config:(`Config config)
+        Constant.WASM.tx_kernel
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -2165,11 +1944,7 @@ module Tx_kernel_e2e = struct
            level;
            _;
          } =
-      prepare_contracts_and_messages
-        ~client
-        ~level
-        ~transfer_message_should_hex_encode:false
-        protocol
+      prepare_contracts_and_messages ~sc_rollup_address ~client ~level protocol
     in
 
     (* Deposit *)
@@ -2180,7 +1955,7 @@ module Tx_kernel_e2e = struct
         ~sc_rollup_address
         ~mint_and_deposit_contract
         level
-      @@ Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh1
+      @@ Tezos_crypto.Signature.Ed25519.Public_key_hash.to_b58check pkh1
     in
     let payload = transfer_message in
 
@@ -2188,21 +1963,12 @@ module Tx_kernel_e2e = struct
        Retrieve certificate after committee members have signed.
        Prepare L1 Dac message hex encoded.
     *)
-    (* Tx kernel dac messages expects the root hash page to be a content page containing
-       a list of hashes that references the actually payload's merkle tree root hash.
-       Rollup id in tx kernel is hard-coded to `0` to select the list head. *)
-    let* _, transfer_messages_preimage_hash =
+    let* `Hex l1_external_message, transfer_messages_preimage_hash =
       prepare_dac_external_message
+        ~sc_rollup_address
         ~coordinator_node
         ~committee_members_nodes
         payload
-    in
-    let* `Hex l1_external_message, hexed_perimage_hash =
-      prepare_dac_external_message
-        ~coordinator_node
-        ~committee_members_nodes
-        ~should_run_committee_member_nodes:false
-        (Hex.to_string transfer_messages_preimage_hash)
     in
 
     (* Delay Observer start up to simulate it missing coordinator's streamed
@@ -2221,7 +1987,9 @@ module Tx_kernel_e2e = struct
 
     Check.(
       (false
-      = List.exists (String.equal (Hex.show hexed_perimage_hash)) filenames)
+      = List.exists
+          (String.equal (Hex.show transfer_messages_preimage_hash))
+          filenames)
         ~__LOC__
         bool
         ~error_msg:
@@ -2294,7 +2062,7 @@ module Tx_kernel_e2e = struct
         [
           Constant.octez_smart_rollup_node;
           Constant.smart_rollup_installer;
-          Constant.WASM.tx_kernel_fixed_dac;
+          Constant.WASM.tx_kernel;
         ])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
@@ -2317,7 +2085,7 @@ module Tx_kernel_e2e = struct
         [
           Constant.octez_smart_rollup_node;
           Constant.smart_rollup_installer;
-          Constant.WASM.tx_kernel_fixed_dac;
+          Constant.WASM.tx_kernel;
         ])
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
