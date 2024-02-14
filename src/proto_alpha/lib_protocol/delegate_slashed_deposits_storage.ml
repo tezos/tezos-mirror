@@ -106,14 +106,26 @@ let punish_double_signing ctxt ~operation_hash misbehaviour delegate
    - for the kind: double baking > double attesting > double preattesting *)
 module MisMap = Map.Make (Misbehaviour_repr)
 
-let apply_and_clear_denunciations ctxt =
-  let open Lwt_result_syntax in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
+let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
+    ~misbehaviour_cycle =
   let previous_cycle =
     match Cycle_repr.pred current_cycle with
     | None -> current_cycle
     | Some previous_cycle -> previous_cycle
   in
+  if Cycle_repr.equal current_cycle misbehaviour_cycle then
+    Delegate_storage.initial_frozen_deposits
+  else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
+    Delegate_storage.initial_frozen_deposits_of_previous_cycle
+  else fun (_ : Raw_context.t) (_ : Signature.public_key_hash) ->
+    (* Denunciation applied too late.
+       We could assert false, but we can also be permissive
+       while keeping the same invariants. *)
+    return Tez_repr.zero
+
+let apply_and_clear_denunciations ctxt =
+  let open Lwt_result_syntax in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
   in
@@ -234,17 +246,6 @@ let apply_and_clear_denunciations ctxt =
                   (Misbehaviour_repr.compare miskey misbehaviour)
                   0) ;
               (* Validate ensures that [denunciations] contains [delegate] at most once *)
-              let get_initial_frozen_deposits_of_misbehaviour_cycle =
-                if Cycle_repr.equal current_cycle misbehaviour_cycle then
-                  Delegate_storage.initial_frozen_deposits
-                else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
-                  Delegate_storage.initial_frozen_deposits_of_previous_cycle
-                else fun (_ : Raw_context.t) (_ : Signature.public_key_hash) ->
-                  return Tez_repr.zero
-                (* (denunciation applied too late)
-                   We could assert false, but we can also be permissive
-                   while keeping the same invariants *)
-              in
               let delegate_contract = Contract_repr.Implicit delegate in
               let* slash_history_opt =
                 Storage.Contract.Slashed_deposits.find ctxt delegate_contract
@@ -282,6 +283,8 @@ let apply_and_clear_denunciations ctxt =
               let* frozen_deposits =
                 let* initial_amount =
                   get_initial_frozen_deposits_of_misbehaviour_cycle
+                    ~current_cycle
+                    ~misbehaviour_cycle
                     ctxt
                     delegate
                 in
