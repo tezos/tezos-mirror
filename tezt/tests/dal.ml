@@ -4239,17 +4239,13 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Slot produced and published" ;
 
   let final_level = publication_level + attestation_lag + 2 in
-  let* current_level = Client.level client in
-  let p =
-    wait_for_layer1_final_block attester (publication_level + attestation_lag)
-  in
   let* () =
-    bake_for
+    bake_until
       ~dal_node_endpoint:attester_dal_node_endpoint
-      ~count:(final_level - current_level)
+      ~level:final_level
       client
+      [attester]
   in
-  let* () = p in
 
   let* slot_headers =
     Dal_RPC.(call attester @@ get_published_level_headers publication_level)
