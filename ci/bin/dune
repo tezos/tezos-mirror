@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  gitlab_ci
+  yaml
+  unix)
+ (flags
+  (:standard)
+  -open Gitlab_ci.Base))

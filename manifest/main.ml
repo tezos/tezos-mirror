@@ -8764,7 +8764,7 @@ let _docs_doc_gen_errors =
         Protocol.(client_exn alpha) |> open_;
       ]
 
-let _ci_lib_gitlab_ci_main =
+let ci_lib_gitlab_ci_main =
   public_lib
     "gitlab_ci"
     ~synopsis:"OCaml library for generating GitLab CI YAML configuration files"
@@ -8772,6 +8772,15 @@ let _ci_lib_gitlab_ci_main =
     ~bisect_ppx:No
     ~deps:[yaml]
     ~inline_tests:ppx_expect
+    ~release_status:Unreleased
+
+let _ci_bin_main =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"ci/bin"
+    ~bisect_ppx:No
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; yaml; unix]
     ~release_status:Unreleased
 
 (* Add entries to this function to declare that some dune and .opam files are
