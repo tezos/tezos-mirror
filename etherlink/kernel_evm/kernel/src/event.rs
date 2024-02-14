@@ -6,7 +6,7 @@ use crate::{storage, upgrade};
 use rlp::{Encodable, RlpStream};
 use tezos_smart_rollup_host::runtime::Runtime;
 
-pub const UPGRADE_CASE: u8 = 0;
+pub const UPGRADE_TAG: u8 = 0x01;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event {
@@ -18,7 +18,7 @@ impl Encodable for Event {
         stream.begin_list(2);
         match self {
             Event::Upgrade(upgrade) => {
-                stream.append(&UPGRADE_CASE);
+                stream.append(&UPGRADE_TAG);
                 stream.append(upgrade);
             }
         }
