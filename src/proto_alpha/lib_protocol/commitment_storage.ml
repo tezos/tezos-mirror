@@ -49,3 +49,5 @@ let decrease_commitment_only_call_from_token ctxt bpkh amount =
     else Storage.Commitments.add ctxt bpkh new_balance
   in
   return result
+
+let fold c = Storage.Commitments.fold c

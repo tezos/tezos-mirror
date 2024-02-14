@@ -26,6 +26,8 @@
 module type PROTOCOL = sig
   type context
 
+  type contract
+
   module Tez : sig
     type t
 
@@ -59,6 +61,39 @@ module type PROTOCOL = sig
     end
   end
 
+  module Commitment : sig
+    type t
+
+    val fold :
+      context ->
+      order:[`Sorted | `Undefined] ->
+      init:'a ->
+      f:(t -> int64 -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+  end
+
+  module Contract : sig
+    val fold : context -> init:'a -> f:('a -> contract -> 'a Lwt.t) -> 'a Lwt.t
+
+    val balance : context -> contract -> Tez.t tzresult Lwt.t
+
+    val frozen_bonds : context -> contract -> Tez.t tzresult Lwt.t
+
+    val contract_address : contract -> string
+
+    val get_staked_balance : context -> contract -> Tez.t option tzresult Lwt.t
+
+    val get_unstaked_frozen_balance :
+      context -> contract -> Tez.t option tzresult Lwt.t
+
+    val get_unstaked_finalizable_balance :
+      context -> contract -> Tez.t option tzresult Lwt.t
+
+    val get_full_balance : context -> contract -> Tez.t tzresult Lwt.t
+
+    val total_supply : context -> Tez.t tzresult Lwt.t
+  end
+
   module Delegate : sig
     val fold :
       context ->
@@ -73,6 +108,12 @@ module type PROTOCOL = sig
       Signature.public_key tzresult Lwt.t
 
     val staking_balance :
+      context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
+
+    val current_frozen_deposits :
+      context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
+
+    val unstaked_frozen_deposits :
       context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
 
     val deactivated :

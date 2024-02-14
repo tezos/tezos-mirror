@@ -43,3 +43,10 @@ val decrease_commitment_only_call_from_token :
   Blinded_public_key_hash.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+val fold :
+  Raw_context.t ->
+  order:[`Sorted | `Undefined] ->
+  init:'a ->
+  f:(Blinded_public_key_hash.t -> Tez_repr.t -> 'a -> 'a Lwt.t) ->
+  'a Lwt.t

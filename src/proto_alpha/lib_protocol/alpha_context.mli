@@ -4942,6 +4942,13 @@ module Commitment : sig
   val exists : context -> Blinded_public_key_hash.t -> bool Lwt.t
 
   val encoding : t Data_encoding.t
+
+  val fold :
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(Blinded_public_key_hash.t -> Tez_repr.t -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 end
 
 (** This module re-exports definitions from {!Bootstrap_storage}. *)
