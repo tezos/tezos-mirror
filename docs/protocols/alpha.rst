@@ -98,7 +98,7 @@ Adaptive Issuance (ongoing)
   a strong incentive against potential consensus attacks. (MR
   :gl:`!11854`)
 
-- Activating adaptive issuance per-block vote (MR !11935)
+- Activating adaptive issuance per-block vote (MR :gl:`!11935`)
 
 - Adjust total supply tracked for AI (estimated in O) so that it matches the
   actual total supply. (MR :gl:`!11996`)
@@ -107,6 +107,7 @@ Adaptive Issuance (ongoing)
 
 - Add RPC to get min_delegated_in_current_cycle for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'`` (MR :gl:`!12018`)
 
+- Activating new slashing flag (MR :gl:`!12013`)
 
 Gas improvements
 ----------------
