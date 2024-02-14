@@ -414,6 +414,8 @@ opam:bls12-381:
   variables:
     package: bls12-381
 
+# Ignoring unreleased package gitlab_ci.
+
 # Ignoring unreleased package internal-devtools.
 
 # Ignoring unreleased package internal-devtools_proto-context-du.
