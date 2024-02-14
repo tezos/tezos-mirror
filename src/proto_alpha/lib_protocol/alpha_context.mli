@@ -1877,6 +1877,12 @@ module Contract : sig
       context -> t -> Tez.t option tzresult Lwt.t
 
     val get_full_balance : context -> t -> Tez.t tzresult Lwt.t
+
+    (** [get_estimated_own_pending_slashed_amount ctxt contract]
+      returns the estimated own pending slashed amount of the given [contract]
+      according to the currently available denunciations. *)
+    val get_estimated_own_pending_slashed_amount :
+      context -> t -> Tez.t tzresult Lwt.t
   end
 end
 
@@ -2456,7 +2462,7 @@ module Delegate : sig
   end
 
   (** The functions in this module are considered too costly to be used in
-  the protocol.
+      the protocol.
       They are meant to be used only to answer RPC calls.  *)
   module For_RPC : sig
     type participation_info = {
@@ -2496,6 +2502,12 @@ module Delegate : sig
 
     val pending_denunciations_list :
       context -> (public_key_hash * Denunciations_repr.item) list Lwt.t
+
+    (** [get_estimated_shared_pending_slashed_amount ctxt delegate]
+      returns the estimated shared pending slashed amount of the given [delegate]
+      according to the currently available denunciations. *)
+    val get_estimated_shared_pending_slashed_amount :
+      context -> public_key_hash -> Tez.t tzresult Lwt.t
   end
 end
 
