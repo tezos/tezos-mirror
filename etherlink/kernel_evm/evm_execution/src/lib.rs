@@ -3712,4 +3712,48 @@ mod test {
             result.reason
         )
     }
+
+    #[test]
+    fn nonce_bump_before_tx() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+        let callee = H160::from_str("b94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let code = hex::decode("323f60005260206000f3").unwrap(); // RETURN (EXTCODEHASH (ORIGIN))
+
+        set_account_code(&mut host, &mut evm_account_storage, &callee, &code);
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(callee),
+            caller,
+            vec![],
+            None,
+            U256::one(),
+            None,
+            false,
+            DUMMY_ALLOCATED_TICKS,
+            false,
+            false,
+        );
+
+        // The origin address is empty but when you start a transaction the nonce is bump
+        // so the EXTCODEHASH return the following value (https://eips.ethereum.org/EIPS/eip-1052).
+        // If the nonce isn't bump before the transaction the return value is 0.
+
+        let return_expected = hex::decode(
+            "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+        )
+        .unwrap();
+
+        assert_eq!(result.unwrap().unwrap().result.unwrap(), return_expected);
+    }
 }
