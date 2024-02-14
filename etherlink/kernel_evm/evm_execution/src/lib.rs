@@ -189,8 +189,12 @@ where
 
         match result {
             Ok(result) => {
-                if !(result.reason == ExtendedExitReason::OutOfTicks && retriable) {
-                    handler.increment_nonce(caller)?;
+                if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                    // The nonce must be incremented before the execution. Details here: https://gitlab.com/tezos/tezos/-/merge_requests/11998.
+                    // In the EVM logic, the nonce is never decremented
+                    // But with the ticks model, if the execution raises an 'out of ticks' error and if the transaction is 'retriable', the nonce must not be incremented
+                    // But we can only know that after the execution, which is why we must decrement the nonce here
+                    handler.decrement_nonce(caller)?;
                 }
 
                 if do_refund(&result, pay_for_gas) {
@@ -1938,7 +1942,7 @@ mod test {
             false,
         );
         let expected_gas = 21000 // base cost
-        + 30124; // execution gas cost (taken at face value from tests)
+        + 5124; // execution gas cost (taken at face value from tests)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
@@ -1947,7 +1951,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 23749485,
+            estimated_ticks_used: 4049485,
         }));
 
         assert_eq!(result, expected_result);
@@ -2066,7 +2070,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 9512509485,
+            estimated_ticks_used: 9742809485,
         }));
 
         assert_eq!(result, expected_result);
