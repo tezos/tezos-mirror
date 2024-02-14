@@ -108,16 +108,14 @@ impl FeeUpdates {
 
         // Due to rounding, we may have a small amount of unaccounted-for gas.
         // Assign this to the burned fee.
-        let burn_amount = total_fees - initial_total_fees;
-
-        let compensate_sequencer_amount = execution_gas_fees + da_fee;
+        let burn_amount = execution_gas_fees + total_fees - initial_total_fees;
 
         Self {
             overall_gas_price: gas_price,
             overall_gas_used: gas_used,
             burn_amount,
             charge_user_amount: total_fees - execution_gas_fees,
-            compensate_sequencer_amount,
+            compensate_sequencer_amount: da_fee,
         }
     }
 
@@ -267,8 +265,9 @@ mod tests {
             // Assert
             let assumed_execution_gas_cost = base_fee_per_gas * execution_gas_used;
             let total_fee = updates.overall_gas_price * updates.overall_gas_used;
-            let expected_sequencer_comp = assumed_execution_gas_cost + da_fee * (data_size + ASSUMED_TX_ENCODED_SIZE);
+            let expected_sequencer_comp = da_fee * (data_size + ASSUMED_TX_ENCODED_SIZE);
 
+            assert!(updates.burn_amount >= assumed_execution_gas_cost, "inconsistent burn amount");
             assert_eq!(updates.charge_user_amount, total_fee - assumed_execution_gas_cost, "inconsistent user charge");
             assert_eq!(total_fee, updates.burn_amount + updates.compensate_sequencer_amount, "inconsistent total fees");
             assert_eq!(updates.compensate_sequencer_amount, expected_sequencer_comp, "inconsistent sequencer comp");
