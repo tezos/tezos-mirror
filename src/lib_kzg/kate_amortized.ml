@@ -386,21 +386,20 @@ let verify_multi t ~commitment ~srs_point ~domain ~root_list ~evaluations_list
       root_list
       evaluations_list
   in
-  let transcript =
+  let alpha =
+    (* We use Fiat-Shamir here to get some pseudo randomness.
+       Since alpha is only used on the verifier side we could
+       use real randomness as well. *)
     List.fold_left
       (fun transcript proof ->
         Utils.Transcript.expand shard_proof_t proof transcript)
       Utils.Transcript.empty
       proof_list
+    |> Utils.Transcript.expand eval_list_t evaluations_list
+    |> Utils.Transcript.expand shard_proof_t commitment
+    |> Utils.Fr_generation.random_fr |> fst
   in
-  let transcript =
-    Utils.Transcript.expand eval_list_t evaluations_list transcript
-  in
-  (* We use Fiat-Shamir here to get some pseudo randomness.
-     Since alpha is only used on the verifier side we could
-     use real randomness as well. *)
-  let alpha, _ = Utils.Fr_generation.random_fr transcript in
-  (*TODO optimize*)
+  (* TODO optimize *)
   let alpha_list =
     List.init (List.length proof_list) (fun i -> Scalar.pow alpha (Z.of_int i))
   in
