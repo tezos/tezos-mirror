@@ -115,6 +115,24 @@ let compute_punishing_amount slashing_percentage frozen_deposits =
   in
   Tez_repr.min punish_value frozen_deposits.Deposits_repr.current_amount
 
+let compute_reward_and_burn ctxt slashing_percentage frozen_deposits =
+  let open Result_syntax in
+  let punishing_amount =
+    compute_punishing_amount slashing_percentage frozen_deposits
+  in
+  let global_limit_of_staking_over_baking_plus_two =
+    let global_limit_of_staking_over_baking =
+      Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
+        ctxt
+    in
+    Int64.add (Int64.of_int global_limit_of_staking_over_baking) 2L
+  in
+  let* reward =
+    Tez_repr.(punishing_amount /? global_limit_of_staking_over_baking_plus_two)
+  in
+  let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
+  {reward; amount_to_burn}
+
 let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
     ~misbehaviour_cycle =
   let previous_cycle =
@@ -137,26 +155,6 @@ let apply_and_clear_denunciations ctxt =
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
-  in
-  let global_limit_of_staking_over_baking_plus_two =
-    let global_limit_of_staking_over_baking =
-      Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
-        ctxt
-    in
-    Int64.add (Int64.of_int global_limit_of_staking_over_baking) 2L
-  in
-  let compute_reward_and_burn slashing_percentage
-      (frozen_deposits : Deposits_repr.t) =
-    let open Result_syntax in
-    let punishing_amount =
-      compute_punishing_amount slashing_percentage frozen_deposits
-    in
-    let* reward =
-      Tez_repr.(
-        punishing_amount /? global_limit_of_staking_over_baking_plus_two)
-    in
-    let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
-    {reward; amount_to_burn}
   in
   (* Split denunciations into two groups: to be applied, and to be delayed *)
   let*! block_denunciations_map, remaining_denunciations =
@@ -297,7 +295,7 @@ let apply_and_clear_denunciations ctxt =
                 return Deposits_repr.{initial_amount; current_amount}
               in
               let*? staked =
-                compute_reward_and_burn slashing_percentage frozen_deposits
+                compute_reward_and_burn ctxt slashing_percentage frozen_deposits
               in
               let* init_to_burn_to_reward =
                 let giver_baker =
@@ -345,6 +343,7 @@ let apply_and_clear_denunciations ctxt =
                     in
                     let*? {amount_to_burn; reward} =
                       compute_reward_and_burn
+                        ctxt
                         slashing_percentage
                         frozen_deposits
                     in
