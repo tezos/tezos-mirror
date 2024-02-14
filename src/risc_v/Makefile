@@ -35,6 +35,7 @@ test:
 
 .PHONY: check
 check:
+	@cargo update --workspace --locked
 	@cargo check --workspace --all-targets
 	@cargo clippy --workspace --all-targets -- --deny warnings
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')

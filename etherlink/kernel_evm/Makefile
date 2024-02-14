@@ -48,6 +48,7 @@ test:
 
 .PHONY: check
 check:
+	@cargo update --workspace --locked
 	@cargo clippy --all-targets --features testing -- --deny warnings
 
 .PHONY: check-all
