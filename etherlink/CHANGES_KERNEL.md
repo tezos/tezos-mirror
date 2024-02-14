@@ -36,6 +36,7 @@
 ### Internals
 
 - Make the stage-1 more resilient to internals errors, to improve the robustness of the upgrade process. (!11874 !11887)
+- Nonce is now bumped before executing the transaction. (!11998)
 
 ### Breaking changes
 
