@@ -250,6 +250,9 @@ let apply_and_clear_denunciations ctxt =
                 Storage.Contract.Slashed_deposits.find ctxt delegate_contract
               in
               let slash_history = Option.value slash_history_opt ~default:[] in
+              let previous_total_slashing_percentage =
+                Storage.Slashed_deposits_history.get level.cycle slash_history
+              in
               let slash_history =
                 Storage.Slashed_deposits_history.add
                   level.cycle
@@ -261,6 +264,19 @@ let apply_and_clear_denunciations ctxt =
                   ctxt
                   delegate_contract
                   slash_history
+              in
+
+              let new_total_slashing_percentage =
+                Storage.Slashed_deposits_history.get level.cycle slash_history
+              in
+              (* We do not slash above 100%: if the slashing percentage would
+                 make the total sum of the slashing history above 100%, we rectify
+                 it to reach exactly 100%. This also means that subsequent slashes
+                 are effectively ignored (set to 0%) *)
+              let slashing_percentage =
+                Percentage.sub_bounded
+                  new_total_slashing_percentage
+                  previous_total_slashing_percentage
               in
 
               let* frozen_deposits =
