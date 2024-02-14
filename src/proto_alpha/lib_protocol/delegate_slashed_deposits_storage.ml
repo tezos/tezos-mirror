@@ -150,6 +150,27 @@ let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
        while keeping the same invariants. *)
     return Tez_repr.zero
 
+let update_block_denunciations_map_with delegate denunciations initial_block_map
+    =
+  List.fold_left
+    (fun block_map denunciation ->
+      MisMap.update
+        denunciation.Denunciations_repr.misbehaviour
+        (function
+          | None ->
+              Some
+                (Signature.Public_key_hash.Map.singleton delegate denunciation)
+          | Some map ->
+              Some
+                (Signature.Public_key_hash.Map.update
+                   delegate
+                   (function
+                     | None -> Some denunciation | Some old_d -> Some old_d)
+                   map))
+        block_map)
+    initial_block_map
+    denunciations
+
 let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
@@ -188,32 +209,16 @@ let apply_and_clear_denunciations ctxt =
                 Cycle_repr.(misb_cycle < current_cycle))
               denunciations
         in
-        let block_map =
-          List.fold_left
-            (fun block_map denunciation ->
-              MisMap.update
-                denunciation.Denunciations_repr.misbehaviour
-                (function
-                  | None ->
-                      Some
-                        (Signature.Public_key_hash.Map.singleton
-                           delegate
-                           denunciation)
-                  | Some map ->
-                      Some
-                        (Signature.Public_key_hash.Map.update
-                           delegate
-                           (function
-                             | None -> Some denunciation
-                             | Some old_d -> Some old_d)
-                           map))
-                block_map)
-            block_map
+        let new_block_map =
+          update_block_denunciations_map_with
+            delegate
             denunciations_to_apply
+            block_map
         in
-        Lwt.return
-          ( block_map,
-            (delegate, denunciations_to_delay) :: remaining_denunciations ))
+        let new_remaining_denunciations =
+          (delegate, denunciations_to_delay) :: remaining_denunciations
+        in
+        Lwt.return (new_block_map, new_remaining_denunciations))
   in
   (* Processes the applicable denunciations *)
   let* ctxt, balance_updates =
