@@ -3569,6 +3569,10 @@ let get_logs_request ?from_block ?to_block ?address ?topics () =
     | [t] -> `String t
     | l -> `A (List.map (fun s -> `String s) l)
   in
+  let parse_address = function
+    | `Single a -> `String a
+    | `List l -> `A (List.map (fun a -> `String a) l)
+  in
   let parameters : JSON.u =
     `A
       [
@@ -3583,7 +3587,7 @@ let get_logs_request ?from_block ?to_block ?address ?topics () =
               to_block
           @ Option.fold
               ~none:[]
-              ~some:(fun a -> [("address", `String a)])
+              ~some:(fun a -> [("address", parse_address a)])
               address
           @ Option.fold
               ~none:[]
@@ -3683,7 +3687,19 @@ let test_rpc_getLogs =
   let* all_logs = get_logs ~from_block:"0" evm_node in
   Check.((List.length all_logs = 3) int) ~error_msg:"Expected %R logs, got %L" ;
   (* Check that the [address] contract has produced 3 logs in total *)
-  let* contract_logs = get_logs ~from_block:"0" ~address evm_node in
+  let* contract_logs =
+    get_logs ~from_block:"0" ~address:(`Single address) evm_node
+  in
+  Check.((List.length contract_logs = 3) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  (* Same check also works if [address] is the second in the addresses
+     list *)
+  let* contract_logs =
+    get_logs
+      ~from_block:"0"
+      ~address:(`List ["0x0000000000000000000000000000000000000000"; address])
+      evm_node
+  in
   Check.((List.length contract_logs = 3) int)
     ~error_msg:"Expected %R logs, got %L" ;
   (* Check that there have been 3 logs with the transfer event topic *)

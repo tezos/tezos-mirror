@@ -10,6 +10,8 @@ Currently supported kernel version: a41f30ddb8787e5ff5c461d949a9ae3f71e4eea9
 
 ### Bug fixes
 
+- Fix `address` parameter to `eth_getLogs` RPC service. (!11990)
+
 ### Breaking changes
 
 ### Internal
