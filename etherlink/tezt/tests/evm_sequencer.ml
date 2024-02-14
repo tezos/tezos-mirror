@@ -973,14 +973,13 @@ let test_observer_applies_blueprint =
 
   unit
 
-(** This tests the situation where the kernel has an upgrade but the sequencer
-    does not upgrade as well, resulting in a different state in the sequencer
-    and rollup-node. *)
-let test_upgrade_kernel_unsync =
+(** This tests the situation where the kernel has an upgrade and the
+    sequencer upgrade by following the event of the kernel. *)
+let test_upgrade_kernel_auto_sync =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "upgrade"; "unsync"]
-    ~title:"Unsynchronised upgrade with rollup-node leads to a fork"
+    ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
+    ~title:"Rollup-node kernel upgrade is applyed to the sequencer state."
     ~uses:(fun protocol -> Constant.WASM.debug_kernel :: uses protocol)
   @@ fun protocol ->
   (* Add a delay between first block and activation timestamp. *)
@@ -1034,8 +1033,9 @@ let test_upgrade_kernel_unsync =
   Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
     ~error_msg:"The head should be the same before the upgrade" ;
 
-  (* Produce a block after activation timestamp, the rollup node will upgrade
-     to debug kernel and therefore not produce the block. *)
+  (* Produce a block after activation timestamp, both the rollup
+     node and the sequencer will upgrade to debug kernel and
+     therefore not produce the block. *)
   let* _ =
     repeat 2 (fun () ->
         let* _ =
@@ -1051,16 +1051,13 @@ let test_upgrade_kernel_unsync =
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash <> rollup_node_head.hash) (option string))
-    ~error_msg:"The head shouldn't be the same after upgrade" ;
-  Check.((sequencer_head.number > rollup_node_head.number) int32)
-    ~error_msg:"The rollup node should be behind the sequencer" ;
-
+  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+    ~error_msg:"The head should be the same after upgrade" ;
   unit
 
 (** This tests the situation where the kernel has an upgrade and the
     sequencer is notified via the private RPC. This is the opposite
-    test of {!test_upgrade_kernel_unsync}. *)
+    test of {!test_upgrade_kernel_auto_sync}. *)
 let test_upgrade_kernel_sync =
   Protocol.register_test
     ~__FILE__
@@ -1584,7 +1581,7 @@ let () =
   test_delayed_deposit_is_included [Alpha] ;
   test_init_from_rollup_node_data_dir [Alpha] ;
   test_observer_applies_blueprint [Alpha] ;
-  test_upgrade_kernel_unsync [Alpha] ;
+  test_upgrade_kernel_auto_sync [Alpha] ;
   test_upgrade_kernel_sync [Alpha] ;
   test_force_kernel_upgrade [Alpha] ;
   test_force_kernel_upgrade_too_early [Alpha] ;
