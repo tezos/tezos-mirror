@@ -10,7 +10,7 @@ let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
 let make_config ?bootstrap_accounts ?ticketer ?administrator
     ?sequencer_administrator ?sequencer ?delayed_bridge
-    ?(da_fee_per_byte = Wei.zero) () =
+    ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -76,9 +76,17 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
     let value = Wei.(to_le_bytes da_fee_per_byte) |> Hex.of_bytes |> Hex.show in
     [Set {value; to_}]
   in
+  let delayed_inbox_timeout =
+    match delayed_inbox_timeout with
+    | Some timeout ->
+        let bytes = Z.of_int timeout |> Z.to_bits in
+        let value = Hex.(of_string bytes |> show) in
+        [Set {value; to_ = Durable_storage_path.delayed_inbox_timeout}]
+    | None -> []
+  in
   match
     ticketer @ bootstrap_accounts @ administrator @ sequencer_administrator
-    @ sequencer @ delayed_bridge @ da_fee_per_byte
+    @ sequencer @ delayed_bridge @ da_fee_per_byte @ delayed_inbox_timeout
   with
   | [] -> None
   | res -> Some (`Config res)

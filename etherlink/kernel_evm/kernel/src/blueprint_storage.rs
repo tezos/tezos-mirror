@@ -185,11 +185,24 @@ pub fn store_inbox_blueprint<Host: Runtime>(
     store_rlp(&store_blueprint, host, &chunk_path)
 }
 
-fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     match read_current_block_number(host) {
         Ok(number) => Ok(number.saturating_add(U256::one())),
         Err(_) => Ok(U256::zero()),
     }
+}
+
+// Used to store a blueprint made out of forced delayed transactions.
+pub fn store_immediate_blueprint<Host: Runtime>(
+    host: &mut Host,
+    blueprint: Blueprint,
+    number: U256,
+) -> Result<(), Error> {
+    let blueprint_path = blueprint_path(number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
+    let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
+    store_rlp(&store_blueprint, host, &chunk_path)
 }
 
 /// Possible errors when validating a blueprint
@@ -230,7 +243,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     for tx_hash in blueprint_with_hashes.delayed_hashes {
         let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
         match tx {
-            Some(tx) => delayed_txs.push(tx),
+            Some(tx) => delayed_txs.push(tx.0),
             None => return Ok(BlueprintValidity::DelayedHashMissing(tx_hash)),
         }
     }

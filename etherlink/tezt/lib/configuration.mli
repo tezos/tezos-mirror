@@ -20,5 +20,6 @@ val make_config :
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?da_fee_per_byte:Wei.t ->
+  ?delayed_inbox_timeout:int ->
   unit ->
   [> `Config of Sc_rollup_helpers.Installer_kernel_config.instr list] option

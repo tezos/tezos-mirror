@@ -29,7 +29,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 4;
+pub const STORAGE_VERSION: u64 = 5;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
@@ -87,6 +87,10 @@ const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
+
+// Path to the number of seconds until delayed txs are timed out.
+const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
+    RefPath::assert_from(b"/delayed_inbox_timeout");
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
@@ -850,6 +854,33 @@ pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Res
     index
         .push_value(host, &event.rlp_bytes())
         .map_err(Into::into)
+}
+
+pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> {
+    // The default timeout is 12 hours
+    let default_timeout = 43200;
+    if host.store_has(&EVM_DELAYED_INBOX_TIMEOUT)?.is_some() {
+        let mut buffer = [0u8; 8];
+        store_read_slice(host, &EVM_DELAYED_INBOX_TIMEOUT, &mut buffer, 8)?;
+        let timeout = u64::from_le_bytes(buffer);
+        log!(
+            host,
+            Info,
+            "Using delayed inbox timeout of {} seconds ({} hours)",
+            timeout,
+            timeout / 3600
+        );
+        Ok(timeout)
+    } else {
+        log!(
+            host,
+            Info,
+            "Using default delayed inbox timeout of {} seconds ({} hours)",
+            default_timeout,
+            default_timeout / 3600
+        );
+        Ok(default_timeout)
+    }
 }
 
 #[cfg(test)]
