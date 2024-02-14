@@ -4242,11 +4242,10 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
 
   Log.info "Slot produced and published" ;
 
-  let final_level = publication_level + attestation_lag + 2 in
   let* () =
-    bake_until
+    bake_until_processed
       ~dal_node_endpoint:attester_dal_node_endpoint
-      ~level:final_level
+      ~level:(publication_level + attestation_lag)
       client
       [attester]
   in
