@@ -515,6 +515,7 @@ mod tests {
     use crate::account_storage::account_path;
     use crate::account_storage::init_account_storage as init_evm_account_storage;
     use crate::handler::ExecutionOutcome;
+    use crate::handler::ExtendedExitReason;
     use crate::EthereumAccountStorage;
     use evm::Config;
     use primitive_types::{H160, U256};
@@ -1231,6 +1232,28 @@ mod tests {
 
     // All the tests for ecAdd, ecMul, ecPrecompile were taken from:
     // https://github.com/bluealloy/revm/blob/main/crates/precompile/src/bn128.rs
+
+    #[test]
+    fn test_modexp_mod_overflow_return_none() {
+        // Input was taken from the official ethereum test-suite at:
+        // GeneralStateTests/stPrecompiledContracts2/modexpRandomInput.json
+        let input_overflow = hex::decode("00000000008000000000000000000000000000000000000000000000000000000000000400000000000000000000000a").unwrap();
+
+        let result = execute_precompiled(
+            H160::from_low_u64_be(5),
+            &input_overflow,
+            None,
+            Some(100_000),
+        );
+
+        assert!(result.is_ok());
+        let outcome = result.unwrap();
+        match outcome.reason {
+            ExtendedExitReason::Exit(ExitReason::Error(_)) => (),
+            _ => panic!("The execution should exit with an error."),
+        }
+        assert!(outcome.result.is_none());
+    }
 
     #[test]
     fn test_ecadd_precompile() {

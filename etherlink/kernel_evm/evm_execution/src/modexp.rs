@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::cmp::{max, min};
+use std::{
+    borrow::Cow,
+    cmp::{max, min},
+};
 
 use crate::{
     handler::EvmHandler,
@@ -12,10 +15,7 @@ use crate::{
     EthereumError,
 };
 use aurora_engine_modexp::modexp;
-use evm::{
-    executor::stack::PrecompileFailure, Context, ExitError, ExitReason, ExitSucceed,
-    Transfer,
-};
+use evm::{Context, ExitError, ExitReason, ExitSucceed, Transfer};
 use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
@@ -60,6 +60,15 @@ fn gas_calc(base_length: u64, exp_length: u64, mod_length: u64, exp_highp: &U256
     }
 }
 
+fn modexp_mod_overflow_exit(reason: &'static str) -> PrecompileOutcome {
+    PrecompileOutcome {
+        exit_status: ExitReason::Error(ExitError::Other(Cow::Borrowed(reason))),
+        output: vec![],
+        withdrawals: vec![],
+        estimated_ticks: 0,
+    }
+}
+
 // The format of input is:
 // <length_of_BASE> <length_of_EXPONENT> <length_of_MODULUS> <BASE> <EXPONENT> <MODULUS>
 // Where every length is a 32-byte left-padded integer representing the number of bytes
@@ -84,10 +93,11 @@ pub fn modexp_precompile<Host: Runtime>(
 
     // cast base and modulus to usize, it does not make sense to handle larger values
     let Ok(base_len) = usize::try_from(base_len) else {
-        return Err(EthereumError::PrecompileFailed(PrecompileFailure::Error { exit_status: ExitError::Other(std::borrow::Cow::Borrowed("modexp mod overflow")) }));
+        return Ok(modexp_mod_overflow_exit("base length: modexp mod overflow"));
     };
+    // cast mod length to usize, it does not make sense to handle larger values.
     let Ok(mod_len) = usize::try_from(mod_len) else {
-        return Err(EthereumError::PrecompileFailed(PrecompileFailure::Error { exit_status: ExitError::Other(std::borrow::Cow::Borrowed("modexp mod overflow")) }));
+        return Ok(modexp_mod_overflow_exit("mod length: modexp mod overflow"));
     };
 
     // Handle a special case when both the base and mod length is zero
@@ -111,7 +121,7 @@ pub fn modexp_precompile<Host: Runtime>(
 
     // cast exponent length to usize, it does not make sense to handle larger values.
     let Ok(exp_len) = usize::try_from(exp_len) else {
-        return Err(EthereumError::PrecompileFailed(PrecompileFailure::Error { exit_status: ExitError::Other(std::borrow::Cow::Borrowed("modexp mod overflow")) }));
+        return Ok(modexp_mod_overflow_exit("exponent length: modexp mod overflow"));
     };
 
     // Used to extract ADJUSTED_EXPONENT_LENGTH.
