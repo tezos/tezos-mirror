@@ -84,9 +84,8 @@ val force_kernel_upgrade :
   unit Lwt.t
 
 (** [upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract
-    ~client ~upgrade_to ~activation_timestamp ~evm_node] prepares the
-    kernel upgrade payload and sends it to the layer 1. If [evm_node]
-    is provided, notifies the sequencer as well. *)
+    ~client ~upgrade_to ~activation_timestamp ] prepares the
+    kernel upgrade payload and sends it to the layer 1. *)
 val upgrade :
   sc_rollup_node:Sc_rollup_node.t ->
   sc_rollup_address:string ->
@@ -95,5 +94,4 @@ val upgrade :
   client:Client.t ->
   upgrade_to:Uses.t ->
   activation_timestamp:string ->
-  evm_node:Evm_node.t option ->
   unit Lwt.t
