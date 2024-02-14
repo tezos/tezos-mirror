@@ -95,7 +95,7 @@ where
     ///
     /// Instruction mis-aligned will never be thrown because we allow C extension
     ///
-    /// Always returns the target address (rs1 + imm)
+    /// Always returns the target address (val(rs1) + imm)
     pub fn run_jalr(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Address {
         self.run_jalr_impl::<4>(imm, rs1, rd)
     }
@@ -129,7 +129,7 @@ where
     ) -> Address {
         let current_pc = self.pc.read();
 
-        // Branch if `rs1 == rs2`, jumping `imm` bytes ahead.
+        // Branch if `val(rs1) == val(rs2)`, jumping `imm` bytes ahead.
         // Otherwise, jump the width of current instruction
         if self.xregisters.read(rs1) == self.xregisters.read(rs2) {
             current_pc.wrapping_add(imm as u64)
@@ -155,7 +155,7 @@ where
     ) -> Address {
         let current_pc = self.pc.read();
 
-        // Branch if `rs1 != rs2`, jumping `imm` bytes ahead.
+        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
         // Otherwise, jump the width of current instruction
         if self.xregisters.read(rs1) != self.xregisters.read(rs2) {
             current_pc.wrapping_add(imm as u64)

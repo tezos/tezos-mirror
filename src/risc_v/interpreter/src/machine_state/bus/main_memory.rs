@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::machine_state::backend::{self as backend, DynRegion};
+use crate::state_backend::{self as backend, DynRegion};
 use std::mem;
 
 use super::Addressable;

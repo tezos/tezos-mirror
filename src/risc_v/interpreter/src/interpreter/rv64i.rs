@@ -118,12 +118,8 @@ where
     ML: MainMemoryLayout,
     M: backend::Manager,
 {
-    /// Generic load-operation for loading mem::size_of<T> bytes from address rs1 + imm
-    fn read_from_bus<T: backend::Elem>(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-    ) -> Result<T, Exception> {
+    /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
+    fn read_from_bus<T: backend::Elem>(&self, imm: i64, rs1: XRegister) -> Result<T, Exception> {
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
         self.bus
             .read(address)
@@ -132,7 +128,7 @@ where
 
     /// `LD` I-type instruction
     ///
-    /// Loads a double-word (8 bytes) starting from address given by: rs1 + imm
+    /// Loads a double-word (8 bytes) starting from address given by: val(rs1) + imm
     pub fn run_ld(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i64 = self.read_from_bus(imm, rs1)?;
         // i64 as u64 is a no-op
@@ -142,9 +138,8 @@ where
 
     /// `LW` I-type instruction
     ///
-    /// Loads a word (4 bytes) starting from address given by: rs1 + imm
-    /// NOTE: For RV32I the value is returned as-is,
-    /// while for RV64I the value is sign-extended to 64 bits
+    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
+    /// NOTE: For RV64I the value is sign-extended to 64 bits
     pub fn run_lw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i32 = self.read_from_bus(imm, rs1)?;
         // i32 as u64 sign-extends to 64 bits
@@ -154,7 +149,7 @@ where
 
     /// `LH` I-type instruction
     ///
-    /// Loads a half-word (2 bytes) starting from address given by: rs1 + imm
+    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
     /// sign-extending the result
     pub fn run_lh(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i16 = self.read_from_bus(imm, rs1)?;
@@ -165,7 +160,7 @@ where
 
     /// `LB` I-type instruction
     ///
-    /// Loads a single byte from the address given by: rs1 + imm
+    /// Loads a single byte from the address given by: val(rs1) + imm
     /// sign-extending the result
     pub fn run_lb(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i8 = self.read_from_bus(imm, rs1)?;
@@ -176,7 +171,7 @@ where
 
     /// `LWU` I-type instruction
     ///
-    /// Loads a word (4 bytes) starting from address given by: rs1 + imm
+    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
     /// zero-extending the result
     pub fn run_lwu(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: u32 = self.read_from_bus(imm, rs1)?;
@@ -187,7 +182,7 @@ where
 
     /// `LHU` I-type instruction
     ///
-    /// Loads a half-word (2 bytes) starting from address given by: rs1 + imm
+    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
     /// zero-extending the result
     pub fn run_lhu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u16 = self.read_from_bus(imm, rs1)?;
@@ -198,7 +193,7 @@ where
 
     /// `LBU` I-type instruction
     ///
-    /// Loads a single byte from the address given by: rs1 + imm
+    /// Loads a single byte from the address given by: val(rs1) + imm
     /// zero-extending the result
     pub fn run_lbu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u8 = self.read_from_bus(imm, rs1)?;
@@ -207,6 +202,7 @@ where
         Ok(())
     }
 
+    /// Generic store-operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm
     fn write_to_bus<T: backend::Elem>(
         &mut self,
         imm: i64,
@@ -221,7 +217,7 @@ where
 
     /// `SD` S-type instruction
     ///
-    /// Stores a double-word (8 bytes from rs2) to the address starting at: rs1 + imm
+    /// Stores a double-word (8 bytes from rs2) to the address starting at: val(rs1) + imm
     pub fn run_sd(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         self.write_to_bus(imm, rs1, value)
@@ -229,30 +225,28 @@ where
 
     /// `SW` S-type instruction
     ///
-    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: rs1 + imm
-    /// NOTE: For RV32I the value is stored as-is,
-    /// while for RV64I the value stored are the lowest 32 bits (4 bytes)
+    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: val(rs1) + imm
     pub fn run_sw(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
-        // u64 as u32 is a no-op, getting the lowest 32 bits
+        // u64 as u32 is truncated, getting the lowest 32 bits
         self.write_to_bus(imm, rs1, value as u32)
     }
 
     /// `SH` S-type instruction
     ///
-    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: rs1 + imm
+    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: val(rs1) + imm
     pub fn run_sh(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
-        // u64 as u16 is a no-op, getting the lowest 16 bits
+        // u64 as u16 is truncated, getting the lowest 16 bits
         self.write_to_bus(imm, rs1, value as u16)
     }
 
     /// `SB` S-type instruction
     ///
-    /// Stores a byte (lowest 1 byte from rs2) to the address starting at: rs1 + imm
+    /// Stores a byte (lowest 1 byte from rs2) to the address starting at: val(rs1) + imm
     pub fn run_sb(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
-        // u64 as u8 is a no-op, getting the lowest 8 bits
+        // u64 as u8 is truncated, getting the lowest 8 bits
         self.write_to_bus(imm, rs1, value as u8)
     }
 }
