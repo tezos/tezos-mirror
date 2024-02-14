@@ -17,9 +17,11 @@ module Test = struct
   let randrange ?(min = 0) max =
     QCheck2.Gen.(generate1 (int_range min (max - 1)))
 
-  (* [randrange ?(min=0) max] returns a random integer in the range [min, max - 1]. *)
+  (* [randrange ?(min=0) ~len max] returns a list of random integer of len between
+     one and len in the range [min, max - 1]. *)
   let randrange_list ?(min = 0) ~len max =
-    QCheck2.Gen.(generate ~n:len (int_range min (max - 1)))
+    QCheck2.Gen.(
+      generate ~n:(generate1 (int_range 1 len)) (int_range min (max - 1)))
 
   let out_of_range ~min ~max =
     let left = QCheck2.Gen.(Int.min_int -- (min - 1)) in
