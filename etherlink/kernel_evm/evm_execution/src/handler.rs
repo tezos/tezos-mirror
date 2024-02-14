@@ -820,9 +820,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
 
                 self.set_contract_code(address, code_out)?;
-                // EIP-161: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md
-                // A created smart contract nonce must start at 1.
-                self.increment_nonce(address)?;
 
                 Ok((sub_context_result, Some(address), vec![]))
             }
@@ -929,7 +926,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let creation_result = match self.contract_will_collide(address) {
             Precondition::PassPrecondition => {
                 match self.execute_transfer(caller, address, value) {
-                    Ok(TransferExitReason::Returned) => self.execute(&mut runtime),
+                    Ok(TransferExitReason::Returned) => {
+                        match self.increment_nonce(address) {
+                            Ok(()) => self.execute(&mut runtime),
+                            Err(eth_err) => Err(eth_err),
+                        }
+                    }
                     Ok(TransferExitReason::OutOfFund) => {
                         Ok(ExitReason::Error(ExitError::OutOfFund))
                     }
