@@ -12,8 +12,8 @@ log() {
   printf '\e[1m%s\e[0m' "$1"
 }
 
-# shellcheck source=./scripts/ci/release.sh
-. "$ci_dir/release.sh"
+# shellcheck source=./scripts/ci/octez-release.sh
+. "$ci_dir/octez-release.sh"
 
 # set up ssh credentials to access github
 mkdir -p "$HOME/.ssh"

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -eu
 
-# shellcheck source=./scripts/ci/release.sh
-. ./scripts/ci/release.sh
+# shellcheck source=./scripts/ci/octez-release.sh
+. ./scripts/ci/octez-release.sh
 
 # Adds export-ignore for each part of the repo that is not part of octez
 ignore="$(comm -2 -3 <(find . -maxdepth 1 | sed 's|^./||' | sort) <(sort "${octez_source_content}"))"
