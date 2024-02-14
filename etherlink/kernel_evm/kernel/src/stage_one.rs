@@ -12,6 +12,7 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
 use crate::read_last_info_per_level_timestamp;
+use crate::storage::read_l1_level;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -48,14 +49,20 @@ fn fetch_timed_out_transactions<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let timeout = crate::storage::delayed_inbox_timeout(host)?;
     let timestamp = current_timestamp(host);
+    let current_level = crate::storage::read_l1_level(host)?;
+    let min_levels = crate::storage::delayed_inbox_min_levels(host)?;
     // Number for the first forced blueprint
     let base = crate::blueprint_storage::read_next_blueprint_number(host)?;
     // Accumulator of how many blueprints we fetched
     let mut offset: u32 = 0;
 
-    while let Some(timed_out) =
-        delayed_inbox.next_delayed_inbox_blueprint(host, timestamp, timeout)?
-    {
+    while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(
+        host,
+        timestamp,
+        timeout,
+        current_level,
+        min_levels,
+    )? {
         log!(
             host,
             Info,
@@ -94,9 +101,15 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         Some(sequencer),
     )? {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+        let level = read_l1_level(host)?;
         // Store the transactions in the delayed inbox.
         for transaction in transactions {
-            delayed_inbox.save_transaction(host, transaction, previous_timestamp)?;
+            delayed_inbox.save_transaction(
+                host,
+                transaction,
+                previous_timestamp,
+                level,
+            )?;
         }
         // Check if there are timed-out transactions in the delayed inbox
         let timed_out = delayed_inbox.first_has_timed_out(host)?;
