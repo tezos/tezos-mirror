@@ -410,3 +410,130 @@ let apply_and_clear_denunciations ctxt =
       remaining_denunciations
   in
   return (ctxt, balance_updates)
+
+module For_RPC = struct
+  let get_pending_misbehaviour_map ctxt =
+    Storage.Pending_denunciations.fold
+      ctxt
+      ~order:`Undefined
+      ~init:MisMap.empty
+      ~f:(fun delegate denunciations block_map ->
+        let new_block_map =
+          update_block_denunciations_map_with delegate denunciations block_map
+        in
+        Lwt.return new_block_map)
+
+  let get_estimated_punished_amount ctxt delegate =
+    let open Lwt_result_syntax in
+    let current_cycle = (Raw_context.current_level ctxt).cycle in
+    let* denunciations = Storage.Pending_denunciations.find ctxt delegate in
+    match denunciations with
+    | None | Some [] -> return Tez_repr.zero
+    | Some denunciations ->
+        let*! pending_misbehaviour_map = get_pending_misbehaviour_map ctxt in
+        List.fold_left_es
+          (fun estimated_punishing_amount denunciation ->
+            let ({Misbehaviour_repr.level = raw_level; kind; _} as
+                misbehaviour_key) =
+              denunciation.Denunciations_repr.misbehaviour
+            in
+            match MisMap.find misbehaviour_key pending_misbehaviour_map with
+            | None ->
+                (* Should not happen as [pending_misbehaviour_map] has been created
+                   using the bindings of [Storage.Pending_denunciations] and
+                   [denunciation] belongs to [Storage.Pending_denunciations]. *)
+                return estimated_punishing_amount
+            | Some denunciations ->
+                let level =
+                  Level_repr.level_from_raw
+                    ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                    raw_level
+                in
+                let denounced_pkhs =
+                  List.map
+                    fst
+                    (Signature.Public_key_hash.Map.bindings denunciations)
+                in
+                let* ctxt, slashing_percentage =
+                  Slash_percentage.get ctxt ~kind ~level denounced_pkhs
+                in
+                let misbehaviour_cycle = level.cycle in
+                let* frozen_deposits =
+                  let* initial_amount =
+                    get_initial_frozen_deposits_of_misbehaviour_cycle
+                      ~current_cycle
+                      ~misbehaviour_cycle
+                      ctxt
+                      delegate
+                  in
+                  let* current_amount =
+                    Delegate_storage.current_frozen_deposits ctxt delegate
+                  in
+                  return {Deposits_repr.initial_amount; current_amount}
+                in
+                let punishing_amount =
+                  compute_punishing_amount slashing_percentage frozen_deposits
+                in
+                let new_estimated_punishing_amount =
+                  Tez_repr.(punishing_amount +? estimated_punishing_amount)
+                in
+                Lwt.return new_estimated_punishing_amount)
+          Tez_repr.zero
+          denunciations
+
+  let get_estimated_punished_share ctxt delegate =
+    let open Lwt_result_syntax in
+    let* estimated_punished_amount =
+      get_estimated_punished_amount ctxt delegate
+    in
+    Shared_stake.share
+      ~rounding:`Towards_baker
+      ctxt
+      delegate
+      estimated_punished_amount
+
+  let get_estimated_shared_pending_slashed_amount ctxt delegate =
+    let open Lwt_result_syntax in
+    let* {baker_part; stakers_part} =
+      get_estimated_punished_share ctxt delegate
+    in
+    Lwt.return Tez_repr.(baker_part +? stakers_part)
+
+  let get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate =
+    let open Lwt_result_syntax in
+    let+ {baker_part; stakers_part = _} =
+      get_estimated_punished_share ctxt delegate
+    in
+    baker_part
+
+  let get_estimated_own_pending_slashed_amount ctxt contract =
+    let open Lwt_result_syntax in
+    let* delegate_opt = Contract_delegate_storage.find ctxt contract in
+    match delegate_opt with
+    | None -> return Tez_repr.zero
+    | Some delegate ->
+        if Contract_repr.(equal (Contract_repr.Implicit delegate) contract) then
+          get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate
+        else
+          let* {baker_part = _; stakers_part} =
+            get_estimated_punished_share ctxt delegate
+          in
+          let* num =
+            let+ staking_pseudotokens =
+              Staking_pseudotokens_storage.For_RPC.staking_pseudotokens_balance
+                ctxt
+                ~delegator:contract
+            in
+            Staking_pseudotoken_repr.to_int64 staking_pseudotokens
+          in
+          let* den =
+            let+ frozen_deposits_pseudotokens =
+              Staking_pseudotokens_storage.For_RPC
+              .get_frozen_deposits_pseudotokens
+                ctxt
+                ~delegate
+            in
+            Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens
+          in
+          Lwt.return (Tez_repr.mul_ratio ~rounding:`Up stakers_part ~num ~den)
+end

@@ -84,3 +84,17 @@ val apply_and_clear_denunciations :
   Raw_context.t -> (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 val update_slashing_storage_for_p : Raw_context.t -> Raw_context.t Lwt.t
+
+module For_RPC : sig
+  (** [get_estimated_shared_pending_slashed_amount ctxt delegate]
+      returns the estimated shared pending slashed amount of the given [delegate]
+      according to the currently available denunciations. *)
+  val get_estimated_shared_pending_slashed_amount :
+    Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
+  (** [get_estimated_own_pending_slashed_amount ctxt contract]
+      returns the estimated own pending slashed amount of the given [contract]
+      according to the currently available denunciations. *)
+  val get_estimated_own_pending_slashed_amount :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+end
