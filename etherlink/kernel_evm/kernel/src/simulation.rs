@@ -223,13 +223,14 @@ enum TxValidationOutcome {
 }
 
 impl TxValidation {
-    // Run the transaction and checks if it fails with "OutOfTicks". It might
-    // fail for other reasons, but in that case it is still correct.
-    pub fn would_exhaust_ticks<Host: Runtime>(
+    // Run the transaction and ensure
+    // - it won't fail with  out-of-ticks
+    // - it won't fail due to not-enough gas fees to cover da fee
+    pub fn validate<Host: Runtime>(
         host: &mut Host,
         transaction: &EthereumTransactionCommon,
         caller: &H160,
-    ) -> Result<bool, anyhow::Error> {
+    ) -> Result<TxValidationOutcome, anyhow::Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
 
@@ -252,7 +253,9 @@ impl TxValidation {
                 tx_data_size,
             );
 
-        let gas_limit = tx_execution_gas_limit(transaction, &block_fees)?;
+        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees) else {
+            return Ok(TxValidationOutcome::MaxGasFeeTooLow);
+        };
 
         match run_transaction(
             host,
@@ -271,8 +274,11 @@ impl TxValidation {
             false,
             false,
         ) {
-            Ok(Some(outcome)) => Ok(outcome.reason == ExtendedExitReason::OutOfTicks),
-            _ => Ok(false),
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::OutOfTicks,
+                ..
+            })) => Ok(TxValidationOutcome::OutOfTicks),
+            _ => Ok(TxValidationOutcome::Valid(*caller)),
         }
     }
 
@@ -304,18 +310,13 @@ impl TxValidation {
         if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
             return Ok(TxValidationOutcome::InvalidChainId);
         }
-        // Check if running the transaction (assuming it is valid) would run out
-        // of ticks.
-        if let Ok(true) = Self::would_exhaust_ticks(host, tx, &caller) {
-            return Ok(TxValidationOutcome::OutOfTicks);
-        }
         // Check if the gas price is high enough
         if tx.max_fee_per_gas < block_fees.base_fee_per_gas() {
             return Ok(TxValidationOutcome::MaxGasFeeTooLow);
         }
-        // TODO: #6498
-        // check PRE_PAY condition
-        Ok(TxValidationOutcome::Valid(caller))
+        // Check if running the transaction (assuming it is valid) would run out
+        // of ticks, or fail validation for another reason.
+        Self::validate(host, tx, &caller)
     }
 }
 
@@ -985,6 +986,52 @@ mod tests {
             .unwrap();
         let result = simulation.run(&mut host);
         println!("{result:?}");
+        assert!(result.is_ok());
+        assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
+    }
+
+    #[test]
+    fn test_tx_validation_da_fees_not_covered() {
+        let mut host = MockHost::default();
+        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
+
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(U256::from(1)),
+            U256::from(0),
+            U256::from(0),
+            block_fees.base_fee_per_gas(),
+            21000, // not covering da_fee
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            None,
+        );
+        let signed = transaction
+            .sign_transaction(
+                "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
+                    .to_string(),
+            )
+            .unwrap();
+        let simulation = TxValidation {
+            transaction: signed,
+        };
+        storage::store_chain_id(&mut host, U256::from(1))
+            .expect("should be able to store a chain id");
+        let evm_account_storage = account_storage::init_account_storage().unwrap();
+        let _account = evm_account_storage
+            .get_or_create(
+                &host,
+                &account_storage::account_path(
+                    &address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let result = simulation.run(&mut host);
+
         assert!(result.is_ok());
         assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
     }
