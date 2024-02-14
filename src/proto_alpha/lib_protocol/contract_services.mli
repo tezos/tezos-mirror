@@ -155,6 +155,12 @@ val storage_opt :
   Contract_hash.t ->
   Script.expr option shell_tzresult Lwt.t
 
+val estimated_own_pending_slashed_amount :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.public_key_hash ->
+  Tez.t shell_tzresult Lwt.t
+
 val big_map_get :
   'a #RPC_context.simple ->
   'a ->
