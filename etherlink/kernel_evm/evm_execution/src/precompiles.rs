@@ -156,7 +156,7 @@ fn erec_output_for_wrong_input() -> PrecompileOutcome {
     }
 }
 
-macro_rules! unwrap {
+macro_rules! unwrap_ecrecover {
     ($expr : expr) => {
         match $expr {
             Ok(x) => x,
@@ -211,6 +211,7 @@ fn ecrecover_precompile<Host: Runtime>(
             estimated_ticks,
         });
     }
+
     log!(
         handler.borrow_host(),
         Debug,
@@ -226,35 +227,29 @@ fn ecrecover_precompile<Host: Runtime>(
         return Ok(erec_output_for_wrong_input());
     }
 
-    let v = match v_raw.checked_sub(27) {
-        Some(v) => v,
-        None => return Ok(erec_output_for_wrong_input()),
-    };
     // wrappers needed by ecdsa crate
     let mut r = Scalar::default();
     let _ = r.set_b32(&r_array);
     let mut s = Scalar::default();
     let _ = s.set_b32(&s_array);
-    let ri = unwrap!(RecoveryId::parse(v));
+    let ri = unwrap_ecrecover!(RecoveryId::parse(v_raw - 27));
 
     // check signature
-    let pubk = unwrap!(recover(&Message::parse(&hash), &Signature { r, s }, &ri));
-    let kec = Keccak256::digest(&pubk.serialize()[1..]);
-    let address: Result<[u8; 20], _> = kec.as_slice()[12..].try_into();
-    let add = unwrap!(address);
+    let pubk =
+        unwrap_ecrecover!(recover(&Message::parse(&hash), &Signature { r, s }, &ri));
+    let mut hash = Keccak256::digest(&pubk.serialize()[1..]);
+    hash[..12].fill(0);
 
-    // format output
-    let mut output = vec![0; 32];
-    output[12..].copy_from_slice(&add);
     log!(
         handler.borrow_host(),
         Debug,
         "Output is {:?}",
-        hex::encode(&output)
+        hex::encode(hash)
     );
+
     Ok(PrecompileOutcome {
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output,
+        output: hash.to_vec(),
         withdrawals: vec![],
         estimated_ticks,
     })
