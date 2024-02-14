@@ -7,6 +7,7 @@
 ### Bug fixes
 
 - EVM call stack is now the number of internal transaction layers. (!11719)
+- Fix the nonce of the caller on contract creation. Callee's address remains hot even if creation fails. (!11634)
 - Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 - Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
 - Fix a bug where validation would succeed, for a transaction that failed to pay da-fee. (!11992)
