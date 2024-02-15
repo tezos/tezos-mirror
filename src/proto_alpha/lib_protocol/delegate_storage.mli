@@ -160,4 +160,7 @@ module For_RPC : sig
 
   val staking_balance :
     Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+
+  val min_delegated_in_current_cycle :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 end

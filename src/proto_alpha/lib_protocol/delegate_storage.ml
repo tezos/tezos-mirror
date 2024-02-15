@@ -392,6 +392,19 @@ module For_RPC = struct
       Stake_storage.For_RPC.get_staking_balance ctxt delegate
     else return Tez_repr.zero
 
+  let min_delegated_in_current_cycle ctxt delegate =
+    let open Lwt_result_syntax in
+    let current_cycle = (Raw_context.current_level ctxt).cycle in
+    let*! is_registered = registered ctxt delegate in
+    if is_registered then
+      let+ staking_balance =
+        Stake_storage.get_full_staking_balance ctxt delegate
+      in
+      Full_staking_balance_repr.min_delegated_in_cycle
+        ~current_cycle
+        staking_balance
+    else return Tez_repr.zero
+
   let delegated_balance ctxt delegate =
     let open Lwt_result_syntax in
     let* staking_balance = staking_balance ctxt delegate in
