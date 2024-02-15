@@ -70,10 +70,8 @@ let page_membership_proof params page_index slot_data =
 let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
     ~inbox_level (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
-  let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
-  let dal_number_of_slots = constants.Rollup_constants.dal.number_of_slots in
   let is_reveal_enabled =
-    match constants.sc_rollup.reveal_activation_level with
+    match constants.Rollup_constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->
         Sc_rollup.is_reveal_enabled_predicate
           (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
@@ -107,9 +105,8 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
       let Dal.Page.{slot_id; page_index} = page_id in
       let* pages =
         Dal_pages_request.slot_pages
+          constants.Rollup_constants.dal
           ~dal_activation_level
-          ~dal_attestation_lag
-          ~dal_number_of_slots
           ~dal_attested_slots_validity_lag
           ~inbox_level
           node_ctxt
