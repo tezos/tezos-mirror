@@ -260,9 +260,9 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       unit
     in
     let dal_node_endpoint = Dal.Helpers.endpoint dal_node2 in
-    Log.info "Bake two blocks to finalize the commitment publication." ;
+    Log.info "Bake one block to include the op, and two blocks to finalize it." ;
     let* () =
-      Base.repeat 2 (fun () ->
+      Base.repeat 3 (fun () ->
           Client.bake_for_and_wait client1 ~dal_node_endpoint)
     in
     Log.info
@@ -282,7 +282,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     in
     Log.info "Bake several blocks to surpass the attestation lag." ;
     let* () =
-      Base.repeat (dal_parameters.attestation_lag - 1) (fun () ->
+      Base.repeat (dal_parameters.attestation_lag - 2) (fun () ->
           Client.bake_for_and_wait client1 ~dal_node_endpoint)
     in
     Log.info "Assert that the attestation was indeed posted." ;
