@@ -13,4 +13,4 @@ fi
 
 echo "Launching new container:"
 # TODO: fix log-driver issue on benchmark server
-docker run --log-driver none --name evm-benchmark -d --mount type=bind,src="$(pwd)/output",target=/home/tezos/output evm-benchmark
+docker run --log-driver none --name evm-benchmark -d --mount type=bind,src="$(pwd)/output",target=/home/tezos/output evm-benchmark $@
