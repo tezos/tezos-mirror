@@ -52,27 +52,9 @@ type punishing_amounts = {
 }
 
 let record_denunciation ctxt ~operation_hash
-    (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
+    (misbehaviour : Misbehaviour_repr.t) delegate (_level : Level_repr.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  (* Placeholder value *)
-  let* ctxt, slashing_percentage =
-    Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
-  in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* slash_history_opt =
-    Storage.Contract.Slashed_deposits.find ctxt delegate_contract
-  in
-  let slash_history = Option.value slash_history_opt ~default:[] in
-  let slash_history =
-    Storage.Slashed_deposits_history.add
-      level.cycle
-      slashing_percentage
-      slash_history
-  in
-  let*! ctxt =
-    Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
-  in
   let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
   Pending_denunciations_storage.add_denunciation
     ctxt
@@ -271,6 +253,24 @@ let apply_and_clear_denunciations ctxt =
                    We could assert false, but we can also be permissive
                    while keeping the same invariants *)
               in
+              let delegate_contract = Contract_repr.Implicit delegate in
+              let* slash_history_opt =
+                Storage.Contract.Slashed_deposits.find ctxt delegate_contract
+              in
+              let slash_history = Option.value slash_history_opt ~default:[] in
+              let slash_history =
+                Storage.Slashed_deposits_history.add
+                  level.cycle
+                  slashing_percentage
+                  slash_history
+              in
+              let*! ctxt =
+                Storage.Contract.Slashed_deposits.add
+                  ctxt
+                  delegate_contract
+                  slash_history
+              in
+
               let* frozen_deposits =
                 let* initial_amount =
                   get_initial_frozen_deposits_of_misbehaviour_cycle
