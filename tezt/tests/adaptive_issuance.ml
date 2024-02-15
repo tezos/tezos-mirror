@@ -35,6 +35,8 @@ let blocks_per_cycle = 4
 
 let nonce_revelation_threshold = 2
 
+let bootstrap_accounts = Constant.all_secret_keys
+
 module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
@@ -51,6 +53,17 @@ module Helpers = struct
     Check.((level = expected_level) level_type)
       ~error_msg:"expected current_period = %R, got %L" ;
     unit
+
+  let bake ?ai_vote
+      ?(keys = List.map (fun x -> x.Account.alias) bootstrap_accounts) ~endpoint
+      ~protocol client =
+    Client.bake_for
+      ~endpoint
+      ~minimal_timestamp:true
+      ~protocol
+      ~keys
+      client
+      ?ai_vote
 
   let bake_n_cycles bake ?keys n client =
     let* current_level = get_current_level client in
@@ -135,8 +148,6 @@ let default_overrides =
     (["adaptive_issuance_launch_ema_threshold"], `Int 1);
   ]
 
-let bootstrap_accounts = Constant.all_secret_keys
-
 let launch_ema_threshold client =
   let* json =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
@@ -171,13 +182,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
   assert (JSON.is_null launch_cycle) ;
   (* Make delegate vote for AI activation*)
   let bake ?keys client =
-    Client.bake_for
-      ~endpoint:sandbox_endpoint
-      ~minimal_timestamp:true
-      ~protocol
-      ?keys
-      client
-      ~ai_vote:On
+    Helpers.bake ~ai_vote:On ~endpoint:sandbox_endpoint ~protocol ?keys client
   in
   (* The vote should have passed during the first cycle *)
   let* () =
@@ -739,10 +744,7 @@ let test_staking =
          Constant.bootstrap2.public_key_hash
   in
   Log.info "Numerator/denominator before: %d/%d " numerator denominator ;
-
-  let bake ?keys client =
-    Client.bake_for ~endpoint ~minimal_timestamp:true ~protocol ?keys client
-  in
+  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
   let* () = Helpers.bake_n_cycles bake 1 client_1 in
 
   let stake0 =
