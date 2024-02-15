@@ -197,4 +197,7 @@ val pending_denunciations :
   public_key_hash ->
   Denunciations_repr.t shell_tzresult Lwt.t
 
+val estimated_shared_pending_slashed_amount :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+
 val register : unit -> unit

@@ -532,6 +532,15 @@ module S = struct
       ~query:RPC_query.empty
       ~output:(list Denunciations_repr.item_encoding)
       RPC_path.(path / "denunciations")
+
+  let estimated_shared_pending_slashed_amount =
+    RPC_service.get_service
+      ~description:
+        "Returns the estimated shared pending slashed amount (in mutez) of a \
+         given delegate."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "estimated_shared_pending_slashed_amount")
 end
 
 let check_delegate_registered ctxt pkh =
@@ -743,7 +752,13 @@ let register () =
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.pending_updates ctxt pkh) ;
   register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
-      Delegate.For_RPC.pending_denunciations ctxt pkh)
+      Delegate.For_RPC.pending_denunciations ctxt pkh) ;
+  register1
+    ~chunked:false
+    S.estimated_shared_pending_slashed_amount
+    (fun ctxt delegate () () ->
+      let* () = check_delegate_registered ctxt delegate in
+      Delegate.For_RPC.get_estimated_shared_pending_slashed_amount ctxt delegate)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
@@ -818,3 +833,12 @@ let pending_staking_parameters ctxt block pkh =
 
 let pending_denunciations ctxt block pkh =
   RPC_context.make_call1 S.pending_denunciations ctxt block pkh () ()
+
+let estimated_shared_pending_slashed_amount ctxt block pkh =
+  RPC_context.make_call1
+    S.estimated_shared_pending_slashed_amount
+    ctxt
+    block
+    pkh
+    ()
+    ()
