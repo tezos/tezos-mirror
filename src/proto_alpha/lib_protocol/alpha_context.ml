@@ -227,6 +227,10 @@ module Raw_level = struct
     let add = add
 
     let sub = sub
+
+    let from_repr (level : raw_level) = level
+
+    let to_repr (level : raw_level) = level
   end
 end
 
@@ -269,6 +273,14 @@ module Round = struct
   let update ctxt round = Storage.Block_round.update ctxt round
 
   let get ctxt = Storage.Block_round.get ctxt
+
+  module Internal_for_tests = struct
+    include Internal_for_tests
+
+    let from_repr (round : round) = round
+
+    let to_repr (round : round) = round
+  end
 end
 
 module Gas = struct

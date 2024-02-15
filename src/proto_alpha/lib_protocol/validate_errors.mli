@@ -113,7 +113,7 @@ end
 
 (** Errors that may arise while validating an anonymous operation. *)
 module Anonymous : sig
-  type denunciation_kind = Preattestation | Attestation | Block
+  type denunciation_kind = Misbehaviour.kind
 
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}

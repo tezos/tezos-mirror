@@ -535,8 +535,8 @@ let test_invalid_double_attestation () =
   Op.double_attestation (B b) attestation attestation |> fun operation ->
   let*! res = Block.bake ~operation b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation kind
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
@@ -559,8 +559,8 @@ let test_invalid_double_attestation_variant () =
   |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation kind
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
@@ -577,8 +577,8 @@ let test_too_early_double_attestation_evidence () =
   double_attestation (B genesis) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Too_early_denunciation
+          {kind = Misbehaviour.Double_attesting; _} ->
           true
       | _ -> false)
 
@@ -604,8 +604,8 @@ let test_too_late_double_attestation_evidence () =
   double_attestation (B blk) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Outdated_denunciation
+          {kind = Misbehaviour.Double_attesting; _} ->
           true
       | _ -> false)
 
@@ -627,8 +627,8 @@ let test_different_delegates () =
   double_attestation (B blk_b) e_a e_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Inconsistent_denunciation
+          {kind = Misbehaviour.Double_attesting; _} ->
           true
       | _ -> false)
 
@@ -652,8 +652,8 @@ let test_wrong_delegate () =
   double_attestation (B blk_b) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Inconsistent_denunciation
+          {kind = Misbehaviour.Double_attesting; _} ->
           true
       | _ -> false)
 
@@ -879,8 +879,8 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
   in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
-          when kind = Validate_errors.Anonymous.Attestation ->
+        | Validate_errors.Anonymous.Conflicting_denunciation
+            {kind = Misbehaviour.Double_attesting; _} ->
             true
         | _ -> false)
   in
@@ -891,8 +891,8 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
     Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
   in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Validate_errors.Anonymous.Already_denounced {kind; _}
-        when kind = Validate_errors.Anonymous.Attestation ->
+      | Validate_errors.Anonymous.Already_denounced
+          {kind = Misbehaviour.Double_attesting; _} ->
           true
       | _ -> false)
 

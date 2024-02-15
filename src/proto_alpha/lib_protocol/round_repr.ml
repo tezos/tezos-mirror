@@ -521,7 +521,7 @@ module Index = struct
   let compare = compare
 end
 
-module Internals_for_test = struct
+module Internal_for_tests = struct
   type round_and_offset_raw = {round : round; offset : Period_repr.t}
 
   let round_and_offset round_durations ~level_offset =
