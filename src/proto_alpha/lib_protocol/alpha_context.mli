@@ -3879,13 +3879,12 @@ module Sc_rollup : sig
       serialized t tzresult Lwt.t
 
     module Dal_helpers : sig
-      val valid_slot_id :
-        dal_number_of_slots:int ->
+      val import_level_is_valid :
         dal_activation_level:Raw_level.t option ->
         dal_attestation_lag:int ->
         origination_level:Raw_level.t ->
         commit_inbox_level:Raw_level.t ->
-        Dal.Slot.Header.id ->
+        published_level:Raw_level.t ->
         dal_attested_slots_validity_lag:int ->
         bool
     end

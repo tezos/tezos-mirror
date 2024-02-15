@@ -124,14 +124,13 @@ let slot_id_is_valid
   let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
   match (origination_level_res, commit_inbox_level_res) with
   | Ok origination_level, Ok commit_inbox_level ->
-      Alpha_context.Sc_rollup.Proof.Dal_helpers.valid_slot_id
+      Alpha_context.Sc_rollup.Proof.Dal_helpers.import_level_is_valid
         ~dal_activation_level
         ~dal_attestation_lag:dal_constants.attestation_lag
         ~origination_level
         ~commit_inbox_level
-        ~dal_number_of_slots:dal_constants.number_of_slots
         ~dal_attested_slots_validity_lag
-        slot_id
+        ~published_level:slot_id.published_level
   | _ -> false
 
 let page_id_is_valid

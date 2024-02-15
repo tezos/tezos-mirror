@@ -238,9 +238,8 @@ module Dal_helpers = struct
      The current DAL refutation integration is not resilient to DAL parameters
      changes when upgrading the protocol. The code needs to be adapted. *)
 
-  let valid_slot_id ~dal_number_of_slots ~dal_activation_level
-      ~dal_attestation_lag ~origination_level ~commit_inbox_level
-      Dal_slot_repr.Header.{published_level; index}
+  let import_level_is_valid ~dal_activation_level ~dal_attestation_lag
+      ~origination_level ~commit_inbox_level ~published_level
       ~dal_attested_slots_validity_lag =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let open Raw_level_repr in
@@ -255,12 +254,6 @@ module Dal_helpers = struct
     let not_too_recent =
       add published_level dal_attestation_lag <= commit_inbox_level
     in
-    let index_is_valid =
-      Result.is_ok
-      @@ Dal_slot_index_repr.check_is_in_range
-           ~number_of_slots:dal_number_of_slots
-           index
-    in
     (* An attested slot is not expired if its attested level (equal to
        [published_level + dal_attestation_lag]) is not further than
        [dal_attested_slots_validity_lag] from the given inbox level. *)
@@ -272,7 +265,7 @@ module Dal_helpers = struct
         >= commit_inbox_level)
     in
     dal_was_activated && slot_published_after_origination && not_too_recent
-    && index_is_valid && ttl_not_expired
+    && ttl_not_expired
 
   let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
       ~dal_attestation_lag ~origination_level ~commit_inbox_level
@@ -288,13 +281,12 @@ module Dal_helpers = struct
          (Dal_slot_index_repr.check_is_in_range
             ~number_of_slots:dal_number_of_slots
             index)
-    && valid_slot_id
-         ~dal_number_of_slots
+    && import_level_is_valid
          ~dal_activation_level
          ~dal_attestation_lag
          ~origination_level
          ~commit_inbox_level
-         Dal_slot_repr.Header.{published_level; index}
+         ~published_level
          ~dal_attested_slots_validity_lag
 
   let verify ~metadata ~dal_activation_level ~dal_attestation_lag
