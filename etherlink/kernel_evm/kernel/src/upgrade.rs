@@ -166,7 +166,7 @@ impl Encodable for SequencerUpgrade {
 
 pub fn store_sequencer_upgrade<Host: Runtime>(
     host: &mut Host,
-    sequencer_upgrade: &SequencerUpgrade,
+    sequencer_upgrade: SequencerUpgrade,
 ) -> anyhow::Result<()> {
     log!(
         host,
@@ -175,8 +175,9 @@ pub fn store_sequencer_upgrade<Host: Runtime>(
         sequencer_upgrade.sequencer.to_b58check(),
         sequencer_upgrade.activation_timestamp
     );
-    let path = OwnedPath::from(SEQUENCER_UPGRADE);
     let bytes = &sequencer_upgrade.rlp_bytes();
+    Event::SequencerUpgrade(sequencer_upgrade).store(host)?;
+    let path = OwnedPath::from(SEQUENCER_UPGRADE);
     host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")
 }

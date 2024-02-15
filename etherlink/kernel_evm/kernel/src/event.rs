@@ -7,10 +7,12 @@ use rlp::{Encodable, RlpStream};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub const UPGRADE_TAG: u8 = 0x01;
+pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event {
     Upgrade(upgrade::KernelUpgrade),
+    SequencerUpgrade(upgrade::SequencerUpgrade),
 }
 
 impl Encodable for Event {
@@ -20,6 +22,10 @@ impl Encodable for Event {
             Event::Upgrade(upgrade) => {
                 stream.append(&UPGRADE_TAG);
                 stream.append(upgrade);
+            }
+            Event::SequencerUpgrade(sequencer_upgrade) => {
+                stream.append(&SEQUENCER_UPGRADE_TAG);
+                stream.append(sequencer_upgrade);
             }
         }
     }
