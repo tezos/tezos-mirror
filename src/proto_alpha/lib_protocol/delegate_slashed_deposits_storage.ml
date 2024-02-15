@@ -52,8 +52,7 @@ type punishing_amounts = {
 }
 
 let record_denunciation ctxt ~operation_hash
-    (misbehaviour : Misbehaviour_repr.t) delegate (_level : Level_repr.t)
-    ~rewarded =
+    (misbehaviour : Misbehaviour_repr.t) delegate ~rewarded =
   let open Lwt_result_syntax in
   let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
   Pending_denunciations_storage.add_denunciation
@@ -99,14 +98,7 @@ let punish_double_signing ctxt ~operation_hash misbehaviour delegate
        exception here would cause the whole block application to fail,
        which we don't want. *)
     return ctxt
-  else
-    record_denunciation
-      ctxt
-      ~operation_hash
-      misbehaviour
-      delegate
-      level
-      ~rewarded
+  else record_denunciation ctxt ~operation_hash misbehaviour delegate ~rewarded
 
 (* Misbehaviour Map: orders denunciations for application.
    See {!Misbehaviour_repr.compare} for the order on misbehaviours:
