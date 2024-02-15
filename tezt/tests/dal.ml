@@ -63,6 +63,18 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+(* Wait for 'new_head' event. Note that the DAL node processes a new head with a
+   delay of one level. Also, this event is emitted before block processing. *)
+let wait_for_layer1_head dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
+(* Wait for 'new_final_block' event. This event is emitted after processing a
+   final block. *)
+let wait_for_layer1_final_block dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
 (* We use a custom [bake_for], which by default bakes with all delegates, unlike
    [Client.bake_for], to highlight the following: baking in the past with all
    delegates ensures that the baked block has round 0, which is the default
@@ -429,18 +441,6 @@ let wait_for_stored_slot ?shard_index dal_node commitment =
   in
   Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
       if check_slot_header e && check_shard_index e then Some () else None)
-
-(* Wait for 'new_head' event. Note that the DAL node processes a new head with a
-   delay of one level. Also, this event is emitted before block processing. *)
-let wait_for_layer1_head dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
-      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
-
-(* Wait for 'new_final_block' event. This event is emitted after processing a
-   final block. *)
-let wait_for_layer1_final_block dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
-      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
