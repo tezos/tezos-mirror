@@ -413,10 +413,17 @@ let update_known_peers dal_node known_peers =
     dal_node
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
 
-let wait_for_stored_slot dal_node slot_header =
+let wait_for_stored_slot ?shard_index dal_node commitment =
+  let check_slot_header e =
+    JSON.(e |-> "commitment" |> as_string) = commitment
+  in
+  let check_shard_index e =
+    match shard_index with
+    | None -> true
+    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+  in
   Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
-      if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
-      else None)
+      if check_slot_header e && check_shard_index e then Some () else None)
 
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
@@ -1145,6 +1152,55 @@ let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
       client
   in
   return commitment
+
+(* Similar to [publish_and_store_slot] but additionally bakes [1 +
+   number_of_extra_blocks] blocks to trigger the publication of the
+   shards of the published slot. Moreover, the [wait_slot] argument
+   can be used to wait for the shards to be received by one or several
+   other DAL nodes. Returns the level at which the slot was
+   published. *)
+let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
+    slot_producer_dal_node source ~index ~wait_slot
+    ~number_of_extra_blocks_to_bake content =
+  let* commitment, proof =
+    Helpers.store_slot ~with_proof:true slot_producer_dal_node content
+  in
+  let p = wait_slot commitment in
+  let* (`OpHash ophash) =
+    publish_commitment
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      client
+  in
+  (* Bake a first block to include the operation. *)
+  let* () = bake_for client in
+  let* level = Client.level client in
+  (* Check that the operation is included. *)
+  let* included_manager_operations =
+    let manager_operation_pass = 3 in
+    Node.RPC.(
+      call node
+      @@ get_chain_block_operation_hashes_of_validation_pass
+           manager_operation_pass)
+  in
+  let () =
+    Check.list_mem
+      Check.string
+      ~__LOC__
+      ophash
+      included_manager_operations
+      ~error_msg:"DAL commitment publishment operation not found in head block."
+  in
+  (* Bake some more blocks to finalize the block containing the publication. *)
+  let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
+  (* Wait for the shards to be received *)
+  let* () = p in
+  return level
 
 let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client node
     dal_node source ~index ~content ~attestation_lag ~number_of_slots =
@@ -3049,14 +3105,24 @@ let event_with_topic_to_string = function
 
     More precisely, since topics depend on a pkh and the number of DAL slots,
     this function monitors all the events {pkh; slot_index = 0} ... {pkh;
-    slot_index = num_slots - 1}.
+    slot_index = num_slots - 1}. When the [already_seen_slots] array paramenter
+    is used however, the events corresponding to slot indices marked with [true]
+    in this array are not monitored.
 
     Depending on the value of [event_with_topic], some extra checks, such as the
     peer id in case of Graft and Subscribe, are also done.
 *)
-let check_events_with_topic ~event_with_topic dal_node ~num_slots expected_pkh =
-  let remaining = ref num_slots in
-  let seen = Array.make num_slots false in
+let check_events_with_topic ~event_with_topic dal_node ~num_slots
+    ?(already_seen_slots = Array.make num_slots false) expected_pkh =
+  assert (Array.length already_seen_slots = num_slots) ;
+  let remaining =
+    ref
+      (Array.fold_left
+         (fun remaining b -> if b then remaining else remaining + 1)
+         0
+         already_seen_slots)
+  in
+  let seen = Array.copy already_seen_slots in
   let get_slot_index_opt event =
     let*?? topic =
       match event_with_topic with
@@ -3974,6 +4040,151 @@ let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
   in
   unit
 
+let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
+    dal_bootstrap =
+  (* In this test we have three DAL nodes:
+     - a boostrap one to connect the other two (producer and attester),
+     - a slot producer on slot 0,
+     - an attester for all the bootstrap pkh.
+
+     We check that when the slot producer publishes a slot, it ends up
+     being attested.
+  *)
+  let index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  let number_of_shards =
+    dal_parameters.Dal.Parameters.cryptobox.number_of_shards
+  in
+  let peers = [Dal_node.listen_addr dal_bootstrap] in
+  let peer_id dal_node =
+    JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
+  in
+
+  (* Check that the attestation threshold for this test is 100%. If
+     not, this means that we forgot to register the test with
+     ~attestation_threshold:100 *)
+  Check.((dal_parameters.Dal.Parameters.attestation_threshold = 100) int)
+    ~error_msg:"attestation_threshold value (%L) should be 100" ;
+  (* Check that the dal node passed as argument to this test function
+     is a running bootstrap DAL node. If not, this means that we
+     forgot to register the test with ~bootstrap_profile:true *)
+  let* () = check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap in
+  Log.info "Bootstrap DAL node is running" ;
+
+  let producer = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
+  let* () = Dal_node.run ~wait_ready:true producer in
+  let producer_peer_id = peer_id producer in
+  Log.info "Slot producer DAL node is running" ;
+
+  let all_pkhs =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun account -> account.Account.public_key_hash)
+  in
+  let attester = Dal_node.create ~name:"attester" ~node () in
+  let* () = Dal_node.init_config ~attester_profiles:all_pkhs ~peers attester in
+  let* () = Dal_node.run ~wait_ready:true attester in
+  let attester_peer_id = peer_id attester in
+
+  (* The connections between attesters and the slot producer have no
+     reason to be grafted on other slot indices than the one the slot
+     producer is subscribed to, so we instruct
+     [check_events_with_topic] to skip all events but the one for
+     [index]. *)
+  let already_seen_slots =
+    Array.init num_slots (fun slot_index -> slot_index <> index)
+  in
+  (* Wait for a GRAFT message between the attester and the producer,
+     in any direction. *)
+  let check_graft pkh =
+    let graft_from_attester =
+      check_events_with_topic
+        ~event_with_topic:(Graft attester_peer_id)
+        producer
+        ~num_slots
+        ~already_seen_slots
+        pkh
+    in
+    let graft_from_producer =
+      check_events_with_topic
+        ~event_with_topic:(Graft producer_peer_id)
+        attester
+        ~num_slots
+        ~already_seen_slots
+        pkh
+    in
+    Lwt.pick [graft_from_attester; graft_from_producer]
+  in
+  let check_graft_promises = List.map check_graft all_pkhs in
+  Log.info "Waiting for grafting of the attester - producer connection" ;
+  (* We need to bake some blocks until the L1 node notifies the
+     attester DAL nodes that some L1 block is final and they have DAL
+     attestation rights in it. *)
+  let* () = bake_for ~count:3 client in
+  let* () = Lwt.join check_graft_promises in
+  Log.info "Attester - producer connection grafted" ;
+
+  (* Produce and publish a slot *)
+  let source = Constant.bootstrap1 in
+  let slot_content = "content" in
+
+  let all_shard_indices =
+    Seq.ints 0 |> Seq.take number_of_shards |> List.of_seq
+  in
+  let wait_slot commitment =
+    Lwt.join
+    @@ List.map
+         (fun shard_index ->
+           wait_for_stored_slot ~shard_index attester commitment)
+         all_shard_indices
+  in
+  let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
+  let* publication_level =
+    publish_store_and_wait_slot
+      node
+      client
+      producer
+      source
+      ~index
+      ~wait_slot
+      ~number_of_extra_blocks_to_bake:2
+    @@ Helpers.make_slot ~slot_size slot_content
+  in
+
+  Log.info "Slot produced and published" ;
+
+  let final_level = publication_level + attestation_lag + 2 in
+  let* current_level = Client.level client in
+  let p =
+    wait_for_layer1_final_block attester (publication_level + attestation_lag)
+  in
+  let* () =
+    bake_for
+      ~dal_node_endpoint:attester_dal_node_endpoint
+      ~count:(final_level - current_level)
+      client
+  in
+  let* () = p in
+
+  let* slot_headers =
+    Dal_RPC.(call attester @@ get_published_level_headers publication_level)
+  in
+  Check.(
+    (1 = List.length slot_headers)
+      int
+      ~error_msg:"Expected a single header (got %R headers)") ;
+  let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
+  Check.(
+    (publication_level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
+  Check.((index = slot_index) int ~error_msg:"Expected index %L (got %R)") ;
+  let expected_status = "attested" in
+  Check.(
+    (expected_status = status) string ~error_msg:"Expected status %L (got %R)") ;
+  Log.info "Slot sucessfully attested" ;
+  unit
+
 module Tx_kernel_e2e = struct
   open Tezos_protocol_alpha.Protocol
   open Tezt_tx_kernel
@@ -4632,6 +4843,13 @@ let register ~protocols =
     ~tags:["producer"; "profile"]
     "producer profile"
     test_producer_profile
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["attestation"; "p2p"]
+    ~attestation_threshold:100
+    ~bootstrap_profile:true
+    "attestation through p2p"
+    test_attestation_through_p2p
     protocols ;
 
   (* Tests with all nodes *)
