@@ -409,15 +409,15 @@ type bu_check = {
   msg : string;
 }
 
-(* some values might be slightly different (+-1 mutez) because of roundings and
+(* some values might be slightly different (+-[margin] mutez) because of roundings and
    randomness in baking rights that may affect the overall rewards coming from
    previous blocks, to avoid flakiness we test the "rounded range" of those
    values *)
-let check_with_roundings got expected =
-  got >= expected - 1 && got <= expected + 1
+let check_with_roundings ?(margin = 1) got expected =
+  got >= expected - margin && got <= expected + margin
 
-let assert_with_roundings ~__LOC__ got expected =
-  if not (check_with_roundings got expected) then
+let assert_with_roundings ~__LOC__ ?margin got expected =
+  if not (check_with_roundings ?margin got expected) then
     Test.fail
       "@[<v 2>%s: Asserted equality (up to rounding) failed. got %d, expected \
        %d.@]@."
@@ -1118,12 +1118,14 @@ let test_staking =
     (int_of_float (float amount_slashed_from_baker_deposits /. 6.)) ;
 
   assert_with_roundings
+    ~margin:3 (* as we sum 3 amounts *)
     ~__LOC__
     (amount_rewarded_from_unstake_stakers_deposits
    + amount_rewarded_from_stakers_deposits + amount_rewarded_from_baker_deposits
     )
     total_amount_rewarded ;
   assert_with_roundings
+    ~margin:3 (* as we sum 3 amounts *)
     ~__LOC__
     (amount_slashed_from_unstake_stakers_deposits
    + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits)
