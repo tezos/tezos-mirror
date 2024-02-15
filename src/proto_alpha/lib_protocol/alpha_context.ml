@@ -540,6 +540,8 @@ module Delegate = struct
 
   let is_forbidden_delegate = Forbidden_delegates_storage.is_forbidden
 
+  let already_denounced = Already_denounced_storage.already_denounced
+
   module Consensus_key = Delegate_consensus_key
 
   module Rewards = struct

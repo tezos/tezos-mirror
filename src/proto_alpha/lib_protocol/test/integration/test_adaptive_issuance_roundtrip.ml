@@ -160,14 +160,9 @@ let default_params =
       Q.(Int32.to_int edge_of_baking_over_staking_billionth // 1_000_000_000);
   }
 
-type double_signing_kind =
-  | Double_baking
-  | Double_attesting
-  | Double_preattesting
-
 type double_signing_state = {
   culprit : Signature.Public_key_hash.t;
-  kind : double_signing_kind;
+  kind : Protocol.Misbehaviour_repr.kind;
   evidence : Context.t -> Protocol.Alpha_context.packed_operation;
   denounced : bool;
   level : Int32.t;
@@ -1400,11 +1395,7 @@ let check_pending_slashings (block, state) : unit tzresult Lwt.t =
     else
       let c2 = Signature.Public_key_hash.compare r1 r2 in
       if c2 <> 0 then c2
-      else
-        match (m1.kind, m2.kind) with
-        | Double_baking, Double_attesting -> -1
-        | x, y when x = y -> 0
-        | _ -> 1
+      else Protocol.Misbehaviour_repr.compare_kind m1.kind m2.kind
   in
   let denunciations_rpc = List.sort compare_denunciations denunciations_rpc in
   let denunciations_state =
@@ -1504,7 +1495,11 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
   let open Lwt_result_syntax in
   Log.info
     ~color:Log_module.event_color
-    "Double (pre)attesting with %s"
+    "Double %s with %s"
+    (match kind with
+    | Protocol.Misbehaviour_repr.Double_preattesting -> "preattesting"
+    | Double_attesting -> "attesting"
+    | Double_baking -> assert false)
     delegate_name ;
   let delegate = State.find_account delegate_name state in
   let* baker, _, _, _ =
@@ -1623,12 +1618,6 @@ let update_state_denunciation (block, state)
            following cycle? *)
         return (state, denounced)
       else
-        let kind =
-          match kind with
-          | Double_baking -> Protocol.Misbehaviour_repr.Double_baking
-          | Double_attesting -> Double_attesting
-          | Double_preattesting -> Double_attesting
-        in
         let misbehaviour =
           {
             Protocol.Misbehaviour_repr.kind;

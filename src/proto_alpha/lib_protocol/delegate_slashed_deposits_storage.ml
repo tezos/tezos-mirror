@@ -44,30 +44,6 @@ let update_slashing_storage_for_p ctxt =
   in
   Storage.Contract.Slashed_deposits__Oxford.clear ctxt
 
-let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
-    round =
-  let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, round), delegate)
-  in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_attesting
-
-let already_denounced_for_double_baking ctxt delegate (level : Level_repr.t)
-    round =
-  let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, round), delegate)
-  in
-  match denounced_opt with
-  | None -> return_false
-  | Some denounced -> return denounced.for_double_baking
-
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
 type punishing_amounts = {
@@ -75,39 +51,16 @@ type punishing_amounts = {
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
-let punish_double_signing ctxt ~operation_hash
+let record_denunciation ctxt ~operation_hash
     (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
     ~rewarded =
   let open Lwt_result_syntax in
-  let* denounced_opt =
-    Storage.Already_denounced.find
-      (ctxt, level.cycle)
-      ((level.level, misbehaviour.round), delegate)
-  in
-  let denounced =
-    Option.value denounced_opt ~default:Storage.default_denounced
-  in
   (* Placeholder value *)
   let* ctxt, slashing_percentage =
     Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
   in
-  let already_denounced, updated_denounced =
-    let Storage.{for_double_baking; for_double_attesting} = denounced in
-    match misbehaviour.kind with
-    | Double_baking ->
-        (for_double_baking, {denounced with for_double_baking = true})
-    | Double_attesting | Double_preattesting ->
-        (for_double_attesting, {denounced with for_double_attesting = true})
-  in
-  assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let*! ctxt =
-    Storage.Already_denounced.add
-      (ctxt, level.cycle)
-      ((level.level, misbehaviour.round), delegate)
-      updated_denounced
-  in
   let* slash_history_opt =
     Storage.Contract.Slashed_deposits.find ctxt delegate_contract
   in
@@ -138,11 +91,50 @@ let punish_double_signing ctxt ~operation_hash
   in
   return ctxt
 
-let clear_outdated_already_denounced ctxt ~new_cycle =
-  let max_slashable_period = Constants_repr.max_slashing_period in
-  match Cycle_repr.(sub new_cycle max_slashable_period) with
-  | None -> Lwt.return ctxt
-  | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
+let punish_double_signing ctxt ~operation_hash misbehaviour delegate
+    (level : Level_repr.t) ~rewarded =
+  let open Lwt_result_syntax in
+  let* ctxt, was_already_denounced =
+    Already_denounced_storage.add_denunciation
+      ctxt
+      delegate
+      level
+      misbehaviour.Misbehaviour_repr.round
+      misbehaviour.kind
+  in
+  if was_already_denounced then
+    (* This can only happen in the very specific case where a delegate
+       has crafted at least three attestations (respectively
+       preattestations) on the same level and round but with three
+       different slots owned by this delegate. Indeed, this makes it
+       possible to have two denunciations about the same delegate,
+       level, round, and kind, but different slots. Such denunciations
+       are considered identical by {!Already_denounced_storage}, which
+       is good because the delegate shouldn't get slashed twice on the
+       same level, round, and kind. However, {!Validate}'s conflict
+       handler identifies denunciations via their slot rather than
+       delegate for technical reasons (because the slot is readily
+       available whereas retrieving the delegate requires a call to
+       {!Delegate_sampler.slot_owner} which is in Lwt and thus
+       incompatible with some signatures). Therefore, if these
+       denunciations (which differ only in their slots) are both
+       included in the same block, then they will both be successfully
+       validated, and then [was_already_denounced] will be [true]
+       during the application of the second one.
+
+       In this unlikely scenario, we simply ignore the redundant
+       denunciation silently. Returning an error or raising an
+       exception here would cause the whole block application to fail,
+       which we don't want. *)
+    return ctxt
+  else
+    record_denunciation
+      ctxt
+      ~operation_hash
+      misbehaviour
+      delegate
+      level
+      ~rewarded
 
 (* Misbehaviour Map: orders denunciations for application.
    See {!Misbehaviour_repr.compare} for the order on misbehaviours:

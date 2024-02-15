@@ -31,24 +31,6 @@
    {!Storage.Pending_denunciations} tables.
 *)
 
-(** Returns true if the given delegate has already been denounced
-    for double baking for the given level. *)
-val already_denounced_for_double_baking :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  Round_repr.t ->
-  bool tzresult Lwt.t
-
-(** Returns true if the given delegate has already been denounced
-    for double preattesting or double attesting for the given level. *)
-val already_denounced_for_double_attesting :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  Round_repr.t ->
-  bool tzresult Lwt.t
-
 (** The [reward_and_burn] type embeds amounts involved when slashing a
     delegate for double attesting or double baking. *)
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
@@ -81,12 +63,6 @@ val punish_double_signing :
   Level_repr.t ->
   rewarded:Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
-
-(** Clear the part of {!Storage.Already_denounced} about the cycle
-    [new_cycle - max_slashable_period]. Indeed, denunciations on
-    events which happened during this cycle are no longer allowed. *)
-val clear_outdated_already_denounced :
-  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
 (** Applies pending denunciations in {!Storage.Pending_denunciations}
     at the end of a cycle. The applicable denunciations are those that

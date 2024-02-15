@@ -1112,23 +1112,20 @@ module Pending_denunciations =
 
 (** Per cycle storage *)
 
-type denounced = {for_double_attesting : bool; for_double_baking : bool}
+type denounced__Oxford = {for_double_attesting : bool; for_double_baking : bool}
+
+type denounced = {
+  for_double_preattesting : bool;
+  for_double_attesting : bool;
+  for_double_baking : bool;
+}
 
 let default_denounced =
-  {for_double_attesting = false; for_double_baking = false}
-
-module Denounced = struct
-  type t = denounced
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {for_double_attesting; for_double_baking} ->
-        (for_double_attesting, for_double_baking))
-      (fun (for_double_attesting, for_double_baking) ->
-        {for_double_attesting; for_double_baking})
-      (obj2 (req "for_double_attesting" bool) (req "for_double_baking" bool))
-end
+  {
+    for_double_preattesting = false;
+    for_double_attesting = false;
+    for_double_baking = false;
+  }
 
 module Cycle = struct
   module Indexed_context =
@@ -1151,7 +1148,27 @@ module Cycle = struct
                   (Raw_level_repr.Index))
                   (Make_index (Round_repr.Index)))
                (Public_key_hash_index))
-      (Denounced)
+      (struct
+        type t = denounced
+
+        let encoding =
+          let open Data_encoding in
+          conv
+            (fun {
+                   for_double_preattesting;
+                   for_double_attesting;
+                   for_double_baking;
+                 } ->
+              (for_double_preattesting, for_double_attesting, for_double_baking))
+            (fun ( for_double_preattesting,
+                   for_double_attesting,
+                   for_double_baking ) ->
+              {for_double_preattesting; for_double_attesting; for_double_baking})
+            (obj3
+               (req "for_double_preattesting" bool)
+               (req "for_double_attesting" bool)
+               (req "for_double_baking" bool))
+      end)
 
   module Already_denounced__Oxford =
     Make_indexed_data_storage
@@ -1160,7 +1177,20 @@ module Cycle = struct
            let name = ["slashed_deposits"]
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-      (Denounced)
+      (struct
+        type t = denounced__Oxford
+
+        let encoding =
+          let open Data_encoding in
+          conv
+            (fun ({for_double_attesting; for_double_baking} : denounced__Oxford) ->
+              (for_double_attesting, for_double_baking))
+            (fun (for_double_attesting, for_double_baking) ->
+              {for_double_attesting; for_double_baking})
+            (obj2
+               (req "for_double_attesting" bool)
+               (req "for_double_baking" bool))
+      end)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map

@@ -181,9 +181,11 @@ Minor Changes
   consistent by adding errors in some cases (BLS12-381 values, Sapling
   transactions, and timelocks). (MR :gl:`!10227`)
 
-- A delegate may now be slashed once per double baking event and once
-  per double (pre)attesting event at every level and round
-  (previously, only at every level, no matter the round). (MR :gl:`!11826`)
+- At every level, a delegate may now be slashed for one double baking
+  per round, one double attesting per round, and one double
+  preattesting per round. Previously, it was at most one double baking
+  for the whole level, and one double operation (either attestion or
+  preattestion) for the whole level. (MRs :gl:`!11826`, :gl:`!11844`)
 
 Internal
 --------
