@@ -1478,6 +1478,98 @@ let test_external_transaction_to_delayed_inbox_fails =
   assert (Option.is_none response) ;
   unit
 
+let test_delayed_inbox_flushing =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
+    ~title:"Delayed inbox flushing"
+    ~uses
+  @@ fun protocol ->
+  (* Setup with a short wall time timeout but a significant lower bound of
+     L1 levels needed for timeout.
+     The idea is to send 2 transactions to the delayed inbox, having one
+     time out and check that the second is also forced.
+     We set [delayed_inbox_min_levels] to a value that is large enough
+     to give us time to send the second one while the first one is not
+     timed out yet.
+  *)
+  let* {
+         client;
+         node;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         sequencer;
+         proxy;
+       } =
+    setup_sequencer
+      ~delayed_inbox_timeout:1
+      ~delayed_inbox_min_levels:20
+      protocol
+  in
+  (* Kill the sequencer *)
+  let* () = Evm_node.terminate sequencer in
+  let endpoint = Evm_node.endpoint proxy in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let sender = Eth_account.bootstrap_accounts.(0).address in
+  let _ = Rpc.block_number proxy in
+  let receiver = Eth_account.bootstrap_accounts.(1).address in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  (* Send the first transaction, this one is dummy (from [100-inputs-for-proxy])
+     as we only use it for the timeout. *)
+  let tx1 =
+    "f863808252088252089400000000000000000000000000000000000000000a80820a95a0aedf43a765be7e57167a732fb460bec1c73f29bc8c2f7e753b652918ea19cd8da04062403d1ddcdf9d80dc69cab4509400a21604f0ec42f82289597f8476792648"
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~node
+      tx1
+  in
+  (* Bake a few blocks but not enough for the first tx to be forced! *)
+  let* _ =
+    repeat 10 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  (* Send the second transaction, a transfer from
+     Eth_account.bootstrap_accounts.(0) to Eth_account.bootstrap_accounts.(1).
+  *)
+  let tx2 =
+    "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~node
+      tx2
+  in
+  (* Bake a few more blocks to make sure the first tx times out, but not
+     the second one. However, the latter should also be included. *)
+  let* _ =
+    repeat 10 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
+    ~error_msg:"Balance should be updated" ;
+  Check.((sender_balance_prev > sender_balance_next) Wei.typ)
+    ~error_msg:"Expected a smaller balance" ;
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+  unit
+
 let () =
   test_remove_sequencer [Alpha] ;
   test_persistent_state [Alpha] ;
@@ -1498,4 +1590,5 @@ let () =
   test_force_kernel_upgrade_too_early [Alpha] ;
   test_external_transaction_to_delayed_inbox_fails [Alpha] ;
   test_delayed_transfer_timeout [Alpha] ;
-  test_delayed_transfer_timeout_fails_l1_levels [Alpha]
+  test_delayed_transfer_timeout_fails_l1_levels [Alpha] ;
+  test_delayed_inbox_flushing [Alpha]
