@@ -642,6 +642,18 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
+let register_wallet ~wallet_dir =
+  let wallet_ctxt =
+    new Client_context_unix.unix_io_wallet
+      ~base_dir:wallet_dir
+      ~password_filename:None
+  in
+  let () =
+    Client_main_run.register_default_signer
+      (wallet_ctxt :> Client_context.io_wallet)
+  in
+  wallet_ctxt
+
 let sequencer_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -694,15 +706,7 @@ let sequencer_command =
          rollup_node_endpoint
          sequencer_str
          () ->
-      let wallet_ctxt =
-        new Client_context_unix.unix_io_wallet
-          ~base_dir:wallet_dir
-          ~password_filename:None
-      in
-      let () =
-        Client_main_run.register_default_signer
-          (wallet_ctxt :> Client_context.io_wallet)
-      in
+      let wallet_ctxt = register_wallet ~wallet_dir in
       let* sequencer =
         Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
       in
@@ -961,15 +965,7 @@ let chunker_command =
             | Some k -> Lwt.return k
             | None -> Lwt.fail_with "missing sequencer key"
           in
-          let wallet_ctxt =
-            new Client_context_unix.unix_io_wallet
-              ~base_dir:wallet_dir
-              ~password_filename:None
-          in
-          let () =
-            Client_main_run.register_default_signer
-              (wallet_ctxt :> Client_context.io_wallet)
-          in
+          let wallet_ctxt = register_wallet ~wallet_dir in
           let+ sequencer_key =
             Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
           in
@@ -1023,7 +1019,53 @@ let make_upgrade_command =
         List [Value root_hash_bytes; Value activation_timestamp]
       in
       let payload = encode kernel_upgrade in
-      Printf.printf "%s" Hex.(of_bytes payload |> show) ;
+      Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
+      return_unit)
+
+let make_sequencer_upgrade_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
+    (args1 wallet_dir_arg)
+    (prefixes
+       [
+         "make";
+         "sequencer";
+         "upgrade";
+         "payload";
+         "at";
+         "activation";
+         "timestamp";
+       ]
+    @@ param
+         ~name:"activation_timestamp"
+         ~desc:
+           "After activation timestamp, the kernel will upgrade to this value"
+         Params.timestamp
+    @@ prefix "for" @@ Params.sequencer_key @@ stop)
+    (fun wallet_dir activation_timestamp sequencer_str () ->
+      let open Rlp in
+      let wallet_ctxt = register_wallet ~wallet_dir in
+      let* _pk_uri, sequencer_pk_opt =
+        Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
+      in
+      let activation_timestamp =
+        Evm_node_lib_dev.Helpers.timestamp_to_bytes activation_timestamp
+      in
+      let*? sequencer_pk =
+        Option.to_result
+          ~none:[error_of_fmt "invalid format or unknown public key."]
+          sequencer_pk_opt
+      in
+      let sequencer_pk_bytes =
+        Signature.Public_key.to_b58check sequencer_pk |> String.to_bytes
+      in
+      let kernel_upgrade =
+        List [Value sequencer_pk_bytes; Value activation_timestamp]
+      in
+      let payload = encode kernel_upgrade in
+      Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
 
 let init_from_rollup_node_command =
@@ -1101,6 +1143,7 @@ let commands =
     observer_command;
     chunker_command;
     make_upgrade_command;
+    make_sequencer_upgrade_command;
     init_from_rollup_node_command;
     dump_to_rlp;
   ]

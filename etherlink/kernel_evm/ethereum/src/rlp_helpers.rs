@@ -10,7 +10,7 @@ use crate::transaction::{
 };
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_encoding::{public_key::PublicKey, timestamp::Timestamp};
 
 pub fn next<'a, 'v>(decoder: &mut RlpIterator<'a, 'v>) -> Result<Rlp<'a>, DecoderError> {
     decoder.next().ok_or(DecoderError::RlpIncorrectListLen)
@@ -307,4 +307,26 @@ pub fn decode_option_u64_le(
         0 => Ok(None),
         _ => Err(DecoderError::RlpIncorrectListLen),
     }
+}
+
+pub fn append_public_key(stream: &mut RlpStream, public_key: &PublicKey) {
+    let pk_b58 = PublicKey::to_b58check(public_key);
+    let pk_bytes = String::as_bytes(&pk_b58);
+    stream.append(&pk_bytes.to_vec());
+}
+
+pub fn decode_public_key(decoder: &Rlp<'_>) -> Result<PublicKey, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, "public_key")?;
+
+    let pk_b58 = String::from_utf8(bytes.to_vec()).map_err(|_| {
+        DecoderError::Custom(
+            "Invalid conversion from timestamp vector of bytes to bytes.",
+        )
+    })?;
+    let pk = PublicKey::from_b58check(&pk_b58).map_err(|_| {
+        DecoderError::Custom(
+            "Invalid conversion from timestamp vector of bytes to bytes.",
+        )
+    })?;
+    Ok(pk)
 }

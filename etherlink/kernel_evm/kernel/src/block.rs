@@ -270,14 +270,14 @@ pub fn produce<Host: KernelRuntime>(
             &mut tick_counter,
             &mut first_block_of_reboot,
         )? {
-            ComputationResult::Finished => {
-                storage::delete_block_in_progress(host)?;
-            }
+            ComputationResult::Finished => storage::delete_block_in_progress(host)?,
             ComputationResult::RebootNeeded => {
                 return Ok(ComputationResult::RebootNeeded)
             }
         },
     }
+
+    upgrade::possible_sequencer_upgrade(host)?;
 
     // Execute stored blueprints
     while let Some(block_in_progress) = next_bip_from_blueprints(

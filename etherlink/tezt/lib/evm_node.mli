@@ -173,6 +173,18 @@ val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
 val upgrade_payload :
   root_hash:string -> activation_timestamp:string -> string Lwt.t
 
+(** [sequencer_upgrade_payload ?client ~public_key
+    ~activation_timestamp ()] gives the sequencer upgrade payload to
+    put in a upgrade message, it will upgrade the sequencer to
+    [public_key] at the first l1 block after [activation_timestamp]
+    (in RFC3399 format). *)
+val sequencer_upgrade_payload :
+  ?client:Client.t ->
+  public_key:string ->
+  activation_timestamp:string ->
+  unit ->
+  string Lwt.t
+
 (** [init_from_rollup_node_data_dir ?devmode evm_node rollup_node]
     initialises the data dir of the evm node by importing the evm
     state from a rollup node data dir. [devmode] is false by default. *)

@@ -4307,7 +4307,7 @@ let test_l2_timestamp_opcode =
     ~title:"Check L2 opcode timestamp"
     test
 
-let test_migrate_proxy_to_sequencer =
+let test_migrate_proxy_to_sequencer_future =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "rollup_node"; "init"; "migration"; "sequencer"]
@@ -4318,22 +4318,165 @@ let test_migrate_proxy_to_sequencer =
         Constant.smart_rollup_installer;
         Constant.WASM.evm_kernel;
       ])
-    ~title:"migrate from proxy to sequencer using a sequencer admin contract"
+    ~title:
+      "migrate from proxy to sequencer using a sequencer admin contract with a \
+       future timestamp"
   @@ fun protocol ->
-  let check_block_hash ~sequencer_node ~proxy_node =
-    let*@ expected_level = Rpc.block_number sequencer_node in
-    let*@ rollup_node_head =
-      Rpc.get_block_by_number ~block:"latest" proxy_node
-    in
-    let*@ sequencer_head =
-      Rpc.get_block_by_number ~block:"latest" sequencer_node
-    in
-    Check.((sequencer_head.hash = rollup_node_head.hash) string)
-      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)" ;
-    Check.((sequencer_head.number = expected_level) int32)
-      ~error_msg:"block level is not equal (sequencer: %L; expected: %R)" ;
-    unit
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
+  (* 10s per block, 6 block.  *)
+  let activation_timestamp = "2020-01-01T00:01:00Z" in
+  let sequencer_admin = Constant.bootstrap5 in
+  let sequencer_key = Constant.bootstrap4 in
+  let* ({
+          evm_node = proxy_node;
+          sc_rollup_node;
+          client;
+          kernel;
+          sc_rollup_address;
+          l1_contracts;
+          node;
+          _;
+        } as full_evm_setup) =
+    setup_evm_kernel
+      ~timestamp:genesis_timestamp
+      ~sequencer_admin
+      ~admin:(Some Constant.bootstrap3)
+      protocol
+  in
+  (* Send a transaction in proxy mode. *)
+  let* () =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let receiver = Eth_account.bootstrap_accounts.(1) in
+    let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
+    check_tx_succeeded ~endpoint:(Evm_node.endpoint proxy_node) ~tx
+  in
+  (* Send the internal message to add a sequencer on the rollup. *)
+  let sequencer_admin_contract =
+    match
+      Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin)
+    with
+    | Some contract -> contract
+    | None -> Test.fail "missing sequencer admin contract"
+  in
+  let* payload =
+    Evm_node.sequencer_upgrade_payload
+      ~client
+      ~public_key:sequencer_key.alias
+      ~activation_timestamp
+      ()
+  in
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:sequencer_admin.public_key_hash
+      ~receiver:sequencer_admin_contract
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
+  let sequencer_node =
+    let mode =
+      Evm_node.Sequencer
+        {
+          initial_kernel = kernel;
+          preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0";
+          private_rpc_port = Port.fresh ();
+          time_between_blocks = Some Nothing;
+          sequencer = sequencer_key.alias;
+          genesis_timestamp = None;
+          max_blueprints_lag = None;
+          max_blueprints_catchup = None;
+          catchup_cooldown = None;
+          devmode = true;
+          wallet_dir = Some (Client.base_dir client);
+        }
+    in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () =
+    repeat 6 (fun () ->
+        let* _ = Client.bake_for_and_wait client in
+        unit)
+  in
+  (* Run the sequencer from the rollup node state. *)
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      sequencer_node
+      sc_rollup_node
+  in
+  let* () = Evm_node.run sequencer_node in
+  (* Same head after initialisation. *)
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
+  (* Produce a block in sequencer. *)
+  let* _ = Rpc.produce_block sequencer_node in
+  (* Conservative way to make sure the produced block is published to L1. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ =
+          next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client
+        in
+        unit)
+  in
+  (* Same head after first sequencer produced block. *)
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
+
+  (* Send a transaction to sequencer. *)
+  let* () =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let receiver = Eth_account.bootstrap_accounts.(1) in
+    let full_evm_setup = {full_evm_setup with evm_node = sequencer_node} in
+    let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
+    check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
+  in
+  (* Conservative way to make sure the produced block is published to L1. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ =
+          next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client
+        in
+        unit)
+  in
+  (* Same head after sequencer transaction. *)
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
+  unit
+
+let test_migrate_proxy_to_sequencer_past =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rollup_node"; "init"; "migration"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "migrate from proxy to sequencer using a sequencer admin contract with a \
+       past timestamp"
+  @@ fun protocol ->
   let sequencer_admin = Constant.bootstrap5 in
   let sequencer_key = Constant.bootstrap4 in
   let* ({
@@ -4363,16 +4506,19 @@ let test_migrate_proxy_to_sequencer =
     | Some contract -> contract
     | None -> Test.fail "missing sequencer admin contract"
   in
+  let* payload =
+    Evm_node.sequencer_upgrade_payload
+      ~client
+      ~public_key:sequencer_key.alias
+      ~activation_timestamp:"0"
+      ()
+  in
   let* () =
     Client.transfer
       ~amount:Tez.zero
       ~giver:sequencer_admin.public_key_hash
       ~receiver:sequencer_admin_contract
-      ~arg:
-        (sf
-           "Pair %S 0x%s"
-           sc_rollup_address
-           (Hex.of_string sequencer_key.public_key |> Hex.show))
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
       ~burn_cap:Tez.one
       client
   in
@@ -4396,7 +4542,6 @@ let test_migrate_proxy_to_sequencer =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
-
   (* Run the sequencer from the rollup node state. *)
   let* () =
     Evm_node.init_from_rollup_node_data_dir
@@ -4406,7 +4551,13 @@ let test_migrate_proxy_to_sequencer =
   in
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
-  let* () = check_block_hash ~sequencer_node ~proxy_node in
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
 
   (* Produce a block in sequencer. *)
   let* _ = Rpc.produce_block sequencer_node in
@@ -4419,7 +4570,13 @@ let test_migrate_proxy_to_sequencer =
         unit)
   in
   (* Same head after first sequencer produced block. *)
-  let* () = check_block_hash ~sequencer_node ~proxy_node in
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
 
   (* Send a transaction to sequencer. *)
   let* () =
@@ -4438,7 +4595,13 @@ let test_migrate_proxy_to_sequencer =
         unit)
   in
   (* Same head after sequencer transaction. *)
-  let* () = check_block_hash ~sequencer_node ~proxy_node in
+  let* () =
+    check_head_consistency
+      ~left:sequencer_node
+      ~right:proxy_node
+      ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
+      ()
+  in
 
   unit
 
@@ -4826,7 +4989,8 @@ let register_evm_node ~protocols =
   test_regression_block_hash_gen protocols ;
   test_reboot_out_of_ticks protocols ;
   test_l2_timestamp_opcode protocols ;
-  test_migrate_proxy_to_sequencer protocols ;
+  test_migrate_proxy_to_sequencer_past protocols ;
+  test_migrate_proxy_to_sequencer_future protocols ;
   test_ghostnet_kernel protocols ;
   test_estimate_gas_out_of_ticks protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;

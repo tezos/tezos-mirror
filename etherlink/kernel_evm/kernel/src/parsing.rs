@@ -10,6 +10,7 @@ use crate::{
     inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
+    upgrade::SequencerUpgrade,
 };
 use primitive_types::{H160, U256};
 use rlp::Encodable;
@@ -89,8 +90,8 @@ pub enum Input {
     SimpleTransaction(Box<Transaction>),
     Deposit(Deposit),
     Upgrade(KernelUpgrade),
+    SequencerUpgrade(SequencerUpgrade),
     RemoveSequencer,
-    NewSequencer(PublicKey),
     NewChunkedTransaction {
         tx_hash: TransactionHash,
         num_chunks: u16,
@@ -204,9 +205,9 @@ impl InputResult {
         if bytes.is_empty() {
             Self::Input(Input::RemoveSequencer)
         } else {
-            let pk_b58 = parsable!(String::from_utf8(bytes.to_vec()).ok());
-            let pk = parsable!(PublicKey::from_b58check(&pk_b58).ok());
-            Self::Input(Input::NewSequencer(pk))
+            let sequencer_upgrade =
+                parsable!(SequencerUpgrade::from_rlp_bytes(bytes).ok());
+            Self::Input(Input::SequencerUpgrade(sequencer_upgrade))
         }
     }
 
