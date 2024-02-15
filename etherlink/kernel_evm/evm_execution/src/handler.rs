@@ -2322,6 +2322,11 @@ mod test {
         account.set_code(handler.borrow_host(), &code).unwrap();
     }
 
+    fn set_nonce<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160, nonce: u64) {
+        let mut account = handler.get_or_create_account(*address).unwrap();
+        account.set_nonce(handler.borrow_host(), nonce).unwrap()
+    }
+
     fn get_balance<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160) -> U256 {
         let account = handler.get_or_create_account(*address).unwrap();
         account.balance(handler.borrow_host()).unwrap()
@@ -4176,5 +4181,46 @@ mod test {
             .unwrap();
 
         assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
+    }
+
+    #[test]
+    fn create_fails_with_max_nonce() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::one(),
+            false,
+        );
+
+        set_balance(&mut handler, &caller, U256::from(1000000000));
+        set_nonce(&mut handler, &caller, u64::MAX);
+
+        let init_code = hex::decode("60006000fd").unwrap(); // Just revert
+
+        let capture = handler.create(
+            caller,
+            CreateScheme::Legacy { caller },
+            U256::zero(),
+            init_code,
+            None,
+        );
+
+        match capture {
+            Capture::Exit((ExitReason::Error(ExitError::MaxNonce), ..)) => (),
+            _ => panic!("Create doesn't fail with Error MaxNonce"),
+        }
     }
 }
