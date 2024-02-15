@@ -536,7 +536,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         dump_bench_opcode(opcodes_dump, benchmark_name, run_benchmark_result.opcodes, i == 0);
         move_profiler_output(run_benchmark_result.profiler_output_path, benchmark_script, time)
     }
-    fs.writeFileSync(opcodes_dump, "}");
+    fs.appendFileSync(opcodes_dump, "}");
     console.log("Benchmarking complete");
     fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
     execSync("rm transactions.json");
