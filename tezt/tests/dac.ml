@@ -2079,7 +2079,6 @@ module Tx_kernel_e2e = struct
     let custom_committee_members = [Constant.aggregate_tz4_account] in
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
-      ~supports:Protocol.(From_protocol (number Nairobi + 1))
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
       ~uses:(fun _protocol ->
         [

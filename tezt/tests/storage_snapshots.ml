@@ -375,7 +375,7 @@ let test_drag_after_rolling_import =
   in
   let finalized_block_distance =
     match protocol with
-    | Nairobi | Oxford ->
+    | Oxford ->
         (* Conservative TB finality *)
         blocks_preservation_cycles * blocks_per_cycle
     | Alpha -> (* TB finality *) 2

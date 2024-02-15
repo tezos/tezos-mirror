@@ -716,7 +716,6 @@ let test_operation_pool_ordering
     block with the given [minimal_timestamp] flag. *)
 let baking_with_given_minimal_timestamp ~minimal_timestamp =
   Protocol.register_test
-    ~supports:Protocol.(From_protocol (number Nairobi))
     ~__FILE__
     ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
     ~tags:["baking"; "timestamp"]

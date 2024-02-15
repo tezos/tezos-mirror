@@ -45,7 +45,6 @@ open Sc_rollup_helpers
 let default_wasm_pvm_revision = function
   | Protocol.Alpha -> "2.0.0-r4"
   | Protocol.Oxford -> "2.0.0-r3"
-  | Protocol.Nairobi -> "2.0.0-r1"
 
 let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
     ~outbox_level =
@@ -2592,7 +2591,7 @@ let test_reveals_fails_on_wrong_hash =
 let test_reveals_fails_on_unknown_hash =
   let kind = "arith" in
   test_full_scenario
-    ~supports:(Protocol.From_protocol 17)
+    ~supports:(Protocol.From_protocol 18)
     ~timeout:120
     ~kind
     ~allow_degraded:true
@@ -2813,44 +2812,6 @@ let test_consecutive_commitments _protocol _rollup_node sc_rollup _tezos_node
       ~src:operator
       tezos_client
   in
-  unit
-
-let test_cement_ignore_commitment ~kind =
-  let commitment_period = 3 in
-  let challenge_window = 3 in
-  test_commitment_scenario
-  (* this test can be removed when oxford is activated because the
-     commitment in the cement operation have been removed. *)
-    ~supports:Protocol.(Until_protocol 17)
-    ~commitment_period
-    ~challenge_window
-    ~kind
-    ~variant:"cement_ignore_commitment"
-  @@ fun protocol _sc_rollup_node sc_rollup node client ->
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      (Custom [Sc_rollup_node.Publish])
-      node
-      ~base_dir:(Client.base_dir client)
-      ~operators:[(Sc_rollup_node.Operating, Constant.bootstrap1.alias)]
-    (* Don't cement commitments *)
-  in
-  let* () =
-    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
-  in
-  let* _level = Sc_rollup_node.wait_sync ~timeout:3. sc_rollup_node in
-  let* _level = bake_until_lpc_updated client sc_rollup_node in
-  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
-  let* () = bake_levels challenge_window client in
-  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
-  let* () =
-    let hash =
-      (* zero commitment hash *)
-      "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8"
-    in
-    cement_commitment protocol client ~sc_rollup ~hash
-  in
-  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   unit
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
@@ -5695,7 +5656,6 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
-  test_cement_ignore_commitment ~kind protocols ;
   test_outbox_message protocols ~kind
 
 let register ~protocols =
