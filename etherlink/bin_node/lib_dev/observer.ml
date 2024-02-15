@@ -72,7 +72,7 @@ end) : Services_backend_sig.Backend = struct
 end
 
 let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
-  let (Qty level) = ctxt.next_blueprint_number in
+  let (Qty level) = blueprint.number in
   let (Qty number) = ctxt.next_blueprint_number in
   if Z.(equal level number) then
     Evm_context.apply_blueprint ctxt blueprint.payload
