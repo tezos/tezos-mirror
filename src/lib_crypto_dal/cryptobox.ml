@@ -26,6 +26,7 @@
 open Error_monad
 include Cryptobox_intf
 module Srs_g1 = Kzg.Bls.Srs_g1
+module Srs_g2 = Kzg.Bls.Srs_g2
 module Scalar = Kzg.Bls.Scalar
 module Poly = Kzg.Bls.Poly
 module Domain = Kzg.Bls.Domain
@@ -52,11 +53,11 @@ let () =
   [@@coverage off]
 
 type initialisation_parameters =
-  | Verifier of {test : bool}
-  | Prover of {test : bool; srs : Srs_g1.t}
+  | Verifier of {is_fake : bool}
+  | Prover of {is_fake : bool; srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 
 (* Initialisation parameters are supposed to be instantiated once. *)
-let initialisation_parameters = ref @@ Verifier {test = false}
+let initialisation_parameters = ref @@ Verifier {is_fake = false}
 
 (* This function is expected to be called once. *)
 let load_parameters parameters =
@@ -68,19 +69,19 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 (* TODO catch Failed_to_load_trusted_setup *)
-let initialisation_parameters_from_files ~srs_g1_path ~srs_size =
+let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path ~srs_size =
   let open Lwt_syntax in
-  let* srs_g1 = Srs.read_srs_g1 ~len:srs_size ~path:srs_g1_path () in
+  let* srs = Srs.read_srs ~len:srs_size ~srs_g1_path ~srs_g2_path () in
   let open Result_syntax in
   Lwt.return
   @@
-  match srs_g1 with
+  match srs with
   | Error (`End_of_file s) ->
       tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
   | Error (`Invalid_point p) ->
       tzfail
         (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
-  | Ok srs_g1 -> return srs_g1
+  | Ok srs -> return srs
 
 module Inner = struct
   module Commitment = struct
@@ -130,7 +131,32 @@ module Inner = struct
     let of_b58check = of_b58check
   end
 
-  module Commitment_proof = Degree_check.Proof
+  module Proof = Commitment
+
+  module Commitment_proof = struct
+    open Kzg.Bls
+
+    type t = G2.t
+
+    let encoding =
+      conv
+        G2.to_compressed_bytes
+        G2.of_compressed_bytes_exn
+        (Fixed.bytes (G2.size_in_bytes / 2))
+
+    let t : t Repr.t =
+      Repr.(
+        map
+          (bytes_of (`Fixed (G2.size_in_bytes / 2)))
+          G2.of_compressed_bytes_exn
+          G2.to_compressed_bytes)
+
+    let _random = G2.random
+
+    let zero = G2.zero
+
+    let alter_proof x = G2.add x G2.one
+  end
 
   type slot = bytes
 
@@ -140,11 +166,11 @@ module Inner = struct
 
   type commitment = Commitment.t
 
-  type shard_proof = Commitment_proof.t
+  type shard_proof = Proof.t
 
-  type commitment_proof = Commitment_proof.t
+  type commitment_proof = Kzg.Bls.G2.t
 
-  type page_proof = Commitment_proof.t
+  type page_proof = Proof.t
 
   type page = bytes
 
@@ -159,11 +185,11 @@ module Inner = struct
   module Encoding = struct
     open Data_encoding
 
-    let page_proof_encoding = Commitment_proof.encoding
+    let page_proof_encoding = Proof.encoding
 
     let share_encoding = array Scalar.encoding
 
-    let shard_proof_encoding = Commitment_proof.encoding
+    let shard_proof_encoding = Proof.encoding
 
     let shard_encoding =
       conv
@@ -235,12 +261,16 @@ module Inner = struct
        polynomial. *)
     remaining_bytes : int;
     (* These srs_g2_* parameters are used by the verifier to check the proofs *)
-    srs_g2 : Srs.srs_verifier;
+    srs_verifier : Srs.srs_verifier;
     mode : [`Verifier | `Prover];
+    (* Kate amortized public parameters for proving and verifying ;
+       contain, among others, SRS₁ *)
     kate_amortized : Kate_amortized.public_parameters;
+    (* Degree check public parameters for proving (None when mode = `Verifier) *)
+    degree_check : Srs_g2.t option;
   }
 
-  let ensure_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
+  let ensure_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
       ~number_of_shards =
     let open Result_syntax in
     let* () =
@@ -251,7 +281,7 @@ module Inner = struct
         ~number_of_shards
     in
     Srs.ensure_srs_validity
-      ~test
+      ~is_fake
       ~mode
       ~slot_size
       ~page_size
@@ -276,8 +306,12 @@ module Inner = struct
       param = param'
       &&
       match (init_param, init_param') with
-      | Verifier {test; _}, Verifier {test = test'; _} when test = test' -> true
-      | Prover {test; _}, Prover {test = test'; _} when test = test' -> true
+      | Verifier {is_fake; _}, Verifier {is_fake = is_fake'; _}
+        when is_fake = is_fake' ->
+          true
+      | Prover {is_fake; _}, Prover {is_fake = is_fake'; _}
+        when is_fake = is_fake' ->
+          true
       | _ -> false
 
     let hash = Hashtbl.hash
@@ -311,27 +345,28 @@ module Inner = struct
       in
       let page_length = Parameters_check.page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-      let mode, srs_g1, test =
+      let mode, is_fake, srs_g1, degree_check =
         match !initialisation_parameters with
-        | Verifier {test} ->
+        | Verifier {is_fake} ->
             let srs =
-              if test then Srs.Internal_for_tests.get_verifier_srs1 ()
+              if is_fake then Srs.Internal_for_tests.get_verifier_srs1 ()
               else Srs.get_verifier_srs1 ()
             in
-            (`Verifier, srs, test)
-        | Prover {test; srs} -> (`Prover, srs, test)
+            (`Verifier, is_fake, srs, None)
+        | Prover {is_fake; srs_g1; srs_g2} ->
+            (`Prover, is_fake, srs_g1, Some srs_g2)
       in
       let* () =
         ensure_validity
-          ~test
+          ~is_fake
           ~mode
           ~slot_size
           ~page_size
           ~redundancy_factor
           ~number_of_shards
       in
-      let srs_g2 =
-        (if test then Srs.Internal_for_tests.get_verifier_srs2
+      let srs_verifier =
+        (if is_fake then Srs.Internal_for_tests.get_verifier_srs2
         else Srs.get_verifier_srs2)
           ~max_polynomial_length
           ~page_length_domain
@@ -359,9 +394,10 @@ module Inner = struct
           page_length;
           page_length_domain;
           remaining_bytes = page_size mod Parameters_check.scalar_bytes_amount;
-          srs_g2;
+          srs_verifier;
           mode;
           kate_amortized;
+          degree_check;
         }
 
   let parameters
@@ -842,31 +878,25 @@ module Inner = struct
      X^{d-n} on G_2. *)
 
   (* Proves that degree(p) < t.max_polynomial_length *)
-  let prove_commitment ({mode; max_polynomial_length; kate_amortized; _} : t) p
-      =
-    match mode with
-    | `Verifier -> Error `Prover_SRS_not_loaded
-    | `Prover ->
-        if Srs_g1.size kate_amortized.srs_g1 >= max_polynomial_length then
+  let prove_commitment ({max_polynomial_length; degree_check; _} : t) p =
+    match degree_check with
+    | None -> Error `Prover_SRS_not_loaded
+    | Some srs_g2 ->
+        if Srs_g2.size srs_g2 >= max_polynomial_length then
           Ok
             (Degree_check.prove
-               ~max_commit:(Srs_g1.size kate_amortized.srs_g1 - 1)
+               ~max_commit:(Srs_g2.size srs_g2 - 1)
                ~max_degree:(max_polynomial_length - 1)
-               kate_amortized.srs_g1
+               srs_g2
                p)
         else
           Error
             (`Invalid_degree_strictly_less_than_expected
-              {
-                given = max_polynomial_length;
-                expected = Srs_g1.size kate_amortized.srs_g1;
-              })
+              {given = max_polynomial_length; expected = Srs_g2.size srs_g2})
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
-    let srs_0 = Kzg.Bls.G2.one in
-    let srs_n_d = t.srs_g2.commitment in
-    Degree_check.verify {srs_0; srs_n_d} cm proof
+    Degree_check.verify t.srs_verifier.commitment cm proof
 
   let save_precompute_shards_proofs precomputation ~filename =
     protect (fun () ->
@@ -952,7 +982,7 @@ module Inner = struct
           Domain.get t.domain_erasure_encoded_polynomial_length shard_index
         in
         let domain = Domain.build t.shard_length in
-        let srs_point = t.srs_g2.shards in
+        let srs_point = t.srs_verifier.shards in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1018,7 +1048,7 @@ module Inner = struct
               | _ -> Scalar.(copy zero))
         in
         let root = Domain.get t.domain_polynomial_length page_index in
-        let srs_point = t.srs_g2.pages in
+        let srs_point = t.srs_verifier.pages in
         if
           Kate_amortized.verify
             t.kate_amortized
@@ -1036,13 +1066,20 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let prover_parameters () =
-    Prover {test = true; srs = Lazy.force Srs.Internal_for_tests.fake_srs}
+  let parameters_initialisation () =
+    Prover
+      {
+        is_fake = true;
+        srs_g1 = Lazy.force Srs.Internal_for_tests.fake_srs1;
+        srs_g2 = Lazy.force Srs.Internal_for_tests.fake_srs2;
+      }
 
   (* Since computing fake_srs is costly, we avoid to recompute it. *)
-  let init_prover_dal () = initialisation_parameters := prover_parameters ()
+  let init_prover_dal () =
+    initialisation_parameters := parameters_initialisation ()
 
-  let init_verifier_dal () = initialisation_parameters := Verifier {test = true}
+  let init_verifier_dal () =
+    initialisation_parameters := Verifier {is_fake = true}
 
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
@@ -1060,15 +1097,14 @@ module Internal_for_tests = struct
 
   let polynomials_equal = Poly.equal
 
-  let page_proof_equal = Commitment_proof.equal
+  let page_proof_equal = Proof.equal
 
-  let alter_page_proof (proof : page_proof) = Commitment_proof.alter_proof proof
+  let alter_page_proof (proof : page_proof) = Proof.alter_proof proof
 
-  let alter_shard_proof (proof : shard_proof) =
-    Commitment_proof.alter_proof proof
+  let alter_shard_proof (proof : shard_proof) = Proof.alter_proof proof
 
   let alter_commitment_proof (proof : commitment_proof) =
-    Commitment_proof.alter_proof proof
+    Kzg.Bls.G2.(add proof one)
 
   let minimum_number_of_shards_to_reconstruct_slot (t : t) =
     t.number_of_shards / t.redundancy_factor
@@ -1077,11 +1113,11 @@ module Internal_for_tests = struct
 
   let precomputation_equal = Kate_amortized.preprocess_equal
 
-  let dummy_commitment ~state () = Commitment_proof.random ~state ()
+  let dummy_commitment ~state () = Commitment.random ~state ()
 
-  let dummy_page_proof ~state () = Commitment_proof.random ~state ()
+  let dummy_page_proof ~state () = Proof.random ~state ()
 
-  let dummy_shard_proof ~state () = Commitment_proof.random ~state ()
+  let dummy_shard_proof ~state () = Proof.random ~state ()
 
   let make_dummy_shard ~state ~index ~length =
     {index; share = Array.init length (fun _ -> Scalar.(random ~state ()))}
@@ -1112,14 +1148,14 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let mode, test =
+    let mode, is_fake =
       match !initialisation_parameters with
-      | Verifier {test} -> (`Verifier, test)
-      | Prover {test; _} -> (`Prover, test)
+      | Verifier {is_fake} -> (`Verifier, is_fake)
+      | Prover {is_fake; _} -> (`Prover, is_fake)
     in
     match
       ensure_validity
-        ~test
+        ~is_fake
         ~mode
         ~slot_size
         ~page_size
@@ -1148,8 +1184,8 @@ module Config = struct
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
-        | Some _parameters -> return (Verifier {test = true})
-        | None -> return (Verifier {test = false})
+        | Some _parameters -> return (Verifier {is_fake = true})
+        | None -> return (Verifier {is_fake = false})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
@@ -1159,15 +1195,17 @@ module Config = struct
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
-        | Some _parameters -> return (Internal_for_tests.prover_parameters ())
+        | Some _parameters ->
+            return (Internal_for_tests.parameters_initialisation ())
         | None ->
-            let*? srs_g1_path, _ = find_srs_files () in
-            let* srs =
+            let*? srs_g1_path, srs_g2_path = find_srs_files () in
+            let* srs_g1, srs_g2 =
               initialisation_parameters_from_files
                 ~srs_g1_path
+                ~srs_g2_path
                 ~srs_size:(1 lsl srs_size_log2)
             in
-            return (Prover {test = false; srs})
+            return (Prover {is_fake = false; srs_g1; srs_g2})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

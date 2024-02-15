@@ -686,7 +686,7 @@ module Internal = struct
        added again in Degree_check *)
     let check_b0, transcript =
       Kzg.Degree_check.verify_multi
-        {srs_0 = pp.srs2_0; srs_n_d = pp.srs2_N_1_k_2}
+        pp.srs2_N_1_k_2
         transcript
         proof.cm_b0
         proof.cm_p

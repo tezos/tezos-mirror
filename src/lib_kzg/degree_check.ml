@@ -4,7 +4,7 @@ module Proof = Commitment.Single
 
 type prover_public_parameters = Srs_g1.t
 
-type verifier_public_parameters = {srs_0 : G2.t; srs_n_d : G2.t}
+type verifier_public_parameters = G2.t
 
 type secret = Poly.t
 
@@ -20,17 +20,29 @@ type secret = Poly.t
    X^{d-n} on G_2. *)
 
 (* Proves that degree(p) < t.max_polynomial_length *)
-let prove ~max_commit ~max_degree srs p =
+let prove_g1 ~max_commit ~max_degree srs p =
   (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
      (2^21 elements in practice), so roughly 100MB. We can get rid of the
      allocation by giving an offset for the SRS in Pippenger. *)
   Poly.mul_xn p (max_commit - max_degree) Scalar.zero
   |> Commitment.Single.commit srs
 
+let prove ~max_commit ~max_degree srs p =
+  (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
+     (2^21 elements in practice), so roughly 100MB. We can get rid of the
+     allocation by giving an offset for the SRS in Pippenger. *)
+  Poly.mul_xn p (max_commit - max_degree) Scalar.zero
+  |> Commitment.Commit.with_srs2 srs
+
 (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
-let verify {srs_0; srs_n_d} (cm : Commitment.Single.t) proof =
+let verify_g1 srs_n_d (cm : Commitment.Single.t) proof =
   (* checking that cm * committed_offset_monomial = proof *)
-  Pairing.pairing_check [(G1.negate cm, srs_n_d); (proof, srs_0)]
+  Pairing.pairing_check [(G1.negate cm, srs_n_d); (proof, G2.one)]
+
+(* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
+let verify srs_n_d (cm : Commitment.Single.t) proof =
+  (* checking that cm * committed_offset_monomial = proof *)
+  Pairing.pairing_check [(G1.negate cm, srs_n_d); (G1.one, proof)]
 
 let prove_multi ~max_commit ~max_degree srs transcript cm p =
   let transcript = Transcript.expand Commitment.t cm transcript in
@@ -42,7 +54,7 @@ let prove_multi ~max_commit ~max_degree srs transcript cm p =
       p
       (Poly.zero, 0)
   in
-  let proof = (prove ~max_commit ~max_degree srs) p in
+  let proof = (prove_g1 ~max_commit ~max_degree srs) p in
   (proof, transcript)
 
 (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
@@ -54,5 +66,5 @@ let verify_multi pp transcript (cm : Commitment.t) proof =
   let cm =
     Commitment.Commit.with_affine_array_1 (SMap.values cm |> Array.of_list) rs
   in
-  let check = verify pp cm proof in
+  let check = verify_g1 pp cm proof in
   (check, transcript)

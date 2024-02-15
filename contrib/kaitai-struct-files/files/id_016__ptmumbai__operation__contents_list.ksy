@@ -1245,7 +1245,7 @@ types:
     - id: commitment
       size: 48
     - id: commitment_proof
-      size: 48
+      size: 96
   smart_rollup_add_messages:
     seq:
     - id: source

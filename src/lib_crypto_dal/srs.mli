@@ -44,7 +44,7 @@ val get_verifier_srs2 :
 (** Fails if and only if the SRS does not suits the parameters, ie SRS₁ would
     be too short to commit or SRS₂ does not contain the needed points *)
 val ensure_srs_validity :
-  test:bool ->
+  is_fake:bool ->
   mode:[< `Prover | `Verifier] ->
   slot_size:int ->
   page_size:int ->
@@ -56,18 +56,24 @@ exception Failed_to_load_trusted_setup of string
 
 (** Returns SRS₁ of size [len] (by default, 2²¹) read from the file given by
    [path]. May raise [Failed_to_load_trusted_setup] exception *)
-val read_srs_g1 :
+val read_srs :
   ?len:int ->
-  path:string ->
+  srs_g1_path:string ->
+  srs_g2_path:string ->
   unit ->
-  (Kzg.Bls.Srs_g1.t, [> `End_of_file of string | `Invalid_point of int]) result
+  ( Kzg.Bls.Srs_g1.t * Kzg.Bls.Srs_g2.t,
+    [> `End_of_file of string | `Invalid_point of int] )
+  result
   Lwt.t
 
 (** This module is used to handle a fake SRS in the DAL. This is more flexible
     and easier to handle in the CI than loading ZCash SRS *)
 module Internal_for_tests : sig
   (** Generates an unsafe SRS₁ of size 2¹⁶ from a known seed *)
-  val fake_srs : Kzg.Bls.Srs_g1.t Lazy.t
+  val fake_srs1 : Kzg.Bls.Srs_g1.t Lazy.t
+
+  (** Generates an unsafe SRS₂ of size 2¹⁶ from a known seed *)
+  val fake_srs2 : Kzg.Bls.Srs_g2.t Lazy.t
 
   (** Same as [fake_srs] but the returned SRS₁ is of size 2⁸, which is enough
        to suit the verifier needs in our tests *)
@@ -88,8 +94,8 @@ module Internal_for_tests : sig
         This function can be used to add points in srs_g1 & srs_g2 in Zcash_srs *)
   val print_verifier_srs_from_file :
     ?max_srs_size:int ->
-    zcash_g1_path:string ->
-    zcash_g2_path:string ->
+    srs_g1_path:string ->
+    srs_g2_path:string ->
     unit ->
     (unit, [> `End_of_file of string | `Invalid_point of int]) result Lwt.t
 end

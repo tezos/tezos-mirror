@@ -29,10 +29,10 @@ open Zcash_srs
 
 exception Failed_to_load_trusted_setup of string
 
-let read_srs ?len ~path srs_of_bigstring =
-  let open Lwt_syntax in
+let read_srs ?len ~srs_g1_path ~srs_g2_path () =
+  let open Lwt_result_syntax in
   let to_bigstring ~path =
-    let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
+    let*! fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
     Lwt.finalize
       (fun () ->
         match
@@ -50,12 +50,11 @@ let read_srs ?len ~path srs_of_bigstring =
         | res -> Lwt.return res)
       (fun () -> Lwt_unix.close fd)
   in
-  let* srs_g1_bigstring = to_bigstring ~path in
-  Lwt.return @@ srs_of_bigstring ?len srs_g1_bigstring
-
-let read_srs_g1 ?len ~path () = read_srs ?len ~path Srs_g1.of_bigstring
-
-let read_srs_g2 ?len ~path () = read_srs ?len ~path Srs_g2.of_bigstring
+  let*! srs_g1_bigstring = to_bigstring ~path:srs_g1_path in
+  let*! srs_g2_bigstring = to_bigstring ~path:srs_g2_path in
+  let*? srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring ?len in
+  let*? srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring ?len in
+  return (srs_g1, srs_g2)
 
 type srs_verifier = {shards : G2.t; pages : G2.t; commitment : G2.t}
 
@@ -85,18 +84,20 @@ module Internal_for_tests = struct
     Scalar.of_string
       "20812168509434597367146703229805575690060615791308155437936410982393987532344"
 
-  let compute_fake_srs ?(size = max_srs_size) () =
-    Srs_g1.generate_insecure size fake_srs_seed
+  let compute_fake_srs ?(size = max_srs_size) gen () = gen size fake_srs_seed
 
   let get_srs2 i = G2.mul G2.one (Scalar.pow fake_srs_seed (Z.of_int i))
 
   let get_verifier_srs2 = get_verifier_srs2_aux max_srs_size get_srs2
 
-  let get_verifier_srs1 = compute_fake_srs ~size:max_verifier_srs_size
+  let get_verifier_srs1 =
+    compute_fake_srs ~size:max_verifier_srs_size Srs_g1.generate_insecure
 
   let is_in_srs2 _ = true
 
-  let fake_srs = Lazy.from_fun compute_fake_srs
+  let fake_srs1 = Lazy.from_fun (compute_fake_srs Srs_g1.generate_insecure)
+
+  let fake_srs2 = Lazy.from_fun (compute_fake_srs Srs_g2.generate_insecure)
 
   module Print = struct
     (* Bounds (in log₂)
@@ -180,8 +181,8 @@ module Internal_for_tests = struct
         (0, [])
   end
 
-  let print_verifier_srs_from_file ?(max_srs_size = max_srs_size) ~zcash_g1_path
-      ~zcash_g2_path () =
+  let print_verifier_srs_from_file ?(max_srs_size = max_srs_size) ~srs_g1_path
+      ~srs_g2_path () =
     let params =
       Print.
         {
@@ -195,8 +196,9 @@ module Internal_for_tests = struct
     let srs_g1_size, lengths =
       Print.generate_poly_lengths ~max_srs_size params
     in
-    let* srs_g1 = read_srs_g1 ~len:srs_g1_size ~path:zcash_g1_path () in
-    let* srs_g2 = read_srs_g2 ~path:zcash_g2_path () in
+    let* srs_g1, srs_g2 =
+      read_srs ~len:srs_g1_size ~srs_g1_path ~srs_g2_path ()
+    in
     let srs2 =
       List.map
         (fun i ->
@@ -223,7 +225,7 @@ module Internal_for_tests = struct
     return_unit
 end
 
-let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
+let ensure_srs_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
     ~number_of_shards =
   let open Result_syntax in
   let assert_result condition error_message =
@@ -238,7 +240,7 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
   in
   let min_g1, srs_g1_length =
     match mode with
-    | `Prover when test ->
+    | `Prover when is_fake ->
         (max_polynomial_length, Internal_for_tests.max_srs_size)
     | `Prover -> (max_polynomial_length, max_srs_size)
     | `Verifier -> (shard_length, max_verifier_srs_size)
@@ -257,7 +259,7 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
   in
   let page_length_domain = Parameters_check.domain_length ~size:page_size in
   let max_srs_size, is_in_srs2 =
-    if test then Internal_for_tests.(max_srs_size, is_in_srs2)
+    if is_fake then Internal_for_tests.(max_srs_size, is_in_srs2)
     else (max_srs_size, is_in_srs2)
   in
   let offset_monomial_degree = max_srs_size - max_polynomial_length in
