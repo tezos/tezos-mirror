@@ -131,7 +131,7 @@ module Inner = struct
     let of_b58check = of_b58check
   end
 
-  module Proof = Degree_check.Proof
+  module Proof = Commitment
 
   module Commitment_proof = struct
     open Kzg.Bls
@@ -1107,7 +1107,7 @@ module Internal_for_tests = struct
 
   let precomputation_equal = Kate_amortized.preprocess_equal
 
-  let dummy_commitment ~state () = Proof.random ~state ()
+  let dummy_commitment ~state () = Commitment.random ~state ()
 
   let dummy_page_proof ~state () = Proof.random ~state ()
 
