@@ -124,7 +124,7 @@ done
 rm -r "$tmp_dir"/packages/octez-deps
 rm -r "$tmp_dir"/packages/$dummy_pkg
 
-## Generating the diff!
+## Checkout tezos/opam-repository while keeping the working directory
 git remote add tezos $opam_repository_git
 git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
@@ -145,7 +145,7 @@ for i in $(cd packages && find ./ -name opam); do
 done
 rm -rf packages.bak
 
-##
+## Generating the diff!
 git add packages
 git diff HEAD -- packages > "$target"
 
