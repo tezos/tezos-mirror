@@ -582,7 +582,7 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     error_unless (Entrypoint.is_default entrypoint) Rollup_invalid_entrypoint
   in
   let+ unparsed_parameters, ctxt =
-    unparse_data ctxt Optimized parameters_ty parameters
+    unparse_data ctxt Optimized_legacy parameters_ty parameters
   in
   ( Transaction_to_sc_rollup
       {destination; entrypoint; parameters_ty; parameters; unparsed_parameters},
