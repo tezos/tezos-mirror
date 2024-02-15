@@ -228,11 +228,12 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
           let* evm_state = Evm_state.init ~kernel in
           let* () = commit ctxt evm_state in
           match produce_genesis_with with
-          | Some secret_key ->
+          | Some (cctxt, sequencer_key) ->
               (* Create the first empty block. *)
-              let genesis =
+              let* genesis =
                 Sequencer_blueprint.create
-                  ~secret_key
+                  ~cctxt
+                  ~sequencer_key
                   ~timestamp:genesis_timestamp
                   ~smart_rollup_address
                   ~transactions:[]

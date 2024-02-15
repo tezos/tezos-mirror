@@ -18,6 +18,11 @@ have their respective changelogs (see [CHANGES_KERNEL.md](CHANGES_KERNEL.md) and
 
 ### Breaking changes
 
+-  Replace the unencrypted sequencer signer key CLI parameter with
+   something similar to what other Octez binaries support (compatible
+   with the `octez-client` base directory using `--wallet-dir`,
+   e.g. base dir of the octez-client). (!12014)
+
 ### Internal
 
 - Add a debug feature flag to the log crate for optional debug traces. (!10692)

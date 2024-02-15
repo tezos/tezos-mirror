@@ -14,6 +14,8 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-version.value
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
   octez-evm-node-libs.evm_node_lib_prod
   octez-evm-node-libs.evm_node_lib_dev
   octez-evm-node-libs.evm_node_lib_dev_encoding
@@ -27,5 +29,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_rpc_http
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
   -open Evm_node_lib_dev_encoding
   -open Evm_node_config))

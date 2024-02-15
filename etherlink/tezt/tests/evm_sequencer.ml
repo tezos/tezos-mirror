@@ -183,23 +183,19 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
   in
   let private_rpc_port = Port.fresh () in
   let mode =
-    let sequencer =
-      match sequencer.secret_key with
-      | Unencrypted sk -> sk
-      | Encrypted _ -> Test.fail "Provide an unencrypted key for the sequencer"
-    in
     Evm_node.Sequencer
       {
         initial_kernel = output;
         preimage_dir = preimages_dir;
         private_rpc_port;
         time_between_blocks;
-        sequencer;
+        sequencer = sequencer.alias;
         genesis_timestamp;
         max_blueprints_lag;
         max_blueprints_catchup;
         catchup_cooldown;
         devmode = true;
+        wallet_dir = Some (Client.base_dir client);
       }
   in
   let* sequencer =

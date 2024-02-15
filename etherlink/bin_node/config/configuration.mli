@@ -31,8 +31,8 @@ type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)
   time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
   private_rpc_port : int;  (** Port for internal RPC services *)
-  sequencer : Signature.secret_key;
-      (** The secret key used to sign the blueprints. *)
+  sequencer : Signature.public_key_hash;
+      (** The key used to sign the blueprints. *)
 }
 
 type observer = {evm_node_endpoint : Uri.t; preimages : string}
@@ -100,7 +100,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
-    sequencer:Signature.secret_key ->
+    sequencer:Signature.public_key_hash ->
     unit ->
     sequencer t
 
@@ -140,7 +140,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
     ?time_between_blocks:time_between_blocks ->
-    sequencer:Signature.secret_key ->
+    sequencer:Signature.public_key_hash ->
     unit ->
     sequencer t tzresult Lwt.t
 

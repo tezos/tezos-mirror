@@ -422,12 +422,6 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
     | Setup_sequencer {time_between_blocks; sequencer; devmode} ->
         let private_rpc_port = Port.fresh () in
-        let sequencer =
-          match sequencer.secret_key with
-          | Unencrypted sk -> sk
-          | Encrypted _ ->
-              Test.fail "Provide an unencrypted key for the sequencer"
-        in
         return
           (Evm_node.Sequencer
              {
@@ -435,12 +429,13 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
                preimage_dir = preimages_dir;
                private_rpc_port;
                time_between_blocks;
-               sequencer;
+               sequencer = sequencer.alias;
                genesis_timestamp = None;
                max_blueprints_lag = None;
                max_blueprints_catchup = None;
                catchup_cooldown = None;
                devmode;
+               wallet_dir = Some (Client.base_dir client);
              })
   in
   let* evm_node =
@@ -4367,24 +4362,19 @@ let test_migrate_proxy_to_sequencer =
   let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
   let sequencer_node =
     let mode =
-      let sequencer =
-        match sequencer_key.secret_key with
-        | Unencrypted sk -> sk
-        | Encrypted _ ->
-            Test.fail "Provide an unencrypted key for the sequencer"
-      in
       Evm_node.Sequencer
         {
           initial_kernel = kernel;
           preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0";
           private_rpc_port = Port.fresh ();
           time_between_blocks = Some Nothing;
-          sequencer;
+          sequencer = sequencer_key.alias;
           genesis_timestamp = None;
           max_blueprints_lag = None;
           max_blueprints_catchup = None;
           catchup_cooldown = None;
           devmode = true;
+          wallet_dir = Some (Client.base_dir client);
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)

@@ -28,7 +28,7 @@ type t = {
     [genesis_timestamp]). *)
 val init :
   ?genesis_timestamp:Time.Protocol.t ->
-  ?produce_genesis_with:Signature.secret_key ->
+  ?produce_genesis_with:Client_context.wallet * Client_keys.sk_uri ->
   ?kernel_path:string ->
   data_dir:string ->
   preimages:string ->
