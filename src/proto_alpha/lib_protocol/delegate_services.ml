@@ -411,6 +411,15 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")
 
+  let min_delegated_in_current_cycle =
+    RPC_service.get_service
+      ~description:
+        "Returns the minimum of delegated tez (in mutez) over the current \
+         cycle."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "min_delegated_in_current_cycle")
+
   let deactivated =
     RPC_service.get_service
       ~description:
@@ -676,6 +685,12 @@ let register () =
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.delegated_balance ctxt pkh) ;
+  register1
+    ~chunked:false
+    S.min_delegated_in_current_cycle
+    (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh) ;
   register1 ~chunked:false S.total_delegated_stake (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
