@@ -94,6 +94,8 @@ let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
 
 let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
+let caqti_sqlite = external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1")
+
 let caqti_dynload = external_lib "caqti-dynload" V.True
 
 (* Checkseum is an irmin-pack dependency. Version 0.5.0 is known to be
@@ -8449,6 +8451,10 @@ let evm_node_lib_dev =
         evm_node_lib_dev_encoding |> open_;
         lwt_watcher;
         lwt_exit;
+        caqti;
+        caqti_lwt;
+        caqti_lwt_unix;
+        caqti_sqlite;
         evm_node_config |> open_;
         octez_context_sigs;
         octez_context_disk;

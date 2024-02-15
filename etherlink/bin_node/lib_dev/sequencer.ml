@@ -203,12 +203,21 @@ let loop_sequencer :
   loop now
 
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
-    ~max_blueprints_catchup ~catchup_cooldown ?genesis_timestamp ~sequencer
+    ~max_blueprints_catchup ~catchup_cooldown
+    ?(genesis_timestamp = Helpers.now ()) ~sequencer
     ~(configuration : Configuration.sequencer Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* smart_rollup_address =
     Rollup_node_services.smart_rollup_address rollup_node_endpoint
+  in
+  let* ctxt, loaded =
+    Evm_context.init
+      ?kernel_path:kernel
+      ~data_dir
+      ~preimages:configuration.mode.preimages
+      ~smart_rollup_address
+      ()
   in
   let* () =
     Blueprints_publisher.start
@@ -216,18 +225,26 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~max_blueprints_lag
       ~max_blueprints_catchup
       ~catchup_cooldown
-      (Blueprint_store.make ~data_dir)
+      ctxt.store
   in
+
   let* ctxt =
-    Evm_context.init
-      ?genesis_timestamp
-      ~produce_genesis_with:sequencer
-      ~data_dir
-      ?kernel_path:kernel
-      ~preimages:configuration.mode.preimages
-      ~smart_rollup_address
-      ()
+    if not loaded then
+      (* Create the first empty block. *)
+      let genesis =
+        Sequencer_blueprint.create
+          ~secret_key:sequencer
+          ~timestamp:genesis_timestamp
+          ~smart_rollup_address
+          ~transactions:[]
+          ~delayed_transactions:[]
+          ~number:Ethereum_types.(Qty Z.zero)
+          ~parent_hash:Ethereum_types.genesis_parent_hash
+      in
+      Evm_context.apply_and_publish_blueprint ctxt genesis
+    else return ctxt
   in
+
   let module Sequencer = Make (struct
     let ctxt = ctxt
 

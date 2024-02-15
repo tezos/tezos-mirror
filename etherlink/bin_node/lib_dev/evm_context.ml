@@ -14,6 +14,7 @@ type t = {
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
+  store : Store.t;
 }
 
 type metadata = {
@@ -105,18 +106,6 @@ let commit (ctxt : t) evm_state =
 
 let evm_state {context; _} = Irmin_context.PVMState.get context
 
-let store_blueprint ctxt number blueprint =
-  Blueprint_store.store
-    (Blueprint_store.make ~data_dir:ctxt.data_dir)
-    number
-    blueprint
-
-let find_blueprint ctxt number =
-  Blueprint_store.find
-    ~kind:`Execute
-    (Blueprint_store.make ~data_dir:ctxt.data_dir)
-    number
-
 let execution_config ctxt =
   Config.config
     ~preimage_directory:ctxt.preimages
@@ -168,7 +157,10 @@ let apply_blueprint ctxt payload =
   | Apply_success (evm_state, Block_height blueprint_number, current_block_hash)
     when Z.equal blueprint_number next ->
       let* () =
-        store_blueprint ~kind:`Execute ctxt payload (Qty blueprint_number)
+        Store.Executable_blueprints.store
+          ctxt.store
+          (Qty blueprint_number)
+          payload
       in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       ctxt.current_block_hash <- current_block_hash ;
@@ -189,13 +181,15 @@ let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let (Qty level) = ctxt.next_blueprint_number in
   let* ctxt = apply_blueprint ctxt blueprint.to_execute in
   let* () =
-    store_blueprint ~kind:`Publish ctxt blueprint.to_publish (Qty level)
+    Store.Publishable_blueprints.store
+      ctxt.store
+      (Qty level)
+      blueprint.to_publish
   in
   let* () = Blueprints_publisher.publish level blueprint.to_publish in
   return ctxt
 
-let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
-    ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
+let init ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
   let open Lwt_result_syntax in
   let* index =
     Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
@@ -206,6 +200,7 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
   let* context, next_blueprint_number, current_block_hash, loaded =
     load_metadata ~data_dir index
   in
+  let* store = Store.init ~data_dir in
   let ctxt =
     {
       index;
@@ -216,41 +211,28 @@ let init ?(genesis_timestamp = Helpers.now ()) ?produce_genesis_with
       next_blueprint_number;
       current_block_hash;
       blueprint_watcher = Lwt_watcher.create_input ();
+      store;
     }
   in
-  let* ctxt =
+
+  let* () =
     match kernel_path with
-    | Some kernel -> (
+    | Some kernel ->
         if loaded then
           let*! () = Events.ignored_kernel_arg () in
-          return ctxt
+          return_unit
         else
           let* evm_state = Evm_state.init ~kernel in
-          let* () = commit ctxt evm_state in
-          match produce_genesis_with with
-          | Some secret_key ->
-              (* Create the first empty block. *)
-              let genesis =
-                Sequencer_blueprint.create
-                  ~secret_key
-                  ~timestamp:genesis_timestamp
-                  ~smart_rollup_address
-                  ~transactions:[]
-                  ~delayed_transactions:[]
-                  ~number:Ethereum_types.(Qty Z.zero)
-                  ~parent_hash:Ethereum_types.genesis_parent_hash
-              in
-              apply_and_publish_blueprint ctxt genesis
-          | None -> return ctxt)
+          commit ctxt evm_state
     | None ->
-        if loaded then return ctxt
+        if loaded then return_unit
         else
           failwith
             "Cannot compute the initial EVM state without the path to the \
              initial kernel"
   in
 
-  return ctxt
+  return (ctxt, loaded)
 
 let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
@@ -323,11 +305,11 @@ let execute_and_inspect ~input ctxt =
   Evm_state.execute_and_inspect ~config ~input evm_state
 
 let last_produced_blueprint (ctxt : t) =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let (Qty next) = ctxt.next_blueprint_number in
   let current = Ethereum_types.Qty Z.(pred next) in
-  let* blueprint = find_blueprint ctxt current in
+  let* blueprint = Store.Executable_blueprints.find ctxt.store current in
   match blueprint with
   | Some blueprint ->
-      return_ok Blueprint_types.{number = current; payload = blueprint}
+      return Blueprint_types.{number = current; payload = blueprint}
   | None -> failwith "Could not fetch the last produced blueprint"

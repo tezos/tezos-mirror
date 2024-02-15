@@ -16,25 +16,22 @@ type t = {
   mutable current_block_hash : Ethereum_types.block_hash;
       (** Hash of the latest processed block *)
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
+  store : Store.t;
 }
 
 (** [init ~data_dir ~preimages ~smart_rollup_address ()] creates
     a context where it initializes the {!type-index}, and use a
     checkpoint mechanism to load the latest {!type-store} if any.
 
-    If the context does not already exist, [kernel_path] is required.
-    Additionally,  if [produce_genesis_with] is set, this function also
-    produces and publishes the genesis blueprint (optionally set to
-    [genesis_timestamp]). *)
+    Returns an additional boolean telling if the context was loaded from disk
+    ([true]) or was initialized from scratch ([false]). *)
 val init :
-  ?genesis_timestamp:Time.Protocol.t ->
-  ?produce_genesis_with:Signature.secret_key ->
   ?kernel_path:string ->
   data_dir:string ->
   preimages:string ->
   smart_rollup_address:string ->
   unit ->
-  t tzresult Lwt.t
+  (t * bool) tzresult Lwt.t
 
 (** [init_from_rollup_node ~data_dir
     ~rollup_node_data_dir ~inspect_current_blueprint_number]
@@ -68,9 +65,6 @@ val execute_and_inspect :
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
-
-val find_blueprint :
-  t -> Ethereum_types.quantity -> Blueprint_types.payload option Lwt.t
 
 val last_produced_blueprint : t -> Blueprint_types.t tzresult Lwt.t
 
