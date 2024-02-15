@@ -115,6 +115,11 @@ let slot_id_is_valid
     ~dal_activation_level ~origination_level ~inbox_level slot_id
     ~dal_attested_slots_validity_lag =
   let open Alpha_context in
+  Result.is_ok
+    (Dal.Slot_index.check_is_in_range
+       ~number_of_slots:dal_constants.number_of_slots
+       slot_id.Dal.index)
+  &&
   let origination_level_res = Raw_level.of_int32 origination_level in
   let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
   match (origination_level_res, commit_inbox_level_res) with
