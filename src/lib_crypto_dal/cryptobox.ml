@@ -53,11 +53,11 @@ let () =
   [@@coverage off]
 
 type initialisation_parameters =
-  | Verifier of {test : bool}
-  | Prover of {test : bool; srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
+  | Verifier of {is_fake : bool}
+  | Prover of {is_fake : bool; srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 
 (* Initialisation parameters are supposed to be instantiated once. *)
-let initialisation_parameters = ref @@ Verifier {test = false}
+let initialisation_parameters = ref @@ Verifier {is_fake = false}
 
 (* This function is expected to be called once. *)
 let load_parameters parameters =
@@ -270,7 +270,7 @@ module Inner = struct
     degree_check : Srs_g2.t option;
   }
 
-  let ensure_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
+  let ensure_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
       ~number_of_shards =
     let open Result_syntax in
     let* () =
@@ -281,7 +281,7 @@ module Inner = struct
         ~number_of_shards
     in
     Srs.ensure_srs_validity
-      ~test
+      ~is_fake
       ~mode
       ~slot_size
       ~page_size
@@ -306,8 +306,12 @@ module Inner = struct
       param = param'
       &&
       match (init_param, init_param') with
-      | Verifier {test; _}, Verifier {test = test'; _} when test = test' -> true
-      | Prover {test; _}, Prover {test = test'; _} when test = test' -> true
+      | Verifier {is_fake; _}, Verifier {is_fake = is_fake'; _}
+        when is_fake = is_fake' ->
+          true
+      | Prover {is_fake; _}, Prover {is_fake = is_fake'; _}
+        when is_fake = is_fake' ->
+          true
       | _ -> false
 
     let hash = Hashtbl.hash
@@ -341,19 +345,20 @@ module Inner = struct
       in
       let page_length = Parameters_check.page_length ~page_size in
       let page_length_domain, _, _ = FFT.select_fft_domain page_length in
-      let mode, test, srs_g1, degree_check =
+      let mode, is_fake, srs_g1, degree_check =
         match !initialisation_parameters with
-        | Verifier {test} ->
+        | Verifier {is_fake} ->
             let srs =
-              if test then Srs.Internal_for_tests.get_verifier_srs1 ()
+              if is_fake then Srs.Internal_for_tests.get_verifier_srs1 ()
               else Srs.get_verifier_srs1 ()
             in
-            (`Verifier, test, srs, None)
-        | Prover {test; srs_g1; srs_g2} -> (`Prover, test, srs_g1, Some srs_g2)
+            (`Verifier, is_fake, srs, None)
+        | Prover {is_fake; srs_g1; srs_g2} ->
+            (`Prover, is_fake, srs_g1, Some srs_g2)
       in
       let* () =
         ensure_validity
-          ~test
+          ~is_fake
           ~mode
           ~slot_size
           ~page_size
@@ -361,7 +366,7 @@ module Inner = struct
           ~number_of_shards
       in
       let srs_verifier =
-        (if test then Srs.Internal_for_tests.get_verifier_srs2
+        (if is_fake then Srs.Internal_for_tests.get_verifier_srs2
         else Srs.get_verifier_srs2)
           ~max_polynomial_length
           ~page_length_domain
@@ -1064,7 +1069,7 @@ module Internal_for_tests = struct
   let parameters_initialisation () =
     Prover
       {
-        test = true;
+        is_fake = true;
         srs_g1 = Lazy.force Srs.Internal_for_tests.fake_srs1;
         srs_g2 = Lazy.force Srs.Internal_for_tests.fake_srs2;
       }
@@ -1073,7 +1078,8 @@ module Internal_for_tests = struct
   let init_prover_dal () =
     initialisation_parameters := parameters_initialisation ()
 
-  let init_verifier_dal () = initialisation_parameters := Verifier {test = true}
+  let init_verifier_dal () =
+    initialisation_parameters := Verifier {is_fake = true}
 
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
@@ -1142,14 +1148,14 @@ module Internal_for_tests = struct
 
   let ensure_validity
       {redundancy_factor; slot_size; page_size; number_of_shards} =
-    let mode, test =
+    let mode, is_fake =
       match !initialisation_parameters with
-      | Verifier {test} -> (`Verifier, test)
-      | Prover {test; _} -> (`Prover, test)
+      | Verifier {is_fake} -> (`Verifier, is_fake)
+      | Prover {is_fake; _} -> (`Prover, is_fake)
     in
     match
       ensure_validity
-        ~test
+        ~is_fake
         ~mode
         ~slot_size
         ~page_size
@@ -1178,8 +1184,8 @@ module Config = struct
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
-        | Some _parameters -> return (Verifier {test = true})
-        | None -> return (Verifier {test = false})
+        | Some _parameters -> return (Verifier {is_fake = true})
+        | None -> return (Verifier {is_fake = false})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
@@ -1199,7 +1205,7 @@ module Config = struct
                 ~srs_g2_path
                 ~srs_size:(1 lsl srs_size_log2)
             in
-            return (Prover {test = false; srs_g1; srs_g2})
+            return (Prover {is_fake = false; srs_g1; srs_g2})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

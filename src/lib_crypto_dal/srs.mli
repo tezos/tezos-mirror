@@ -44,7 +44,7 @@ val get_verifier_srs2 :
 (** Fails if and only if the SRS does not suits the parameters, ie SRS₁ would
     be too short to commit or SRS₂ does not contain the needed points *)
 val ensure_srs_validity :
-  test:bool ->
+  is_fake:bool ->
   mode:[< `Prover | `Verifier] ->
   slot_size:int ->
   page_size:int ->

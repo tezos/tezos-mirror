@@ -225,7 +225,7 @@ module Internal_for_tests = struct
     return_unit
 end
 
-let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
+let ensure_srs_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
     ~number_of_shards =
   let open Result_syntax in
   let assert_result condition error_message =
@@ -240,7 +240,7 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
   in
   let min_g1, srs_g1_length =
     match mode with
-    | `Prover when test ->
+    | `Prover when is_fake ->
         (max_polynomial_length, Internal_for_tests.max_srs_size)
     | `Prover -> (max_polynomial_length, max_srs_size)
     | `Verifier -> (shard_length, max_verifier_srs_size)
@@ -259,7 +259,7 @@ let ensure_srs_validity ~test ~mode ~slot_size ~page_size ~redundancy_factor
   in
   let page_length_domain = Parameters_check.domain_length ~size:page_size in
   let max_srs_size, is_in_srs2 =
-    if test then Internal_for_tests.(max_srs_size, is_in_srs2)
+    if is_fake then Internal_for_tests.(max_srs_size, is_in_srs2)
     else (max_srs_size, is_in_srs2)
   in
   let offset_monomial_degree = max_srs_size - max_polynomial_length in
