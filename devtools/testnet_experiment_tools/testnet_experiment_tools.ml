@@ -95,11 +95,6 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
-  | Tezt_tezos.Protocol.Nairobi ->
-      Some
-        (Filename.concat
-           network_parameters_templates_dir
-           "proto_017_PtNairob_mainnet.json")
   | Tezt_tezos.Protocol.Oxford ->
       Some
         (Filename.concat
@@ -378,7 +373,7 @@ let () =
     ~__FILE__
     ~title:"Generate Network Activation Parameters"
     ~tags:["generate_activation_parameters"]
-    (Local.generate_network_activation_parameters Protocol.Nairobi) ;
+    (Local.generate_network_activation_parameters Protocol.Oxford) ;
   register
     ~__FILE__
     ~title:"Partition bakers by node"
