@@ -92,6 +92,13 @@ let empty =
       observers = Slot_set.empty;
     }
 
+let is_empty = function
+  | Bootstrap -> false
+  | Operator {producers; attesters; observers} ->
+      Slot_set.is_empty producers
+      && Pkh_set.is_empty attesters
+      && Slot_set.is_empty observers
+
 let is_bootstrap_profile = function Bootstrap -> true | Operator _ -> false
 
 let bootstrap_profile = Bootstrap
@@ -138,6 +145,14 @@ let add_operator_profiles t proto_parameters gs_worker
           operator_profiles
       in
       Some (Operator operator_sets)
+
+let add_profiles t proto_parameters gs_worker = function
+  | Types.Bootstrap -> if is_empty t then Some bootstrap_profile else None
+  | Random_observer ->
+      let slot_index = Random.int proto_parameters.Dal_plugin.number_of_slots in
+      add_operator_profiles t proto_parameters gs_worker [Observer {slot_index}]
+  | Operator operator_profiles ->
+      add_operator_profiles t proto_parameters gs_worker operator_profiles
 
 let validate_slot_indexes t ~number_of_slots =
   let open Result_syntax in

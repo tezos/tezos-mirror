@@ -49,6 +49,16 @@ val add_operator_profiles :
   Types.operator_profiles ->
   t option
 
+(** [add_profiles t proto_parameters gs_worker profiles] registers [profiles].
+    If the current profiles are incompatible with provided [profiles], it
+    returns [None]. *)
+val add_profiles :
+  t ->
+  Dal_plugin.proto_parameters ->
+  Gossipsub.Worker.t ->
+  Types.profiles ->
+  t option
+
 (** Checks that each producer profile only refers to slot indexes strictly
     smaller than [number_of_slots]. This may not be the case when the profile
     context is first built because there is no information about the number of

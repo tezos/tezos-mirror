@@ -236,6 +236,24 @@ module Handler = struct
                the message revalidated? *)
             other
 
+  (* Set the profile context once we have the protocol plugin. This is supposed
+     to be called only once. *)
+  let set_profile_context ctxt config proto_parameters =
+    let open Lwt_result_syntax in
+    let pctxt = Node_context.get_profile_ctxt ctxt in
+    let pctxt_opt =
+      Profile_manager.add_profiles
+        pctxt
+        proto_parameters
+        (Node_context.get_gs_worker ctxt)
+        config.Configuration_file.profiles
+    in
+    match pctxt_opt with
+    | None -> fail Errors.[Profile_incompatibility]
+    | Some pctxt ->
+        let*! () = Node_context.set_profile_ctxt ctxt pctxt in
+        return_unit
+
   let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
@@ -259,38 +277,7 @@ module Handler = struct
           in
           Store.Value_size_hooks.set_share_size
             (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-          let* () =
-            let* pctxt =
-              let pctxt = Node_context.get_profile_ctxt ctxt in
-              match config.Configuration_file.profiles with
-              | Bootstrap -> return @@ Profile_manager.bootstrap_profile
-              | Random_observer -> (
-                  let slot_index =
-                    Random.int proto_parameters.number_of_slots
-                  in
-                  match
-                    Profile_manager.add_operator_profiles
-                      pctxt
-                      proto_parameters
-                      (Node_context.get_gs_worker ctxt)
-                      [Observer {slot_index}]
-                  with
-                  | None -> fail Errors.[Profile_incompatibility]
-                  | Some pctxt -> return pctxt)
-              | Operator operator_profiles -> (
-                  match
-                    Profile_manager.add_operator_profiles
-                      pctxt
-                      proto_parameters
-                      (Node_context.get_gs_worker ctxt)
-                      operator_profiles
-                  with
-                  | None -> fail Errors.[Profile_incompatibility]
-                  | Some pctxt -> return pctxt)
-            in
-            let*! () = Node_context.set_profile_ctxt ctxt pctxt in
-            return_unit
-          in
+          let* () = set_profile_context ctxt config proto_parameters in
           let*? () =
             Node_context.set_ready
               ctxt
