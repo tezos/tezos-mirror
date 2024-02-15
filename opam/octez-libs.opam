@@ -19,8 +19,8 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "ppx_expect"
   "hex" { >= "1.3.0" }
-  "zarith" { >= "1.12" & < "1.13" }
-  "zarith_stubs_js"
+  "zarith" { >= "1.13" & < "1.14" }
+  "zarith_stubs_js" { >= "0.16.1" }
   "aches" { >= "1.0.0" }
   "seqes" { >= "0.2" }
   "lwt-canceler" { >= "0.3" & < "0.4" }

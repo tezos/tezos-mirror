@@ -27,8 +27,7 @@
 
 open Manifest
 
-let warnings_disabled_by_default =
-  [4; 40; 41; 42; 44; 45; 48; 58; 60; 67; 69; 70]
+let warnings_disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 60; 67; 69; 70]
 (*
    4 [fragile-match]
   40 [name-out-of-scope]
@@ -37,7 +36,6 @@ let warnings_disabled_by_default =
   44 [open-shadow-identifier]
   45 [open-shadow-label-constructor]
   48 [eliminated-optional-arguments]
-  58 [no-cmx-file] (flambda specific, necessary as long as Zarith_version.cmx is not installed)
   60 [unused-module]
   67 [unused-functor-parameter]
   69 [unused-field]
@@ -363,9 +361,11 @@ let zarith =
   external_lib
     ~js_compatible:true
     "zarith"
-    V.(at_least "1.12" && less_than "1.13")
+    V.(at_least "1.13" && less_than "1.14")
 
-let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
+(* The 0.16.1 release matches of the stubs matches the 1.13 release of zarith *)
+let zarith_stubs_js =
+  external_lib ~js_compatible:true "zarith_stubs_js" V.(at_least "0.16.1")
 
 let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
 

@@ -14,8 +14,8 @@ depends: [
   "octez-l2-libs"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "bls12-381"
-  "zarith" { >= "1.12" & < "1.13" }
-  "zarith_stubs_js"
+  "zarith" { >= "1.13" & < "1.14" }
+  "zarith_stubs_js" { >= "0.16.1" }
   "class_group_vdf" { >= "0.0.4" }
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
