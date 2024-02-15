@@ -260,6 +260,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // check that enough gas is provided to cover fees
     let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees)
     else {
+        log!(host, Debug, "Transaction status: ERROR_GAS_FEE.");
          return Ok(Validity::InvalidNotEnoughGasForFees)
     };
 
