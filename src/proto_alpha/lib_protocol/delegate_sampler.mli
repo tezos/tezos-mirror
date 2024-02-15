@@ -77,6 +77,14 @@ val cleanup_values_for_protocol_p :
   new_cycle:Cycle_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+(** [attesting_rights_count ctxt level] returns a map of the delegates to
+    their number of attestation slots for the given level. Fails if the
+    given level is in a cycle for which the seed is not in the storage *)
+val attesting_rights_count :
+  Raw_context.t ->
+  Level_repr.t ->
+  (Raw_context.t * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
+
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)

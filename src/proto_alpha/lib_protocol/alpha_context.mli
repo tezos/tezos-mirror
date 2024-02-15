@@ -921,6 +921,8 @@ module Constants : sig
       percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
       percentage_of_frozen_deposits_slashed_per_double_attestation :
         Percentage.t;
+      max_slashing_per_block : Percentage.t;
+      max_slashing_threshold : int;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -946,6 +948,7 @@ module Constants : sig
     type t = {
       consensus_threshold : int;
       issuance_weights : Parametric.issuance_weights;
+      max_slashing_threshold : int;
     }
 
     val generate : consensus_committee_size:int -> t
@@ -2190,7 +2193,7 @@ end
 
 (** This module re-exports definitions from {!Misbehaviour_repr}. *)
 module Misbehaviour : sig
-  type kind = Double_baking | Double_attesting
+  type kind = Double_baking | Double_attesting | Double_preattesting
 
   type t = {kind : kind; level : Raw_level.t; round : Round.t; slot : Slot.t}
 end

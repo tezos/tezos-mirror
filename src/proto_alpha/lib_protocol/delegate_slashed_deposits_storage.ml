@@ -25,6 +25,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO #6918: Remove after P *)
+let update_slashing_storage_for_p ctxt =
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    Storage.Contract.Slashed_deposits__Oxford.fold
+      ctxt
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun contract slashed_history ctxt ->
+        let slashed_history =
+          List.map
+            (fun (cycle, percentage) ->
+              (cycle, Percentage.convert_from_o_to_p percentage))
+            slashed_history
+        in
+        Storage.Contract.Slashed_deposits.add ctxt contract slashed_history)
+  in
+  Storage.Contract.Slashed_deposits__Oxford.clear ctxt
+
 let already_denounced_for_double_attesting ctxt delegate (level : Level_repr.t)
     round =
   let open Lwt_result_syntax in
@@ -68,21 +87,17 @@ let punish_double_signing ctxt ~operation_hash
   let denounced =
     Option.value denounced_opt ~default:Storage.default_denounced
   in
-  let already_denounced, updated_denounced, slashing_percentage =
+  (* Placeholder value *)
+  let* ctxt, slashing_percentage =
+    Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
+  in
+  let already_denounced, updated_denounced =
     let Storage.{for_double_baking; for_double_attesting} = denounced in
     match misbehaviour.kind with
     | Double_baking ->
-        ( for_double_baking,
-          {denounced with for_double_baking = true},
-          Constants_storage
-          .percentage_of_frozen_deposits_slashed_per_double_baking
-            ctxt )
-    | Double_attesting ->
-        ( for_double_attesting,
-          {denounced with for_double_attesting = true},
-          Constants_storage
-          .percentage_of_frozen_deposits_slashed_per_double_attestation
-            ctxt )
+        (for_double_baking, {denounced with for_double_baking = true})
+    | Double_attesting | Double_preattesting ->
+        (for_double_attesting, {denounced with for_double_attesting = true})
   in
   assert (Compare.Bool.(already_denounced = false)) ;
   let delegate_contract = Contract_repr.Implicit delegate in
@@ -129,6 +144,12 @@ let clear_outdated_already_denounced ctxt ~new_cycle =
   | None -> Lwt.return ctxt
   | Some outdated_cycle -> Storage.Already_denounced.clear (ctxt, outdated_cycle)
 
+(* Misbehaviour Map: orders denunciations for application.
+   See {!Misbehaviour_repr.compare} for the order on misbehaviours:
+   - by increasing level, then increasing round, then kind, ignoring the slot
+   - for the kind: double baking > double attesting > double preattesting *)
+module MisMap = Map.Make (Misbehaviour_repr)
+
 let apply_and_clear_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
@@ -166,13 +187,14 @@ let apply_and_clear_denunciations ctxt =
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     {reward; amount_to_burn}
   in
-  let* ctxt, balance_updates, remaining_denunciations =
+  (* Split denunciations into two groups: to be applied, and to be delayed *)
+  let*! block_denunciations_map, remaining_denunciations =
     Pending_denunciations_storage.fold
       ctxt
       ~order:`Undefined
-      ~init:(Ok (ctxt, [], []))
+      ~init:(MisMap.empty, [])
       ~f:(fun delegate denunciations acc ->
-        let*? ctxt, balance_updates, remaining_denunciations = acc in
+        let block_map, remaining_denunciations = acc in
         (* Since the [max_slashing_period] is 2, and we want to apply denunciations at the
            end of this period, we "delay" the current cycle's misbehaviour's denunciations,
            while we apply the older denunciations.
@@ -197,27 +219,65 @@ let apply_and_clear_denunciations ctxt =
                 Cycle_repr.(misb_cycle < current_cycle))
               denunciations
         in
+        let block_map =
+          List.fold_left
+            (fun block_map denunciation ->
+              MisMap.update
+                denunciation.Denunciations_repr.misbehaviour
+                (function
+                  | None ->
+                      Some
+                        (Signature.Public_key_hash.Map.singleton
+                           delegate
+                           denunciation)
+                  | Some map ->
+                      Some
+                        (Signature.Public_key_hash.Map.update
+                           delegate
+                           (function
+                             | None -> Some denunciation
+                             | Some old_d -> Some old_d)
+                           map))
+                block_map)
+            block_map
+            denunciations_to_apply
+        in
+        Lwt.return
+          ( block_map,
+            (delegate, denunciations_to_delay) :: remaining_denunciations ))
+  in
+  (* Processes the applicable denunciations *)
+  let* ctxt, balance_updates =
+    MisMap.fold_es
+      (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
+           denunciations_map
+           acc ->
+        let ctxt, balance_updates = acc in
+        let level =
+          Level_repr.level_from_raw
+            ~cycle_eras:(Raw_context.cycle_eras ctxt)
+            raw_level
+        in
+        let misbehaviour_cycle = level.cycle in
+        let denunciations =
+          Signature.Public_key_hash.Map.bindings denunciations_map
+        in
+        let denounced = List.map fst denunciations in
+        let* ctxt, slashing_percentage =
+          Slash_percentage.get ctxt ~kind ~level denounced
+        in
         let+ ctxt, balance_updates =
           List.fold_left_es
             (fun (ctxt, balance_updates)
-                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} ->
-              let slashing_percentage =
-                match misbehaviour.kind with
-                | Double_baking ->
-                    Constants_storage
-                    .percentage_of_frozen_deposits_slashed_per_double_baking
-                      ctxt
-                | Double_attesting ->
-                    Constants_storage
-                    .percentage_of_frozen_deposits_slashed_per_double_attestation
-                      ctxt
-              in
-              let misbehaviour_cycle =
-                (Level_repr.level_from_raw
-                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
-                   misbehaviour.level)
-                  .cycle
-              in
+                 ( delegate,
+                   Denunciations_repr.{operation_hash; rewarded; misbehaviour}
+                 ) ->
+              assert (
+                Compare.Int.equal
+                  (* This compare ignores the slot *)
+                  (Misbehaviour_repr.compare miskey misbehaviour)
+                  0) ;
+              (* Validate ensures that [denunciations] contains [delegate] at most once *)
               let get_initial_frozen_deposits_of_misbehaviour_cycle =
                 if Cycle_repr.equal current_cycle misbehaviour_cycle then
                   Delegate_storage.initial_frozen_deposits
@@ -321,12 +381,13 @@ let apply_and_clear_denunciations ctxt =
                 punish_balance_updates @ reward_balance_updates
                 @ balance_updates ))
             (ctxt, balance_updates)
-            denunciations_to_apply
+            denunciations
         in
-        ( ctxt,
-          balance_updates,
-          (delegate, denunciations_to_delay) :: remaining_denunciations ))
+        (ctxt, balance_updates))
+      block_denunciations_map
+      (ctxt, [])
   in
+  (* Updates the storage to only contain the remaining denunciations *)
   let*! ctxt = Pending_denunciations_storage.clear ctxt in
   let*! ctxt =
     List.fold_left_s

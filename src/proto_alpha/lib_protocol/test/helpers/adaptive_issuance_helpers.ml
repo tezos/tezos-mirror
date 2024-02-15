@@ -1044,7 +1044,7 @@ let apply_slashing
         constants
           .Protocol.Alpha_context.Constants.Parametric
            .percentage_of_frozen_deposits_slashed_per_double_baking
-    | Double_attesting ->
+    | Double_attesting | Double_preattesting ->
         constants.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let get_total_supply acc_map =

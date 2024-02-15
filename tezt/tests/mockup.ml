@@ -1184,10 +1184,15 @@ let test_create_mockup_config_show_init_roundtrip protocols =
     let constant_parametric_constants : JSON.t =
       JSON.annotate ~origin:"constant_parametric_constants"
       @@ `O
-           [
-             (* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
-             ("consensus_threshold", `Float 0.0);
-           ]
+           ((* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
+            ("consensus_threshold", `Float 0.0)
+           ::
+           (if Protocol.number protocol >= 019 then
+            [
+              (* Constraint: 0 <= max_slashing_per_block <= 10_000 *)
+              ("max_slashing_per_block", `Float 10_000.0);
+            ]
+           else []))
     in
     (* To fulfill the requirement that [blocks_per_epoch], present in protocols
        up to O, divides [blocks_per_cycle], we set [blocks_per_cycle] to 1, for

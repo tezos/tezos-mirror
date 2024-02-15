@@ -120,6 +120,7 @@ module Generated : sig
   type t = {
     consensus_threshold : int;
     issuance_weights : Constants_parametric_repr.issuance_weights;
+    max_slashing_threshold : int;
   }
 
   (* This function is meant to be used just in lib_parameters and in the

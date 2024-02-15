@@ -84,6 +84,18 @@ Adaptive Issuance (ongoing)
   double bake/attest, by giving them some time to fix it. (MR
   :gl:`!11704`)
 
+- Denunciations are now applied in chronological order of the denounced
+  double signing events, instead of chronological order of denunciation
+  inclusion. (MR :gl:`!11854`)
+
+- Under the new slashing feature flag, the amount slashed for a double
+  attestation or pre-attestation depends on the number of slots owned
+  by misbehaving delegates in the exact block this double signing
+  event occurred. This greatly diminishes potential losses in cases of
+  legitimate accidents that do not threaten the chain, while keeping
+  a strong incentive against potential consensus attacks. (MR
+  :gl:`!11854`)
+
 - Activating adaptive issuance per-block vote (MR !11935)
 
 Gas improvements

@@ -6,10 +6,7 @@
 (*****************************************************************************)
 
 (** Which double signing event has occurred. *)
-type kind =
-  | Double_baking
-  | Double_attesting
-      (** Includes both double preattestion and double attestion. *)
+type kind = Double_baking | Double_attesting | Double_preattesting
 
 (** Internal representation of a double signing event used in
     {!Denunciations_repr.item}.
@@ -34,3 +31,10 @@ type t = {
 }
 
 val encoding : t Data_encoding.t
+
+val compare_kind : kind -> kind -> int
+
+val equal_kind : kind -> kind -> bool
+
+(** Note: the field [slot] is not taken into account in this comparison *)
+val compare : t -> t -> int

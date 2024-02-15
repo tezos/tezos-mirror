@@ -187,6 +187,18 @@ module Slashed_deposits_history = struct
     | _ -> Percentage.p0
 end
 
+(* TODO #6918: Remove after P *)
+module Slashed_deposits_history__Oxford = struct
+  include Slashed_deposits_history
+
+  let encoding =
+    let open Data_encoding in
+    list
+      (obj2
+         (req "cycle" Cycle_repr.encoding)
+         (req "slashed_percentage" Percentage.encoding_legacy_in_o))
+end
+
 module Unstake_request = struct
   type request = Cycle_repr.t * Tez_repr.t
 
@@ -475,13 +487,23 @@ module Contract = struct
       end)
       (Tez_repr)
 
+  (* TODO #6918: change name back after P *)
   module Slashed_deposits =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["slashed_deposits"]
+        let name = ["slashed_deposits_p"]
       end)
       (Slashed_deposits_history)
+
+  (* TODO #6918: Remove after P *)
+  module Slashed_deposits__Oxford =
+    Indexed_context.Make_map
+      (Ghost)
+      (struct
+        let name = ["slashed_deposits"]
+      end)
+      (Slashed_deposits_history__Oxford)
 
   module Bond_id_index =
     Make_indexed_subcontext

@@ -163,6 +163,7 @@ let constants_mainnet : Constants.Parametric.t =
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
             };
+          max_slashing_threshold;
         } =
     Constants.Generated.generate ~consensus_committee_size
   in
@@ -247,6 +248,8 @@ let constants_mainnet : Constants.Parametric.t =
       Protocol.Percentage.p5;
     percentage_of_frozen_deposits_slashed_per_double_attestation =
       Protocol.Percentage.p50;
+    max_slashing_per_block = Protocol.Percentage.p100;
+    max_slashing_threshold;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;
@@ -318,7 +321,8 @@ let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
-  let Constants.Generated.{consensus_threshold = _; issuance_weights} =
+  let Constants.Generated.
+        {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
   in
   {
@@ -347,13 +351,15 @@ let constants_sandbox =
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
+    max_slashing_threshold;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
   }
 
 let constants_test =
   let consensus_committee_size = 25 in
-  let Constants.Generated.{consensus_threshold; issuance_weights} =
+  let Constants.Generated.
+        {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
   in
   {
@@ -386,6 +392,9 @@ let constants_test =
       (* Not 9 so that multiplication by a percentage and
          divisions by a limit do not easily get intermingled. *);
     max_operations_time_to_live = 8;
+    (* This has the same slashing behaviour as before P *)
+    max_slashing_per_block = Protocol.Percentage.p50;
+    max_slashing_threshold = 1;
   }
 
 let test_commitments =

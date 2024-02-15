@@ -241,9 +241,13 @@ seq:
 - id: limit_of_delegation_over_baking
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
-  type: u1
+  type: u2
 - id: percentage_of_frozen_deposits_slashed_per_double_attestation
-  type: u1
+  type: u2
+- id: max_slashing_per_block
+  type: u2
+- id: max_slashing_threshold
+  type: int31
 - id: testnet_dictator_tag
   type: u1
   enum: bool

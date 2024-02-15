@@ -259,6 +259,25 @@ let cleanup_values_for_protocol_p ctxt ~preserved_cycles ~consensus_rights_delay
       ctxt
       Cycle_repr.(start_cycle ---> end_cycle)
 
+let attesting_rights_count ctxt level =
+  let consensus_committee_size =
+    Constants_storage.consensus_committee_size ctxt
+  in
+  let open Lwt_result_syntax in
+  let*? slots = Slot_repr.Range.create ~min:0 ~count:consensus_committee_size in
+  Slot_repr.Range.fold_es
+    (fun (ctxt, map) slot ->
+      let* ctxt, consensus_pk = slot_owner ctxt level slot in
+      let map =
+        Signature.Public_key_hash.Map.update
+          consensus_pk.delegate
+          (function None -> Some 1 | Some slots_n -> Some (slots_n + 1))
+          map
+      in
+      return (ctxt, map))
+    (ctxt, Signature.Public_key_hash.Map.empty)
+    slots
+
 module For_RPC = struct
   let delegate_current_baking_power ctxt delegate =
     let open Lwt_result_syntax in
