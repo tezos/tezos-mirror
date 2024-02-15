@@ -137,7 +137,7 @@ function run_profiler(path, logs) {
 
         childProcess.stdout.on('data', (data) => {
             const output = data.toString();
-            if (!output.includes("__wasm_debugger__::Section")) fs.appendFileSync(logs, output)
+            if (!output.includes("__wasm_debugger__")) fs.appendFileSync(logs, output)
             const profiler_output_path_regex = /Profiling result can be found in (.+)/;
             const profiler_output_path_match = output.match(profiler_output_path_regex);
             const profiler_output_path_result = profiler_output_path_match
