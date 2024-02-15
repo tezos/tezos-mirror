@@ -18,6 +18,7 @@ variables:
         - debian-deps-build.Dockerfile
       when: on_success
     - when: manual
+      allow_failure: true
   tags:
     - $TAGS
   script:
