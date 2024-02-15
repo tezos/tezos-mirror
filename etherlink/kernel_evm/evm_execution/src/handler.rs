@@ -2167,26 +2167,27 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     ));
                 }
 
-                if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
-                    log!(
-                        self.host,
-                        Debug,
-                        "Not enought gas for call. Required at least: {:?}",
-                        gas_limit
-                    );
+                match self.begin_inter_transaction(false, gas_limit) {
+                    Ok(()) => {
+                        let result = self.execute_create(
+                            caller,
+                            value,
+                            init_code,
+                            contract_address,
+                        );
 
-                    Capture::Exit((
-                        ExitReason::Fatal(ExitFatal::Other(Cow::from(
-                            "Out of gas before recursive create",
-                        ))),
-                        None,
-                        vec![],
-                    ))
-                } else {
-                    let result =
-                        self.execute_create(caller, value, init_code, contract_address);
+                        self.end_inter_transaction(result)
+                    }
+                    Err(err) => {
+                        log!(
+                            self.host,
+                            Debug,
+                            "Intermediate transaction failed, reason: {:?}",
+                            err
+                        );
 
-                    self.end_inter_transaction(result)
+                        Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
+                    }
                 }
             }
             Precondition::PreconditionErr(exit_reason) => {
