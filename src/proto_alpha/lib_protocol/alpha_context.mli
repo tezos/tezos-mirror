@@ -2796,6 +2796,10 @@ module Dal : sig
       val compare : int -> int -> int
 
       val equal : int -> int -> bool
+
+      type error += Invalid_page_index of {given : int; min : int; max : int}
+
+      val check_is_in_range : number_of_pages:int -> t -> unit tzresult
     end
 
     type t = {slot_id : slot_id; page_index : Index.t}

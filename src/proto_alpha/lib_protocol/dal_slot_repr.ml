@@ -137,6 +137,36 @@ module Page = struct
     let compare = Compare.Int.compare
 
     let equal = Compare.Int.equal
+
+    type error += Invalid_page_index of {given : int; min : int; max : int}
+
+    let () =
+      let open Data_encoding in
+      register_error_kind
+        `Permanent
+        ~id:"dal_page_index_repr.index.invalid_index"
+        ~title:"Invalid Dal page index"
+        ~description:
+          "The given index is out of range of representable page indices"
+        ~pp:(fun ppf (given, min, max) ->
+          Format.fprintf
+            ppf
+            "The given index %d is out of range of representable page indices \
+             [%d, %d]"
+            given
+            min
+            max)
+        (obj3 (req "given" int31) (req "min" int31) (req "max" int31))
+        (function
+          | Invalid_page_index {given; min; max} -> Some (given, min, max)
+          | _ -> None)
+        (fun (given, min, max) -> Invalid_page_index {given; min; max})
+
+    let check_is_in_range ~number_of_pages page_id =
+      error_unless
+        Compare.Int.(0 <= page_id && page_id < number_of_pages)
+        (Invalid_page_index
+           {given = page_id; min = zero; max = number_of_pages - 1})
   end
 
   type t = {slot_id : Header.id; page_index : Index.t}
