@@ -1112,6 +1112,7 @@ module Pending_denunciations =
 
 (** Per cycle storage *)
 
+(* TODO #6957: Remove this from protocol Q. *)
 type denounced__Oxford = {for_double_attesting : bool; for_double_baking : bool}
 
 type denounced = {
@@ -1170,6 +1171,7 @@ module Cycle = struct
                (req "for_double_baking" bool))
       end)
 
+  (* TODO #6957: Remove this from protocol Q. *)
   module Already_denounced__Oxford =
     Make_indexed_data_storage
       (Make_subcontext (Ghost) (Indexed_context.Raw_context)

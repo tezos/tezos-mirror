@@ -485,7 +485,8 @@ module Pending_denunciations :
      and type key = Signature.public_key_hash
      and type value = Denunciations_repr.t
 
-(** Needed for the stitching from Oxford to P. Remove this in Q. *)
+(** Needed for the stitching from Oxford to P.
+    TODO #6957: Remove this from protocol Q. *)
 type denounced__Oxford = {for_double_attesting : bool; for_double_baking : bool}
 
 (** This type is used to track which denunciations have already been
@@ -507,7 +508,8 @@ module Already_denounced :
       (Raw_level_repr.t * Round_repr.t) * Signature.Public_key_hash.t
      and type value = denounced
 
-(** Needed for the stitching from Oxford to P. Remove this in Q. *)
+(** Needed for the stitching from Oxford to P.
+    TODO #6957: Remove this from protocol Q. *)
 module Already_denounced__Oxford :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
