@@ -84,7 +84,7 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let* _ctxt = Evm_context.commit Ctxt.ctxt evm_state in
+    let* () = Evm_context.commit Ctxt.ctxt evm_state in
     return_unit
 end
 
@@ -105,6 +105,7 @@ let install_finalizer_seq server private_server =
   let* () = Events.shutdown_rpc_server ~private_:true in
   let* () = Tx_pool.shutdown () in
   let* () = Rollup_node_follower.shutdown () in
+  let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   let* () = Delayed_inbox.shutdown () in
   return_unit
@@ -256,6 +257,10 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   in
   let* () =
     Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
+  in
+  let* () =
+    Evm_events_follower.start
+      {rollup_node_endpoint; backend = (module Sequencer)}
   in
   let* () = Rollup_node_follower.start {rollup_node_endpoint} in
   let directory =
