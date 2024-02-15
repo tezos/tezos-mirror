@@ -44,7 +44,8 @@ let already_denounced ctxt delegate level round kind =
          - has not been found in the storage under its own round
          (ie. [answer] is [false]).
 
-         This whole control flow can be removed in Q. *)
+         TODO #6957: This whole control flow should be removed from
+         protocol Q. *)
       already_denounced_aux ctxt delegate level Round_repr.zero kind
 
 let add_denunciation ctxt delegate (level : Level_repr.t) round kind =
