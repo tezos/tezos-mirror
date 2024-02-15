@@ -16,6 +16,7 @@ depends: [
   "octez-version"
   "lwt-watcher" { = "0.2" }
   "lwt-exit"
+  "octez-shell-libs"
   "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
   "caqti"

@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-version"
+  "octez-shell-libs"
   "octez-evm-node-libs"
 ]
 build: [

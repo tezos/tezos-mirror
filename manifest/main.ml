@@ -8411,6 +8411,7 @@ let evm_node_lib_prod =
         evm_node_lib_prod_encoding |> open_;
         lwt_watcher;
         lwt_exit;
+        octez_client_base |> open_;
         evm_node_config |> open_;
         octez_context_sigs;
         octez_context_disk;
@@ -8455,6 +8456,7 @@ let evm_node_lib_dev =
         caqti_lwt;
         caqti_lwt_unix;
         caqti_sqlite;
+        octez_client_base |> open_;
         evm_node_config |> open_;
         octez_context_sigs;
         octez_context_disk;
@@ -8524,6 +8526,8 @@ let _evm_node =
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         octez_version_value;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
         evm_node_lib_prod;
         evm_node_lib_dev;
         evm_node_lib_dev_encoding |> open_;
