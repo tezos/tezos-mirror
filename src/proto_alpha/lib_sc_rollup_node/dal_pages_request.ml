@@ -134,6 +134,23 @@ let slot_id_is_valid
         slot_id
   | _ -> false
 
+let page_id_is_valid
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~origination_level ~inbox_level
+    Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
+  Result.is_ok
+    (Dal.Page.Index.check_is_in_range
+       ~number_of_pages:
+         (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+       page_index)
+  && slot_id_is_valid
+       dal_constants
+       ~dal_activation_level
+       ~origination_level
+       ~inbox_level
+       slot_id
+       ~dal_attested_slots_validity_lag
+
 let slot_pages
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt slot_id
@@ -185,13 +202,13 @@ let page_content
   in
   if
     not
-    @@ slot_id_is_valid
+    @@ page_id_is_valid
          dal_constants
          ~dal_activation_level
          ~origination_level
          ~inbox_level
          ~dal_attested_slots_validity_lag
-         slot_id
+         page_id
   then return_none
   else
     let* confirmed_in_block_hash =
