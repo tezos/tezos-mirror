@@ -52,44 +52,15 @@ type punishing_amounts = {
 }
 
 let record_denunciation ctxt ~operation_hash
-    (misbehaviour : Misbehaviour_repr.t) delegate (level : Level_repr.t)
-    ~rewarded =
+    (misbehaviour : Misbehaviour_repr.t) delegate ~rewarded =
   let open Lwt_result_syntax in
-  (* Placeholder value *)
-  let* ctxt, slashing_percentage =
-    Slash_percentage.get ctxt ~kind:misbehaviour.kind ~level [delegate]
-  in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let* slash_history_opt =
-    Storage.Contract.Slashed_deposits.find ctxt delegate_contract
-  in
-  let slash_history = Option.value slash_history_opt ~default:[] in
-  let previously_slashed_this_cycle =
-    Storage.Slashed_deposits_history.get current_cycle slash_history
-  in
-  let slash_history =
-    Storage.Slashed_deposits_history.add
-      level.cycle
-      slashing_percentage
-      slash_history
-  in
-  let*! ctxt =
-    Storage.Contract.Slashed_deposits.add ctxt delegate_contract slash_history
-  in
   let*! ctxt = Forbidden_delegates_storage.forbid ctxt delegate in
-  let* ctxt =
-    if Percentage.(Compare.(previously_slashed_this_cycle >= p100)) then
-      (* Do not store denunciations that have no effects .*) return ctxt
-    else
-      Pending_denunciations_storage.add_denunciation
-        ctxt
-        ~misbehaving_delegate:delegate
-        operation_hash
-        ~rewarded_delegate:rewarded
-        misbehaviour
-  in
-  return ctxt
+  Pending_denunciations_storage.add_denunciation
+    ctxt
+    ~misbehaving_delegate:delegate
+    operation_hash
+    ~rewarded_delegate:rewarded
+    misbehaviour
 
 let punish_double_signing ctxt ~operation_hash misbehaviour delegate
     (level : Level_repr.t) ~rewarded =
@@ -127,14 +98,7 @@ let punish_double_signing ctxt ~operation_hash misbehaviour delegate
        exception here would cause the whole block application to fail,
        which we don't want. *)
     return ctxt
-  else
-    record_denunciation
-      ctxt
-      ~operation_hash
-      misbehaviour
-      delegate
-      level
-      ~rewarded
+  else record_denunciation ctxt ~operation_hash misbehaviour delegate ~rewarded
 
 (* Misbehaviour Map: orders denunciations for application.
    See {!Misbehaviour_repr.compare} for the order on misbehaviours:
@@ -281,6 +245,40 @@ let apply_and_clear_denunciations ctxt =
                    We could assert false, but we can also be permissive
                    while keeping the same invariants *)
               in
+              let delegate_contract = Contract_repr.Implicit delegate in
+              let* slash_history_opt =
+                Storage.Contract.Slashed_deposits.find ctxt delegate_contract
+              in
+              let slash_history = Option.value slash_history_opt ~default:[] in
+              let previous_total_slashing_percentage =
+                Storage.Slashed_deposits_history.get level.cycle slash_history
+              in
+              let slash_history =
+                Storage.Slashed_deposits_history.add
+                  level.cycle
+                  slashing_percentage
+                  slash_history
+              in
+              let*! ctxt =
+                Storage.Contract.Slashed_deposits.add
+                  ctxt
+                  delegate_contract
+                  slash_history
+              in
+
+              let new_total_slashing_percentage =
+                Storage.Slashed_deposits_history.get level.cycle slash_history
+              in
+              (* We do not slash above 100%: if the slashing percentage would
+                 make the total sum of the slashing history above 100%, we rectify
+                 it to reach exactly 100%. This also means that subsequent slashes
+                 are effectively ignored (set to 0%) *)
+              let slashing_percentage =
+                Percentage.sub_bounded
+                  new_total_slashing_percentage
+                  previous_total_slashing_percentage
+              in
+
               let* frozen_deposits =
                 let* initial_amount =
                   get_initial_frozen_deposits_of_misbehaviour_cycle
