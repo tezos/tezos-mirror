@@ -416,6 +416,15 @@ type bu_check = {
 let check_with_roundings got expected =
   got >= expected - 1 && got <= expected + 1
 
+let assert_with_roundings ~__LOC__ got expected =
+  if not (check_with_roundings got expected) then
+    Test.fail
+      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %d, expected \
+       %d.@]@."
+      __LOC__
+      got
+      expected
+
 let check_balance_updates balance_updates (predicates : bu_check list) =
   List.iter
     (fun {pred; change; msg} ->
@@ -431,11 +440,13 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
              pre_filtered)
       then
         Test.fail
-          "Inconsistant balance update: %s, could it be a regression, got:  %s"
+          "@[<v 2>Inconsistant balance update, could it be a regression.@. \
+           Expected:@ @[%s, change amount: %d@]@.Got:@ @[%s@]@]"
           msg
+          change
           (List.fold_left
              (fun acc x ->
-               acc ^ "\n" ^ Operation_receipt.Balance_updates.to_string x)
+               acc ^ "@ " ^ Operation_receipt.Balance_updates.to_string x)
              ""
              pre_filtered))
     predicates
@@ -1091,35 +1102,32 @@ let test_staking =
   let amount_rewarded_from_baker_deposits = 1435680618 in
   let amount_slashed_from_baker_deposits = 8614083709 in
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_unstake_stakers_deposits
-      (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_unstake_stakers_deposits
+    (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_stakers_deposits
-      (int_of_float (float amount_slashed_from_stakers_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_stakers_deposits
+    (int_of_float (float amount_slashed_from_stakers_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_baker_deposits
-      (int_of_float (float amount_slashed_from_baker_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_baker_deposits
+    (int_of_float (float amount_slashed_from_baker_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      (amount_rewarded_from_unstake_stakers_deposits
-     + amount_rewarded_from_stakers_deposits
-     + amount_rewarded_from_baker_deposits)
-      total_amount_rewarded) ;
-
-  assert (
-    check_with_roundings
-      (amount_slashed_from_unstake_stakers_deposits
-     + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits
-      )
-      total_amount_slashed) ;
-
+  assert_with_roundings
+    ~__LOC__
+    (amount_rewarded_from_unstake_stakers_deposits
+   + amount_rewarded_from_stakers_deposits + amount_rewarded_from_baker_deposits
+    )
+    total_amount_rewarded ;
+  assert_with_roundings
+    ~__LOC__
+    (amount_slashed_from_unstake_stakers_deposits
+   + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits)
+    total_amount_slashed ;
   let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
     let open Operation_receipt.Balance_updates in
     {
