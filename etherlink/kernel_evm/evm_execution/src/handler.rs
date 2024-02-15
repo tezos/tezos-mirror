@@ -113,7 +113,12 @@ type CreateOutcome = (ExitReason, Option<H160>, Vec<u8>);
 /// SputnikVM execution. This is needed if an error occurs in a callback
 /// called by SputnikVM.
 fn ethereum_error_to_exit_reason(exit_reason: &EthereumError) -> ExitReason {
-    ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason))))
+    match exit_reason {
+        EthereumError::EthereumAccountError(AccountStorageError::NonceOverflow) => {
+            ExitReason::Error(ExitError::MaxNonce)
+        }
+        _ => ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason)))),
+    }
 }
 
 pub enum TransferExitReason {
@@ -2120,23 +2125,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     }
                 }
 
-                let gas_limit = self.nested_call_gas_limit(target_gas);
-
-                if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
-                    log!(
-                        self.host,
-                        Debug,
-                        "Not enough gas for create. Required at least: {:?}",
-                        gas_limit
-                    );
-
-                    return Capture::Exit((
-                        ExitReason::Error(ExitError::OutOfGas),
-                        None,
-                        vec![],
-                    ));
-                }
-
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
                 let contract_address = self.create_address(scheme);
@@ -2170,6 +2158,24 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         vec![],
                     ));
                 }
+
+                let gas_limit = self.nested_call_gas_limit(target_gas);
+
+                if let Err(err) = self.record_cost(gas_limit.unwrap_or_default()) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Not enough gas for create. Required at least: {:?}",
+                        gas_limit
+                    );
+
+                    return Capture::Exit((
+                        ExitReason::Error(ExitError::OutOfGas),
+                        None,
+                        vec![],
+                    ));
+                }
+
                 if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
                     log!(
                         self.host,
