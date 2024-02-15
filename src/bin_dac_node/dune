@@ -25,7 +25,6 @@
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
-  octez-protocol-017-PtNairob-libs.dac
   octez-protocol-018-Proxford-libs.dac
   (select void_for_linking-octez-protocol-alpha-libs-dac from
    (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)

@@ -15,7 +15,6 @@
   data-encoding
   re
   tezos-protocol-genesis.embedded-protocol
-  tezos-protocol-017-PtNairob.embedded-protocol
   tezos-protocol-018-Proxford.embedded-protocol
   tezos-protocol-alpha.embedded-protocol)
  (link_flags

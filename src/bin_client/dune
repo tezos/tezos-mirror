@@ -107,9 +107,12 @@
   (select void_for_linking-octez-protocol-016-PtMumbai-libs-plugin from
    (octez-protocol-016-PtMumbai-libs.plugin -> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty)
    (-> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty))
-  octez-protocol-017-PtNairob-libs.client.commands-registration
-  octez-protocol-017-PtNairob-libs.baking-commands.registration
-  octez-protocol-017-PtNairob-libs.plugin
+  (select void_for_linking-octez-protocol-017-PtNairob-libs-client-commands-registration from
+   (octez-protocol-017-PtNairob-libs.client.commands-registration -> void_for_linking-octez-protocol-017-PtNairob-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-017-PtNairob-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-017-PtNairob-libs-plugin from
+   (octez-protocol-017-PtNairob-libs.plugin -> void_for_linking-octez-protocol-017-PtNairob-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-017-PtNairob-libs-plugin.empty))
   octez-protocol-018-Proxford-libs.client.commands-registration
   octez-protocol-018-Proxford-libs.baking-commands.registration
   octez-protocol-018-Proxford-libs.plugin
@@ -170,6 +173,8 @@
    (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-017-PtNairob-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-017-PtNairob-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin.empty ""))))

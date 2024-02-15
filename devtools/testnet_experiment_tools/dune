@@ -35,10 +35,6 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-libs.tezos-context
-  octez-protocol-017-PtNairob-libs.baking
-  octez-protocol-017-PtNairob-libs.client
-  octez-protocol-017-PtNairob-libs.client.commands
-  tezos-protocol-017-PtNairob.protocol
   octez-protocol-018-Proxford-libs.baking
   octez-protocol-018-Proxford-libs.client
   octez-protocol-018-Proxford-libs.client.commands
@@ -58,7 +54,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules sigs tool_017_PtNairob tool_018_Proxford tool_alpha))
+ (modules sigs tool_018_Proxford tool_alpha))
 
 (executable
  (name simulation_scenario)

@@ -22,8 +22,6 @@ depends: [
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "tezos-protocol-000-Ps9mPmXa"
-  "tezos-protocol-017-PtNairob"
-  "octez-protocol-017-PtNairob-libs"
   "tezos-protocol-018-Proxford"
   "octez-protocol-018-Proxford-libs"
 ]
@@ -59,6 +57,8 @@ depopts: [
   "octez-protocol-015-PtLimaPt-libs"
   "tezos-protocol-016-PtMumbai"
   "octez-protocol-016-PtMumbai-libs"
+  "tezos-protocol-017-PtNairob"
+  "octez-protocol-017-PtNairob-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]

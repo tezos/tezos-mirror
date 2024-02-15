@@ -14,7 +14,6 @@ depends: [
   "octez-shell-libs"
   "tezos-dac-lib"
   "tezos-dac-client-lib"
-  "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
 ]
 depopts: [

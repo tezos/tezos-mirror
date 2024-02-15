@@ -13,7 +13,6 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
-  "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
 ]
 depopts: [
@@ -36,6 +35,7 @@ depopts: [
   "octez-protocol-014-PtKathma-libs"
   "octez-protocol-015-PtLimaPt-libs"
   "octez-protocol-016-PtMumbai-libs"
+  "octez-protocol-017-PtNairob-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [
