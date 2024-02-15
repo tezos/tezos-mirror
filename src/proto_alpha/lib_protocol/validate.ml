@@ -503,7 +503,6 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation checks for Construction mode.
@@ -532,7 +531,6 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
-    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     return (consensus_key, voting_power)
 
   (** Preattestation/attestation checks for Mempool mode.
@@ -615,6 +613,7 @@ module Consensus = struct
             Preattestation
             consensus_content
     in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     let*? () =
       if check_signature then
         Operation.check_signature
@@ -716,7 +715,6 @@ module Consensus = struct
     let*? consensus_key, voting_power =
       get_delegate_details consensus_info.attestation_slot_map kind slot
     in
-    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     let* () =
       Option.fold
         ~none:return_unit
@@ -763,6 +761,7 @@ module Consensus = struct
             Attestation
             consensus_content
     in
+    let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     let*? () =
       if check_signature then
         Operation.check_signature
