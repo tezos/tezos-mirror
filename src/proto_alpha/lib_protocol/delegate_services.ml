@@ -116,6 +116,7 @@ type info = {
   frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
+  min_delegated_in_current_cycle : Tez.t;
   total_delegated_stake : Tez.t;
   staking_denominator : Staking_pseudotoken.t;
   deactivated : bool;
@@ -136,6 +137,7 @@ let info_encoding =
            frozen_deposits_limit;
            delegated_contracts;
            delegated_balance;
+           min_delegated_in_current_cycle;
            total_delegated_stake;
            staking_denominator;
            deactivated;
@@ -151,6 +153,7 @@ let info_encoding =
           frozen_deposits_limit,
           delegated_contracts,
           delegated_balance,
+          min_delegated_in_current_cycle,
           deactivated,
           grace_period ),
         ( (total_delegated_stake, staking_denominator),
@@ -162,6 +165,7 @@ let info_encoding =
              frozen_deposits_limit,
              delegated_contracts,
              delegated_balance,
+             min_delegated_in_current_cycle,
              deactivated,
              grace_period ),
            ( (total_delegated_stake, staking_denominator),
@@ -174,6 +178,7 @@ let info_encoding =
         frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
+        min_delegated_in_current_cycle;
         total_delegated_stake;
         staking_denominator;
         deactivated;
@@ -183,7 +188,7 @@ let info_encoding =
         pending_consensus_keys;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req "full_balance" Tez.encoding)
           (req "current_frozen_deposits" Tez.encoding)
           (req "frozen_deposits" Tez.encoding)
@@ -191,6 +196,7 @@ let info_encoding =
           (opt "frozen_deposits_limit" Tez.encoding)
           (req "delegated_contracts" (list Contract.encoding))
           (req "delegated_balance" Tez.encoding)
+          (req "min_delegated_in_current_cycle" Tez.encoding)
           (req "deactivated" bool)
           (req "grace_period" Cycle.encoding))
        (merge_objs
@@ -578,6 +584,9 @@ let register () =
       let* frozen_deposits_limit = Delegate.frozen_deposits_limit ctxt pkh in
       let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
       let* delegated_balance = Delegate.For_RPC.delegated_balance ctxt pkh in
+      let* min_delegated_in_current_cycle =
+        Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh
+      in
       let* total_delegated_stake =
         Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
           ctxt
@@ -604,6 +613,7 @@ let register () =
         frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
+        min_delegated_in_current_cycle;
         total_delegated_stake;
         staking_denominator;
         deactivated;
