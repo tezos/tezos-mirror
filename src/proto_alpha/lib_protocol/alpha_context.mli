@@ -2738,6 +2738,8 @@ module Dal : sig
 
     val slots_range_opt :
       number_of_slots:int -> lower:int -> upper:int -> t list option
+
+    val check_is_in_range : number_of_slots:int -> t -> unit tzresult
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
