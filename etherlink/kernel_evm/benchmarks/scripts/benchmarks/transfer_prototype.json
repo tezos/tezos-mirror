@@ -1,7 +1,7 @@
 {
     "nonce": 0,
-    "gasPrice": 21000,
-    "gasLimit": "0x100000",
+    "gasPrice": 50000000,
+    "gasLimit": 1048576,
     "to": "0x4e1b2c985d729ae6e05ef7974013eeb48f394449",
     "value": 1000000000,
     "data": "",
