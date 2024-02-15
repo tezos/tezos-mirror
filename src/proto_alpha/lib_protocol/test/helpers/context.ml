@@ -336,6 +336,12 @@ let get_denunciations ctxt =
 let get_denunciations_for_delegate ctxt =
   Alpha_services.Delegate.pending_denunciations rpc_ctxt ctxt
 
+let estimated_shared_pending_slashed_amount ctxt =
+  Alpha_services.Delegate.estimated_shared_pending_slashed_amount rpc_ctxt ctxt
+
+let estimated_own_pending_slashed_amount ctxt =
+  Alpha_services.Contract.estimated_own_pending_slashed_amount rpc_ctxt ctxt
+
 module Dal = struct
   let shards ctxt = Plugin.RPC.Dal.dal_shards rpc_ctxt ctxt
 end
