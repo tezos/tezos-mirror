@@ -225,8 +225,19 @@ let apply_and_clear_denunciations ctxt =
               MisMap.update
                 denunciation.Denunciations_repr.misbehaviour
                 (function
-                  | None -> Some [(delegate, denunciation)]
-                  | Some l -> Some ((delegate, denunciation) :: l))
+                  | None ->
+                      Some
+                        (Signature.Public_key_hash.Map.singleton
+                           delegate
+                           denunciation)
+                  | Some map ->
+                      Some
+                        (Signature.Public_key_hash.Map.update
+                           delegate
+                           (function
+                             | None -> Some denunciation
+                             | Some old_d -> Some old_d)
+                           map))
                 block_map)
             block_map
             denunciations_to_apply
@@ -239,7 +250,7 @@ let apply_and_clear_denunciations ctxt =
   let* ctxt, balance_updates =
     MisMap.fold_es
       (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
-           denunciations
+           denunciations_map
            acc ->
         let ctxt, balance_updates = acc in
         let level =
@@ -248,6 +259,9 @@ let apply_and_clear_denunciations ctxt =
             raw_level
         in
         let misbehaviour_cycle = level.cycle in
+        let denunciations =
+          Signature.Public_key_hash.Map.bindings denunciations_map
+        in
         let denounced = List.map fst denunciations in
         let* ctxt, slashing_percentage =
           Slash_percentage.get ctxt ~kind ~level denounced
