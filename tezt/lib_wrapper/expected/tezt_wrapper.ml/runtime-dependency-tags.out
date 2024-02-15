@@ -5,11 +5,9 @@ failed_migration: etherlink/kernel_evm/kernel/tests/resources/failed_migration.w
 ghostnet_evm_kernel: etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm
 evm_kernel: evm_kernel.wasm
 accuser_proxford: octez-accuser-Proxford
-accuser_ptnairob: octez-accuser-PtNairob
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
 baker_proxford: octez-baker-Proxford
-baker_ptnairob: octez-baker-PtNairob
 baker_alpha: octez-baker-alpha
 client: octez-client
 codec: octez-codec
