@@ -93,6 +93,19 @@ type sc_rollup_reveal_activation_level = {
   (* Once a DAL slot is attested, a rollup can only import it within the range
      of levels [attested_level; attested_level +
      dal_attested_slots_validity_lag]. *)
+  (* Warning: the semantics of valid slots needs to be adapted if the
+     value of this parameter is changed in the future.
+     - If it is increased, some attested slots that were outdated with
+       the old value will become valid again.
+     - If it is decreased, some attested slots that were valid with
+       the old value will become outdated.
+
+     In both cases, the status of slots before and after the value change is
+     different. Said otherwise, the validity of the slot may differ depending on
+     the time of the check, in particular it may be different in the following
+     two cases: (a) the slot is imported before the value upgrade, (2) a
+     refutation game targeting a page of that slot is started after the
+     upgrade. *)
   dal_attested_slots_validity_lag : int;
 }
 

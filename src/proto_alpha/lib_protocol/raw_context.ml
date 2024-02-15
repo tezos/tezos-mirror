@@ -1098,6 +1098,18 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             metadata;
             dal_page = dal_activation_level;
             dal_parameters = dal_activation_level;
+            (* Warning: the semantics of valid slots needs to be adapted if the
+               value of this parameter is changed in the future.
+               - If it is increased, some attested slots that were outdated with
+                 the old value will become valid again.
+               - If it is decreased, some attested slots that were valid with
+                 the old value will become outdated.
+
+               In both cases, the status of slots before and after the value
+               change is different. So, the behaviour if a valid slot is
+               imported before the value upgrade but a refutation game
+               targetting a page of that slot is started after the upgrade is
+               not the correct/expected one. *)
             dal_attested_slots_validity_lag;
           }
         in
