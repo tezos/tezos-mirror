@@ -98,6 +98,9 @@ Adaptive Issuance (ongoing)
 
 - Activating adaptive issuance per-block vote (MR !11935)
 
+- Adjust total supply tracked for AI (estimated in O) so that it matches the
+  actual total supply. (MR :gl:`!11996`)
+
 Gas improvements
 ----------------
 
