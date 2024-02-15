@@ -107,6 +107,11 @@ Adaptive Issuance (ongoing)
 - Adjust total supply tracked for AI (estimated in O) so that it matches the
   actual total supply. (MR :gl:`!11996`)
 
+- Add min_delegated_in_current_cycle field in delegates info obtained via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``  (MR :gl:`!12018``)
+
+- Add RPC to get min_delegated_in_current_cycle for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'`` (MR :gl:`!12018`)
+
+
 Gas improvements
 ----------------
 
