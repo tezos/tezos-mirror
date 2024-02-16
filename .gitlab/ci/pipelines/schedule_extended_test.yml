@@ -12,6 +12,7 @@ include:
 
   # These jobs are necessary to run flaky tezts
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
+  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-other.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
   - .gitlab/ci/jobs/build/oc.build_kernels.yml

@@ -1,0 +1,4 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+oc.docker:client-libs-dependencies:
+  extends: .oc.docker:client-libs-dependencies_template
