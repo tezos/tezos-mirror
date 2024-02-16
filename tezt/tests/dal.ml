@@ -189,14 +189,17 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     ?attestation_lag ?slot_size ?page_size ?attestation_threshold
-    ?number_of_shards ?commitment_period ?challenge_window ?dal_enable
-    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?number_of_shards ?redundancy_factor ?commitment_period ?challenge_window
+    ?dal_enable ?event_sections_levels ?node_arguments ?activation_timestamp
     ?dal_bootstrap_peers f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
@@ -342,10 +345,11 @@ let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
-    ?page_size ?number_of_shards ?attestation_lag ?(tags = [])
-    ?(uses = fun _ -> []) ?(pvm_name = "arith") ?(dal_enable = true)
-    ?commitment_period ?challenge_window ?minimal_block_delay
-    ?delay_increment_per_round ?activation_timestamp variant scenario =
+    ?page_size ?number_of_shards ?redundancy_factor ?attestation_lag
+    ?(tags = []) ?(uses = fun _ -> []) ?(pvm_name = "arith")
+    ?(dal_enable = true) ?commitment_period ?challenge_window
+    ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
+    variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -361,6 +365,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
         ?slot_size
         ?page_size
         ?number_of_shards
+        ?redundancy_factor
         ?attestation_lag
         ?commitment_period
         ?challenge_window
@@ -1015,9 +1020,9 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
      get roughly n / 64 = 16 TB slots on average. So the probability that it is
-     on TB committee is high. With [number_of_shards = 16] (which is the minimum
+     on TB committee is high. With [number_of_shards = 32] (which is the minimum
      possible without changing other parameters), the new baker should be
-     assigned roughly 16/64 = 1/4 shards on average. *)
+     assigned roughly 32/64 = 1/2 shards on average. *)
   let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
@@ -1889,10 +1894,10 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and slot 1 has not been downloaded.
   *)
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let page_size = parameters.Dal.Parameters.cryptobox.page_size in
   let store_slot content =
     Helpers.(store_slot dal_node @@ make_slot ~slot_size content)
   in
-
   Log.info
     "Step 1: send three slots to DAL node and obtain corresponding headers" ;
   let slot_contents_0 = " 10 " in
@@ -1924,7 +1929,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and 6" ;
   let number_of_slots = parameters.number_of_slots in
   let attestation_lag = parameters.attestation_lag in
-  let number_of_pages = 256 in
+  let number_of_pages = slot_size / page_size in
   let subscribed_slots = "0:2:4:6" in
   let messages =
     [
@@ -2929,7 +2934,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     let do_sum = String.make (number_of_dal_slots - 1) '+' in
     let* () = send_messages ~bake:false l1_client [do_sum ^ " value"] in
     (* Wait sufficiently many levels so that the PVM interprets the message. *)
-    let* _lvl = Node.wait_for_level l1_node (level + 2) in
+    let* _lvl = Node.wait_for_level l1_node (level + 5) in
     unit
   in
   Log.info
@@ -2977,7 +2982,7 @@ let e2e_tests =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 3;
-      block_delay = 6;
+      block_delay = 12;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
       num_extra_nodes = 2;
@@ -2987,7 +2992,7 @@ let e2e_tests =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 3;
-      block_delay = 2;
+      block_delay = 4;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
       num_extra_nodes = 2;
@@ -3055,7 +3060,7 @@ let register_end_to_end_tests ~protocols =
            origination and another to configure the PVM. Baker daemon is then
            started. *)
         let expected_bake_for_occurrences = 2 in
-        Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
+        Ptime.Span.of_int_s expected_bake_for_occurrences
       in
       (* Preparing the list of node operators for extra nodes. *)
       let extra_node_operators =
@@ -4774,7 +4779,7 @@ let register ~protocols =
     (* We need to set the prevalidator's event level to [`Debug]
        in order to capture the errors thrown in the validation phase. *)
     ~event_sections_levels:[("prevalidator", `Debug)]
-    ~number_of_shards:16
+    ~number_of_shards:32
     ~consensus_committee_size:1024
     protocols ;
   scenario_with_layer1_node
@@ -4843,7 +4848,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~attestation_threshold:100
-    ~attestation_lag:8
+    ~attestation_lag:16
     ~activation_timestamp:Now
     "dal attester with baker daemon"
     test_attester_with_daemon
@@ -4930,6 +4935,10 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
     ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:2048
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:32
+    ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
@@ -4937,6 +4946,10 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:2048
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:32
+    ~page_size:128
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes

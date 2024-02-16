@@ -170,7 +170,7 @@ let constants_mainnet : Constants.Parametric.t =
     Constants.Generated.generate ~consensus_committee_size
   in
   let dal_activation_level =
-    if default_dal.feature_enable then Raw_level.root
+    if default_dal.feature_enable then Raw_level.succ Raw_level.root
     else
       (* Deactivate the reveal if the dal is not enabled. *)
       (* https://gitlab.com/tezos/tezos/-/issues/5968
