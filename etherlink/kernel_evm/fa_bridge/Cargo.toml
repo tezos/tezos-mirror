@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "fa-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

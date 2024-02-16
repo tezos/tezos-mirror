@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 # SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
 #
 # SPDX-License-Identifier: MIT
 
 [workspace]
 
-members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "logging"]
+members = ["ethereum", "fa_bridge", "kernel", "evm_execution", "evm_evaluation", "logging"]
 
 [workspace.dependencies]
 
@@ -44,6 +45,7 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
+fa-bridge = { path = "./fa_bridge" }
 tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
