@@ -13,12 +13,17 @@
 
 use std::{cmp::min, str::FromStr, vec};
 
+use crate::eip152;
 use crate::handler::EvmHandler;
 use crate::zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 use crate::EthereumError;
 use crate::{abi, modexp::modexp_precompile};
+use alloc::borrow::Cow;
 use alloc::collections::btree_map::BTreeMap;
-use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
+use evm::{
+    executor::stack::PrecompileFailure, Context, ExitError, ExitReason, ExitRevert,
+    ExitSucceed, Handler, Transfer,
+};
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, U256};
@@ -192,7 +197,7 @@ fn ecrecover_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling ecrecover precompile");
 
-    // check that enough ressources to execute (gas / ticks) are available
+    // check that enough resources to execute (gas / ticks) are available
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
     let cost = 3000;
     if let Err(err) = handler.record_cost(cost) {
@@ -357,6 +362,121 @@ fn ripemd160_precompile<Host: Runtime>(
     })
 }
 
+fn blake2f_output_for_wrong_input() -> EthereumError {
+    EthereumError::PrecompileFailed(PrecompileFailure::Error {
+        exit_status: ExitError::Other(Cow::from("Wrong input for blake2f precompile")),
+    })
+}
+
+trait Decodable {
+    fn decode_from_le_slice(&mut self, source: &[u8]);
+}
+
+impl<const N: usize> Decodable for [u64; N] {
+    fn decode_from_le_slice(&mut self, src: &[u8]) {
+        let mut word_buf = [0_u8; 8];
+        for (i, word) in self.iter_mut().enumerate() {
+            word_buf.copy_from_slice(&src[i * 8..(i + 1) * 8]);
+            *word = u64::from_le_bytes(word_buf);
+        }
+    }
+}
+
+fn blake2f_precompile_without_gas_draining<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+) -> Result<PrecompileOutcome, EthereumError> {
+    log!(handler.borrow_host(), Info, "Calling blake2f precompile");
+
+    // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
+    if input.len() != 213 {
+        return Err(blake2f_output_for_wrong_input());
+    }
+
+    // the number of rounds - 32-bit unsigned big-endian word
+    let mut rounds_buf = [0_u8; 4];
+    rounds_buf.copy_from_slice(&input[0..4]);
+    let rounds: u32 = u32::from_be_bytes(rounds_buf);
+
+    // check that enough resources to execute (gas / ticks) are available
+    let estimated_ticks =
+        fail_if_too_much!(tick_model::ticks_of_blake2f(rounds), handler);
+    let cost = rounds as u64; // static_gas + dynamic_gas
+    if let Err(err) = handler.record_cost(cost) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Couldn't record the cost of blake2f {:?}",
+            err
+        );
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Input is {:?}",
+        hex::encode(input)
+    );
+
+    // parse inputs
+    // the state vector - 8 unsigned 64-bit little-endian words
+    let mut h = [0_u64; 8];
+    h.decode_from_le_slice(&input[4..68]);
+
+    // the message block vector - 16 unsigned 64-bit little-endian words
+    let mut m = [0_u64; 16];
+    m.decode_from_le_slice(&input[68..196]);
+
+    // offset counters - 2 unsigned 64-bit little-endian words
+    let mut t = [0_u64; 2];
+    t.decode_from_le_slice(&input[196..212]);
+
+    // the final block indicator flag - 8-bit word (true if 1 or false if 0)
+    let f = match input[212] {
+        1 => true,
+        0 => false,
+        _ => return Err(blake2f_output_for_wrong_input()),
+    };
+
+    eip152::compress(&mut h, m, t, f, rounds as usize);
+
+    let mut output = [0_u8; 64];
+    for (i, state_word) in h.iter().enumerate() {
+        output[i * 8..(i + 1) * 8].copy_from_slice(&state_word.to_le_bytes());
+    }
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Output is {:?}",
+        hex::encode(output)
+    );
+    Ok(PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output: output.to_vec(),
+        withdrawals: vec![],
+        estimated_ticks,
+    })
+}
+
+fn blake2f_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    call_precompile_with_gas_draining(
+        handler,
+        input,
+        blake2f_precompile_without_gas_draining,
+    )
+}
+
 /// Implementation of Etherelink specific withdrawals precompiled contract.
 fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
@@ -475,6 +595,10 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             ecpairing_precompile as PrecompileFn<Host>,
         ),
         (
+            H160::from_low_u64_be(9u64),
+            blake2f_precompile as PrecompileFn<Host>,
+        ),
+        (
             // Prefixed by 'ff' to make sure we will not conflict with any
             // upcoming Ethereum upgrades.
             // NB: The `unwrap()` here is safe.
@@ -505,6 +629,10 @@ mod tick_model {
 
     pub fn ticks_of_ecrecover() -> u64 {
         30_000_000
+    }
+
+    pub fn ticks_of_blake2f(rounds: u32) -> u64 {
+        1_850_000 + 3_200 * rounds as u64
     }
 }
 
@@ -1032,6 +1160,101 @@ mod tests {
             hex::encode(expected_output),
             hex::encode(outcome.result.unwrap())
         );
+    }
+
+    #[test]
+    fn test_blake2f_invalid_empty() {
+        let input = [0; 0];
+
+        // act
+        let result =
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+
+        // assert
+        // expected outcome is Err
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_blake2f_invalid_flag() {
+        let input = hex::decode(
+            "0000000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
+            d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000300000000000000000000000000000002"
+        ).unwrap();
+
+        let result =
+            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+
+        assert!(result.is_err());
+    }
+
+    struct Blake2fTest {
+        input: &'static str,
+        expected: &'static str,
+    }
+
+    const BLAKE2F_TESTS: [Blake2fTest; 4] = [
+        Blake2fTest {
+            input: "\
+            0000000048c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
+            d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000300000000000000000000000000000001",
+            expected: "\
+            08c9bcf367e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d282e6ad7f520e511f6c3e2b8c68059b9442be0454267ce079\
+            217e1319cde05b"
+        },
+        Blake2fTest {
+            input: "\
+            0000000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
+            d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000300000000000000000000000000000001",
+            expected: "\
+            ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab9\
+            2386edd4009923"
+        },
+        Blake2fTest {
+            input: "\
+            0000000c48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
+            d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000300000000000000000000000000000000",
+            expected: "\
+            75ab69d3190a562c51aef8d88f1c2775876944407270c42c9844252c26d2875298743e7f6d5ea2f2d3e8d226039cd31b4e426ac4f2d3d666a6\
+            10c2116fde4735"
+        },
+        Blake2fTest {
+            input: "\
+            0000000148c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbab\
+            d9831f79217e1319cde05b616263000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000300000000000000000000000000000001",
+            expected: "\
+            b63a380cb2897d521994a85234ee2c181b5f844d2c624c002677e9703449d2fba551b3a8333bcdf5f2f7e08993d53923de3d64fcc68c034e71\
+            7b9293fed7a421"
+        }
+    ];
+
+    #[test]
+    fn test_blake2f_input_spec() {
+        for test in BLAKE2F_TESTS.iter() {
+            let input = hex::decode(test.input).unwrap();
+            let result =
+                execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+
+            assert!(result.is_ok());
+            let outcome = result.unwrap();
+            println!("{}", outcome.gas_used);
+            assert!(outcome.is_success);
+
+            let expected = hex::decode(test.expected).unwrap();
+
+            assert_eq!(Some(expected), outcome.result);
+        }
     }
 
     struct ModexpTestCase {

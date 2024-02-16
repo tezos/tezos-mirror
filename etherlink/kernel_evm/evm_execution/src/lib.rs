@@ -19,6 +19,8 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 
+mod eip152;
+
 pub mod abi;
 mod access_record;
 pub mod account_storage;
