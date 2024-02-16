@@ -682,7 +682,7 @@ let test_two_attestations_with_same_attester () =
    committee, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
-   default test parameters, [consensus_committee_size = 25 < 32 =
+   default test parameters, [consensus_committee_size = 25 < 64 =
    number_of_shards], so that test would not work! *)
 let test_attester_not_in_dal_committee () =
   let open Lwt_result_syntax in
@@ -691,9 +691,23 @@ let test_attester_not_in_dal_committee () =
   (* Create many accounts with balance [bal_high] and one with [bal_low]. *)
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
+  let dal =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_sandbox.dal
+  in
+  let dal =
+    (* We need to take a small number of shards to be sure there is a
+       really high probability an attester is not part of the DAL
+       committee in the first hundred blocks. *)
+    {
+      dal with
+      cryptobox_parameters =
+        {dal.cryptobox_parameters with number_of_shards = 64};
+    }
+  in
   let* genesis, contracts =
     Context.init_gen
       ~dal_enable:true
+      ~dal
       ~consensus_committee_size:100
       ~consensus_threshold:0
       ~bootstrap_balances
