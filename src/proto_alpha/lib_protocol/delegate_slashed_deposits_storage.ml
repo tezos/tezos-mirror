@@ -168,6 +168,7 @@ let update_block_denunciations_map_with delegate denunciations initial_block_map
     initial_block_map
     denunciations
 
+(* Split denunciations into two groups: those to be applied, and those to be delayed. *)
 let get_applicable_and_remaining_denunciations ctxt current_cycle =
   Storage.Pending_denunciations.fold
     ctxt
@@ -216,7 +217,6 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
   let global_limit_of_staking_over_baking =
     Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
   in
-
   MisMap.fold_es
     (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
          denunciations_map
@@ -378,16 +378,21 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
     block_denunciations_map
     (ctxt, [])
 
-let apply_and_clear_denunciations ctxt =
+let apply_denunciations ctxt =
   let open Lwt_result_syntax in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  (* Split denunciations into two groups: to be applied, and to be delayed *)
-  let*! block_denunciations_map, remaining_denunciations =
+  let*! applicable_denunciations_map, remaining_denunciations =
     get_applicable_and_remaining_denunciations ctxt current_cycle
   in
-  (* Processes the applicable denunciations *)
   let* ctxt, balance_updates =
-    apply_block_denunciations ctxt current_cycle block_denunciations_map
+    apply_block_denunciations ctxt current_cycle applicable_denunciations_map
+  in
+  return (ctxt, balance_updates, remaining_denunciations)
+
+let apply_and_clear_denunciations ctxt =
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates, remaining_denunciations =
+    apply_denunciations ctxt
   in
   (* Updates the storage to only contain the remaining denunciations *)
   let*! ctxt = Pending_denunciations_storage.clear ctxt in
