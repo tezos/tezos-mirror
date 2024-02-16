@@ -189,14 +189,17 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     ?attestation_lag ?slot_size ?page_size ?attestation_threshold
-    ?number_of_shards ?commitment_period ?challenge_window ?dal_enable
-    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?number_of_shards ?redundancy_factor ?commitment_period ?challenge_window
+    ?dal_enable ?event_sections_levels ?node_arguments ?activation_timestamp
     ?dal_bootstrap_peers f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
@@ -342,10 +345,11 @@ let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
-    ?page_size ?number_of_shards ?attestation_lag ?(tags = [])
-    ?(uses = fun _ -> []) ?(pvm_name = "arith") ?(dal_enable = true)
-    ?commitment_period ?challenge_window ?minimal_block_delay
-    ?delay_increment_per_round ?activation_timestamp variant scenario =
+    ?page_size ?number_of_shards ?redundancy_factor ?attestation_lag
+    ?(tags = []) ?(uses = fun _ -> []) ?(pvm_name = "arith")
+    ?(dal_enable = true) ?commitment_period ?challenge_window
+    ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
+    variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -361,6 +365,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
         ?slot_size
         ?page_size
         ?number_of_shards
+        ?redundancy_factor
         ?attestation_lag
         ?commitment_period
         ?challenge_window
