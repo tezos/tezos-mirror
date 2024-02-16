@@ -34,12 +34,13 @@ module type Evaluations_sig =
      and type domain = Domain.t
      and type polynomial = Polynomial.t
 
+module type Srs_sig = Srs.S with type polynomial = Polynomial.t
+
 module Internal_for_tests = struct
   module Fr_carray = Fr_carray
   module Domain_unsafe = Domain.Domain_unsafe
   module Polynomial_unsafe = Polynomial.Polynomial_unsafe
   module Evaluations_unsafe = Evaluations.Evaluations_unsafe
-  module Srs_unsafe = Srs.Srs_g1_unsafe
 end
 
 module Evaluations = Evaluations

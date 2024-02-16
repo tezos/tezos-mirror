@@ -11,11 +11,11 @@ type preprocess
 
 val preprocess_encoding : preprocess t
 
-type shard_proof = G1.t
+type shard_proof = Commitment.Single_G1.t
 
 val preprocess_equal : preprocess -> preprocess -> bool
 
-val commit : public_parameters -> Poly.t -> Commitment.Single.t
+val commit : public_parameters -> Poly.t -> shard_proof
 
 val preprocess_multiple_multi_reveals : public_parameters -> preprocess
 
@@ -27,7 +27,7 @@ val multiple_multi_reveals :
 
 val verify :
   public_parameters ->
-  commitment:Commitment.Single.t ->
+  commitment:shard_proof ->
   srs_point:G2.t ->
   domain:Domain.t ->
   root:scalar ->
