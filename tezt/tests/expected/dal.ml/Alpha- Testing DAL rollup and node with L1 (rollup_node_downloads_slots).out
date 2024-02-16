@@ -64,7 +64,7 @@ This sequence of operations was run:
 
 GET http://[HOST]:[PORT]/global/block/head/dal/slot_headers
 200 OK
-[{"level":4,"index":0,"commitment":"[DAL_SLOT_HEADER]"},{"level":4,"index":1,"commitment":"[DAL_SLOT_HEADER]"},{"level":4,"index":2,"commitment":"[DAL_SLOT_HEADER]"}]
+[{"version":"0","level":4,"index":0,"commitment":"[DAL_SLOT_HEADER]"},{"version":"0","level":4,"index":1,"commitment":"[DAL_SLOT_HEADER]"},{"version":"0","level":4,"index":2,"commitment":"[DAL_SLOT_HEADER]"}]
 
 GET http://[HOST]:[PORT]/global/block/head/dal/processed_slots
 200 OK

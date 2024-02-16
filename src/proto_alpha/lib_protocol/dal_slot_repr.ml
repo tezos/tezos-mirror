@@ -84,7 +84,21 @@ module Header = struct
     conv
       (fun {id; commitment} -> (id, commitment))
       (fun (id, commitment) -> {id; commitment})
-      (merge_objs id_encoding (obj1 (req "commitment" Commitment.encoding)))
+      (* A tag is added to ensure we can migrate from this encoding to
+         different version if we decide to change the encoding. *)
+      (union
+         [
+           case
+             ~title:"v0"
+             (Tag 0)
+             (merge_objs
+                (obj1 (req "version" (constant "0")))
+                (merge_objs
+                   id_encoding
+                   (obj1 (req "commitment" Commitment.encoding))))
+             (fun x -> Some ((), x))
+             (fun ((), x) -> x);
+         ])
 
   let pp_id fmt {published_level; index} =
     Format.fprintf

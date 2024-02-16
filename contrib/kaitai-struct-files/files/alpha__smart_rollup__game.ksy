@@ -15,12 +15,12 @@ types:
       type: n
   attested:
     seq:
-    - id: level
-      type: s4
-    - id: index
+    - id: attested_tag
       type: u1
-    - id: commitment
-      size: 48
+      enum: attested_tag
+    - id: v0
+      type: v0
+      if: (attested_tag == attested_tag::v0)
   back_pointers:
     seq:
     - id: back_pointers_entries
@@ -176,7 +176,17 @@ types:
       type: s4
     - id: index
       type: u1
+  v0:
+    seq:
+    - id: level
+      type: s4
+    - id: index
+      type: u1
+    - id: commitment
+      size: 48
 enums:
+  attested_tag:
+    0: v0
   bool:
     0: false
     255: true
