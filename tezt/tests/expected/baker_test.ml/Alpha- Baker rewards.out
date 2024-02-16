@@ -123,4 +123,4 @@
         "paid_storage_size_diff": "1" } ],
   "proposer_consensus_key": "[PUBLIC_KEY_HASH]",
   "baker_consensus_key": "[PUBLIC_KEY_HASH]",
-  "consumed_milligas": "0" }
+  "consumed_milligas": "0", "dal_attestation": "0" }

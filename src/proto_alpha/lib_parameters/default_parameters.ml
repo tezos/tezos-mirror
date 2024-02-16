@@ -141,7 +141,7 @@ let default_cryptobox_parameters =
 let default_dal =
   Constants.Parametric.
     {
-      feature_enable = false;
+      feature_enable = true;
       incentives_enable = false;
       number_of_slots = 256;
       attestation_lag = 4;
@@ -317,19 +317,6 @@ let constants_mainnet : Constants.Parametric.t =
     direct_ticket_spending_enable = false;
   }
 
-(* Sandbox and test networks's Dal cryptobox are computed by this function:
-   - Redundancy_factor is provided as a parameter;
-   - The other fields are derived from mainnet's values, as divisions by the
-     provided factor. *)
-let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
-  let m = default_cryptobox_parameters in
-  {
-    Dal.redundancy_factor;
-    page_size = m.page_size / mainnet_constants_divider;
-    slot_size = m.slot_size / mainnet_constants_divider;
-    number_of_shards = m.number_of_shards / mainnet_constants_divider;
-  }
-
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
@@ -345,9 +332,12 @@ let constants_sandbox =
           constants_mainnet.dal with
           number_of_slots = 16;
           cryptobox_parameters =
-            derive_cryptobox_parameters
-              ~redundancy_factor:8
-              ~mainnet_constants_divider:32;
+            {
+              Dal.redundancy_factor = 16;
+              page_size = 4096;
+              number_of_shards = 2048;
+              slot_size = 1 lsl 16;
+            };
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
@@ -382,9 +372,12 @@ let constants_test =
           constants_mainnet.dal with
           number_of_slots = 8;
           cryptobox_parameters =
-            derive_cryptobox_parameters
-              ~redundancy_factor:4
-              ~mainnet_constants_divider:64;
+            {
+              redundancy_factor = 16;
+              page_size = 4096;
+              number_of_shards = 2048;
+              slot_size = 1 lsl 16;
+            };
         };
     issuance_weights;
     consensus_rights_delay = 3;

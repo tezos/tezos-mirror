@@ -1033,46 +1033,41 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         (* When modifying the line below, be careful that the values are
            compatible with the encodings exported by the environment did not
            change. *)
-        let cryptobox_parameters = c.dal.cryptobox_parameters in
+        let cryptobox_parameters =
+          {
+            Dal.page_size = 4096;
+            slot_size = 1 lsl 20;
+            redundancy_factor = 16;
+            number_of_shards = 2048;
+          }
+        in
         let dal =
           Constants_parametric_repr.
             {
-              feature_enable = c.dal.feature_enable;
+              feature_enable = true;
               incentives_enable = false;
-              number_of_slots = c.dal.number_of_slots;
-              attestation_lag = c.dal.attestation_lag;
-              attestation_threshold = c.dal.attestation_threshold;
+              number_of_slots = 256;
+              attestation_lag = 4;
+              attestation_threshold = 50;
               cryptobox_parameters;
             }
         in
         (* This test prevents the activation of the protocol if the
            set of parameters given for the DAL is invalid. *)
         let*? () =
-          if dal.feature_enable then
-            match Dal.make cryptobox_parameters with
-            | Ok _cryptobox -> ok ()
-            | Error (`Fail explanation) ->
-                error (Dal_errors_repr.Dal_cryptobox_error {explanation})
-          else ok ()
+          match Dal.make cryptobox_parameters with
+          | Ok _cryptobox -> ok ()
+          | Error (`Fail explanation) ->
+              error (Dal_errors_repr.Dal_cryptobox_error {explanation})
         in
         let dal_activation_level =
           if c.dal.feature_enable then
             (* if dal was enable in previous protocol, do as if it were always
                activated *)
             Raw_level_repr.succ Raw_level_repr.root
-          else if dal.feature_enable then
+          else
             (* dal activates at first level of the new protocol. *)
             Raw_level_repr.of_int32_exn (Int32.succ level)
-          else
-            (* Deactivate the reveal if the dal is not enabled.
-
-               assert (not (c.dal.feature_enable || dal.feature_enable))
-
-               We set the activation level to [pred max_int] to deactivate
-               the feature. The [pred] is needed to not trigger an encoding
-               exception with the value [Int32.int_min] (see
-               tezt/tests/mockup.ml). *)
-            Raw_level_repr.of_int32_exn Int32.(pred max_int)
         in
         let dal_attested_slots_validity_lag =
           (* A rollup node shouldn't import a page of an attested slot whose attested
