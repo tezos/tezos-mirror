@@ -4,8 +4,11 @@
 
 mod xstatus;
 
-use crate::machine_state::backend::{self, Region};
-use crate::machine_state::mode::Mode;
+use crate::machine_state::{
+    backend::{self, Region},
+    mode::Mode,
+    Exception,
+};
 use strum::IntoEnumIterator;
 
 /// Privilege required to access a CSR
@@ -1039,12 +1042,6 @@ impl CSRegister {
 
 /// Value in a CSR
 pub type CSRValue = u64;
-
-/// RISC-V exceptions
-#[derive(PartialEq, Eq)]
-pub enum Exception {
-    IllegalInstruction,
-}
 
 /// Return type of read/write operations
 pub type Result<R> = core::result::Result<R, Exception>;
