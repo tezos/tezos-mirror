@@ -50,6 +50,25 @@ module Q = struct
       (int ->? string)
       @@ {eos|SELECT (payload) FROM publishable_blueprints WHERE id = ?|eos}
   end
+
+  module Context_hashes = struct
+    let create_table =
+      (unit ->. unit)
+      @@ {eos|
+      CREATE TABLE context_hashes (
+        id SERIAL PRIMARY KEY,
+        context_hash VARCHAR(52) NOT NULL
+      )
+    |eos}
+
+    let insert =
+      (t2 int string ->. unit)
+      @@ {eos|REPLACE INTO context_hashes (id, context_hash) VALUES (?, ?)|eos}
+
+    let select =
+      (int ->? string)
+      @@ {eos|SELECT (context_hash) FROM context_hashes WHERE id = ?|eos}
+  end
 end
 
 let with_caqti_error p =
@@ -73,6 +92,7 @@ let init ~data_dir =
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         let* () = Db.exec Q.Publishable_blueprints.create_table () in
         let* () = Db.exec Q.Executable_blueprints.create_table () in
+        let* () = Db.exec Q.Context_hashes.create_table () in
         return_unit)
   in
   return {db_uri = uri}
@@ -136,5 +156,29 @@ module Publishable_blueprints = struct
             blob
         in
         return_some payload
+    | None -> return_none
+end
+
+module Context_hashes = struct
+  open Ethereum_types
+
+  let store {db_uri} (Qty number) hash =
+    with_caqti_error
+    @@ Caqti_lwt_unix.with_connection db_uri
+    @@ fun (module Db : Caqti_lwt.CONNECTION) ->
+    Db.exec
+      Q.Context_hashes.insert
+      (Z.to_int number, Context_hash.to_b58check hash)
+
+  let find {db_uri} (Qty number) =
+    let open Lwt_result_syntax in
+    with_caqti_error
+    @@ Caqti_lwt_unix.with_connection db_uri
+    @@ fun (module Db : Caqti_lwt.CONNECTION) ->
+    let* blob = Db.find_opt Q.Context_hashes.select (Z.to_int number) in
+    match blob with
+    | Some blob ->
+        let hash = Context_hash.of_b58check_exn blob in
+        return_some hash
     | None -> return_none
 end

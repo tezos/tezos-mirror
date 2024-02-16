@@ -37,3 +37,11 @@ module Publishable_blueprints : sig
     Ethereum_types.quantity ->
     Blueprint_types.payload option tzresult Lwt.t
 end
+
+module Context_hashes : sig
+  val store :
+    t -> Ethereum_types.quantity -> Context_hash.t -> unit tzresult Lwt.t
+
+  val find :
+    t -> Ethereum_types.quantity -> Context_hash.t option tzresult Lwt.t
+end

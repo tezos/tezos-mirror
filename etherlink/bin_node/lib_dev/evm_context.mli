@@ -41,23 +41,18 @@ val init :
 val init_from_rollup_node :
   data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
 
-(** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
-    to disk the changes, and update the checkpoint. *)
-val commit : t -> Evm_state.t -> unit tzresult Lwt.t
+(** [commit ~number ctxt evm_state] updates the [evm_state] resulting from the
+    application of the [number]th blueprint in [ctxt], commits to disk the
+    changes, and update the checkpoint. *)
+val commit :
+  number:Ethereum_types.quantity -> t -> Evm_state.t -> unit tzresult Lwt.t
 
 (** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
 val evm_state : t -> Evm_state.t Lwt.t
 
-(** [execute ?commit ctxt messages] executes [messages] on the freshest
-    EVM state stored in [ctxt].
-
-    If [commit = true], the resulting EVM state is committed in [ctxt] (that
-    is, it becomes the freshest one). *)
-val execute :
-  ?commit:bool ->
-  t ->
-  [< `Input of string] list ->
-  (t * Evm_state.t) tzresult Lwt.t
+(** [execute ctxt messages] executes [messages] on the freshest
+    EVM state stored in [ctxt]. *)
+val execute : t -> [< `Input of string] list -> (t * Evm_state.t) tzresult Lwt.t
 
 (** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
     state, and returns [input.insights_requests]. *)
