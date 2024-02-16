@@ -238,8 +238,6 @@ types:
       type: int31
     - id: attesting_reward_weight
       type: int31
-    - id: liquidity_baking_subsidy_weight
-      type: int31
     - id: seed_nonce_revelation_tip_weight
       type: int31
     - id: vdf_revelation_tip_weight
@@ -504,6 +502,8 @@ seq:
   type: s4
 - id: min_proposal_quorum
   type: s4
+- id: liquidity_baking_subsidy
+  type: alpha__mutez
 - id: liquidity_baking_toggle_ema_threshold
   type: s4
 - id: max_operations_time_to_live
