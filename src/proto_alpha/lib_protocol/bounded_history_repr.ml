@@ -54,7 +54,13 @@ module type S = sig
 
   type value
 
+  module Map : Map.S with type key = key
+
+  type view = value Map.t
+
   val empty : capacity:int64 -> t
+
+  val view : t -> view
 
   val encoding : t Data_encoding.t
 
@@ -87,6 +93,8 @@ module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
   module Int64_map = Map.Make (Int64)
   module Map = Map.Make (Key)
 
+  type view = value Map.t
+
   type t = {
     events : value Map.t;
         (** Values stored in the structure, indexes with the keys. *)
@@ -106,6 +114,8 @@ module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
         (** Counts the number of entries that are stored in history. It
             satisfies the invariant: `0 <= size <= capacity` *)
   }
+
+  let view t = t.events
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
