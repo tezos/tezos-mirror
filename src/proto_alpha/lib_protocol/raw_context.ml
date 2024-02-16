@@ -1059,7 +1059,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           if c.dal.feature_enable then
             (* if dal was enable in previous protocol, do as if it were always
                activated *)
-            Raw_level_repr.root
+            Raw_level_repr.succ Raw_level_repr.root
           else if dal.feature_enable then
             (* dal activates at first level of the new protocol. *)
             Raw_level_repr.of_int32_exn (Int32.succ level)
