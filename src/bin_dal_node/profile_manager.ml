@@ -42,6 +42,9 @@ type operator_sets = {
   observers : Slot_set.t;
 }
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6958
+   Unify this type with the one from `src/lib_dal_node_services/types.ml` *)
+
 (** A profile context stores profile-specific data used by the daemon.  *)
 type t = Bootstrap | Operator of operator_sets
 

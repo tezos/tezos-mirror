@@ -251,11 +251,18 @@ module Handler = struct
             config.Configuration_file.profiles
       | Some pctxt ->
           let profiles = Profile_manager.get_profiles pctxt in
+          (* The profiles from the loaded context are prioritized over the
+             profiles provided in the config file. *)
+          let merged_profiles =
+            Types.merge_profiles
+              ~lower_prio:config.Configuration_file.profiles
+              ~higher_prio:profiles
+          in
           Profile_manager.add_profiles
             Profile_manager.empty
             proto_parameters
             (Node_context.get_gs_worker ctxt)
-            profiles
+            merged_profiles
     in
     match pctxt_opt with
     | None -> fail Errors.[Profile_incompatibility]

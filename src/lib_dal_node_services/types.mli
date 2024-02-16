@@ -237,6 +237,9 @@ type operator_profile =
       provided by the user in unprocessed form. *)
 type operator_profiles = operator_profile list
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6958
+   Unify the {profiles} type with the one from `src/bin_dal_node/profile_manager.ml` *)
+
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
 type profiles =
@@ -247,6 +250,11 @@ type profiles =
       expected to connect to all the meshes with degree 0. *)
   | Operator of operator_profiles
   | Random_observer
+
+(* Merge the two sets of profiles. In case of incompatibility (that is, case
+   [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
+   priority. *)
+val merge_profiles : lower_prio:profiles -> higher_prio:profiles -> profiles
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)

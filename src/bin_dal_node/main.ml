@@ -23,24 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
-   Improve profile configuration UX for when we have conflicting CLI and config file. *)
-let merge_profiles ~from_config_file ~from_cli =
-  let open Types in
-  match from_cli with
-  | None -> from_config_file
-  | Some from_cli -> (
-      (* Note that the profile from the CLI is prioritized over
-         the profile provided from the config file. *)
-      match (from_config_file, from_cli) with
-      | Bootstrap, Bootstrap -> Bootstrap
-      | Operator _, Bootstrap -> Bootstrap
-      | Bootstrap, Operator op -> Operator op
-      | Operator op1, Operator op2 -> Operator (op1 @ op2)
-      | Random_observer, Random_observer -> Random_observer
-      | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
-      | (Operator _ | Bootstrap), Random_observer -> Random_observer)
-
 let merge
     Cli.
       {
@@ -54,24 +36,30 @@ let merge
         profiles;
         peers;
       } configuration =
-  Configuration_file.
-    {
-      configuration with
-      data_dir = Option.value ~default:configuration.data_dir data_dir;
-      rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-      listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
-      public_addr = Option.value ~default:configuration.public_addr public_addr;
-      expected_pow =
-        Option.value ~default:configuration.expected_pow expected_pow;
-      endpoint = Option.value ~default:configuration.endpoint endpoint;
-      profiles =
-        merge_profiles
-          ~from_cli:profiles
-          ~from_config_file:configuration.profiles;
-      metrics_addr =
-        Option.value ~default:configuration.metrics_addr metrics_addr;
-      peers = peers @ configuration.peers;
-    }
+  let profiles =
+    match profiles with
+    | None -> configuration.Configuration_file.profiles
+    | Some from_cli ->
+        (* Note that the profile from the CLI is prioritized over
+           the profile provided in the config file. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
+           Improve profile configuration UX for when we have conflicting CLI and config file. *)
+        Types.merge_profiles
+          ~lower_prio:configuration.profiles
+          ~higher_prio:from_cli
+  in
+  {
+    configuration with
+    data_dir = Option.value ~default:configuration.data_dir data_dir;
+    rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
+    listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
+    public_addr = Option.value ~default:configuration.public_addr public_addr;
+    expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
+    endpoint = Option.value ~default:configuration.endpoint endpoint;
+    profiles;
+    metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
+    peers = peers @ configuration.peers;
+  }
 
 let wrap_with_error main_promise =
   let open Lwt_syntax in
