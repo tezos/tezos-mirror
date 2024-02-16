@@ -293,6 +293,93 @@ let test_AI_activation =
   let* () = Process.check stake in
   Lwt.return_unit
 
+(** This test starts from a protocol with AI feature flag enabled and forces activation.  *)
+let test_AI_activation_bypass_vote =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "AI Activation - test AI activation with feature flag force_activation \
+       set"
+    ~tags:["adaptive_issuance"; "staking"]
+  @@ fun protocol ->
+  let* _proto_hash, endpoint, client, _node =
+    init
+      ~overrides:
+        ((["adaptive_issuance_force_activation"], `Bool true)
+        :: default_overrides)
+      protocol
+  in
+
+  let* ai_activated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
+  in
+  assert (JSON.as_int ai_activated = 0) ;
+
+  let* staking_parameters =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
+         Constant.bootstrap3.public_key_hash
+  in
+  let limit_before =
+    JSON.(
+      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
+  in
+  let edge_before =
+    JSON.(
+      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
+  in
+
+  assert (limit_before = 0 && edge_before = 1000000000) ;
+
+  log_step 0 "Update staking parameters" ;
+  (* set bootstrap2 parameters to accept stakers *)
+  let set_delegate_parameters =
+    Client.spawn_set_delegate_parameters
+      ~delegate:"bootstrap3"
+      ~limit:"5"
+      ~edge:"0.5"
+      client
+  in
+
+  log_step 1 "Bake 3 cycles for new parameters to be taken into account" ;
+  let bake ?keys client =
+    Client.bake_for_and_wait ~endpoint ~protocol ?keys client
+  in
+  let* () = Helpers.bake_n_cycles bake 3 client in
+  let* () = set_delegate_parameters |> Process.check in
+
+  log_step 2 "Check new staking parameters" ;
+  let* staking_parameters =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
+         Constant.bootstrap3.public_key_hash
+  in
+  let limit_after =
+    JSON.(
+      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
+  in
+  let edge_after =
+    JSON.(
+      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
+  in
+
+  assert (limit_after = 5000000 && edge_after = 500000000) ;
+
+  log_step 3 "Check staking is now possible" ;
+  (* Make sure AI is activated by trying to explictly stake with one delegate *)
+  let stake = Client.spawn_stake (Tez.of_int 1) ~staker:"bootstrap2" client in
+  let* () =
+    Client.bake_for_and_wait
+      ~endpoint
+      ~protocol
+      ~keys:(List.map (fun x -> x.Account.alias) bootstrap_accounts)
+      client
+      ~ai_vote:On
+  in
+  let* () = Process.check stake in
+  Lwt.return_unit
+
 let get_hash_of operation =
   let* stdout = Process.check_and_read_stdout operation in
   Log.info "%s" stdout ;
@@ -317,6 +404,13 @@ let check_balance_updates balance_updates predicates =
       if not (List.exists pred balance_updates) then
         Test.fail "Inconsistant balance update: %s" msg)
     predicates
+
+(* some values might be slightly different (+-1 mutez) because of roundings and
+   randomness in baking rights that may affect the overall rewards coming from
+   previous blocks, to avoid flakiness we test the "rounded range" of those
+   values *)
+let check_with_roundings got expected =
+  got >= expected - 1 && got <= expected + 1
 
 let check_balance_updates_for operation_hash predicates client =
   let* receipt = Operation_receipt.get_result_for operation_hash client in
@@ -351,22 +445,15 @@ let test_staking =
       ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client_1, node_1 = init protocol in
-
-  log_step 0 "Check staking is not allowed before AI activation" ;
-  Log.info "Staking should fail before AI activation" ;
-  let stake =
-    Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client_1
-  in
-  let* () =
-    Process.check_error
-      ~msg:
-        (rex
-           "Manual staking operations are forbidden because staking is \
-            currently automated.")
-      stake
+  let* _proto_hash, endpoint, client_1, node_1 =
+    init
+      ~overrides:
+        ((["adaptive_issuance_force_activation"], `Bool true)
+        :: default_overrides)
+      protocol
   in
 
+  log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
   let* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* () = Node.wait_for_ready node_2 in
@@ -378,9 +465,6 @@ let test_staking =
 
   let stake_amount = Tez.of_int 600 in
   let delegate = "bootstrap2" in
-
-  log_step 1 "Activate AI" ;
-  let* _ = activate_ai protocol client_1 endpoint in
 
   log_step 2 "Create two stakers accounts" ;
   let* staker0 = Client.gen_and_show_keys client_1 in
@@ -668,12 +752,19 @@ let test_staking =
     numerator1
     (JSON.as_int denominator) ;
 
-  log_step 10 "Unstake with staker 0" ;
+  log_step 10 "Unstake with staker 0 and bootstrap2" ;
   let unstake0 =
     Client.spawn_unstake (Tez.of_int 1000) ~staker:staker0.alias client_1
   in
+  let unstake_baker =
+    Client.spawn_unstake
+      (Tez.of_int 1000)
+      ~staker:Constant.bootstrap2.alias
+      client_1
+  in
   let* () = bake_n ~endpoint ~protocol client_1 2 in
   let* () = Process.check ~expect_failure:false unstake0 in
+  let* () = Process.check ~expect_failure:false unstake_baker in
 
   log_step 11 "Check reward increase with each blocks" ;
   let check_and_return_balances ?check contract =
@@ -783,7 +874,6 @@ let test_staking =
 
         Lwt.return_unit)
   in
-  let* current_level = Helpers.get_current_level client_1 in
 
   (* unstake all *)
   log_step 12 "Unstake all with staker 0" ;
@@ -791,7 +881,7 @@ let test_staking =
     Client.spawn_unstake (Tez.of_int 500000) ~staker:staker0.alias client_1
   in
 
-  let* _ = Helpers.bake_n_cycles bake (current_level.cycle - 13) client_1 in
+  let* _ = Helpers.bake_n_cycles bake 2 client_1 in
 
   let* () = Process.check ~expect_failure:false unstake0 in
 
@@ -919,50 +1009,42 @@ let test_staking =
 
   (* check slashed and rewarded amounts *)
   (* total amounts *)
-  let total_amount_rewarded = 1457144917 in
-  let total_amount_slashed = 8742869507 in
+  let total_amount_rewarded = 1450001818 in
+  let total_amount_slashed = 8700010914 in
 
-  (* slashed unstake deposit *)
-  let amount_slashed_from_unstake_deposits = 42857144 in
-  let amount_rewarded_from_unstake_deposits = 7142857 in
+  (* slashed stakers (including baker) unstake deposit *)
+  let amount_rewarded_from_unstake_stakers_deposits = 7142857 in
+  let amount_slashed_from_unstake_stakers_deposits = 42857144 in
 
   (* slashed  stake *)
-  let amount_slashed_from_stakers_deposits = 43069306 in
-  let amount_rewarded_from_stakers_deposits = 7178217 in
+  let amount_rewarded_from_stakers_deposits = 7178393 in
+  let amount_slashed_from_stakers_deposits = 43070361 in
 
   (* slashing baker (bootstrap2) stake*)
-  let amount_rewarded_from_delegate_deposits = 1442823843 in
-  let amount_slashed_from_delegate_deposits = 8656943057 in
+  let amount_rewarded_from_baker_deposits = 1435680568 in
+  let amount_slashed_from_baker_deposits = 8614083410 in
 
   assert (
-    amount_rewarded_from_unstake_deposits
-    = int_of_float (float amount_slashed_from_unstake_deposits /. 6.)) ;
+    check_with_roundings
+      amount_rewarded_from_unstake_stakers_deposits
+      (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.))) ;
 
   assert (
-    amount_rewarded_from_stakers_deposits
-    = int_of_float (float amount_slashed_from_stakers_deposits /. 6.)) ;
+    check_with_roundings
+      amount_rewarded_from_stakers_deposits
+      (int_of_float (float amount_slashed_from_stakers_deposits /. 6.))) ;
 
   assert (
-    amount_rewarded_from_delegate_deposits
-    = int_of_float @@ ceil (float amount_slashed_from_delegate_deposits /. 6.)) ;
+    check_with_roundings
+      amount_rewarded_from_baker_deposits
+      (int_of_float (float amount_slashed_from_baker_deposits /. 6.))) ;
 
   assert (
-    amount_slashed_from_unstake_deposits + amount_slashed_from_stakers_deposits
-    + amount_slashed_from_delegate_deposits
-    = total_amount_slashed) ;
-  assert (
-    amount_rewarded_from_unstake_deposits
-    + amount_rewarded_from_stakers_deposits
-    + amount_rewarded_from_delegate_deposits
-    = total_amount_rewarded) ;
-
-  (* some values might be slightly different (+-1 mutez) because of roundings and
-     randomness in baking rights that may affect the overall rewards coming from
-     previous blocks, to avoid flakyness we test the "rounded range" of those
-     values *)
-  let check_with_roundings got expected =
-    got >= expected - 1 && got <= expected + 1
-  in
+    check_with_roundings
+      (amount_rewarded_from_unstake_stakers_deposits
+     + amount_rewarded_from_stakers_deposits
+     + amount_rewarded_from_baker_deposits)
+      total_amount_rewarded) ;
 
   let check_opr ~kind ~category ~change ~staker ~delayed_operation_hash opr =
     let open Operation_receipt.Balance_updates in
@@ -981,10 +1063,10 @@ let test_staking =
       ( check_opr
           ~kind:"freezer"
           ~category:(Some "deposits")
-          ~change:(-amount_slashed_from_delegate_deposits)
+          ~change:(-amount_slashed_from_baker_deposits)
           ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
           ~delayed_operation_hash:None,
-        "Slashed from delegate's deposits" );
+        "Slashed from baker deposits" );
       ( check_opr
           ~kind:"freezer"
           ~category:(Some "deposits")
@@ -1001,7 +1083,7 @@ let test_staking =
       ( check_opr
           ~kind:"freezer"
           ~category:(Some "unstaked_deposits")
-          ~change:(-amount_slashed_from_unstake_deposits)
+          ~change:(-amount_slashed_from_unstake_stakers_deposits)
           ~staker:
             (Some
                (Delegate
@@ -1021,7 +1103,7 @@ let test_staking =
       ( check_opr
           ~kind:"freezer"
           ~category:(Some "deposits")
-          ~change:(-amount_rewarded_from_delegate_deposits)
+          ~change:(-amount_rewarded_from_baker_deposits)
           ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
           ~delayed_operation_hash:(Some denunciation_oph),
         "Reward from delegate's deposits" );
@@ -1041,7 +1123,7 @@ let test_staking =
       ( check_opr
           ~kind:"freezer"
           ~category:(Some "unstaked_deposits")
-          ~change:(-amount_rewarded_from_unstake_deposits)
+          ~change:(-amount_rewarded_from_unstake_stakers_deposits)
           ~staker:
             (Some
                (Delegate
@@ -1166,5 +1248,6 @@ let test_staking =
   unit
 
 let register ~protocols =
+  test_AI_activation_bypass_vote protocols ;
   test_AI_activation protocols ;
   test_staking protocols
