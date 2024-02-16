@@ -121,6 +121,7 @@ type info = {
   staking_denominator : Staking_pseudotoken.t;
   deactivated : bool;
   grace_period : Cycle.t;
+  pending_denunciations : bool;
   voting_info : Vote.delegate_info;
   active_consensus_key : Signature.Public_key_hash.t;
   pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
@@ -142,6 +143,7 @@ let info_encoding =
            staking_denominator;
            deactivated;
            grace_period;
+           pending_denunciations;
            voting_info;
            active_consensus_key;
            pending_consensus_keys;
@@ -155,7 +157,8 @@ let info_encoding =
           delegated_balance,
           min_delegated_in_current_cycle,
           deactivated,
-          grace_period ),
+          grace_period,
+          pending_denunciations ),
         ( (total_delegated_stake, staking_denominator),
           (voting_info, (active_consensus_key, pending_consensus_keys)) ) ))
     (fun ( ( full_balance,
@@ -167,7 +170,8 @@ let info_encoding =
              delegated_balance,
              min_delegated_in_current_cycle,
              deactivated,
-             grace_period ),
+             grace_period,
+             pending_denunciations ),
            ( (total_delegated_stake, staking_denominator),
              (voting_info, (active_consensus_key, pending_consensus_keys)) ) ) ->
       {
@@ -183,6 +187,7 @@ let info_encoding =
         staking_denominator;
         deactivated;
         grace_period;
+        pending_denunciations;
         voting_info;
         active_consensus_key;
         pending_consensus_keys;
@@ -198,7 +203,8 @@ let info_encoding =
           (req "delegated_balance" Tez.encoding)
           (req "min_delegated_in_current_cycle" Tez.encoding)
           (req "deactivated" bool)
-          (req "grace_period" Cycle.encoding))
+          (req "grace_period" Cycle.encoding)
+          (req "pending_denunciations" bool))
        (merge_objs
           (obj2
              (req "total_delegated_stake" Tez.encoding)
@@ -617,6 +623,9 @@ let register () =
       in
       let* deactivated = Delegate.deactivated ctxt pkh in
       let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
+      let*! pending_denunciations =
+        Delegate.For_RPC.has_pending_denunciations ctxt pkh
+      in
       let* voting_info = Vote.get_delegate_info ctxt pkh in
       let* consensus_key = Delegate.Consensus_key.active_pubkey ctxt pkh in
       let+ pendings = Delegate.Consensus_key.pending_updates ctxt pkh in
@@ -636,6 +645,7 @@ let register () =
         staking_denominator;
         deactivated;
         grace_period;
+        pending_denunciations;
         voting_info;
         active_consensus_key = consensus_key.consensus_pkh;
         pending_consensus_keys;

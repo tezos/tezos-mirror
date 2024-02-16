@@ -492,6 +492,7 @@ module Delegate = struct
     staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;
     grace_period : Cycle.t;
+    pending_denunciations : bool;
     voting_info : Alpha_context.Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
