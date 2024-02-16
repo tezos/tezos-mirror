@@ -103,8 +103,7 @@ let retry_connection (f : Uri.t -> string tzresult Lwt.t) endpoint :
     let*! result = f endpoint in
     match result with
     | Ok smart_rollup_address -> return smart_rollup_address
-    | Error err
-      when Evm_node_lib_dev.Rollup_node_services.is_connection_error err ->
+    | Error err when Evm_node_lib_dev.Rollup_services.is_connection_error err ->
         let*! () =
           emit Event.event_retrying_connect (Uri.to_string endpoint, delay)
         in
@@ -185,7 +184,7 @@ let rollup_node_config_dev ~rollup_node_endpoint ~keep_alive =
   let* smart_rollup_address =
     fetch_smart_rollup_address
       ~keep_alive
-      Rollup_node_services.smart_rollup_address
+      Rollup_services.smart_rollup_address
       rollup_node_endpoint
   in
   return

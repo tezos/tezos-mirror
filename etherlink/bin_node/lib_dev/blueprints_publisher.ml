@@ -95,7 +95,7 @@ module Worker = struct
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
-    let* res = Rollup_node_services.publish ~rollup_node_endpoint payload in
+    let* res = Rollup_services.publish ~rollup_node_endpoint payload in
     match res with
     | Ok _ -> Blueprint_events.blueprint_injected level
     | Error _ ->
