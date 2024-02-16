@@ -73,6 +73,8 @@ Client
   support legacy ``endorsement`` kind instead of ``attestation``. (MR
   :gl:`!11871`)
 
+- **Breaking change** Removed read-write commands specific to Nairobi (MR :gl:`!12058`)
+
 Baker
 -----
 
