@@ -1,10 +1,14 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
+//
 // SPDX-License-Identifier: MIT
 
 //! Definitions & tezos-encodings for *michelson* data.
+use micheline::annots::Annotations;
 use nom::branch::alt;
 use nom::combinator::map;
+use prim::*;
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{self, BinResult, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
@@ -15,6 +19,7 @@ mod micheline;
 #[cfg(feature = "alloc")]
 pub mod ticket;
 
+use self::micheline::Node;
 use super::contract::Contract;
 use micheline::{
     bin_write_micheline_bytes, bin_write_micheline_int, bin_write_micheline_string,
@@ -47,8 +52,36 @@ pub mod v1_primitives {
 
     /// unit encoding case tag.
     pub const UNIT_TAG: u8 = 11;
+
+    /// int type tag
+    pub const INT_TYPE_TAG: u8 = 91;
+
+    /// nat type tag
+    pub const NAT_TYPE_TAG: u8 = 98;
+
+    /// option type tag
+    pub const OPTION_TYPE_TAG: u8 = 99;
+
+    /// or type tag
+    pub const OR_TYPE_TAG: u8 = 100;
+
+    /// pair type tag
+    pub const PAIR_TYPE_TAG: u8 = 101;
+
+    /// string type tag
+    pub const STRING_TYPE_TAG: u8 = 104;
+
+    /// bytes type tag
+    pub const BYTES_TYPE_TAG: u8 = 105;
+
+    /// unit type tag
+    pub const UNIT_TYPE_TAG: u8 = 108;
+
+    /// ticket encoding case tag.
+    pub const TICKET_TAG: u8 = 157;
 }
 
+// TODO: combine MichelsonTicketContent and Michelson traits
 /// marker trait for michelson encoding
 pub trait Michelson:
     HasEncoding + BinWriter + NomReader + Debug + PartialEq + Eq
@@ -272,6 +305,306 @@ where
             MichelinePrim2ArgsNoAnnots::<_, _, { prim::PAIR_TAG }>::nom_read,
             Into::into,
         )(input)
+    }
+}
+/// Functions needed to ensure a safe conversion to/from a valid MichelsonTicket and to/from a Node.
+#[doc(hidden)]
+pub trait MichelsonTicketContent: Michelson {
+    fn typecheck_node(node: &Node) -> bool;
+    fn node_of_type() -> Node;
+    fn of_node(node: Node) -> Option<Self>;
+    fn to_node(&self) -> Node;
+}
+
+macro_rules! typed_prim {
+    ($ty:ty, $tag:expr) => {
+    fn typecheck_node(node: &Node) -> bool {
+        matches!(node, Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if *prim_tag == $tag && args.is_empty() && annots.is_empty())
+    }
+    fn node_of_type() -> Node {
+        Node::Prim {
+            prim_tag: $tag,
+            args: vec![],
+            annots: Annotations(vec![]),
+        }
+    }
+    }
+}
+
+impl MichelsonTicketContent for MichelsonUnit {
+    typed_prim!(MichelsonUnit, UNIT_TYPE_TAG);
+
+    fn of_node(node: Node) -> Option<Self> {
+        match node {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == UNIT_TAG && args.is_empty() && annots.is_empty() => {
+                Some(MichelsonUnit)
+            }
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::Prim {
+            prim_tag: UNIT_TAG,
+            args: vec![],
+            annots: Annotations(vec![]),
+        }
+    }
+}
+
+impl MichelsonTicketContent for MichelsonNat {
+    typed_prim!(MichelsonNat, NAT_TYPE_TAG);
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Int(value) if value.0 >= 0.into() => Some(MichelsonNat(value)),
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::Int(self.0.clone())
+    }
+}
+
+impl MichelsonTicketContent for MichelsonInt {
+    typed_prim!(MichelsonInt, INT_TYPE_TAG);
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Int(value) => Some(MichelsonInt(value)),
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::Int(self.0.clone())
+    }
+}
+
+impl MichelsonTicketContent for MichelsonString {
+    typed_prim!(MichelsonString, STRING_TYPE_TAG);
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::String(value) => Some(MichelsonString(value)),
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::String(self.0.clone())
+    }
+}
+
+impl MichelsonTicketContent for MichelsonBytes {
+    typed_prim!(MichelsonBytes, BYTES_TYPE_TAG);
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Bytes(value) => Some(MichelsonBytes(value)),
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::Bytes(self.0.clone())
+    }
+}
+
+impl<Expr> MichelsonTicketContent for MichelsonOption<Expr>
+where
+    Expr: MichelsonTicketContent,
+{
+    fn typecheck_node(node: &Node) -> bool {
+        let args = match node {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if *prim_tag == OPTION_TYPE_TAG && annots.is_empty() => args,
+            _ => return false,
+        };
+
+        match args.as_slice() {
+            [arg] => Expr::typecheck_node(arg),
+            _ => false,
+        }
+    }
+
+    fn node_of_type() -> Node {
+        Node::Prim {
+            prim_tag: OPTION_TYPE_TAG,
+            args: vec![Expr::node_of_type()],
+            annots: Annotations(vec![]),
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        match &self.0 {
+            Some(v) => Node::Prim {
+                prim_tag: SOME_TAG,
+                args: vec![Expr::to_node(v)],
+                annots: Annotations(vec![]),
+            },
+            None => Node::Prim {
+                prim_tag: NONE_TAG,
+                args: vec![],
+                annots: Annotations(vec![]),
+            },
+        }
+    }
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == NONE_TAG && args.is_empty() && annots.is_empty() => {
+                Some(MichelsonOption(None))
+            }
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == SOME_TAG && annots.is_empty() && args.len() == 1 => {
+                let [v]: [Node; 1] = args.try_into().unwrap();
+                let v = Expr::of_node(v)?;
+                Some(MichelsonOption(Some(v)))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl<Arg0, Arg1> MichelsonTicketContent for MichelsonPair<Arg0, Arg1>
+where
+    Arg0: MichelsonTicketContent,
+    Arg1: MichelsonTicketContent,
+{
+    fn typecheck_node(node: &Node) -> bool {
+        let args = match node {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if *prim_tag == PAIR_TYPE_TAG && annots.is_empty() => args,
+            _ => return false,
+        };
+
+        match args.as_slice() {
+            [arg0, arg1] => Arg0::typecheck_node(arg0) && Arg1::typecheck_node(arg1),
+            _ => false,
+        }
+    }
+
+    fn node_of_type() -> Node {
+        Node::Prim {
+            prim_tag: PAIR_TYPE_TAG,
+            args: vec![Arg0::node_of_type(), Arg1::node_of_type()],
+            annots: Annotations(vec![]),
+        }
+    }
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == PAIR_TAG && annots.is_empty() && args.len() == 2 => {
+                let [v0, v1]: [Node; 2] = args.try_into().unwrap();
+                let v0 = Arg0::of_node(v0)?;
+                let v1 = Arg1::of_node(v1)?;
+                Some(MichelsonPair(v0, v1))
+            }
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        let MichelsonPair(v0, v1) = self;
+        Node::Prim {
+            prim_tag: PAIR_TAG,
+            args: vec![Arg0::to_node(v0), Arg1::to_node(v1)],
+            annots: Annotations(vec![]),
+        }
+    }
+}
+
+impl<Arg0, Arg1> MichelsonTicketContent for MichelsonOr<Arg0, Arg1>
+where
+    Arg0: MichelsonTicketContent,
+    Arg1: MichelsonTicketContent,
+{
+    fn typecheck_node(node: &Node) -> bool {
+        let args = match node {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if *prim_tag == OR_TYPE_TAG && annots.is_empty() => args,
+            _ => return false,
+        };
+
+        match args.as_slice() {
+            [left, right] => Arg0::typecheck_node(left) && Arg1::typecheck_node(right),
+            _ => false,
+        }
+    }
+
+    fn node_of_type() -> Node {
+        Node::Prim {
+            prim_tag: OR_TYPE_TAG,
+            args: vec![Arg0::node_of_type(), Arg1::node_of_type()],
+            annots: Annotations(vec![]),
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        match &self {
+            MichelsonOr::Left(v) => Node::Prim {
+                prim_tag: LEFT_TAG,
+                args: vec![Arg0::to_node(v)],
+                annots: Annotations(vec![]),
+            },
+            MichelsonOr::Right(v) => Node::Prim {
+                prim_tag: RIGHT_TAG,
+                args: vec![Arg1::to_node(v)],
+                annots: Annotations(vec![]),
+            },
+        }
+    }
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == LEFT_TAG && annots.is_empty() && args.len() == 1 => {
+                let [v]: [Node; 1] = args.try_into().unwrap();
+                let v = Arg0::of_node(v)?;
+                Some(MichelsonOr::Left(v))
+            }
+            Node::Prim {
+                prim_tag,
+                args,
+                annots,
+            } if prim_tag == RIGHT_TAG && annots.is_empty() && args.len() == 1 => {
+                let [v]: [Node; 1] = args.try_into().unwrap();
+                let v = Arg1::of_node(v)?;
+                Some(MichelsonOr::Right(v))
+            }
+            _ => None,
+        }
     }
 }
 
