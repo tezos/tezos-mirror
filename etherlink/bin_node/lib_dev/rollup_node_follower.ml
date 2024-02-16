@@ -86,7 +86,7 @@ let worker =
     | Lwt.Sleep -> Error (TzTrace.make No_l2_block_follower))
 
 let read_from_rollup_node path level rollup_node_endpoint =
-  let open Rollup_node_services in
+  let open Rollup_services in
   call_service
     ~base:rollup_node_endpoint
     durable_state_value
@@ -144,7 +144,7 @@ let start ({rollup_node_endpoint} as parameters) =
     Lwt.dont_wait
       (fun () ->
         let*! stream =
-          Rollup_node_services.make_streamed_call ~rollup_node_endpoint
+          Rollup_services.make_streamed_call ~rollup_node_endpoint
         in
         process_rollup_node_stream ~stream worker)
       (fun _ -> ())

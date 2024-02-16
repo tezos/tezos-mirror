@@ -210,7 +210,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let open Lwt_result_syntax in
   let open Configuration in
   let* smart_rollup_address =
-    Rollup_node_services.smart_rollup_address rollup_node_endpoint
+    Rollup_services.smart_rollup_address rollup_node_endpoint
   in
   let* ctxt, loaded =
     Evm_context.init

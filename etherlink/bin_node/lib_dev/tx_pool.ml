@@ -473,7 +473,7 @@ let start ({mode; _} as parameters) =
         match mode with
         | Proxy {rollup_node_endpoint} ->
             let*! stream_l2 =
-              Rollup_node_services.make_streamed_call ~rollup_node_endpoint
+              Rollup_services.make_streamed_call ~rollup_node_endpoint
             in
             subscribe_l2_block ~stream_l2 worker
         | Sequencer -> Lwt.return_unit)
