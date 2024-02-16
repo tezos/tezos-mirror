@@ -13,8 +13,7 @@ end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
-      let*! evm_state = Evm_context.evm_state ctxt in
+      let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
       let*! res = Evm_state.inspect evm_state path in
       return res
   end
@@ -49,7 +48,6 @@ end) : Services_backend_sig.Backend = struct
 
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
       (* Create the blueprint with the messages. *)
       let blueprint =
         Sequencer_blueprint.create
@@ -58,18 +56,20 @@ end) : Services_backend_sig.Backend = struct
           ~smart_rollup_address
           ~transactions:messages.TxEncoder.raw
           ~delayed_transactions:messages.TxEncoder.delayed
-          ~number:ctxt.next_blueprint_number
+          ~parent_hash:Ctxt.ctxt.current_block_hash
+          ~number:Ctxt.ctxt.next_blueprint_number
       in
       (* Apply the blueprint *)
-      let* _ctxt = Evm_context.apply_and_publish_blueprint ctxt blueprint in
+      let* _ctxt =
+        Evm_context.apply_and_publish_blueprint Ctxt.ctxt blueprint
+      in
       return_unit
   end
 
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* ctxt = Evm_context.sync Ctxt.ctxt in
-      let* raw_insights = Evm_context.execute_and_inspect ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
       match Simulation.Encodings.insights_from_list raw_insights with
       | Some i -> return i
       | None -> Error_monad.failwith "Invalid insights format"
@@ -77,15 +77,14 @@ end) : Services_backend_sig.Backend = struct
 
   let inject_kernel_upgrade ~payload =
     let open Lwt_result_syntax in
-    let* ctxt = Evm_context.sync Ctxt.ctxt in
-    let*! evm_state = Evm_context.evm_state ctxt in
+    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
     let*! evm_state =
       Evm_state.modify
         ~key:Durable_storage_path.kernel_upgrade
         ~value:payload
         evm_state
     in
-    let* _ctxt = Evm_context.commit ctxt evm_state in
+    let* _ctxt = Evm_context.commit Ctxt.ctxt evm_state in
     return_unit
 end
 
@@ -105,11 +104,10 @@ let install_finalizer_seq server private_server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
   let* () = Events.shutdown_rpc_server ~private_:true in
   let* () = Tx_pool.shutdown () in
-  let* () = Tx_pool_events.shutdown () in
+  let* () = Rollup_node_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
-  let* () = Blueprint_events.publisher_shutdown () in
   let* () = Delayed_inbox.shutdown () in
-  Delayed_inbox_events.shutdown ()
+  return_unit
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -204,14 +202,22 @@ let loop_sequencer :
   let now = Helpers.now () in
   loop now
 
-let main ~data_dir ~rollup_node_endpoint ?genesis_timestamp ~sequencer
+let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
+    ~max_blueprints_catchup ~catchup_cooldown ?genesis_timestamp ~sequencer
     ~(configuration : Configuration.sequencer Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* smart_rollup_address =
     Rollup_node_services.smart_rollup_address rollup_node_endpoint
   in
-  let* () = Blueprints_publisher.start {rollup_node_endpoint} in
+  let* () =
+    Blueprints_publisher.start
+      ~rollup_node_endpoint
+      ~max_blueprints_lag
+      ~max_blueprints_catchup
+      ~catchup_cooldown
+      (Blueprint_store.make ~data_dir)
+  in
   let* ctxt =
     Evm_context.init
       ?genesis_timestamp
@@ -234,6 +240,7 @@ let main ~data_dir ~rollup_node_endpoint ?genesis_timestamp ~sequencer
   let* () =
     Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
   in
+  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in

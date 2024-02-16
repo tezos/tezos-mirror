@@ -22,18 +22,21 @@ type t = string
 
 let make ~data_dir = data_dir // "blueprint"
 
-let blueprint_relative_path number =
+let kind_to_string ~kind =
+  match kind with `Execute -> "execute" | `Publish -> "publish"
+
+let blueprint_relative_path ~kind number =
   let to_string i = Format.sprintf "%04i" i in
   let share = 10_000 in
   let base = number / share in
   let file = number mod share |> to_string in
   let sub_directory = base / share |> to_string in
   let sub_sub_directory = base mod share |> to_string in
-  (sub_directory // sub_sub_directory, file)
+  (kind_to_string ~kind // sub_directory // sub_sub_directory, file)
 
 type error += Cannot_store_blueprint
 
-let store store_path blueprint (Qty number) =
+let store store_path ~kind blueprint (Qty number) =
   let open Lwt_syntax in
   let number = Z.to_int number in
   let str =
@@ -42,7 +45,7 @@ let store store_path blueprint (Qty number) =
       blueprint
   in
 
-  let blueprint_directory, file = blueprint_relative_path number in
+  let blueprint_directory, file = blueprint_relative_path ~kind number in
 
   let* _ = Lwt_utils_unix.create_dir (store_path // blueprint_directory) in
 
@@ -55,11 +58,11 @@ let store store_path blueprint (Qty number) =
 
   return (Result.map_error (fun _ -> [Cannot_store_blueprint]) res)
 
-let find store_path (Qty number) =
+let find store_path ~kind (Qty number) =
   let open Lwt_syntax in
   let number = Z.to_int number in
 
-  let blueprint_directory, file = blueprint_relative_path number in
+  let blueprint_directory, file = blueprint_relative_path ~kind number in
 
   Lwt.catch
     (fun () ->

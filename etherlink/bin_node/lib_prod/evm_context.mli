@@ -7,11 +7,14 @@
 
 type t = {
   data_dir : string;  (** Data dir of the EVM node. *)
-  context : Irmin_context.rw;  (** Irmin read and write context. *)
+  mutable context : Irmin_context.rw;  (** Irmin read and write context. *)
+  index : Irmin_context.rw_index;
   preimages : string;  (** Path to the preimages directory. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
       (** Number for the next bluerpint to be produced. *)
+  mutable current_block_hash : Ethereum_types.block_hash;
+      (** Hash of the latest processed block *)
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
 }
 
@@ -43,11 +46,7 @@ val init_from_rollup_node :
 
 (** [commit ctxt evm_state] updates the [evm_state] in [ctxt], commits
     to disk the changes, and update the checkpoint. *)
-val commit : t -> Evm_state.t -> t tzresult Lwt.t
-
-(** [sync ctxt] synchronizes the [ctxt] based on on-disk information, loads the
-    latest checkpoint. *)
-val sync : t -> t tzresult Lwt.t
+val commit : t -> Evm_state.t -> unit tzresult Lwt.t
 
 (** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
 val evm_state : t -> Evm_state.t Lwt.t

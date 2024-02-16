@@ -25,11 +25,20 @@ val blueprint_applied : Z.t -> unit Lwt.t
     [level] has been forwarded to a rollup node  *)
 val blueprint_injected : Z.t -> unit Lwt.t
 
-(** [entered_degraded_mode level] advertizes that the worker will
-    no longer forward blueprints to the rollup node. *)
-val entered_degraded_mode : Z.t -> unit Lwt.t
+(** [blueprint_injection_failed level] advertizes that a blueprint could not be
+    injected for level [level]. *)
+val blueprint_injection_failed : Z.t -> unit Lwt.t
 
 (** [invalid_blueprint_produced level] advertizes that the sequencer has tried
     to produce a blueprint which does not result in the publication of a new
     Ethereum block. *)
 val invalid_blueprint_produced : Z.t -> unit Lwt.t
+
+(** [missing_blueprint level] advertizes that a sequencer has tried to fetch
+    the blueprint for level [level] from its store and failed. This means the
+    sequencer store is inconsistent. *)
+val missing_blueprint : Z.t -> unit Lwt.t
+
+(** [catching_up min max] advertizes that the sequencer is reinjecting
+    blueprints from level [min] to [max] because the rollup node is lagging. *)
+val catching_up : Z.t -> Z.t -> unit Lwt.t

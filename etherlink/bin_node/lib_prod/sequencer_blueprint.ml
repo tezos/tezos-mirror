@@ -61,7 +61,8 @@ let encode_delayed_transaction Delayed_transaction.{kind; hash; raw} =
           List [Value (Bytes.of_string "\002"); rlp];
         ]
 
-let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
+let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions
+    ~parent_hash =
   let open Rlp in
   let delayed_hashes =
     List
@@ -85,8 +86,15 @@ let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions =
     (List m, List (delayed_transactions @ m))
   in
   let timestamp = Value (Helpers.timestamp_to_bytes timestamp) in
-  let to_publish = List [delayed_hashes; messages; timestamp] |> encode in
-  let to_execute = List [List []; full_messages; timestamp] |> encode in
+  let parent_hash =
+    Value (block_hash_to_bytes parent_hash |> Bytes.of_string)
+  in
+  let to_publish =
+    List [parent_hash; delayed_hashes; messages; timestamp] |> encode
+  in
+  let to_execute =
+    List [parent_hash; List []; full_messages; timestamp] |> encode
+  in
   match
     ( String.chunk_bytes max_chunk_size to_publish,
       String.chunk_bytes max_chunk_size to_execute )
@@ -108,12 +116,16 @@ type t = {
   to_execute : Blueprint_types.payload;
 }
 
-let create ~secret_key ~timestamp ~smart_rollup_address ~number
+let create ~secret_key ~timestamp ~smart_rollup_address ~number ~parent_hash
     ~delayed_transactions ~transactions =
   let open Rlp in
   let number = Value (encode_u256_le number) in
   let to_publish_chunks, to_execute_chunks =
-    make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions
+    make_blueprint_chunks
+      ~timestamp
+      ~transactions
+      ~delayed_transactions
+      ~parent_hash
   in
   let nb_chunks_publish =
     Rlp.Value (encode_u16_le @@ List.length to_publish_chunks)

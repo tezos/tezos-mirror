@@ -410,7 +410,9 @@ let dispatch_request (config : 'a Configuration.t)
               let* call_result = Backend_rpc.simulate_call call in
               match call_result with
               | Ok result -> return (Either.Left result)
-              | Error () -> return (Either.Right "Call simulation failed"))
+              | Error reason ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+                  return (Either.Right reason))
         in
         build ~f module_ parameters
     | Method (Get_estimate_gas.Method, module_) ->
@@ -418,9 +420,13 @@ let dispatch_request (config : 'a Configuration.t)
           let open Lwt_result_syntax in
           match input with
           | None -> return missing_parameter
-          | Some (call, _) ->
-              let* gas = Backend_rpc.estimate_gas call in
-              return (Either.Left gas)
+          | Some (call, _) -> (
+              let* gas_result = Backend_rpc.estimate_gas call in
+              match gas_result with
+              | Ok gas -> return (Either.Left gas)
+              | Error reason ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+                  return (Either.Right reason))
         in
         build ~f module_ parameters
     | Method (Txpool_content.Method, module_) ->

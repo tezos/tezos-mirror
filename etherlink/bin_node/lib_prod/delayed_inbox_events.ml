@@ -64,22 +64,6 @@ module Event = struct
       ("level", Data_encoding.int32)
       ~pp2:pp_int32
 
-  let connection_lost =
-    declare_0
-      ~section
-      ~name:"delayed_inbox_connection_lost"
-      ~msg:"Connection with the rollup node has been lost"
-      ~level:Error
-      ()
-
-  let stopped =
-    declare_0
-      ~section
-      ~name:"delayed_inbox_stopped"
-      ~msg:"Delayed inbox has been stopped"
-      ~level:Notice
-      ()
-
   let shutdown =
     declare_0
       ~section
@@ -101,9 +85,5 @@ let fetch_failed ~level = Internal_event.Simple.emit Event.fetch_failed level
 
 let transaction_fetch_failed ~tx_hash ~level =
   Internal_event.Simple.emit Event.transaction_fetch_failed (tx_hash, level)
-
-let connection_lost = Internal_event.Simple.emit Event.connection_lost
-
-let stopped = Internal_event.Simple.emit Event.stopped
 
 let shutdown = Internal_event.Simple.emit Event.shutdown

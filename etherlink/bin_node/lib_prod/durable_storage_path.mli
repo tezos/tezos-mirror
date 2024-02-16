@@ -45,6 +45,9 @@ module Block : sig
 
   (** Path to the current block number. *)
   val current_number : path
+
+  (** Path to the current block hash. *)
+  val current_hash : path
 end
 
 module Indexes : sig

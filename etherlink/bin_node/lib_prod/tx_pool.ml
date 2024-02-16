@@ -420,7 +420,7 @@ module Handlers = struct
 
   let on_no_request _ = Lwt.return_unit
 
-  let on_close _ = Tx_pool_events.stopped ()
+  let on_close _ = Lwt.return_unit
 end
 
 let table = Worker.create_table Queue
@@ -435,7 +435,8 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
+    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
+    | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -481,12 +482,15 @@ let start ({mode; _} as parameters) =
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
+  let open Lwt_syntax in
   let w = Lazy.force worker in
   match w with
   | Error _ ->
       (* There is no tx-pool, nothing to do *)
       Lwt.return_unit
-  | Ok w -> Worker.shutdown w
+  | Ok w ->
+      let* () = Tx_pool_events.shutdown () in
+      Worker.shutdown w
 
 let add raw_tx =
   let open Lwt_result_syntax in
