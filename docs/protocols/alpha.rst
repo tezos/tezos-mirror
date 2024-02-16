@@ -138,6 +138,10 @@ RPC Changes
   specified delegate, and set to false otherwise.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/``. (MR :gl:`!12042`)
 
+- New RPC to list the pending denunciations of a given delegate.
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
+
+
 Operation receipts
 ------------------
 
