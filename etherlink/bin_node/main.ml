@@ -783,7 +783,7 @@ let observer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in observer mode"
-    (args8
+    (args9
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -791,7 +791,8 @@ let observer_command =
        cors_allowed_headers_arg
        verbose_arg
        kernel_arg
-       preimages_arg)
+       preimages_arg
+       preimages_endpoint_arg)
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -807,7 +808,8 @@ let observer_command =
            cors_headers,
            verbose,
            kernel,
-           preimages )
+           preimages,
+           preimages_endpoint )
              evm_node_endpoint
              () ->
   let open Evm_node_lib_dev in
@@ -829,6 +831,7 @@ let observer_command =
       ?cors_headers
       ~evm_node_endpoint
       ?preimages
+      ?preimages_endpoint
       ()
   in
   let* () = Configuration.save_observer ~force:true ~data_dir config in
@@ -842,6 +845,7 @@ let observer_command =
       ~data_dir
       ?kernel_path:kernel
       ~preimages:config.mode.preimages
+      ~preimages_endpoint:config.mode.preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

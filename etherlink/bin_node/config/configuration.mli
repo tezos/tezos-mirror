@@ -37,7 +37,11 @@ type sequencer = {
       (** The key used to sign the blueprints. *)
 }
 
-type observer = {evm_node_endpoint : Uri.t; preimages : string}
+type observer = {
+  evm_node_endpoint : Uri.t;
+  preimages : string;
+  preimages_endpoint : Uri.t option;
+}
 
 type 'a t = {
   rpc_addr : string;
@@ -116,6 +120,7 @@ module Cli : sig
     ?log_filter:log_filter_config ->
     ?evm_node_endpoint:Uri.t ->
     ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
     unit ->
     observer t
 
@@ -158,6 +163,7 @@ module Cli : sig
     ?log_filter:log_filter_config ->
     ?evm_node_endpoint:Uri.t ->
     ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
     unit ->
     observer t tzresult Lwt.t
 end
