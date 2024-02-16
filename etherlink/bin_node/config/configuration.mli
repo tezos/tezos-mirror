@@ -29,6 +29,8 @@ type sequencer = {
       (** Rollup node endpoint used to make blueprints available and
           monitor the delayed inbox. *)
   preimages : string;  (** Path to the preimages directory. *)
+  preimages_endpoint : Uri.t option;
+      (** Endpoint where pre-images can be fetched individually when missing. *)
   time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
   private_rpc_port : int;  (** Port for internal RPC services *)
   sequencer : Signature.public_key_hash;
@@ -99,6 +101,7 @@ module Cli : sig
     ?log_filter:log_filter_config ->
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
     ?time_between_blocks:time_between_blocks ->
     sequencer:Signature.public_key_hash ->
     unit ->
@@ -139,6 +142,7 @@ module Cli : sig
     ?log_filter:log_filter_config ->
     ?rollup_node_endpoint:Uri.t ->
     ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
     ?time_between_blocks:time_between_blocks ->
     sequencer:Signature.public_key_hash ->
     unit ->

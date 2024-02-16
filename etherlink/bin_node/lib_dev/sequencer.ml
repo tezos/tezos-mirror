@@ -231,6 +231,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ?kernel_path:kernel
       ~data_dir
       ~preimages:configuration.mode.preimages
+      ~preimages_endpoint:configuration.mode.preimages_endpoint
       ~smart_rollup_address
       ()
   in
