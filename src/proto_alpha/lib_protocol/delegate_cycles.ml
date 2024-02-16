@@ -196,33 +196,45 @@ let adjust_frozen_stakes ctxt ~deactivated_delegates :
 
 let cycle_end ctxt last_cycle =
   let open Lwt_result_syntax in
+  (* attributing attesting rewards   *)
   let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
   let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
   in
+  (* Applying slashing related to expiring denunciations *)
   let* ctxt, slashing_balance_updates =
     Delegate_slashed_deposits_storage.apply_and_clear_denunciations ctxt
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
   let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
+  (* Deactivating delegates which didn't participate to consensus for too long *)
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
+  (* Applying autostaking. Do not move before slashing. Keep before rights
+     computation for optimising rights*)
   let* ctxt, autostake_balance_updates =
     match Staking.staking_automation ctxt with
     | Manual_staking -> return (ctxt, [])
     | Auto_staking -> adjust_frozen_stakes ctxt ~deactivated_delegates
   in
+  (* Computing future staking rights *)
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
   in
+  (* Activating consensus key for the cycle to come *)
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
+  (* trying to unforbid delegates for the cycle to come.  *)
   let* ctxt =
     Forbidden_delegates_storage.update_at_cycle_end_after_slashing
       ctxt
       ~new_cycle
   in
+  (* clear deprecated cycles data.  *)
   let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
+  (* activate delegate parameters for the cycle to come.  *)
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
+  (* updating AI coefficient. It should remain after all balance changes of the
+     cycle-end operations *)
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
