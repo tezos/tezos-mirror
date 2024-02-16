@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -25,7 +25,7 @@ use num_traits::Signed;
 use std::fmt::Debug;
 use tezos_data_encoding::{
     enc::{BinError, BinResult, BinWriter},
-    encoding::HasEncoding,
+    encoding::{Encoding, HasEncoding},
     nom::{NomReader, NomResult},
     types::{SizedBytes, Zarith},
 };
@@ -107,6 +107,21 @@ pub enum TicketError {
     /// Invalid amount in ticket repr.
     #[error("ticket amount out of range")]
     InvalidAmount(BigInt),
+}
+
+/// Michelson *ticket* encoding.
+#[derive(Debug, PartialEq, Eq)]
+struct TypedTicket<Arg0>(pub MichelsonContract, pub Arg0, pub MichelsonInt)
+where
+    Arg0: Debug + PartialEq + Eq;
+
+impl<Arg> HasEncoding for TypedTicket<Arg>
+where
+    Arg: Debug + PartialEq + Eq,
+{
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
 }
 
 // Expr is guarantee by construction to implement `Michelson` even though
@@ -227,7 +242,8 @@ pub type FA2_1Ticket =
 mod test {
     use super::*;
     use tezos_data_encoding::enc::BinWriter;
-    use tezos_data_encoding::nom::NomReader;
+
+    use super::BytesTicket;
 
     #[test]
     fn content_bytes() {
@@ -311,4 +327,196 @@ mod test {
         assert_eq!(ticket, parsed);
         assert!(remaining.is_empty());
     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_unit_ticket() {
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonUnit,
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::<MichelsonUnit>::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+    //     #[test]
+    //     fn basic_encode_decode_on_int_ticket() {
+    //         let expected_ticket: TypedTicket<MichelsonInt> = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             17_i32.into(),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::<MichelsonInt>::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_nat_ticket() {
+    //         let expected_ticket: TypedTicket<MichelsonNat> = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             17_u32.into(),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::<MichelsonNat>::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_string_ticket() {
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonString("string".into()),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::<MichelsonString>::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_bytes_ticket() {
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonBytes(vec![62, 79, 74, 65, 73]),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::<MichelsonBytes>::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_option_ticket() {
+    //         // Some
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonOption(Some(MichelsonBytes(vec![62, 79, 74, 65, 73]))),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+
+    //         // none
+    //         let expected_ticket = TypedTicket::<MichelsonOption<MichelsonBytes>>(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonOption(None),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_or_ticket() {
+    //         // Left
+    //         let left: MichelsonOr<MichelsonBytes, MichelsonBytes> =
+    //             MichelsonOr::Left(MichelsonBytes(vec![62, 79, 74, 65, 73]));
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             left,
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+
+    //         // Right
+    //         let right: MichelsonOr<MichelsonBytes, MichelsonBytes> =
+    //             MichelsonOr::Right(MichelsonBytes(vec![62, 79, 74, 65, 73]));
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             right,
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
+
+    //     #[test]
+    //     fn basic_encode_decode_on_pair_ticket() {
+    //         // Some
+    //         let expected_ticket = TypedTicket(
+    //             MichelsonContract(
+    //                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
+    //             ),
+    //             MichelsonPair(MichelsonInt::from(5_i32), MichelsonNat::from(11_u32)),
+    //             11_i32.into(),
+    //         );
+    //         let mut output = Vec::new();
+    //         let result = expected_ticket.bin_write(&mut output);
+    //         assert!(result.is_ok());
+    //         let result = TypedTicket::nom_read(output.as_slice());
+    //         assert!(result.is_ok());
+    //         let (remaining, ticket) = result.unwrap();
+    //         assert_eq!(expected_ticket, ticket);
+    //         assert!(remaining.is_empty());
+    //     }
 }
