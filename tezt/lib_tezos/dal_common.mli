@@ -230,6 +230,13 @@ module RPC : sig
        identity is given. *)
   val delete_p2p_peer_disconnect : peer_id:string -> unit RPC_core.t
 
+  type topic = {topic_slot_index : int; topic_pkh : string}
+
+  (* Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
+     each topic. *)
+  val get_topics_peers :
+    subscribed:bool -> (topic * string list) list RPC_core.t
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
   module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider
@@ -268,4 +275,6 @@ end
 
 module Check : sig
   val profiles_typ : RPC.profiles Check.typ
+
+  val topics_peers_typ : (RPC.topic * string list) list Check.typ
 end

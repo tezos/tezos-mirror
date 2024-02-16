@@ -341,6 +341,24 @@ module Dal_RPC = struct
   let delete_p2p_peer_disconnect ~peer_id =
     make DELETE ["p2p"; "peers"; "disconnect"; peer_id] as_empty_object_or_fail
 
+  type topic = {topic_slot_index : int; topic_pkh : string}
+
+  let get_topics_peers ~subscribed =
+    let open JSON in
+    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let as_topic json =
+      let topic_slot_index = get "slot_index" json |> as_int in
+      let topic_pkh = get "pkh" json |> as_string in
+      {topic_slot_index; topic_pkh}
+    in
+    let as_topic_and_peers json =
+      let topic = get "topic" json |> as_topic in
+      let peers = get "peers" json |> as_list |> List.map as_string in
+      (topic, peers)
+    in
+    make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
+        JSON.(json |> as_list |> List.map as_topic_and_peers))
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
@@ -578,6 +596,14 @@ module Check = struct
       | _, _ -> false
     in
     Check.equalable pp equal
+
+  let topic_typ : topic Check.typ =
+    Check.convert
+      (fun {topic_slot_index; topic_pkh} -> (topic_slot_index, topic_pkh))
+      (Check.tuple2 Check.int Check.string)
+
+  let topics_peers_typ : (topic * string list) list Check.typ =
+    Check.list (Check.tuple2 topic_typ (Check.list Check.string))
 end
 
 module RPC = Dal_RPC

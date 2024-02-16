@@ -2236,6 +2236,28 @@ let check_profiles ~__LOC__ dal_node ~expected =
         ~error_msg:
           (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
 
+let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
+  let normalize_peers l = List.sort String.compare l in
+  let compare_topics {Dal.RPC.topic_slot_index = s1; topic_pkh = p1}
+      {Dal.RPC.topic_slot_index = s2; topic_pkh = p2} =
+    let c = Int.compare s1 s2 in
+    if c = 0 then String.compare p1 p2 else c
+  in
+  let normalize_topics_peers l =
+    l
+    |> List.map (fun (topic, peers) -> (topic, normalize_peers peers))
+    |> List.sort (fun (t1, _p1) (t2, _p2) -> compare_topics t1 t2)
+  in
+  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ~subscribed) in
+  return
+    Check.(
+      (normalize_topics_peers topic_peers = normalize_topics_peers expected)
+        Dal.Check.topics_peers_typ
+        ~error_msg:
+          (__LOC__
+         ^ " : Unexpected topic - peers association (Actual: %L <> Expected: \
+            %R)"))
+
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
   let check_bad_attester_pkh_encoding profile =
@@ -4061,6 +4083,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let peer_id dal_node =
     JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
   in
+  let bootstrap_peer_id = peer_id dal_bootstrap in
 
   (* Check that the attestation threshold for this test is 100%. If
      not, this means that we forgot to register the test with
@@ -4077,6 +4100,12 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
   let* () = Dal_node.run ~wait_ready:true producer in
   let producer_peer_id = peer_id producer in
+  let* () =
+    check_profiles
+      ~__LOC__
+      producer
+      ~expected:Dal_RPC.(Operator [Producer index])
+  in
   Log.info "Slot producer DAL node is running" ;
 
   let all_pkhs =
@@ -4119,12 +4148,48 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   in
   let check_graft_promises = List.map check_graft all_pkhs in
   Log.info "Waiting for grafting of the attester - producer connection" ;
+  let* () =
+    check_profiles
+      ~__LOC__
+      attester
+      ~expected:Dal_RPC.(Operator (List.map (fun pkh -> Attester pkh) all_pkhs))
+  in
   (* We need to bake some blocks until the L1 node notifies the
      attester DAL nodes that some L1 block is final and they have DAL
      attestation rights in it. *)
   let* () = bake_for ~count:3 client in
   let* () = Lwt.join check_graft_promises in
   Log.info "Attester - producer connection grafted" ;
+
+  (* Attester should be connected to:
+     - the bootstrap DAL node on all the topics,
+     - the producer on all topics with slot_index=index *)
+  let* () =
+    let expected topic_pkh =
+      Seq.ints 0 |> Seq.take num_slots
+      |> Seq.map (fun topic_slot_index ->
+             ( {Dal_RPC.topic_slot_index; topic_pkh},
+               bootstrap_peer_id
+               :: (if topic_slot_index = index then [producer_peer_id] else [])
+             ))
+      |> List.of_seq
+    in
+    let expected = List.concat (List.map expected all_pkhs) in
+    check_topics_peers ~__LOC__ attester ~subscribed:true ~expected
+  in
+
+  (* The slot producer should be connected to:
+     - the attester and the bootstrap DAL node on all topics with slot_index=index,
+  *)
+  let* () =
+    let expected =
+      all_pkhs
+      |> List.map (fun topic_pkh ->
+             ( {Dal_RPC.topic_slot_index = index; topic_pkh},
+               [bootstrap_peer_id; attester_peer_id] ))
+    in
+    check_topics_peers ~__LOC__ producer ~subscribed:true ~expected
+  in
 
   (* Produce and publish a slot *)
   let source = Constant.bootstrap1 in
