@@ -2738,6 +2738,8 @@ module Dal : sig
 
     val slots_range_opt :
       number_of_slots:int -> lower:int -> upper:int -> t list option
+
+    val check_is_in_range : number_of_slots:int -> t -> unit tzresult
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
@@ -2796,6 +2798,10 @@ module Dal : sig
       val compare : int -> int -> int
 
       val equal : int -> int -> bool
+
+      type error += Invalid_page_index of {given : int; min : int; max : int}
+
+      val check_is_in_range : number_of_pages:int -> t -> unit tzresult
     end
 
     type t = {slot_id : slot_id; page_index : Index.t}
@@ -3873,13 +3879,12 @@ module Sc_rollup : sig
       serialized t tzresult Lwt.t
 
     module Dal_helpers : sig
-      val valid_slot_id :
-        dal_number_of_slots:int ->
+      val import_level_is_valid :
         dal_activation_level:Raw_level.t option ->
         dal_attestation_lag:int ->
         origination_level:Raw_level.t ->
         commit_inbox_level:Raw_level.t ->
-        Dal.Slot.Header.id ->
+        published_level:Raw_level.t ->
         dal_attested_slots_validity_lag:int ->
         bool
     end

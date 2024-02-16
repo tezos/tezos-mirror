@@ -138,6 +138,12 @@ module Page : sig
     val compare : int -> int -> int
 
     val equal : int -> int -> bool
+
+    type error += Invalid_page_index of {given : int; min : int; max : int}
+
+    (** [is_in_range ~number_of_pages page_id] returns true if and only if the
+      provided [page_id] is within the bounds of allowed pages. *)
+    val check_is_in_range : number_of_pages:int -> int -> unit tzresult
   end
 
   (** Encoding for page contents. *)
@@ -223,7 +229,7 @@ module History : sig
       {!Raw_level_repr.root} as published level and no attested slots. Since Dal
       is not necessarily activated in the genesis block (e.g. this will be the case
       on mainnet), the skip list is reset at the first call to
-      {!add_confirmed_slot_headers} to enforce the invariant that there are no gaps 
+      {!add_confirmed_slot_headers} to enforce the invariant that there are no gaps
       in the levels of the cells of the skip list.
 
       So, a skip list is initialized with this genesis cell. It's then replaced

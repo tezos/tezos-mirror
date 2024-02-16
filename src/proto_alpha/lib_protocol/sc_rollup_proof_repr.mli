@@ -292,13 +292,12 @@ module Dal_helpers : sig
       before producing the related commitment.
       We also check that the given slot ID's index is within the range of
       allowed slots thanks to [dal_number_of_slots].  *)
-  val valid_slot_id :
-    dal_number_of_slots:int ->
+  val import_level_is_valid :
     dal_activation_level:Raw_level_repr.t option ->
     dal_attestation_lag:int ->
     origination_level:Raw_level_repr.t ->
     commit_inbox_level:Raw_level_repr.t ->
-    Dal_slot_repr.Header.id ->
+    published_level:Raw_level_repr.t ->
     dal_attested_slots_validity_lag:int ->
     bool
 end

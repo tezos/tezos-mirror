@@ -110,25 +110,50 @@ let storage_invariant_broken published_level index =
     Raw_level.pp
     published_level
 
-let slot_id_is_valid ~dal_activation_level ~dal_attestation_lag
-    ~dal_number_of_slots ~origination_level ~inbox_level slot_id
+let slot_id_is_valid
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~origination_level ~inbox_level slot_id
     ~dal_attested_slots_validity_lag =
+  let open Alpha_context in
+  Result.is_ok
+    (Dal.Slot_index.check_is_in_range
+       ~number_of_slots:dal_constants.number_of_slots
+       slot_id.Dal.index)
+  &&
   let origination_level_res = Raw_level.of_int32 origination_level in
   let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
   match (origination_level_res, commit_inbox_level_res) with
   | Ok origination_level, Ok commit_inbox_level ->
-      Alpha_context.Sc_rollup.Proof.Dal_helpers.valid_slot_id
+      Alpha_context.Sc_rollup.Proof.Dal_helpers.import_level_is_valid
         ~dal_activation_level
-        ~dal_attestation_lag
+        ~dal_attestation_lag:dal_constants.attestation_lag
         ~origination_level
         ~commit_inbox_level
-        ~dal_number_of_slots
         ~dal_attested_slots_validity_lag
-        slot_id
+        ~published_level:slot_id.published_level
   | _ -> false
 
-let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~inbox_level node_ctxt slot_id ~dal_attested_slots_validity_lag =
+let page_id_is_valid
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~origination_level ~inbox_level
+    Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
+  Result.is_ok
+    (Dal.Page.Index.check_is_in_range
+       ~number_of_pages:
+         (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+       page_index)
+  && slot_id_is_valid
+       dal_constants
+       ~dal_activation_level
+       ~origination_level
+       ~inbox_level
+       slot_id
+       ~dal_attested_slots_validity_lag
+
+let slot_pages
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~inbox_level node_ctxt slot_id
+    ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
@@ -137,18 +162,17 @@ let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
   if
     not
     @@ slot_id_is_valid
+         dal_constants
          ~dal_activation_level
-         ~dal_attestation_lag
          ~origination_level
          ~inbox_level
-         ~dal_number_of_slots
          ~dal_attested_slots_validity_lag
          slot_id
   then return_none
   else
     let* confirmed_in_block_hash =
       store_entry_from_published_level
-        ~dal_attestation_lag
+        ~dal_attestation_lag:dal_constants.attestation_lag
         ~published_level
         node_ctxt
     in
@@ -165,8 +189,10 @@ let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
     | Some `Unconfirmed -> return_none
     | None -> storage_invariant_broken published_level index
 
-let page_content ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~inbox_level node_ctxt page_id ~dal_attested_slots_validity_lag =
+let page_content
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~inbox_level node_ctxt page_id
+    ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
@@ -175,19 +201,18 @@ let page_content ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
   in
   if
     not
-    @@ slot_id_is_valid
+    @@ page_id_is_valid
+         dal_constants
          ~dal_activation_level
-         ~dal_attestation_lag
          ~origination_level
          ~inbox_level
-         ~dal_number_of_slots
          ~dal_attested_slots_validity_lag
-         slot_id
+         page_id
   then return_none
   else
     let* confirmed_in_block_hash =
       store_entry_from_published_level
-        ~dal_attestation_lag
+        ~dal_attestation_lag:dal_constants.attestation_lag
         ~published_level
         node_ctxt
     in

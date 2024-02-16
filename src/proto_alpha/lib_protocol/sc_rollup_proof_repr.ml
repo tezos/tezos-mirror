@@ -238,9 +238,8 @@ module Dal_helpers = struct
      The current DAL refutation integration is not resilient to DAL parameters
      changes when upgrading the protocol. The code needs to be adapted. *)
 
-  let valid_slot_id ~dal_number_of_slots ~dal_activation_level
-      ~dal_attestation_lag ~origination_level ~commit_inbox_level
-      Dal_slot_repr.Header.{published_level; index}
+  let import_level_is_valid ~dal_activation_level ~dal_attestation_lag
+      ~origination_level ~commit_inbox_level ~published_level
       ~dal_attested_slots_validity_lag =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let open Raw_level_repr in
@@ -255,12 +254,6 @@ module Dal_helpers = struct
     let not_too_recent =
       add published_level dal_attestation_lag <= commit_inbox_level
     in
-    let index_is_valid =
-      Result.is_ok
-      @@ Dal_slot_index_repr.check_is_in_range
-           ~number_of_slots:dal_number_of_slots
-           index
-    in
     (* An attested slot is not expired if its attested level (equal to
        [published_level + dal_attestation_lag]) is not further than
        [dal_attested_slots_validity_lag] from the given inbox level. *)
@@ -272,20 +265,43 @@ module Dal_helpers = struct
         >= commit_inbox_level)
     in
     dal_was_activated && slot_published_after_origination && not_too_recent
-    && index_is_valid && ttl_not_expired
+    && ttl_not_expired
+
+  let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
+      ~dal_attestation_lag ~origination_level ~commit_inbox_level
+      cryptobox_parameters
+      Dal_slot_repr.Page.{slot_id = {published_level; index}; page_index}
+      ~dal_attested_slots_validity_lag =
+    let open Dal_slot_repr in
+    Result.is_ok
+      (Page.Index.check_is_in_range
+         ~number_of_pages:(Page.pages_per_slot cryptobox_parameters)
+         page_index)
+    && Result.is_ok
+         (Dal_slot_index_repr.check_is_in_range
+            ~number_of_slots:dal_number_of_slots
+            index)
+    && import_level_is_valid
+         ~dal_activation_level
+         ~dal_attestation_lag
+         ~origination_level
+         ~commit_inbox_level
+         ~published_level
+         ~dal_attested_slots_validity_lag
 
   let verify ~metadata ~dal_activation_level ~dal_attestation_lag
       ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
       dal_snapshot proof ~dal_attested_slots_validity_lag =
     let open Result_syntax in
     if
-      valid_slot_id
+      page_id_is_valid
+        dal_parameters
         ~dal_activation_level
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
         ~commit_inbox_level
         ~dal_number_of_slots
-        Dal_slot_repr.(page_id.Page.slot_id)
+        page_id
         ~dal_attested_slots_validity_lag
     then
       let* input =
@@ -303,13 +319,14 @@ module Dal_helpers = struct
       ~get_history confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
     if
-      valid_slot_id
+      page_id_is_valid
+        dal_parameters
         ~dal_number_of_slots
         ~dal_activation_level
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
         ~commit_inbox_level
-        Dal_slot_repr.(page_id.Page.slot_id)
+        page_id
         ~dal_attested_slots_validity_lag
     then
       let* proof, content_opt =
