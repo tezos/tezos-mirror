@@ -116,6 +116,10 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Make ``liquidity_baking_subsidy`` a protocol constant independent of Adaptive Issuance (MR :gl:`!11971`).
+  This changes the JSON from the RPC ``/chains/main/blocks/head/context/constants``
+  and ``/chains/main/blocks/head/context/issuance/expected_issuance``.
+
 Operation receipts
 ------------------
 
@@ -128,6 +132,8 @@ Protocol parameters
   :gl:`!11279`, :gl:`!11220`)
 
 - Set the number of blocks preservation cycles to 1. (MR :gl:`!11325`)
+
+- Set ``liquidity_baking_subsidy`` to 5 tez issued per minute (MR :gl:`!11971`)
 
 Bug Fixes
 ---------
