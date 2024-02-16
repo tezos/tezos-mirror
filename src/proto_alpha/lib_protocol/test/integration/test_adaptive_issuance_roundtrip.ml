@@ -1900,11 +1900,11 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
         baking_reward_fixed_portion_weight = 1;
         baking_reward_bonus_weight = 0;
         attesting_reward_weight = 0;
-        liquidity_baking_subsidy_weight = 0;
         seed_nonce_revelation_tip_weight = 0;
         vdf_revelation_tip_weight = 0;
       }
   in
+  let liquidity_baking_subsidy = Tez.zero in
   let minimal_block_delay = Protocol.Alpha_context.Period.one_minute in
   let cost_per_byte = Tez.zero in
   let consensus_threshold = 0 in
@@ -1930,6 +1930,7 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
     cost_per_byte;
     adaptive_issuance;
     blocks_per_cycle;
+    liquidity_baking_subsidy;
   }
 
 (** Initialization of scenarios with 3 cases:

@@ -1185,25 +1185,32 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               ns_enable = false;
             }
         in
-        let issuance_weights : Constants_parametric_repr.issuance_weights =
+        let liquidity_baking_subsidy = Tez_repr.(mul_exn one 5) in
+        let (issuance_weights : Constants_parametric_repr.issuance_weights) =
           let ({
                  base_total_issued_per_minute;
                  baking_reward_fixed_portion_weight;
                  baking_reward_bonus_weight;
                  attesting_reward_weight;
-                 liquidity_baking_subsidy_weight;
+                 liquidity_baking_subsidy_weight = _;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
                }
                 : Constants_parametric_previous_repr.issuance_weights) =
             c.issuance_weights
           in
+          let base_total_issued_per_minute =
+            let x =
+              Tez_repr.(
+                sub_opt base_total_issued_per_minute liquidity_baking_subsidy)
+            in
+            match x with None -> assert false | Some x -> x
+          in
           {
             base_total_issued_per_minute;
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
-            liquidity_baking_subsidy_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
           }
@@ -1242,6 +1249,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               quorum_min = c.quorum_min;
               quorum_max = c.quorum_max;
               min_proposal_quorum = c.min_proposal_quorum;
+              liquidity_baking_subsidy;
               liquidity_baking_toggle_ema_threshold =
                 c.liquidity_baking_toggle_ema_threshold;
               minimal_block_delay = c.minimal_block_delay;

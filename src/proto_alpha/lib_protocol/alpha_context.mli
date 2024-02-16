@@ -895,7 +895,6 @@ module Constants : sig
       baking_reward_fixed_portion_weight : int;
       baking_reward_bonus_weight : int;
       attesting_reward_weight : int;
-      liquidity_baking_subsidy_weight : int;
       seed_nonce_revelation_tip_weight : int;
       vdf_revelation_tip_weight : int;
     }
@@ -921,6 +920,7 @@ module Constants : sig
       quorum_min : int32;
       quorum_max : int32;
       min_proposal_quorum : int32;
+      liquidity_baking_subsidy : Tez.t;
       liquidity_baking_toggle_ema_threshold : int32;
       max_operations_time_to_live : int;
       minimal_block_delay : Period.t;
@@ -2345,7 +2345,6 @@ module Delegate : sig
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
         | Attesting_reward_per_slot
-        | Liquidity_baking_subsidy
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
 
@@ -2360,6 +2359,9 @@ module Delegate : sig
         Constants.Parametric.t ->
         reward_kind:reward_kind ->
         Tez.t tzresult
+
+      val liquidity_baking_subsidy_from_constants :
+        Constants.Parametric.t -> Tez.t tzresult
 
       (** [get_reward_coeff ctxt cycle] reads the reward coeff for the given cycle
           from the storage.

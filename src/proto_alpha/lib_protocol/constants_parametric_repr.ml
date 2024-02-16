@@ -199,7 +199,6 @@ type issuance_weights = {
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
-  liquidity_baking_subsidy_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
 }
@@ -225,6 +224,7 @@ type t = {
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
+  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -512,7 +512,6 @@ let issuance_weights_encoding =
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
-            liquidity_baking_subsidy_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
           } :
@@ -521,14 +520,12 @@ let issuance_weights_encoding =
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
         attesting_reward_weight,
-        liquidity_baking_subsidy_weight,
         seed_nonce_revelation_tip_weight,
         vdf_revelation_tip_weight ))
     (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
-           liquidity_baking_subsidy_weight,
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight ) ->
       {
@@ -536,16 +533,14 @@ let issuance_weights_encoding =
         baking_reward_fixed_portion_weight;
         baking_reward_bonus_weight;
         attesting_reward_weight;
-        liquidity_baking_subsidy_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
       })
-    (obj7
+    (obj6
        (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
-       (req "liquidity_baking_subsidy_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
        (req "vdf_revelation_tip_weight" int31))
 
@@ -573,6 +568,7 @@ let encoding =
             c.quorum_min ),
           ( ( c.quorum_max,
               c.min_proposal_quorum,
+              c.liquidity_baking_subsidy,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -614,6 +610,7 @@ let encoding =
                quorum_min ),
              ( ( quorum_max,
                  min_proposal_quorum,
+                 liquidity_baking_subsidy,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -656,6 +653,7 @@ let encoding =
         quorum_min;
         quorum_max;
         min_proposal_quorum;
+        liquidity_baking_subsidy;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
@@ -708,9 +706,10 @@ let encoding =
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj8
+             (obj9
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
+                (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)

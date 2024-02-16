@@ -30,7 +30,6 @@ let sum_weights
        baking_reward_fixed_portion_weight;
        baking_reward_bonus_weight;
        attesting_reward_weight;
-       liquidity_baking_subsidy_weight;
        seed_nonce_revelation_tip_weight;
        vdf_revelation_tip_weight;
      } :
@@ -38,7 +37,6 @@ let sum_weights
   let r = baking_reward_fixed_portion_weight in
   let r = baking_reward_bonus_weight + r in
   let r = attesting_reward_weight + r in
-  let r = liquidity_baking_subsidy_weight + r in
   let r = seed_nonce_revelation_tip_weight + r in
   let r = vdf_revelation_tip_weight + r in
   assert (Compare.Int.(r > 0)) ;
@@ -75,7 +73,6 @@ module M = struct
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
     | Attesting_reward_per_slot
-    | Liquidity_baking_subsidy
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
 
@@ -90,8 +87,6 @@ module M = struct
       | Baking_reward_bonus_per_slot ->
           issuance_weights.baking_reward_bonus_weight
       | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
-      | Liquidity_baking_subsidy ->
-          issuance_weights.liquidity_baking_subsidy_weight
       | Seed_nonce_revelation_tip ->
           (* Seed nonce revelation rewards are given every [blocks_per_commitment](=192)th block *)
           let blocks_per_commitment = Int32.to_int csts.blocks_per_commitment in
@@ -119,6 +114,17 @@ module M = struct
       | _ -> rewards
     in
     Tez_repr.mul_q ~rounding:`Down base_rewards coeff
+
+  let liquidity_baking_subsidy_from_constants
+      (constants : Constants_parametric_repr.t) =
+    let liquidity_baking_subsidy = constants.liquidity_baking_subsidy in
+    let minimal_block_delay =
+      constants.minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int
+    in
+    Tez_repr.mul_q
+      ~rounding:`Down
+      liquidity_baking_subsidy
+      Q.(minimal_block_delay // 60)
 end
 
 open M
@@ -138,7 +144,8 @@ let attesting_reward_per_slot ctxt =
   reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_slot
 
 let liquidity_baking_subsidy ctxt =
-  reward_from_context ~ctxt ~reward_kind:Liquidity_baking_subsidy
+  let constants = Raw_context.constants ctxt in
+  liquidity_baking_subsidy_from_constants constants
 
 let seed_nonce_revelation_tip ctxt =
   reward_from_context ~ctxt ~reward_kind:Seed_nonce_revelation_tip

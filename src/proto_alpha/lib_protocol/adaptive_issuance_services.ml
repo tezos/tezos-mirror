@@ -30,7 +30,6 @@ type expected_rewards = {
   baking_reward_fixed_portion : Tez.t;
   baking_reward_bonus_per_slot : Tez.t;
   attesting_reward_per_slot : Tez.t;
-  liquidity_baking_subsidy : Tez.t;
   seed_nonce_revelation_tip : Tez.t;
   vdf_revelation_tip : Tez.t;
 }
@@ -43,7 +42,6 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
            baking_reward_fixed_portion;
            baking_reward_bonus_per_slot;
            attesting_reward_per_slot;
-           liquidity_baking_subsidy;
            seed_nonce_revelation_tip;
            vdf_revelation_tip;
          } ->
@@ -51,14 +49,12 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
         baking_reward_fixed_portion,
         baking_reward_bonus_per_slot,
         attesting_reward_per_slot,
-        liquidity_baking_subsidy,
         seed_nonce_revelation_tip,
         vdf_revelation_tip ))
     (fun ( cycle,
            baking_reward_fixed_portion,
            baking_reward_bonus_per_slot,
            attesting_reward_per_slot,
-           liquidity_baking_subsidy,
            seed_nonce_revelation_tip,
            vdf_revelation_tip ) ->
       {
@@ -66,16 +62,14 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
         baking_reward_fixed_portion;
         baking_reward_bonus_per_slot;
         attesting_reward_per_slot;
-        liquidity_baking_subsidy;
         seed_nonce_revelation_tip;
         vdf_revelation_tip;
       })
-    (obj7
+    (obj6
        (req "cycle" Cycle.encoding)
        (req "baking_reward_fixed_portion" Tez.encoding)
        (req "baking_reward_bonus_per_slot" Tez.encoding)
        (req "attesting_reward_per_slot" Tez.encoding)
-       (req "liquidity_baking_subsidy" Tez.encoding)
        (req "seed_nonce_revelation_tip" Tez.encoding)
        (req "vdf_revelation_tip" Tez.encoding))
 
@@ -205,7 +199,6 @@ let collect_expected_rewards ~ctxt =
       let*? baking_reward_fixed_portion = baking_reward_fixed_portion ctxt in
       let*? baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt in
       let*? attesting_reward_per_slot = attesting_reward_per_slot ctxt in
-      let*? liquidity_baking_subsidy = liquidity_baking_subsidy ctxt in
       let*? seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt in
       let*? vdf_revelation_tip = vdf_revelation_tip ctxt in
       return
@@ -214,7 +207,6 @@ let collect_expected_rewards ~ctxt =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           attesting_reward_per_slot;
-          liquidity_baking_subsidy;
           seed_nonce_revelation_tip;
           vdf_revelation_tip;
         }
@@ -240,9 +232,6 @@ let collect_expected_rewards ~ctxt =
       let*? attesting_reward_per_slot =
         reward_from_constants ~coeff csts ~reward_kind:Attesting_reward_per_slot
       in
-      let*? liquidity_baking_subsidy =
-        reward_from_constants ~coeff csts ~reward_kind:Liquidity_baking_subsidy
-      in
       let*? seed_nonce_revelation_tip =
         reward_from_constants ~coeff csts ~reward_kind:Seed_nonce_revelation_tip
       in
@@ -255,7 +244,6 @@ let collect_expected_rewards ~ctxt =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           attesting_reward_per_slot;
-          liquidity_baking_subsidy;
           seed_nonce_revelation_tip;
           vdf_revelation_tip;
         }

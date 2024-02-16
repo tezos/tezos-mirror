@@ -285,9 +285,7 @@ let get_liquidity_baking_subsidy ctxt =
   let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
   let*?@ reward =
-    Delegate.Rewards.For_RPC.reward_from_constants
-      csts
-      ~reward_kind:Liquidity_baking_subsidy
+    Delegate.Rewards.For_RPC.liquidity_baking_subsidy_from_constants csts
   in
   return reward
 

@@ -166,7 +166,6 @@ type issuance_weights = {
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
-  liquidity_baking_subsidy_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
 }
@@ -199,6 +198,7 @@ type t = {
   (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
+  liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
