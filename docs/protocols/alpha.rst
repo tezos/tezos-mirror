@@ -58,13 +58,6 @@ Data Availability Layer (ongoing)
   <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_.
 
 
-
-- An optional ``dal_attestation`` field is now present in the
-  ``block_metadata`` indicating the attested slots. The slots being
-  attested are the slots that were published ``attestation_lag`` blocks
-  ago (MR :gl:`!11903`) (see `DAL documentation
-  <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
-
 Adaptive Issuance (ongoing)
 ----------------------------
 
@@ -120,6 +113,12 @@ Gas improvements
 
 Breaking Changes
 ----------------
+
+- A new ``dal_attestation`` field has been added to the
+  ``block_metadata`` indicating the attested slots. The slots being
+  attested are the slots that were published ``attestation_lag`` levels
+  ago (MRs :gl:`!11903`, :gl:`!12063`) (see `DAL documentation
+  <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
 
 RPC Changes
 -----------
